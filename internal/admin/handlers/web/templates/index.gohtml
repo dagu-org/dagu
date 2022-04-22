@@ -1,0 +1,167 @@
+{{define "content"}}
+<div id="root"></div>
+<script type="text/babel">
+  function Title() {
+    return (
+      <div className="has-background-white py-3">
+        <h2 className="title ml-2">JOBs</h2>
+      </div>
+    )
+  }
+  const SCHEDULER_STATUS__NONE = 0;
+  const SCHEDULER_STATUS__RUNNING = 1;
+  const SCHEDULER_STATUS__ERROR = 2;
+  const SCHEDULER_STATUS__CANCEL = 3;
+  const SCHEDULER_STATUS__SUCCESS = 4;
+  const SCHEDULER_STATUS__SKIPPED_UNUSED = 5;
+  const statusColorMapping = {
+    [SCHEDULER_STATUS__NONE]: { backgroundColor: "lightblue", },
+    [SCHEDULER_STATUS__RUNNING]: { backgroundColor: "lime", },
+    [SCHEDULER_STATUS__ERROR]: { backgroundColor: "red", color: "white" },
+    [SCHEDULER_STATUS__CANCEL]: { backgroundColor: "pink" },
+    [SCHEDULER_STATUS__SUCCESS]: { backgroundColor: "green", color: "white" },
+    [SCHEDULER_STATUS__SKIPPED_UNUSED]: { backgroundColor: "gray", color: "white" },
+  }
+  const tagColorMapping = {
+    "Job": { backgroundColor: "rgb(88, 187, 151)", color: "white" },
+    "Group": { backgroundColor: "rgb(76, 172, 229)", color: "white" },
+  }
+  function Error({ jobs, hasError }) {
+    if (!jobs || !hasError) {
+      return <div></div>
+    }
+    return (
+      <div class="notification is-danger mt-0 mb-0">
+        <div>Please check the below errors!</div>
+        <div class="content">
+          <ul>
+            {jobs.filter((job) => job.Error).map((job) => {
+              const url = encodeURI(job.File);
+              return <li><a href={url}>{job.File}</a>: {job.ErrorT} </li>
+            })}
+          </ul>
+        </div>
+      </div>
+    )
+  }
+  function App() {
+    const [data, setData] = React.useState();
+    async function getData() {
+      let url = "?format=json"
+      url += "&group={{.Group}}"
+      const resp = await fetch(url, {
+        method: "GET",
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json'
+        },
+      })
+      if (!resp.ok) {
+        return
+      }
+      const body = await resp.json()
+      setData(body)
+    }
+    React.useEffect(() => {
+      getData();
+      const timer = setInterval(getData, 10000);
+      return () => clearInterval(timer);
+    }, []);
+    if (!data) {
+      return (
+        <div>
+          Loading...
+        </div>
+      )
+    }
+    return (
+      <React.Fragment>
+        <Title></Title>
+        <div className="mx-5 mt-5">
+          <Error jobs={data.Jobs} hasError={data.HasError}></Error>
+          <JobTable jobs={data.Jobs} groups={data.Groups} group={data.Group}></JobTable>
+        </div>
+      </React.Fragment>
+    );
+  }
+  function JobItem({ job, group }) {
+    const url = encodeURI("/" + job.File + "?group=" + group)
+    return (<tr>
+      <td className="has-text-weight-semibold"><a href={url}>{job.File}</a></td>
+      <td><span class="tag has-text-weight-semibold" style={tagColorMapping["Job"]}>Job</span></td>
+      <td>{job.Config.Name}</td>
+      <td>{job.Config.Description}</td>
+      <td><StatusTag status={job.Status.Status}>{job.Status.StatusText}</StatusTag></td>
+      <td>{job.Status.Pid == "-1" ? "" : job.Status.Pid}</td>
+      <td>{job.Status.StartedAt}</td>
+      <td>{job.Status.FinishedAt}</td>
+    </tr>)
+  }
+  function StatusTag({ status, children }) {
+    const style = React.useMemo(() => {
+      return statusColorMapping[status] || {};
+    }, [status])
+    return (
+      <span class="tag has-text-weight-semibold" style={style}>{children}</span>
+    )
+  }
+  function GroupItemBack({ group }) {
+    const url = encodeURI("/")
+    return (<tr>
+      <td className="has-text-weight-semibold"><a href={url}>../ (upper group)</a></td>
+      <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>)
+  }
+  function GroupItem({ group }) {
+    const url = encodeURI("/?group=" + group.Name)
+    return (<tr>
+      <td className="has-text-weight-semibold"><a href={url}>{group.Name}</a></td>
+      <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>)
+  }
+  function JobTable({ jobs = [], groups = [], group = "" }) {
+    const root = { Name: "" };
+    const currGrp = "{{.Group}}";
+    return (
+      <table class="table is-bordered is-fullwidth card">
+        <thead className="has-background-light">
+          <tr>
+            <th>Job</th>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Pid</th>
+            <th>Started At</th>
+            <th>Finished At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {currGrp != "" ? (
+            <GroupItemBack></GroupItemBack>
+          ) : null}
+          {groups.map((item) => {
+            return <GroupItem key={item.Name} group={item}></GroupItem>
+          })}
+          {jobs.filter((job) => !job.Error).map((job) => {
+            return <JobItem key={job.File} job={job} group={group}></JobItem>
+          })}
+        </tbody>
+      </table >
+    )
+  }
+  ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+{{end}}

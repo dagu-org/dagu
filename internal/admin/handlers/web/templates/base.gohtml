@@ -1,0 +1,90 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css"
+    />
+    <link href="https://cdn.lineicons.com/3.0/lineicons.css" rel="stylesheet">
+    <script
+      crossorigin
+      src="https://unpkg.com/react@17/umd/react.production.min.js"
+    ></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"
+    ></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"
+      integrity="sha512-qTXRIMyZIFb8iQcfjXWCO8+M5Tbc38Qi5WzdPOYZHIlZpzBHG3L3by84BBBOiRGiEb7KKtAOAs5qYdUiZiQNNQ=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script>
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+    <title>Jobctl Admin</title>
+    <style>
+      .code-indent {
+        display: contents;
+      }
+
+      a {
+        color: #485fc7;
+        cursor: pointer;
+        text-decoration: none;
+      }
+
+      html,
+      body {
+        /* font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, */
+        /* Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; */
+        font-family: open sans, -apple-system, BlinkMacSystemFont, segoe ui,
+          Roboto, helvetica neue, Arial, sans-serif, apple color emoji,
+          segoe ui emoji, segoe ui symbol;
+        height: 100vh;
+        background-color: #dce6eb;
+      }
+
+      .title {
+        margin-bottom: 0 !important;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      #nav {
+        background-image: linear-gradient(to right, #23282d, #666666);
+      }
+
+      #nav-title {
+        color: white;
+        font: 20px "Arial";
+        font-weight: bold;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="is-size-7">
+      <nav
+        id="nav"
+        class="navbar"
+        role="navigation"
+        aria-label="main navigation"
+      >
+        <div class="navbar-brand">
+          <a id="nav-title" class="navbar-item" href="/">JOBCTL</a>
+        </div>
+      </nav>
+      {{template "content" .}}
+    </div>
+    <div style="height: 100px"></div>
+  </body>
+</html>
+{{ end }}

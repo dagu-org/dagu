@@ -1,0 +1,6 @@
+host: ${HOST}
+port: 8082
+jobs: "${HOME}/jobctl/jobs"
+command: "${HOME}/jobctl/bin/jobctl"
+workDir: "${HOME}/jobctl/jobs"
+logEncodingCharset: euc-jp

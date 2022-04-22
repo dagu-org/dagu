@@ -1,0 +1,15 @@
+env:
+  LOG_DIR: "${HOME}/logs"
+logDir: "${LOG_DIR}"
+smtp:
+  host: "smtp.host"
+  port: "25"
+errorMail:
+  from: "system@mail.com"
+  to: "error@mail.com"
+  prefix: "[ERROR]"
+infoMail:
+  from: "system@mail.com"
+  to: "info@mail.com"
+  prefix: "[INFO]"
+histRetentionDays: 7

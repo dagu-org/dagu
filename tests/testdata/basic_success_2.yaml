@@ -1,0 +1,6 @@
+name: "basic success 2"
+steps:
+  - name: "1"
+    command: "true"
+  - name: "2"
+    command: "true"

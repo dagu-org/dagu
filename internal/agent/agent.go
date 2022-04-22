@@ -1,0 +1,363 @@
+package agent
+
+import (
+	"errors"
+	"fmt"
+	"jobctl/internal/config"
+	"jobctl/internal/constants"
+	"jobctl/internal/controller"
+	"jobctl/internal/database"
+	"jobctl/internal/mail"
+	"jobctl/internal/models"
+	"jobctl/internal/reporter"
+	"jobctl/internal/scheduler"
+	"jobctl/internal/sock"
+	"jobctl/internal/utils"
+	"log"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"syscall"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+type Agent struct {
+	*Config
+	*RetryConfig
+	scheduler    *scheduler.Scheduler
+	graph        *scheduler.ExecutionGraph
+	logFilename  string
+	reporter     *reporter.Reporter
+	database     *database.Database
+	dbWriter     *database.Writer
+	socketServer *sock.Server
+	requestId    string
+}
+
+type Config struct {
+	Job *config.Config
+	Dry bool
+}
+
+type RetryConfig struct {
+	Status *models.Status
+}
+
+func (a *Agent) Run() error {
+	a.init()
+	if err := a.setupGraph(); err != nil {
+		return err
+	}
+	if err := a.checkPreconditions(); err != nil {
+		return err
+	}
+	if a.Dry {
+		return a.dryRun()
+	}
+	setup := []func() error{
+		a.checkIsRunning,
+		a.setupRequestId,
+		a.setupDatabase,
+		a.setupSocketServer,
+	}
+	for _, fn := range setup {
+		err := fn()
+		if err != nil {
+			return err
+		}
+	}
+	return a.run()
+}
+
+func (a *Agent) Status() *models.Status {
+	status := models.NewStatus(
+		a.Job,
+		a.graph.Nodes(),
+		a.scheduler.Status(a.graph),
+		os.Getpid(),
+		&a.graph.StartedAt,
+		&a.graph.FinishedAt,
+	)
+	status.RequestId = a.requestId
+	status.Log = a.logFilename
+	if node := a.scheduler.HanderNode(constants.OnExit); node != nil {
+		status.OnExit = models.FromNode(node)
+	}
+	if node := a.scheduler.HanderNode(constants.OnSuccess); node != nil {
+		status.OnSuccess = models.FromNode(node)
+	}
+	if node := a.scheduler.HanderNode(constants.OnFailure); node != nil {
+		status.OnFailure = models.FromNode(node)
+	}
+	if node := a.scheduler.HanderNode(constants.OnCancel); node != nil {
+		status.OnCancel = models.FromNode(node)
+	}
+	return status
+}
+
+// Signal sends the signal to the processes running
+// if processes do not terminate for 60 seconds,
+// cancel all processes which will send signal -1 to the processes.
+func (a *Agent) Signal(sig os.Signal) {
+	log.Printf("Sending %s signal to running child processes.", sig)
+	done := make(chan bool)
+	go func() {
+		a.scheduler.Signal(a.graph, sig, done)
+	}()
+	select {
+	case <-done:
+		log.Printf("All child processes have been terminated.")
+	case <-time.After(time.Second * 60):
+		a.Cancel(sig)
+	default:
+		log.Printf("Waiting for child processes to exit...")
+		time.Sleep(time.Second * 1)
+	}
+}
+
+// Cancel sends signal -1 to all child processes.
+// then it waits another 20 seconds before therminating the
+// parent process.
+func (a *Agent) Cancel(sig os.Signal) {
+	log.Printf("Sending -1 signal to running child processes.")
+	done := make(chan bool)
+	go func() {
+		a.scheduler.Cancel(a.graph, done)
+	}()
+	select {
+	case <-done:
+		log.Printf("All child processes have been terminated.")
+	case <-time.After(time.Second * 20):
+		log.Printf("Terminating the controller process.")
+		a.Kill(done)
+	default:
+		log.Printf("Waiting for child processes to exit...")
+		time.Sleep(time.Second * 1)
+	}
+}
+
+// Kill sends signal SIGKILL to all child processes.
+func (a *Agent) Kill(done chan bool) {
+	if a.scheduler == nil {
+		panic("Invalid state")
+	}
+	a.scheduler.Signal(a.graph, syscall.SIGKILL, done)
+}
+
+func (a *Agent) init() {
+	a.scheduler = scheduler.New(
+		&scheduler.Config{
+			LogDir:        path.Join(a.Job.LogDir, utils.ValidFilename(a.Job.Name, "_")),
+			MaxActiveRuns: a.Job.MaxActiveRuns,
+			DelaySec:      a.Job.DelaySec,
+			Dry:           a.Dry,
+			OnExit:        a.Job.HandlerOn.Exit,
+			OnSuccess:     a.Job.HandlerOn.Success,
+			OnFailure:     a.Job.HandlerOn.Failure,
+			OnCancel:      a.Job.HandlerOn.Cancel,
+		})
+	a.reporter = reporter.New(&reporter.Config{
+		Mailer: mail.New(
+			&mail.Config{
+				Host: a.Job.Smtp.Host,
+				Port: a.Job.Smtp.Port,
+			}),
+	})
+	a.logFilename = filepath.Join(
+		a.Job.LogDir, fmt.Sprintf("%s.%s.log",
+			utils.ValidFilename(a.Job.Name, "_"),
+			time.Now().Format("20060102.15:04:05"),
+		))
+}
+
+func (a *Agent) setupGraph() (err error) {
+	if a.RetryConfig != nil && a.RetryConfig.Status != nil {
+		log.Printf("setup for retry")
+		return a.setupRetry()
+	}
+	a.graph, err = scheduler.NewExecutionGraph(a.Job.Steps...)
+	return
+}
+
+func (a *Agent) setupRetry() (err error) {
+	nodes := []*scheduler.Node{}
+	for _, n := range a.RetryConfig.Status.Nodes {
+		nodes = append(nodes, n.ToNode())
+	}
+	a.graph, err = scheduler.RetryExecutionGraph(nodes...)
+	return
+}
+
+func (a *Agent) setupRequestId() error {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return err
+	}
+	a.requestId = id.String()
+	return nil
+}
+
+func (a *Agent) setupDatabase() (err error) {
+	a.database = database.New(database.DefaultConfig())
+	a.dbWriter, _, err = a.database.NewWriter(a.Job.ConfigPath, time.Now())
+	return
+}
+
+func (a *Agent) setupSocketServer() (err error) {
+	a.socketServer, err = sock.NewServer(
+		&sock.Config{
+			Addr:        sock.GetSockAddr(a.Job.ConfigPath),
+			HandlerFunc: a.handleHTTP,
+		})
+	return
+}
+
+func (a *Agent) checkPreconditions() error {
+	if len(a.Job.Preconditions) > 0 {
+		log.Printf("checking pre conditions for \"%s\"", a.Job.Name)
+		if err := config.EvalConditions(a.Job.Preconditions); err != nil {
+			done := make(chan bool)
+			go a.scheduler.Cancel(a.graph, done)
+			<-done
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *Agent) run() error {
+	tl := &teeLogger{
+		filename: a.logFilename,
+	}
+	if err := tl.Open(); err != nil {
+		return err
+	}
+	defer tl.Close()
+
+	err := a.dbWriter.Open()
+	if err != nil {
+		return err
+	}
+	defer a.dbWriter.Close()
+
+	a.dbWriter.Write(a.Status())
+
+	listen := make(chan error)
+	go func() {
+		err := a.socketServer.Serve(listen)
+		if err != nil && err != sock.ErrServerRequestedShutdown {
+			log.Printf("failed to start socket server %v", err)
+		}
+	}()
+	defer func() {
+		a.socketServer.Shutdown()
+	}()
+
+	select {
+	case err := <-listen:
+		if err != nil {
+			return fmt.Errorf("failed to start the socket server.")
+		}
+	}
+
+	done := make(chan *scheduler.Node)
+	defer close(done)
+	go func() {
+		for node := range done {
+			a.dbWriter.Write(a.Status())
+			a.reporter.ReportStep(a.scheduler, a.graph, a.Job, node)
+		}
+	}()
+
+	lastErr := a.scheduler.Schedule(a.graph, done)
+	status := a.scheduler.Status(a.graph)
+
+	log.Println("schedule finished.")
+	if err := a.dbWriter.Write(a.Status()); err != nil {
+		log.Printf("failed to write status. %s", err)
+	}
+
+	a.reporter.Report(status, a.graph.Nodes(), lastErr)
+	if err := a.reporter.ReportMail(status, a.graph, lastErr, a.Job); err != nil {
+		log.Printf("failed to send mail. %s", err)
+	}
+
+	return lastErr
+}
+
+func (a *Agent) dryRun() error {
+	done := make(chan *scheduler.Node)
+	defer close(done)
+	go func() {
+		for node := range done {
+			a.reporter.ReportStep(a.scheduler, a.graph, a.Job, node)
+		}
+	}()
+
+	log.Printf("***** Starting DRY-RUN *****")
+
+	lastErr := a.scheduler.Schedule(a.graph, done)
+	status := a.scheduler.Status(a.graph)
+	a.reporter.Report(status, a.graph.Nodes(), lastErr)
+
+	log.Printf("***** Finished DRY-RUN *****")
+
+	return lastErr
+}
+
+func (a *Agent) checkIsRunning() error {
+	status, err := controller.New(a.Job).GetStatus()
+	if err != nil {
+		return err
+	}
+	if status.Status != scheduler.SchedulerStatus_None {
+		return fmt.Errorf("The job is already running. socket=%s",
+			sock.GetSockAddr(a.Job.ConfigPath))
+	}
+	return nil
+}
+
+var (
+	statusRe = regexp.MustCompile(`^/status[/]?$`)
+	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
+)
+
+func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	switch {
+	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
+		status := a.Status()
+		b, err := status.ToJson()
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(b)
+	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
+		encodeResult(w, true)
+		a.Signal(syscall.SIGINT)
+	default:
+		encodeError(w, ErrNotFound)
+	}
+}
+
+func encodeResult(w http.ResponseWriter, result bool) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
+var ErrNotFound = errors.New("not found")
+
+func encodeError(w http.ResponseWriter, err error) {
+	switch err {
+	case ErrNotFound:
+		http.Error(w, err.Error(), http.StatusNotFound)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}

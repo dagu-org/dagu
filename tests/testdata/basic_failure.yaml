@@ -1,0 +1,4 @@
+name: "basic failure"
+steps:
+  - name: "1"
+    command: "false"

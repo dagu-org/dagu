@@ -1,0 +1,5 @@
+name: "with params"
+params: "param-value"
+steps:
+  - name: "1"
+    command: "echo \"params is $1\""

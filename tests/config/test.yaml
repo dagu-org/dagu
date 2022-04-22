@@ -1,0 +1,46 @@
+name: test job
+description: this is a test job.
+env:
+  LOG_DIR: ${HOME}/logs
+logDir: ${LOG_DIR}
+histRetentionDays: 3
+mailOn:
+  Error: true
+  Success: true
+delaySec: 1
+maxActiveRuns: 1
+params: param1 param2
+smtp:
+  host: smtp.host
+  port: "25"
+errorMail:
+  from: system@mail.com
+  to: error@mail.com
+  prefix: "[ERROR]"
+infoMail:
+  from: system@mail.com
+  to: info@mail.com
+  prefix: "[INFO]"
+preconditions:
+  - condition: "`printf 1`"
+    expected: "1"
+steps:
+  - name: step 1
+    dir: ${HOME}
+    command: "true"
+    mailOnError: true
+    continueOn:
+      failure: true
+      skipped: true
+    retryPolicy:
+      limit: 2
+    preconditions:
+      - condition: "`printf test`"
+        expected: test
+  - name: step 2
+    dir: ${HOME}
+    command: "false"
+    continueOn:
+      failure: true
+    depends:
+      - step 1

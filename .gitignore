@@ -1,0 +1,5 @@
+# build
+bin/*
+
+# tmp files
+tmp/*
