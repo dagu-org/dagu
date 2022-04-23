@@ -1,15 +1,20 @@
+<p align="center">
+<img width="400" src="https://user-images.githubusercontent.com/1475839/164872784-99fb53e4-28df-4154-8e4f-0bfae4311c69.png" alt="jobctl - A simple tool to manage DAGs" title="jobctl - A simple tool to manage DAGs" />
+</p>
+
 # jobctl
 
-**A dead simple tool to run & manage DAGs**
+**A simple command to run & manage DAGs**
 
-jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI. It aims to be one of the easiest option to manage DAGs executed by cron.
+jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST api interface. It aims to be one of the easiest option to manage DAGs executed by cron.
 
 ## Contents
-
 - [jobctl](#jobctl)
   - [Contents](#contents)
   - [Features](#features)
-  - [Usecases](#usecases)
+  - [Use cases](#use-cases)
+  - [User interface](#user-interface)
+  - [Architecture](#architecture)
   - [Getting started](#getting-started)
     - [Installation](#installation)
     - [Usage](#usage)
@@ -20,6 +25,10 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
   - [Job configuration](#job-configuration)
     - [Simple example](#simple-example)
     - [Complex example](#complex-example)
+  - [FAQ](#faq)
+    - [How to contribute?](#how-to-contribute)
+  - [License](#license)
+  - [Authors](#authors)
 
 
 ## Features
@@ -35,17 +44,42 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
 - Retry
 - Prallelism limits
 - Environment variables
-- Repeat jobs
+- Repeat
 - Basic Authentication
 - E-mail notifications
 - REST api interface
+- onExit / onSuccess / onFailure / onCancel handlers
+- Automatic data cleaning
 
-## Usecases
+## Use cases
 - ETL Pipeline
 - Batches
 - Machine Learning
 - Data Processing
 - Automation
+
+## User interface
+
+- **JOBs**: Overview of all JOBs in your environment.
+
+  ![JOBs](https://user-images.githubusercontent.com/1475839/164859814-98afc587-ff86-4ebd-97b8-7d32f86a9ad9.png)
+
+- **Detail**: Current status of the job.
+
+  ![Detail](https://user-images.githubusercontent.com/1475839/164857046-b620a8a0-f5f5-4551-a651-66c8ec38f820.png)
+
+- **Timeline**: Timeline of each steps in the pipeline.
+
+  ![Timeline](https://user-images.githubusercontent.com/1475839/164860845-98595a3f-4579-4c15-9d6b-1942b4561900.png)
+
+- **History**: History of the execution of the pipeline.
+
+  ![History](https://user-images.githubusercontent.com/1475839/164849560-ab5be8d0-378e-46eb-a4d4-c6a8ff3d6af9.png)
+
+## Architecture
+
+- uses plain JSON files as history database, and unix sockets to communicate with running processes.
+  ![jobctl Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
 
 ## Getting started
 ### Installation
@@ -178,3 +212,24 @@ steps:
 ```
 
 The global config file `~/.jobctl/config.yaml` is useful to gather common settings such as mail-server configs or log directory.
+
+## FAQ
+
+### How to contribute?
+
+Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
+You can start by improving this [README.md](https://github.com/jobctl/jobctl/blob/master/README.md) or suggesting new [features](https://github.com/jobctl/jobctl/issues)
+Thank you!
+
+## License
+This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
+
+## Authors
+ - Yota Hamada - [yohamta](https://github.com/yohamta)
+See also the list of [contributors](https://github.com/jobctl/jobctl/contributors) who participated in this project.
+
+<a href="https://github.com/jobctl/jobctl/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=jobctl/jobctl" />
+</a>
+
+Made with [contrib.rocks](https://contrib.rocks).
