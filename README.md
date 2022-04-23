@@ -27,6 +27,7 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
     - [Complex example](#complex-example)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
+  - [TODOs](#todos)
   - [License](#license)
   - [Authors](#authors)
 
@@ -220,6 +221,17 @@ The global config file `~/.jobctl/config.yaml` is useful to gather common settin
 Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
 You can start by improving this [README.md](https://github.com/jobctl/jobctl/blob/master/README.md) or suggesting new [features](https://github.com/jobctl/jobctl/issues)
 Thank you!
+
+## TODOs
+
+- [ ] Documentation for YAML definitions
+- [ ] Prettier CLI interface
+- [ ] JWT authentication
+- [ ] History compaction
+- [ ] History sub command
+- [ ] Edit YAML on Web UI
+- [ ] Pause & Resume pipeline
+- [ ] Docker container
 
 ## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
