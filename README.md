@@ -12,11 +12,15 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
 - [jobctl](#jobctl)
   - [Contents](#contents)
   - [Features](#features)
+  - [Installation](#installation)
+    - [Linux](#linux)
+    - [MacOS (ARM64)](#macos-arm64)
+    - [MacOS (ARM64)](#macos-arm64-1)
   - [Use cases](#use-cases)
   - [User interface](#user-interface)
   - [Architecture](#architecture)
   - [Getting started](#getting-started)
-    - [Installation](#installation)
+    - [Installation](#installation-1)
     - [Usage](#usage)
   - [Configuration](#configuration)
     - [Environment variables](#environment-variables)
@@ -51,6 +55,19 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
 - REST api interface
 - onExit / onSuccess / onFailure / onCancel handlers
 - Automatic data cleaning
+
+## Installation
+Download the binary from [Releases page](https://github.com/jobctl/jobctl/releases) and place it on your system.
+
+### Linux
+```
+sudo wget https://github.com/jobctl/jobctl/releases/latest/download/jobctl_linux_amd64 -O /usr/local/bin/jobctl
+sudo chmod +x /usr/local/bin/jobctl
+```
+
+### MacOS (ARM64)
+
+### MacOS (ARM64)
 
 ## Use cases
 - ETL Pipeline

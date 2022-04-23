@@ -3,3 +3,5 @@ bin/*
 
 # tmp files
 tmp/*
+
+dist/
