@@ -1,0 +1,38 @@
+name: A sample job
+env:
+  LOG_DIR: ${HOME}/logs
+logDir: ${LOG_DIR}
+params: foo bar
+steps:
+  - name: "check precondition"
+    command: echo start
+    preconditions:
+      - condition: "`echo $1`"
+        expected: foo
+  - name: "print foo"
+    command: echo $1
+    depends:
+      - "check precondition"
+  - name: "print bar"
+    command: echo $2
+    depends:
+      - "print foo"
+  - name: "failure and continue"
+    command: "false"
+    continueOn:
+      failure: true
+    depends:
+      - "print bar"
+  - name: "print done"
+    command: echo done!
+    depends:
+      - "failure and continue"
+handlerOn:
+  exit:
+    command: echo finished!
+  success:
+    command: echo success!
+  failure:
+    command: echo failed!
+  cancel:
+    command: echo canceled!

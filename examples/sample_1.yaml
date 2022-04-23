@@ -1,0 +1,12 @@
+name: A sample job
+steps:
+  - name: "1"
+    command: echo hello world
+  - name: "2"
+    command: sleep 10
+    depends:
+      - "1"
+  - name: "3"
+    command: echo done!
+    depends:
+      - "2"
