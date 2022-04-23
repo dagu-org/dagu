@@ -1,39 +1,30 @@
-<p align="center">
-<img width="400" src="https://user-images.githubusercontent.com/1475839/164872784-99fb53e4-28df-4154-8e4f-0bfae4311c69.png" alt="jobctl - A simple tool to manage DAGs" title="jobctl - A simple tool to manage DAGs" />
-</p>
-
 # jobctl
 
-**A simple command to run & manage DAGs**
+**A simple command to run workflows (DAGs)**
 
 jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST api interface. It aims to be one of the easiest option to manage DAGs executed by cron.
 
 ## Contents
-- [jobctl](#jobctl)
-  - [Contents](#contents)
-  - [Features](#features)
-  - [Installation](#installation)
-    - [Linux](#linux)
-    - [MacOS (ARM64)](#macos-arm64)
-    - [MacOS (ARM64)](#macos-arm64-1)
-  - [Use cases](#use-cases)
-  - [User interface](#user-interface)
-  - [Architecture](#architecture)
-  - [Getting started](#getting-started)
-    - [Installation](#installation-1)
-    - [Usage](#usage)
-  - [Configuration](#configuration)
-    - [Environment variables](#environment-variables)
-    - [Web UI configuration](#web-ui-configuration)
-    - [Global configuration](#global-configuration)
-  - [Job configuration](#job-configuration)
-    - [Simple example](#simple-example)
-    - [Complex example](#complex-example)
-  - [FAQ](#faq)
-    - [How to contribute?](#how-to-contribute)
-  - [TODOs](#todos)
-  - [License](#license)
-  - [Authors](#authors)
+- [Features](#features)
+- [Installation](#installation)
+- [Use cases](#use-cases)
+- [User interface](#user-interface)
+- [Architecture](#architecture)
+- [Getting started](#getting-started)
+  - [Installation](#installation-1)
+  - [Usage](#usage)
+- [Configuration](#configuration)
+  - [Environment variables](#environment-variables)
+  - [Web UI configuration](#web-ui-configuration)
+  - [Global configuration](#global-configuration)
+- [Job configuration](#job-configuration)
+  - [Simple example](#simple-example)
+  - [Complex example](#complex-example)
+- [Examples](#examples)
+- [FAQ](#faq)
+  - [How to contribute?](#how-to-contribute)
+- [Todo](#todo)
+- [License](#license)
 
 
 ## Features
@@ -58,16 +49,6 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
 
 ## Installation
 Download the binary from [Releases page](https://github.com/jobctl/jobctl/releases) and place it on your system.
-
-### Linux
-```
-sudo wget https://github.com/jobctl/jobctl/releases/latest/download/jobctl_linux_amd64 -O /usr/local/bin/jobctl
-sudo chmod +x /usr/local/bin/jobctl
-```
-
-### MacOS (ARM64)
-
-### MacOS (ARM64)
 
 ## Use cases
 - ETL Pipeline
@@ -231,6 +212,10 @@ steps:
 
 The global config file `~/.jobctl/config.yaml` is useful to gather common settings such as mail-server configs or log directory.
 
+## Examples
+
+To check all examples, visit [this page](https://github.com/jobctl/jobctl/tree/master/examples).
+
 ## FAQ
 
 ### How to contribute?
@@ -239,7 +224,7 @@ Feel free to contribute in any way you want. Share ideas, submit issues, create 
 You can start by improving this [README.md](https://github.com/jobctl/jobctl/blob/master/README.md) or suggesting new [features](https://github.com/jobctl/jobctl/issues)
 Thank you!
 
-## TODOs
+## Todo
 
 - [ ] Documentation for YAML definitions
 - [ ] Prettier CLI interface
@@ -252,13 +237,3 @@ Thank you!
 
 ## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
-
-## Authors
- - Yota Hamada - [yohamta](https://github.com/yohamta)
-See also the list of [contributors](https://github.com/jobctl/jobctl/contributors) who participated in this project.
-
-<a href="https://github.com/jobctl/jobctl/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=jobctl/jobctl" />
-</a>
-
-Made with [contrib.rocks](https://contrib.rocks).
