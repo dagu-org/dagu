@@ -3,16 +3,6 @@ package agent
 import (
 	"errors"
 	"fmt"
-	"jobctl/internal/config"
-	"jobctl/internal/constants"
-	"jobctl/internal/controller"
-	"jobctl/internal/database"
-	"jobctl/internal/mail"
-	"jobctl/internal/models"
-	"jobctl/internal/reporter"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/sock"
-	"jobctl/internal/utils"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +13,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/constants"
+	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/database"
+	"github.com/yohamta/jobctl/internal/mail"
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/reporter"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/sock"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Agent struct {

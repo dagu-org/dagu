@@ -1,11 +1,12 @@
 package models_test
 
 import (
-	"jobctl/internal/config"
-	"jobctl/internal/models"
-	"jobctl/internal/scheduler"
 	"testing"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/scheduler"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

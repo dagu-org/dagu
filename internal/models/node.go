@@ -3,10 +3,11 @@ package models
 import (
 	"bytes"
 	"fmt"
-	"jobctl/internal/config"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/utils"
 	"strings"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Node struct {

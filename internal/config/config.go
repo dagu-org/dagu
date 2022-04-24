@@ -3,14 +3,15 @@ package config
 import (
 	"encoding/csv"
 	"fmt"
-	"jobctl/internal/constants"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/constants"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Config struct {

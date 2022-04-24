@@ -1,15 +1,15 @@
 package admin_test
 
 import (
-	"jobctl/internal/admin"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/admin"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var (

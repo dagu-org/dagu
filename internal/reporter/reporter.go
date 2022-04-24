@@ -3,12 +3,13 @@ package reporter
 import (
 	"bytes"
 	"fmt"
-	"jobctl/internal/config"
-	"jobctl/internal/mail"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/utils"
 	"log"
 	"strings"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/mail"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Reporter struct {

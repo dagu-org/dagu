@@ -5,9 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"jobctl/internal/models"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"log"
 	"os"
 	"path"
@@ -16,6 +13,10 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Database struct {

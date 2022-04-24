@@ -2,13 +2,14 @@ package scheduler
 
 import (
 	"fmt"
-	"jobctl/internal/config"
-	"jobctl/internal/constants"
-	"jobctl/internal/settings"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/constants"
+	"github.com/yohamta/jobctl/internal/settings"
 )
 
 type SchedulerStatus int

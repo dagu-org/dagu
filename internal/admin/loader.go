@@ -6,9 +6,8 @@ import (
 	"io/ioutil"
 	"path"
 
-	"jobctl/internal/utils"
-
 	"github.com/mitchellh/mapstructure"
+	"github.com/yohamta/jobctl/internal/utils"
 
 	"gopkg.in/yaml.v2"
 )

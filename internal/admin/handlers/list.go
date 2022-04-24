@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"io/ioutil"
-	"jobctl/internal/controller"
 	"log"
 	"net/http"
 	"path/filepath"
+
+	"github.com/yohamta/jobctl/internal/controller"
 )
 
 type jobListResponse struct {

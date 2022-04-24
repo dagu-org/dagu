@@ -3,11 +3,12 @@ package database
 import (
 	"bufio"
 	"fmt"
-	"jobctl/internal/models"
-	"jobctl/internal/utils"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Writer struct {

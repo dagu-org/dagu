@@ -2,12 +2,12 @@ package main
 
 import (
 	"errors"
-	"jobctl/internal/agent"
-	"jobctl/internal/config"
 	"log"
 	"os"
 
 	"github.com/urfave/cli/v2"
+	"github.com/yohamta/jobctl/internal/agent"
+	"github.com/yohamta/jobctl/internal/config"
 )
 
 func newDryCommand() *cli.Command {

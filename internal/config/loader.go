@@ -8,10 +8,9 @@ import (
 	"path"
 	"path/filepath"
 
-	"jobctl/internal/utils"
-
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
+	"github.com/yohamta/jobctl/internal/utils"
 
 	"gopkg.in/yaml.v2"
 )

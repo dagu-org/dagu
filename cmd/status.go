@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"jobctl/internal/config"
-	"jobctl/internal/controller"
-	"jobctl/internal/models"
 	"log"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/models"
 
 	"github.com/urfave/cli/v2"
 )

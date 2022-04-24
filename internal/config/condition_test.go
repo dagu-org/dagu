@@ -1,12 +1,12 @@
 package config_test
 
 import (
-	"jobctl/internal/config"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
 )
 
 func TestCondition(t *testing.T) {

@@ -2,10 +2,11 @@ package agent
 
 import (
 	"io"
-	"jobctl/internal/utils"
 	"log"
 	"os"
 	"path"
+
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type teeLogger struct {

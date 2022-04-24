@@ -1,12 +1,12 @@
 package settings
 
 import (
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var testHomeDir string

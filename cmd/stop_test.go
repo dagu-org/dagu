@@ -1,14 +1,14 @@
 package main
 
 import (
-	"jobctl/internal/config"
-	"jobctl/internal/database"
-	"jobctl/internal/scheduler"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/database"
+	"github.com/yohamta/jobctl/internal/scheduler"
 )
 
 func Test_stopCommand(t *testing.T) {

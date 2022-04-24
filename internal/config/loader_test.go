@@ -2,8 +2,6 @@ package config_test
 
 import (
 	"fmt"
-	"jobctl/internal/config"
-	"jobctl/internal/constants"
 	"path"
 	"sort"
 	"strings"
@@ -12,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/constants"
 )
 
 func TestLoadConfig(t *testing.T) {

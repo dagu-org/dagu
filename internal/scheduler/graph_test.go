@@ -1,12 +1,12 @@
 package scheduler_test
 
 import (
-	"jobctl/internal/config"
-	"jobctl/internal/scheduler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/scheduler"
 )
 
 func TestCycleDetection(t *testing.T) {

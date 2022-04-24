@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"io"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"log"
 	"os"
 	"path"
@@ -12,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type appTest struct {

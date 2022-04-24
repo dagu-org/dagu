@@ -2,12 +2,13 @@ package utils
 
 import (
 	"io/ioutil"
-	"jobctl/internal/constants"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/constants"
 )
 
 func DefaultEnv() map[string]string {

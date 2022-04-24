@@ -2,13 +2,14 @@ package main
 
 import (
 	"errors"
-	"jobctl/internal/agent"
-	"jobctl/internal/config"
-	"jobctl/internal/database"
-	"jobctl/internal/models"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/yohamta/jobctl/internal/agent"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/database"
+	"github.com/yohamta/jobctl/internal/models"
 
 	"github.com/urfave/cli/v2"
 )

@@ -1,8 +1,9 @@
 package admin
 
 import (
-	"jobctl/internal/admin/handlers"
 	"net/http"
+
+	"github.com/yohamta/jobctl/internal/admin/handlers"
 )
 
 type route struct {

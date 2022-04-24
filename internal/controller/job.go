@@ -1,10 +1,11 @@
 package controller
 
 import (
-	"jobctl/internal/config"
-	"jobctl/internal/models"
-	"jobctl/internal/scheduler"
 	"path/filepath"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/scheduler"
 )
 
 type Job struct {

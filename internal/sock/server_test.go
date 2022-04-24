@@ -2,8 +2,6 @@ package sock_test
 
 import (
 	"io/ioutil"
-	"jobctl/internal/sock"
-	"jobctl/internal/utils"
 	"net/http"
 	"os"
 	"path"
@@ -12,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/sock"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var (

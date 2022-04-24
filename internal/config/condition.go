@@ -2,7 +2,8 @@ package config
 
 import (
 	"fmt"
-	"jobctl/internal/utils"
+
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Condition struct {

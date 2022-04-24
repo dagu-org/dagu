@@ -2,9 +2,10 @@ package settings
 
 import (
 	"fmt"
-	"jobctl/internal/utils"
 	"os"
 	"path"
+
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var ErrConfigNotFound = fmt.Errorf("config not found")

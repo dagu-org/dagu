@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"jobctl/internal/controller"
-	"jobctl/internal/database"
-	"jobctl/internal/scheduler"
 	"testing"
+
+	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/database"
+	"github.com/yohamta/jobctl/internal/scheduler"
 
 	"github.com/stretchr/testify/require"
 )

@@ -2,14 +2,14 @@ package main
 
 import (
 	"errors"
-	"jobctl/internal/config"
-	"jobctl/internal/controller"
-	"jobctl/internal/scheduler"
 	"log"
 	"syscall"
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/scheduler"
 )
 
 func newStopCommand() *cli.Command {

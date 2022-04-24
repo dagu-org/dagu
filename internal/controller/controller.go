@@ -3,17 +3,18 @@ package controller
 import (
 	"fmt"
 	"io/ioutil"
-	"jobctl/internal/config"
-	"jobctl/internal/database"
-	"jobctl/internal/models"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/sock"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/database"
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/sock"
 )
 
 type Controller interface {

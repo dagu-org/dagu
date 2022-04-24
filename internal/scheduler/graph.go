@@ -2,9 +2,10 @@ package scheduler
 
 import (
 	"fmt"
-	"jobctl/internal/config"
 	"log"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/config"
 )
 
 type ExecutionGraph struct {

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"jobctl/internal/admin"
 	"os"
 
 	"github.com/urfave/cli/v2"
+	"github.com/yohamta/jobctl/internal/admin"
 )
 
 func newServerCommand() *cli.Command {

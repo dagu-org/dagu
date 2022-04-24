@@ -3,10 +3,6 @@ package database
 import (
 	"fmt"
 	"io/ioutil"
-	"jobctl/internal/config"
-	"jobctl/internal/models"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"strings"
@@ -15,6 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 func TestDatabase(t *testing.T) {

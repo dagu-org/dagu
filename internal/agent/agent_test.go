@@ -1,13 +1,6 @@
 package agent_test
 
 import (
-	"jobctl/internal/agent"
-	"jobctl/internal/config"
-	"jobctl/internal/controller"
-	"jobctl/internal/models"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"syscall"
@@ -16,6 +9,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/agent"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/models"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var testsDir = path.Join(utils.MustGetwd(), "../../tests/testdata")

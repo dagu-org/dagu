@@ -2,14 +2,14 @@ package config_test
 
 import (
 	"fmt"
-	"jobctl/internal/config"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var (

@@ -3,8 +3,9 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"jobctl/internal/config"
 	"net/http"
+
+	"github.com/yohamta/jobctl/internal/config"
 )
 
 var (

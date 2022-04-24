@@ -1,11 +1,6 @@
 package controller_test
 
 import (
-	"jobctl/internal/agent"
-	"jobctl/internal/controller"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,6 +9,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/agent"
+	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var (

@@ -2,13 +2,14 @@ package admin
 
 import (
 	"fmt"
-	"jobctl/internal/utils"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var tickerMatcher *regexp.Regexp

@@ -2,11 +2,6 @@ package scheduler_test
 
 import (
 	"io/ioutil"
-	"jobctl/internal/config"
-	"jobctl/internal/constants"
-	"jobctl/internal/scheduler"
-	"jobctl/internal/settings"
-	"jobctl/internal/utils"
 	"os"
 	"path"
 	"testing"
@@ -14,6 +9,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/jobctl/internal/constants"
+	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var (
