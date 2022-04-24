@@ -5,6 +5,7 @@
 jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST api interface. It aims to be one of the easiest option to manage DAGs executed by cron.
 
 ## Contents
+- [Motivation](#motivation)
 - [Features](#features)
 - [Installation](#installation)
 - [Use cases](#use-cases)
@@ -26,6 +27,22 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
 - [Todo](#todo)
 - [License](#license)
 
+## Motivation
+Currently, my environment has **many problems**. Hundreds of complex cron jobs are registered on huge servers and it is impossible to keep track of the dependencies between them. If one job fails, I don't know which job to re-run. I also have to SSH into the server to see the logs and manually run the shell scripts one by one.
+
+So I needed a tool that can explicitly visualize and manage the dependencies of the pipeline.
+
+**How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a web browser, and to be able to rerun or stop a series of jobs with just a mouse click!**
+
+## Why not alternatives, like Airflow?
+I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc.
+
+But unfortunately, they were not suitable for my existing environment. Because they required a DBMS(Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
+
+Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use.
+
+## Installation
+Download the binary from [Releases page](https://github.com/jobctl/jobctl/releases) and place it on your system.
 
 ## Features
 
@@ -46,9 +63,6 @@ jobctl is a single command that generates and executes a [DAG (Directed acyclic 
 - REST api interface
 - onExit / onSuccess / onFailure / onCancel handlers
 - Automatic data cleaning
-
-## Installation
-Download the binary from [Releases page](https://github.com/jobctl/jobctl/releases) and place it on your system.
 
 ## Use cases
 - ETL Pipeline
