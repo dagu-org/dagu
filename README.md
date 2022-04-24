@@ -1,22 +1,21 @@
 # jobctl
 
-**A simple command to run workflows (DAGs)**
+**A simple command to run workflows (DAGs) defined in YAML format**
 
-jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST api interface. It aims to be one of the easiest option to manage DAGs executed by cron.
+jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST API interface. It aims to be one of the easiest option to manage DAGs executed by cron.
 
 ## Contents
 - [jobctl](#jobctl)
   - [Contents](#contents)
   - [Motivation](#motivation)
-  - [Why not alternatives, like Airflow?](#why-not-alternatives-like-airflow)
-  - [Installation](#installation)
+  - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
+  - [Quick start](#quick-start)
+    - [Installation](#installation)
+    - [Usage](#usage)
   - [Features](#features)
   - [Use cases](#use-cases)
   - [User interface](#user-interface)
   - [Architecture](#architecture)
-  - [Getting started](#getting-started)
-    - [Installation](#installation-1)
-    - [Usage](#usage)
   - [Configuration](#configuration)
     - [Environment variables](#environment-variables)
     - [Web UI configuration](#web-ui-configuration)
@@ -37,21 +36,31 @@ So I needed a tool that can explicitly visualize and manage the dependencies of 
 
 ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a web browser, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
-## Why not alternatives, like Airflow?
+## Why not existing tools, like Airflow?
 I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc.
 
-But unfortunately, they were not suitable for my existing environment. Because they required a DBMS(Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
+But unfortunately, they were not suitable for my existing environment. Because they required a DBMS (Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
 
 Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use.
 
-## Installation
+## Quick start
+
+### Installation
 Download the binary from [Releases page](https://github.com/jobctl/jobctl/releases) and place it on your system.
+
+### Usage
+
+- `jobctl start [--params=<params>] <job file>` - run a job
+- `jobctl status <job file>` - display the current status of the job
+- `jobctl retry --req=<request-id> <job file>` - retry the failed/canceled job
+- `jobctl stop <job file>` - cancel a job
+- `jobctl dry [--params=<params>] <job file>` - dry-run a job
+- `jobctl server` - start a web server for web UI
 
 ## Features
 
 - Simple command interface (See [Usage](#usage))
 - Simple configuration YAML format (See [Simple example](#simple-example))
-- Simple architecture (no DBMS or agent process is required)
 - Web UI to visualize, manage jobs and watch logs
 - Parameterization
 - Conditions
@@ -63,9 +72,9 @@ Download the binary from [Releases page](https://github.com/jobctl/jobctl/releas
 - Repeat
 - Basic Authentication
 - E-mail notifications
-- REST api interface
+- REST API interface
 - onExit / onSuccess / onFailure / onCancel handlers
-- Automatic data cleaning
+- Automatic history cleaning
 
 ## Use cases
 - ETL Pipeline
@@ -97,20 +106,6 @@ Download the binary from [Releases page](https://github.com/jobctl/jobctl/releas
 - uses plain JSON files as history database, and unix sockets to communicate with running processes.
   ![jobctl Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
 
-## Getting started
-### Installation
-
-Place a `jobctl` executable somewhere on your system.
-
-### Usage
-
-- `jobctl start [--params=<params>] <job file>` - run a job
-- `jobctl status <job file>` - display the current status of the job
-- `jobctl retry --req=<request-id> <job file>` - retry the failed/canceled job
-- `jobctl stop <job file>` - cancel a job
-- `jobctl dry [--params=<params>] <job file>` - dry-run a job
-- `jobctl server` - start a web server for web UI
-
 ## Configuration
 
 ### Environment variables
@@ -119,16 +114,15 @@ Place a `jobctl` executable somewhere on your system.
 
 ### Web UI configuration
 
-Plase create `~/.jobctl/admin.yaml`.
+Please create `~/.jobctl/admin.yaml`.
 
 ```yaml
-# required
-host: <hostname for web UI address>
-port: <port number for web UI address>
-jobs: <the location of job configuration files>
-command: <absolute path to the jobctl exectable>
+host: <hostname for web UI address>             # default : ${HOST}
+port: <port number for web UI address>          # default : 8080
+jobs: <the location of job configuration files> # default : current working directory
 
 # optional
+command: <Absolute path of jobctl binary if it's not in $PATH>
 isBasicAuth: <true|false>
 basicAuthUsername: <username for basic auth of web UI>
 basicAuthPassword: <password for basic auth of web UI>
@@ -136,7 +130,9 @@ basicAuthPassword: <password for basic auth of web UI>
 
 ### Global configuration
 
-Plase create `~/.jobctl/config.yaml`. All settings can be overridden by individual job configurations.
+Please create `~/.jobctl/config.yaml`. All settings can be overridden by individual job configurations.
+
+Creating a global configuration is a convenient way to organize common settings.
 
 ```yaml
 logDir: <path-to-write-log>   # log directory to write standard output from the job steps
@@ -225,6 +221,7 @@ steps:
     retryPolicy:
       limit: 2         # retry up to 2 times when the step failed
     # Define preconditions for whether or not the step is allowed to run
+    # If the specified conditions are not met, this step and subsequent steps are skipped.
     preconditions:
       - condition: "`printf 1`"
         expected: "1"
@@ -387,6 +384,7 @@ Thank you!
 - [ ] Edit YAML on Web UI
 - [ ] Pause & Resume pipeline
 - [ ] Docker container
+- [ ] Edit node status on Web UI
 
 ## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
