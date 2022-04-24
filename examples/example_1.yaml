@@ -1,4 +1,4 @@
-name: A sample job
+name: example job
 steps:
   - name: "1"
     command: echo hello world
