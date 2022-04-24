@@ -5,34 +5,37 @@
 jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST api interface. It aims to be one of the easiest option to manage DAGs executed by cron.
 
 ## Contents
-- [Motivation](#motivation)
-- [Features](#features)
-- [Installation](#installation)
-- [Use cases](#use-cases)
-- [User interface](#user-interface)
-- [Architecture](#architecture)
-- [Getting started](#getting-started)
-  - [Installation](#installation-1)
-  - [Usage](#usage)
-- [Configuration](#configuration)
-  - [Environment variables](#environment-variables)
-  - [Web UI configuration](#web-ui-configuration)
-  - [Global configuration](#global-configuration)
-- [Job configuration](#job-configuration)
-  - [Simple example](#simple-example)
-  - [Complex example](#complex-example)
-- [Examples](#examples)
-- [FAQ](#faq)
-  - [How to contribute?](#how-to-contribute)
-- [Todo](#todo)
-- [License](#license)
+- [jobctl](#jobctl)
+  - [Contents](#contents)
+  - [Motivation](#motivation)
+  - [Why not alternatives, like Airflow?](#why-not-alternatives-like-airflow)
+  - [Installation](#installation)
+  - [Features](#features)
+  - [Use cases](#use-cases)
+  - [User interface](#user-interface)
+  - [Architecture](#architecture)
+  - [Getting started](#getting-started)
+    - [Installation](#installation-1)
+    - [Usage](#usage)
+  - [Configuration](#configuration)
+    - [Environment variables](#environment-variables)
+    - [Web UI configuration](#web-ui-configuration)
+    - [Global configuration](#global-configuration)
+  - [Job configuration](#job-configuration)
+    - [Simple configuration](#simple-configuration)
+    - [All configuration](#all-configuration)
+  - [Examples](#examples)
+  - [FAQ](#faq)
+    - [How to contribute?](#how-to-contribute)
+  - [Todo](#todo)
+  - [License](#license)
 
 ## Motivation
 Currently, my environment has **many problems**. Hundreds of complex cron jobs are registered on huge servers and it is impossible to keep track of the dependencies between them. If one job fails, I don't know which job to re-run. I also have to SSH into the server to see the logs and manually run the shell scripts one by one.
 
 So I needed a tool that can explicitly visualize and manage the dependencies of the pipeline.
 
-**How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a web browser, and to be able to rerun or stop a series of jobs with just a mouse click!**
+***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a web browser, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
 ## Why not alternatives, like Airflow?
 I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc.
@@ -155,11 +158,10 @@ infoMail:
 
 ## Job configuration
 
-### Simple example
+### Simple configuration
 
-A simple example is as follows:
 ```yaml
-name: simple job
+name: simple configuration
 steps:
   - name: step 1
     command: python some_batch_1.py
@@ -171,11 +173,10 @@ steps:
       - step 1
 ```
 
-### Complex example
+### All configuration
 
-More complex example is as follows:
 ```yaml
-name: complex job
+name: all configuration
 description: run python jobs
 
 # Define environment variables
@@ -200,6 +201,17 @@ preconditions:
 mailOnError: true    # send a mail when a job failed
 mailOnFinish: true   # send a mail when a job finished
 
+# Handler on Success, Failure, Cancel, Exit
+handlerOn:
+  success:
+    command: "echo succeed"
+  failure:
+    command: "echo failed"
+  cancel:
+    command: "echo canceled"
+  exit:
+    command: "echo finished"
+
 # Job steps
 steps:
   - name: step 1
@@ -209,7 +221,7 @@ steps:
     mailOnError: false # do not send mail on error
     continueOn:
       failed: true     # continue to the next step regardless the error of this job
-      canceled: true   # continue to the next step regardless the evaluation result of preconditions
+      skipped: true    # continue to the next step regardless the evaluation result of preconditions
     retryPolicy:
       limit: 2         # retry up to 2 times when the step failed
     # Define preconditions for whether or not the step is allowed to run
@@ -229,6 +241,133 @@ The global config file `~/.jobctl/config.yaml` is useful to gather common settin
 ## Examples
 
 To check all examples, visit [this page](https://github.com/jobctl/jobctl/tree/master/examples).
+
+-  Sample 1
+
+  ![sample_1](https://user-images.githubusercontent.com/1475839/164965036-fede5675-cba0-410b-b371-22deec55b9e8.png)
+```yaml
+name: example job
+steps:
+  - name: "1"
+    command: echo hello world
+  - name: "2"
+    command: sleep 10
+    depends:
+      - "1"
+  - name: "3"
+    command: echo done!
+    depends:
+      - "2"
+```
+
+-  Sample 2
+
+  ![sample_2](https://user-images.githubusercontent.com/1475839/164965143-b10a0511-35f3-45fa-9eba-69c6db4614a2.png)
+```yaml
+name: example job
+env:
+  LOG_DIR: ${HOME}/logs
+logDir: ${LOG_DIR}
+params: foo bar
+steps:
+  - name: "check precondition"
+    command: echo start
+    preconditions:
+      - condition: "`echo $1`"
+        expected: foo
+  - name: "print foo"
+    command: echo $1
+    depends:
+      - "check precondition"
+  - name: "print bar"
+    command: echo $2
+    depends:
+      - "print foo"
+  - name: "failure and continue"
+    command: "false"
+    continueOn:
+      failure: true
+    depends:
+      - "print bar"
+  - name: "print done"
+    command: echo done!
+    depends:
+      - "failure and continue"
+handlerOn:
+  exit:
+    command: echo finished!
+  success:
+    command: echo success!
+  failure:
+    command: echo failed!
+  cancel:
+    command: echo canceled!
+```
+
+-  Complex example
+
+  ![complex](https://user-images.githubusercontent.com/1475839/164965345-977de1bc-d042-4d3f-bf0e-bb648e534a78.png)
+```yaml
+name: complex job
+steps:
+  - name: "Initialize"
+    command: "sleep 2"
+  - name: "Copy TAB_1"
+    description: "Extract data from TAB_1 to TAB_2"
+    command: "sleep 2"
+    depends:
+      - "Initialize"
+  - name: "Update TAB_2"
+    description: "Update TAB_2"
+    command: "sleep 2"
+    depends:
+      - Copy TAB_1
+  - name: Validate TAB_2
+    command: "sleep 2"
+    depends:
+      - "Update TAB_2"
+  - name: "Load TAB_3"
+    description: "Read data from files"
+    command: "sleep 2"
+    depends:
+      - Initialize
+  - name: "Update TAB_3"
+    command: "sleep 2"
+    depends:
+      - "Load TAB_3"
+  - name: Merge
+    command: "sleep 2"
+    depends:
+      - Update TAB_3
+      - Validate TAB_2
+      - Validate File
+  - name: "Check File"
+    command: "sleep 2"
+  - name: "Copy File"
+    command: "sleep 2"
+    depends:
+      - Check File
+  - name: "Validate File"
+    command: "sleep 2"
+    depends:
+      - Copy File
+  - name: Calc Result
+    command: "sleep 2"
+    depends:
+      - Merge
+  - name: "Report"
+    command: "sleep 2"
+    depends:
+      - Calc Result
+  - name: Reconcile
+    command: "sleep 2"
+    depends:
+      - Calc Result
+  - name: "Cleaning"
+    command: "sleep 2"
+    depends:
+      - Reconcile
+```
 
 ## FAQ
 
