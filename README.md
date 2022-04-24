@@ -240,7 +240,7 @@ The global config file `~/.jobctl/config.yaml` is useful to gather common settin
 
 ## Examples
 
-To check all examples, visit [this page](https://github.com/jobctl/jobctl/tree/master/examples).
+To check all examples, visit [this page](https://github.com/jobctl/jobctl/tree/main/examples).
 
 -  Sample 1
 
@@ -374,7 +374,7 @@ steps:
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
-You can start by improving this [README.md](https://github.com/jobctl/jobctl/blob/master/README.md) or suggesting new [features](https://github.com/jobctl/jobctl/issues)
+You can start by improving this [README.md](https://github.com/jobctl/jobctl/blob/main/README.md) or suggesting new [features](https://github.com/jobctl/jobctl/issues)
 Thank you!
 
 ## Todo
