@@ -12,7 +12,7 @@ import (
 )
 
 func Test_stopCommand(t *testing.T) {
-	c := testConfig("basic_sleep_long.yaml")
+	c := testConfig("cmd_stop_sleep.yaml")
 	test := appTest{
 		args: []string{"", "start", c}, errored: false,
 	}

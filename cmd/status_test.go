@@ -8,7 +8,7 @@ import (
 func Test_statusCommand(t *testing.T) {
 	tests := []appTest{
 		{
-			args: []string{"", "start", testConfig("basic_sleep.yaml")}, errored: false,
+			args: []string{"", "start", testConfig("cmd_status.yaml")}, errored: false,
 		},
 	}
 

@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestRunJob(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("basic_success.yaml"))
+	job, err := controller.FromConfig(testConfig("agent_run.yaml"))
 	require.NoError(t, err)
 
 	status, err := testJob(t, job)
@@ -44,7 +44,7 @@ func TestCancelJob(t *testing.T) {
 		func(a *agent.Agent) { a.Cancel(syscall.SIGTERM) },
 		func(a *agent.Agent) { a.Kill(nil) },
 	} {
-		a, job := testJobAsync(t, testConfig("basic_sleep_long.yaml"))
+		a, job := testJobAsync(t, testConfig("agent_sleep.yaml"))
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
@@ -55,7 +55,7 @@ func TestCancelJob(t *testing.T) {
 }
 
 func TestPreConditionInvalid(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("multiple_steps.yaml"))
+	job, err := controller.FromConfig(testConfig("agent_multiple_steps.yaml"))
 	require.NoError(t, err)
 
 	job.Config.Preconditions = []*config.Condition{
@@ -75,7 +75,7 @@ func TestPreConditionInvalid(t *testing.T) {
 }
 
 func TestPreConditionValid(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("with_params.yaml"))
+	job, err := controller.FromConfig(testConfig("agent_with_params.yaml"))
 	require.NoError(t, err)
 
 	job.Config.Preconditions = []*config.Condition{
@@ -94,7 +94,7 @@ func TestPreConditionValid(t *testing.T) {
 }
 
 func TestOnExit(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("with_teardown.yaml"))
+	job, err := controller.FromConfig(testConfig("agent_on_exit.yaml"))
 	require.NoError(t, err)
 	status, err := testJob(t, job)
 	require.NoError(t, err)

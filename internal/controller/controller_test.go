@@ -33,7 +33,7 @@ func testConfig(name string) string {
 }
 
 func TestGetStatus(t *testing.T) {
-	file := testConfig("basic_success_2.yaml")
+	file := testConfig("controller_success.yaml")
 	job, err := controller.FromConfig(file)
 	require.NoError(t, err)
 
@@ -43,7 +43,7 @@ func TestGetStatus(t *testing.T) {
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
-	file := testConfig("basic_sleep.yaml")
+	file := testConfig("controller_status.yaml")
 
 	job, err := controller.FromConfig(file)
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 }
 
 func TestGetJob(t *testing.T) {
-	file := testConfig("basic_success.yaml")
+	file := testConfig("controller_get_job.yaml")
 	job, err := controller.FromConfig(file)
 	require.NoError(t, err)
 	assert.Equal(t, "basic success", job.Config.Name)
