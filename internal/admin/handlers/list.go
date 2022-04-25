@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/yohamta/jobctl/internal/controller"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type jobListResponse struct {
@@ -91,7 +92,9 @@ func getGetListParameter(r *http.Request) *jobListParameter {
 
 func listGroups(dir string) ([]*group, error) {
 	ret := []*group{}
-
+	if !utils.FileExists(dir) {
+		return ret, nil
+	}
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil || fis == nil {
 		log.Printf("%v", err)

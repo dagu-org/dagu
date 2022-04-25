@@ -16,6 +16,7 @@ import (
 	"github.com/yohamta/jobctl/internal/models"
 	"github.com/yohamta/jobctl/internal/scheduler"
 	"github.com/yohamta/jobctl/internal/sock"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Controller interface {
@@ -28,8 +29,12 @@ type Controller interface {
 }
 
 func GetJobList(dir string) (jobs []*Job, errs []string, err error) {
-	ret := []*Job{}
+	jobs = []*Job{}
 	errs = []string{}
+	if !utils.FileExists(dir) {
+		errs = append(errs, fmt.Sprintf("invalid jobs directory: %s", dir))
+		return
+	}
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		log.Printf("%v", err)
@@ -46,9 +51,9 @@ func GetJobList(dir string) (jobs []*Job, errs []string, err error) {
 				continue
 			}
 		}
-		ret = append(ret, job)
+		jobs = append(jobs, job)
 	}
-	return ret, errs, nil
+	return jobs, errs, nil
 }
 
 var _ Controller = (*controller)(nil)

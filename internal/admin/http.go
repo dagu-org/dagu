@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"time"
 )
 
 type server struct {
@@ -77,7 +76,6 @@ func (svr *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	log.Println("received shutdown request")
 	w.Write([]byte("shutting down the jobctl server...\n"))
 	go func() {
-		time.Sleep(time.Millisecond * 3000)
 		svr.Shutdown()
 	}()
 }

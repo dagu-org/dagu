@@ -373,7 +373,7 @@ func buildLog(logs []*models.StatusFile) *Log {
 }
 
 func getPathParameter(r *http.Request) (string, error) {
-	re := regexp.MustCompile("/([^/\\?]+)/?$")
+	re := regexp.MustCompile("/jobs/([^/\\?]+)/?$")
 	m := re.FindStringSubmatch(r.URL.Path)
 	if len(m) < 2 {
 		return "", fmt.Errorf("invalid URL")

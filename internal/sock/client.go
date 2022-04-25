@@ -8,17 +8,23 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 var ErrTimeout = fmt.Errorf("unix socket timeout")
-var ErrConnectionRefused = fmt.Errorf("connection failed")
-var timeout = time.Millisecond * 500
+var ErrConnectionRefused = fmt.Errorf("unix socket connection failed")
+var ErrFileNotExist = fmt.Errorf("unix socket file does not exit")
+var timeout = time.Millisecond * 3000
 
 type Client struct {
 	Addr string
 }
 
 func (cl *Client) Request(method, url string) (string, error) {
+	if !utils.FileExists(cl.Addr) {
+		return "", fmt.Errorf("%w: %s", ErrFileNotExist, cl.Addr)
+	}
 	conn, err := net.DialTimeout("unix", cl.Addr, timeout)
 	if err != nil {
 		if err.(net.Error).Timeout() {
