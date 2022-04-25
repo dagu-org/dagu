@@ -26,10 +26,11 @@
     "Job": { backgroundColor: "rgb(88, 187, 151)", color: "white" },
     "Group": { backgroundColor: "rgb(76, 172, 229)", color: "white" },
   }
-  function Error({ jobs, hasError }) {
+  function Error({ jobs, errors, hasError }) {
     if (!jobs || !hasError) {
       return <div></div>
     }
+    console.log({jobs, errors, hasError})
     return (
       <div class="notification is-danger mt-0 mb-0">
         <div>Please check the below errors!</div>
@@ -39,6 +40,7 @@
               const url = encodeURI(job.File);
               return <li><a href={url}>{job.File}</a>: {job.ErrorT} </li>
             })}
+            {errors.map(e => <li>{e}</li>)}
           </ul>
         </div>
       </div>
@@ -78,7 +80,7 @@
       <React.Fragment>
         <Title></Title>
         <div className="mx-5 mt-5">
-          <Error jobs={data.Jobs} hasError={data.HasError}></Error>
+          <Error jobs={data.Jobs} errors={data.Errors} hasError={data.HasError}></Error>
           <JobTable jobs={data.Jobs} groups={data.Groups} group={data.Group}></JobTable>
         </div>
       </React.Fragment>

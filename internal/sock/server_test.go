@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestStartServer(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "test-server-start")
+	tmpFile, err := ioutil.TempFile("", "test_server_start")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -44,9 +44,7 @@ func TestStartServer(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	client, err := sock.NewUnixClient(tmpFile.Name())
-	require.NoError(t, err)
-
+	client := sock.Client{Addr: tmpFile.Name()}
 	listen := make(chan error)
 	go func() {
 		for range listen {
