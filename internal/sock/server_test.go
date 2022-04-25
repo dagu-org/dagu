@@ -1,6 +1,7 @@
 package sock_test
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -29,8 +30,8 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestStartServer(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "test_server_start")
+func TestStartAndShutdownServer(t *testing.T) {
+	tmpFile, err := ioutil.TempFile("", "test_server_start_shutdown")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -53,11 +54,17 @@ func TestStartServer(t *testing.T) {
 
 	go func() {
 		err = unixServer.Serve(listen)
-		require.NoError(t, err)
+		assert.True(t, errors.Is(sock.ErrServerRequestedShutdown, err))
 	}()
 
 	time.Sleep(time.Second * 1)
 
 	ret, err := client.Request(http.MethodPost, "/")
 	assert.Equal(t, ret, "OK")
+
+	unixServer.Shutdown()
+
+	time.Sleep(time.Millisecond * 100)
+	_, err = client.Request(http.MethodPost, "/")
+	assert.True(t, errors.Is(err, sock.ErrFileNotExist))
 }

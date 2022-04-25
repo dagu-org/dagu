@@ -19,13 +19,18 @@ func defaultRoutes(cfg *Config) []*route {
 				JobsDir: cfg.Jobs,
 			},
 		)},
-		{http.MethodGet, `^/([^/]+)$`, handlers.HandleGetJob(
+		{http.MethodGet, `^/jobs/?$`, handlers.HandleGetList(
+			&handlers.JobListHandlerConfig{
+				JobsDir: cfg.Jobs,
+			},
+		)},
+		{http.MethodGet, `^/jobs/([^/]+)$`, handlers.HandleGetJob(
 			&handlers.JobHandlerConfig{
 				JobsDir:            cfg.Jobs,
 				LogEncodingCharset: cfg.LogEncodingCharset,
 			},
 		)},
-		{http.MethodPost, `^/([^/]+)$`, handlers.HandlePostJobAction(
+		{http.MethodPost, `^/jobs/([^/]+)$`, handlers.HandlePostJobAction(
 			&handlers.PostJobHandlerConfig{
 				JobsDir: cfg.Jobs,
 				Bin:     cfg.Command,

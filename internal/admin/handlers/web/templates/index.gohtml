@@ -87,7 +87,7 @@
     );
   }
   function JobItem({ job, group }) {
-    const url = encodeURI("/" + job.File + "?group=" + group)
+    const url = encodeURI("/jobs/" + job.File + "?group=" + group)
     return (<tr>
       <td className="has-text-weight-semibold"><a href={url}>{job.File}</a></td>
       <td><span class="tag has-text-weight-semibold" style={tagColorMapping["Job"]}>Job</span></td>
@@ -108,7 +108,7 @@
     )
   }
   function GroupItemBack({ group }) {
-    const url = encodeURI("/")
+    const url = encodeURI("/jobs/")
     return (<tr>
       <td className="has-text-weight-semibold"><a href={url}>../ (upper group)</a></td>
       <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
@@ -121,7 +121,7 @@
     </tr>)
   }
   function GroupItem({ group }) {
-    const url = encodeURI("/?group=" + group.Name)
+    const url = encodeURI("/jobs/?group=" + group.Name)
     return (<tr>
       <td className="has-text-weight-semibold"><a href={url}>{group.Name}</a></td>
       <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>

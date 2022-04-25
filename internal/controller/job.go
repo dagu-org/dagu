@@ -1,11 +1,13 @@
 package controller
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/yohamta/jobctl/internal/config"
 	"github.com/yohamta/jobctl/internal/models"
 	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Job struct {
@@ -18,6 +20,9 @@ type Job struct {
 }
 
 func FromConfig(file string) (*Job, error) {
+	if !utils.FileExists(file) {
+		return nil, fmt.Errorf("file not found: %s", file)
+	}
 	return fromConfig(file, false)
 }
 
