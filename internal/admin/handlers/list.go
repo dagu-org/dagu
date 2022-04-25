@@ -15,6 +15,7 @@ type jobListResponse struct {
 	Jobs     []*controller.Job
 	Groups   []*group
 	Group    string
+	Errors   []string
 	HasError bool
 }
 
@@ -36,7 +37,7 @@ func HandleGetList(hc *JobListHandlerConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := getGetListParameter(r)
 		dir := filepath.Join(hc.JobsDir, params.Group)
-		jobs, err := controller.GetJobList(dir)
+		jobs, errs, err := controller.GetJobList(dir)
 		if err != nil {
 			encodeError(w, err)
 			return
@@ -58,12 +59,16 @@ func HandleGetList(hc *JobListHandlerConfig) http.HandlerFunc {
 				break
 			}
 		}
+		if len(errs) > 0 {
+			hasErr = true
+		}
 
 		data := &jobListResponse{
 			Title:    "JobList",
 			Jobs:     jobs,
 			Groups:   groups,
 			Group:    params.Group,
+			Errors:   errs,
 			HasError: hasErr,
 		}
 		if r.Header.Get("Accept") == "application/json" {

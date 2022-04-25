@@ -40,10 +40,14 @@ func (svr *Server) Serve(listen chan error) error {
 	var err error
 	svr.listener, err = net.Listen("unix", svr.Addr)
 	if err != nil {
-		listen <- err
+		if listen != nil {
+			listen <- err
+		}
 		return err
 	}
-	listen <- err
+	if listen != nil {
+		listen <- err
+	}
 	log.Printf("server is running at \"%v\"\n", svr.Addr)
 	defer func() {
 		svr.listener.Close()

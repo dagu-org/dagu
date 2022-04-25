@@ -78,8 +78,9 @@ func TestGetJob(t *testing.T) {
 }
 
 func TestGetJobList(t *testing.T) {
-	jobs, err := controller.GetJobList(testsDir)
+	jobs, errs, err := controller.GetJobList(testsDir)
 	require.NoError(t, err)
+	require.Equal(t, 0, len(errs))
 
 	matches, err := filepath.Glob(path.Join(testsDir, "*.yaml"))
 	assert.Equal(t, len(matches), len(jobs))

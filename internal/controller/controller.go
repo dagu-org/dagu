@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -26,8 +27,9 @@ type Controller interface {
 	GetStatusHist(n int) ([]*models.StatusFile, error)
 }
 
-func GetJobList(dir string) ([]*Job, error) {
+func GetJobList(dir string) (jobs []*Job, errs []string, err error) {
 	ret := []*Job{}
+	errs = []string{}
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		log.Printf("%v", err)
@@ -40,12 +42,13 @@ func GetJobList(dir string) ([]*Job, error) {
 		if err != nil {
 			log.Printf("%v", err)
 			if job == nil {
+				errs = append(errs, err.Error())
 				continue
 			}
 		}
 		ret = append(ret, job)
 	}
-	return ret, nil
+	return ret, errs, nil
 }
 
 var _ Controller = (*controller)(nil)
@@ -61,11 +64,8 @@ func New(cfg *config.Config) Controller {
 }
 
 func (c *controller) StopJob() error {
-	unixClient, err := sock.NewUnixClient(sock.GetSockAddr(c.cfg.ConfigPath))
-	if err != nil {
-		return err
-	}
-	_, err = unixClient.Request("POST", "/stop")
+	client := sock.Client{Addr: sock.GetSockAddr(c.cfg.ConfigPath)}
+	_, err := client.Request("POST", "/stop")
 	return err
 }
 
@@ -111,13 +111,14 @@ func (c *controller) RetryJob(bin string, workDir string, reqId string) (err err
 }
 
 func (s *controller) GetStatus() (*models.Status, error) {
-	unixClient, err := sock.NewUnixClient(sock.GetSockAddr(s.cfg.ConfigPath))
+	client := sock.Client{Addr: sock.GetSockAddr(s.cfg.ConfigPath)}
+	ret, err := client.Request("GET", "/status")
 	if err != nil {
-		return nil, err
-	}
-	ret, err := unixClient.Request("GET", "/status")
-	if err != nil {
-		return defaultStatus(s.cfg), nil
+		if errors.Is(err, sock.ErrTimeout) {
+			return nil, err
+		} else {
+			return defaultStatus(s.cfg), nil
+		}
 	}
 	status, err := models.StatusFromJson(ret)
 	if err != nil {
@@ -127,13 +128,13 @@ func (s *controller) GetStatus() (*models.Status, error) {
 }
 
 func (s *controller) GetLastStatus() (*models.Status, error) {
-	unixClient, err := sock.NewUnixClient(sock.GetSockAddr(s.cfg.ConfigPath))
-	if err != nil {
-		return nil, err
-	}
-	ret, err := unixClient.Request("GET", "/status")
+	client := sock.Client{Addr: sock.GetSockAddr(s.cfg.ConfigPath)}
+	ret, err := client.Request("GET", "/status")
 	if err == nil {
 		return models.StatusFromJson(ret)
+	}
+	if err != nil && errors.Is(err, sock.ErrTimeout) {
+		return nil, err
 	}
 	db := database.New(database.DefaultConfig())
 	status, err := db.ReadStatusToday(s.cfg.ConfigPath)
