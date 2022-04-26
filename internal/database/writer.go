@@ -48,9 +48,13 @@ func (w *Writer) Write(st *models.Status) error {
 	return w.writer.Flush()
 }
 
-func (w *Writer) Close() {
+func (w *Writer) Close() error {
 	if !w.closed {
+		if err := w.writer.Flush(); err != nil {
+			return err
+		}
 		w.file.Close()
 		w.closed = true
 	}
+	return nil
 }

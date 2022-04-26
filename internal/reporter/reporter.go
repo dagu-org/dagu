@@ -93,8 +93,9 @@ func renderSummary(status *models.Status, err error) string {
 	if err != nil {
 		errText = err.Error()
 	}
-	t.AppendHeader(table.Row{"Name", "Started At", "Finished At", "Status", "Params", "Error"})
+	t.AppendHeader(table.Row{"RequestID", "Name", "Started At", "Finished At", "Status", "Params", "Error"})
 	t.AppendRow(table.Row{
+		status.RequestId,
 		status.Name,
 		status.StartedAt,
 		status.FinishedAt,

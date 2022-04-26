@@ -288,3 +288,15 @@ func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *mod
 	defer dw.Close()
 	require.NoError(t, dw.Write(status))
 }
+
+func TestTimestamp(t *testing.T) {
+	for _, tt := range []struct {
+		Name string
+		Want string
+	}{
+		{Name: "test_timestamp.20200101.10:00:00.dat", Want: "20200101.10:00:00"},
+		{Name: "test_timestamp.20200101.12:34:56_c.dat", Want: "20200101.12:34:56"},
+	} {
+		assert.Equal(t, tt.Want, timestamp(tt.Name))
+	}
+}

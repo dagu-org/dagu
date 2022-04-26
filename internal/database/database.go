@@ -254,7 +254,7 @@ var (
 	ErrRequestIdNotFound = fmt.Errorf("request id not found")
 )
 
-var rTimestamp = regexp.MustCompile(`2\\d{7}.\\d{2}.\\d{2}.\\d{2}`)
+var rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
 
 func filterLatest(files []string, n int) ([]string, error) {
 	if len(files) == 0 {

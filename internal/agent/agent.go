@@ -33,6 +33,7 @@ type Agent struct {
 	logFilename  string
 	reporter     *reporter.Reporter
 	database     *database.Database
+	dbFile       string
 	dbWriter     *database.Writer
 	socketServer *sock.Server
 	requestId    string
@@ -203,7 +204,7 @@ func (a *Agent) setupRequestId() error {
 
 func (a *Agent) setupDatabase() (err error) {
 	a.database = database.New(database.DefaultConfig())
-	a.dbWriter, _, err = a.database.NewWriter(a.Job.ConfigPath, time.Now())
+	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.Job.ConfigPath, time.Now())
 	return
 }
 
@@ -242,7 +243,12 @@ func (a *Agent) run() error {
 	if err != nil {
 		return err
 	}
-	defer a.dbWriter.Close()
+
+	defer func() {
+		if err := a.dbWriter.Close(); err != nil {
+			log.Printf("failed to close db writer. err: %v", err)
+		}
+	}()
 
 	a.dbWriter.Write(a.Status())
 
@@ -253,19 +259,18 @@ func (a *Agent) run() error {
 			log.Printf("failed to start socket server %v", err)
 		}
 	}()
+
 	defer func() {
 		a.socketServer.Shutdown()
 	}()
 
-	select {
-	case err := <-listen:
-		if err != nil {
-			return fmt.Errorf("failed to start the socket server.")
-		}
+	if err := <-listen; err != nil {
+		return fmt.Errorf("failed to start the socket server")
 	}
 
 	done := make(chan *scheduler.Node)
 	defer close(done)
+
 	go func() {
 		for node := range done {
 			status := a.Status()
@@ -285,6 +290,12 @@ func (a *Agent) run() error {
 	a.reporter.ReportSummary(status, lastErr)
 	if err := a.reporter.ReportMail(a.Job, status); err != nil {
 		log.Printf("failed to send mail. %s", err)
+	}
+
+	if err := a.dbWriter.Close(); err != nil {
+		log.Printf("failed to close db writer. err: %v", err)
+	} else if err := a.database.Compact(a.Job.ConfigPath, a.dbFile); err != nil {
+		log.Printf("failed to compact data. %s", err)
 	}
 
 	return lastErr
@@ -317,7 +328,7 @@ func (a *Agent) checkIsRunning() error {
 		return err
 	}
 	if status.Status != scheduler.SchedulerStatus_None {
-		return fmt.Errorf("The job is already running. socket=%s",
+		return fmt.Errorf("the job is already running. socket=%s",
 			sock.GetSockAddr(a.Job.ConfigPath))
 	}
 	return nil
