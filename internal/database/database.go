@@ -16,7 +16,6 @@ import (
 
 	"github.com/yohamta/jobctl/internal/models"
 	"github.com/yohamta/jobctl/internal/settings"
-	"github.com/yohamta/jobctl/internal/utils"
 )
 
 type Database struct {
@@ -71,9 +70,6 @@ func (db *Database) NewWriter(configPath string, t time.Time) (*Writer, string, 
 }
 
 func (db *Database) NewWriterFor(configPath string, file string) (*Writer, error) {
-	if !utils.FileExists(file) {
-		return nil, ErrNoDataFile
-	}
 	w := &Writer{
 		filename: file,
 	}
@@ -176,6 +172,39 @@ func (db *Database) RemoveOld(configPath string, retentionDays int) error {
 	return err
 }
 
+func (db *Database) Compact(configPath, original string) error {
+	status, err := ParseFile(original)
+	if err != nil {
+		return err
+	}
+
+	new := fmt.Sprintf("%s_c.dat",
+		strings.TrimSuffix(filepath.Base(original), path.Ext(original)))
+	f := path.Join(filepath.Dir(original), new)
+	w, err := db.NewWriterFor(configPath, f)
+	if err != nil {
+		return err
+	}
+
+	if err := w.Open(); err != nil {
+		return err
+	}
+	defer w.Close()
+
+	if err := w.Write(status.Status); err != nil {
+		if err := os.Remove(f); err != nil {
+			log.Printf("failed to remove %s : %s", f, err.Error())
+		}
+		return err
+	}
+
+	if err := os.Remove(original); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (db *Database) dir(configPath string, prefix string) string {
 	h := md5.New()
 	h.Write([]byte(configPath))
@@ -221,19 +250,19 @@ func (db *Database) latest(configPath string, n int) ([]string, error) {
 }
 
 var (
-	ErrNoDataFile        = fmt.Errorf("no data file found.")
-	ErrRequestIdNotFound = fmt.Errorf("request id not found.")
+	ErrNoDataFile        = fmt.Errorf("no data file found")
+	ErrRequestIdNotFound = fmt.Errorf("request id not found")
 )
 
-var rTimestamp = regexp.MustCompile("2\\d{7}.\\d{2}.\\d{2}.\\d{2}")
+var rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
 
 func filterLatest(files []string, n int) ([]string, error) {
 	if len(files) == 0 {
 		return []string{}, ErrNoDataFile
 	}
 	sort.Slice(files, func(i, j int) bool {
-		t1 := rTimestamp.FindString(files[i])
-		t2 := rTimestamp.FindString(files[j])
+		t1 := timestamp(files[i])
+		t2 := timestamp(files[j])
 		return t1 > t2
 	})
 	ret := make([]string, 0, n)
@@ -241,6 +270,10 @@ func filterLatest(files []string, n int) ([]string, error) {
 		ret = append(ret, files[i])
 	}
 	return ret, nil
+}
+
+func timestamp(file string) string {
+	return rTimestamp.FindString(file)
 }
 
 func findLastLine(f *os.File) (ret string, err error) {

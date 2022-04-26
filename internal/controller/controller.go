@@ -96,7 +96,6 @@ func (c *controller) StartJob(bin string, workDir string, params string) (err er
 }
 
 func (c *controller) RetryJob(bin string, workDir string, reqId string) (err error) {
-	log.Printf("retry start: %s, %s, %s, %s", bin, workDir, c.cfg.ConfigPath, reqId)
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))

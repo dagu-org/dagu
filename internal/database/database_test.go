@@ -29,6 +29,7 @@ func TestDatabase(t *testing.T) {
 		"remove old files":                    testRemoveOldFiles,
 		"test read latest status":             testReadLatestStatus,
 		"test read latest n status":           testReadStatusN,
+		"test compaction":                     testCompactFile,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, err := ioutil.TempDir("", "test-database")
@@ -100,17 +101,17 @@ func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 	}{
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
-			fmt.Sprintf("request-id-1"),
+			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
-			fmt.Sprintf("request-id-2"),
+			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
-			fmt.Sprintf("request-id-3"),
+			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
@@ -225,6 +226,60 @@ func testReadStatusN(t *testing.T, db *Database) {
 	assert.Equal(t, cfg.Name, ret[1].Status.Name)
 }
 
+func testCompactFile(t *testing.T, db *Database) {
+	cfg := &config.Config{
+		Name:       "test_compact_file",
+		ConfigPath: "test_compact_file.yaml",
+	}
+
+	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, dw.Open())
+
+	for _, data := range []struct {
+		Status *models.Status
+	}{
+		{models.NewStatus(
+			cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)},
+		{models.NewStatus(
+			cfg, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)},
+		{models.NewStatus(
+			cfg, nil, scheduler.SchedulerStatus_Success, 10000, nil, nil)},
+	} {
+		require.NoError(t, dw.Write(data.Status))
+	}
+
+	dw.Close()
+
+	var s *models.StatusFile = nil
+	if h, err := db.ReadStatusHist(cfg.ConfigPath, 1); len(h) > 0 || err != nil {
+		if err != nil {
+			t.Error(err)
+		} else {
+			s = h[0]
+		}
+	}
+	require.NotNil(t, s)
+
+	db2 := New(db.Config)
+	err = db2.Compact(cfg.ConfigPath, s.File)
+	assert.False(t, utils.FileExists(s.File))
+	require.NoError(t, err)
+
+	var s2 *models.StatusFile = nil
+	if h, err := db2.ReadStatusHist(cfg.ConfigPath, 1); len(h) > 0 || err != nil {
+		if err != nil {
+			t.Error(err)
+		} else {
+			s2 = h[0]
+		}
+	}
+	require.NotNil(t, s2)
+
+	assert.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
+	assert.Equal(t, s.Status, s2.Status)
+}
+
 func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *models.Status, tm time.Time) {
 	t.Helper()
 	dw, _, err := db.NewWriter(cfg.ConfigPath, tm)
@@ -232,4 +287,16 @@ func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *mod
 	require.NoError(t, dw.Open())
 	defer dw.Close()
 	require.NoError(t, dw.Write(status))
+}
+
+func TestTimestamp(t *testing.T) {
+	for _, tt := range []struct {
+		Name string
+		Want string
+	}{
+		{Name: "test_timestamp.20200101.10:00:00.dat", Want: "20200101.10:00:00"},
+		{Name: "test_timestamp.20200101.12:34:56_c.dat", Want: "20200101.12:34:56"},
+	} {
+		assert.Equal(t, tt.Want, timestamp(tt.Name))
+	}
 }

@@ -16,9 +16,13 @@ type Writer struct {
 	writer   *bufio.Writer
 	file     *os.File
 	mu       sync.Mutex
+	closed   bool
 }
 
 func (w *Writer) Open() error {
+	if w.closed {
+		return fmt.Errorf("file was already closed")
+	}
 	var err error
 	w.file, err = utils.OpenOrCreateFile(w.filename)
 	if err != nil {
@@ -44,6 +48,13 @@ func (w *Writer) Write(st *models.Status) error {
 	return w.writer.Flush()
 }
 
-func (w *Writer) Close() {
-	w.file.Close()
+func (w *Writer) Close() error {
+	if !w.closed {
+		if err := w.writer.Flush(); err != nil {
+			return err
+		}
+		w.file.Close()
+		w.closed = true
+	}
+	return nil
 }
