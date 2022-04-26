@@ -46,7 +46,7 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 	buf.Write([]byte("\n"))
 	buf.Write([]byte("Details ->\n"))
 	buf.Write([]byte(renderTable(status.Nodes)))
-	log.Printf(buf.String())
+	log.Print(buf.String())
 }
 
 func (rp *Reporter) ReportMail(cfg *config.Config, status *models.Status) error {
