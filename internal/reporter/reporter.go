@@ -33,7 +33,12 @@ func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *
 		log.Printf("%s %s", node.Name, status.StatusText)
 	}
 	if st == scheduler.NodeStatus_Error && node.MailOnError {
-		return rp.sendError(cfg, status)
+		return rp.Mailer.SendMail(
+			cfg.ErrorMail.From,
+			[]string{cfg.ErrorMail.To},
+			fmt.Sprintf("%s %s (%s)", cfg.ErrorMail.Prefix, cfg.Name, status.Status),
+			renderHTML(status.Nodes),
+		)
 	}
 	return nil
 }
@@ -50,41 +55,27 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 }
 
 func (rp *Reporter) ReportMail(cfg *config.Config, status *models.Status) error {
-	if (status.Status != scheduler.SchedulerStatus_Error &&
-		status.Status != scheduler.SchedulerStatus_Cancel) && cfg.MailOn.Failure {
-		return rp.sendError(cfg, status)
-	} else if cfg.MailOn.Success {
-		return rp.sendInfo(cfg, status)
+	switch status.Status {
+	case scheduler.SchedulerStatus_Error:
+		if cfg.MailOn.Failure {
+			return rp.Mailer.SendMail(
+				cfg.ErrorMail.From,
+				[]string{cfg.ErrorMail.To},
+				fmt.Sprintf("%s %s (%s)", cfg.ErrorMail.Prefix, cfg.Name, status.Status),
+				renderHTML(status.Nodes),
+			)
+		}
+	case scheduler.SchedulerStatus_Success:
+		if cfg.MailOn.Success {
+			rp.Mailer.SendMail(
+				cfg.InfoMail.From,
+				[]string{cfg.InfoMail.To},
+				fmt.Sprintf("%s %s (%s)", cfg.InfoMail.Prefix, cfg.Name, status.Status),
+				renderHTML(status.Nodes),
+			)
+		}
 	}
 	return nil
-}
-
-func (rp *Reporter) sendInfo(cfg *config.Config, status *models.Status) error {
-	mailConfig := cfg.InfoMail
-	jobName := cfg.Name
-	subject := fmt.Sprintf("%s %s (%s)", mailConfig.Prefix, jobName, status)
-	body := renderHTML(status.Nodes)
-
-	return rp.Mailer.SendMail(
-		cfg.InfoMail.From,
-		[]string{cfg.InfoMail.To},
-		subject,
-		body,
-	)
-}
-
-func (rp *Reporter) sendError(cfg *config.Config, status *models.Status) error {
-	mailConfig := cfg.ErrorMail
-	jobName := cfg.Name
-	subject := fmt.Sprintf("%s %s (%s)", mailConfig.Prefix, jobName, status)
-	body := renderHTML(status.Nodes)
-
-	return rp.Mailer.SendMail(
-		cfg.ErrorMail.From,
-		[]string{cfg.ErrorMail.To},
-		subject,
-		body,
-	)
 }
 
 func renderSummary(status *models.Status, err error) string {
