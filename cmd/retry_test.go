@@ -3,11 +3,13 @@ package main
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/yohamta/jobctl/internal/controller"
 	"github.com/yohamta/jobctl/internal/database"
 	"github.com/yohamta/jobctl/internal/scheduler"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +46,9 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{"parameter is x"},
 	}, t)
 
-	job, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
+	assert.Eventually(t, func() bool {
+		job, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
+		return job.Status.Status == scheduler.SchedulerStatus_Success
+	}, time.Millisecond*3000, time.Millisecond*300)
 	require.NoError(t, err)
-	require.Equal(t, job.Status.Status, scheduler.SchedulerStatus_Success)
 }
