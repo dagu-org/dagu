@@ -268,21 +268,22 @@ func (a *Agent) run() error {
 	defer close(done)
 	go func() {
 		for node := range done {
-			a.dbWriter.Write(a.Status())
-			a.reporter.ReportStep(a.scheduler, a.graph, a.Job, node)
+			status := a.Status()
+			a.dbWriter.Write(status)
+			a.reporter.ReportStep(a.Job, status, node)
 		}
 	}()
 
 	lastErr := a.scheduler.Schedule(a.graph, done)
-	status := a.scheduler.Status(a.graph)
+	status := a.Status()
 
 	log.Println("schedule finished.")
 	if err := a.dbWriter.Write(a.Status()); err != nil {
 		log.Printf("failed to write status. %s", err)
 	}
 
-	a.reporter.Report(status, a.graph.Nodes(), lastErr)
-	if err := a.reporter.ReportMail(status, a.graph, lastErr, a.Job); err != nil {
+	a.reporter.ReportSummary(status, lastErr)
+	if err := a.reporter.ReportMail(a.Job, status); err != nil {
 		log.Printf("failed to send mail. %s", err)
 	}
 
@@ -294,15 +295,16 @@ func (a *Agent) dryRun() error {
 	defer close(done)
 	go func() {
 		for node := range done {
-			a.reporter.ReportStep(a.scheduler, a.graph, a.Job, node)
+			status := a.Status()
+			a.reporter.ReportStep(a.Job, status, node)
 		}
 	}()
 
 	log.Printf("***** Starting DRY-RUN *****")
 
 	lastErr := a.scheduler.Schedule(a.graph, done)
-	status := a.scheduler.Status(a.graph)
-	a.reporter.Report(status, a.graph.Nodes(), lastErr)
+	status := a.Status()
+	a.reporter.ReportSummary(status, lastErr)
 
 	log.Printf("***** Finished DRY-RUN *****")
 

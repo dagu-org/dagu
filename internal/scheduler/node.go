@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -97,21 +96,6 @@ func (n *Node) ReadStatus() NodeStatus {
 	defer n.mu.RUnlock()
 	ret := n.Status
 	return ret
-}
-
-func (n *Node) Report() string {
-	vals := []string{}
-	vals = append(vals, fmt.Sprintf("Step: %s", n.Name))
-	vals = append(vals, fmt.Sprintf("Status: %s", n.ReadStatus()))
-	cmd := n.Command
-	if len(n.Args) > 0 {
-		cmd += " " + strings.Join(n.Args, " ")
-	}
-	vals = append(vals, fmt.Sprintf("Command: %s", cmd))
-	if n.Error != nil {
-		vals = append(vals, fmt.Sprintf("Error: %s", n.Error))
-	}
-	return strings.Join(vals, "\t")
 }
 
 func (n *Node) updateStatus(status NodeStatus) {
