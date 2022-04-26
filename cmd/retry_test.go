@@ -39,6 +39,8 @@ func Test_retryCommand(t *testing.T) {
 	err = dw.Write(status.Status)
 	require.NoError(t, err)
 
+	time.Sleep(time.Second)
+
 	app = makeApp()
 	runAppTestOutput(app, appTest{
 		args: []string{"", "retry", fmt.Sprintf("--req=%s",
@@ -48,7 +50,13 @@ func Test_retryCommand(t *testing.T) {
 
 	assert.Eventually(t, func() bool {
 		job, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
+		if err != nil {
+			return false
+		}
 		return job.Status.Status == scheduler.SchedulerStatus_Success
-	}, time.Millisecond*3000, time.Millisecond*300)
+	}, time.Millisecond*3000, time.Millisecond*100)
+
+	job, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
 	require.NoError(t, err)
+	require.NotEqual(t, status.Status.RequestId, job.Status.RequestId)
 }
