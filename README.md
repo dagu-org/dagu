@@ -20,10 +20,10 @@ dagu is a single command that generates and executes a [DAG (Directed acyclic gr
   - [Configuration](#configuration)
     - [Environment variables](#environment-variables)
     - [Web UI configuration](#web-ui-configuration)
-    - [Global configuration](#global-configuration)
-  - [DAG configuration](#dag-configuration)
-    - [Simple configuration](#simple-configuration)
-    - [All configuration](#all-configuration)
+    - [Global DAG configuration](#global-dag-configuration)
+  - [Individual DAG configuration](#individual-dag-configuration)
+    - [Minimal](#minimal)
+    - [Available configurations](#available-configurations)
   - [Examples](#examples)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
@@ -118,123 +118,103 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 Please create `~/.dagu/admin.yaml`.
 
 ```yaml
-host: <hostname for web UI address>             # default : 127.0.0.1 
-port: <port number for web UI address>          # default : 8080
-dags: <the location of DAG configuration files> # default : current working directory
-
-# optional
-command: <Absolute path of dagu binary if it's not in $PATH>
-isBasicAuth: <true|false>
-basicAuthUsername: <username for basic auth of web UI>
-basicAuthPassword: <password for basic auth of web UI>
+host: <hostname for web UI address>                          # default value is 127.0.0.1 
+port: <port number for web UI address>                       # default value is 8080
+dags: <the location of DAG configuration files>              # default value is current working directory
+command: <Absolute path to the dagu binary>                  # [optional] required if the dagu command not in $PATH
+isBasicAuth: <true|false>                                    # [optional] basic auth config
+basicAuthUsername: <username for basic auth of web UI>       # [optional] basic auth config
+basicAuthPassword: <password for basic auth of web UI>       # [optional] basic auth config
 ```
 
-### Global configuration
+### Global DAG configuration
 
 Please create `~/.dagu/config.yaml`. All settings can be overridden by individual DAG configurations.
 
 Creating a global configuration is a convenient way to organize common settings.
 
 ```yaml
-logDir: <path-to-write-log>   # log directory to write standard output
-histRetentionDays: 3 # history retention days (not for log files)
-
-# E-mail server config (optional)
-smtp:
+logDir: <path-to-write-log>         # log directory to write standard output
+histRetentionDays: 3                # history retention days
+smtp:                               # [optional] mail server configurations to send notifications
   host: <smtp server host>
   port: <stmp server port>
-errorMail:
-  from: <from address to send error mail>
-  to: <to address to send error mail>
-  prefix: <prefix of mail subject for error mail>
+errorMail:                          # [optional] mail configurations for error-level
+  from: <from address>
+  to: <to address>
+  prefix: <prefix of mail subject>
 infoMail:
-  from: <from address to send notification mail>
-  to: <to address to send notification mail>
-  prefix: <prefix of mail subject for notification mail>
+  from: <from address>              # [optional] mail configurations for info-level
+  to: <to address>
+  prefix: <prefix of mail subject>
 ```
 
-## DAG configuration
+## Individual DAG configuration
 
-### Simple configuration
+### Minimal
 
 ```yaml
-name: simple configuration
-steps:
-  - name: step 1                     # step name (required, unique)
-    command: python some_batch_1.py  # command and arguments
-    dir: ${HOME}/dags/               # working directory (optional)
+name: minimal configuration          # DAG name
+steps:                               # steps inside the DAG
+  - name: step 1                     # step name (should be unique within the file)
+    description: step 1              # [optional] description of the step
+    command: python main_1.py        # command and arguments
+    dir: ${HOME}/dags/               # [optional] working directory
   - name: step 2
-    command: python some_batch_2.py
+    description: step 2
+    command: python main_2.py
     dir: ${HOME}/dags/
     depends:
-      - step 1                       # dependency
+      - step 1                       # [optional] dependant steps
 ```
 
-### All configuration
+### Available configurations
 
 ```yaml
-name: all configuration
-description: run a DAG
-
-# Define environment variables
-env:
+name: all configuration              # DAG name
+description: run a DAG               # DAG description
+env:                                 # Environment variables
   LOG_DIR: ${HOME}/logs
   PATH: /usr/local/bin:${PATH}
-  
-logDir: ${LOG_DIR}   # log directory to write standard output
-histRetentionDays: 3 # execution history retention days (not for log files)
-delaySec: 1          # interval seconds between steps
-maxActiveRuns: 1     # max parallel number of running step
-
-# Define parameters
-params: param1 param2 # they can be referenced by each steps as $1, $2 and so on.
-
-# Define preconditions for whether or not the DAG is allowed to run
-preconditions:
-  - condition: "`printf 1`"
-    expected: "1"
-
-# Mail notification configs
-mailOnError: true    # send a mail when a dag failed
-mailOnFinish: true   # send a mail when a dag finished
-
-# Handler on Success, Failure, Cancel, Exit
-handlerOn:
-  success:
+logDir: ${LOG_DIR}                   # log directory to write standard output
+histRetentionDays: 3                 # execution history retention days (not for log files)
+delaySec: 1                          # interval seconds between steps
+maxActiveRuns: 1                     # max parallel number of running step
+params: param1 param2                # parameters can be refered by $1, $2 and so on.
+preconditions:                       # precondisions for whether the DAG is allowed to run
+  - condition: "`printf 1`"          # command or variables to evaluate
+    expected: "1"                    # value to be expected to run the DAG
+mailOn:
+  failure: true                      # send a mail when the DAG failed
+  success: true                      # send a mail when the DAG finished
+handlerOn:                           # Handler on Success, Failure, Cancel, Exit
+  success:                           # will be executed when the DAG succeed
     command: "echo succeed"
-  failure:
+  failure:                           # will be executed when the DAG failed 
     command: "echo failed"
-  cancel:
+  cancel:                            # will be executed when the DAG canceled 
     command: "echo canceled"
-  exit:
+  exit:                              # will be executed when the DAG exited
     command: "echo finished"
-
-# DAG steps
 steps:
-  - name: step 1
-    description: step 1 description
-    dir: ${HOME}/logs
-    command: python some_batch_1.py $1
-    mailOnError: false # do not send mail on error
+  - name: step 1                     # DAG name
+    description: step 1              # DAG description
+    dir: ${HOME}/logs                # working directory
+    command: python main.py $1       # command and parameters
+    mailOn:
+      failure: true                  # send a mail when the step failed
+      success: true                  # send a mail when the step finished
     continueOn:
-      failed: true     # continue to the next step regardless the error of this step
-      skipped: true    # continue to the next step regardless the evaluation result of preconditions
-    retryPolicy:
-      limit: 2         # retry up to 2 times when the step failed
-    # Define preconditions for whether or not the step is allowed to run
-    # If the specified conditions are not met, this step and subsequent steps are skipped.
-    preconditions:
-      - condition: "`printf 1`"
-        expected: "1"
-  - name: step 2
-    description: step 2 description
-    dir: ${HOME}/logs
-    command: python some_batch_2.py $1
-    depends:
-      - step 1
+      failed: true                   # continue to the next regardless the step failed or not
+      skipped: true                  # continue to the next regardless the preconditions are met or not 
+    retryPolicy:                     # retry policy for the step
+      limit: 2                       # retry up to 2 times when the step failed
+    preconditions:                   # precondisions for whether the step is allowed to run
+      - condition: "`printf 1`"      # command or variables to evaluate
+        expected: "1"                # value to be expected to run the step
 ```
 
-The global config file `~/.dagu/config.yaml` is useful to gather common settings such as mail-server configs or log directory.
+The global config file `~/.dagu/config.yaml` is useful to gather common settings such as log directory.
 
 ## Examples
 
