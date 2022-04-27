@@ -254,8 +254,6 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 
-			return
-
 		case "mark-failed":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
 				w.WriteHeader(http.StatusBadRequest)
