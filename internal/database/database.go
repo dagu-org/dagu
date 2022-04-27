@@ -116,6 +116,9 @@ func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
 }
 
 func (db *Database) FindByRequestId(configPath string, requestId string) (*models.StatusFile, error) {
+	if requestId == "" {
+		return nil, fmt.Errorf("requestId is empty")
+	}
 	pattern := db.pattern(configPath) + "*.dat"
 	matches, err := filepath.Glob(pattern)
 	if err != nil {

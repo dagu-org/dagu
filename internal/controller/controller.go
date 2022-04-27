@@ -25,7 +25,9 @@ type Controller interface {
 	Retry(bin string, workDir string, reqId string) error
 	GetStatus() (*models.Status, error)
 	GetLastStatus() (*models.Status, error)
+	GetStatusByRequestId(requestId string) (*models.Status, error)
 	GetStatusHist(n int) ([]*models.StatusFile, error)
+	UpdateStatus(*models.Status) error
 }
 
 func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
@@ -151,6 +153,15 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 	return status, nil
 }
 
+func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
+	db := database.New(database.DefaultConfig())
+	ret, err := db.FindByRequestId(s.cfg.ConfigPath, requestId)
+	if err != nil {
+		return nil, err
+	}
+	return ret.Status, nil
+}
+
 func (s *controller) GetStatusHist(n int) ([]*models.StatusFile, error) {
 	db := database.New(database.DefaultConfig())
 	ret, err := db.ReadStatusHist(s.cfg.ConfigPath, n)
@@ -158,6 +169,45 @@ func (s *controller) GetStatusHist(n int) ([]*models.StatusFile, error) {
 		return []*models.StatusFile{}, nil
 	}
 	return ret, nil
+}
+
+func (s *controller) UpdateStatus(status *models.Status) error {
+	client := sock.Client{Addr: sock.GetSockAddr(s.cfg.ConfigPath)}
+	res, err := client.Request("GET", "/status")
+	if err != nil {
+		if errors.Is(err, sock.ErrTimeout) {
+			return err
+		}
+	}
+	if err == nil {
+		ss, err := models.StatusFromJson(res)
+		if err != nil {
+			return err
+		}
+		if ss.RequestId == status.RequestId && ss.Status == scheduler.SchedulerStatus_Running {
+			return fmt.Errorf("the DAG is running")
+		}
+	}
+	db := database.New(database.DefaultConfig())
+	toUpdate, err := db.FindByRequestId(s.cfg.ConfigPath, status.RequestId)
+	if err != nil {
+		return err
+	}
+	w, err := db.NewWriterFor(s.cfg.ConfigPath, toUpdate.File)
+	if err != nil {
+		return err
+	}
+	if err := w.Open(); err != nil {
+		return err
+	}
+	defer w.Close()
+	if err := w.Write(status); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {

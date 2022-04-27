@@ -115,10 +115,12 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		switch params.Tab {
 		case DAG_TabType_Status:
 			data.Graph = models.StepGraph(dag.Status.Nodes, params.Tab != DAG_TabType_Config)
+
 		case DAG_TabType_Config:
 			steps := models.FromSteps(dag.Config.Steps)
 			data.Graph = models.StepGraph(steps, params.Tab != DAG_TabType_Config)
 			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, params.Group, cfg))
+
 		case DAG_TabType_History:
 			logs, err := controller.New(dag.Config).GetStatusHist(30)
 			if err != nil {
@@ -126,6 +128,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 			data.LogData = buildLog(logs)
+
 		case DAG_TabType_StepLog:
 			if isJsonRequest(r) {
 				data.StepLog, err = readStepLog(c, params.File, params.Step, hc.LogEncodingCharset)
@@ -134,6 +137,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 					return
 				}
 			}
+
 		case DAG_TabType_ScLog:
 			if isJsonRequest(r) {
 				data.ScLog, err = readSchedulerLog(c, params.File)
@@ -142,6 +146,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 					return
 				}
 			}
+
 		default:
 		}
 
@@ -169,6 +174,7 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		action := r.FormValue("action")
 		group := r.FormValue("group")
 		reqId := r.FormValue("request-id")
+		step := r.FormValue("step")
 
 		cfg, err := getPathParameter(r)
 		if err != nil {
@@ -197,6 +203,7 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				w.Write([]byte(err.Error()))
 				return
 			}
+
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {
 				w.WriteHeader(http.StatusBadRequest)
@@ -209,6 +216,7 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				w.Write([]byte(err.Error()))
 				return
 			}
+
 		case "retry":
 			if reqId == "" {
 				w.WriteHeader(http.StatusBadRequest)
@@ -221,6 +229,57 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				w.Write([]byte(err.Error()))
 				return
 			}
+
+		case "mark-success":
+			if dag.Status.Status == scheduler.SchedulerStatus_Running {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("DAG is running."))
+				return
+			}
+			if reqId == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("request-id is required."))
+				return
+			}
+			if step == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("step is required."))
+				return
+			}
+
+			err = updateStatus(c, reqId, step, scheduler.NodeStatus_Success)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+
+			return
+
+		case "mark-failed":
+			if dag.Status.Status == scheduler.SchedulerStatus_Running {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("DAG is running."))
+				return
+			}
+			if reqId == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("request-id is required."))
+				return
+			}
+			if step == "" {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte("step is required."))
+				return
+			}
+
+			err = updateStatus(c, reqId, step, scheduler.NodeStatus_Error)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+				return
+			}
+
 		default:
 			encodeError(w, errInvalidArgs)
 			return
@@ -228,6 +287,26 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 		http.Redirect(w, r, dag.File, http.StatusSeeOther)
 	}
+}
+
+func updateStatus(c controller.Controller, reqId, step string, to scheduler.NodeStatus) error {
+	status, err := c.GetStatusByRequestId(reqId)
+	if err != nil {
+		return err
+	}
+	found := false
+	for i := range status.Nodes {
+		if status.Nodes[i].Step.Name == step {
+			status.Nodes[i].Status = to
+			status.Nodes[i].StatusText = to.String()
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("step %s not found", step)
+	}
+	return c.UpdateStatus(status)
 }
 
 func readSchedulerLog(c controller.Controller, file string) (*schedulerLog, error) {
