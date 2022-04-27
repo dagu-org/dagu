@@ -100,7 +100,7 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 
 - **History**: History of the execution of the pipeline.
 
-  ![History](https://user-images.githubusercontent.com/1475839/165418472-385cb8e0-351c-4508-b337-a082ea53b4ec.png)
+  ![History](https://user-images.githubusercontent.com/1475839/165426067-02c4f72f-e3f0-4cd8-aa38-35fa98f0382f.png)
 
 ## Architecture
 
@@ -120,7 +120,7 @@ Please create `~/.dagu/admin.yaml`.
 ```yaml
 host: <hostname for web UI address>             # default : 127.0.0.1 
 port: <port number for web UI address>          # default : 8080
-jobs: <the location of job configuration files> # default : current working directory
+dags: <the location of DAG configuration files> # default : current working directory
 
 # optional
 command: <Absolute path of dagu binary if it's not in $PATH>
@@ -136,8 +136,8 @@ Please create `~/.dagu/config.yaml`. All settings can be overridden by individua
 Creating a global configuration is a convenient way to organize common settings.
 
 ```yaml
-logDir: <path-to-write-log>   # log directory to write standard output from the job steps
-histRetentionDays: 3 # job history retention days (not for log files)
+logDir: <path-to-write-log>   # log directory to write standard output
+histRetentionDays: 3 # history retention days (not for log files)
 
 # E-mail server config (optional)
 smtp:

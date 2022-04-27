@@ -63,7 +63,7 @@ func runAppTestOutput(app *cli.App, test appTest, t *testing.T) {
 	w.Close()
 
 	if err != nil && !test.errored {
-		t.Fatalf("job failed unexpectedly %v", err)
+		t.Fatalf("failed unexpectedly %v", err)
 		return
 	}
 
@@ -87,7 +87,7 @@ func runAppTest(app *cli.App, test appTest, t *testing.T) {
 	err := app.Run(test.args)
 
 	if err != nil && !test.errored {
-		t.Fatalf("job failed unexpectedly %v", err)
+		t.Fatalf("failed unexpectedly %v", err)
 		return
 	}
 }

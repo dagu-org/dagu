@@ -21,12 +21,12 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{},
 	}, t)
 
-	job, err := controller.FromConfig(configPath)
+	dag, err := controller.FromConfig(configPath)
 	require.NoError(t, err)
-	require.Equal(t, job.Status.Status, scheduler.SchedulerStatus_Error)
+	require.Equal(t, dag.Status.Status, scheduler.SchedulerStatus_Error)
 
 	db := database.New(database.DefaultConfig())
-	status, err := db.FindByRequestId(configPath, job.Status.RequestId)
+	status, err := db.FindByRequestId(configPath, dag.Status.RequestId)
 	require.NoError(t, err)
 	dw, err := db.NewWriterFor(configPath, status.File)
 	require.NoError(t, err)
@@ -44,19 +44,19 @@ func Test_retryCommand(t *testing.T) {
 	app = makeApp()
 	runAppTestOutput(app, appTest{
 		args: []string{"", "retry", fmt.Sprintf("--req=%s",
-			job.Status.RequestId), testConfig("cmd_retry.yaml")}, errored: false,
+			dag.Status.RequestId), testConfig("cmd_retry.yaml")}, errored: false,
 		output: []string{"parameter is x"},
 	}, t)
 
 	assert.Eventually(t, func() bool {
-		job, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
+		dag, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
 		if err != nil {
 			return false
 		}
-		return job.Status.Status == scheduler.SchedulerStatus_Success
+		return dag.Status.Status == scheduler.SchedulerStatus_Success
 	}, time.Millisecond*3000, time.Millisecond*100)
 
-	job, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
+	dag, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
 	require.NoError(t, err)
-	require.NotEqual(t, status.Status.RequestId, job.Status.RequestId)
+	require.NotEqual(t, status.Status.RequestId, dag.Status.RequestId)
 }

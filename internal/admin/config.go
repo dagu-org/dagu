@@ -22,7 +22,7 @@ type Config struct {
 	Host               string
 	Port               string
 	Env                []string
-	Jobs               string
+	DAGs               string
 	Command            string
 	WorkDir            string
 	IsBasicAuth        bool
@@ -41,12 +41,12 @@ func (c *Config) setup() error {
 	if c.Command == "" {
 		c.Command = "dagu"
 	}
-	if c.Jobs == "" {
+	if c.DAGs == "" {
 		wd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
-		c.Jobs = wd
+		c.DAGs = wd
 	}
 	if c.Host == "" {
 		c.Host = "127.0.0.1"
@@ -81,14 +81,14 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 	}
 	c.Port = strconv.Itoa(def.Port)
 
-	jd, err := parseVariable(def.Jobs)
+	jd, err := parseVariable(def.Dags)
 	if err != nil {
 		return nil, err
 	}
 	if !filepath.IsAbs(jd) {
-		return nil, fmt.Errorf("jobs directory should be absolute path. was %s", jd)
+		return nil, fmt.Errorf("DAGs directory should be absolute path. was %s", jd)
 	}
-	c.Jobs, err = filepath.Abs(jd)
+	c.DAGs, err = filepath.Abs(jd)
 	if err != nil {
 		return nil, err
 	}

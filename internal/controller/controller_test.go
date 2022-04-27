@@ -34,10 +34,10 @@ func testConfig(name string) string {
 
 func TestGetStatus(t *testing.T) {
 	file := testConfig("controller_success.yaml")
-	job, err := controller.FromConfig(file)
+	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
 
-	st, err := controller.New(job.Config).GetStatus()
+	st, err := controller.New(dag.Config).GetStatus()
 	require.NoError(t, err)
 	assert.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
@@ -45,11 +45,11 @@ func TestGetStatus(t *testing.T) {
 func TestGetStatusRunningAndDone(t *testing.T) {
 	file := testConfig("controller_status.yaml")
 
-	job, err := controller.FromConfig(file)
+	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
 
 	a := agent.Agent{Config: &agent.Config{
-		Job: job.Config,
+		DAG: dag.Config,
 	}}
 
 	go func() {
@@ -58,30 +58,30 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	}()
 	time.Sleep(time.Millisecond * 500)
 
-	st, err := controller.New(job.Config).GetStatus()
+	st, err := controller.New(dag.Config).GetStatus()
 	require.NoError(t, err)
 	time.Sleep(time.Millisecond * 50)
 
 	assert.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
 
 	assert.Eventually(t, func() bool {
-		st, _ := controller.New(job.Config).GetLastStatus()
+		st, _ := controller.New(dag.Config).GetLastStatus()
 		return scheduler.SchedulerStatus_Success == st.Status
 	}, time.Millisecond*1500, time.Millisecond*100)
 }
 
-func TestGetJob(t *testing.T) {
-	file := testConfig("controller_get_job.yaml")
-	job, err := controller.FromConfig(file)
+func TestGetDAG(t *testing.T) {
+	file := testConfig("controller_get_dag.yaml")
+	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
-	assert.Equal(t, "basic success", job.Config.Name)
+	assert.Equal(t, "basic success", dag.Config.Name)
 }
 
-func TestGetJobList(t *testing.T) {
-	jobs, errs, err := controller.GetJobList(testsDir)
+func TestGetDAGList(t *testing.T) {
+	dags, errs, err := controller.GetDAGs(testsDir)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(errs))
 
-	matches, err := filepath.Glob(path.Join(testsDir, "*.yaml"))
-	assert.Equal(t, len(matches), len(jobs))
+	matches, _ := filepath.Glob(path.Join(testsDir, "*.yaml"))
+	assert.Equal(t, len(matches), len(dags))
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-type Job struct {
+type DAG struct {
 	File   string
 	Dir    string
 	Config *config.Config
@@ -19,14 +19,14 @@ type Job struct {
 	ErrorT *string
 }
 
-func FromConfig(file string) (*Job, error) {
+func FromConfig(file string) (*DAG, error) {
 	if !utils.FileExists(file) {
 		return nil, fmt.Errorf("file not found: %s", file)
 	}
 	return fromConfig(file, false)
 }
 
-func fromConfig(file string, headOnly bool) (*Job, error) {
+func fromConfig(file string, headOnly bool) (*DAG, error) {
 	cl := config.NewConfigLoader()
 	var cfg *config.Config
 	var err error
@@ -37,11 +37,11 @@ func fromConfig(file string, headOnly bool) (*Job, error) {
 	}
 	if err != nil {
 		if cfg != nil {
-			return newJob(cfg, nil, err), err
+			return newDAG(cfg, nil, err), err
 		}
 		cfg := &config.Config{ConfigPath: file}
 		cfg.Init()
-		return newJob(cfg, nil, err), err
+		return newDAG(cfg, nil, err), err
 	}
 	status, err := New(cfg).GetLastStatus()
 	if err != nil {
@@ -49,14 +49,14 @@ func fromConfig(file string, headOnly bool) (*Job, error) {
 	}
 	if !headOnly {
 		if _, err := scheduler.NewExecutionGraph(cfg.Steps...); err != nil {
-			return newJob(cfg, status, err), err
+			return newDAG(cfg, status, err), err
 		}
 	}
-	return newJob(cfg, status, err), nil
+	return newDAG(cfg, status, err), nil
 }
 
-func newJob(cfg *config.Config, s *models.Status, err error) *Job {
-	ret := &Job{
+func newDAG(cfg *config.Config, s *models.Status, err error) *DAG {
+	ret := &DAG{
 		File:   filepath.Base(cfg.ConfigPath),
 		Dir:    filepath.Dir(cfg.ConfigPath),
 		Config: cfg,

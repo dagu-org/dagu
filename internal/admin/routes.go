@@ -15,24 +15,24 @@ type route struct {
 func defaultRoutes(cfg *Config) []*route {
 	return []*route{
 		{http.MethodGet, `^/?$`, handlers.HandleGetList(
-			&handlers.JobListHandlerConfig{
-				JobsDir: cfg.Jobs,
+			&handlers.DAGListHandlerConfig{
+				DAGsDir: cfg.DAGs,
 			},
 		)},
-		{http.MethodGet, `^/jobs/?$`, handlers.HandleGetList(
-			&handlers.JobListHandlerConfig{
-				JobsDir: cfg.Jobs,
+		{http.MethodGet, `^/dags/?$`, handlers.HandleGetList(
+			&handlers.DAGListHandlerConfig{
+				DAGsDir: cfg.DAGs,
 			},
 		)},
-		{http.MethodGet, `^/jobs/([^/]+)$`, handlers.HandleGetJob(
-			&handlers.JobHandlerConfig{
-				JobsDir:            cfg.Jobs,
+		{http.MethodGet, `^/dags/([^/]+)$`, handlers.HandleGetDAG(
+			&handlers.DAGHandlerConfig{
+				DAGsDir:            cfg.DAGs,
 				LogEncodingCharset: cfg.LogEncodingCharset,
 			},
 		)},
-		{http.MethodPost, `^/jobs/([^/]+)$`, handlers.HandlePostJobAction(
-			&handlers.PostJobHandlerConfig{
-				JobsDir: cfg.Jobs,
+		{http.MethodPost, `^/dags/([^/]+)$`, handlers.HandlePostDAGAction(
+			&handlers.PostDAGHandlerConfig{
+				DAGsDir: cfg.DAGs,
 				Bin:     cfg.Command,
 				WkDir:   cfg.WorkDir,
 			},

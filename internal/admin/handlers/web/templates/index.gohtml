@@ -23,22 +23,21 @@
     [SCHEDULER_STATUS__SKIPPED_UNUSED]: { backgroundColor: "gray", color: "white" },
   }
   const tagColorMapping = {
-    "Job": { backgroundColor: "rgb(88, 187, 151)", color: "white" },
+    "DAG": { backgroundColor: "rgb(88, 187, 151)", color: "white" },
     "Group": { backgroundColor: "rgb(76, 172, 229)", color: "white" },
   }
-  function Error({ jobs, errors, hasError }) {
-    if (!jobs || !hasError) {
+  function Error({ dags, errors, hasError }) {
+    if (!dags || !hasError) {
       return <div></div>
     }
-    console.log({jobs, errors, hasError})
     return (
       <div class="notification is-danger mt-0 mb-0">
         <div>Please check the below errors!</div>
         <div class="content">
           <ul>
-            {jobs.filter((job) => job.Error).map((job) => {
-              const url = encodeURI(job.File);
-              return <li><a href={url}>{job.File}</a>: {job.ErrorT} </li>
+            {dags.filter((dag) => dag.Error).map((dag) => {
+              const url = encodeURI(dag.File);
+              return <li><a href={url}>{dag.File}</a>: {dag.ErrorT} </li>
             })}
             {errors.map(e => <li>{e}</li>)}
           </ul>
@@ -80,23 +79,23 @@
       <React.Fragment>
         <Title></Title>
         <div className="mx-5 mt-5">
-          <Error jobs={data.Jobs} errors={data.Errors} hasError={data.HasError}></Error>
-          <JobTable jobs={data.Jobs} groups={data.Groups} group={data.Group}></JobTable>
+          <Error dags={data.DAGs} errors={data.Errors} hasError={data.HasError}></Error>
+          <DAGsTable dags={data.DAGs} groups={data.Groups} group={data.Group}></DAGsTable>
         </div>
       </React.Fragment>
     );
   }
-  function JobItem({ job, group }) {
-    const url = encodeURI("/jobs/" + job.File + "?group=" + group)
+  function DAGItem({ dag, group }) {
+    const url = encodeURI("/dags/" + dag.File + "?group=" + group)
     return (<tr>
-      <td className="has-text-weight-semibold"><a href={url}>{job.File}</a></td>
-      <td><span class="tag has-text-weight-semibold" style={tagColorMapping["Job"]}>Job</span></td>
-      <td>{job.Config.Name}</td>
-      <td>{job.Config.Description}</td>
-      <td><StatusTag status={job.Status.Status}>{job.Status.StatusText}</StatusTag></td>
-      <td>{job.Status.Pid == "-1" ? "" : job.Status.Pid}</td>
-      <td>{job.Status.StartedAt}</td>
-      <td>{job.Status.FinishedAt}</td>
+      <td className="has-text-weight-semibold"><a href={url}>{dag.File}</a></td>
+      <td><span class="tag has-text-weight-semibold" style={tagColorMapping["DAG"]}>DAG</span></td>
+      <td>{dag.Config.Name}</td>
+      <td>{dag.Config.Description}</td>
+      <td><StatusTag status={dag.Status.Status}>{dag.Status.StatusText}</StatusTag></td>
+      <td>{dag.Status.Pid == "-1" ? "" : dag.Status.Pid}</td>
+      <td>{dag.Status.StartedAt}</td>
+      <td>{dag.Status.FinishedAt}</td>
     </tr>)
   }
   function StatusTag({ status, children }) {
@@ -108,7 +107,7 @@
     )
   }
   function GroupItemBack({ group }) {
-    const url = encodeURI("/jobs/")
+    const url = encodeURI("/dags/")
     return (<tr>
       <td className="has-text-weight-semibold"><a href={url}>../ (upper group)</a></td>
       <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
@@ -121,7 +120,7 @@
     </tr>)
   }
   function GroupItem({ group }) {
-    const url = encodeURI("/jobs/?group=" + group.Name)
+    const url = encodeURI("/dags/?group=" + group.Name)
     return (<tr>
       <td className="has-text-weight-semibold"><a href={url}>{group.Name}</a></td>
       <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
@@ -133,14 +132,14 @@
       <td>-</td>
     </tr>)
   }
-  function JobTable({ jobs = [], groups = [], group = "" }) {
+  function DAGsTable({ dags = [], groups = [], group = "" }) {
     const root = { Name: "" };
     const currGrp = "{{.Group}}";
     return (
       <table class="table is-bordered is-fullwidth card">
         <thead className="has-background-light">
           <tr>
-            <th>Job</th>
+            <th>DAG</th>
             <th>Type</th>
             <th>Name</th>
             <th>Description</th>
@@ -157,8 +156,8 @@
           {groups.map((item) => {
             return <GroupItem key={item.Name} group={item}></GroupItem>
           })}
-          {jobs.filter((job) => !job.Error).map((job) => {
-            return <JobItem key={job.File} job={job} group={group}></JobItem>
+          {dags.filter((dag) => !dag.Error).map((dag) => {
+            return <DAGItem key={dag.File} dag={dag} group={group}></DAGItem>
           })}
         </tbody>
       </table >

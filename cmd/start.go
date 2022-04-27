@@ -25,24 +25,24 @@ func newStartCommand() *cli.Command {
 		},
 		Action: func(c *cli.Context) error {
 			if c.NArg() == 0 {
-				return errors.New("config file must be specified.")
+				return errors.New("config file must be specified")
 			}
 			if c.NArg() != 1 {
-				return errors.New("too many parameters.")
+				return errors.New("too many parameters")
 			}
 			config_file_path := c.Args().Get(0)
 			cfg, err := cl.Load(config_file_path, c.String("params"))
 			if err != nil {
 				return err
 			}
-			return startJob(cfg)
+			return start(cfg)
 		},
 	}
 }
 
-func startJob(cfg *config.Config) error {
+func start(cfg *config.Config) error {
 	a := &agent.Agent{Config: &agent.Config{
-		Job: cfg,
+		DAG: cfg,
 		Dry: false,
 	}}
 
@@ -52,7 +52,7 @@ func startJob(cfg *config.Config) error {
 
 	err := a.Run()
 	if err != nil {
-		log.Printf("running job failed. %v", err)
+		log.Printf("running failed. %v", err)
 	}
 	return nil
 }
