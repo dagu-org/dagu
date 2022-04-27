@@ -21,7 +21,7 @@ dagu is a single command that generates and executes a [DAG (Directed acyclic gr
     - [Environment variables](#environment-variables)
     - [Web UI configuration](#web-ui-configuration)
     - [Global configuration](#global-configuration)
-  - [Job configuration](#job-configuration)
+  - [DAG configuration](#dag-configuration)
     - [Simple configuration](#simple-configuration)
     - [All configuration](#all-configuration)
   - [Examples](#examples)
@@ -51,18 +51,18 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 
 ### Usage
 
-- `dagu start [--params=<params>] <job file>` - run a job
-- `dagu status <job file>` - display the current status of the job
-- `dagu retry --req=<request-id> <job file>` - retry the failed/canceled job
-- `dagu stop <job file>` - cancel a job
-- `dagu dry [--params=<params>] <job file>` - dry-run a job
+- `dagu start [--params=<params>] <DAG file>` - run a DAG
+- `dagu status <DAG file>` - display the current status of the DAG
+- `dagu retry --req=<request-id> <DAG file>` - retry the failed/canceled DAG
+- `dagu stop <DAG file>` - cancel a DAG
+- `dagu dry [--params=<params>] <DAG file>` - dry-run a DAG
 - `dagu server` - start a web server for web UI
 
 ## Features
 
 - Simple command interface (See [Usage](#usage))
 - Simple configuration YAML format (See [Simple example](#simple-example))
-- Web UI to visualize, manage jobs and watch logs
+- Web UI to visualize, manage DAGs and watch logs
 - Parameterization
 - Conditions
 - Automatic retry
@@ -86,21 +86,21 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 
 ## User interface
 
-- **JOBs**: Overview of all JOBs in your environment.
+- **DAGs**: Overview of all DAGs in your environment.
 
-  ![JOBs](https://user-images.githubusercontent.com/1475839/164859814-98afc587-ff86-4ebd-97b8-7d32f86a9ad9.png)
+  ![DAGs](https://user-images.githubusercontent.com/1475839/165417789-18d29f3d-aecf-462a-8cdf-0b575ba613d0.png)
 
-- **Detail**: Current status of the job.
+- **Detail**: Current status of the dag.
 
-  ![Detail](https://user-images.githubusercontent.com/1475839/164857046-b620a8a0-f5f5-4551-a651-66c8ec38f820.png)
+  ![Detail](https://user-images.githubusercontent.com/1475839/165418393-d7d876bc-329f-4299-977e-7726e8ef0fa1.png)
 
 - **Timeline**: Timeline of each steps in the pipeline.
 
-  ![Timeline](https://user-images.githubusercontent.com/1475839/164860845-98595a3f-4579-4c15-9d6b-1942b4561900.png)
+  ![Timeline](https://user-images.githubusercontent.com/1475839/165418430-1fe3b100-33eb-4d81-a68a-c8a881890b61.png)
 
 - **History**: History of the execution of the pipeline.
 
-  ![History](https://user-images.githubusercontent.com/1475839/164849560-ab5be8d0-378e-46eb-a4d4-c6a8ff3d6af9.png)
+  ![History](https://user-images.githubusercontent.com/1475839/165418472-385cb8e0-351c-4508-b337-a082ea53b4ec.png)
 
 ## Architecture
 
@@ -118,7 +118,7 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 Please create `~/.dagu/admin.yaml`.
 
 ```yaml
-host: <hostname for web UI address>             # default : ${HOST}
+host: <hostname for web UI address>             # default : 127.0.0.1 
 port: <port number for web UI address>          # default : 8080
 jobs: <the location of job configuration files> # default : current working directory
 
@@ -131,7 +131,7 @@ basicAuthPassword: <password for basic auth of web UI>
 
 ### Global configuration
 
-Please create `~/.dagu/config.yaml`. All settings can be overridden by individual job configurations.
+Please create `~/.dagu/config.yaml`. All settings can be overridden by individual DAG configurations.
 
 Creating a global configuration is a convenient way to organize common settings.
 
@@ -153,50 +153,50 @@ infoMail:
   prefix: <prefix of mail subject for notification mail>
 ```
 
-## Job configuration
+## DAG configuration
 
 ### Simple configuration
 
 ```yaml
 name: simple configuration
 steps:
-  - name: step 1
-    command: python some_batch_1.py
-    dir: ${HOME}/jobs/                  # working directory for the job (optional)
+  - name: step 1                     # step name (required, unique)
+    command: python some_batch_1.py  # command and arguments
+    dir: ${HOME}/dags/               # working directory (optional)
   - name: step 2
     command: python some_batch_2.py
-    dir: ${HOME}/jobs/
+    dir: ${HOME}/dags/
     depends:
-      - step 1
+      - step 1                       # dependency
 ```
 
 ### All configuration
 
 ```yaml
 name: all configuration
-description: run python jobs
+description: run a DAG
 
 # Define environment variables
 env:
-  LOG_DIR: ${HOME}/jobs/logs
+  LOG_DIR: ${HOME}/logs
   PATH: /usr/local/bin:${PATH}
   
-logDir: ${LOG_DIR}   # log directory to write standard output from the job steps
-histRetentionDays: 3 # job history retention days (not for log files)
-delaySec: 1          # interval seconds between job steps
+logDir: ${LOG_DIR}   # log directory to write standard output
+histRetentionDays: 3 # execution history retention days (not for log files)
+delaySec: 1          # interval seconds between steps
 maxActiveRuns: 1     # max parallel number of running step
 
 # Define parameters
 params: param1 param2 # they can be referenced by each steps as $1, $2 and so on.
 
-# Define preconditions for whether or not the job is allowed to run
+# Define preconditions for whether or not the DAG is allowed to run
 preconditions:
-  - condition: "`printf 1`" # This condition will be evaluated at each execution of the job
-    expected: "1"           # If the evaluation result do not match, the job is canceled
+  - condition: "`printf 1`"
+    expected: "1"
 
 # Mail notification configs
-mailOnError: true    # send a mail when a job failed
-mailOnFinish: true   # send a mail when a job finished
+mailOnError: true    # send a mail when a dag failed
+mailOnFinish: true   # send a mail when a dag finished
 
 # Handler on Success, Failure, Cancel, Exit
 handlerOn:
@@ -209,15 +209,15 @@ handlerOn:
   exit:
     command: "echo finished"
 
-# Job steps
+# DAG steps
 steps:
   - name: step 1
     description: step 1 description
-    dir: ${HOME}/jobs
+    dir: ${HOME}/logs
     command: python some_batch_1.py $1
     mailOnError: false # do not send mail on error
     continueOn:
-      failed: true     # continue to the next step regardless the error of this job
+      failed: true     # continue to the next step regardless the error of this step
       skipped: true    # continue to the next step regardless the evaluation result of preconditions
     retryPolicy:
       limit: 2         # retry up to 2 times when the step failed
@@ -228,7 +228,7 @@ steps:
         expected: "1"
   - name: step 2
     description: step 2 description
-    dir: ${HOME}/jobs
+    dir: ${HOME}/logs
     command: python some_batch_2.py $1
     depends:
       - step 1
@@ -244,7 +244,7 @@ To check all examples, visit [this page](https://github.com/dagu/dagu/tree/main/
 
   ![sample_1](https://user-images.githubusercontent.com/1475839/164965036-fede5675-cba0-410b-b371-22deec55b9e8.png)
 ```yaml
-name: example job
+name: example DAG
 steps:
   - name: "1"
     command: echo hello world
@@ -262,7 +262,7 @@ steps:
 
   ![sample_2](https://user-images.githubusercontent.com/1475839/164965143-b10a0511-35f3-45fa-9eba-69c6db4614a2.png)
 ```yaml
-name: example job
+name: example DAG
 env:
   LOG_DIR: ${HOME}/logs
 logDir: ${LOG_DIR}
@@ -306,7 +306,7 @@ handlerOn:
 
   ![complex](https://user-images.githubusercontent.com/1475839/164965345-977de1bc-d042-4d3f-bf0e-bb648e534a78.png)
 ```yaml
-name: complex job
+name: complex DAG
 steps:
   - name: "Initialize"
     command: "sleep 2"

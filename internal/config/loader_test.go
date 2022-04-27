@@ -81,8 +81,8 @@ func TestLoadConfig(t *testing.T) {
 
 	want := &config.Config{
 		ConfigPath:        testConfig,
-		Name:              "test job",
-		Description:       "this is a test job.",
+		Name:              "test DAG",
+		Description:       "this is a test DAG.",
 		Env:               testEnv,
 		LogDir:            path.Join(testHomeDir, "/logs"),
 		HistRetentionDays: 3,

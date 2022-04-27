@@ -1,4 +1,4 @@
-name: example job
+name: example DAG
 env:
   LOG_DIR: ${HOME}/logs
 logDir: ${LOG_DIR}
