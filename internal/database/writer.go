@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yohamta/jobctl/internal/models"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Writer struct {

@@ -14,7 +14,7 @@ var defaultFuncs = template.FuncMap{
 	"defTitle": func(ip interface{}) string {
 		v, ok := ip.(string)
 		if !ok || (ok && v == "") {
-			return "Jobctl Admin"
+			return "dagu Admin"
 		}
 		return v
 	},

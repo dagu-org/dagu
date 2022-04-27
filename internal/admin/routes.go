@@ -3,7 +3,7 @@ package admin
 import (
 	"net/http"
 
-	"github.com/yohamta/jobctl/internal/admin/handlers"
+	"github.com/yohamta/dagu/internal/admin/handlers"
 )
 
 type route struct {

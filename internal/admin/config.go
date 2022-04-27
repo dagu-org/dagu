@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 var tickerMatcher *regexp.Regexp
@@ -39,7 +39,7 @@ func (c *Config) Init() {
 
 func (c *Config) setup() error {
 	if c.Command == "" {
-		c.Command = "jobctl"
+		c.Command = "dagu"
 	}
 	if c.Jobs == "" {
 		wd, err := os.Getwd()

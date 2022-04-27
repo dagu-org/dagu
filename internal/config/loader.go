@@ -10,7 +10,7 @@ import (
 
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 
 	"gopkg.in/yaml.v2"
 )
@@ -116,7 +116,7 @@ func (cl *Loader) LoadGlobalConfig() (*Config, error) {
 		return nil, fmt.Errorf("home directory was not found.")
 	}
 
-	file := path.Join(cl.homeDir, ".jobctl", "config.yaml")
+	file := path.Join(cl.homeDir, ".dagu", "config.yaml")
 	if !utils.FileExists(file) {
 		return nil, nil
 	}

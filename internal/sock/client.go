@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 var ErrTimeout = fmt.Errorf("unix socket timeout")

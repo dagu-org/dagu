@@ -1,11 +1,12 @@
-# jobctl
+#  dagu 
+<img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
 **A simple command to run workflows (DAGs) defined in YAML format**
 
-jobctl is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. jobctl also comes with a convenient web UI & REST API interface. It aims to be one of the easiest option to manage DAGs executed by cron.
+dagu is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. dagu also comes with a convenient web UI & REST API interface. It aims to be one of the easiest option to manage DAGs executed by cron.
 
 ## Contents
-- [jobctl](#jobctl)
+- [dagu](#dagu)
   - [Contents](#contents)
   - [Motivation](#motivation)
   - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
@@ -46,16 +47,16 @@ Finally, I decided to build my own tool that would not require any DBMS server, 
 ## Quick start
 
 ### Installation
-Download the binary from [Releases page](https://github.com/jobctl/jobctl/releases) and place it on your system.
+Download the binary from [Releases page](https://github.com/dagu/dagu/releases) and place it on your system.
 
 ### Usage
 
-- `jobctl start [--params=<params>] <job file>` - run a job
-- `jobctl status <job file>` - display the current status of the job
-- `jobctl retry --req=<request-id> <job file>` - retry the failed/canceled job
-- `jobctl stop <job file>` - cancel a job
-- `jobctl dry [--params=<params>] <job file>` - dry-run a job
-- `jobctl server` - start a web server for web UI
+- `dagu start [--params=<params>] <job file>` - run a job
+- `dagu status <job file>` - display the current status of the job
+- `dagu retry --req=<request-id> <job file>` - retry the failed/canceled job
+- `dagu stop <job file>` - cancel a job
+- `dagu dry [--params=<params>] <job file>` - dry-run a job
+- `dagu server` - start a web server for web UI
 
 ## Features
 
@@ -104,17 +105,17 @@ Download the binary from [Releases page](https://github.com/jobctl/jobctl/releas
 ## Architecture
 
 - uses plain JSON files as history database, and unix sockets to communicate with running processes.
-  ![jobctl Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
+  ![dagu Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
 
 ## Configuration
 
 ### Environment variables
-- `JOBCTL__DATA` - path to directory for internal use by jobctl (default : `~/.jobctl/data`)
-- `JOBCTL__LOGS` - path to directory for logging (default : `~/.jobctl/logs`)
+- `dagu__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
+- `dagu__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
 
 ### Web UI configuration
 
-Please create `~/.jobctl/admin.yaml`.
+Please create `~/.dagu/admin.yaml`.
 
 ```yaml
 host: <hostname for web UI address>             # default : ${HOST}
@@ -122,7 +123,7 @@ port: <port number for web UI address>          # default : 8080
 jobs: <the location of job configuration files> # default : current working directory
 
 # optional
-command: <Absolute path of jobctl binary if it's not in $PATH>
+command: <Absolute path of dagu binary if it's not in $PATH>
 isBasicAuth: <true|false>
 basicAuthUsername: <username for basic auth of web UI>
 basicAuthPassword: <password for basic auth of web UI>
@@ -130,7 +131,7 @@ basicAuthPassword: <password for basic auth of web UI>
 
 ### Global configuration
 
-Please create `~/.jobctl/config.yaml`. All settings can be overridden by individual job configurations.
+Please create `~/.dagu/config.yaml`. All settings can be overridden by individual job configurations.
 
 Creating a global configuration is a convenient way to organize common settings.
 
@@ -233,11 +234,11 @@ steps:
       - step 1
 ```
 
-The global config file `~/.jobctl/config.yaml` is useful to gather common settings such as mail-server configs or log directory.
+The global config file `~/.dagu/config.yaml` is useful to gather common settings such as mail-server configs or log directory.
 
 ## Examples
 
-To check all examples, visit [this page](https://github.com/jobctl/jobctl/tree/main/examples).
+To check all examples, visit [this page](https://github.com/dagu/dagu/tree/main/examples).
 
 -  Sample 1
 
@@ -371,7 +372,7 @@ steps:
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
-You can start by improving this [README.md](https://github.com/jobctl/jobctl/blob/main/README.md) or suggesting new [features](https://github.com/jobctl/jobctl/issues)
+You can start by improving this [README.md](https://github.com/dagu/dagu/blob/main/README.md) or suggesting new [features](https://github.com/dagu/dagu/issues)
 Thank you!
 
 ## Todo

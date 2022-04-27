@@ -1,7 +1,7 @@
 # Contributing
-# Contributing to jobctl
+# Contributing to dagu
 
-jobctl is an open source project and we appreciate your contributions!
+dagu is an open source project and we appreciate your contributions!
 
 ## Following the Go convention
 

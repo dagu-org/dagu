@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestCondition(t *testing.T) {

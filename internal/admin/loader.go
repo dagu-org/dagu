@@ -7,7 +7,7 @@ import (
 	"path"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 
 	"gopkg.in/yaml.v2"
 )
@@ -32,7 +32,7 @@ func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 
 	if file == "" {
 		homeDir := utils.MustGetUserHomeDir()
-		file = path.Join(homeDir, ".jobctl", "admin.yaml")
+		file = path.Join(homeDir, ".dagu", "admin.yaml")
 	}
 
 	if !utils.FileExists(file) {

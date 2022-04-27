@@ -1,5 +1,0 @@
-host: ${HOST}
-port: 8081
-jobs: "${HOME}/jobctl/jobs"
-command: "${HOME}/jobctl/bin/jobctl"
-workDir: "${HOME}/jobctl/jobs"

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yohamta/jobctl/internal/controller"
-	"github.com/yohamta/jobctl/internal/database"
-	"github.com/yohamta/jobctl/internal/scheduler"
+	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/scheduler"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

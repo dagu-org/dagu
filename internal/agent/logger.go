@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type teeLogger struct {
