@@ -52,7 +52,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 	server := admin.NewServer(&admin.Config{
 		Host: host,
 		Port: port,
-		Jobs: dir,
+		DAGs: dir,
 	})
 
 	go func() {

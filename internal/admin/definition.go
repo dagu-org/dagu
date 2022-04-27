@@ -4,7 +4,7 @@ type configDefinition struct {
 	Host               string
 	Port               int
 	Env                map[string]string
-	Jobs               string
+	Dags               string
 	Command            string
 	WorkDir            string
 	IsBasicAuth        bool

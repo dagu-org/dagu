@@ -20,19 +20,19 @@ import (
 )
 
 type Controller interface {
-	StopJob() error
-	StartJob(bin string, workDir string, params string) error
-	RetryJob(bin string, workDir string, reqId string) error
+	Stop() error
+	Start(bin string, workDir string, params string) error
+	Retry(bin string, workDir string, reqId string) error
 	GetStatus() (*models.Status, error)
 	GetLastStatus() (*models.Status, error)
 	GetStatusHist(n int) ([]*models.StatusFile, error)
 }
 
-func GetJobList(dir string) (jobs []*Job, errs []string, err error) {
-	jobs = []*Job{}
+func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
+	dags = []*DAG{}
 	errs = []string{}
 	if !utils.FileExists(dir) {
-		errs = append(errs, fmt.Sprintf("invalid jobs directory: %s", dir))
+		errs = append(errs, fmt.Sprintf("invalid DAGs directory: %s", dir))
 		return
 	}
 	fis, err := ioutil.ReadDir(dir)
@@ -43,17 +43,17 @@ func GetJobList(dir string) (jobs []*Job, errs []string, err error) {
 		if filepath.Ext(fi.Name()) != ".yaml" {
 			continue
 		}
-		job, err := fromConfig(filepath.Join(dir, fi.Name()), true)
+		dag, err := fromConfig(filepath.Join(dir, fi.Name()), true)
 		if err != nil {
 			log.Printf("%v", err)
-			if job == nil {
+			if dag == nil {
 				errs = append(errs, err.Error())
 				continue
 			}
 		}
-		jobs = append(jobs, job)
+		dags = append(dags, dag)
 	}
-	return jobs, errs, nil
+	return dags, errs, nil
 }
 
 var _ Controller = (*controller)(nil)
@@ -68,13 +68,13 @@ func New(cfg *config.Config) Controller {
 	}
 }
 
-func (c *controller) StopJob() error {
+func (c *controller) Stop() error {
 	client := sock.Client{Addr: sock.GetSockAddr(c.cfg.ConfigPath)}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (c *controller) StartJob(bin string, workDir string, params string) (err error) {
+func (c *controller) Start(bin string, workDir string, params string) (err error) {
 	go func() {
 		args := []string{"start"}
 		if params != "" {
@@ -88,14 +88,14 @@ func (c *controller) StartJob(bin string, workDir string, params string) (err er
 		defer cmd.Wait()
 		err = cmd.Start()
 		if err != nil {
-			log.Printf("failed to start a job: %v", err)
+			log.Printf("failed to start a DAG: %v", err)
 		}
 	}()
 	time.Sleep(time.Millisecond * 500)
 	return
 }
 
-func (c *controller) RetryJob(bin string, workDir string, reqId string) (err error) {
+func (c *controller) Retry(bin string, workDir string, reqId string) (err error) {
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
@@ -107,7 +107,7 @@ func (c *controller) RetryJob(bin string, workDir string, reqId string) (err err
 		defer cmd.Wait()
 		err := cmd.Start()
 		if err != nil {
-			log.Printf("failed to retry a job: %v", err)
+			log.Printf("failed to retry a DAG: %v", err)
 		}
 	}()
 	time.Sleep(time.Millisecond * 500)

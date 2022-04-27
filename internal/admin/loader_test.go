@@ -34,7 +34,7 @@ func TestDefaultConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "127.0.0.1",
 		Port:    "8000",
-		Jobs:    path.Join(wd),
+		DAGs:    path.Join(wd),
 		Command: "dagu",
 	})
 }
@@ -47,9 +47,9 @@ func TestHomeAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8081",
-		Jobs:    path.Join(testsDir, "/dagu/jobs"),
+		DAGs:    path.Join(testsDir, "/dagu/dags"),
 		Command: path.Join(testsDir, "/dagu/bin/dagu"),
-		WorkDir: path.Join(testsDir, "/dagu/jobs"),
+		WorkDir: path.Join(testsDir, "/dagu/dags"),
 	})
 }
 
@@ -61,9 +61,9 @@ func TestLoadAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8082",
-		Jobs:    path.Join(testsDir, "/dagu/jobs"),
+		DAGs:    path.Join(testsDir, "/dagu/dags"),
 		Command: path.Join(testsDir, "/dagu/bin/dagu"),
-		WorkDir: path.Join(testsDir, "/dagu/jobs"),
+		WorkDir: path.Join(testsDir, "/dagu/dags"),
 	})
 }
 
@@ -71,7 +71,7 @@ func testConfig(t *testing.T, cfg *admin.Config, want *testWant) {
 	t.Helper()
 	assert.Equal(t, want.Host, cfg.Host)
 	assert.Equal(t, want.Port, cfg.Port)
-	assert.Equal(t, want.Jobs, cfg.Jobs)
+	assert.Equal(t, want.DAGs, cfg.DAGs)
 	assert.Equal(t, want.WorkDir, cfg.WorkDir)
 	assert.Equal(t, want.Command, cfg.Command)
 }
@@ -79,7 +79,7 @@ func testConfig(t *testing.T, cfg *admin.Config, want *testWant) {
 type testWant struct {
 	Host    string
 	Port    string
-	Jobs    string
+	DAGs    string
 	Command string
 	WorkDir string
 }

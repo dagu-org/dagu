@@ -24,7 +24,7 @@ func TestReporter(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 
 			cfg := &config.Config{
-				Name: "test-job",
+				Name: "test DAG",
 				MailOn: config.MailOn{
 					Failure: true,
 				},
@@ -74,7 +74,7 @@ func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mode
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Contains(t, mock.subject, "Error")
-	require.Contains(t, mock.subject, "test-job")
+	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
 }
 
@@ -102,7 +102,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Contains(t, mock.subject, "Success")
-	require.Contains(t, mock.subject, "test-job")
+	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
 }
 

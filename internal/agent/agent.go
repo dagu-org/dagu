@@ -40,7 +40,7 @@ type Agent struct {
 }
 
 type Config struct {
-	Job *config.Config
+	DAG *config.Config
 	Dry bool
 }
 
@@ -76,7 +76,7 @@ func (a *Agent) Run() error {
 
 func (a *Agent) Status() *models.Status {
 	status := models.NewStatus(
-		a.Job,
+		a.DAG,
 		a.graph.Nodes(),
 		a.scheduler.Status(a.graph),
 		os.Getpid(),
@@ -152,25 +152,25 @@ func (a *Agent) Kill(done chan bool) {
 func (a *Agent) init() {
 	a.scheduler = scheduler.New(
 		&scheduler.Config{
-			LogDir:        path.Join(a.Job.LogDir, utils.ValidFilename(a.Job.Name, "_")),
-			MaxActiveRuns: a.Job.MaxActiveRuns,
-			DelaySec:      a.Job.DelaySec,
+			LogDir:        path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_")),
+			MaxActiveRuns: a.DAG.MaxActiveRuns,
+			DelaySec:      a.DAG.DelaySec,
 			Dry:           a.Dry,
-			OnExit:        a.Job.HandlerOn.Exit,
-			OnSuccess:     a.Job.HandlerOn.Success,
-			OnFailure:     a.Job.HandlerOn.Failure,
-			OnCancel:      a.Job.HandlerOn.Cancel,
+			OnExit:        a.DAG.HandlerOn.Exit,
+			OnSuccess:     a.DAG.HandlerOn.Success,
+			OnFailure:     a.DAG.HandlerOn.Failure,
+			OnCancel:      a.DAG.HandlerOn.Cancel,
 		})
 	a.reporter = reporter.New(&reporter.Config{
 		Mailer: mail.New(
 			&mail.Config{
-				Host: a.Job.Smtp.Host,
-				Port: a.Job.Smtp.Port,
+				Host: a.DAG.Smtp.Host,
+				Port: a.DAG.Smtp.Port,
 			}),
 	})
 	a.logFilename = filepath.Join(
-		a.Job.LogDir, fmt.Sprintf("%s.%s.log",
-			utils.ValidFilename(a.Job.Name, "_"),
+		a.DAG.LogDir, fmt.Sprintf("%s.%s.log",
+			utils.ValidFilename(a.DAG.Name, "_"),
 			time.Now().Format("20060102.15:04:05"),
 		))
 }
@@ -180,7 +180,7 @@ func (a *Agent) setupGraph() (err error) {
 		log.Printf("setup for retry")
 		return a.setupRetry()
 	}
-	a.graph, err = scheduler.NewExecutionGraph(a.Job.Steps...)
+	a.graph, err = scheduler.NewExecutionGraph(a.DAG.Steps...)
 	return
 }
 
@@ -204,23 +204,23 @@ func (a *Agent) setupRequestId() error {
 
 func (a *Agent) setupDatabase() (err error) {
 	a.database = database.New(database.DefaultConfig())
-	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.Job.ConfigPath, time.Now())
+	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now())
 	return
 }
 
 func (a *Agent) setupSocketServer() (err error) {
 	a.socketServer, err = sock.NewServer(
 		&sock.Config{
-			Addr:        sock.GetSockAddr(a.Job.ConfigPath),
+			Addr:        sock.GetSockAddr(a.DAG.ConfigPath),
 			HandlerFunc: a.handleHTTP,
 		})
 	return
 }
 
 func (a *Agent) checkPreconditions() error {
-	if len(a.Job.Preconditions) > 0 {
-		log.Printf("checking pre conditions for \"%s\"", a.Job.Name)
-		if err := config.EvalConditions(a.Job.Preconditions); err != nil {
+	if len(a.DAG.Preconditions) > 0 {
+		log.Printf("checking pre conditions for \"%s\"", a.DAG.Name)
+		if err := config.EvalConditions(a.DAG.Preconditions); err != nil {
 			done := make(chan bool)
 			go a.scheduler.Cancel(a.graph, done)
 			<-done
@@ -275,7 +275,7 @@ func (a *Agent) run() error {
 		for node := range done {
 			status := a.Status()
 			a.dbWriter.Write(status)
-			a.reporter.ReportStep(a.Job, status, node)
+			a.reporter.ReportStep(a.DAG, status, node)
 		}
 	}()
 
@@ -288,13 +288,13 @@ func (a *Agent) run() error {
 	}
 
 	a.reporter.ReportSummary(status, lastErr)
-	if err := a.reporter.ReportMail(a.Job, status); err != nil {
+	if err := a.reporter.ReportMail(a.DAG, status); err != nil {
 		log.Printf("failed to send mail. %s", err)
 	}
 
 	if err := a.dbWriter.Close(); err != nil {
 		log.Printf("failed to close db writer. err: %v", err)
-	} else if err := a.database.Compact(a.Job.ConfigPath, a.dbFile); err != nil {
+	} else if err := a.database.Compact(a.DAG.ConfigPath, a.dbFile); err != nil {
 		log.Printf("failed to compact data. %s", err)
 	}
 
@@ -307,7 +307,7 @@ func (a *Agent) dryRun() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			a.reporter.ReportStep(a.Job, status, node)
+			a.reporter.ReportStep(a.DAG, status, node)
 		}
 	}()
 
@@ -323,13 +323,13 @@ func (a *Agent) dryRun() error {
 }
 
 func (a *Agent) checkIsRunning() error {
-	status, err := controller.New(a.Job).GetStatus()
+	status, err := controller.New(a.DAG).GetStatus()
 	if err != nil {
 		return err
 	}
 	if status.Status != scheduler.SchedulerStatus_None {
-		return fmt.Errorf("the job is already running. socket=%s",
-			sock.GetSockAddr(a.Job.ConfigPath))
+		return fmt.Errorf("the DAG is already running. socket=%s",
+			sock.GetSockAddr(a.DAG.ConfigPath))
 	}
 	return nil
 }

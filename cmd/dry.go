@@ -42,7 +42,7 @@ func newDryCommand() *cli.Command {
 
 func dryRun(cfg *config.Config) error {
 	a := &agent.Agent{Config: &agent.Config{
-		Job: cfg,
+		DAG: cfg,
 		Dry: true,
 	}}
 	listenSignals(func(sig os.Signal) {
@@ -51,7 +51,7 @@ func dryRun(cfg *config.Config) error {
 
 	err := a.Run()
 	if err != nil {
-		log.Printf("[DRY] job failed %v", err)
+		log.Printf("[DRY] failed %v", err)
 	}
 	return nil
 }

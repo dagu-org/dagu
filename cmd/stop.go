@@ -26,12 +26,12 @@ func newStopCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			return stopJob(cfg)
+			return stop(cfg)
 		},
 	}
 }
 
-func stopJob(cfg *config.Config) error {
+func stop(cfg *config.Config) error {
 	status, err := controller.New(cfg).GetStatus()
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func stopJob(cfg *config.Config) error {
 
 	if status.Status != scheduler.SchedulerStatus_Running ||
 		!status.Pid.IsRunning() {
-		log.Printf("job is not running.")
+		log.Printf("DAG is not running.")
 		return nil
 	}
 	syscall.Kill(int(status.Pid), syscall.SIGINT)
@@ -55,6 +55,6 @@ func stopJob(cfg *config.Config) error {
 		}
 		break
 	}
-	log.Printf("job is stopped.")
+	log.Printf("DAG is stopped.")
 	return nil
 }

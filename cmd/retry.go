@@ -48,15 +48,15 @@ func newRetryCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			return retryJob(cfg, status.Status)
+			return retry(cfg, status.Status)
 		},
 	}
 }
 
-func retryJob(cfg *config.Config, status *models.Status) error {
+func retry(cfg *config.Config, status *models.Status) error {
 	a := &agent.Agent{
 		Config: &agent.Config{
-			Job: cfg,
+			DAG: cfg,
 			Dry: false,
 		},
 		RetryConfig: &agent.RetryConfig{
@@ -70,7 +70,7 @@ func retryJob(cfg *config.Config, status *models.Status) error {
 
 	err := a.Run()
 	if err != nil {
-		log.Printf("running job failed. %v", err)
+		log.Printf("running failed. %v", err)
 	}
 	return nil
 }

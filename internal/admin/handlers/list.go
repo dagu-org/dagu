@@ -10,17 +10,17 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-type jobListResponse struct {
+type dagListResponse struct {
 	Title    string
 	Charset  string
-	Jobs     []*controller.Job
+	DAGs     []*controller.DAG
 	Groups   []*group
 	Group    string
 	Errors   []string
 	HasError bool
 }
 
-type jobListParameter struct {
+type dagListParameter struct {
 	Group string
 }
 
@@ -29,16 +29,16 @@ type group struct {
 	Dir  string
 }
 
-type JobListHandlerConfig struct {
-	JobsDir string
+type DAGListHandlerConfig struct {
+	DAGsDir string
 }
 
-func HandleGetList(hc *JobListHandlerConfig) http.HandlerFunc {
+func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "index")
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := getGetListParameter(r)
-		dir := filepath.Join(hc.JobsDir, params.Group)
-		jobs, errs, err := controller.GetJobList(dir)
+		dir := filepath.Join(hc.DAGsDir, params.Group)
+		dags, errs, err := controller.GetDAGs(dir)
 		if err != nil {
 			encodeError(w, err)
 			return
@@ -54,7 +54,7 @@ func HandleGetList(hc *JobListHandlerConfig) http.HandlerFunc {
 		}
 
 		hasErr := false
-		for _, j := range jobs {
+		for _, j := range dags {
 			if j.Error != nil {
 				hasErr = true
 				break
@@ -64,9 +64,9 @@ func HandleGetList(hc *JobListHandlerConfig) http.HandlerFunc {
 			hasErr = true
 		}
 
-		data := &jobListResponse{
-			Title:    "JobList",
-			Jobs:     jobs,
+		data := &dagListResponse{
+			Title:    "DAGList",
+			DAGs:     dags,
 			Groups:   groups,
 			Group:    params.Group,
 			Errors:   errs,
@@ -80,8 +80,8 @@ func HandleGetList(hc *JobListHandlerConfig) http.HandlerFunc {
 	}
 }
 
-func getGetListParameter(r *http.Request) *jobListParameter {
-	p := &jobListParameter{
+func getGetListParameter(r *http.Request) *dagListParameter {
+	p := &dagListParameter{
 		Group: "",
 	}
 	if group, ok := r.URL.Query()["group"]; ok {

@@ -23,21 +23,21 @@ import (
 	"golang.org/x/text/transform"
 )
 
-type jobStatus struct {
+type dagStatus struct {
 	Name string
 	Vals []scheduler.NodeStatus
 }
 
 type Log struct {
-	GridData []*jobStatus
+	GridData []*dagStatus
 	Logs     []*models.StatusFile
 }
 
-type jobResponse struct {
+type dagResponse struct {
 	Title      string
 	Charset    string
-	Job        *controller.Job
-	Tab        jobTabType
+	DAG        *controller.DAG
+	Tab        dagTabType
 	Graph      string
 	Definition string
 	LogData    *Log
@@ -58,29 +58,29 @@ type stepLog struct {
 	Content string
 }
 
-type jobTabType int
+type dagTabType int
 
 const (
-	JobTabType_Status jobTabType = iota
-	JobTabType_Config
-	JobTabType_History
-	JobTabType_StepLog
-	JobTabType_ScLog
-	JobTabType_None
+	DAG_TabType_Status dagTabType = iota
+	DAG_TabType_Config
+	DAG_TabType_History
+	DAG_TabType_StepLog
+	DAG_TabType_ScLog
+	DAG_TabType_None
 )
 
-type jobParameter struct {
-	Tab   jobTabType
+type dagParameter struct {
+	Tab   dagTabType
 	Group string
 	File  string
 	Step  string
 }
 
-func newJobResponse(cfg string, job *controller.Job, tab jobTabType,
-	group string) *jobResponse {
-	return &jobResponse{
+func newDAGResponse(cfg string, dag *controller.DAG, tab dagTabType,
+	group string) *dagResponse {
+	return &dagResponse{
 		Title:      cfg,
-		Job:        job,
+		DAG:        dag,
 		Tab:        tab,
 		Definition: "",
 		LogData:    nil,
@@ -88,13 +88,13 @@ func newJobResponse(cfg string, job *controller.Job, tab jobTabType,
 	}
 }
 
-type JobHandlerConfig struct {
-	JobsDir            string
+type DAGHandlerConfig struct {
+	DAGsDir            string
 	LogEncodingCharset string
 }
 
-func HandleGetJob(hc *JobHandlerConfig) http.HandlerFunc {
-	renderFunc := useTemplate("job.gohtml", "job")
+func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
+	renderFunc := useTemplate("dag.gohtml", "dag")
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg, err := getPathParameter(r)
@@ -103,30 +103,30 @@ func HandleGetJob(hc *JobHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		params := getJobParameter(r)
-		job, err := controller.FromConfig(filepath.Join(hc.JobsDir, params.Group, cfg))
+		params := getDAGParameter(r)
+		dag, err := controller.FromConfig(filepath.Join(hc.DAGsDir, params.Group, cfg))
 		if err != nil {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(job.Config)
-		data := newJobResponse(cfg, job, params.Tab, params.Group)
+		c := controller.New(dag.Config)
+		data := newDAGResponse(cfg, dag, params.Tab, params.Group)
 
 		switch params.Tab {
-		case JobTabType_Status:
-			data.Graph = models.StepGraph(job.Status.Nodes, params.Tab != JobTabType_Config)
-		case JobTabType_Config:
-			steps := models.FromSteps(job.Config.Steps)
-			data.Graph = models.StepGraph(steps, params.Tab != JobTabType_Config)
-			data.Definition, _ = config.ReadConfig(path.Join(hc.JobsDir, params.Group, cfg))
-		case JobTabType_History:
-			logs, err := controller.New(job.Config).GetStatusHist(30)
+		case DAG_TabType_Status:
+			data.Graph = models.StepGraph(dag.Status.Nodes, params.Tab != DAG_TabType_Config)
+		case DAG_TabType_Config:
+			steps := models.FromSteps(dag.Config.Steps)
+			data.Graph = models.StepGraph(steps, params.Tab != DAG_TabType_Config)
+			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, params.Group, cfg))
+		case DAG_TabType_History:
+			logs, err := controller.New(dag.Config).GetStatusHist(30)
 			if err != nil {
 				encodeError(w, err)
 				return
 			}
 			data.LogData = buildLog(logs)
-		case JobTabType_StepLog:
+		case DAG_TabType_StepLog:
 			if isJsonRequest(r) {
 				data.StepLog, err = readStepLog(c, params.File, params.Step, hc.LogEncodingCharset)
 				if err != nil {
@@ -134,7 +134,7 @@ func HandleGetJob(hc *JobHandlerConfig) http.HandlerFunc {
 					return
 				}
 			}
-		case JobTabType_ScLog:
+		case DAG_TabType_ScLog:
 			if isJsonRequest(r) {
 				data.ScLog, err = readSchedulerLog(c, params.File)
 				if err != nil {
@@ -157,13 +157,13 @@ func isJsonRequest(r *http.Request) bool {
 	return r.Header.Get("Accept") == "application/json"
 }
 
-type PostJobHandlerConfig struct {
-	JobsDir string
+type PostDAGHandlerConfig struct {
+	DAGsDir string
 	Bin     string
 	WkDir   string
 }
 
-func HandlePostJobAction(hc *PostJobHandlerConfig) http.HandlerFunc {
+func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
@@ -176,34 +176,34 @@ func HandlePostJobAction(hc *PostJobHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		file := filepath.Join(hc.JobsDir, group, cfg)
-		job, err := controller.FromConfig(file)
+		file := filepath.Join(hc.DAGsDir, group, cfg)
+		dag, err := controller.FromConfig(file)
 		if err != nil {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(job.Config)
+		c := controller.New(dag.Config)
 
 		switch action {
 		case "start":
-			if job.Status.Status == scheduler.SchedulerStatus_Running {
+			if dag.Status.Status == scheduler.SchedulerStatus_Running {
 				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("job is already running."))
+				w.Write([]byte("DAG is already running."))
 				return
 			}
-			err = c.StartJob(hc.Bin, hc.WkDir, "")
+			err = c.Start(hc.Bin, hc.WkDir, "")
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte(err.Error()))
 				return
 			}
 		case "stop":
-			if job.Status.Status != scheduler.SchedulerStatus_Running {
+			if dag.Status.Status != scheduler.SchedulerStatus_Running {
 				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("job is not running."))
+				w.Write([]byte("DAG is not running."))
 				return
 			}
-			err = c.StopJob()
+			err = c.Stop()
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
 				w.Write([]byte(err.Error()))
@@ -215,7 +215,7 @@ func HandlePostJobAction(hc *PostJobHandlerConfig) http.HandlerFunc {
 				w.Write([]byte("request-id is required."))
 				return
 			}
-			err = c.RetryJob(hc.Bin, hc.WkDir, reqId)
+			err = c.Retry(hc.Bin, hc.WkDir, reqId)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte(err.Error()))
@@ -226,7 +226,7 @@ func HandlePostJobAction(hc *PostJobHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, job.File, http.StatusSeeOther)
+		http.Redirect(w, r, dag.File, http.StatusSeeOther)
 	}
 }
 
@@ -327,7 +327,7 @@ func readFile(f string, decorder *encoding.Decoder) ([]byte, error) {
 
 func buildLog(logs []*models.StatusFile) *Log {
 	ret := &Log{
-		GridData: []*jobStatus{},
+		GridData: []*dagStatus{},
 		Logs:     logs,
 	}
 	tmp := map[string][]scheduler.NodeStatus{}
@@ -344,7 +344,7 @@ func buildLog(logs []*models.StatusFile) *Log {
 		}
 	}
 	for k, v := range tmp {
-		ret.GridData = append(ret.GridData, &jobStatus{Name: k, Vals: v})
+		ret.GridData = append(ret.GridData, &dagStatus{Name: k, Vals: v})
 	}
 	sort.Slice(ret.GridData, func(i, c int) bool {
 		return strings.Compare(ret.GridData[i].Name, ret.GridData[c].Name) <= 0
@@ -366,14 +366,14 @@ func buildLog(logs []*models.StatusFile) *Log {
 	}
 	for _, h := range []string{constants.OnSuccess, constants.OnFailure, constants.OnCancel, constants.OnExit} {
 		if v, ok := tmp[h]; ok {
-			ret.GridData = append(ret.GridData, &jobStatus{Name: h, Vals: v})
+			ret.GridData = append(ret.GridData, &dagStatus{Name: h, Vals: v})
 		}
 	}
 	return ret
 }
 
 func getPathParameter(r *http.Request) (string, error) {
-	re := regexp.MustCompile("/jobs/([^/\\?]+)/?$")
+	re := regexp.MustCompile("/dags/([^/\\?]+)/?$")
 	m := re.FindStringSubmatch(r.URL.Path)
 	if len(m) < 2 {
 		return "", fmt.Errorf("invalid URL")
@@ -381,17 +381,17 @@ func getPathParameter(r *http.Request) (string, error) {
 	return m[1], nil
 }
 
-func getJobParameter(r *http.Request) *jobParameter {
-	p := &jobParameter{
-		Tab:   JobTabType_Status,
+func getDAGParameter(r *http.Request) *dagParameter {
+	p := &dagParameter{
+		Tab:   DAG_TabType_Status,
 		Group: "",
 	}
 	if tab, ok := r.URL.Query()["t"]; ok {
 		i, err := strconv.Atoi(tab[0])
-		if err != nil || i >= int(JobTabType_None) {
-			p.Tab = JobTabType_Status
+		if err != nil || i >= int(DAG_TabType_None) {
+			p.Tab = DAG_TabType_Status
 		} else {
-			p.Tab = jobTabType(i)
+			p.Tab = dagTabType(i)
 		}
 	}
 	if group, ok := r.URL.Query()["group"]; ok {

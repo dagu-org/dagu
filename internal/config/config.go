@@ -352,7 +352,7 @@ func loadVariables(strVariables map[string]string) (map[string]string, error) {
 
 func assertDef(def *configDefinition) error {
 	if def.Name == "" {
-		return fmt.Errorf("job name must be specified.")
+		return fmt.Errorf("DAG name must be specified.")
 	}
 	if len(def.Steps) == 0 {
 		return fmt.Errorf("at least one step must be specified.")

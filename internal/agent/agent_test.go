@@ -28,44 +28,44 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestRunJob(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("agent_run.yaml"))
+func TestRunDAG(t *testing.T) {
+	dag, err := controller.FromConfig(testConfig("agent_run.yaml"))
 	require.NoError(t, err)
 
-	status, err := testJob(t, job)
+	status, err := testDAG(t, dag)
 	require.NoError(t, err)
 
 	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 }
 
-func TestCancelJob(t *testing.T) {
+func TestCancelDAG(t *testing.T) {
 	for _, abort := range []func(*agent.Agent){
 		func(a *agent.Agent) { a.Signal(syscall.SIGTERM) },
 		func(a *agent.Agent) { a.Cancel(syscall.SIGTERM) },
 		func(a *agent.Agent) { a.Kill(nil) },
 	} {
-		a, job := testJobAsync(t, testConfig("agent_sleep.yaml"))
+		a, dag := testDAGAsync(t, testConfig("agent_sleep.yaml"))
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
-		status, err := controller.New(job.Config).GetLastStatus()
+		status, err := controller.New(dag.Config).GetLastStatus()
 		require.NoError(t, err)
 		assert.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
 	}
 }
 
 func TestPreConditionInvalid(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("agent_multiple_steps.yaml"))
+	dag, err := controller.FromConfig(testConfig("agent_multiple_steps.yaml"))
 	require.NoError(t, err)
 
-	job.Config.Preconditions = []*config.Condition{
+	dag.Config.Preconditions = []*config.Condition{
 		{
 			Condition: "`echo 1`",
 			Expected:  "0",
 		},
 	}
 
-	status, err := testJob(t, job)
+	status, err := testDAG(t, dag)
 	require.Error(t, err)
 
 	assert.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
@@ -75,16 +75,16 @@ func TestPreConditionInvalid(t *testing.T) {
 }
 
 func TestPreConditionValid(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("agent_with_params.yaml"))
+	dag, err := controller.FromConfig(testConfig("agent_with_params.yaml"))
 	require.NoError(t, err)
 
-	job.Config.Preconditions = []*config.Condition{
+	dag.Config.Preconditions = []*config.Condition{
 		{
 			Condition: "`echo 1`",
 			Expected:  "1",
 		},
 	}
-	status, err := testJob(t, job)
+	status, err := testDAG(t, dag)
 	require.NoError(t, err)
 
 	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
@@ -94,9 +94,9 @@ func TestPreConditionValid(t *testing.T) {
 }
 
 func TestOnExit(t *testing.T) {
-	job, err := controller.FromConfig(testConfig("agent_on_exit.yaml"))
+	dag, err := controller.FromConfig(testConfig("agent_on_exit.yaml"))
 	require.NoError(t, err)
-	status, err := testJob(t, job)
+	status, err := testDAG(t, dag)
 	require.NoError(t, err)
 
 	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
@@ -108,10 +108,10 @@ func TestOnExit(t *testing.T) {
 
 func TestRetry(t *testing.T) {
 	cfg := testConfig("agent_retry.yaml")
-	job, err := controller.FromConfig(cfg)
+	dag, err := controller.FromConfig(cfg)
 	require.NoError(t, err)
 
-	status, err := testJob(t, job)
+	status, err := testDAG(t, dag)
 	require.Error(t, err)
 	assert.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 
@@ -120,7 +120,7 @@ func TestRetry(t *testing.T) {
 	}
 	a := &agent.Agent{
 		Config: &agent.Config{
-			Job: job.Config,
+			DAG: dag.Config,
 		},
 		RetryConfig: &agent.RetryConfig{
 			Status: status,
@@ -139,10 +139,10 @@ func TestRetry(t *testing.T) {
 	}
 }
 
-func testJob(t *testing.T, job *controller.Job) (*models.Status, error) {
+func testDAG(t *testing.T, dag *controller.DAG) (*models.Status, error) {
 	t.Helper()
 	a := &agent.Agent{Config: &agent.Config{
-		Job: job.Config,
+		DAG: dag.Config,
 	}}
 	err := a.Run()
 	return a.Status(), err
@@ -152,19 +152,19 @@ func testConfig(name string) string {
 	return path.Join(testsDir, name)
 }
 
-func testJobAsync(t *testing.T, file string) (*agent.Agent, *controller.Job) {
+func testDAGAsync(t *testing.T, file string) (*agent.Agent, *controller.DAG) {
 	t.Helper()
 
-	job, err := controller.FromConfig(file)
+	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
 
 	a := &agent.Agent{Config: &agent.Config{
-		Job: job.Config,
+		DAG: dag.Config,
 	}}
 
 	go func() {
 		a.Run()
 	}()
 
-	return a, job
+	return a, dag
 }

@@ -33,7 +33,7 @@ func TestAssertDefinition(t *testing.T) {
 	loader := config.NewConfigLoader()
 
 	_, err := loader.Load(path.Join(testDir, "config_err_no_name.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("job name must be specified."))
+	require.Equal(t, err, fmt.Errorf("DAG name must be specified."))
 
 	_, err = loader.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("at least one step must be specified."))

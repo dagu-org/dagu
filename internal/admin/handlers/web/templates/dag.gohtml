@@ -145,12 +145,12 @@
             <NodeTable
               nodes={logs[idx].Status.Nodes}
               file={logs[idx].File}
-              job={data.Job}
+              dag={data.DAG}
             ></NodeTable>
             <NodeTable
               nodes={getHandlersFromStatus(logs[idx].Status)}
               file={logs[idx].File}
-              job={data.Job}
+              dag={data.DAG}
             ></NodeTable>
           </React.Fragment>
         ) : null}
@@ -233,19 +233,19 @@
   function ConfigTab({ data }) {
     const mermaidStyle = {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: (data.Job.Config.Steps.length * 100) + "px"
+      width: (data.DAG.Config.Steps.length * 100) + "px"
     };
-    const handlers = getHandlersFromConfig(data.Job.Config);
+    const handlers = getHandlersFromConfig(data.DAG.Config);
     return (
       <div>
         <MermaidC style={mermaidStyle}>{data.Graph}</MermaidC>
-        <ConfigTable config={data.Job.Config}></ConfigTable>
-        <StepConfigTable steps={data.Job.Config.Steps}></StepConfigTable>
+        <ConfigTable config={data.DAG.Config}></ConfigTable>
+        <StepConfigTable steps={data.DAG.Config.Steps}></StepConfigTable>
         <StepConfigTable steps={handlers}></StepConfigTable>
 
         <div class="content">
           <div class="box">
-            <h2>{data.Job.Config.ConfigPath}</h2>
+            <h2>{data.DAG.Config.ConfigPath}</h2>
             <pre>{data.Definition}</pre>
           </div>
         </div>
@@ -257,16 +257,16 @@
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'flex-start',
-      width: (data.Job.Status.Nodes.length * 100) + "px"
+      width: (data.DAG.Status.Nodes.length * 100) + "px"
     };
-    const handlers = getHandlersFromStatus(data.Job.Status);
+    const handlers = getHandlersFromStatus(data.DAG.Status);
     return (
       <div>
         {subTab == 0 ? (
           <MermaidC style={mermaidStyle}>{data.Graph}</MermaidC>
-        ) : (<Timeline status={data.Job.Status}></Timeline>)}
-        <StatusTable status={data.Job.Status}></StatusTable>
-        <NodeTable nodes={data.Job.Status.Nodes} job={data.Job}></NodeTable>
+        ) : (<Timeline status={data.DAG.Status}></Timeline>)}
+        <StatusTable status={data.DAG.Status}></StatusTable>
+        <NodeTable nodes={data.DAG.Status.Nodes} dag={data.DAG}></NodeTable>
         <NodeTable nodes={handlers}></NodeTable>
       </div>
     );
@@ -427,7 +427,7 @@
   ]
   function Timeline({ status }) {
     if (status.Status == 0 || status.Status == 1) {
-      // the job is not running or running
+      // the DAG is not running or running
       return null;
     }
     const graph = React.useMemo(() => {
@@ -471,7 +471,7 @@
           <thead className="has-background-light">
             <tr>
               <th style={styles[i++]}>Request ID</th>
-              <th style={styles[i++]}>Job Name</th>
+              <th style={styles[i++]}>DAG Name</th>
               <th style={styles[i++]}>Started At</th>
               <th style={styles[i++]}>Finished At</th>
               <th style={styles[i++]}>Status</th>
@@ -506,7 +506,7 @@
     { width: "100px" },
     {},
   ]
-  function NodeTable({ nodes, file = "", job }) {
+  function NodeTable({ nodes, file = "", dag }) {
     const tableStyle = {
       "tableLayout": "fixed",
       "wordWrap": "break-word",
@@ -537,7 +537,7 @@
             </tr>
           </thead>
           <tbody>
-            {nodes.map((n, idx) => <NodeTableRow rownum={idx + 1} node={n} file={file} job={job}></NodeTableRow>)}
+            {nodes.map((n, idx) => <NodeTableRow rownum={idx + 1} node={n} file={file}></NodeTableRow>)}
           </tbody>
         </table>
       </div>
@@ -550,7 +550,7 @@
       </React.Fragment>
     )
   }
-  function NodeTableRow({ rownum, node, file, job }) {
+  function NodeTableRow({ rownum, node, file }) {
     const url = encodeURI("?t=" + TAB_ID__STEPLOG + "&group={{.Group}}&file=" + file + "&step=" + node.Step.Name)
     return (
       <tr>
@@ -577,23 +577,23 @@
         }
       }
       return {
-        "start": func('Do you really want to start the job?'),
-        "stop": func('Do you really want to cancel the job?'),
+        "start": func('Do you really want to start the DAG?'),
+        "stop": func('Do you really want to cancel the DAG?'),
         "retry": func(
-          "Do you really want to retry the last job (" +
-          data.Job.Status.RequestId + ") ?"),
+          "Do you really want to retry the last execution (" +
+          data.DAG.Status.RequestId + ") ?"),
       }
-    }, [data.Job.Status.RequestId]);
+    }, [data.DAG.Status.RequestId]);
     const buttonStyle = React.useMemo(() => ({
       "start": { width: "100px", backgroundColor: "gray", border: 0, color: "white", },
       "stop": { width: "100px", backgroundColor: "gray", border: 0, color: "white", },
       "retry": { width: "100px", backgroundColor: "gray", border: 0, color: "white", },
     }), []);
     const buttonState = React.useMemo(() => ({
-      "start": data.Job.Status.Status != SCHEDULER_STATUS__RUNNING,
-      "stop": data.Job.Status.Status == SCHEDULER_STATUS__RUNNING,
-      "retry": data.Job.Status.Status != SCHEDULER_STATUS__RUNNING
-        && data.Job.Status.RequestId != "",
+      "start": data.DAG.Status.Status != SCHEDULER_STATUS__RUNNING,
+      "stop": data.DAG.Status.Status == SCHEDULER_STATUS__RUNNING,
+      "retry": data.DAG.Status.Status != SCHEDULER_STATUS__RUNNING
+        && data.DAG.Status.RequestId != "",
     }), [data]);
     return (
       <div className="mr-4 pt-4 is-flex is-flex-direction-row">
@@ -623,7 +623,7 @@
         </form>
         <form method="post" onSubmit={onSubmit["retry"]}>
           <input type="hidden" name="group" value="{{.Group}}"></input>
-          <input type="hidden" name="request-id" value={data.Job.Status.RequestId}></input>
+          <input type="hidden" name="request-id" value={data.DAG.Status.RequestId}></input>
           <button type="submit" name="action" value="retry"
             className="button is-rounded ml-4"
             disabled={!buttonState["retry"]}

@@ -1,4 +1,4 @@
-name: example job
+name: example DAG
 steps:
   - name: "1"
     command: echo hello world

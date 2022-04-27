@@ -23,8 +23,6 @@ var defaultFuncs = template.FuncMap{
 //go:embed web/templates/*
 var assets embed.FS
 var templatePath = "web/templates/"
-var defaultConfig = &struct {
-}{}
 
 func useTemplate(layout string, name string) func(http.ResponseWriter, interface{}) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))

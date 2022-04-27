@@ -1,6 +1,6 @@
 host: ${HOST}
 port: 8082
-jobs: "${HOME}/dagu/jobs"
+dags: "${HOME}/dagu/dags"
 command: "${HOME}/dagu/bin/dagu"
-workDir: "${HOME}/dagu/jobs"
+workDir: "${HOME}/dagu/dags"
 logEncodingCharset: euc-jp
