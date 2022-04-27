@@ -507,6 +507,27 @@
     {},
   ]
   function NodeTable({ nodes, file = "", dag }) {
+    const [modal, setModal] = React.useState(false);
+    const [current, setCurrent] = React.useState(null);
+    const requireModal = (step) => { 
+      if (dag.Status.Status == SCHEDULER_STATUS__RUNNING || dag.Status.Status == SCHEDULER_STATUS__NONE) {
+        return;
+      }
+      setCurrent(step);
+      setModal(true);
+    }
+    const dismissModal = () => { setModal(false); }
+    React.useEffect(() => {
+      document.addEventListener('keydown', (event) => {
+        const e = event || window.event;
+        if (e.keyCode === 27) { // Escape key
+          setModal(false);
+        }
+      });
+      return () => {
+        document.removeEventListener('keydown');
+      };
+    }, [])
     const tableStyle = {
       "tableLayout": "fixed",
       "wordWrap": "break-word",
@@ -515,6 +536,10 @@
       "overflow-x": "auto",
     };
     const styles = stepTabColStyles;
+    const modalbuttonStyle = {};
+    const modalStyle = {
+      display: modal ? "flex" : "none",
+    }
     let i = 0;
     if (!nodes.length) {
       return null;
@@ -537,9 +562,49 @@
             </tr>
           </thead>
           <tbody>
-            {nodes.map((n, idx) => <NodeTableRow rownum={idx + 1} node={n} file={file}></NodeTableRow>)}
+            {nodes.map((n, idx) => <NodeTableRow rownum={idx + 1} node={n} file={file} onRequireModal={requireModal}></NodeTableRow>)}
           </tbody>
         </table>
+
+        {current ? (
+          <div className="modal is-active" style={modalStyle}>
+            <div className="modal-background"></div>
+            <div className="modal-card">
+              <header className="modal-card-head">
+                <p className="modal-card-title">Update status of "{current.Name}"</p>
+                <button className="delete" aria-label="close" onClick={dismissModal}></button>
+              </header>
+              <section className="modal-card-body">
+                <div className="mr-4 pt-4 is-flex is-flex-direction-row">
+                  <form method="post" onSubmit={null}>
+                    <input type="hidden" name="group" value="{{.Group}}"></input>
+                    <input type="hidden" name="request-id" value={dag.Status.RequestId}></input>
+                    <input type="hidden" name="step" value={current.Name}></input>
+                    <button type="submit" name="action" value="mark-success"
+                      className="button is-info"
+                      style={modalbuttonStyle}>
+                      <span>Mark Success</span>
+                    </button>
+                  </form>
+                  <form method="post" onSubmit={null}>
+                    <input type="hidden" name="group" value="{{.Group}}"></input>
+                    <input type="hidden" name="request-id" value={dag.Status.RequestId}></input>
+                    <input type="hidden" name="step" value={current.Name}></input>
+                    <button type="submit" name="action" value="mark-failed"
+                      className="button is-info ml-4"
+                      style={modalbuttonStyle}>
+                      <span>Mark Failed</span>
+                    </button>
+                  </form>
+                </div>
+              </section>
+              <footer className="modal-card-foot">
+                <button className="button" onClick={dismissModal}>Cancel</button>
+              </footer>
+            </div>
+          </div>
+
+        ) : null}
       </div>
     )
   }
@@ -550,8 +615,15 @@
       </React.Fragment>
     )
   }
-  function NodeTableRow({ rownum, node, file }) {
+  function NodeTableRow({ rownum, node, file, onRequireModal }) {
     const url = encodeURI("?t=" + TAB_ID__STEPLOG + "&group={{.Group}}&file=" + file + "&step=" + node.Step.Name)
+    const buttonStyle = {
+      "margin": "0px",
+      "padding": "0px",
+      "border": "0px",
+      "background": "none",
+      "outline": "none",
+    };
     return (
       <tr>
         <td> {rownum} </td>
@@ -561,7 +633,9 @@
         <td> {node.Step.Args ? node.Step.Args.join(" ") : ""} </td>
         <td> {node.StartedAt} </td>
         <td> {node.FinishedAt} </td>
-        <td> <StatusTag status={node.Status}>{node.StatusText}</StatusTag></td>
+        <td> <button style={buttonStyle} onClick={() => onRequireModal(node.Step)}>
+          <StatusTag status={node.Status}>{node.StatusText}</StatusTag>
+        </button> </td>
         <td> {node.Error} </td>
         <td> <a href={url}> {node.Log} </a> </td>
       </tr>

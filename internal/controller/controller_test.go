@@ -85,3 +85,33 @@ func TestGetDAGList(t *testing.T) {
 	matches, _ := filepath.Glob(path.Join(testsDir, "*.yaml"))
 	assert.Equal(t, len(matches), len(dags))
 }
+
+func TestUpdateStatus(t *testing.T) {
+	file := testConfig("controller_update_status.yaml")
+
+	dag, err := controller.FromConfig(file)
+	require.NoError(t, err)
+
+	a := agent.Agent{Config: &agent.Config{
+		DAG: dag.Config,
+	}}
+
+	err = a.Run()
+	require.NoError(t, err)
+
+	st, err := controller.New(dag.Config).GetLastStatus()
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(st.Nodes))
+	require.Equal(t, scheduler.NodeStatus_Success, st.Nodes[0].Status)
+
+	st.Nodes[0].Status = scheduler.NodeStatus_Error
+	err = controller.New(dag.Config).UpdateStatus(st)
+	require.NoError(t, err)
+
+	updated, err := controller.New(dag.Config).GetLastStatus()
+	require.NoError(t, err)
+
+	require.Equal(t, 1, len(st.Nodes))
+	require.Equal(t, scheduler.NodeStatus_Error, updated.Nodes[0].Status)
+}
