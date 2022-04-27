@@ -16,7 +16,6 @@ dagu is a single command that generates and executes a [DAG (Directed acyclic gr
   - [Features](#features)
   - [Use cases](#use-cases)
   - [User interface](#user-interface)
-  - [Architecture](#architecture)
   - [Configuration](#configuration)
     - [Environment variables](#environment-variables)
     - [Web UI configuration](#web-ui-configuration)
@@ -25,9 +24,9 @@ dagu is a single command that generates and executes a [DAG (Directed acyclic gr
     - [Minimal](#minimal)
     - [Available configurations](#available-configurations)
   - [Examples](#examples)
+  - [Architecture](#architecture)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
-  - [Todo](#todo)
   - [License](#license)
 
 ## Motivation
@@ -101,11 +100,6 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 - **History**: History of the execution of the pipeline.
 
   ![History](https://user-images.githubusercontent.com/1475839/165426067-02c4f72f-e3f0-4cd8-aa38-35fa98f0382f.png)
-
-## Architecture
-
-- uses plain JSON files as history database, and unix sockets to communicate with running processes.
-  ![dagu Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
 
 ## Configuration
 
@@ -347,6 +341,11 @@ steps:
       - Reconcile
 ```
 
+## Architecture
+
+- uses plain JSON files as history database, and unix sockets to communicate with running processes.
+  ![dagu Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
+
 ## FAQ
 
 ### How to contribute?
@@ -354,18 +353,6 @@ steps:
 Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
 You can start by improving this [README.md](https://github.com/dagu/dagu/blob/main/README.md) or suggesting new [features](https://github.com/dagu/dagu/issues)
 Thank you!
-
-## Todo
-
-- [ ] Documentation for YAML definitions
-- [ ] Prettier CLI interface
-- [ ] JWT authentication
-- [ ] History compaction
-- [ ] History sub command
-- [ ] Edit YAML on Web UI
-- [ ] Pause & Resume pipeline
-- [ ] Docker container
-- [ ] Edit node status on Web UI
 
 ## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
