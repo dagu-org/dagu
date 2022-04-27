@@ -49,11 +49,7 @@ func (c *Config) setup() error {
 		c.Jobs = wd
 	}
 	if c.Host == "" {
-		h, err := os.Hostname()
-		if err != nil {
-			return err
-		}
-		c.Host = h
+		c.Host = "127.0.0.1"
 	}
 	if c.Port == "" {
 		c.Port = "8000"
