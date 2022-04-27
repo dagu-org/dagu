@@ -6,15 +6,15 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/jobctl/internal/agent"
-	"github.com/yohamta/jobctl/internal/config"
+	"github.com/yohamta/dagu/internal/agent"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func newDryCommand() *cli.Command {
 	cl := config.NewConfigLoader()
 	return &cli.Command{
 		Name:  "dry",
-		Usage: "jobctl dry [--params=\"<params>\"] <config>",
+		Usage: "dagu dry [--params=\"<params>\"] <config>",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "params",

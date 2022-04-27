@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/jobctl/internal/sock"
+	"github.com/yohamta/dagu/internal/sock"
 )
 
 func TestDialFail(t *testing.T) {

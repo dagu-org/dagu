@@ -1,4 +1,4 @@
-module github.com/yohamta/jobctl
+module github.com/yohamta/dagu
 
 go 1.17
 

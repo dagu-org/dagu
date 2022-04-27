@@ -12,7 +12,7 @@ bin:
 
 .PHONY: build
 build: bin
-	go build -o ./bin/jobctl ./cmd/
+	go build -o ./bin/dagu ./cmd/
 
 .PHONY: server
 server: build

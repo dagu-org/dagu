@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yohamta/jobctl/internal/config"
-	"github.com/yohamta/jobctl/internal/database"
-	"github.com/yohamta/jobctl/internal/models"
-	"github.com/yohamta/jobctl/internal/scheduler"
-	"github.com/yohamta/jobctl/internal/sock"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/sock"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Controller interface {

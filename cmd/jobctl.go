@@ -38,9 +38,9 @@ func run() error {
 
 func makeApp() *cli.App {
 	return &cli.App{
-		Name:      "jobctl",
+		Name:      "dagu",
 		Usage:     "Simple command to run a group of jobs",
-		UsageText: "jobctl [options] <start|status|stop|retry|dry|server> [args]",
+		UsageText: "dagu [options] <start|status|stop|retry|dry|server> [args]",
 		Commands: []*cli.Command{
 			newStartCommand(),
 			newStatusCommand(),

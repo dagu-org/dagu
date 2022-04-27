@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/jobctl/internal/config"
-	"github.com/yohamta/jobctl/internal/constants"
-	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 type SchedulerStatus int

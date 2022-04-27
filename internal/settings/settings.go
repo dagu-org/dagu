@@ -5,7 +5,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 var ErrConfigNotFound = fmt.Errorf("config not found")
@@ -13,8 +13,8 @@ var ErrConfigNotFound = fmt.Errorf("config not found")
 var cache map[string]string = nil
 
 const (
-	CONFIG__DATA_DIR = "JOBCTL__DATA"
-	CONFIG__LOGS_DIR = "JOBCTL__LOGS"
+	CONFIG__DATA_DIR = "dagu__DATA"
+	CONFIG__LOGS_DIR = "dagu__LOGS"
 )
 
 func MustGet(name string) string {
@@ -42,10 +42,10 @@ func load() {
 	cache = map[string]string{}
 	cache[CONFIG__DATA_DIR] = config(
 		CONFIG__DATA_DIR,
-		path.Join(dir, "/.jobctl/data"))
+		path.Join(dir, "/.dagu/data"))
 	cache[CONFIG__LOGS_DIR] = config(
 		CONFIG__LOGS_DIR,
-		path.Join(dir, "/.jobctl/logs"))
+		path.Join(dir, "/.dagu/logs"))
 }
 
 func InitTest(dir string) {

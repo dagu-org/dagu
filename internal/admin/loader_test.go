@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/jobctl/internal/admin"
-	"github.com/yohamta/jobctl/internal/settings"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 var (
@@ -37,7 +37,7 @@ func TestDefaultConfig(t *testing.T) {
 		Host:    h,
 		Port:    "8000",
 		Jobs:    path.Join(wd),
-		Command: "jobctl",
+		Command: "dagu",
 	})
 }
 
@@ -49,9 +49,9 @@ func TestHomeAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8081",
-		Jobs:    path.Join(testsDir, "/jobctl/jobs"),
-		Command: path.Join(testsDir, "/jobctl/bin/jobctl"),
-		WorkDir: path.Join(testsDir, "/jobctl/jobs"),
+		Jobs:    path.Join(testsDir, "/dagu/jobs"),
+		Command: path.Join(testsDir, "/dagu/bin/dagu"),
+		WorkDir: path.Join(testsDir, "/dagu/jobs"),
 	})
 }
 
@@ -63,9 +63,9 @@ func TestLoadAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8082",
-		Jobs:    path.Join(testsDir, "/jobctl/jobs"),
-		Command: path.Join(testsDir, "/jobctl/bin/jobctl"),
-		WorkDir: path.Join(testsDir, "/jobctl/jobs"),
+		Jobs:    path.Join(testsDir, "/dagu/jobs"),
+		Command: path.Join(testsDir, "/dagu/bin/dagu"),
+		WorkDir: path.Join(testsDir, "/dagu/jobs"),
 	})
 }
 

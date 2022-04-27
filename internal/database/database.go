@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohamta/jobctl/internal/models"
-	"github.com/yohamta/jobctl/internal/settings"
+	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 type Database struct {

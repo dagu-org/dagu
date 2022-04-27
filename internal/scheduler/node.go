@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/jobctl/internal/config"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type NodeStatus int

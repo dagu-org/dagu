@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Condition struct {

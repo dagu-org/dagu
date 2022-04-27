@@ -5,3 +5,6 @@ bin/*
 tmp/*
 
 dist/
+
+# MacOS
+.DS_Store

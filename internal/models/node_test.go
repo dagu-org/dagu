@@ -5,10 +5,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/jobctl/internal/config"
-	"github.com/yohamta/jobctl/internal/models"
-	"github.com/yohamta/jobctl/internal/scheduler"
-	"github.com/yohamta/jobctl/internal/utils"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func makeStep(cmd string) *config.Step {
