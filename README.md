@@ -110,8 +110,8 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 ## Configuration
 
 ### Environment variables
-- `dagu__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
-- `dagu__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
+- `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
+- `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
 
 ### Web UI configuration
 

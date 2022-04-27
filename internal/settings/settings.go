@@ -13,8 +13,8 @@ var ErrConfigNotFound = fmt.Errorf("config not found")
 var cache map[string]string = nil
 
 const (
-	CONFIG__DATA_DIR = "dagu__DATA"
-	CONFIG__LOGS_DIR = "dagu__LOGS"
+	CONFIG__DATA_DIR = "DAGU__DATA"
+	CONFIG__LOGS_DIR = "DAGU__LOGS"
 )
 
 func MustGet(name string) string {
