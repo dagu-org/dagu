@@ -31,10 +31,8 @@ func TestDefaultConfig(t *testing.T) {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
 
-	h, err := os.Hostname()
-	require.NoError(t, err)
 	testConfig(t, cfg, &testWant{
-		Host:    h,
+		Host:    "127.0.0.1",
 		Port:    "8000",
 		Jobs:    path.Join(wd),
 		Command: "dagu",

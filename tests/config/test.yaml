@@ -1,5 +1,5 @@
-name: test job
-description: this is a test job.
+name: test DAG
+description: this is a test DAG.
 env:
   LOG_DIR: ${HOME}/logs
 logDir: ${LOG_DIR}
