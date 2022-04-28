@@ -172,7 +172,7 @@ steps:
 
 ### Using command substitution
 
-You can use command substitution in field values. A string enclosed in backquotes (`\``) is evaluated as a command and replaced with the result of standard output.
+You can use command substitution in field values. A string enclosed in backquotes (`` ` ``) is evaluated as a command and replaced with the result of standard output.
 
 ```yaml
 name: minimal configuration          
