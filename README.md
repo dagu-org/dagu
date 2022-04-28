@@ -53,7 +53,7 @@ I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobSc
 
 But unfortunately, they were not suitable for my existing environment. Because they required a DBMS (Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
 
-Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use.  I hope this tool will help others with the same thoughts.
+Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use. I hope that this tool will help people in similar situations.
 
 ## Quick start
 
