@@ -33,6 +33,7 @@ handlerOn:
     command: "onFailure.sh"
   cancel:
     command: "onCancel.sh"
+maxCleanupTimeSec: 500
 
 steps:
   - name: "1"
