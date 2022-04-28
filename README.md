@@ -376,15 +376,11 @@ Thank you!
 
 ### Where is the history data stored?
 
-DAGU's DAG execution history data is stored in plain json files in the path of the `DAGU__DATA` environment variable with extension `*.dat`.
-
-The default location is `$HOME/.dagu/data`.
+DAGU's DAG execution history data is stored in plain json files in the path of the `DAGU__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagu/data`.
 
 ### How long will the history data be stored?
 
-The default retension period for execution history is 7 days.
-
-This setting can be changed with `histRetentionDays` option in the config file.
+The default retension period for execution history is 7 days. This setting can be changed with `histRetentionDays` option in the config file.
 
 ### Is it possible to retry a DAG from a specific step?
 
