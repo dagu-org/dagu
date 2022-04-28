@@ -137,20 +137,16 @@ A minimal DAG definition is as simple as:
 name: minimal configuration          # DAG's name
 steps:                               # Steps inside the DAG
   - name: step 1                     # Step's name (should be unique within the file)
-    description: step 1              # [optional] Description of the step
     command: python main_1.py        # Command and arguments to execute
-    dir: ${HOME}/dags/               # [optional] Working directory
   - name: step 2
-    description: step 2
     command: python main_2.py
-    dir: ${HOME}/dags/
     depends:
       - step 1                       # [optional] Name of the step to depend on
 ```
 
 ### Using environment Variables
 
-Environment variables can be defined and used throughout the file.
+Environment variables can be defined and used throughout the file using `env` field.
 
 ```yaml
 name: example
@@ -164,7 +160,7 @@ steps:
 
 ### Using DAG parameters
 
-Parameters can be defined and referenced throughout a file. Each parameter can be referenced as $1, $2, etc. Parameters can also be command substitutions or environment variables. You can override the default values of the parameters with the `--params=` parameter of the `start` command.
+Parameters can be defined and referenced throughout a file using `params` field. Each parameter can be referenced as $1, $2, etc. Parameters can also be command substitutions or environment variables. You can override the default values of the parameters with the `--params=` parameter of the `start` command.
 
 ```yaml
 name: example
@@ -176,7 +172,7 @@ steps:
 
 ### Using command substitution
 
-You can use command substitution. A string enclosed in backquotes is evaluated as a command and replaced with the result of standard output.
+You can use command substitution in field values. A string enclosed in backquotes (`\``) is evaluated as a command and replaced with the result of standard output.
 
 ```yaml
 name: minimal configuration          
