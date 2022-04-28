@@ -44,6 +44,9 @@ steps:
       skipped: true
     retryPolicy:
       limit: 2
+    repeatPolicy:
+      repeat: true
+      intervalSec: 10
     preconditions:
       - condition: "`echo test`"
         expected: test

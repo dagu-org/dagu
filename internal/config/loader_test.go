@@ -40,6 +40,10 @@ func TestLoadConfig(t *testing.T) {
 			RetryPolicy: &config.RetryPolicy{
 				Limit: 2,
 			},
+			RepeatPolicy: config.RepeatPolicy{
+				Repeat:   true,
+				Interval: time.Second * 10,
+			},
 		},
 		{
 			Name:          "2",
@@ -90,7 +94,7 @@ func TestLoadConfig(t *testing.T) {
 			Failure: true,
 			Success: true,
 		},
-		DelaySec:      time.Second * 1,
+		Delay:         time.Second * 1,
 		MaxActiveRuns: 1,
 		Params:        []string{"param1", "param2"},
 		DefaultParams: "param1 param2",

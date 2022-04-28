@@ -31,22 +31,26 @@ type handerOnDef struct {
 }
 
 type stepDef struct {
-	Name              string
-	Description       string
-	Dir               string
-	Command           string
-	Depends           []string
-	ContinueOn        *continueOnDef
-	RetryPolicy       *retryPolicyDef
-	MailOnError       bool
-	Repeat            bool
-	RepeatIntervalSec int
-	Preconditions     []*conditionDef
+	Name          string
+	Description   string
+	Dir           string
+	Command       string
+	Depends       []string
+	ContinueOn    *continueOnDef
+	RetryPolicy   *retryPolicyDef
+	RepeatPolicy  *repeatPolicyDef
+	MailOnError   bool
+	Preconditions []*conditionDef
 }
 
 type continueOnDef struct {
 	Failure bool
 	Skipped bool
+}
+
+type repeatPolicyDef struct {
+	Repeat      bool
+	IntervalSec int
 }
 
 type retryPolicyDef struct {

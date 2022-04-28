@@ -26,7 +26,7 @@ type Config struct {
 	ErrorMail         *MailConfig
 	InfoMail          *MailConfig
 	Smtp              *SmtpConfig
-	DelaySec          time.Duration
+	Delay             time.Duration
 	HistRetentionDays int
 	Preconditions     []*Condition
 	MaxActiveRuns     int
@@ -135,7 +135,7 @@ func buildFromDefinition(def *configDefinition, file string, globalConfig *Confi
 	c.Description = def.Description
 	c.MailOn.Failure = def.MailOn.Failure
 	c.MailOn.Success = def.MailOn.Success
-	c.DelaySec = time.Second * time.Duration(def.DelaySec)
+	c.Delay = time.Second * time.Duration(def.DelaySec)
 
 	if opts != nil && opts.headOnly {
 		return c, nil
@@ -308,9 +308,11 @@ func buildStep(variables []string, def *stepDef) (*Step, error) {
 			Limit: def.RetryPolicy.Limit,
 		}
 	}
+	if def.RepeatPolicy != nil {
+		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
+		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+	}
 	step.MailOnError = def.MailOnError
-	step.Repeat = def.Repeat
-	step.RepeatInterval = time.Second * time.Duration(def.RepeatIntervalSec)
 	step.Preconditions = loadPreCondition(def.Preconditions)
 	return step, nil
 }

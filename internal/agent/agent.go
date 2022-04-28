@@ -154,7 +154,7 @@ func (a *Agent) init() {
 		&scheduler.Config{
 			LogDir:        path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_")),
 			MaxActiveRuns: a.DAG.MaxActiveRuns,
-			DelaySec:      a.DAG.DelaySec,
+			Delay:         a.DAG.Delay,
 			Dry:           a.Dry,
 			OnExit:        a.DAG.HandlerOn.Exit,
 			OnSuccess:     a.DAG.HandlerOn.Success,
