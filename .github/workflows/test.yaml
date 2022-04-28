@@ -23,4 +23,6 @@ jobs:
           ${{ runner.os }}-go-
     - name: Test
       run: |
-        go test -v ./...
+        go test -v -coverprofile="coverage.txt" -covermode=atomic ./...
+    - name: Upload coverage
+      uses: codecov/codecov-action@v2
