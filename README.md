@@ -34,6 +34,7 @@ dagu is a simple workflow engine to executes [DAGs (Directed acyclic graph)](htt
     - [Where is the log files stored?](#where-is-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [Is it possible to retry a DAG from a specific step?](#is-it-possible-to-retry-a-dag-from-a-specific-step)
+  - [GoDoc](#godoc)
   - [License](#license)
 
 ## Motivation
@@ -392,6 +393,10 @@ The default retension period for execution history is 7 days. This setting can b
 Just like Airflow, you can change the status of any task to failed. Then, when the job is retried, the tasks after the failed node will be executed.
 
 ![Update Status](https://user-images.githubusercontent.com/1475839/165755497-923828f8-1992-43fe-8618-979128c38c79.png)
+
+## GoDoc
+
+https://pkg.go.dev/github.com/yohamta/dagu
 
 ## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
