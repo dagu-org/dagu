@@ -71,9 +71,7 @@ func (n *Node) Execute() error {
 	cmd := exec.CommandContext(ctx, n.Command, n.Args...)
 	n.cmd = cmd
 	cmd.Dir = n.Dir
-	for _, v := range n.Variables {
-		cmd.Env = append(cmd.Env, v)
-	}
+	cmd.Env = append(cmd.Env, n.Variables...)
 
 	if n.logWriter != nil {
 		cmd.Stdout = n.logWriter

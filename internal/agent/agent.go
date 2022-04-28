@@ -101,7 +101,7 @@ func (a *Agent) Status() *models.Status {
 }
 
 // Signal sends the signal to the processes running
-// if processes do not terminate for 60 seconds,
+// if processes do not terminate for 120 seconds,
 // cancel all processes which will send signal -1 to the processes.
 func (a *Agent) Signal(sig os.Signal) {
 	log.Printf("Sending %s signal to running child processes.", sig)
@@ -112,7 +112,7 @@ func (a *Agent) Signal(sig os.Signal) {
 	select {
 	case <-done:
 		log.Printf("All child processes have been terminated.")
-	case <-time.After(time.Second * 60):
+	case <-time.After(time.Second * 120):
 		a.Cancel(sig)
 	default:
 		log.Printf("Waiting for child processes to exit...")
@@ -121,7 +121,7 @@ func (a *Agent) Signal(sig os.Signal) {
 }
 
 // Cancel sends signal -1 to all child processes.
-// then it waits another 20 seconds before therminating the
+// then it waits another 60 seconds before therminating the
 // parent process.
 func (a *Agent) Cancel(sig os.Signal) {
 	log.Printf("Sending -1 signal to running child processes.")
@@ -132,7 +132,7 @@ func (a *Agent) Cancel(sig os.Signal) {
 	select {
 	case <-done:
 		log.Printf("All child processes have been terminated.")
-	case <-time.After(time.Second * 20):
+	case <-time.After(time.Second * 60):
 		log.Printf("Terminating the controller process.")
 		a.Kill(done)
 	default:
@@ -154,7 +154,7 @@ func (a *Agent) init() {
 		&scheduler.Config{
 			LogDir:        path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_")),
 			MaxActiveRuns: a.DAG.MaxActiveRuns,
-			DelaySec:      a.DAG.DelaySec,
+			Delay:         a.DAG.Delay,
 			Dry:           a.Dry,
 			OnExit:        a.DAG.HandlerOn.Exit,
 			OnSuccess:     a.DAG.HandlerOn.Success,

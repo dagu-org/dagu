@@ -52,7 +52,7 @@ type Scheduler struct {
 type Config struct {
 	LogDir        string
 	MaxActiveRuns int
-	DelaySec      time.Duration
+	Delay         time.Duration
 	Dry           bool
 	OnExit        *config.Step
 	OnSuccess     *config.Step
@@ -134,18 +134,22 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 							// nothing to do
 						case NodeStatus_Error:
 							sc.lastError = err
-							fallthrough
-						default:
-							if done != nil {
-								done <- node
-							}
+						}
+					}
+					if node.ReadStatus() != NodeStatus_Cancel {
+						node.incDoneCount()
+					}
+					if node.RepeatPolicy.Repeat {
+						if err == nil || node.ContinueOn.Failure {
+							time.Sleep(node.RepeatPolicy.Interval)
+							continue
+						}
+					}
+					if err != nil {
+						if done != nil {
+							done <- node
 						}
 						return
-					}
-					if node.Repeat {
-						node.incDoneCount()
-						time.Sleep(node.RepeatInterval)
-						continue
 					}
 					break
 				}
@@ -155,7 +159,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 				}
 			}(node)
 
-			time.Sleep(sc.DelaySec)
+			time.Sleep(sc.Delay)
 		}
 
 		time.Sleep(sc.pause)

@@ -42,7 +42,7 @@ func stop(cfg *config.Config) error {
 		log.Printf("DAG is not running.")
 		return nil
 	}
-	syscall.Kill(int(status.Pid), syscall.SIGINT)
+	syscall.Kill(int(status.Pid), syscall.SIGTERM)
 	for {
 		time.Sleep(time.Second * 3)
 		s, err := controller.New(cfg).GetStatus()

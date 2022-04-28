@@ -7,23 +7,27 @@ import (
 )
 
 type Step struct {
-	Name           string
-	Description    string
-	Variables      []string
-	Dir            string
-	Command        string
-	Args           []string
-	Depends        []string
-	ContinueOn     ContinueOn
-	RetryPolicy    *RetryPolicy
-	MailOnError    bool
-	Repeat         bool
-	RepeatInterval time.Duration
-	Preconditions  []*Condition
+	Name          string
+	Description   string
+	Variables     []string
+	Dir           string
+	Command       string
+	Args          []string
+	Depends       []string
+	ContinueOn    ContinueOn
+	RetryPolicy   *RetryPolicy
+	RepeatPolicy  RepeatPolicy
+	MailOnError   bool
+	Preconditions []*Condition
 }
 
 type RetryPolicy struct {
 	Limit int
+}
+
+type RepeatPolicy struct {
+	Repeat   bool
+	Interval time.Duration
 }
 
 type ContinueOn struct {

@@ -216,12 +216,10 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	defer os.Remove(tmpDir)
 
 	go func() {
-		select {
-		case <-time.After(time.Millisecond * 300):
-			f, err := os.Create(tmpFile)
-			require.NoError(t, err)
-			f.Close()
-		}
+		<-time.After(time.Millisecond * 300)
+		f, err := os.Create(tmpFile)
+		require.NoError(t, err)
+		f.Close()
 	}()
 
 	g, sc, err := testSchedule(t,
@@ -400,6 +398,58 @@ func TestSchedulerOnFailure(t *testing.T) {
 	assert.Equal(t, sc.HanderNode(constants.OnSuccess).ReadStatus(), scheduler.NodeStatus_None)
 	assert.Equal(t, sc.HanderNode(constants.OnFailure).ReadStatus(), scheduler.NodeStatus_Success)
 	assert.Equal(t, sc.HanderNode(constants.OnCancel).ReadStatus(), scheduler.NodeStatus_None)
+}
+
+func TestRepeat(t *testing.T) {
+	g, _ := scheduler.NewExecutionGraph(
+		&config.Step{
+			Name:    "1",
+			Command: "sleep",
+			Args:    []string{"1"},
+			RepeatPolicy: config.RepeatPolicy{
+				Repeat:   true,
+				Interval: time.Millisecond * 300,
+			},
+		},
+	)
+	sc := scheduler.New(&scheduler.Config{})
+
+	done := make(chan bool)
+	go func() {
+		<-time.After(time.Millisecond * 3000)
+		sc.Cancel(g, done)
+	}()
+
+	err := sc.Schedule(g, nil)
+	<-done // Wait for canceling finished
+	require.NoError(t, err)
+
+	nodes := g.Nodes()
+
+	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Cancel)
+	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Cancel)
+	assert.Equal(t, nodes[0].DoneCount, 2)
+}
+
+func TestRepeatFail(t *testing.T) {
+	g, _ := scheduler.NewExecutionGraph(
+		&config.Step{
+			Name:    "1",
+			Command: testCommandFail,
+			RepeatPolicy: config.RepeatPolicy{
+				Repeat:   true,
+				Interval: time.Millisecond * 300,
+			},
+		},
+	)
+	sc := scheduler.New(&scheduler.Config{})
+	err := sc.Schedule(g, nil)
+	require.Error(t, err)
+
+	nodes := g.Nodes()
+	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
+	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Error)
+	assert.Equal(t, nodes[0].DoneCount, 1)
 }
 
 func testSchedule(t *testing.T, steps ...*config.Step) (
