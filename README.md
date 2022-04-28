@@ -1,9 +1,9 @@
 #  dagu 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
-**A simple command to run workflows (DAGs) defined in YAML format**
+**A simpler Airflow aLternative to run workflows (DAGs) defined in declarative YAML format**
 
-dagu is a single command that generates and executes a [DAG (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from a simple YAML definition. dagu also comes with a convenient web UI & REST API interface. It aims to be one of the easiest option to manage DAGs executed by cron.
+dagu is a simple workflow engine to executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in YAML format. dagu also comes with a rich web UI and REST API interface.
 
 ## Contents
 - [dagu](#dagu)
@@ -12,6 +12,9 @@ dagu is a single command that generates and executes a [DAG (Directed acyclic gr
   - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
   - [Quick start](#quick-start)
     - [Installation](#installation)
+    - [Download an example DAG definition](#download-an-example-dag-definition)
+    - [Start Web UI server](#start-web-ui-server)
+    - [Running the DAG](#running-the-dag)
     - [Usage](#usage)
   - [Features](#features)
   - [Use cases](#use-cases)
@@ -27,6 +30,9 @@ dagu is a single command that generates and executes a [DAG (Directed acyclic gr
   - [Architecture](#architecture)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
+    - [Where is the history data stored?](#where-is-the-history-data-stored)
+    - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
+    - [Is it possible to retry a DAG from a specific step?](#is-it-possible-to-retry-a-dag-from-a-specific-step)
   - [License](#license)
 
 ## Motivation
@@ -41,12 +47,26 @@ I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobSc
 
 But unfortunately, they were not suitable for my existing environment. Because they required a DBMS (Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
 
-Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use.
+Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use.  I hope this tool will help others with the same thoughts.
 
 ## Quick start
 
 ### Installation
-Download the binary from [Releases page](https://github.com/dagu/dagu/releases) and place it on your system.
+Download the binary from [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`.
+
+### Download an example DAG definition
+
+Download this [example](https://github.com/dagu/dagu/tree/main/examples) and place it in the current directory.
+
+### Start Web UI server
+
+Start the server with `dagu server` and browse to `http://localhost:8080` to explore the UI.
+
+### Running the DAG
+
+Then you can start the example DAG from the Web UI.
+
+![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
 
 ### Usage
 
@@ -353,6 +373,24 @@ steps:
 Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
 You can start by improving this [README.md](https://github.com/dagu/dagu/blob/main/README.md) or suggesting new [features](https://github.com/dagu/dagu/issues)
 Thank you!
+
+### Where is the history data stored?
+
+DAGU's DAG execution history data is stored in json files in the path of the `DAGU__DATA` environment variable. However the extension is `*.dat`
+
+The default location is `$HOME/.dagu/data`.
+
+### How long will the history data be stored?
+
+The default retension period for execution history is 7 days.
+
+This setting can be changed with `histRetentionDays` option in the config file.
+
+### Is it possible to retry a DAG from a specific step?
+
+Just like Airflow, you can change the status of any task to failed. Then, when the job is retried, the tasks after the failed node will be executed.
+
+![Update Status](https://user-images.githubusercontent.com/1475839/165755497-923828f8-1992-43fe-8618-979128c38c79.png)
 
 ## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
