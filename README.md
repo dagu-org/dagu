@@ -3,7 +3,7 @@
 
 **A simpler Airflow alternative to run workflows (DAGs) defined in declarative YAML format**
 
-dagu is a simple workflow engine to executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in declarative YAML format. dagu also comes with a rich web UI and REST API interface.
+dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definiton. dagu comes with an admin web UI and REST API interfaces are also included.
 
 ## Contents
 - [dagu](#dagu)
