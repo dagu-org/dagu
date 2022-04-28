@@ -56,7 +56,7 @@ Download the binary from [Releases page](https://github.com/dagu/dagu/releases) 
 
 ### Download an example DAG definition
 
-Download this [example](https://github.com/dagu/dagu/tree/main/examples) and place it in the current directory.
+Download this [example](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and place it in the current directory with extension `*.yaml`.
 
 ### Start Web UI server
 
