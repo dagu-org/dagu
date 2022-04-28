@@ -31,6 +31,7 @@ dagu is a simple workflow engine to executes [DAGs (Directed acyclic graph)](htt
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
+    - [Where is the log files stored?](#where-is-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [Is it possible to retry a DAG from a specific step?](#is-it-possible-to-retry-a-dag-from-a-specific-step)
   - [License](#license)
@@ -377,6 +378,10 @@ Thank you!
 ### Where is the history data stored?
 
 DAGU's DAG execution history data is stored in plain json files in the path of the `DAGU__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagu/data`.
+
+### Where is the log files stored?
+
+Log files are stored in the path of the `DAGU__LOGS` environment variable. The default location is `$HOME/.dagu/logs`. You can override this setting by `logDir` option in the config file.
 
 ### How long will the history data be stored?
 
