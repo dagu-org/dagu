@@ -1,7 +1,7 @@
 #  dagu 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
-**A simpler Airflow aLternative to run workflows (DAGs) defined in declarative YAML format**
+**A simpler Airflow alternative to run workflows (DAGs) defined in declarative YAML format**
 
 dagu is a simple workflow engine to executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in declarative YAML format. dagu also comes with a rich web UI and REST API interface.
 
