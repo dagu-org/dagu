@@ -233,7 +233,9 @@
   function ConfigTab({ data }) {
     const mermaidStyle = {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: (data.DAG.Config.Steps.length * 100) + "px"
+      width: (data.DAG.Config.Steps.length * 100) + "px",
+      minWidth: "100%",
+      minHeight: "100px",
     };
     const handlers = getHandlersFromConfig(data.DAG.Config);
     return (
@@ -257,7 +259,9 @@
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'flex-start',
-      width: (data.DAG.Status.Nodes.length * 100) + "px"
+      width: (data.DAG.Status.Nodes.length * 100) + "px",
+      minWidth: "100%",
+      minHeight: "100px",
     };
     const handlers = getHandlersFromStatus(data.DAG.Status);
     return (
