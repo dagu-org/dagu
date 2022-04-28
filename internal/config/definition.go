@@ -16,6 +16,7 @@ type configDefinition struct {
 	Preconditions     []*conditionDef
 	MaxActiveRuns     int
 	Params            string
+	MaxCleanUpTimeSec *int
 }
 
 type conditionDef struct {

@@ -101,8 +101,8 @@ func (a *Agent) Status() *models.Status {
 }
 
 // Signal sends the signal to the processes running
-// if processes do not terminate for 120 seconds,
-// cancel all processes which will send signal -1 to the processes.
+// if processes do not terminate after MaxCleanUp time,
+// will send signal -1 to the processes.
 func (a *Agent) Signal(sig os.Signal) {
 	log.Printf("Sending %s signal to running child processes.", sig)
 	done := make(chan bool)
@@ -112,7 +112,7 @@ func (a *Agent) Signal(sig os.Signal) {
 	select {
 	case <-done:
 		log.Printf("All child processes have been terminated.")
-	case <-time.After(time.Second * 120):
+	case <-time.After(a.DAG.MaxCleanUpTime):
 		a.Cancel(sig)
 	default:
 		log.Printf("Waiting for child processes to exit...")

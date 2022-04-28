@@ -125,8 +125,9 @@ func TestLoadConfig(t *testing.T) {
 			Failure: stepm[constants.OnFailure],
 			Cancel:  stepm[constants.OnCancel],
 		},
+		MaxCleanUpTime: time.Second * 500,
 	}
-	assert.Equal(t, cfg, want)
+	assert.Equal(t, want, cfg)
 }
 
 func TestLoadGlobalConfig(t *testing.T) {
@@ -161,5 +162,14 @@ func TestLoadGlobalConfig(t *testing.T) {
 		},
 		Preconditions: []*config.Condition{},
 	}
-	assert.Equal(t, cfg, want)
+	assert.Equal(t, want, cfg)
+}
+
+func TestLoadDeafult(t *testing.T) {
+	loader := config.NewConfigLoader()
+	cfg, err := loader.Load(path.Join(testDir, "config_default.yaml"), "")
+	require.NoError(t, err)
+
+	assert.Equal(t, time.Minute*5, cfg.MaxCleanUpTime)
+	assert.Equal(t, 7, cfg.HistRetentionDays)
 }

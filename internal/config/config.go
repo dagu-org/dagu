@@ -32,6 +32,7 @@ type Config struct {
 	MaxActiveRuns     int
 	Params            []string
 	DefaultParams     string
+	MaxCleanUpTime    time.Duration
 }
 
 type HandlerOn struct {
@@ -79,6 +80,9 @@ func (c *Config) setup(file string) {
 	if c.HistRetentionDays == 0 {
 		c.HistRetentionDays = 7
 	}
+	if c.MaxCleanUpTime == 0 {
+		c.MaxCleanUpTime = time.Minute * 5
+	}
 	dir := path.Dir(file)
 	for _, step := range c.Steps {
 		c.setupStep(step, dir)
@@ -109,7 +113,7 @@ func (c *Config) Clone() *Config {
 }
 
 func (c *Config) String() string {
-	ret := fmt.Sprintf("{\n")
+	ret := "{\n"
 	ret = fmt.Sprintf("%s\tName: %s\n", ret, c.Name)
 	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(c.Description))
 	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(c.Env, ", "))
@@ -229,6 +233,10 @@ func buildFromDefinition(def *configDefinition, file string, globalConfig *Confi
 	}
 	c.Preconditions = loadPreCondition(def.Preconditions)
 	c.MaxActiveRuns = def.MaxActiveRuns
+
+	if def.MaxCleanUpTimeSec != nil {
+		c.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
+	}
 
 	return c, nil
 }

@@ -48,11 +48,3 @@ func TestAssertStepDefinition(t *testing.T) {
 	_, err = loader.Load(path.Join(testDir, "config_err_step_no_command.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("step command must be specified."))
 }
-
-func TestReadConfig(t *testing.T) {
-	f, err := config.ReadConfig(testConfig)
-	require.NoError(t, err)
-	if len(f) == 0 {
-		t.Error("reading yaml file failed")
-	}
-}

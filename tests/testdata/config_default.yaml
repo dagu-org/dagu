@@ -1,0 +1,4 @@
+name: test DAG
+steps:
+  - name: "1"
+    command: "true"
