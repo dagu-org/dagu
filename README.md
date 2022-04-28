@@ -376,7 +376,7 @@ Thank you!
 
 ### Where is the history data stored?
 
-DAGU's DAG execution history data is stored in json files in the path of the `DAGU__DATA` environment variable. However the extension is `*.dat`
+DAGU's DAG execution history data is stored in plain json files in the path of the `DAGU__DATA` environment variable with extension `*.dat`.
 
 The default location is `$HOME/.dagu/data`.
 
