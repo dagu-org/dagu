@@ -53,7 +53,7 @@ I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobSc
 
 But unfortunately, they were not suitable for my existing environment. Because they required a DBMS (Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
 
-Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use. I hope that this tool will help people in the same situations.
+Therefore, we developed a workflow engine that fills the gap between cron and Airflow, without the need to manage an additional DBMS or scheduler process. I hope that this tool will help people in the same situation.
 
 ## Quick start
 
