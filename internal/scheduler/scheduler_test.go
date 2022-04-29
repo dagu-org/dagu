@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"syscall"
 	"testing"
 	"time"
 
@@ -449,6 +450,37 @@ func TestRepeatFail(t *testing.T) {
 	nodes := g.Nodes()
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
 	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Error)
+	assert.Equal(t, nodes[0].DoneCount, 1)
+}
+
+func TestStopRepetitiveTaskGracefully(t *testing.T) {
+	g, _ := scheduler.NewExecutionGraph(
+		&config.Step{
+			Name:    "1",
+			Command: "sleep",
+			Args:    []string{"10"},
+			RepeatPolicy: config.RepeatPolicy{
+				Repeat:   true,
+				Interval: time.Millisecond * 300,
+			},
+		},
+	)
+	sc := scheduler.New(&scheduler.Config{})
+
+	done := make(chan bool)
+	go func() {
+		<-time.After(time.Millisecond * 100)
+		sc.Signal(g, syscall.SIGTERM, done)
+	}()
+
+	err := sc.Schedule(g, nil)
+	require.NoError(t, err)
+	<-done
+
+	nodes := g.Nodes()
+
+	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Success)
+	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Success)
 	assert.Equal(t, nodes[0].DoneCount, 1)
 }
 

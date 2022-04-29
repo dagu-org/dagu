@@ -141,8 +141,10 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 					}
 					if node.RepeatPolicy.Repeat {
 						if err == nil || node.ContinueOn.Failure {
-							time.Sleep(node.RepeatPolicy.Interval)
-							continue
+							if !sc.IsCanceled() {
+								time.Sleep(node.RepeatPolicy.Interval)
+								continue
+							}
 						}
 					}
 					if err != nil {
@@ -329,7 +331,12 @@ func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool) {
 		sc.setCanceled()
 	}
 	for _, node := range g.Nodes() {
-		node.signal(sig)
+		if node.RepeatPolicy.Repeat {
+			// for a repetitive task, we'll wait for the job to finish
+			// until time reaches max wait time
+		} else {
+			node.signal(sig)
+		}
 	}
 	if done != nil {
 		defer func() {
