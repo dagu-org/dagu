@@ -1,80 +1,87 @@
-#  dagu 
+# dagu 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
-**A simple Airflow alternative to run workflows (DAGs) defined in declarative YAML format**
+**A simple command to run workflows (DAGs) defined in declarative YAML format**
 
-dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definiton. dagu comes with a web UI and REST API interfaces are also included.
+dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definition. dagu comes with a web UI and REST API interfaces.
 
-## Contents
+## 🚀 Contents
 - [dagu](#dagu)
-  - [Contents](#contents)
-  - [Motivation](#motivation)
-  - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
-  - [Quick start](#quick-start)
-    - [Installation](#installation)
-    - [Download an example DAG definition](#download-an-example-dag-definition)
-    - [Start Web UI server](#start-web-ui-server)
-    - [Running the DAG](#running-the-dag)
-    - [Usage](#usage)
-  - [Use cases](#use-cases)
-  - [Features](#features)
-  - [User interface](#user-interface)
-  - [DAG definition](#dag-definition)
+  - [🚀 Contents](#-contents)
+  - [🌟 Project goal](#-project-goal)
+  - [⚙️ How does it work?](#️-how-does-it-work)
+  - [🔥 Motivation](#-motivation)
+  - [🤔 Why not existing tools, like Airflow?](#-why-not-existing-tools-like-airflow)
+  - [⚡️ Quick start](#️-quick-start)
+    - [1. Installation](#1-installation)
+    - [2. Download an example DAG definition](#2-download-an-example-dag-definition)
+    - [3. Start Web UI server](#3-start-web-ui-server)
+    - [4. Running the DAG](#4-running-the-dag)
+  - [📖 Usage](#-usage)
+  - [🛠 Use cases](#-use-cases)
+  - [✨ Features](#-features)
+  - [🖥 User interface](#-user-interface)
+  - [📋 DAG definition](#-dag-definition)
     - [Minimal](#minimal)
     - [Using environment variables](#using-environment-variables)
     - [Using DAG parameters](#using-dag-parameters)
     - [Using command substitution](#using-command-substitution)
     - [All available fields](#all-available-fields)
     - [Examples](#examples)
-  - [Admin configurations](#admin-configurations)
+  - [🧑‍💻 Admin configuration](#-admin-configuration)
     - [Environment variables](#environment-variables)
     - [Web UI configuration](#web-ui-configuration)
     - [Global DAG configuration](#global-dag-configuration)
-  - [Architecture](#architecture)
-  - [FAQ](#faq)
+  - [💡 Architecture](#-architecture)
+  - [❓FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
     - [Where is the log files stored?](#where-is-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [Is it possible to retry a DAG from a specific step?](#is-it-possible-to-retry-a-dag-from-a-specific-step)
     - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
-  - [GoDoc](#godoc)
-  - [License](#license)
+  - [🔗 GoDoc](#-godoc)
+  - [⚠️ License](#️-license)
 
-## Motivation
-Currently, my environment has **many problems**. Hundreds of complex cron jobs are registered on huge servers and it is impossible to keep track of the dependencies between them. If one job fails, I don't know which job to re-run. I also have to SSH into the server to see the logs and manually run the shell scripts one by one.
+## 🌟 Project goal
 
-So I needed a tool that can explicitly visualize and manage the dependencies of the pipeline.
+dagu aims to be one of the easiest options to manage and run DAGs without a DBMS, operational burden, high learning curve, or even writing code.
 
-***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a web browser, and to be able to rerun or stop a series of jobs with just a mouse click!***
+## ⚙️ How does it work?
 
-## Why not existing tools, like Airflow?
-I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc.
+- dagu is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
+- You can easily define DAGs using the declarative YAML format. Existing shell scripts or arbitrary programs can be used without modification. This makes the migration of existing workflows very easy.
 
-But unfortunately, they were not suitable for my existing environment. Because they required a DBMS (Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
+## 🔥 Motivation
 
-Therefore, we developed a workflow engine that fills the gap between cron and Airflow, without the need to manage an additional DBMS or scheduler process. I hope that this tool will help people in the same situation.
+There were many problems in our ETL pipelines. Hundreds of cron jobs are on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to re-run. We also have to SSH into the server to see the logs and run each shell script one by one manually. So We needed a tool that explicitly visualizes and allows us to manage the dependencies of the jobs in the pipeline.
 
-## Quick start
+***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
-### Installation
-Download the binary from the [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`.
+## 🤔 Why not existing tools, like Airflow?
+We considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc. But unfortunately, they were not suitable for our existing environment. Because in order to use one of those tools, we had to setup DBMS (Database Management System), accepet relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS. We couldn't afford them. Therefore, we developed a simple and easy-to-use workflow engine that fills the gap between cron and Airflow, that does not require DBMS, scheduler process or other daemons. We hope that this tool will help other people in the same situation.
 
-### Download an example DAG definition
+## ⚡️ Quick start
+
+### 1. Installation
+
+Download the latest binary from the [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
+
+### 2. Download an example DAG definition
 
 Download this [example](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and place it in the current directory with extension `*.yaml`.
 
-### Start Web UI server
+### 3. Start Web UI server
 
-Start the server with `dagu server` and browse to `http://localhost:8080` to explore the UI.
+Start the server with `dagu server` and browse to `http://localhost:8080` to explore the Web UI.
 
-### Running the DAG
+### 4. Running the DAG
 
-Then you can start the example DAG from the Web UI.
+You can start the example DAG from the Web UI by submitting `Start` button on the top right corner of the UI.
 
 ![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
 
-### Usage
+## 📖 Usage
 
 - `dagu start [--params=<params>] <file>` - run a DAG
 - `dagu status <file>` - display the current status of the DAG
@@ -83,18 +90,19 @@ Then you can start the example DAG from the Web UI.
 - `dagu dry [--params=<params>] <file>` - dry-run a DAG
 - `dagu server` - start a web server for web UI
 
-## Use cases
+## 🛠 Use cases
 - ETL Pipeline
 - Machine Learning model training
 - Automated generation of reports
 - Backups and other DevOps tasks
 - Visualizing existing workflows
 
-## Features
+## ✨ Features
 
 - Simple command interface (See [Usage](#usage))
 - Simple configuration YAML format (See [Simple example](#simple-example))
 - Web UI to visualize, manage DAGs and watch logs
+- REST API interface
 - Parameterization
 - Conditions
 - Automatic retry
@@ -105,13 +113,10 @@ Then you can start the example DAG from the Web UI.
 - Repeat
 - Basic Authentication
 - E-mail notifications
-- REST API interface
-- onExit / onSuccess / onFailure / onCancel handlers
-- Automatic history cleaning
 
-## User interface
+## 🖥 User interface
 
-- **DAGs**: Overview of all DAGs in your environment.
+- **DAGs**: Overview of all DAGs.
 
   ![DAGs](https://user-images.githubusercontent.com/1475839/165417789-18d29f3d-aecf-462a-8cdf-0b575ba613d0.png)
 
@@ -127,7 +132,7 @@ Then you can start the example DAG from the Web UI.
 
   ![History](https://user-images.githubusercontent.com/1475839/165426067-02c4f72f-e3f0-4cd8-aa38-35fa98f0382f.png)
 
-## DAG definition
+## 📋 DAG definition
 
 ### Minimal
 
@@ -245,7 +250,7 @@ To check all examples, visit [this page](https://github.com/dagu/dagu/tree/main/
 
   ![sample_1](https://user-images.githubusercontent.com/1475839/164965036-fede5675-cba0-410b-b371-22deec55b9e8.png)
 ```yaml
-name: example DAG
+name: example
 steps:
   - name: "1"
     command: echo hello world
@@ -261,7 +266,7 @@ steps:
 
 -  Sample 2
 
-  ![sample_2](https://user-images.githubusercontent.com/1475839/164965143-b10a0511-35f3-45fa-9eba-69c6db4614a2.png)
+  ![sample_2](https://user-images.githubusercontent.com/1475839/166093413-ebcc3d7b-1757-4fdf-8747-32acf4fa9473.png)
 ```yaml
 name: example DAG
 env:
@@ -305,7 +310,7 @@ handlerOn:
 
 -  Complex example
 
-  ![complex](https://user-images.githubusercontent.com/1475839/164965345-977de1bc-d042-4d3f-bf0e-bb648e534a78.png)
+  ![complex](https://user-images.githubusercontent.com/1475839/166093433-5245e39b-4f80-4e6e-a2f9-9be48d85133e.png)
 ```yaml
 name: complex DAG
 steps:
@@ -368,7 +373,7 @@ steps:
       - Reconcile
 ```
 
-## Admin configurations
+## 🧑‍💻 Admin configuration
 
 ### Environment variables
 
@@ -391,32 +396,33 @@ basicAuthPassword: <password for basic auth of web UI>       # [optional] basic 
 
 ### Global DAG configuration
 
-Please create `~/.dagu/config.yaml`. All settings can be overridden by individual DAG configurations.
+Please create `~/.dagu/config.yaml`. All settings can be overridden by individual DAG configuration.
 
 Creating a global configuration is a convenient way to organize common settings.
 
 ```yaml
 logDir: <path-to-write-log>         # log directory to write standard output
 histRetentionDays: 3                # history retention days
-smtp:                               # [optional] mail server configurations to send notifications
+smtp:                               # [optional] mail server configuration to send notifications
   host: <smtp server host>
   port: <stmp server port>
-errorMail:                          # [optional] mail configurations for error-level
+errorMail:                          # [optional] mail configuration for error-level
   from: <from address>
   to: <to address>
   prefix: <prefix of mail subject>
 infoMail:
-  from: <from address>              # [optional] mail configurations for info-level
+  from: <from address>              # [optional] mail configuration for info-level
   to: <to address>
   prefix: <prefix of mail subject>
 ```
 
-## Architecture
+## 💡 Architecture
 
-- uses plain JSON files as history database, and unix sockets to communicate with running processes.
-  ![dagu Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
+dagu uses plain JSON files as history database, and unix sockets to communicate with running processes.
 
-## FAQ
+![dagu Architecture](https://user-images.githubusercontent.com/1475839/166124202-e0deeded-c4ce-4a96-982c-498cf8db9118.png)
+
+## ❓FAQ
 
 ### How to contribute?
 
@@ -446,9 +452,9 @@ You can change the status of any task to a `failed` status. Then, when the job i
 
 No, there is no scheduler functionality so far. It is intended to be used with cron.
 
-## GoDoc
+## 🔗 GoDoc
 
 https://pkg.go.dev/github.com/yohamta/dagu
 
-## License
+## ⚠️ License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
