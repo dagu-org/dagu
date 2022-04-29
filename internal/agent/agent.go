@@ -113,6 +113,7 @@ func (a *Agent) Signal(sig os.Signal) {
 	case <-done:
 		log.Printf("All child processes have been terminated.")
 	case <-time.After(a.DAG.MaxCleanUpTime):
+		log.Printf("Time reached to max cleanup time")
 		a.Cancel(sig)
 	default:
 		log.Printf("Waiting for child processes to exit...")

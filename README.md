@@ -1,9 +1,9 @@
 #  dagu 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
-**A simpler Airflow alternative to run workflows (DAGs) defined in declarative YAML format**
+**A simple Airflow alternative to run workflows (DAGs) defined in declarative YAML format**
 
-dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definiton. dagu comes with an admin web UI and REST API interfaces are also included.
+dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definiton. dagu comes with a web UI and REST API interfaces are also included.
 
 ## Contents
 - [dagu](#dagu)
@@ -19,9 +19,9 @@ dagu is a simple workflow engine to generate and executes [DAGs (Directed acycli
   - [Use cases](#use-cases)
   - [Features](#features)
   - [User interface](#user-interface)
-  - [DAG definiton](#dag-definiton)
+  - [DAG definition](#dag-definition)
     - [Minimal](#minimal)
-    - [Using environment Variables](#using-environment-variables)
+    - [Using environment variables](#using-environment-variables)
     - [Using DAG parameters](#using-dag-parameters)
     - [Using command substitution](#using-command-substitution)
     - [All available fields](#all-available-fields)
@@ -53,12 +53,12 @@ I considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobSc
 
 But unfortunately, they were not suitable for my existing environment. Because they required a DBMS (Database Management System) installation, relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS.
 
-Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use. I hope that this tool will help people in similar situations.
+Finally, I decided to build my own tool that would not require any DBMS server, any daemon process, or any additional operational burden and is easy to use. I hope that this tool will help people in the same situations.
 
 ## Quick start
 
 ### Installation
-Download the binary from [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`.
+Download the binary from the [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`.
 
 ### Download an example DAG definition
 
@@ -76,11 +76,11 @@ Then you can start the example DAG from the Web UI.
 
 ### Usage
 
-- `dagu start [--params=<params>] <DAG file>` - run a DAG
-- `dagu status <DAG file>` - display the current status of the DAG
-- `dagu retry --req=<request-id> <DAG file>` - retry the failed/canceled DAG
-- `dagu stop <DAG file>` - cancel a DAG
-- `dagu dry [--params=<params>] <DAG file>` - dry-run a DAG
+- `dagu start [--params=<params>] <file>` - run a DAG
+- `dagu status <file>` - display the current status of the DAG
+- `dagu retry --req=<request-id> <file>` - retry the failed/canceled DAG
+- `dagu stop <file>` - stop a DAG execution by sending a TERM signal
+- `dagu dry [--params=<params>] <file>` - dry-run a DAG
 - `dagu server` - start a web server for web UI
 
 ## Use cases
@@ -100,7 +100,7 @@ Then you can start the example DAG from the Web UI.
 - Automatic retry
 - Cancellation
 - Retry
-- Prallelism limits
+- Parallelism limits
 - Environment variables
 - Repeat
 - Basic Authentication
@@ -115,19 +115,19 @@ Then you can start the example DAG from the Web UI.
 
   ![DAGs](https://user-images.githubusercontent.com/1475839/165417789-18d29f3d-aecf-462a-8cdf-0b575ba613d0.png)
 
-- **Detail**: Current status of the dag.
+- **Detail**: Realtime status of the DAG.
 
   ![Detail](https://user-images.githubusercontent.com/1475839/165418393-d7d876bc-329f-4299-977e-7726e8ef0fa1.png)
 
-- **Timeline**: Timeline of each steps in the pipeline.
+- **Timeline**: Timeline of each step in the DAG.
 
   ![Timeline](https://user-images.githubusercontent.com/1475839/165418430-1fe3b100-33eb-4d81-a68a-c8a881890b61.png)
 
-- **History**: History of the execution of the pipeline.
+- **History**: History of the execution of the DAG.
 
   ![History](https://user-images.githubusercontent.com/1475839/165426067-02c4f72f-e3f0-4cd8-aa38-35fa98f0382f.png)
 
-## DAG definiton
+## DAG definition
 
 ### Minimal
 
@@ -144,7 +144,7 @@ steps:                               # Steps inside the DAG
       - step 1                       # [optional] Name of the step to depend on
 ```
 
-### Using environment Variables
+### Using environment variables
 
 Environment variables can be defined and used throughout the file using `env` field.
 
@@ -197,7 +197,7 @@ logDir: ${LOG_DIR}                   # Log directory to write standard output
 histRetentionDays: 3                 # Execution history retention days (not for log files)
 delaySec: 1                          # Interval seconds between steps
 maxActiveRuns: 1                     # Max parallel number of running step
-params: param1 param2                # Default parameters for the DAG that can be refered by $1, $2, and so on
+params: param1 param2                # Default parameters for the DAG that can be referred to by $1, $2, and so on
 preconditions:                       # Precondisions for whether the DAG is allowed to run
   - condition: "`echo 1`"            # Command or variables to evaluate
     expected: "1"                    # Expected value for the condition
@@ -223,7 +223,7 @@ steps:
       failure: true                  # Send a mail when the step failed
       success: true                  # Send a mail when the step finished
     continueOn:
-      failed: true                   # Continue to the next regardless the step failed or not
+      failed: true                   # Continue to the next regardless of the step failed or not
       skipped: true                  # Continue to the next regardless the preconditions are met or not 
     retryPolicy:                     # Retry policy for the step
       limit: 2                       # Retry up to 2 times when the step failed
@@ -235,7 +235,7 @@ steps:
         expected: "1"                # Expected Value for the condition
 ```
 
-The global config file `~/.dagu/config.yaml` is useful to gather common settings such as log directory.
+The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as the directory to write log files.
 
 ### Examples
 
@@ -420,25 +420,25 @@ infoMail:
 
 ### How to contribute?
 
-Feel free to contribute in any way you want. Share ideas, submit issues, create pull requests. 
+Feel free to contribute in any way you want. Share ideas, submit issues, and create pull requests. 
 You can start by improving this [README.md](https://github.com/dagu/dagu/blob/main/README.md) or suggesting new [features](https://github.com/dagu/dagu/issues)
 Thank you!
 
 ### Where is the history data stored?
 
-dagu's DAG execution history data is stored in plain json files in the path of the `DAGU__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagu/data`.
+dagu's DAG execution history data is stored in plain JSON files in the path of the `DAGU__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagu/data`.
 
 ### Where is the log files stored?
 
-Log files are stored in the path of the `DAGU__LOGS` environment variable. The default location is `$HOME/.dagu/logs`. You can override this setting by `logDir` option in the config file.
+Log files are stored in the path of the `DAGU__LOGS` environment variable. The default location is `$HOME/.dagu/logs`. You can override this setting by `logDir` option in a YAML file.
 
 ### How long will the history data be stored?
 
-The default retension period for execution history is 7 days. This setting can be changed with `histRetentionDays` option in the config file.
+The default retention period for execution history is 7 days. This setting can be changed with `histRetentionDays` option in a YAML file.
 
 ### Is it possible to retry a DAG from a specific step?
 
-Just like Airflow, you can change the status of any task to failed. Then, when the job is retried, the tasks after the failed node will be executed.
+You can change the status of any task to a `failed` status. Then, when the job is retried, the tasks after the failed node will be executed.
 
 ![Update Status](https://user-images.githubusercontent.com/1475839/165755497-923828f8-1992-43fe-8618-979128c38c79.png)
 
