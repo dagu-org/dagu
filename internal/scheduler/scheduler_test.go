@@ -343,7 +343,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 	done := make(chan bool)
 	go func() {
 		<-time.After(time.Millisecond * 500)
-		sc.Cancel(g, done)
+		sc.Signal(g, syscall.SIGTERM, done)
 	}()
 
 	err := sc.Schedule(g, nil)
@@ -500,6 +500,29 @@ func newTestSchedule(t *testing.T, c *scheduler.Config, steps ...*config.Step) (
 	g, err := scheduler.NewExecutionGraph(steps...)
 	require.NoError(t, err)
 	return g, scheduler.New(c)
+}
+
+func TestSchedulerStatusText(t *testing.T) {
+	for k, v := range map[scheduler.SchedulerStatus]string{
+		scheduler.SchedulerStatus_None:    "not started",
+		scheduler.SchedulerStatus_Running: "running",
+		scheduler.SchedulerStatus_Error:   "failed",
+		scheduler.SchedulerStatus_Cancel:  "canceled",
+		scheduler.SchedulerStatus_Success: "finished",
+	} {
+		assert.Equal(t, k.String(), v)
+	}
+
+	for k, v := range map[scheduler.NodeStatus]string{
+		scheduler.NodeStatus_None:    "not started",
+		scheduler.NodeStatus_Running: "running",
+		scheduler.NodeStatus_Error:   "failed",
+		scheduler.NodeStatus_Cancel:  "canceled",
+		scheduler.NodeStatus_Success: "finished",
+		scheduler.NodeStatus_Skipped: "skipped",
+	} {
+		assert.Equal(t, k.String(), v)
+	}
 }
 
 func step(name, command string, depends ...string) *config.Step {
