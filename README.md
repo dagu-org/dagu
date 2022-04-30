@@ -380,8 +380,8 @@ steps:
 
 ### Environment variables
 
-- `dagman__DATA` - path to directory for internal use by dagman (default : `~/.dagman/data`)
-- `dagman__LOGS` - path to directory for logging (default : `~/.dagman/logs`)
+- `DAGMAN__DATA` - path to directory for internal use by dagman (default : `~/.dagman/data`)
+- `DAGMAN__LOGS` - path to directory for logging (default : `~/.dagman/logs`)
 
 ### Web UI configuration
 
@@ -435,11 +435,11 @@ Thank you!
 
 ### Where is the history data stored?
 
-dagman's DAG execution history data is stored in plain JSON files in the path of the `dagman__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagman/data`.
+dagman's DAG execution history data is stored in plain JSON files in the path of the `DAGMAN__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagman/data`.
 
 ### Where is the log files stored?
 
-Log files are stored in the path of the `dagman__LOGS` environment variable. The default location is `$HOME/.dagman/logs`. You can override this setting by `logDir` option in a YAML file.
+Log files are stored in the path of the `DAGMAN__LOGS` environment variable. The default location is `$HOME/.dagman/logs`. You can override this setting by `logDir` option in a YAML file.
 
 ### How long will the history data be stored?
 
