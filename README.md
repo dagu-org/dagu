@@ -1,7 +1,7 @@
 # dagman 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagman" title="dagman" />
 
-**A easy-to-use command to run workflows (DAGs) defined in declarative YAML format**
+**An easy-to-use command to manage workflows (DAGs) defined in declarative YAML format**
 
 dagman (DAG manager) is a easy-to-use workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definition. dagman comes with a web UI and REST API interfaces are also included.
 
