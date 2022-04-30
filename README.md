@@ -59,7 +59,7 @@ There were many problems in our ETL pipelines. Hundreds of cron jobs are on the 
 ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
 ## 🤔 Why?
-We considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc. But unfortunately, they were not suitable for our existing environment. Because in order to use one of those tools, we had to setup DBMS (Database Management System), accepet relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS. We couldn't afford them. Therefore, we developed a simple and easy-to-use workflow engine that fills the gap between cron and Airflow, that does not require DBMS, scheduler process or other daemons. I hope that this tool will help people in the same situation.
+We considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc. But unfortunately, they were not suitable for our existing environment. Because in order to use one of those tools, we had to setup DBMS (Database Management System), accepet relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS. We couldn't afford them. Therefore, we developed a simple and easy-to-use workflow engine that fills the gap between cron and Airflow, that does not require DBMS, scheduler process or other daemons. We hope that this tool will help people in the same situation.
 
 ## ⚡️ Quick start
 
@@ -102,6 +102,7 @@ You can start the example DAG from the Web UI by submitting `Start` button on th
 - Simple command interface (See [Usage](#usage))
 - Simple configuration YAML format (See [Simple example](#simple-example))
 - Web UI to visualize, manage DAGs and watch logs
+- Automatic logging of standard output
 - Parameterization
 - Conditions
 - Automatic retry
@@ -420,8 +421,9 @@ infoMail:
 
 ## 💡 Architecture
 
-- uses plain JSON files as history database, and unix sockets to communicate with running processes.
-  ![dagman Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
+dagman uses plain JSON files as history database, and unix sockets to communicate with running processes.
+
+![dagman Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
 
 ## ❓FAQ
 
