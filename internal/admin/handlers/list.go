@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/controller"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 type dagListResponse struct {

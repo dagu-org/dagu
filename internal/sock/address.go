@@ -15,5 +15,5 @@ func GetSockAddr(key string) string {
 	h := md5.New()
 	h.Write([]byte(s))
 	bs := h.Sum(nil)
-	return path.Join(sockDir, fmt.Sprintf("@dagu-%s-%x", name, bs))
+	return path.Join(sockDir, fmt.Sprintf("@dagman-%s-%x", name, bs))
 }

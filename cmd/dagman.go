@@ -38,9 +38,9 @@ func run() error {
 
 func makeApp() *cli.App {
 	return &cli.App{
-		Name:      "dagu",
+		Name:      "dagman",
 		Usage:     "A simple command to run workflows (DAGs)",
-		UsageText: "dagu [options] <start|status|stop|retry|dry|server> [args]",
+		UsageText: "dagman [options] <start|status|stop|retry|dry|server> [args]",
 		Commands: []*cli.Command{
 			newStartCommand(),
 			newStatusCommand(),

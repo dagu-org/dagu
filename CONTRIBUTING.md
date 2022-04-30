@@ -1,7 +1,7 @@
 # Contributing
-# Contributing to dagu
+# Contributing to dagman
 
-dagu is an open source project and we appreciate your contributions!
+dagman is an open source project and we appreciate your contributions!
 
 ## Following the Go convention
 

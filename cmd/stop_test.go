@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/database"
+	"github.com/yohamta/dagman/internal/scheduler"
 )
 
 func Test_stopCommand(t *testing.T) {

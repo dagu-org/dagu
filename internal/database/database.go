@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagman/internal/models"
+	"github.com/yohamta/dagman/internal/settings"
 )
 
 type Database struct {

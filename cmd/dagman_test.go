@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/settings"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/settings"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 type appTest struct {
@@ -25,7 +25,7 @@ type appTest struct {
 var testsDir = path.Join(utils.MustGetwd(), "../tests/testdata")
 
 func TestMain(m *testing.M) {
-	tempDir := utils.MustTempDir("dagu_test")
+	tempDir := utils.MustTempDir("dagman_test")
 	settings.InitTest(tempDir)
 	code := m.Run()
 	os.RemoveAll(tempDir)

@@ -4,14 +4,14 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagman/internal/admin"
 )
 
 func newServerCommand() *cli.Command {
 	cl := admin.NewConfigLoader()
 	return &cli.Command{
 		Name:  "server",
-		Usage: "dagu server",
+		Usage: "dagman server",
 		Action: func(c *cli.Context) error {
 			cfg, err := cl.LoadAdminConfig("")
 			if err == admin.ErrConfigNotFound {

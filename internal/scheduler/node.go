@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 type NodeStatus int

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"log"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/controller"
+	"github.com/yohamta/dagman/internal/models"
 
 	"github.com/urfave/cli/v2"
 )
@@ -15,7 +15,7 @@ func newStatusCommand() *cli.Command {
 	cl := config.NewConfigLoader()
 	return &cli.Command{
 		Name:  "status",
-		Usage: "dagu status <config>",
+		Usage: "dagman status <config>",
 		Action: func(c *cli.Context) error {
 			if c.NArg() == 0 {
 				return errors.New("config file must be specified.")

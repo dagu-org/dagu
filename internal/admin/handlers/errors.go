@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagman/internal/config"
 )
 
 var (

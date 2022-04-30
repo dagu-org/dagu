@@ -6,15 +6,15 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/agent"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagman/internal/agent"
+	"github.com/yohamta/dagman/internal/config"
 )
 
 func newDryCommand() *cli.Command {
 	cl := config.NewConfigLoader()
 	return &cli.Command{
 		Name:  "dry",
-		Usage: "dagu dry [--params=\"<params>\"] <config>",
+		Usage: "dagman dry [--params=\"<params>\"] <config>",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "params",

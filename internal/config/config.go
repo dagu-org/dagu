@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohamta/dagu/internal/constants"
-	"github.com/yohamta/dagu/internal/settings"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/constants"
+	"github.com/yohamta/dagman/internal/settings"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 type Config struct {

@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/settings"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/admin"
+	"github.com/yohamta/dagman/internal/settings"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 var (
@@ -35,7 +35,7 @@ func TestDefaultConfig(t *testing.T) {
 		Host:    "127.0.0.1",
 		Port:    "8000",
 		DAGs:    path.Join(wd),
-		Command: "dagu",
+		Command: "dagman",
 	})
 }
 
@@ -47,9 +47,9 @@ func TestHomeAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8081",
-		DAGs:    path.Join(testsDir, "/dagu/dags"),
-		Command: path.Join(testsDir, "/dagu/bin/dagu"),
-		WorkDir: path.Join(testsDir, "/dagu/dags"),
+		DAGs:    path.Join(testsDir, "/dagman/dags"),
+		Command: path.Join(testsDir, "/dagman/bin/dagman"),
+		WorkDir: path.Join(testsDir, "/dagman/dags"),
 	})
 }
 
@@ -61,9 +61,9 @@ func TestLoadAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8082",
-		DAGs:    path.Join(testsDir, "/dagu/dags"),
-		Command: path.Join(testsDir, "/dagu/bin/dagu"),
-		WorkDir: path.Join(testsDir, "/dagu/dags"),
+		DAGs:    path.Join(testsDir, "/dagman/dags"),
+		Command: path.Join(testsDir, "/dagman/bin/dagman"),
+		WorkDir: path.Join(testsDir, "/dagman/dags"),
 	})
 }
 

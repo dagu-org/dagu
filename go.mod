@@ -1,4 +1,4 @@
-module github.com/yohamta/dagu
+module github.com/yohamta/dagman
 
 go 1.17
 

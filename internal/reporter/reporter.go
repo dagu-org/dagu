@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/mail"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/mail"
+	"github.com/yohamta/dagman/internal/models"
+	"github.com/yohamta/dagman/internal/scheduler"
 )
 
 type Reporter struct {

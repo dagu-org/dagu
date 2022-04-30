@@ -13,16 +13,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/constants"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/mail"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/reporter"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/sock"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/constants"
+	"github.com/yohamta/dagman/internal/controller"
+	"github.com/yohamta/dagman/internal/database"
+	"github.com/yohamta/dagman/internal/mail"
+	"github.com/yohamta/dagman/internal/models"
+	"github.com/yohamta/dagman/internal/reporter"
+	"github.com/yohamta/dagman/internal/scheduler"
+	"github.com/yohamta/dagman/internal/sock"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 type Agent struct {
