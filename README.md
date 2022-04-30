@@ -79,7 +79,7 @@ Start the server with `dagman server` and browse to `http://localhost:8080` to e
 
 You can start the example DAG from the Web UI by submitting `Start` button on the top right corner of the UI.
 
-![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
+![example](https://user-images.githubusercontent.com/1475839/166093236-d5fd1633-55c9-46da-b77c-3c8f083c2f4b.gif)
 
 ## 📖 Usage
 
@@ -120,19 +120,19 @@ You can start the example DAG from the Web UI by submitting `Start` button on th
 
 - **DAGs**: Overview of all DAGs.
 
-  ![DAGs](https://user-images.githubusercontent.com/1475839/165417789-18d29f3d-aecf-462a-8cdf-0b575ba613d0.png)
+  ![DAGs](https://user-images.githubusercontent.com/1475839/166093298-c978fd56-9476-41ac-94b1-47744c073ff5.png)
 
 - **Detail**: Realtime status of the DAG.
 
-  ![Detail](https://user-images.githubusercontent.com/1475839/165418393-d7d876bc-329f-4299-977e-7726e8ef0fa1.png)
+  ![Detail](https://user-images.githubusercontent.com/1475839/166093310-03d9ea95-5180-4887-9896-a43939100def.png)
 
 - **Timeline**: Timeline of each step in the DAG.
 
-  ![Timeline](https://user-images.githubusercontent.com/1475839/165418430-1fe3b100-33eb-4d81-a68a-c8a881890b61.png)
+  ![Timeline](https://user-images.githubusercontent.com/1475839/166093320-1b3bf2c1-c23f-47b8-a67d-43f34a708450.png)
 
 - **History**: History of the execution of the DAG.
 
-  ![History](https://user-images.githubusercontent.com/1475839/165426067-02c4f72f-e3f0-4cd8-aa38-35fa98f0382f.png)
+  ![History](https://user-images.githubusercontent.com/1475839/166093335-47732cb8-ab8d-4c29-be16-baf547aae47c.png)
 
 ## 📋 DAG definition
 
@@ -252,7 +252,7 @@ To check all examples, visit [this page](https://github.com/dagman/dagman/tree/m
 
   ![sample_1](https://user-images.githubusercontent.com/1475839/164965036-fede5675-cba0-410b-b371-22deec55b9e8.png)
 ```yaml
-name: example DAG
+name: example
 steps:
   - name: "1"
     command: echo hello world
@@ -268,7 +268,7 @@ steps:
 
 -  Sample 2
 
-  ![sample_2](https://user-images.githubusercontent.com/1475839/164965143-b10a0511-35f3-45fa-9eba-69c6db4614a2.png)
+  ![sample_2](https://user-images.githubusercontent.com/1475839/166093413-ebcc3d7b-1757-4fdf-8747-32acf4fa9473.png)
 ```yaml
 name: example DAG
 env:
@@ -312,7 +312,7 @@ handlerOn:
 
 -  Complex example
 
-  ![complex](https://user-images.githubusercontent.com/1475839/164965345-977de1bc-d042-4d3f-bf0e-bb648e534a78.png)
+  ![complex](https://user-images.githubusercontent.com/1475839/166093433-5245e39b-4f80-4e6e-a2f9-9be48d85133e.png)
 ```yaml
 name: complex DAG
 steps:
