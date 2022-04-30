@@ -5,7 +5,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 var ErrConfigNotFound = fmt.Errorf("config not found")
@@ -13,8 +13,8 @@ var ErrConfigNotFound = fmt.Errorf("config not found")
 var cache map[string]string = nil
 
 const (
-	CONFIG__DATA_DIR = "DAGU__DATA"
-	CONFIG__LOGS_DIR = "DAGU__LOGS"
+	CONFIG__DATA_DIR = "dagman__DATA"
+	CONFIG__LOGS_DIR = "dagman__LOGS"
 )
 
 func MustGet(name string) string {
@@ -42,10 +42,10 @@ func load() {
 	cache = map[string]string{}
 	cache[CONFIG__DATA_DIR] = config(
 		CONFIG__DATA_DIR,
-		path.Join(dir, "/.dagu/data"))
+		path.Join(dir, "/.dagman/data"))
 	cache[CONFIG__LOGS_DIR] = config(
 		CONFIG__LOGS_DIR,
-		path.Join(dir, "/.dagu/logs"))
+		path.Join(dir, "/.dagman/logs"))
 }
 
 func InitTest(dir string) {

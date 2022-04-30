@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 var tickerMatcher *regexp.Regexp
@@ -39,7 +39,7 @@ func (c *Config) Init() {
 
 func (c *Config) setup() error {
 	if c.Command == "" {
-		c.Command = "dagu"
+		c.Command = "dagman"
 	}
 	if c.DAGs == "" {
 		wd, err := os.Getwd()

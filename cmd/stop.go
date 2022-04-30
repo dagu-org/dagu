@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/controller"
+	"github.com/yohamta/dagman/internal/scheduler"
 )
 
 func newStopCommand() *cli.Command {
 	cl := config.NewConfigLoader()
 	return &cli.Command{
 		Name:  "stop",
-		Usage: "dagu stop <config>",
+		Usage: "dagman stop <config>",
 		Action: func(c *cli.Context) error {
 			if c.NArg() == 0 {
 				return errors.New("config file must be specified.")

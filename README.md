@@ -1,17 +1,17 @@
-# dagu 
-<img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
+# dagman 
+<img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagman" title="dagman" />
 
-**A simple Airflow alternative to run workflows (DAGs) defined in declarative YAML format**
+**A easy-to-use command to run workflows (DAGs) defined in declarative YAML format**
 
-dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definition. dagu comes with a web UI and REST API interfaces are also included.
+dagman (DAG manager) is a easy-to-use workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definition. dagman comes with a web UI and REST API interfaces are also included.
 
 ## 🚀 Contents
-- [dagu](#dagu)
+- [dagman](#dagman)
   - [🚀 Contents](#-contents)
   - [🌟 Project goal](#-project-goal)
   - [⚙️ How does it work?](#️-how-does-it-work)
   - [🔥 Motivation](#-motivation)
-  - [🤔 Why not existing tools, like Airflow?](#-why-not-existing-tools-like-airflow)
+  - [🤔 Why?](#-why)
   - [⚡️ Quick start](#️-quick-start)
     - [Installation](#installation)
     - [Download an example DAG definition](#download-an-example-dag-definition)
@@ -45,11 +45,11 @@ dagu is a simple workflow engine to generate and executes [DAGs (Directed acycli
 
 ## 🌟 Project goal
 
-dagu aims to be one of the easiest options to manage and run DAGs without a DBMS, operational burden, high learning curve, or even writing code.
+dagman aims to be one of the easiest options to manage and run DAGs without a DBMS, operational burden, high learning curve, or even writing code.
 
 ## ⚙️ How does it work?
 
-- dagu is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
+- dagman is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
 - You can easily define DAGs using the declarative YAML format. Existing shell scripts or arbitrary programs can be used without modification. This makes the migration of existing workflows very easy.
 
 ## 🔥 Motivation
@@ -58,22 +58,22 @@ There were many problems in our ETL pipelines. Hundreds of cron jobs are on the 
 
 ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
-## 🤔 Why not existing tools, like Airflow?
+## 🤔 Why?
 We considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc. But unfortunately, they were not suitable for our existing environment. Because in order to use one of those tools, we had to setup DBMS (Database Management System), accepet relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS. We couldn't afford them. Therefore, we developed a simple and easy-to-use workflow engine that fills the gap between cron and Airflow, that does not require DBMS, scheduler process or other daemons. I hope that this tool will help people in the same situation.
 
 ## ⚡️ Quick start
 
 ### Installation
 
-Download the latest binary from the [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
+Download the latest binary from the [Releases page](https://github.com/dagman/dagman/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
 ### Download an example DAG definition
 
-Download this [example](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and place it in the current directory with extension `*.yaml`.
+Download this [example](https://github.com/yohamta/dagman/blob/main/examples/complex_dag.yaml) and place it in the current directory with extension `*.yaml`.
 
 ### Start Web UI server
 
-Start the server with `dagu server` and browse to `http://localhost:8080` to explore the Web UI.
+Start the server with `dagman server` and browse to `http://localhost:8080` to explore the Web UI.
 
 ### Running the DAG
 
@@ -83,12 +83,12 @@ You can start the example DAG from the Web UI by submitting `Start` button on th
 
 ## 📖 Usage
 
-- `dagu start [--params=<params>] <file>` - run a DAG
-- `dagu status <file>` - display the current status of the DAG
-- `dagu retry --req=<request-id> <file>` - retry the failed/canceled DAG
-- `dagu stop <file>` - stop a DAG execution by sending a TERM signal
-- `dagu dry [--params=<params>] <file>` - dry-run a DAG
-- `dagu server` - start a web server for web UI
+- `dagman start [--params=<params>] <file>` - run a DAG
+- `dagman status <file>` - display the current status of the DAG
+- `dagman retry --req=<request-id> <file>` - retry the failed/canceled DAG
+- `dagman stop <file>` - stop a DAG execution by sending a TERM signal
+- `dagman dry [--params=<params>] <file>` - dry-run a DAG
+- `dagman server` - start a web server for web UI
 
 ## 🛠 Use cases
 - ETL Pipeline
@@ -242,11 +242,11 @@ steps:
         expected: "1"                # Expected Value for the condition
 ```
 
-The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as the directory to write log files.
+The global configuration file `~/.dagman/config.yaml` is useful to gather common settings, such as the directory to write log files.
 
 ### Examples
 
-To check all examples, visit [this page](https://github.com/dagu/dagu/tree/main/examples).
+To check all examples, visit [this page](https://github.com/dagman/dagman/tree/main/examples).
 
 -  Sample 1
 
@@ -379,18 +379,18 @@ steps:
 
 ### Environment variables
 
-- `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
-- `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
+- `dagman__DATA` - path to directory for internal use by dagman (default : `~/.dagman/data`)
+- `dagman__LOGS` - path to directory for logging (default : `~/.dagman/logs`)
 
 ### Web UI configuration
 
-Please create `~/.dagu/admin.yaml`.
+Please create `~/.dagman/admin.yaml`.
 
 ```yaml
 host: <hostname for web UI address>                          # default value is 127.0.0.1 
 port: <port number for web UI address>                       # default value is 8080
 dags: <the location of DAG configuration files>              # default value is current working directory
-command: <Absolute path to the dagu binary>                  # [optional] required if the dagu command not in $PATH
+command: <Absolute path to the dagman binary>                  # [optional] required if the dagman command not in $PATH
 isBasicAuth: <true|false>                                    # [optional] basic auth config
 basicAuthUsername: <username for basic auth of web UI>       # [optional] basic auth config
 basicAuthPassword: <password for basic auth of web UI>       # [optional] basic auth config
@@ -398,7 +398,7 @@ basicAuthPassword: <password for basic auth of web UI>       # [optional] basic 
 
 ### Global DAG configuration
 
-Please create `~/.dagu/config.yaml`. All settings can be overridden by individual DAG configurations.
+Please create `~/.dagman/config.yaml`. All settings can be overridden by individual DAG configurations.
 
 Creating a global configuration is a convenient way to organize common settings.
 
@@ -421,23 +421,23 @@ infoMail:
 ## 💡 Architecture
 
 - uses plain JSON files as history database, and unix sockets to communicate with running processes.
-  ![dagu Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
+  ![dagman Architecture](https://user-images.githubusercontent.com/1475839/164869015-769bfe1d-ad38-4aca-836b-bf3ffe0665df.png)
 
 ## ❓FAQ
 
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, submit issues, and create pull requests. 
-You can start by improving this [README.md](https://github.com/dagu/dagu/blob/main/README.md) or suggesting new [features](https://github.com/dagu/dagu/issues)
+You can start by improving this [README.md](https://github.com/dagman/dagman/blob/main/README.md) or suggesting new [features](https://github.com/dagman/dagman/issues)
 Thank you!
 
 ### Where is the history data stored?
 
-dagu's DAG execution history data is stored in plain JSON files in the path of the `DAGU__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagu/data`.
+dagman's DAG execution history data is stored in plain JSON files in the path of the `dagman__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagman/data`.
 
 ### Where is the log files stored?
 
-Log files are stored in the path of the `DAGU__LOGS` environment variable. The default location is `$HOME/.dagu/logs`. You can override this setting by `logDir` option in a YAML file.
+Log files are stored in the path of the `dagman__LOGS` environment variable. The default location is `$HOME/.dagman/logs`. You can override this setting by `logDir` option in a YAML file.
 
 ### How long will the history data be stored?
 
@@ -455,7 +455,7 @@ No, there is no scheduler functionality so far. It is intended to be used with c
 
 ## 🔗 GoDoc
 
-https://pkg.go.dev/github.com/yohamta/dagu
+https://pkg.go.dev/github.com/yohamta/dagman
 
 ## ⚠️ License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagman/internal/constants"
 )
 
 func DefaultEnv() map[string]string {

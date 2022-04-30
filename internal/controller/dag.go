@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/models"
+	"github.com/yohamta/dagman/internal/scheduler"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 type DAG struct {

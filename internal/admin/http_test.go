@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagman/internal/admin"
 )
 
 func TestHttpServerStartShutdown(t *testing.T) {

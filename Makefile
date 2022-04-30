@@ -12,7 +12,7 @@ bin:
 
 .PHONY: build
 build: bin
-	go build -o ./bin/dagu ./cmd/
+	go build -o ./bin/dagman ./cmd/
 
 .PHONY: server
 server: build

@@ -11,12 +11,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/controller"
+	"github.com/yohamta/dagman/internal/models"
+	"github.com/yohamta/dagman/internal/scheduler"
+	"github.com/yohamta/dagman/internal/settings"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 var testsDir = path.Join(utils.MustGetwd(), "../../tests/testdata")

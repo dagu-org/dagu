@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagman/internal/config"
 )
 
 type ExecutionGraph struct {

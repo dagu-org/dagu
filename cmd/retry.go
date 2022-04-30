@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/agent"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagman/internal/agent"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/database"
+	"github.com/yohamta/dagman/internal/models"
 
 	"github.com/urfave/cli/v2"
 )
@@ -18,7 +18,7 @@ func newRetryCommand() *cli.Command {
 	cl := config.NewConfigLoader()
 	return &cli.Command{
 		Name:  "retry",
-		Usage: "dagu retry --req=<request-id> <config>",
+		Usage: "dagman retry --req=<request-id> <config>",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "req",

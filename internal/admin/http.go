@@ -74,7 +74,7 @@ func (svr *server) setupHandler() {
 
 func (svr *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	log.Println("received shutdown request")
-	w.Write([]byte("shutting down the dagu server...\n"))
+	w.Write([]byte("shutting down the dagman server...\n"))
 	go func() {
 		svr.Shutdown()
 	}()

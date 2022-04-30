@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagman/internal/config"
+	"github.com/yohamta/dagman/internal/constants"
 )
 
 func TestLoadConfig(t *testing.T) {

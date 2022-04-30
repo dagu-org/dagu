@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagman/internal/utils"
 )
 
 var testHomeDir string
@@ -27,11 +27,11 @@ func TestReadSetting(t *testing.T) {
 	}{
 		{
 			Name: CONFIG__DATA_DIR,
-			Want: path.Join(testHomeDir, ".dagu/data"),
+			Want: path.Join(testHomeDir, ".dagman/data"),
 		},
 		{
 			Name: CONFIG__LOGS_DIR,
-			Want: path.Join(testHomeDir, ".dagu/logs"),
+			Want: path.Join(testHomeDir, ".dagman/logs"),
 		},
 	} {
 		val, err := Get(test.Name)
@@ -46,11 +46,11 @@ func TestReadSetting(t *testing.T) {
 	}{
 		{
 			Name: CONFIG__DATA_DIR,
-			Want: "/home/dagu/data",
+			Want: "/home/dagman/data",
 		},
 		{
 			Name: CONFIG__LOGS_DIR,
-			Want: "/home/dagu/logs",
+			Want: "/home/dagman/logs",
 		},
 	} {
 		os.Setenv(test.Name, test.Want)

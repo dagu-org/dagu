@@ -1,6 +1,5 @@
 host: ${HOST}
-port: 8082
+port: 8081
 dags: "${HOME}/dagman/dags"
 command: "${HOME}/dagman/bin/dagman"
 workDir: "${HOME}/dagman/dags"
-logEncodingCharset: euc-jp
