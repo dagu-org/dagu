@@ -1,6 +1,11 @@
 package reporter
 
 import (
+	"bytes"
+	"errors"
+	"io"
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +25,10 @@ func TestReporter(t *testing.T) {
 		"create errormail":   testErrorMail,
 		"no errormail":       testNoErrorMail,
 		"create successmail": testSuccessMail,
+		"create summary":     testRenderSummary,
+		"create node list":   testRenderTable,
+		"report summary":     testReportSummary,
+		"report step":        testReportStep,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
@@ -38,6 +47,12 @@ func TestReporter(t *testing.T) {
 					From:   "from@mail.com",
 					To:     "to@mail.com",
 				},
+				Steps: []*config.Step{
+					{
+						Name:    "test-step",
+						Command: "true",
+					},
+				},
 			}
 
 			nodes := []*models.Node{
@@ -45,6 +60,7 @@ func TestReporter(t *testing.T) {
 					Step: &config.Step{
 						Name:    "test-step",
 						Command: "true",
+						Args:    []string{"param-x"},
 					},
 					Status:     scheduler.NodeStatus_Running,
 					StartedAt:  utils.FormatTime(time.Now()),
@@ -104,6 +120,92 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	require.Contains(t, mock.subject, "Success")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
+}
+
+func testReportSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	log.SetOutput(w)
+
+	defer func() {
+		os.Stdout = origStdout
+		log.SetOutput(origStdout)
+	}()
+
+	rp.ReportSummary(&models.Status{
+		Status: scheduler.SchedulerStatus_Success,
+		Nodes:  nodes,
+	}, errors.New("test error"))
+
+	w.Close()
+	os.Stdout = origStdout
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+
+	s := buf.String()
+	require.Contains(t, s, "test error")
+}
+
+func testReportStep(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	log.SetOutput(w)
+
+	defer func() {
+		os.Stdout = origStdout
+		log.SetOutput(origStdout)
+	}()
+
+	cfg.Steps[0].MailOnError = true
+	rp.ReportStep(
+		cfg,
+		&models.Status{
+			Status: scheduler.SchedulerStatus_Running,
+			Nodes:  nodes,
+		},
+		&scheduler.Node{
+			Step: cfg.Steps[0],
+			NodeState: scheduler.NodeState{
+				Status: scheduler.NodeStatus_Error,
+			},
+		},
+	)
+
+	w.Close()
+	os.Stdout = origStdout
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+
+	s := buf.String()
+	require.Contains(t, s, cfg.Steps[0].Name)
+
+	mock := rp.Mailer.(*mockMailer)
+	require.Equal(t, 1, mock.count)
+}
+
+func testRenderSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+	status := &models.Status{
+		Name:   cfg.Name,
+		Status: scheduler.SchedulerStatus_Error,
+		Nodes:  nodes,
+	}
+	summary := renderSummary(status, errors.New("test error"))
+	require.Contains(t, summary, "test error")
+	require.Contains(t, summary, cfg.Name)
+}
+
+func testRenderTable(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+	summary := renderTable(nodes)
+	require.Contains(t, summary, nodes[0].Name)
+	require.Contains(t, summary, nodes[0].Args[0])
 }
 
 type mockMailer struct {

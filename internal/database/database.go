@@ -216,6 +216,9 @@ func (db *Database) dir(configPath string, prefix string) string {
 }
 
 func (db *Database) new(configPath string, t time.Time) (string, error) {
+	if configPath == "" {
+		return "", fmt.Errorf("configPath is empty")
+	}
 	fileName := fmt.Sprintf("%s.%s.dat", db.pattern(configPath), t.Format("20060102.15:04:05"))
 	if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
 		return "", err

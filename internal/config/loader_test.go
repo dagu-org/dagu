@@ -1,4 +1,4 @@
-package config_test
+package config
 
 import (
 	"fmt"
@@ -10,37 +10,36 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 )
 
 func TestLoadConfig(t *testing.T) {
-	loader := config.NewConfigLoader()
+	loader := NewConfigLoader()
 	cfg, err := loader.Load(testConfig, "")
 	require.NoError(t, err)
 
-	steps := []*config.Step{
+	steps := []*Step{
 		{
 			Name:      "1",
 			Dir:       testHomeDir,
 			Command:   "true",
 			Args:      []string{},
 			Variables: testEnv,
-			Preconditions: []*config.Condition{
+			Preconditions: []*Condition{
 				{
 					Condition: "`echo test`",
 					Expected:  "test",
 				},
 			},
 			MailOnError: true,
-			ContinueOn: config.ContinueOn{
+			ContinueOn: ContinueOn{
 				Failure: true,
 				Skipped: true,
 			},
-			RetryPolicy: &config.RetryPolicy{
+			RetryPolicy: &RetryPolicy{
 				Limit: 2,
 			},
-			RepeatPolicy: config.RepeatPolicy{
+			RepeatPolicy: RepeatPolicy{
 				Repeat:   true,
 				Interval: time.Second * 10,
 			},
@@ -51,8 +50,8 @@ func TestLoadConfig(t *testing.T) {
 			Command:       "false",
 			Args:          []string{},
 			Variables:     testEnv,
-			Preconditions: []*config.Condition{},
-			ContinueOn: config.ContinueOn{
+			Preconditions: []*Condition{},
+			ContinueOn: ContinueOn{
 				Failure: true,
 				Skipped: false,
 			},
@@ -62,18 +61,18 @@ func TestLoadConfig(t *testing.T) {
 		},
 	}
 
-	makeTestStepFunc := func(name string) *config.Step {
-		return &config.Step{
+	makeTestStepFunc := func(name string) *Step {
+		return &Step{
 			Name:          name,
 			Dir:           testDir,
 			Command:       fmt.Sprintf("%s.sh", name),
 			Args:          []string{},
 			Variables:     testEnv,
-			Preconditions: []*config.Condition{},
+			Preconditions: []*Condition{},
 		}
 	}
 
-	stepm := map[string]*config.Step{}
+	stepm := map[string]*Step{}
 	for _, name := range []string{
 		constants.OnExit,
 		constants.OnSuccess,
@@ -83,14 +82,14 @@ func TestLoadConfig(t *testing.T) {
 		stepm[name] = makeTestStepFunc(name)
 	}
 
-	want := &config.Config{
+	want := &Config{
 		ConfigPath:        testConfig,
 		Name:              "test DAG",
 		Description:       "this is a test DAG.",
 		Env:               testEnv,
 		LogDir:            path.Join(testHomeDir, "/logs"),
 		HistRetentionDays: 3,
-		MailOn: config.MailOn{
+		MailOn: MailOn{
 			Failure: true,
 			Success: true,
 		},
@@ -98,28 +97,28 @@ func TestLoadConfig(t *testing.T) {
 		MaxActiveRuns: 1,
 		Params:        []string{"param1", "param2"},
 		DefaultParams: "param1 param2",
-		Smtp: &config.SmtpConfig{
+		Smtp: &SmtpConfig{
 			Host: "smtp.host",
 			Port: "25",
 		},
-		ErrorMail: &config.MailConfig{
+		ErrorMail: &MailConfig{
 			From:   "system@mail.com",
 			To:     "error@mail.com",
 			Prefix: "[ERROR]",
 		},
-		InfoMail: &config.MailConfig{
+		InfoMail: &MailConfig{
 			From:   "system@mail.com",
 			To:     "info@mail.com",
 			Prefix: "[INFO]",
 		},
-		Preconditions: []*config.Condition{
+		Preconditions: []*Condition{
 			{
 				Condition: "`echo 1`",
 				Expected:  "1",
 			},
 		},
 		Steps: steps,
-		HandlerOn: config.HandlerOn{
+		HandlerOn: HandlerOn{
 			Exit:    stepm[constants.OnExit],
 			Success: stepm[constants.OnSuccess],
 			Failure: stepm[constants.OnFailure],
@@ -131,7 +130,7 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestLoadGlobalConfig(t *testing.T) {
-	loader := config.NewConfigLoader()
+	loader := NewConfigLoader()
 	cfg, err := loader.LoadGlobalConfig()
 	require.NotNil(t, cfg)
 	require.NoError(t, err)
@@ -140,36 +139,42 @@ func TestLoadGlobalConfig(t *testing.T) {
 		return strings.Compare(cfg.Env[i], cfg.Env[j]) < 0
 	})
 
-	want := &config.Config{
+	want := &Config{
 		Env:               testEnv,
 		LogDir:            path.Join(testHomeDir, "/logs"),
 		HistRetentionDays: 7,
 		Params:            []string{},
-		Steps:             []*config.Step{},
-		Smtp: &config.SmtpConfig{
+		Steps:             []*Step{},
+		Smtp: &SmtpConfig{
 			Host: "smtp.host",
 			Port: "25",
 		},
-		ErrorMail: &config.MailConfig{
+		ErrorMail: &MailConfig{
 			From:   "system@mail.com",
 			To:     "error@mail.com",
 			Prefix: "[ERROR]",
 		},
-		InfoMail: &config.MailConfig{
+		InfoMail: &MailConfig{
 			From:   "system@mail.com",
 			To:     "info@mail.com",
 			Prefix: "[INFO]",
 		},
-		Preconditions: []*config.Condition{},
+		Preconditions: []*Condition{},
 	}
 	assert.Equal(t, want, cfg)
 }
 
 func TestLoadDeafult(t *testing.T) {
-	loader := config.NewConfigLoader()
+	loader := NewConfigLoader()
 	cfg, err := loader.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
 	assert.Equal(t, time.Minute*5, cfg.MaxCleanUpTime)
 	assert.Equal(t, 7, cfg.HistRetentionDays)
+}
+
+func TestLoadErrorFileNotExist(t *testing.T) {
+	loader := NewConfigLoader()
+	_, err := loader.Load(path.Join(testDir, "not_existing_file.yaml"), "")
+	require.Error(t, err)
 }

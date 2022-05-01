@@ -130,7 +130,7 @@ type BuildConfigOptions struct {
 	parameters string
 }
 
-func buildFromDefinition(def *configDefinition, file string, globalConfig *Config,
+func buildFromDefinition(def *configDefinition, globalConfig *Config,
 	opts *BuildConfigOptions) (c *Config, err error) {
 	c = &Config{}
 	c.Init()
@@ -170,16 +170,14 @@ func buildFromDefinition(def *configDefinition, file string, globalConfig *Confi
 	}
 
 	c.DefaultParams = def.Params
-	if opts.parameters != "" {
-		c.Params, err = parseParameters(opts.parameters, false)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		c.Params, err = parseParameters(c.DefaultParams, true)
-		if err != nil {
-			return nil, err
-		}
+	p := c.DefaultParams
+	if opts != nil && opts.parameters != "" {
+		p = opts.parameters
+	}
+
+	c.Params, err = parseParameters(p, true)
+	if err != nil {
+		return nil, err
 	}
 
 	c.Steps, err = buildStepsFromDefinition(c.Env, def.Steps)

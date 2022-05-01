@@ -3,20 +3,11 @@ package admin
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/yohamta/dagu/internal/utils"
 )
-
-var tickerMatcher *regexp.Regexp
-
-func init() {
-	tickerMatcher = regexp.MustCompile("`[^`]+`")
-}
 
 type Config struct {
 	Host               string
@@ -75,13 +66,13 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 	}
 	c.Env = buildConfigEnv(env)
 
-	c.Host, err = parseVariable(def.Host)
+	c.Host, err = utils.ParseVariable(def.Host)
 	if err != nil {
 		return nil, err
 	}
 	c.Port = strconv.Itoa(def.Port)
 
-	jd, err := parseVariable(def.Dags)
+	jd, err := utils.ParseVariable(def.Dags)
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +83,11 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Command, err = parseVariable(def.Command)
+	c.Command, err = utils.ParseVariable(def.Command)
 	if err != nil {
 		return nil, err
 	}
-	c.WorkDir, err = parseVariable(def.WorkDir)
+	c.WorkDir, err = utils.ParseVariable(def.WorkDir)
 	if err != nil {
 		return nil, err
 	}
@@ -107,15 +98,15 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 		}
 	}
 	c.IsBasicAuth = def.IsBasicAuth
-	c.BasicAuthUsername, err = parseVariable(def.BasicAuthUsername)
+	c.BasicAuthUsername, err = utils.ParseVariable(def.BasicAuthUsername)
 	if err != nil {
 		return nil, err
 	}
-	c.BasicAuthPassword, err = parseVariable(def.BasicAuthPassword)
+	c.BasicAuthPassword, err = utils.ParseVariable(def.BasicAuthPassword)
 	if err != nil {
 		return nil, err
 	}
-	c.LogEncodingCharset, err = parseVariable(def.LogEncodingCharset)
+	c.LogEncodingCharset, err = utils.ParseVariable(def.LogEncodingCharset)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +124,7 @@ func buildConfigEnv(vars map[string]string) []string {
 func loadVariables(strVariables map[string]string) (map[string]string, error) {
 	vars := map[string]string{}
 	for k, v := range strVariables {
-		parsed, err := parseVariable(v)
+		parsed, err := utils.ParseVariable(v)
 		if err != nil {
 			return nil, err
 		}
@@ -144,30 +135,4 @@ func loadVariables(strVariables map[string]string) (map[string]string, error) {
 		}
 	}
 	return vars, nil
-}
-
-func parseVariable(value string) (string, error) {
-	val, err := parseCommand(os.ExpandEnv(value))
-	if err != nil {
-		return "", err
-	}
-	return val, nil
-}
-
-func parseCommand(value string) (string, error) {
-	matches := tickerMatcher.FindAllString(strings.TrimSpace(value), -1)
-	if matches == nil {
-		return value, nil
-	}
-	ret := value
-	for i := 0; i < len(matches); i++ {
-		command := matches[i]
-		out, err := exec.Command(strings.ReplaceAll(command, "`", "")).Output()
-		if err != nil {
-			return "", err
-		}
-		ret = strings.ReplaceAll(ret, command, strings.TrimSpace(string(out[:])))
-
-	}
-	return ret, nil
 }
