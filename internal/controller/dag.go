@@ -1,13 +1,11 @@
 package controller
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 type DAG struct {
@@ -20,9 +18,6 @@ type DAG struct {
 }
 
 func FromConfig(file string) (*DAG, error) {
-	if !utils.FileExists(file) {
-		return nil, fmt.Errorf("file not found: %s", file)
-	}
 	return fromConfig(file, false)
 }
 

@@ -2,7 +2,6 @@ package database
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -20,43 +19,32 @@ type Writer struct {
 	closed bool
 }
 
-func (w *Writer) Open() error {
-	if w.closed {
-		return fmt.Errorf("file was already closed")
-	}
-	var err error
+func (w *Writer) Open() (err error) {
 	os.MkdirAll(path.Dir(w.Target), 0755)
 	w.file, err = utils.OpenOrCreateFile(w.Target)
-	if err != nil {
-		return err
+	if err == nil {
+		w.writer = bufio.NewWriter(w.file)
 	}
-	w.writer = bufio.NewWriter(w.file)
-	return nil
+	return
 }
 
 func (w *Writer) Write(st *models.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.writer == nil || w.file == nil {
-		return fmt.Errorf("file was not opened")
-	}
 	jsonb, _ := st.ToJson()
 	str := strings.ReplaceAll(string(jsonb), "\n", " ")
 	str = strings.ReplaceAll(str, "\r", " ")
 	_, err := w.writer.WriteString(str + "\n")
-	if err != nil {
-		return err
-	}
+	utils.LogIgnoreErr("write status", err)
 	return w.writer.Flush()
 }
 
-func (w *Writer) Close() error {
+func (w *Writer) Close() (err error) {
 	if !w.closed {
-		if err := w.writer.Flush(); err != nil {
-			return err
-		}
+		err = w.writer.Flush()
+		utils.LogIgnoreErr("flush file", err)
 		w.file.Close()
 		w.closed = true
 	}
-	return nil
+	return err
 }
