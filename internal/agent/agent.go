@@ -114,7 +114,7 @@ func (a *Agent) Signal(sig os.Signal) {
 		log.Printf("All child processes have been terminated.")
 	case <-time.After(a.DAG.MaxCleanUpTime):
 		log.Printf("Time reached to max cleanup time")
-		a.Cancel(sig)
+		a.Cancel()
 	default:
 		log.Printf("Waiting for child processes to exit...")
 		time.Sleep(time.Second * 1)
@@ -124,30 +124,9 @@ func (a *Agent) Signal(sig os.Signal) {
 // Cancel sends signal -1 to all child processes.
 // then it waits another 60 seconds before therminating the
 // parent process.
-func (a *Agent) Cancel(sig os.Signal) {
+func (a *Agent) Cancel() {
 	log.Printf("Sending -1 signal to running child processes.")
-	done := make(chan bool)
-	go func() {
-		a.scheduler.Cancel(a.graph, done)
-	}()
-	select {
-	case <-done:
-		log.Printf("All child processes have been terminated.")
-	case <-time.After(time.Second * 60):
-		log.Printf("Terminating the controller process.")
-		a.Kill(done)
-	default:
-		log.Printf("Waiting for child processes to exit...")
-		time.Sleep(time.Second * 1)
-	}
-}
-
-// Kill sends signal SIGKILL to all child processes.
-func (a *Agent) Kill(done chan bool) {
-	if a.scheduler == nil {
-		panic("Invalid state")
-	}
-	a.scheduler.Signal(a.graph, syscall.SIGKILL, done)
+	a.scheduler.Cancel(a.graph)
 }
 
 func (a *Agent) init() {
@@ -223,9 +202,7 @@ func (a *Agent) checkPreconditions() error {
 	if len(a.DAG.Preconditions) > 0 {
 		log.Printf("checking pre conditions for \"%s\"", a.DAG.Name)
 		if err := config.EvalConditions(a.DAG.Preconditions); err != nil {
-			done := make(chan bool)
-			go a.scheduler.Cancel(a.graph, done)
-			<-done
+			a.scheduler.Cancel(a.graph)
 			return err
 		}
 	}
@@ -285,20 +262,13 @@ func (a *Agent) run() error {
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	if err := a.dbWriter.Write(a.Status()); err != nil {
-		log.Printf("failed to write status. %s", err)
-	}
+	logIgnoreErr("writing status", a.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	if err := a.reporter.ReportMail(a.DAG, status); err != nil {
-		log.Printf("failed to send mail. %s", err)
-	}
+	logIgnoreErr("sending email", a.reporter.ReportMail(a.DAG, status))
 
-	if err := a.dbWriter.Close(); err != nil {
-		log.Printf("failed to close db writer. err: %v", err)
-	} else if err := a.database.Compact(a.DAG.ConfigPath, a.dbFile); err != nil {
-		log.Printf("failed to compact data. %s", err)
-	}
+	logIgnoreErr("closing data file", a.dbWriter.Close())
+	logIgnoreErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
 
 	return lastErr
 }
@@ -336,6 +306,12 @@ func (a *Agent) checkIsRunning() error {
 	return nil
 }
 
+func logIgnoreErr(action string, err error) {
+	if err != nil {
+		log.Printf("%s failed. %s", action, err)
+	}
+}
+
 var (
 	statusRe = regexp.MustCompile(`^/status[/]?$`)
 	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
@@ -354,16 +330,12 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-		encodeResult(w, true)
-		a.Signal(syscall.SIGINT)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+		a.Signal(syscall.SIGTERM)
 	default:
 		encodeError(w, ErrNotFound)
 	}
-}
-
-func encodeResult(w http.ResponseWriter, result bool) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
 }
 
 var ErrNotFound = errors.New("not found")

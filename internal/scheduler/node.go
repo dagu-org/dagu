@@ -113,11 +113,11 @@ func (n *Node) signal(sig os.Signal) {
 }
 
 func (n *Node) cancel() {
-	status := n.ReadStatus()
-	if status == NodeStatus_None {
-		n.updateStatus(NodeStatus_Cancel)
-	} else if status == NodeStatus_Running {
-		n.updateStatus(NodeStatus_Cancel)
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	status := n.Status
+	if status == NodeStatus_None || status == NodeStatus_Running {
+		n.Status = NodeStatus_Cancel
 	}
 	if n.cancelFunc != nil {
 		n.cancelFunc()

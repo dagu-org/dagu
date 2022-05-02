@@ -155,7 +155,9 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 					}
 					break
 				}
-				node.updateStatus(NodeStatus_Success)
+				if node.ReadStatus() == NodeStatus_Running {
+					node.updateStatus(NodeStatus_Success)
+				}
 				if done != nil {
 					done <- node
 				}
@@ -181,7 +183,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
 			log.Println(fmt.Sprintf("%s started", n.Name))
-			err := sc.runNode(n)
+			err := sc.runHandlerNode(n)
 			if err != nil {
 				sc.lastError = err
 			}
@@ -193,7 +195,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	return sc.lastError
 }
 
-func (sc *Scheduler) runNode(node *Node) error {
+func (sc *Scheduler) runHandlerNode(node *Node) error {
 	defer func() {
 		node.FinishedAt = time.Now()
 	}()
@@ -348,18 +350,10 @@ func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool) {
 	}
 }
 
-func (sc *Scheduler) Cancel(g *ExecutionGraph, done chan bool) {
+func (sc *Scheduler) Cancel(g *ExecutionGraph) {
 	sc.setCanceled()
-	if done != nil {
-		defer func() {
-			done <- true
-		}()
-	}
 	for _, node := range g.Nodes() {
 		node.cancel()
-	}
-	for sc.isRunning(g) {
-		time.Sleep(sc.pause)
 	}
 }
 

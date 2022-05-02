@@ -15,13 +15,11 @@ func newServerCommand() *cli.Command {
 		Name:  "server",
 		Usage: "dagu server",
 		Action: func(c *cli.Context) error {
-
 			cfg, err := l.LoadAdminConfig(
 				path.Join(utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
 			if err == admin.ErrConfigNotFound {
-				cfg, err = admin.DefaultConfig()
-			}
-			if err != nil {
+				cfg = admin.DefaultConfig()
+			} else if err != nil {
 				return err
 			}
 			return startServer(cfg)

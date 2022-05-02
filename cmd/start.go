@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"os"
 
@@ -27,12 +26,6 @@ func newStartCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			if c.NArg() == 0 {
-				return errors.New("config file must be specified")
-			}
-			if c.NArg() != 1 {
-				return errors.New("too many parameters")
-			}
 			config_file_path := c.Args().Get(0)
 			cfg, err := cl.Load(config_file_path, c.String("params"))
 			if err != nil {

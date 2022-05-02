@@ -1,8 +1,6 @@
 package main
 
 import (
-	"errors"
-	"log"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -27,12 +25,6 @@ func newDryCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			if c.NArg() == 0 {
-				return errors.New("config file must be specified.")
-			}
-			if c.NArg() != 1 {
-				return errors.New("too many parameters.")
-			}
 			config_file_path := c.Args().Get(0)
 			cfg, err := cl.Load(config_file_path, c.String("params"))
 			if err != nil {
@@ -51,10 +43,5 @@ func dryRun(cfg *config.Config) error {
 	listenSignals(func(sig os.Signal) {
 		a.Signal(sig)
 	})
-
-	err := a.Run()
-	if err != nil {
-		log.Printf("[DRY] failed %v", err)
-	}
-	return nil
+	return a.Run()
 }

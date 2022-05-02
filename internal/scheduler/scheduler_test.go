@@ -56,8 +56,8 @@ func TestScheduler(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[3].ReadStatus(), scheduler.NodeStatus_Cancel)
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[2].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[3].ReadStatus())
 }
 
 func TestSchedulerParallel(t *testing.T) {
@@ -74,9 +74,9 @@ func TestSchedulerParallel(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
 }
 
 func TestSchedulerFailPartially(t *testing.T) {
@@ -90,10 +90,10 @@ func TestSchedulerFailPartially(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[3].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[3].ReadStatus())
 }
 
 func TestSchedulerContinueOnFailure(t *testing.T) {
@@ -113,9 +113,9 @@ func TestSchedulerContinueOnFailure(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
 }
 
 func TestSchedulerAllowSkipped(t *testing.T) {
@@ -139,9 +139,9 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Skipped)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Skipped, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
 }
 
 func TestSchedulerCancel(t *testing.T) {
@@ -155,20 +155,18 @@ func TestSchedulerCancel(t *testing.T) {
 		MaxActiveRuns: 1,
 	})
 
-	done := make(chan bool)
 	go func() {
-		<-time.After(time.Millisecond * 1000)
-		sc.Cancel(g, done)
+		<-time.After(time.Millisecond * 100)
+		sc.Cancel(g)
 	}()
 
 	_ = sc.Schedule(g, nil)
-	<-done // Wait for canceling finished
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Cancel)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Cancel)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Cancel)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[2].ReadStatus())
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
@@ -199,10 +197,10 @@ func TestSchedulerRetryFail(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[3].ReadStatus(), scheduler.NodeStatus_Cancel)
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[2].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[3].ReadStatus())
 
 	assert.Equal(t, nodes[0].ReadRetryCount(), 1)
 	assert.Equal(t, nodes[1].ReadRetryCount(), 1)
@@ -238,9 +236,9 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
 
 	if nodes[1].ReadRetryCount() == 0 {
 		t.Error("step 2 Should be retried")
@@ -278,11 +276,11 @@ func TestStepPreCondition(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Skipped)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Skipped)
-	assert.Equal(t, nodes[3].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[4].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Skipped, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Skipped, nodes[2].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[3].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[4].ReadStatus())
 }
 
 func TestSchedulerOnExit(t *testing.T) {
@@ -299,13 +297,13 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
 
 	onExit := sc.HanderNode(constants.OnExit)
 	require.NotNil(t, onExit)
-	assert.Equal(t, onExit.ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, onExit.ReadStatus())
 }
 
 func TestSchedulerOnExitOnFail(t *testing.T) {
@@ -322,11 +320,11 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Cancel)
-	assert.Equal(t, nodes[2].ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[2].ReadStatus())
 
-	assert.Equal(t, sc.HanderNode(constants.OnExit).ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnExit).ReadStatus())
 }
 
 func TestSchedulerOnCancel(t *testing.T) {
@@ -352,11 +350,11 @@ func TestSchedulerOnCancel(t *testing.T) {
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Cancel)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, nodes[1].ReadStatus(), scheduler.NodeStatus_Cancel)
-	assert.Equal(t, sc.HanderNode(constants.OnSuccess).ReadStatus(), scheduler.NodeStatus_None)
-	assert.Equal(t, sc.HanderNode(constants.OnFailure).ReadStatus(), scheduler.NodeStatus_None)
-	assert.Equal(t, sc.HanderNode(constants.OnCancel).ReadStatus(), scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[1].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_None, sc.HanderNode(constants.OnSuccess).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_None, sc.HanderNode(constants.OnFailure).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnCancel).ReadStatus())
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
@@ -373,10 +371,10 @@ func TestSchedulerOnSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, sc.HanderNode(constants.OnExit).ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, sc.HanderNode(constants.OnSuccess).ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, sc.HanderNode(constants.OnFailure).ReadStatus(), scheduler.NodeStatus_None)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnExit).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnSuccess).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_None, sc.HanderNode(constants.OnFailure).ReadStatus())
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
@@ -394,11 +392,11 @@ func TestSchedulerOnFailure(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, nodes[0].ReadStatus(), scheduler.NodeStatus_Error)
-	assert.Equal(t, sc.HanderNode(constants.OnExit).ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, sc.HanderNode(constants.OnSuccess).ReadStatus(), scheduler.NodeStatus_None)
-	assert.Equal(t, sc.HanderNode(constants.OnFailure).ReadStatus(), scheduler.NodeStatus_Success)
-	assert.Equal(t, sc.HanderNode(constants.OnCancel).ReadStatus(), scheduler.NodeStatus_None)
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[0].ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnExit).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_None, sc.HanderNode(constants.OnSuccess).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnFailure).ReadStatus())
+	assert.Equal(t, scheduler.NodeStatus_None, sc.HanderNode(constants.OnCancel).ReadStatus())
 }
 
 func TestRepeat(t *testing.T) {
@@ -415,20 +413,18 @@ func TestRepeat(t *testing.T) {
 	)
 	sc := scheduler.New(&scheduler.Config{})
 
-	done := make(chan bool)
 	go func() {
 		<-time.After(time.Millisecond * 3000)
-		sc.Cancel(g, done)
+		sc.Cancel(g)
 	}()
 
 	err := sc.Schedule(g, nil)
-	<-done // Wait for canceling finished
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
 
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Cancel)
-	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Cancel)
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[0].Status)
 	assert.Equal(t, nodes[0].DoneCount, 2)
 }
 
@@ -449,7 +445,7 @@ func TestRepeatFail(t *testing.T) {
 
 	nodes := g.Nodes()
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Error)
-	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Error)
+	assert.Equal(t, scheduler.NodeStatus_Error, nodes[0].Status)
 	assert.Equal(t, nodes[0].DoneCount, 1)
 }
 
@@ -480,7 +476,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	nodes := g.Nodes()
 
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Success)
-	assert.Equal(t, nodes[0].Status, scheduler.NodeStatus_Success)
+	assert.Equal(t, scheduler.NodeStatus_Success, nodes[0].Status)
 	assert.Equal(t, nodes[0].DoneCount, 1)
 }
 

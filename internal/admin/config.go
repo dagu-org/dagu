@@ -28,14 +28,14 @@ func (c *Config) Init() {
 	}
 }
 
-func (c *Config) setup() error {
+func (c *Config) setup() {
 	if c.Command == "" {
 		c.Command = "dagu"
 	}
 	if c.DAGs == "" {
 		wd, err := os.Getwd()
 		if err != nil {
-			return err
+			panic(err)
 		}
 		c.DAGs = wd
 	}
@@ -49,11 +49,10 @@ func (c *Config) setup() error {
 		env := utils.DefaultEnv()
 		env, err := loadVariables(env)
 		if err != nil {
-			return err
+			panic(err)
 		}
 		c.Env = buildConfigEnv(env)
 	}
-	return nil
 }
 
 func buildFromDefinition(def *configDefinition) (c *Config, err error) {
