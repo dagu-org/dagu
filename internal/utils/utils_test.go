@@ -71,3 +71,46 @@ func TestOpenOrCreateFile(t *testing.T) {
 	}()
 	require.True(t, utils.FileExists(name))
 }
+
+func TestParseVariable(t *testing.T) {
+	os.Setenv("TEST_VAR", "test")
+	r, err := utils.ParseVariable("${TEST_VAR}")
+	require.NoError(t, err)
+	assert.Equal(t, r, "test")
+
+	_, err = utils.ParseVariable("`ech test`")
+	require.Error(t, err)
+
+	r, err = utils.ParseVariable("`echo test`")
+	require.NoError(t, err)
+	assert.Equal(t, r, "test")
+}
+
+func TestMustTempDir(t *testing.T) {
+	dir := utils.MustTempDir("tempdir")
+	defer os.RemoveAll(dir)
+	require.Contains(t, dir, "tempdir")
+}
+
+func TestOpenfile(t *testing.T) {
+	dir := utils.MustTempDir("tempdir")
+	defer os.RemoveAll(dir)
+
+	fn := path.Join(dir, "test.txt")
+	f, err := utils.OpenOrCreateFile(fn)
+	require.NoError(t, err)
+	defer f.Close()
+
+	_, err = f.WriteString("test")
+	require.NoError(t, err)
+	require.NoError(t, f.Sync(), err)
+	require.NoError(t, f.Close(), err)
+	require.True(t, utils.FileExists(fn))
+
+	f2, err := os.Open(fn)
+	require.NoError(t, err)
+	defer f2.Close()
+	b, err := ioutil.ReadAll(f2)
+	require.NoError(t, err)
+	assert.Equal(t, "test", string(b))
+}

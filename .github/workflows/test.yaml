@@ -23,6 +23,8 @@ jobs:
           ${{ runner.os }}-go-
     - name: Test
       run: |
+        mkdir -p ./bin
+      	go build -o ./bin/dagu ./cmd/
         go test -v -coverprofile="coverage.txt" -covermode=atomic ./...
     - name: Upload coverage
       uses: codecov/codecov-action@v2

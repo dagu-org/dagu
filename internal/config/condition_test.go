@@ -1,4 +1,4 @@
-package config_test
+package config
 
 import (
 	"os"
@@ -6,12 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestCondition(t *testing.T) {
 	{
-		c := &config.Condition{
+		c := &Condition{
 			Condition: "`echo 1`",
 			Expected:  "1",
 		}
@@ -23,7 +22,7 @@ func TestCondition(t *testing.T) {
 	}
 	{
 		os.Setenv("TEST_CONDITION", "100")
-		c := &config.Condition{
+		c := &Condition{
 			Condition: "${TEST_CONDITION}",
 			Expected:  "100",
 		}
@@ -37,11 +36,11 @@ func TestCondition(t *testing.T) {
 
 func TestEvalConditions(t *testing.T) {
 	for scenario, test := range map[string]struct {
-		Conditions []*config.Condition
+		Conditions []*Condition
 		Want       bool
 	}{
 		"no error conditions": {
-			[]*config.Condition{
+			[]*Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -54,7 +53,7 @@ func TestEvalConditions(t *testing.T) {
 			true,
 		},
 		"fail conditions": {
-			[]*config.Condition{
+			[]*Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -68,7 +67,7 @@ func TestEvalConditions(t *testing.T) {
 		},
 	} {
 		t.Run(scenario, func(t *testing.T) {
-			err := config.EvalConditions(test.Conditions)
+			err := EvalConditions(test.Conditions)
 			if test.Want {
 				require.NoError(t, err)
 			} else {

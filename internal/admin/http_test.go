@@ -72,8 +72,51 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 1000)
 
-	resp, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	_, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
 	require.Error(t, err)
+}
+
+func TestHttpServerBasicAuth(t *testing.T) {
+	dir, err := ioutil.TempDir("", "test_http_server")
+	require.NoError(t, err)
+	os.RemoveAll(dir)
+
+	host := "127.0.0.1"
+	port := findPort()
+	server := admin.NewServer(&admin.Config{
+		Host:              host,
+		Port:              port,
+		IsBasicAuth:       true,
+		BasicAuthUsername: "user",
+		BasicAuthPassword: "password",
+	})
+
+	go func() {
+		err := server.Serve()
+		require.Equal(t, http.ErrServerClosed, err)
+	}()
+	defer server.Shutdown()
+
+	time.Sleep(time.Millisecond * 300)
+
+	client := &http.Client{
+		Timeout: time.Second * 1,
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%s", host, port), nil)
+	require.NoError(t, err)
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, "401 Unauthorized", res.Status)
+
+	req, err = http.NewRequest("GET", fmt.Sprintf("http://%s:%s", host, port), nil)
+	require.NoError(t, err)
+	req.SetBasicAuth("user", "password")
+
+	res, err = client.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, "200 OK", res.Status)
 }
 
 func findPort() string {

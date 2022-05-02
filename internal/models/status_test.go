@@ -1,11 +1,10 @@
-package models_test
+package models
 
 import (
 	"testing"
 	"time"
 
 	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 
 	"github.com/stretchr/testify/assert"
@@ -13,9 +12,14 @@ import (
 )
 
 func TestPid(t *testing.T) {
-	if models.PidNotRunning.IsRunning() {
+	if PidNotRunning.IsRunning() {
 		t.Error()
 	}
+	var pid Pid = Pid(-1)
+	require.Equal(t, "", pid.String())
+
+	pid = Pid(12345)
+	require.Equal(t, "12345", pid.String())
 }
 
 func TestStatusSerialization(t *testing.T) {
@@ -47,12 +51,12 @@ func TestStatusSerialization(t *testing.T) {
 		Params:            []string{},
 		DefaultParams:     "",
 	}
-	st := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
+	st := NewStatus(cfg, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
 
 	js, err := st.ToJson()
 	require.NoError(t, err)
 
-	st_, err := models.StatusFromJson(string(js))
+	st_, err := StatusFromJson(string(js))
 	require.NoError(t, err)
 
 	assert.Equal(t, st.Name, st_.Name)

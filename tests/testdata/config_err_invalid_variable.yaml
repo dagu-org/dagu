@@ -1,0 +1,6 @@
+name: test
+env:
+  VAR: "`ech 1`"
+steps:
+  - name: "step1"
+    command: "echo 1"
