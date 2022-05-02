@@ -38,8 +38,8 @@ func run() error {
 
 func makeApp() *cli.App {
 	return &cli.App{
-		Name:      "dagu",
-		Usage:     "A simple command to run workflows (DAGs)",
+		Name:      "Dagu",
+		Usage:     "A No-code workflow executor (DAGs)",
 		UsageText: "dagu [options] <start|status|stop|retry|dry|server> [args]",
 		Commands: []*cli.Command{
 			newStartCommand(),
