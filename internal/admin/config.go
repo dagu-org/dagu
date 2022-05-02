@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -43,7 +44,7 @@ func (c *Config) setup() {
 		c.Host = "127.0.0.1"
 	}
 	if c.Port == "" {
-		c.Port = "8000"
+		c.Port = settings.MustGet(settings.CONFIG__ADMIN_PORT)
 	}
 	if len(c.Env) == 0 {
 		env := utils.DefaultEnv()

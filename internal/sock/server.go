@@ -58,22 +58,21 @@ func (svr *Server) Serve(listen chan error) error {
 		if svr.quit {
 			return ErrServerRequestedShutdown
 		}
-		if err != nil {
-			return err
-		}
-		go func() {
-			request, err := http.ReadRequest(bufio.NewReader(conn))
-			if err != nil {
-				log.Printf("Failed to read request %v", err)
-				return
-			}
-			svr.HandlerFunc(NewHttpResponseWriter(&conn), request)
-			conn.Close()
+		if err == nil {
+			go func() {
+				request, err := http.ReadRequest(bufio.NewReader(conn))
+				if err != nil {
+					log.Printf("Failed to read request %v", err)
+					return
+				}
+				svr.HandlerFunc(NewHttpResponseWriter(&conn), request)
+				conn.Close()
 
-			if svr.quit {
-				svr.Shutdown()
-			}
-		}()
+				if svr.quit {
+					svr.Shutdown()
+				}
+			}()
+		}
 	}
 }
 

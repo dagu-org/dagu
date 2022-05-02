@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,12 +43,11 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 		if ex == ".yaml" || ex == ".yml" {
 			dag, err := fromConfig(filepath.Join(dir, fi.Name()), true)
 			utils.LogIgnoreErr("read DAG config", err)
-			if dag == nil {
-				errs = append(errs,
-					fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
-				continue
+			if dag != nil {
+				dags = append(dags, dag)
+			} else {
+				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
 			}
-			dags = append(dags, dag)
 		}
 	}
 	return dags, errs, nil
@@ -102,10 +100,8 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 		cmd.Dir = workDir
 		cmd.Env = os.Environ()
 		defer cmd.Wait()
-		err := cmd.Start()
-		if err != nil {
-			log.Printf("failed to retry a DAG: %v", err)
-		}
+		err = cmd.Start()
+		utils.LogIgnoreErr("retry a DAG", err)
 	}()
 	time.Sleep(time.Millisecond * 500)
 	return
@@ -121,11 +117,7 @@ func (s *controller) GetStatus() (*models.Status, error) {
 			return defaultStatus(s.cfg), nil
 		}
 	}
-	status, err := models.StatusFromJson(ret)
-	if err != nil {
-		return nil, err
-	}
-	return status, nil
+	return models.StatusFromJson(ret)
 }
 
 func (s *controller) GetLastStatus() (*models.Status, error) {
@@ -171,11 +163,9 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 			return err
 		}
 	} else {
-		ss, err := models.StatusFromJson(res)
-		if err != nil {
-			return err
-		}
-		if ss.RequestId == status.RequestId && ss.Status == scheduler.SchedulerStatus_Running {
+		ss, _ := models.StatusFromJson(res)
+		if ss != nil && ss.RequestId == status.RequestId &&
+			ss.Status == scheduler.SchedulerStatus_Running {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
@@ -189,10 +179,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 		return err
 	}
 	defer w.Close()
-	if err := w.Write(status); err != nil {
-		return err
-	}
-	return w.Close()
+	return w.Write(status)
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {
