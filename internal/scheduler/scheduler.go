@@ -183,7 +183,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
 			log.Println(fmt.Sprintf("%s started", n.Name))
-			err := sc.runNode(n)
+			err := sc.runHandlerNode(n)
 			if err != nil {
 				sc.lastError = err
 			}
@@ -195,7 +195,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	return sc.lastError
 }
 
-func (sc *Scheduler) runNode(node *Node) error {
+func (sc *Scheduler) runHandlerNode(node *Node) error {
 	defer func() {
 		node.FinishedAt = time.Now()
 	}()

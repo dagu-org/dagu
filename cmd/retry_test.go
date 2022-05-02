@@ -60,3 +60,8 @@ func Test_retryCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, status.Status.RequestId, dag.Status.RequestId)
 }
+
+func Test_retryFail(t *testing.T) {
+	configPath := testConfig("cmd_retry.yaml")
+	require.Error(t, retry(configPath, "invalid-request-id"))
+}

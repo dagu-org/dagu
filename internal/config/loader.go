@@ -59,6 +59,9 @@ func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 }
 
 func (cl *Loader) loadConfig(f, params string, headOnly bool) (*Config, error) {
+	if f == "" {
+		return nil, fmt.Errorf("config file was not specified")
+	}
 	file, err := filepath.Abs(f)
 	if err != nil {
 		return nil, err

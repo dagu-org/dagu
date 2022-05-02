@@ -24,9 +24,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDefaultConfig(t *testing.T) {
-	cfg, err := DefaultConfig()
-	require.NoError(t, err)
-
+	cfg := DefaultConfig()
 	wd, err := os.Getwd()
 	require.NoError(t, err)
 

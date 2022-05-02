@@ -19,25 +19,22 @@ func Test_stopCommand(t *testing.T) {
 
 	app := makeApp()
 	stopper := makeApp()
-	done := make(chan bool)
 
 	go func() {
 		time.Sleep(time.Millisecond * 50)
 		runAppTestOutput(stopper, appTest{
 			args: []string{"", "stop", test.args[2]}, errored: false,
-			output: []string{"stopped"},
+			output: []string{"Stopping..."},
 		}, t)
-		done <- true
 	}()
 
 	runAppTest(app, test, t)
-
-	<-done
 
 	db := database.New(database.DefaultConfig())
 	cfg := &config.Config{
 		ConfigPath: c,
 	}
+
 	s, err := db.ReadStatusHist(cfg.ConfigPath, 1)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(s))

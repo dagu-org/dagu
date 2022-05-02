@@ -13,11 +13,11 @@ import (
 
 type Loader struct{}
 
-func DefaultConfig() (*Config, error) {
+func DefaultConfig() *Config {
 	c := &Config{}
 	c.Init()
-	err := c.setup()
-	return c, err
+	c.setup()
+	return c
 }
 
 func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
