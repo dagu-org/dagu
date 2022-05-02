@@ -29,29 +29,35 @@ func TestMain(m *testing.M) {
 }
 
 func TestAssertDefinition(t *testing.T) {
-	loader := NewConfigLoader()
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 
-	_, err := loader.Load(path.Join(testDir, "config_err_no_name.yaml"), "")
+	_, err := l.Load(path.Join(testDir, "config_err_no_name.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("DAG name must be specified."))
 
-	_, err = loader.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
+	_, err = l.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("at least one step must be specified."))
 }
 
 func TestAssertStepDefinition(t *testing.T) {
-	loader := NewConfigLoader()
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 
-	_, err := loader.Load(path.Join(testDir, "config_err_step_no_name.yaml"), "")
+	_, err := l.Load(path.Join(testDir, "config_err_step_no_name.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("step name must be specified."))
 
-	_, err = loader.Load(path.Join(testDir, "config_err_step_no_command.yaml"), "")
+	_, err = l.Load(path.Join(testDir, "config_err_step_no_command.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("step command must be specified."))
 }
 
 func TestConfigReadClone(t *testing.T) {
-	loader := NewConfigLoader()
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 
-	cfg, err := loader.Load(path.Join(testDir, "config_default.yaml"), "")
+	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
 	require.Contains(t, cfg.String(), "test DAG")
@@ -63,9 +69,11 @@ func TestConfigReadClone(t *testing.T) {
 }
 
 func TestConfigLoadHeadOnly(t *testing.T) {
-	loader := NewConfigLoader()
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 
-	cfg, err := loader.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
+	cfg, err := l.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
 	require.NoError(t, err)
 
 	require.Equal(t, cfg.Name, "test DAG")
@@ -80,7 +88,9 @@ func TestLoadInvalidConfigError(t *testing.T) {
 		`logDir: "` + "`ech foo`" + `"`,
 		`params: "` + "`ech foo`" + `"`,
 	} {
-		l := NewConfigLoader()
+		l := &Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
 		d, err := l.unmarshalData([]byte(c))
 		require.NoError(t, err)
 

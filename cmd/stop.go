@@ -10,10 +10,13 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func newStopCommand() *cli.Command {
-	cl := config.NewConfigLoader()
+	cl := &config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 	return &cli.Command{
 		Name:  "stop",
 		Usage: "dagu stop <config>",

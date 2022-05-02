@@ -1,4 +1,4 @@
-package admin_test
+package admin
 
 import (
 	"os"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/admin"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -25,7 +24,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDefaultConfig(t *testing.T) {
-	cfg, err := admin.DefaultConfig()
+	cfg, err := DefaultConfig()
 	require.NoError(t, err)
 
 	wd, err := os.Getwd()
@@ -40,8 +39,9 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestHomeAdminConfig(t *testing.T) {
-	loader := admin.NewConfigLoader()
-	cfg, err := loader.LoadAdminConfig("")
+	l := &Loader{}
+	cfg, err := l.LoadAdminConfig(
+		path.Join(utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
 	require.NoError(t, err)
 
 	testConfig(t, cfg, &testWant{
@@ -54,8 +54,8 @@ func TestHomeAdminConfig(t *testing.T) {
 }
 
 func TestLoadAdminConfig(t *testing.T) {
-	loader := admin.NewConfigLoader()
-	cfg, err := loader.LoadAdminConfig(testsConfig)
+	l := &Loader{}
+	cfg, err := l.LoadAdminConfig(testsConfig)
 	require.NoError(t, err)
 
 	testConfig(t, cfg, &testWant{
@@ -67,7 +67,7 @@ func TestLoadAdminConfig(t *testing.T) {
 	})
 }
 
-func testConfig(t *testing.T, cfg *admin.Config, want *testWant) {
+func testConfig(t *testing.T, cfg *Config, want *testWant) {
 	t.Helper()
 	assert.Equal(t, want.Host, cfg.Host)
 	assert.Equal(t, want.Port, cfg.Port)

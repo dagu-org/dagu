@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"path"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/yohamta/dagu/internal/utils"
@@ -14,27 +13,14 @@ import (
 
 type Loader struct{}
 
-func NewConfigLoader() *Loader {
-	return &Loader{}
-}
-
 func DefaultConfig() (*Config, error) {
 	c := &Config{}
 	c.Init()
 	err := c.setup()
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	return c, err
 }
 
 func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
-
-	if file == "" {
-		homeDir := utils.MustGetUserHomeDir()
-		file = path.Join(homeDir, ".dagu", "admin.yaml")
-	}
-
 	if !utils.FileExists(file) {
 		return nil, ErrConfigNotFound
 	}
@@ -58,12 +44,7 @@ func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 		}
 	}
 
-	c, err := buildFromDefinition(def)
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
+	return buildFromDefinition(def)
 }
 
 func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
@@ -83,12 +64,8 @@ func (cl *Loader) readFile(file string) (config map[string]interface{}, err erro
 
 func (cl *Loader) unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
-
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
-	if err != nil {
-		return nil, err
-	}
-	return cm, nil
+	return cm, err
 }
 
 func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
@@ -99,10 +76,7 @@ func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
 		TagName:     "",
 	})
 	err := md.Decode(cm)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	return c, err
 }
 
 var ErrConfigNotFound = fmt.Errorf("admin.yaml file not found")

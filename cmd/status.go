@@ -7,12 +7,15 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/utils"
 
 	"github.com/urfave/cli/v2"
 )
 
 func newStatusCommand() *cli.Command {
-	cl := config.NewConfigLoader()
+	cl := &config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 	return &cli.Command{
 		Name:  "status",
 		Usage: "dagu status <config>",
