@@ -18,7 +18,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 	os.RemoveAll(dir)
 
 	host := "127.0.0.1"
-	port := findPort()
+	port := findPort(t)
 	server := NewServer(&Config{
 		Host: host,
 		Port: port,
@@ -26,7 +26,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	go func() {
 		err := server.Serve()
-		require.Equal(t, http.ErrServerClosed, err)
+		require.NoError(t, err)
 	}()
 
 	time.Sleep(time.Millisecond * 300)
@@ -47,7 +47,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 	os.RemoveAll(dir)
 
 	host := "127.0.0.1"
-	port := findPort()
+	port := findPort(t)
 	server := NewServer(&Config{
 		Host: host,
 		Port: port,
@@ -56,7 +56,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	go func() {
 		err := server.Serve()
-		require.Equal(t, http.ErrServerClosed, err)
+		require.NoError(t, err)
 	}()
 
 	time.Sleep(time.Millisecond * 300)
@@ -81,7 +81,7 @@ func TestHttpServerBasicAuth(t *testing.T) {
 	os.RemoveAll(dir)
 
 	host := "127.0.0.1"
-	port := findPort()
+	port := findPort(t)
 	server := NewServer(&Config{
 		Host:              host,
 		Port:              port,
@@ -92,7 +92,7 @@ func TestHttpServerBasicAuth(t *testing.T) {
 
 	go func() {
 		err := server.Serve()
-		require.Equal(t, http.ErrServerClosed, err)
+		require.NoError(t, err)
 	}()
 	defer server.Shutdown()
 
@@ -118,7 +118,8 @@ func TestHttpServerBasicAuth(t *testing.T) {
 	require.Equal(t, "200 OK", res.Status)
 }
 
-func findPort() string {
+func findPort(t *testing.T) string {
+	t.Helper()
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		panic(err)

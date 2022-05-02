@@ -41,7 +41,7 @@ func (svr *server) Serve() (err error) {
 	log.Printf("admin server is running at \"http://%s\"\n", svr.addr)
 
 	err = svr.server.ListenAndServe()
-	if err != http.ErrServerClosed {
+	if err == http.ErrServerClosed {
 		err = nil
 	}
 	if err != nil {
