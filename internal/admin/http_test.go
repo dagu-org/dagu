@@ -1,4 +1,4 @@
-package admin_test
+package admin
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/admin"
 )
 
 func TestHttpServerStartShutdown(t *testing.T) {
@@ -20,7 +19,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort()
-	server := admin.NewServer(&admin.Config{
+	server := NewServer(&Config{
 		Host: host,
 		Port: port,
 	})
@@ -38,7 +37,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	server.Shutdown()
 
-	resp, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	_, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
 	require.Error(t, err)
 }
 
@@ -49,7 +48,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort()
-	server := admin.NewServer(&admin.Config{
+	server := NewServer(&Config{
 		Host: host,
 		Port: port,
 		DAGs: dir,
@@ -83,7 +82,7 @@ func TestHttpServerBasicAuth(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort()
-	server := admin.NewServer(&admin.Config{
+	server := NewServer(&Config{
 		Host:              host,
 		Port:              port,
 		IsBasicAuth:       true,
