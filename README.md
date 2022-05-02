@@ -43,7 +43,7 @@ Dagu execute [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direc
   - [GoDoc](#godoc)
   - [License](#license)
 
-## Why not existing tools, like Airflow or Prefect?
+## Why not Airflow or Prefect?
 Airflow or Prefect requires us to write Python code for workflow definitions. For my specific situation, there were hundreds of thousands of existing Perl or ShellScript codes. Adding another layer of Python would add too much complexity for us. We needed more light-weight solution. So, we developed a No-code workflow executor that doesn't require writing code. We hope that this tool will help other people in the same situation.
 
 ## ️How does it work?
@@ -269,7 +269,7 @@ The default retention period for execution history is 7 days. This setting can b
 
 You can change the status of any task to a `failed` status. Then, when the job is retried, the tasks after the failed node will be executed.
 
-![Update Status](https://user-images.githubusercontent.com/1475839/165755497-923828f8-1992-43fe-8618-979128c38c79.png)
+![Update Status](https://user-images.githubusercontent.com/1475839/166289470-f4af7e14-28f1-45bd-8c32-59cd59d2d583.png)
 
 ### Does it have a scheduler function?
 
