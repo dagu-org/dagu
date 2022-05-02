@@ -262,13 +262,13 @@ func (a *Agent) run() error {
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	logIgnoreErr("writing status", a.dbWriter.Write(a.Status()))
+	utils.LogIgnoreErr("writing status", a.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	logIgnoreErr("sending email", a.reporter.ReportMail(a.DAG, status))
+	utils.LogIgnoreErr("sending email", a.reporter.ReportMail(a.DAG, status))
 
-	logIgnoreErr("closing data file", a.dbWriter.Close())
-	logIgnoreErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
+	utils.LogIgnoreErr("closing data file", a.dbWriter.Close())
+	utils.LogIgnoreErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
 
 	return lastErr
 }
@@ -304,12 +304,6 @@ func (a *Agent) checkIsRunning() error {
 			sock.GetSockAddr(a.DAG.ConfigPath))
 	}
 	return nil
-}
-
-func logIgnoreErr(action string, err error) {
-	if err != nil {
-		log.Printf("%s failed. %s", action, err)
-	}
 }
 
 var (

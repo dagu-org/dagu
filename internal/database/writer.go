@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"sync"
 
@@ -12,11 +13,11 @@ import (
 )
 
 type Writer struct {
-	filename string
-	writer   *bufio.Writer
-	file     *os.File
-	mu       sync.Mutex
-	closed   bool
+	Target string
+	writer *bufio.Writer
+	file   *os.File
+	mu     sync.Mutex
+	closed bool
 }
 
 func (w *Writer) Open() error {
@@ -24,7 +25,8 @@ func (w *Writer) Open() error {
 		return fmt.Errorf("file was already closed")
 	}
 	var err error
-	w.file, err = utils.OpenOrCreateFile(w.filename)
+	os.MkdirAll(path.Dir(w.Target), 0755)
+	w.file, err = utils.OpenOrCreateFile(w.Target)
 	if err != nil {
 		return err
 	}

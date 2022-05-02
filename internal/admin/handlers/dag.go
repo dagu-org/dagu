@@ -320,7 +320,7 @@ func readSchedulerLog(c controller.Controller, file string) (*schedulerLog, erro
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status file %s", file)
 		}
-		logFile = s.Status.Log
+		logFile = s.Log
 	}
 	b, err := os.ReadFile(logFile)
 	if err != nil {
@@ -355,11 +355,11 @@ func readStepLog(c controller.Controller, file, stepName, enc string) (*stepLog,
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status file %s", file)
 		}
-		steps = s.Status.Nodes
-		stepm[constants.OnSuccess] = s.Status.OnSuccess
-		stepm[constants.OnFailure] = s.Status.OnFailure
-		stepm[constants.OnCancel] = s.Status.OnCancel
-		stepm[constants.OnExit] = s.Status.OnExit
+		steps = s.Nodes
+		stepm[constants.OnSuccess] = s.OnSuccess
+		stepm[constants.OnFailure] = s.OnFailure
+		stepm[constants.OnCancel] = s.OnCancel
+		stepm[constants.OnExit] = s.OnExit
 	}
 	var step *models.Node = nil
 	for _, s := range steps {
