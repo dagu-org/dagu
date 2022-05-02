@@ -122,11 +122,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, params.Group, cfg))
 
 		case DAG_TabType_History:
-			logs, err := controller.New(dag.Config).GetStatusHist(30)
-			if err != nil {
-				encodeError(w, err)
-				return
-			}
+			logs := controller.New(dag.Config).GetStatusHist(30)
 			data.LogData = buildLog(logs)
 
 		case DAG_TabType_StepLog:

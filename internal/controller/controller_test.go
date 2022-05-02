@@ -199,7 +199,6 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, s2, s3)
 
-	s4, err := c.GetStatusHist(1)
-	require.NoError(t, err)
+	s4 := c.GetStatusHist(1)
 	require.Equal(t, s2, s4[0].Status)
 }

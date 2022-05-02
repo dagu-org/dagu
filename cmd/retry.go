@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
@@ -26,10 +25,7 @@ func newRetryCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			f, err := filepath.Abs(c.Args().Get(0))
-			if err != nil {
-				return err
-			}
+			f, _ := filepath.Abs(c.Args().Get(0))
 			requestId := c.String("req")
 			return retry(f, requestId)
 		},
@@ -67,9 +63,6 @@ func retry(f, requestId string) error {
 	})
 
 	err = a.Run()
-	if err != nil {
-		log.Printf("running failed. %v", err)
-	}
-
+	utils.LogIgnoreErr("retry", err)
 	return nil
 }

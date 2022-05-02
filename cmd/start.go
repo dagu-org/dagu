@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -47,8 +46,6 @@ func start(cfg *config.Config) error {
 	})
 
 	err := a.Run()
-	if err != nil {
-		log.Printf("running failed. %v", err)
-	}
+	utils.LogIgnoreErr("running", err)
 	return nil
 }

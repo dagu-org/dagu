@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -59,5 +60,11 @@ func TestReadSetting(t *testing.T) {
 		val, err := Get(test.Name)
 		assert.NoError(t, err)
 		assert.Equal(t, val, test.Want)
+
+		val = MustGet(test.Name)
+		assert.Equal(t, val, test.Want)
 	}
+
+	_, err := Get("Invalid_Name")
+	require.Equal(t, ErrConfigNotFound, err)
 }
