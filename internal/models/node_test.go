@@ -1,4 +1,4 @@
-package models
+package models_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -25,7 +26,7 @@ func TestFromNodes(t *testing.T) {
 		makeStep("false"),
 	)
 
-	ret := FromNodes(g.Nodes())
+	ret := models.FromNodes(g.Nodes())
 
 	assert.Equal(t, 2, len(ret))
 	assert.NotEqual(t, "", ret[1].Error)
@@ -41,27 +42,12 @@ func TestToNode(t *testing.T) {
 	for _, n := range orig {
 		require.Equal(t, scheduler.NodeStatus_Success, n.Status)
 	}
-	nodes := FromNodes(orig)
+	nodes := models.FromNodes(orig)
 	for i := range nodes {
 		n := nodes[i].ToNode()
 		require.Equal(t, n.Step, orig[i].Step)
 		require.Equal(t, n.NodeState, orig[i].NodeState)
 	}
-}
-
-func TestStepGraph(t *testing.T) {
-	g := testRunSteps(
-		t,
-		makeStep("true"),
-	)
-	orig := g.Nodes()
-	nodes := FromNodes(orig)
-	ret := StepGraph(nodes, true)
-	require.Contains(t, ret, nodes[0].Name)
-}
-
-func TestGraphNodeString(t *testing.T) {
-	require.Equal(t, graphNode("test step"), "test_step")
 }
 
 func testRunSteps(t *testing.T, steps ...*config.Step) *scheduler.ExecutionGraph {

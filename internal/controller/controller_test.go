@@ -74,7 +74,7 @@ func TestGetDAG(t *testing.T) {
 	file := testConfig("controller_get_dag.yaml")
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
-	assert.Equal(t, "test", dag.Config.Name)
+	assert.Equal(t, "basic success", dag.Config.Name)
 }
 
 func TestGetDAGList(t *testing.T) {
@@ -114,58 +114,4 @@ func TestUpdateStatus(t *testing.T) {
 
 	require.Equal(t, 1, len(st.Nodes))
 	require.Equal(t, scheduler.NodeStatus_Error, updated.Nodes[0].Status)
-}
-
-func TestStartStop(t *testing.T) {
-	file := testConfig("controller_start.yaml")
-	dag, err := controller.FromConfig(file)
-	require.NoError(t, err)
-
-	c := controller.New(dag.Config)
-	go func() {
-		err = c.Start(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
-		require.NoError(t, err)
-	}()
-
-	time.Sleep(time.Millisecond * 50)
-	err = c.Stop()
-	require.NoError(t, err)
-
-	time.Sleep(time.Millisecond * 50)
-	s, err := c.GetLastStatus()
-	require.NoError(t, err)
-
-	require.Equal(t, scheduler.SchedulerStatus_Cancel, s.Status)
-}
-
-func TestRetry(t *testing.T) {
-	file := testConfig("controller_retry.yaml")
-	dag, err := controller.FromConfig(file)
-	require.NoError(t, err)
-
-	c := controller.New(dag.Config)
-	err = c.Start(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "x y z")
-	require.NoError(t, err)
-
-	time.Sleep(time.Millisecond * 50)
-
-	s, err := c.GetLastStatus()
-	require.Equal(t, scheduler.SchedulerStatus_Success, s.Status)
-	require.NoError(t, err)
-
-	err = c.Retry(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", s.RequestId)
-	require.NoError(t, err)
-	s2, err := c.GetLastStatus()
-	require.NoError(t, err)
-
-	require.Equal(t, scheduler.SchedulerStatus_Success, s2.Status)
-	require.Equal(t, s.Params, s2.Params)
-
-	s3, err := c.GetStatusByRequestId(s2.RequestId)
-	require.NoError(t, err)
-	require.Equal(t, s2, s3)
-
-	s4, err := c.GetStatusHist(1)
-	require.NoError(t, err)
-	require.Equal(t, s2, s4[0].Status)
 }

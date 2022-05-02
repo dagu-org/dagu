@@ -14,7 +14,6 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -31,7 +30,6 @@ func TestDatabase(t *testing.T) {
 		"test read latest status":             testReadLatestStatus,
 		"test read latest n status":           testReadStatusN,
 		"test compaction":                     testCompactFile,
-		"test error read file":                testErrorReadFile,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, err := ioutil.TempDir("", "test-database")
@@ -282,23 +280,6 @@ func testCompactFile(t *testing.T, db *Database) {
 	assert.Equal(t, s.Status, s2.Status)
 }
 
-func testErrorReadFile(t *testing.T, db *Database) {
-	_, err := ParseFile("invalid_file.dat")
-	require.Error(t, err)
-
-	_, _, err = db.NewWriter("", time.Now())
-	require.Error(t, err)
-
-	_, err = db.ReadStatusHist("invalid_file.yaml", 1)
-	require.Error(t, err)
-
-	_, err = db.ReadStatusToday("invalid_file.yaml")
-	require.Error(t, err)
-
-	_, err = db.FindByRequestId("invalid_file.yaml", "invalid_id")
-	require.Error(t, err)
-}
-
 func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *models.Status, tm time.Time) {
 	t.Helper()
 	dw, _, err := db.NewWriter(cfg.ConfigPath, tm)
@@ -306,11 +287,6 @@ func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *mod
 	require.NoError(t, dw.Open())
 	defer dw.Close()
 	require.NoError(t, dw.Write(status))
-}
-
-func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	require.Equal(t, cfg.Dir, settings.MustGet(settings.CONFIG__DATA_DIR))
 }
 
 func TestTimestamp(t *testing.T) {

@@ -162,14 +162,13 @@ func (a *Agent) init() {
 			OnFailure:     a.DAG.HandlerOn.Failure,
 			OnCancel:      a.DAG.HandlerOn.Cancel,
 		})
-	a.reporter = &reporter.Reporter{
-		Config: &reporter.Config{
-			Mailer: mail.New(
-				&mail.Config{
-					Host: a.DAG.Smtp.Host,
-					Port: a.DAG.Smtp.Port,
-				}),
-		}}
+	a.reporter = reporter.New(&reporter.Config{
+		Mailer: mail.New(
+			&mail.Config{
+				Host: a.DAG.Smtp.Host,
+				Port: a.DAG.Smtp.Port,
+			}),
+	})
 	a.logFilename = filepath.Join(
 		a.DAG.LogDir, fmt.Sprintf("%s.%s.log",
 			utils.ValidFilename(a.DAG.Name, "_"),

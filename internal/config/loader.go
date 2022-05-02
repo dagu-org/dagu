@@ -58,7 +58,8 @@ func (cl *Loader) Load(f, params string) (*Config, error) {
 		return nil, err
 	}
 
-	c, err := buildFromDefinition(def, dst,
+	c, err := buildFromDefinition(def, file,
+		dst,
 		&BuildConfigOptions{
 			headOnly:   false,
 			parameters: params,
@@ -97,7 +98,7 @@ func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
 		return nil, err
 	}
 
-	c, err := buildFromDefinition(def, nil,
+	c, err := buildFromDefinition(def, file, nil,
 		&BuildConfigOptions{
 			headOnly: true,
 		})
@@ -140,7 +141,8 @@ func (cl *Loader) LoadGlobalConfig() (*Config, error) {
 	}
 
 	c, err := buildFromDefinition(
-		def, nil, &BuildConfigOptions{headOnly: false},
+		def, file, nil,
+		&BuildConfigOptions{headOnly: false},
 	)
 
 	if err != nil {

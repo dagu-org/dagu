@@ -39,47 +39,6 @@ func TestRunDAG(t *testing.T) {
 	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 }
 
-func TestCheckRunning(t *testing.T) {
-	config := testConfig("agent_is_running.yaml")
-	dag, err := controller.FromConfig(config)
-	require.NoError(t, err)
-
-	a := &Agent{Config: &Config{
-		DAG: dag.Config,
-	}}
-
-	go func() {
-		a.Run()
-	}()
-
-	time.Sleep(time.Millisecond * 30)
-
-	status := a.Status()
-	require.NotNil(t, status)
-	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
-
-	_, err = testDAG(t, dag)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "is already running")
-}
-
-func TestDryRun(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_dry.yaml"))
-	require.NoError(t, err)
-
-	a := &Agent{Config: &Config{
-		DAG: dag.Config,
-		Dry: true,
-	}}
-	err = a.Run()
-	require.NoError(t, err)
-
-	status := a.Status()
-	require.NoError(t, err)
-
-	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
-}
-
 func TestCancelDAG(t *testing.T) {
 	for _, abort := range []func(*Agent){
 		func(a *Agent) { a.Signal(syscall.SIGTERM) },

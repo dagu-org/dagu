@@ -21,6 +21,12 @@ type Config struct {
 	Mailer mail.Mailer
 }
 
+func New(config *Config) *Reporter {
+	return &Reporter{
+		Config: config,
+	}
+}
+
 func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *scheduler.Node) error {
 	st := node.ReadStatus()
 	if st != scheduler.NodeStatus_None {

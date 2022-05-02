@@ -1,4 +1,4 @@
-name: "test"
+name: "basic success 2"
 steps:
   - name: "1"
     command: "true"
