@@ -355,7 +355,7 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(b)
 	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
 		encodeResult(w, true)
-		a.Signal(syscall.SIGINT)
+		a.Signal(syscall.SIGTERM)
 	default:
 		encodeError(w, ErrNotFound)
 	}
