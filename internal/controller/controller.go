@@ -26,7 +26,7 @@ type Controller interface {
 	GetStatus() (*models.Status, error)
 	GetLastStatus() (*models.Status, error)
 	GetStatusByRequestId(requestId string) (*models.Status, error)
-	GetStatusHist(n int) ([]*models.StatusFile, error)
+	GetStatusHist(n int) []*models.StatusFile
 	UpdateStatus(*models.Status) error
 }
 
@@ -154,16 +154,13 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
 	db := database.New(database.DefaultConfig())
 	ret, err := db.FindByRequestId(s.cfg.ConfigPath, requestId)
-	if err != nil {
-		return nil, err
-	}
-	return ret.Status, nil
+	return ret.Status, err
 }
 
-func (s *controller) GetStatusHist(n int) ([]*models.StatusFile, error) {
+func (s *controller) GetStatusHist(n int) []*models.StatusFile {
 	db := database.New(database.DefaultConfig())
 	ret := db.ReadStatusHist(s.cfg.ConfigPath, n)
-	return ret, nil
+	return ret
 }
 
 func (s *controller) UpdateStatus(status *models.Status) error {
