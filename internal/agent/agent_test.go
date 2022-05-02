@@ -1,6 +1,10 @@
 package agent
 
 import (
+	"bytes"
+	"errors"
+	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,8 +87,7 @@ func TestDryRun(t *testing.T) {
 func TestCancelDAG(t *testing.T) {
 	for _, abort := range []func(*Agent){
 		func(a *Agent) { a.Signal(syscall.SIGTERM) },
-		func(a *Agent) { a.Cancel(syscall.SIGTERM) },
-		func(a *Agent) { a.Kill(nil) },
+		func(a *Agent) { a.Cancel() },
 	} {
 		a, dag := testDAGAsync(t, testConfig("agent_sleep.yaml"))
 		time.Sleep(time.Millisecond * 100)
@@ -197,6 +200,8 @@ func TestHandleHTTP(t *testing.T) {
 	<-time.After(time.Millisecond * 50)
 
 	var mockResponseWriter = mockResponseWriter{}
+
+	// status
 	r := &http.Request{
 		Method: "GET",
 		URL: &url.URL{
@@ -210,6 +215,57 @@ func TestHandleHTTP(t *testing.T) {
 	status, err := models.StatusFromJson(mockResponseWriter.body)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Running, status.Status)
+
+	// invalid path
+	r = &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Path: "/invalid-path",
+		},
+	}
+	a.handleHTTP(&mockResponseWriter, r)
+	require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
+
+	// cancel
+	r = &http.Request{
+		Method: "POST",
+		URL: &url.URL{
+			Path: "/stop",
+		},
+	}
+	a.handleHTTP(&mockResponseWriter, r)
+	require.Equal(t, http.StatusOK, mockResponseWriter.status)
+	require.Equal(t, "OK", mockResponseWriter.body)
+
+	<-time.After(time.Millisecond * 50)
+
+	status = a.Status()
+	require.Equal(t, status.Status, scheduler.SchedulerStatus_Cancel)
+}
+
+func TestIgnoreErr(t *testing.T) {
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	log.SetOutput(w)
+
+	defer func() {
+		os.Stdout = origStdout
+		log.SetOutput(origStdout)
+	}()
+
+	logIgnoreErr("test action", errors.New("test error"))
+	os.Stdout = origStdout
+	w.Close()
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	require.NoError(t, err)
+
+	s := buf.String()
+	require.Contains(t, s, "test action failed")
+	require.Contains(t, s, "test error")
 }
 
 type mockResponseWriter struct {

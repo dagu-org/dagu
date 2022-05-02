@@ -155,14 +155,12 @@ func TestSchedulerCancel(t *testing.T) {
 		MaxActiveRuns: 1,
 	})
 
-	done := make(chan bool)
 	go func() {
-		<-time.After(time.Millisecond * 1000)
-		sc.Cancel(g, done)
+		<-time.After(time.Millisecond * 100)
+		sc.Cancel(g)
 	}()
 
 	_ = sc.Schedule(g, nil)
-	<-done // Wait for canceling finished
 	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Cancel)
 
 	nodes := g.Nodes()
@@ -415,14 +413,12 @@ func TestRepeat(t *testing.T) {
 	)
 	sc := scheduler.New(&scheduler.Config{})
 
-	done := make(chan bool)
 	go func() {
 		<-time.After(time.Millisecond * 3000)
-		sc.Cancel(g, done)
+		sc.Cancel(g)
 	}()
 
 	err := sc.Schedule(g, nil)
-	<-done // Wait for canceling finished
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
