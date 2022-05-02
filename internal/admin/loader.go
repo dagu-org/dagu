@@ -48,9 +48,6 @@ func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 }
 
 func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
-	if !utils.FileExists(file) {
-		return config, fmt.Errorf("file not found: %s", file)
-	}
 	return cl.readFile(file)
 }
 

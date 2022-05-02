@@ -38,6 +38,10 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestHomeAdminConfig(t *testing.T) {
 	l := &Loader{}
+
+	_, err := l.LoadAdminConfig("no-existing-file.yaml")
+	require.Equal(t, ErrConfigNotFound, err)
+
 	cfg, err := l.LoadAdminConfig(
 		path.Join(utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
 	require.NoError(t, err)
@@ -49,6 +53,12 @@ func TestHomeAdminConfig(t *testing.T) {
 		Command: path.Join(testsDir, "/dagu/bin/dagu"),
 		WorkDir: path.Join(testsDir, "/dagu/dags"),
 	})
+}
+
+func TestReadFileError(t *testing.T) {
+	l := &Loader{}
+	_, err := l.readFile("no-existing-file.yaml")
+	require.Error(t, err)
 }
 
 func TestLoadAdminConfig(t *testing.T) {
