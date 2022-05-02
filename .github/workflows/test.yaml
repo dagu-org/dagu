@@ -27,10 +27,11 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
+    - name: Build
+      run: |
+        mkdir ./bin && go build -o ./bin/dagu ./cmd/
     - name: Test
       run: |
-        mkdir -p ./bin
-      	go build -o ./bin/dagu ./cmd/
         go test -v -coverprofile="coverage.txt" -covermode=atomic ./...
     - name: Upload coverage
       uses: codecov/codecov-action@v2
