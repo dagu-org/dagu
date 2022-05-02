@@ -73,26 +73,26 @@ You can start the example by pressing `Start` on the UI.
 
 ## Command usage
 
-- `dagu start [--params=<params>] <file>` - run a DAG
-- `dagu status <file>` - display the current status of the DAG
-- `dagu retry --req=<request-id> <file>` - retry the failed/canceled DAG
-- `dagu stop <file>` - stop a DAG execution by sending a TERM signal
-- `dagu dry [--params=<params>] <file>` - dry-run a DAG
+- `dagu start [--params=<params>] <file>` - start a workflow
+- `dagu status <file>` - display the current status of a workflow
+- `dagu retry --req=<request-id> <file>` - retry the failed/canceled workflow
+- `dagu stop <file>` - stop a workflow execution by sending a TERM signal
+- `dagu dry [--params=<params>] <file>` - dry-run a workflow
 - `dagu server` - start a web server for web UI
 
 ## Web interface
 
 You can launch web UI by `dagu server` command. Default URL is `http://localhost:8000`.
 
-- **DAGs**: Overview of all DAGs.
+- **DAGs**: Overview of all DAGs (workflows).
 
   ![DAGs](https://user-images.githubusercontent.com/1475839/166269631-f031106e-dd13-49dc-9d00-0f6d1e22e4dc.png)
 
-- **Detail**: Realtime status of the DAG.
+- **Detail**: Realtime status of the workflow.
 
   ![Detail](https://user-images.githubusercontent.com/1475839/166269521-03098e46-6608-43fa-b363-0d00b069c808.png)
 
-- **History**: History of the execution of the DAG.
+- **History**: History of the execution of the workflow.
 
   ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
 
