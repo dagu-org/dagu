@@ -38,22 +38,19 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 		return
 	}
 	fis, err := ioutil.ReadDir(dir)
-	if err != nil {
-		log.Printf("%v", err)
-	}
+	utils.LogIgnoreErr("read DAGs directory", err)
 	for _, fi := range fis {
-		if filepath.Ext(fi.Name()) != ".yaml" {
-			continue
-		}
-		dag, err := fromConfig(filepath.Join(dir, fi.Name()), true)
-		if err != nil {
-			log.Printf("%v", err)
+		ex := filepath.Ext(fi.Name())
+		if ex == ".yaml" || ex == ".yml" {
+			dag, err := fromConfig(filepath.Join(dir, fi.Name()), true)
+			utils.LogIgnoreErr("read DAG config", err)
 			if dag == nil {
-				errs = append(errs, err.Error())
+				errs = append(errs,
+					fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
 				continue
 			}
+			dags = append(dags, dag)
 		}
-		dags = append(dags, dag)
 	}
 	return dags, errs, nil
 }
@@ -89,9 +86,7 @@ func (c *controller) Start(bin string, workDir string, params string) (err error
 		cmd.Env = os.Environ()
 		defer cmd.Wait()
 		err = cmd.Start()
-		if err != nil {
-			log.Printf("failed to start a DAG: %v", err)
-		}
+		utils.LogIgnoreErr("starting a DAG", err)
 	}()
 	time.Sleep(time.Millisecond * 500)
 	return
@@ -139,20 +134,21 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 	if err == nil {
 		return models.StatusFromJson(ret)
 	}
-	if err != nil && errors.Is(err, sock.ErrTimeout) {
-		return nil, err
-	}
-	db := database.New(database.DefaultConfig())
-	status, err := db.ReadStatusToday(s.cfg.ConfigPath)
-	if err != nil {
-		var readErr error = nil
-		if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
-			fmt.Printf("read status failed : %s", err)
-			readErr = err
+	utils.LogIgnoreErr("get last status", err)
+	if err == nil || !errors.Is(err, sock.ErrTimeout) {
+		db := database.New(database.DefaultConfig())
+		status, err := db.ReadStatusToday(s.cfg.ConfigPath)
+		if err != nil {
+			var readErr error = nil
+			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
+				fmt.Printf("read status failed : %s", err)
+				readErr = err
+			}
+			return defaultStatus(s.cfg), readErr
 		}
-		return defaultStatus(s.cfg), readErr
+		return status, nil
 	}
-	return status, nil
+	return nil, err
 }
 
 func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
@@ -177,8 +173,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 		if errors.Is(err, sock.ErrTimeout) {
 			return err
 		}
-	}
-	if err == nil {
+	} else {
 		ss, err := models.StatusFromJson(res)
 		if err != nil {
 			return err
@@ -200,10 +195,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 	if err := w.Write(status); err != nil {
 		return err
 	}
-	if err := w.Close(); err != nil {
-		return err
-	}
-	return nil
+	return w.Close()
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {

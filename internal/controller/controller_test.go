@@ -116,6 +116,40 @@ func TestUpdateStatus(t *testing.T) {
 	require.Equal(t, scheduler.NodeStatus_Error, updated.Nodes[0].Status)
 }
 
+func TestUpdateStatusError(t *testing.T) {
+	file := testConfig("controller_update_status_failed.yaml")
+
+	dag, err := controller.FromConfig(file)
+	require.NoError(t, err)
+
+	a := agent.Agent{Config: &agent.Config{
+		DAG: dag.Config,
+	}}
+
+	go func() {
+		err = a.Run()
+		require.NoError(t, err)
+	}()
+
+	time.Sleep(time.Millisecond * 30)
+
+	c := controller.New(dag.Config)
+	st, err := c.GetLastStatus()
+	require.NoError(t, err)
+	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
+
+	st.Nodes[0].Status = scheduler.NodeStatus_Error
+	err = c.UpdateStatus(st)
+	require.Error(t, err)
+
+	err = c.Stop()
+	require.NoError(t, err)
+
+	st.RequestId = "invalid request id"
+	err = c.UpdateStatus(st)
+	require.Error(t, err)
+}
+
 func TestStartStop(t *testing.T) {
 	file := testConfig("controller_start.yaml")
 	dag, err := controller.FromConfig(file)

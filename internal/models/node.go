@@ -119,6 +119,9 @@ func graphNode(val string) string {
 }
 
 func fromStepWithDefValues(s *config.Step) *Node {
+	if s == nil {
+		return nil
+	}
 	step := &Node{
 		Step:       s,
 		Log:        "",

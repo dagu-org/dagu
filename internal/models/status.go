@@ -77,18 +77,10 @@ func NewStatus(cfg *config.Config, nodes []*scheduler.Node, status scheduler.Sch
 		models = FromSteps(cfg.Steps)
 	}
 	var onExit, onSuccess, onFailure, onCancel *Node = nil, nil, nil, nil
-	if cfg.HandlerOn.Exit != nil {
-		onExit = fromStepWithDefValues(cfg.HandlerOn.Exit)
-	}
-	if cfg.HandlerOn.Success != nil {
-		onSuccess = fromStepWithDefValues(cfg.HandlerOn.Success)
-	}
-	if cfg.HandlerOn.Failure != nil {
-		onFailure = fromStepWithDefValues(cfg.HandlerOn.Failure)
-	}
-	if cfg.HandlerOn.Cancel != nil {
-		onCancel = fromStepWithDefValues(cfg.HandlerOn.Cancel)
-	}
+	onExit = fromStepWithDefValues(cfg.HandlerOn.Exit)
+	onSuccess = fromStepWithDefValues(cfg.HandlerOn.Success)
+	onFailure = fromStepWithDefValues(cfg.HandlerOn.Failure)
+	onCancel = fromStepWithDefValues(cfg.HandlerOn.Cancel)
 	return &Status{
 		RequestId:  "",
 		Name:       cfg.Name,

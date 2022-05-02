@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -23,6 +24,11 @@ func TestMustGetUserHomeDir(t *testing.T) {
 	}
 	hd := utils.MustGetUserHomeDir()
 	assert.Equal(t, "/test", hd)
+}
+
+func TestDefaultEnv(t *testing.T) {
+	env := utils.DefaultEnv()
+	require.Contains(t, env, "PATH")
 }
 
 func TestMustGetwd(t *testing.T) {
@@ -39,6 +45,10 @@ func TestFormatTime(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, tm, parsed)
 
+	require.Equal(t, constants.TimeEmpty, utils.FormatTime(time.Time{}))
+	parsed, err = utils.ParseTime(constants.TimeEmpty)
+	require.NoError(t, err)
+	require.Equal(t, time.Time{}, parsed)
 }
 
 func TestFormatDuration(t *testing.T) {
@@ -63,17 +73,47 @@ func TestValidFilename(t *testing.T) {
 	assert.Equal(t, f, "file_name")
 }
 
-func TestOpenOrCreateFile(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "utils_test")
+func TestOpenFile(t *testing.T) {
+	tmp, err := ioutil.TempDir("", "open")
 	require.NoError(t, err)
-	name := path.Join(tmp, "/file_for_test.txt")
-	f, err := utils.OpenOrCreateFile(name)
+
+	name := path.Join(tmp, "/file.txt")
+	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
 	require.NoError(t, err)
+
 	defer func() {
 		f.Close()
 		os.Remove(name)
 	}()
+
+	f.WriteString("test")
+	f.Sync()
+	f.Close()
+
+	_, err = utils.OpenFile(name)
+	require.NoError(t, err)
+}
+
+func TestOpenOrCreateFile(t *testing.T) {
+	tmp, err := ioutil.TempDir("", "open_or_create")
+	require.NoError(t, err)
+
+	name := path.Join(tmp, "/file.txt")
+	f, err := utils.OpenOrCreateFile(name)
+	require.NoError(t, err)
+
+	defer func() {
+		f.Close()
+		os.Remove(name)
+	}()
+
 	require.True(t, utils.FileExists(name))
+
+	f.Close()
+	os.Remove(name)
+
+	_, err = utils.OpenFile(name)
+	require.Error(t, err)
 }
 
 func TestParseVariable(t *testing.T) {

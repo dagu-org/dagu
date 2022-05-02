@@ -21,22 +21,14 @@ func DefaultEnv() map[string]string {
 // MustGetUserHomeDir returns current working directory.
 // Panics is os.UserHomeDir() returns error
 func MustGetUserHomeDir() string {
-	hd, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-
+	hd, _ := os.UserHomeDir()
 	return hd
 }
 
 // MustGetwd returns current working directory.
 // Panics is os.Getwd() returns error
 func MustGetwd() string {
-	wd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
+	wd, _ := os.Getwd()
 	return wd
 }
 
@@ -52,11 +44,7 @@ func ParseTime(val string) (time.Time, error) {
 	if val == constants.TimeEmpty {
 		return time.Time{}, nil
 	}
-	ret, err := time.ParseInLocation(constants.TimeFormat, val, time.Local)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return ret, nil
+	return time.ParseInLocation(constants.TimeFormat, val, time.Local)
 }
 
 func FormatDuration(t time.Duration, defaultVal string) string {
