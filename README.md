@@ -1,6 +1,11 @@
 # dagu 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
+[![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
+[![GitHub release](https://img.shields.io/github/release/yohamta/dagu.svg)](https://github.com/yohamta/dagu/releases)
+[![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
+
 **A simple command to run workflows (DAGs) defined in declarative YAML format**
 
 dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definition. dagu comes with a web UI and REST API interfaces.
@@ -73,7 +78,7 @@ Download this [example](https://github.com/yohamta/dagu/blob/main/examples/compl
 
 ### 3. Start Web UI server
 
-Start the server with `dagu server` and browse to `http://localhost:8080` to explore the Web UI.
+Start the server with `dagu server` and browse to `http://localhost:8000` to explore the Web UI.
 
 ### 4. Running the DAG
 
