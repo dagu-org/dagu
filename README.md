@@ -8,7 +8,7 @@
 
 **A No-code workflow executor**
 
-Dagu execute [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflow.
+Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflow.
 
 ## Contents
 - [Dagu](#dagu)
