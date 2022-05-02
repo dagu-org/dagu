@@ -11,11 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func TestLoadConfig(t *testing.T) {
-	loader := NewConfigLoader()
-	cfg, err := loader.Load(testConfig, "")
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	cfg, err := l.Load(testConfig, "")
 	require.NoError(t, err)
 
 	steps := []*Step{
@@ -130,8 +133,12 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestLoadGlobalConfig(t *testing.T) {
-	loader := NewConfigLoader()
-	cfg, err := loader.LoadGlobalConfig()
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	cfg, err := l.loadGlobalConfig(
+		path.Join(l.HomeDir, ".dagu/config.yaml"),
+	)
 	require.NotNil(t, cfg)
 	require.NoError(t, err)
 
@@ -165,8 +172,10 @@ func TestLoadGlobalConfig(t *testing.T) {
 }
 
 func TestLoadDeafult(t *testing.T) {
-	loader := NewConfigLoader()
-	cfg, err := loader.Load(path.Join(testDir, "config_default.yaml"), "")
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
 	assert.Equal(t, time.Minute*5, cfg.MaxCleanUpTime)
@@ -174,7 +183,28 @@ func TestLoadDeafult(t *testing.T) {
 }
 
 func TestLoadErrorFileNotExist(t *testing.T) {
-	loader := NewConfigLoader()
-	_, err := loader.Load(path.Join(testDir, "not_existing_file.yaml"), "")
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	_, err := l.Load(path.Join(testDir, "not_existing_file.yaml"), "")
+	require.Error(t, err)
+}
+
+func TestGlobalConfigNotExist(t *testing.T) {
+	l := &Loader{
+		HomeDir: "/not_existing_dir",
+	}
+
+	file := path.Join(testDir, "config_default.yaml")
+	_, err := l.Load(file, "")
+	require.NoError(t, err)
+}
+
+func TestDecodeError(t *testing.T) {
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	file := path.Join(testDir, "config_err_decode.yaml")
+	_, err := l.Load(file, "")
 	require.Error(t, err)
 }

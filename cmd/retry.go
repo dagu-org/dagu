@@ -10,12 +10,15 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/utils"
 
 	"github.com/urfave/cli/v2"
 )
 
 func newRetryCommand() *cli.Command {
-	cl := config.NewConfigLoader()
+	cl := &config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 	return &cli.Command{
 		Name:  "retry",
 		Usage: "dagu retry --req=<request-id> <config>",

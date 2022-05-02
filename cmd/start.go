@@ -8,10 +8,13 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func newStartCommand() *cli.Command {
-	cl := config.NewConfigLoader()
+	cl := &config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 	return &cli.Command{
 		Name:  "start",
 		Usage: "dagu start [--params=\"<params>\"] <config>",

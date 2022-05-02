@@ -8,10 +8,13 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func newDryCommand() *cli.Command {
-	cl := config.NewConfigLoader()
+	cl := &config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
 	return &cli.Command{
 		Name:  "dry",
 		Usage: "dagu dry [--params=\"<params>\"] <config>",

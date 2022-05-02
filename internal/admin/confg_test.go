@@ -18,7 +18,7 @@ logEncodingCharset: utf-8
 `
 
 func TestLoadConfig(t *testing.T) {
-	l := NewConfigLoader()
+	l := &Loader{}
 	d, err := l.unmarshalData([]byte(testLoadConfigYaml))
 	require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func TestLoadInvalidConfigError(t *testing.T) {
 		`basicAuthPassword: "` + "`ech foo`" + `"`,
 		`logEncodingCharset: "` + "`ech foo`" + `"`,
 	} {
-		l := NewConfigLoader()
+		l := &Loader{}
 		d, err := l.unmarshalData([]byte(c))
 		require.NoError(t, err)
 

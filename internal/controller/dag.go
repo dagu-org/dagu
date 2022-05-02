@@ -27,7 +27,7 @@ func FromConfig(file string) (*DAG, error) {
 }
 
 func fromConfig(file string, headOnly bool) (*DAG, error) {
-	cl := config.NewConfigLoader()
+	cl := config.Loader{}
 	var cfg *config.Config
 	var err error
 	if headOnly {

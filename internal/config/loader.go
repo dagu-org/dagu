@@ -18,104 +18,18 @@ import (
 var ErrConfigNotFound = errors.New("config file was not found")
 
 type Loader struct {
-	dir     string
-	homeDir string
-}
-
-func NewConfigLoader() *Loader {
-	return &Loader{
-		homeDir: utils.MustGetUserHomeDir(),
-		dir:     utils.MustGetwd(),
-	}
+	HomeDir string
 }
 
 func (cl *Loader) Load(f, params string) (*Config, error) {
-	file, err := filepath.Abs(f)
-	if err != nil {
-		return nil, err
-	}
-
-	dst, err := cl.LoadGlobalConfig()
-	if err != nil {
-		return nil, err
-	}
-	if dst == nil {
-		dst = &Config{}
-		dst.Init()
-	}
-
-	raw, err := cl.load(file)
-	if err != nil {
-		return nil, err
-	}
-
-	def, err := cl.decode(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := assertDef(def); err != nil {
-		return nil, err
-	}
-
-	c, err := buildFromDefinition(def, dst,
-		&BuildConfigOptions{
-			headOnly:   false,
-			parameters: params,
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	err = cl.merge(dst, c)
-	if err != nil {
-		return nil, err
-	}
-
-	dst.setup(file)
-
-	return dst, nil
+	return cl.loadConfig(f, params, false)
 }
 
 func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
-	file, err := filepath.Abs(f)
-	if err != nil {
-		return nil, err
-	}
-
-	raw, err := cl.load(file)
-	if err != nil {
-		return nil, err
-	}
-
-	def, err := cl.decode(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := assertDef(def); err != nil {
-		return nil, err
-	}
-
-	c, err := buildFromDefinition(def, nil,
-		&BuildConfigOptions{
-			headOnly: true,
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	c.setup(file)
-
-	return c, nil
+	return cl.loadConfig(f, "", true)
 }
 
-func (cl *Loader) LoadGlobalConfig() (*Config, error) {
-	if cl.homeDir == "" {
-		return nil, fmt.Errorf("home directory was not found.")
-	}
-
-	file := path.Join(cl.homeDir, ".dagu", "config.yaml")
+func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 	if !utils.FileExists(file) {
 		return nil, nil
 	}
@@ -139,28 +53,71 @@ func (cl *Loader) LoadGlobalConfig() (*Config, error) {
 		}
 	}
 
-	c, err := buildFromDefinition(
+	return buildFromDefinition(
 		def, nil, &BuildConfigOptions{headOnly: false},
 	)
+}
+
+func (cl *Loader) loadConfig(f, params string, headOnly bool) (*Config, error) {
+	file, err := filepath.Abs(f)
+	if err != nil {
+		return nil, err
+	}
+
+	var dst *Config = nil
+
+	if !headOnly {
+		file := path.Join(cl.HomeDir, ".dagu/config.yaml")
+		dst, err = cl.loadGlobalConfig(file)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if dst == nil {
+		dst = &Config{}
+		dst.Init()
+	}
+
+	raw, err := cl.load(file)
+	if err != nil {
+		return nil, err
+	}
+
+	def, err := cl.decode(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := assertDef(def); err != nil {
+		return nil, err
+	}
+
+	c, err := buildFromDefinition(def, dst,
+		&BuildConfigOptions{
+			headOnly:   headOnly,
+			parameters: params,
+		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
+	err = cl.merge(dst, c)
+	if err != nil {
+		return nil, err
+	}
+
+	dst.setup(file)
+
+	return dst, nil
 }
 
 func (cl *Loader) merge(dst, src *Config) error {
-	if err := mergo.MergeWithOverwrite(dst, src); err != nil {
-		return err
-	}
-	return nil
+	return mergo.MergeWithOverwrite(dst, src)
 }
 
 func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
-	if !utils.FileExists(file) {
-		return config, ErrConfigNotFound
-	}
 	return cl.readFile(file)
 }
 
@@ -174,12 +131,8 @@ func (cl *Loader) readFile(file string) (config map[string]interface{}, err erro
 
 func (cl *Loader) unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
-
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
-	if err != nil {
-		return nil, err
-	}
-	return cm, nil
+	return cm, err
 }
 
 func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
@@ -190,8 +143,5 @@ func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
 		TagName:     "",
 	})
 	err := md.Decode(cm)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	return c, err
 }
