@@ -1,4 +1,4 @@
-# dagu 
+# Dagu 
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
@@ -6,87 +6,72 @@
 [![GitHub release](https://img.shields.io/github/release/yohamta/dagu.svg)](https://github.com/yohamta/dagu/releases)
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 
-**A simple command to run workflows (DAGs) defined in declarative YAML format**
+**A No-code workflow executor**
 
-dagu is a simple workflow engine to generate and executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from YAML definition. dagu comes with a web UI and REST API interfaces.
+Dagu execute [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflow.
 
-## 🚀 Contents
-- [dagu](#dagu)
-  - [🚀 Contents](#-contents)
-  - [🌟 Project goal](#-project-goal)
-  - [⚙️ How does it work?](#️-how-does-it-work)
-  - [🔥 Motivation](#-motivation)
-  - [🤔 Why not existing tools, like Airflow?](#-why-not-existing-tools-like-airflow)
-  - [⚡️ Quick start](#️-quick-start)
+## Contents
+- [Dagu](#dagu)
+  - [Contents](#contents)
+  - [Why not existing tools, like Airflow or Prefect?](#why-not-existing-tools-like-airflow-or-prefect)
+  - [️How does it work?](#️how-does-it-work)
+  - [️Quick start](#️quick-start)
     - [1. Installation](#1-installation)
-    - [2. Download an example DAG definition](#2-download-an-example-dag-definition)
-    - [3. Start Web UI server](#3-start-web-ui-server)
-    - [4. Running the DAG](#4-running-the-dag)
-  - [📖 Usage](#-usage)
-  - [🛠 Use cases](#-use-cases)
-  - [✨ Features](#-features)
-  - [🖥 User interface](#-user-interface)
-  - [📋 DAG definition](#-dag-definition)
+    - [2. Download an example YAML file](#2-download-an-example-yaml-file)
+    - [3. Launch web server](#3-launch-web-server)
+    - [4. Running the example](#4-running-the-example)
+  - [Command usage](#command-usage)
+  - [Web interface](#web-interface)
+  - [YAML format](#yaml-format)
     - [Minimal](#minimal)
     - [Using environment variables](#using-environment-variables)
-    - [Using DAG parameters](#using-dag-parameters)
+    - [Using parameters](#using-parameters)
     - [Using command substitution](#using-command-substitution)
     - [All available fields](#all-available-fields)
-    - [Examples](#examples)
-  - [🧑‍💻 Admin configuration](#-admin-configuration)
+  - [Admin configuration](#admin-configuration)
     - [Environment variables](#environment-variables)
     - [Web UI configuration](#web-ui-configuration)
-    - [Global DAG configuration](#global-dag-configuration)
-  - [💡 Architecture](#-architecture)
-  - [❓FAQ](#faq)
+    - [Global configuration](#global-configuration)
+  - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
     - [Where is the log files stored?](#where-is-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [Is it possible to retry a DAG from a specific step?](#is-it-possible-to-retry-a-dag-from-a-specific-step)
     - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
-  - [🔗 GoDoc](#-godoc)
-  - [⚠️ License](#️-license)
+    - [How it can communicate with running processes?](#how-it-can-communicate-with-running-processes)
+  - [GoDoc](#godoc)
+  - [License](#license)
 
-## 🌟 Project goal
+## Why not existing tools, like Airflow or Prefect?
+Airflow or Prefect requires us to write Python code for workflow definitions. For my specific situation, there were hundreds of thousands of existing Perl or ShellScript codes. Adding another layer of Python would add too much complexity for us. We needed more light-weight solution. So, we developed a No-code workflow executor that doesn't require writing code. We hope that this tool will help other people in the same situation.
 
-dagu aims to be one of the easiest options to manage and run DAGs without a DBMS, operational burden, high learning curve, or even writing code.
+## ️How does it work?
 
-## ⚙️ How does it work?
+- Dagu is a single command and it uses the file system to stores data in JSON format. Therefore, no DBMS or cloud service is required.
+- Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
-- dagu is a single binary and it uses the file system as the database and stores the data in plain JSON files. Therefore, no DBMS or cloud service is required.
-- You can easily define DAGs using the declarative YAML format. Existing shell scripts or arbitrary programs can be used without modification. This makes the migration of existing workflows very easy.
-
-## 🔥 Motivation
-
-There were many problems in our ETL pipelines. Hundreds of cron jobs are on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to re-run. We also have to SSH into the server to see the logs and run each shell script one by one manually. So We needed a tool that explicitly visualizes and allows us to manage the dependencies of the jobs in the pipeline.
-
-***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
-
-## 🤔 Why not existing tools, like Airflow?
-We considered many potential tools such as Airflow, Rundeck, Luigi, DigDag, JobScheduler, etc. But unfortunately, they were not suitable for our existing environment. Because in order to use one of those tools, we had to setup DBMS (Database Management System), accepet relatively high learning curves, and more operational overheads. We only have a small group of engineers in our office and use a less common DBMS. We couldn't afford them. Therefore, we developed a simple and easy-to-use workflow engine that fills the gap between cron and Airflow, that does not require DBMS, scheduler process or other daemons. We hope that this tool will help other people in the same situation.
-
-## ⚡️ Quick start
+## ️Quick start
 
 ### 1. Installation
 
 Download the latest binary from the [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
-### 2. Download an example DAG definition
+### 2. Download an example YAML file
 
-Download this [example](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and place it in the current directory with extension `*.yaml`.
+Download this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and place it in the current directory with extension `*.yaml`.
 
-### 3. Start Web UI server
+### 3. Launch web server
 
 Start the server with `dagu server` and browse to `http://localhost:8000` to explore the Web UI.
 
-### 4. Running the DAG
+### 4. Running the example
 
-You can start the example DAG from the Web UI by submitting `Start` button on the top right corner of the UI.
+You can start the example by pressing `Start` on the UI.
 
 ![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
 
-## 📖 Usage
+## Command usage
 
 - `dagu start [--params=<params>] <file>` - run a DAG
 - `dagu status <file>` - display the current status of the DAG
@@ -95,53 +80,27 @@ You can start the example DAG from the Web UI by submitting `Start` button on th
 - `dagu dry [--params=<params>] <file>` - dry-run a DAG
 - `dagu server` - start a web server for web UI
 
-## 🛠 Use cases
-- ETL Pipeline
-- Machine Learning model training
-- Automated generation of reports
-- Backups and other DevOps tasks
-- Visualizing existing workflows
+## Web interface
 
-## ✨ Features
-
-- Simple command interface (See [Usage](#usage))
-- Simple configuration YAML format (See [Simple example](#simple-example))
-- Web UI to visualize, manage DAGs and watch logs
-- REST API interface
-- Parameterization
-- Conditions
-- Automatic retry
-- Cancellation
-- Retry
-- Parallelism limits
-- Environment variables
-- Repeat
-- Basic Authentication
-- E-mail notifications
-
-## 🖥 User interface
+You can launch web UI by `dagu server` command. Default URL is `http://localhost:8000`.
 
 - **DAGs**: Overview of all DAGs.
 
-  ![DAGs](https://user-images.githubusercontent.com/1475839/165417789-18d29f3d-aecf-462a-8cdf-0b575ba613d0.png)
+  ![DAGs](https://user-images.githubusercontent.com/1475839/166269631-f031106e-dd13-49dc-9d00-0f6d1e22e4dc.png)
 
 - **Detail**: Realtime status of the DAG.
 
-  ![Detail](https://user-images.githubusercontent.com/1475839/165418393-d7d876bc-329f-4299-977e-7726e8ef0fa1.png)
-
-- **Timeline**: Timeline of each step in the DAG.
-
-  ![Timeline](https://user-images.githubusercontent.com/1475839/165418430-1fe3b100-33eb-4d81-a68a-c8a881890b61.png)
+  ![Detail](https://user-images.githubusercontent.com/1475839/166269521-03098e46-6608-43fa-b363-0d00b069c808.png)
 
 - **History**: History of the execution of the DAG.
 
-  ![History](https://user-images.githubusercontent.com/1475839/165426067-02c4f72f-e3f0-4cd8-aa38-35fa98f0382f.png)
+  ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
 
-## 📋 DAG definition
+## YAML format
 
 ### Minimal
 
-A minimal DAG definition is as simple as:
+A minimal definition is as follows:
 
 ```yaml
 name: minimal configuration          # DAG's name
@@ -156,7 +115,7 @@ steps:                               # Steps inside the DAG
 
 ### Using environment variables
 
-Environment variables can be defined and used throughout the file using `env` field.
+Environment variables can be defined and used using `env` field.
 
 ```yaml
 name: example
@@ -168,9 +127,9 @@ steps:
     command: python main.py
 ```
 
-### Using DAG parameters
+### Using parameters
 
-Parameters can be defined and referenced throughout a file using `params` field. Each parameter can be referenced as $1, $2, etc. Parameters can also be command substitutions or environment variables. You can override the default values of the parameters with the `--params=` parameter of the `start` command.
+Parameters can be defined using `params` field. Each parameter can be referenced as $1, $2, etc. Parameters can also be command substitutions or environment variables. You can override the parameters with the `--params=` parameter for `start` command.
 
 ```yaml
 name: example
@@ -195,7 +154,7 @@ steps:
 
 ### All available fields
 
-All of the following settings are available. By combining settings, you have granular control over how the workflow runs.
+By combining these settings, you have granular control over how the workflow runs.
 
 ```yaml
 name: all configuration              # DAG's name
@@ -247,138 +206,7 @@ steps:
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as the directory to write log files.
 
-### Examples
-
-To check all examples, visit [this page](https://github.com/dagu/dagu/tree/main/examples).
-
--  Sample 1
-
-  ![sample_1](https://user-images.githubusercontent.com/1475839/164965036-fede5675-cba0-410b-b371-22deec55b9e8.png)
-```yaml
-name: example
-steps:
-  - name: "1"
-    command: echo hello world
-  - name: "2"
-    command: sleep 10
-    depends:
-      - "1"
-  - name: "3"
-    command: echo done!
-    depends:
-      - "2"
-```
-
--  Sample 2
-
-  ![sample_2](https://user-images.githubusercontent.com/1475839/166093413-ebcc3d7b-1757-4fdf-8747-32acf4fa9473.png)
-```yaml
-name: example DAG
-env:
-  LOG_DIR: ${HOME}/logs
-logDir: ${LOG_DIR}
-params: foo bar
-steps:
-  - name: "check precondition"
-    command: echo start
-    preconditions:
-      - condition: "`echo $1`"
-        expected: foo
-  - name: "print foo"
-    command: echo $1
-    depends:
-      - "check precondition"
-  - name: "print bar"
-    command: echo $2
-    depends:
-      - "print foo"
-  - name: "failure and continue"
-    command: "false"
-    continueOn:
-      failure: true
-    depends:
-      - "print bar"
-  - name: "print done"
-    command: echo done!
-    depends:
-      - "failure and continue"
-handlerOn:
-  exit:
-    command: echo finished!
-  success:
-    command: echo success!
-  failure:
-    command: echo failed!
-  cancel:
-    command: echo canceled!
-```
-
--  Complex example
-
-  ![complex](https://user-images.githubusercontent.com/1475839/166093433-5245e39b-4f80-4e6e-a2f9-9be48d85133e.png)
-```yaml
-name: complex DAG
-steps:
-  - name: "Initialize"
-    command: "sleep 2"
-  - name: "Copy TAB_1"
-    description: "Extract data from TAB_1 to TAB_2"
-    command: "sleep 2"
-    depends:
-      - "Initialize"
-  - name: "Update TAB_2"
-    description: "Update TAB_2"
-    command: "sleep 2"
-    depends:
-      - Copy TAB_1
-  - name: Validate TAB_2
-    command: "sleep 2"
-    depends:
-      - "Update TAB_2"
-  - name: "Load TAB_3"
-    description: "Read data from files"
-    command: "sleep 2"
-    depends:
-      - Initialize
-  - name: "Update TAB_3"
-    command: "sleep 2"
-    depends:
-      - "Load TAB_3"
-  - name: Merge
-    command: "sleep 2"
-    depends:
-      - Update TAB_3
-      - Validate TAB_2
-      - Validate File
-  - name: "Check File"
-    command: "sleep 2"
-  - name: "Copy File"
-    command: "sleep 2"
-    depends:
-      - Check File
-  - name: "Validate File"
-    command: "sleep 2"
-    depends:
-      - Copy File
-  - name: Calc Result
-    command: "sleep 2"
-    depends:
-      - Merge
-  - name: "Report"
-    command: "sleep 2"
-    depends:
-      - Calc Result
-  - name: Reconcile
-    command: "sleep 2"
-    depends:
-      - Calc Result
-  - name: "Cleaning"
-    command: "sleep 2"
-    depends:
-      - Reconcile
-```
-
-## 🧑‍💻 Admin configuration
+## Admin configuration
 
 ### Environment variables
 
@@ -399,11 +227,9 @@ basicAuthUsername: <username for basic auth of web UI>       # [optional] basic 
 basicAuthPassword: <password for basic auth of web UI>       # [optional] basic auth config
 ```
 
-### Global DAG configuration
+### Global configuration
 
-Please create `~/.dagu/config.yaml`. All settings can be overridden by individual DAG configuration.
-
-Creating a global configuration is a convenient way to organize common settings.
+Creating a global configuration `~/.dagu/config.yaml` is a convenient way to organize common settings.
 
 ```yaml
 logDir: <path-to-write-log>         # log directory to write standard output
@@ -421,23 +247,15 @@ infoMail:
   prefix: <prefix of mail subject>
 ```
 
-## 💡 Architecture
-
-dagu uses plain JSON files as history database, and unix sockets to communicate with running processes.
-
-![dagu Architecture](https://user-images.githubusercontent.com/1475839/166124202-e0deeded-c4ce-4a96-982c-498cf8db9118.png)
-
-## ❓FAQ
+## FAQ
 
 ### How to contribute?
 
-Feel free to contribute in any way you want. Share ideas, submit issues, and create pull requests. 
-You can start by improving this [README.md](https://github.com/dagu/dagu/blob/main/README.md) or suggesting new [features](https://github.com/dagu/dagu/issues)
-Thank you!
+Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thank you!
 
 ### Where is the history data stored?
 
-dagu's DAG execution history data is stored in plain JSON files in the path of the `DAGU__DATA` environment variable with extension `*.dat`. The default location is `$HOME/.dagu/data`.
+Dagu's history data will be stored in the path of `DAGU__DATA` environment variable. The default location is `$HOME/.dagu/data`.
 
 ### Where is the log files stored?
 
@@ -457,9 +275,15 @@ You can change the status of any task to a `failed` status. Then, when the job i
 
 No, there is no scheduler functionality so far. It is intended to be used with cron.
 
-## 🔗 GoDoc
+### How it can communicate with running processes?
+
+Dagu uses unix sockets to communicate with running processes.
+
+![dagu Architecture](https://user-images.githubusercontent.com/1475839/166124202-e0deeded-c4ce-4a96-982c-498cf8db9118.png)
+
+## GoDoc
 
 https://pkg.go.dev/github.com/yohamta/dagu
 
-## ⚠️ License
+## License
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
