@@ -35,8 +35,7 @@ func Test_stopCommand(t *testing.T) {
 		ConfigPath: c,
 	}
 
-	s, err := db.ReadStatusHist(cfg.ConfigPath, 1)
-	require.NoError(t, err)
+	s := db.ReadStatusHist(cfg.ConfigPath, 1)
 	require.Equal(t, 1, len(s))
 	assert.Equal(t, scheduler.SchedulerStatus_Cancel, s[0].Status.Status)
 }

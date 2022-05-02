@@ -23,7 +23,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	require.NoError(t, dw.Open())
 	defer func() {
 		dw.Close()
-		db.RemoveOld(cfg.ConfigPath, 0)
+		db.RemoveOld(db.pattern(cfg.ConfigPath)+"*.dat", 0)
 	}()
 
 	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
@@ -59,8 +59,7 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 	assert.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Running)
 	assert.Equal(t, file, data.File)
 
-	dw, err = db.NewWriterFor(cfg.ConfigPath, file)
-	require.NoError(t, err)
+	dw = &Writer{Target: file}
 	require.NoError(t, dw.Open())
 	status.Status = scheduler.SchedulerStatus_Success
 	require.NoError(t, dw.Write(status))

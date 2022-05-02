@@ -16,6 +16,7 @@ import (
 
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Database struct {
@@ -38,7 +39,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-func ParseFile(file string) (*models.StatusFile, error) {
+func ParseFile(file string) (*models.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Printf("failed to open file. err: %v", err)
@@ -55,41 +56,31 @@ func ParseFile(file string) (*models.StatusFile, error) {
 		log.Printf("failed to parse json. err: %v", err)
 		return nil, err
 	}
-	return &models.StatusFile{File: file, Status: m}, nil
+	return m, nil
 }
 
 func (db *Database) NewWriter(configPath string, t time.Time) (*Writer, string, error) {
-	f, err := db.new(configPath, t)
+	f, err := db.newFile(configPath, t)
 	if err != nil {
 		return nil, "", err
 	}
-	w := &Writer{
-		filename: f,
-	}
+	w := &Writer{Target: f}
 	return w, f, nil
 }
 
-func (db *Database) NewWriterFor(configPath string, file string) (*Writer, error) {
-	w := &Writer{
-		filename: file,
-	}
-	return w, nil
-}
-
-func (db *Database) ReadStatusHist(configPath string, n int) ([]*models.StatusFile, error) {
-	files, err := db.latest(configPath, n)
-	if err != nil {
-		return nil, err
-	}
+func (db *Database) ReadStatusHist(configPath string, n int) []*models.StatusFile {
 	ret := make([]*models.StatusFile, 0)
+	files := db.latest(db.pattern(configPath)+"*.dat", n)
 	for _, file := range files {
 		status, err := ParseFile(file)
-		if err != nil {
-			continue
+		if err == nil {
+			ret = append(ret, &models.StatusFile{
+				File:   file,
+				Status: status,
+			})
 		}
-		ret = append(ret, status)
 	}
-	return ret, nil
+	return ret
 }
 
 func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
@@ -97,22 +88,7 @@ func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	l, err := findLastLine(f)
-	if err != nil {
-		return nil, err
-	}
-	m, err := models.StatusFromJson(l)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
+	return ParseFile(file)
 }
 
 func (db *Database) FindByRequestId(configPath string, requestId string) (*models.StatusFile, error) {
@@ -121,58 +97,46 @@ func (db *Database) FindByRequestId(configPath string, requestId string) (*model
 	}
 	pattern := db.pattern(configPath) + "*.dat"
 	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, err
-	}
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w : %s", ErrNoDataFile, pattern)
-	}
-	sort.Slice(matches, func(i, j int) bool {
-		return strings.Compare(matches[i], matches[j]) >= 0
-	})
-	for _, f := range matches {
-		status, err := ParseFile(f)
-		if err != nil {
-			log.Printf("parsing failed %s : %s", f, err)
-			continue
-		}
-		if status.Status != nil && status.Status.RequestId == requestId {
-			return status, nil
+	if len(matches) > 0 || err == nil {
+		sort.Slice(matches, func(i, j int) bool {
+			return strings.Compare(matches[i], matches[j]) >= 0
+		})
+		for _, f := range matches {
+			status, err := ParseFile(f)
+			if err != nil {
+				log.Printf("parsing failed %s : %s", f, err)
+				continue
+			}
+			if status != nil && status.RequestId == requestId {
+				return &models.StatusFile{
+					File:   f,
+					Status: status,
+				}, nil
+			}
 		}
 	}
 	return nil, fmt.Errorf("%w : %s", ErrRequestIdNotFound, requestId)
 }
 
 func (db *Database) RemoveAll(configPath string) {
-	db.RemoveOld(configPath, 0)
+	db.RemoveOld(db.pattern(configPath)+"*.dat", 0)
 }
 
-func (db *Database) RemoveOld(configPath string, retentionDays int) error {
-	if retentionDays <= -1 {
-		return nil
-	}
-
-	pattern := db.pattern(configPath) + "*.dat"
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return err
-	}
-
-	ot := time.Now().AddDate(-1*retentionDays, 0, 0)
-	for _, m := range matches {
-		info, err := os.Stat(m)
-		if err != nil {
-			log.Printf("%v", err)
-			continue
-		}
-		if info.ModTime().Before(ot) {
-			err := os.Remove(m)
-			if err != nil {
-				log.Printf("%v", err)
+func (db *Database) RemoveOld(pattern string, retentionDays int) error {
+	var lastErr error = nil
+	if retentionDays >= 0 {
+		matches, _ := filepath.Glob(pattern)
+		ot := time.Now().AddDate(-1*retentionDays, 0, 0)
+		for _, m := range matches {
+			info, err := os.Stat(m)
+			if err == nil {
+				if info.ModTime().Before(ot) {
+					lastErr = os.Remove(m)
+				}
 			}
 		}
 	}
-	return err
+	return lastErr
 }
 
 func (db *Database) Compact(configPath, original string) error {
@@ -184,17 +148,13 @@ func (db *Database) Compact(configPath, original string) error {
 	new := fmt.Sprintf("%s_c.dat",
 		strings.TrimSuffix(filepath.Base(original), path.Ext(original)))
 	f := path.Join(filepath.Dir(original), new)
-	w, err := db.NewWriterFor(configPath, f)
-	if err != nil {
-		return err
-	}
-
+	w := &Writer{Target: f}
 	if err := w.Open(); err != nil {
 		return err
 	}
 	defer w.Close()
 
-	if err := w.Write(status.Status); err != nil {
+	if err := w.Write(status); err != nil {
 		if err := os.Remove(f); err != nil {
 			log.Printf("failed to remove %s : %s", f, err.Error())
 		}
@@ -215,14 +175,11 @@ func (db *Database) dir(configPath string, prefix string) string {
 	return filepath.Join(db.Dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
-func (db *Database) new(configPath string, t time.Time) (string, error) {
+func (db *Database) newFile(configPath string, t time.Time) (string, error) {
 	if configPath == "" {
 		return "", fmt.Errorf("configPath is empty")
 	}
 	fileName := fmt.Sprintf("%s.%s.dat", db.pattern(configPath), t.Format("20060102.15:04:05"))
-	if err := os.MkdirAll(path.Dir(fileName), 0755); err != nil {
-		return "", err
-	}
 	return fileName, nil
 }
 
@@ -233,38 +190,40 @@ func (db *Database) pattern(configPath string) string {
 }
 
 func (db *Database) latestToday(configPath string, day time.Time) (string, error) {
+	var ret = []string{}
 	pattern := fmt.Sprintf("%s.%s*.dat", db.pattern(configPath), day.Format("20060102"))
 	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return "", err
+	if err == nil || len(matches) > 0 {
+		ret = filterLatest(matches, 1)
+	} else {
+		return "", ErrNoStatusDataToday
 	}
-	ret, err := filterLatest(matches, 1)
-	if err != nil {
-		return "", err
+	if len(ret) == 0 {
+		return "", ErrNoStatusData
 	}
 	return ret[0], err
 }
 
-func (db *Database) latest(configPath string, n int) ([]string, error) {
-	pattern := db.pattern(configPath) + "*.dat"
+func (db *Database) latest(pattern string, n int) []string {
 	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return []string{}, err
+	var ret = []string{}
+	if err == nil || len(matches) >= 0 {
+		ret = filterLatest(matches, n)
 	}
-	ret, err := filterLatest(matches, n)
-	return ret, err
+	return ret
 }
 
 var (
-	ErrNoDataFile        = fmt.Errorf("no data file found")
 	ErrRequestIdNotFound = fmt.Errorf("request id not found")
+	ErrNoStatusDataToday = fmt.Errorf("no status data today")
+	ErrNoStatusData      = fmt.Errorf("no status data")
 )
 
 var rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
 
-func filterLatest(files []string, n int) ([]string, error) {
+func filterLatest(files []string, n int) []string {
 	if len(files) == 0 {
-		return []string{}, ErrNoDataFile
+		return []string{}
 	}
 	sort.Slice(files, func(i, j int) bool {
 		t1 := timestamp(files[i])
@@ -275,7 +234,7 @@ func filterLatest(files []string, n int) ([]string, error) {
 	for i := 0; i < n && i < len(files); i++ {
 		ret = append(ret, files[i])
 	}
-	return ret, nil
+	return ret
 }
 
 func timestamp(file string) string {
@@ -316,12 +275,12 @@ func readLineFrom(f *os.File) (string, error) {
 	ret := []byte{}
 	for {
 		b, isPrefix, err := r.ReadLine()
-		if err != nil {
-			return "", err
-		}
-		ret = append(ret, b...)
-		if !isPrefix {
-			break
+		utils.LogIgnoreErr("read line", err)
+		if err == nil {
+			ret = append(ret, b...)
+			if !isPrefix {
+				break
+			}
 		}
 	}
 	return string(ret), nil

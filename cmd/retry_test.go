@@ -28,8 +28,7 @@ func Test_retryCommand(t *testing.T) {
 	db := database.New(database.DefaultConfig())
 	status, err := db.FindByRequestId(configPath, dag.Status.RequestId)
 	require.NoError(t, err)
-	dw, err := db.NewWriterFor(configPath, status.File)
-	require.NoError(t, err)
+	dw := &database.Writer{Target: status.File}
 	err = dw.Open()
 	require.NoError(t, err)
 

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -150,4 +151,10 @@ func MustTempDir(pattern string) string {
 		panic(err)
 	}
 	return t
+}
+
+func LogIgnoreErr(action string, err error) {
+	if err != nil {
+		log.Printf("%s failed. %s", action, err)
+	}
 }

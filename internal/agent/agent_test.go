@@ -1,10 +1,6 @@
 package agent
 
 import (
-	"bytes"
-	"errors"
-	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -241,31 +237,6 @@ func TestHandleHTTP(t *testing.T) {
 
 	status = a.Status()
 	require.Equal(t, status.Status, scheduler.SchedulerStatus_Cancel)
-}
-
-func TestIgnoreErr(t *testing.T) {
-	origStdout := os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stdout = w
-	log.SetOutput(w)
-
-	defer func() {
-		os.Stdout = origStdout
-		log.SetOutput(origStdout)
-	}()
-
-	logIgnoreErr("test action", errors.New("test error"))
-	os.Stdout = origStdout
-	w.Close()
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
-
-	s := buf.String()
-	require.Contains(t, s, "test action failed")
-	require.Contains(t, s, "test error")
 }
 
 type mockResponseWriter struct {

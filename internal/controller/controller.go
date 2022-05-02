@@ -145,10 +145,12 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 	db := database.New(database.DefaultConfig())
 	status, err := db.ReadStatusToday(s.cfg.ConfigPath)
 	if err != nil {
-		if err != database.ErrNoDataFile {
+		var readErr error = nil
+		if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
 			fmt.Printf("read status failed : %s", err)
+			readErr = err
 		}
-		return defaultStatus(s.cfg), nil
+		return defaultStatus(s.cfg), readErr
 	}
 	return status, nil
 }
@@ -164,10 +166,7 @@ func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 
 func (s *controller) GetStatusHist(n int) ([]*models.StatusFile, error) {
 	db := database.New(database.DefaultConfig())
-	ret, err := db.ReadStatusHist(s.cfg.ConfigPath, n)
-	if err != nil {
-		return []*models.StatusFile{}, nil
-	}
+	ret := db.ReadStatusHist(s.cfg.ConfigPath, n)
 	return ret, nil
 }
 
@@ -193,10 +192,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 	if err != nil {
 		return err
 	}
-	w, err := db.NewWriterFor(s.cfg.ConfigPath, toUpdate.File)
-	if err != nil {
-		return err
-	}
+	w := &database.Writer{Target: toUpdate.File}
 	if err := w.Open(); err != nil {
 		return err
 	}
