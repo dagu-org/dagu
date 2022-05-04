@@ -187,18 +187,18 @@ steps:
 
 ### State handlers
 
-It is often desirable to take action when a specific event happens, for example, when a task fails. To achieve this, you can use `handlerOn` fields.
+It is often desirable to take action when a specific event happens, for example, when a workflow fails. To achieve this, you can use `handlerOn` fields.
 
 ```yaml
 name: example
-steps:
-  - name: A task
-    command: main.sh
 handlerOn:
   failure:
     command: notify_error.sh
   exit:
     command: cleanup.sh
+steps:
+  - name: A task
+    command: main.sh
 ```
 
 ### Repeating task
