@@ -1,4 +1,4 @@
-package sock_test
+package sock
 
 import (
 	"errors"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/sock"
 )
 
 func TestMain(m *testing.M) {
@@ -29,8 +28,8 @@ func TestStartAndShutdownServer(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
-	unixServer, err := sock.NewServer(
-		&sock.Config{
+	unixServer, err := NewServer(
+		&Config{
 			Addr: tmpFile.Name(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
@@ -39,7 +38,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	client := sock.Client{Addr: tmpFile.Name()}
+	client := Client{Addr: tmpFile.Name()}
 	listen := make(chan error)
 	go func() {
 		for range listen {
@@ -48,22 +47,84 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	go func() {
 		err = unixServer.Serve(listen)
-		assert.True(t, errors.Is(sock.ErrServerRequestedShutdown, err))
+		assert.True(t, errors.Is(ErrServerRequestedShutdown, err))
 	}()
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Millisecond * 50)
 
 	ret, err := client.Request(http.MethodPost, "/")
-	assert.Equal(t, ret, "OK")
+	assert.Equal(t, "OK", ret)
 
 	unixServer.Shutdown()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 	_, err = client.Request(http.MethodPost, "/")
-	assert.True(t, errors.Is(err, sock.ErrFileNotExist))
+	assert.Error(t, err)
+}
+
+func TestNoResponse(t *testing.T) {
+	tmpFile, err := ioutil.TempFile("", "test_error_response")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	unixServer, err := NewServer(
+		&Config{
+			Addr: tmpFile.Name(),
+			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+			},
+		})
+	require.NoError(t, err)
+
+	client := Client{Addr: tmpFile.Name()}
+	listen := make(chan error)
+	go func() {
+		for range listen {
+		}
+	}()
+
+	go func() {
+		err = unixServer.Serve(listen)
+		defer unixServer.Shutdown()
+	}()
+
+	time.Sleep(time.Millisecond * 50)
+
+	_, err = client.Request(http.MethodGet, "/")
+	require.Error(t, err)
+}
+
+func TestErrorResponse(t *testing.T) {
+	tmpFile, err := ioutil.TempFile("", "test_error_response")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	unixServer, err := NewServer(
+		&Config{
+			Addr:        tmpFile.Name(),
+			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {},
+		})
+	require.NoError(t, err)
+
+	client := Client{Addr: tmpFile.Name()}
+	listen := make(chan error)
+	go func() {
+		for range listen {
+		}
+	}()
+
+	go func() {
+		err = unixServer.Serve(listen)
+		defer unixServer.Shutdown()
+	}()
+
+	time.Sleep(time.Millisecond * 50)
+
+	_, err = client.Request(http.MethodGet, "/")
+	require.Error(t, err)
 }
 
 func TestResponseWriter(t *testing.T) {
-	w := sock.NewHttpResponseWriter(nil)
+	w := NewHttpResponseWriter(nil)
 	require.Equal(t, make(http.Header), w.Header())
 }

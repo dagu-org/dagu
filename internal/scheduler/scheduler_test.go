@@ -331,6 +331,30 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 	assert.Equal(t, scheduler.NodeStatus_Success, sc.HanderNode(constants.OnExit).ReadStatus())
 }
 
+func TestSchedulerOnSignal(t *testing.T) {
+	g, _ := scheduler.NewExecutionGraph(
+		&config.Step{
+			Name:    "1",
+			Command: "sleep",
+			Args:    []string{"10"},
+		},
+	)
+	sc := scheduler.New(&scheduler.Config{})
+
+	go func() {
+		<-time.After(time.Millisecond * 50)
+		sc.Signal(g, syscall.SIGTERM, nil)
+	}()
+
+	err := sc.Schedule(g, nil)
+	require.NoError(t, err)
+
+	nodes := g.Nodes()
+
+	assert.Equal(t, sc.Status(g), scheduler.SchedulerStatus_Cancel)
+	assert.Equal(t, scheduler.NodeStatus_Cancel, nodes[0].Status)
+}
+
 func TestSchedulerOnCancel(t *testing.T) {
 	g, sc := newTestSchedule(t,
 		&scheduler.Config{

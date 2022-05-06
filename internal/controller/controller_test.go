@@ -163,14 +163,17 @@ func TestStartStop(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	require.Eventually(t, func() bool {
+		st, _ := c.GetStatus()
+		return st.Status == scheduler.SchedulerStatus_Running
+	}, time.Millisecond*1500, time.Millisecond*100)
+
 	c.Stop()
 
-	time.Sleep(time.Millisecond * 100)
-	s, err := c.GetLastStatus()
-	require.NoError(t, err)
-
-	require.Equal(t, scheduler.SchedulerStatus_Cancel, s.Status)
+	require.Eventually(t, func() bool {
+		st, _ := c.GetLastStatus()
+		return st.Status == scheduler.SchedulerStatus_Cancel
+	}, time.Millisecond*1500, time.Millisecond*100)
 }
 
 func TestRetry(t *testing.T) {

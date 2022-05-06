@@ -1,8 +1,10 @@
-package sock_test
+package sock
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -10,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/sock"
 )
 
 func TestDialFail(t *testing.T) {
@@ -18,9 +19,9 @@ func TestDialFail(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
-	client := sock.Client{Addr: f.Name()}
+	client := Client{Addr: f.Name()}
 	_, err = client.Request("GET", "/status")
-	assert.True(t, errors.Is(err, sock.ErrConnectionRefused))
+	require.Error(t, err)
 }
 
 func TestDialTimeout(t *testing.T) {
@@ -28,8 +29,8 @@ func TestDialTimeout(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
-	s, err := sock.NewServer(
-		&sock.Config{
+	s, err := NewServer(
+		&Config{
 			Addr: f.Name(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				time.Sleep(time.Second * 3100)
@@ -46,8 +47,23 @@ func TestDialTimeout(t *testing.T) {
 	time.Sleep(time.Millisecond * 500)
 
 	require.NoError(t, err)
-	client := sock.Client{Addr: f.Name()}
+	client := Client{Addr: f.Name()}
 	_, err = client.Request("GET", "/status")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, sock.ErrTimeout))
+	assert.True(t, errors.Is(err, ErrTimeout))
 }
+
+func TestProcErr(t *testing.T) {
+	e := procError("test", fmt.Errorf("error"))
+	require.Contains(t, e.Error(), "test failed")
+
+	e = procError("test", errTimeout)
+	require.Contains(t, e.Error(), "test timeout")
+}
+
+type testTimeout struct{ error }
+
+var errTimeout net.Error = &testTimeout{error: fmt.Errorf("timeout")}
+
+func (t *testTimeout) Timeout() bool   { return true }
+func (t *testTimeout) Temporary() bool { return false }
