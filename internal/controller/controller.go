@@ -126,7 +126,6 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 	if err == nil {
 		return models.StatusFromJson(ret)
 	}
-	utils.LogIgnoreErr("get last status", err)
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
 		db := database.New(database.DefaultConfig())
 		status, err := db.ReadStatusToday(s.cfg.ConfigPath)
