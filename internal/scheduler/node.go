@@ -104,7 +104,7 @@ func (n *Node) updateStatus(status NodeStatus) {
 
 func (n *Node) signal(sig os.Signal) {
 	status := n.ReadStatus()
-	if status == NodeStatus_Running {
+	if status == NodeStatus_None || status == NodeStatus_Running {
 		n.updateStatus(NodeStatus_Cancel)
 	}
 	if n.cmd != nil {

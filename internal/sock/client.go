@@ -8,13 +8,10 @@ import (
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 var ErrTimeout = fmt.Errorf("unix socket timeout")
 var ErrConnectionRefused = fmt.Errorf("unix socket connection failed")
-var ErrFileNotExist = fmt.Errorf("unix socket file does not exit")
 var timeout = time.Millisecond * 3000
 
 type Client struct {
@@ -22,22 +19,12 @@ type Client struct {
 }
 
 func (cl *Client) Request(method, url string) (string, error) {
-	if !utils.FileExists(cl.Addr) {
-		return "", fmt.Errorf("%w: %s", ErrFileNotExist, cl.Addr)
-	}
 	conn, err := net.DialTimeout("unix", cl.Addr, timeout)
 	if err != nil {
-		if err.(net.Error).Timeout() {
-			return "", fmt.Errorf("%s: %w", err, ErrTimeout)
-		} else {
-			return "", fmt.Errorf("%s: %w", err, ErrConnectionRefused)
-		}
+		return "", procError("dial to socket", err)
 	}
 	defer conn.Close()
-	err = conn.SetDeadline((time.Now().Add(timeout)))
-	if err != nil {
-		return "", err
-	}
+	conn.SetDeadline((time.Now().Add(timeout)))
 	request, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		log.Printf("NewRequest %v", err)
@@ -46,19 +33,20 @@ func (cl *Client) Request(method, url string) (string, error) {
 	request.Write(conn)
 	response, err := http.ReadResponse(bufio.NewReader(conn), request)
 	if err != nil {
-		if err.(net.Error).Timeout() {
-			return "", fmt.Errorf("%s: %w", err, ErrTimeout)
-		} else {
-			return "", fmt.Errorf("failed to read: %w addr=%s", err, cl.Addr)
-		}
+		return "", procError("read response", err)
 	}
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		if err.(net.Error).Timeout() {
-			return "", fmt.Errorf("%s : %w", err, ErrTimeout)
-		} else {
-			return "", fmt.Errorf("failed to write: %w", err)
-		}
+		return "", procError("read response body", err)
 	}
 	return string(body), nil
+}
+
+func procError(action string, err error) error {
+	if err, ok := err.(net.Error); ok {
+		if err.Timeout() {
+			return fmt.Errorf("%s timeout %w: %s", action, ErrTimeout, err.Error())
+		}
+	}
+	return fmt.Errorf("%s failed: %w", action, err)
 }

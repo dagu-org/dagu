@@ -61,9 +61,6 @@ func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 		return nil, err
 	}
 
-	if def.Env == nil {
-		def.Env = map[string]string{}
-	}
 	for k, v := range utils.DefaultEnv() {
 		if _, ok := def.Env[v]; !ok {
 			def.Env[k] = v
