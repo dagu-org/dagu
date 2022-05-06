@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Server struct {
@@ -50,7 +52,7 @@ func (svr *Server) Serve(listen chan error) error {
 	}
 	log.Printf("server is running at \"%v\"\n", svr.Addr)
 	defer func() {
-		svr.listener.Close()
+		svr.Shutdown()
 		os.Remove(svr.Addr)
 	}()
 	for {
@@ -61,16 +63,11 @@ func (svr *Server) Serve(listen chan error) error {
 		if err == nil {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
-				if err != nil {
-					log.Printf("Failed to read request %v", err)
-					return
+				utils.LogIgnoreErr("read request", err)
+				if err == nil {
+					svr.HandlerFunc(NewHttpResponseWriter(&conn), request)
 				}
-				svr.HandlerFunc(NewHttpResponseWriter(&conn), request)
 				conn.Close()
-
-				if svr.quit {
-					svr.Shutdown()
-				}
 			}()
 		}
 	}
@@ -79,11 +76,8 @@ func (svr *Server) Serve(listen chan error) error {
 func (svr *Server) Shutdown() {
 	if !svr.quit {
 		svr.quit = true
-		if svr.listener != nil {
-			if err := svr.listener.Close(); err != nil {
-				log.Printf("failed to close listener: %s", err)
-			}
-		}
+		err := svr.listener.Close()
+		utils.LogIgnoreErr("close listener", err)
 	}
 }
 

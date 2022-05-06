@@ -5,18 +5,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/sock"
-	"github.com/yohamta/dagu/internal/utils"
-)
-
-var (
-	testsDir = path.Join(utils.MustGetwd(), "../../tests/testdata")
 )
 
 func TestMain(m *testing.M) {
@@ -67,4 +61,9 @@ func TestStartAndShutdownServer(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	_, err = client.Request(http.MethodPost, "/")
 	assert.True(t, errors.Is(err, sock.ErrFileNotExist))
+}
+
+func TestResponseWriter(t *testing.T) {
+	w := sock.NewHttpResponseWriter(nil)
+	require.Equal(t, make(http.Header), w.Header())
 }

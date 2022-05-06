@@ -171,6 +171,17 @@ func TestLoadGlobalConfig(t *testing.T) {
 	assert.Equal(t, want, cfg)
 }
 
+func TestLoadGlobalConfigError(t *testing.T) {
+	for _, path := range []string{
+		path.Join(testDir, "config_err_decode.yaml"),
+		path.Join(testDir, "config_err_parse.yaml"),
+	} {
+		l := &Loader{HomeDir: utils.MustGetUserHomeDir()}
+		_, err := l.loadGlobalConfig(path)
+		require.Error(t, err)
+	}
+}
+
 func TestLoadDeafult(t *testing.T) {
 	l := &Loader{
 		HomeDir: utils.MustGetUserHomeDir(),
@@ -198,6 +209,11 @@ steps:
 	step := ret.Steps[0]
 	require.Equal(t, step.Name, "1")
 	require.Equal(t, step.Command, "true")
+
+	// error
+	dat = `invalidyaml`
+	_, err = l.LoadData([]byte(dat))
+	require.Error(t, err)
 
 	// error
 	dat = `invalidkey: test DAG`

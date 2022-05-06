@@ -148,7 +148,7 @@ func TestSchedulerCancel(t *testing.T) {
 
 	g, _ := scheduler.NewExecutionGraph(
 		step("1", testCommand),
-		step("2", "sleep 60", "1"),
+		step("2", "sleep 1000", "1"),
 		step("3", testCommandFail, "2"),
 	)
 	sc := scheduler.New(&scheduler.Config{
