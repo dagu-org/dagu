@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"path"
 	"text/template"
+
+	"github.com/yohamta/dagu/internal/constants"
 )
 
 var defaultFuncs = template.FuncMap{
@@ -18,9 +20,12 @@ var defaultFuncs = template.FuncMap{
 		}
 		return v
 	},
+	"version": func() string {
+		return constants.Version
+	},
 }
 
-//go:embed web/templates/*
+//go:embed web/templates/* web/assets/*
 var assets embed.FS
 var templatePath = "web/templates/"
 
