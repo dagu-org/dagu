@@ -162,8 +162,7 @@ func TestStartStop(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond * 50)
-	err = c.Stop()
-	require.NoError(t, err)
+	c.Stop()
 
 	time.Sleep(time.Millisecond * 50)
 	s, err := c.GetLastStatus()
