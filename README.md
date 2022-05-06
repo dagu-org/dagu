@@ -47,7 +47,7 @@ Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Dire
 
 ## Why not Airflow or Prefect?
 
-Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So, we have developed a No-code workflow executor that doesn't require writing code. We hope that this tool will help others in the same situation.
+Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we have developed a No-code workflow execution engine that doesn't require writing code.
 
 ## ️How does it work?
 
@@ -89,13 +89,19 @@ You can launch the web UI by `dagu server` command. Default URL is `http://127.0
 
 - **DAGs**: Overview of all DAGs (workflows).
 
-  ![DAGs](https://user-images.githubusercontent.com/1475839/166269631-f031106e-dd13-49dc-9d00-0f6d1e22e4dc.png)
+  DAGs page displays all workflows and real-time status. To create a new workflow, you can click the button in the top-right corner.
+
+  ![DAGs](https://user-images.githubusercontent.com/1475839/167070248-743b5e8f-ee24-49bf-a4f4-a5225dfc755a.png)
 
 - **Detail**: Realtime status of the workflow.
+
+  The detail page displays the real-time status, logs, and all workflow configurations.
 
   ![Detail](https://user-images.githubusercontent.com/1475839/166269521-03098e46-6608-43fa-b363-0d00b069c808.png)
 
 - **History**: History of the execution of the workflow.
+
+  The history page allows you to check past execution results and logs.
 
   ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
 
