@@ -34,10 +34,10 @@ func TestAssertDefinition(t *testing.T) {
 	}
 
 	_, err := l.Load(path.Join(testDir, "config_err_no_name.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("DAG name must be specified."))
+	require.Equal(t, err, fmt.Errorf("DAG name must be specified"))
 
 	_, err = l.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("at least one step must be specified."))
+	require.Equal(t, err, fmt.Errorf("at least one step must be specified"))
 }
 
 func TestAssertStepDefinition(t *testing.T) {
@@ -46,10 +46,10 @@ func TestAssertStepDefinition(t *testing.T) {
 	}
 
 	_, err := l.Load(path.Join(testDir, "config_err_step_no_name.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("step name must be specified."))
+	require.Equal(t, err, fmt.Errorf("step name must be specified"))
 
 	_, err = l.Load(path.Join(testDir, "config_err_step_no_command.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("step command must be specified."))
+	require.Equal(t, err, fmt.Errorf("step command must be specified"))
 }
 
 func TestConfigReadClone(t *testing.T) {
