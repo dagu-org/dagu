@@ -19,7 +19,17 @@ func defaultRoutes(cfg *Config) []*route {
 				DAGsDir: cfg.DAGs,
 			},
 		)},
+		{http.MethodPost, `^/?$`, handlers.HandlePostListAction(
+			&handlers.DAGListHandlerConfig{
+				DAGsDir: cfg.DAGs,
+			},
+		)},
 		{http.MethodGet, `^/dags/?$`, handlers.HandleGetList(
+			&handlers.DAGListHandlerConfig{
+				DAGsDir: cfg.DAGs,
+			},
+		)},
+		{http.MethodPost, `^/dags/?$`, handlers.HandlePostListAction(
 			&handlers.DAGListHandlerConfig{
 				DAGsDir: cfg.DAGs,
 			},

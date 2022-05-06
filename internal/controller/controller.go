@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -196,6 +198,21 @@ func (s *controller) Save(value string) error {
 	}
 	err = ioutil.WriteFile(s.cfg.ConfigPath, []byte(value), 0755)
 	return err
+}
+
+func NewConfig(file string) error {
+	if path.Ext(file) != ".yaml" {
+		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
+	}
+	if utils.FileExists(file) {
+		return fmt.Errorf("the config file %s already exists", file)
+	}
+	defaultVal := `name: ` + strings.TrimSuffix(path.Base(file), path.Ext(file)) + `
+steps:
+  - name: step1
+    command: echo hello
+`
+	return ioutil.WriteFile(file, []byte(defaultVal), 0755)
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {

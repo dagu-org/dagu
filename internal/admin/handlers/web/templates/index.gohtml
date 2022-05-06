@@ -1,12 +1,52 @@
 {{define "content"}}
 <div id="root"></div>
 <script type="text/babel">
-  function Title() {
+  function Title({ refresh }) {
+    const buttonStyle = {
+      width: "100px",
+      backgroundColor: "gray",
+      border: 0,
+      color: "white",
+    };
     return (
       <div className="has-background-white py-3">
-        <h2 className="title ml-2">DAGs</h2>
+        <div className="is-flex is-flex-direction-row is-justify-content-space-between">
+          <h2 className="title ml-2">DAGs</h2>
+          <button
+            className="button mr-5 is-rounded"
+            style={buttonStyle}
+            onClick={async () => {
+              const name = window.prompt("Please input the new file name (*.yaml)", "");
+              if (name == "") {
+                return;
+              }
+              if (name.indexOf(" ") != -1) {
+                alert("File name cannot contain space");
+                return;
+              }
+              const formData = new FormData();
+              formData.append('action', 'new');
+              formData.append('value', name);
+              const resp = await fetch("", {
+                method: "POST",
+                headers: {
+                  'Accept': 'application/json'
+                },
+                body: formData,
+              })
+              if (resp.ok) {
+                refresh();
+              } else {
+                const e = await resp.text();
+                alert(e);
+              }
+            }}
+          >
+            New DAG
+          </button>
+        </div>
       </div>
-    )
+    );
   }
   const SCHEDULER_STATUS__NONE = 0;
   const SCHEDULER_STATUS__RUNNING = 1;
@@ -15,53 +55,64 @@
   const SCHEDULER_STATUS__SUCCESS = 4;
   const SCHEDULER_STATUS__SKIPPED_UNUSED = 5;
   const statusColorMapping = {
-    [SCHEDULER_STATUS__NONE]: { backgroundColor: "lightblue", },
-    [SCHEDULER_STATUS__RUNNING]: { backgroundColor: "lime", },
+    [SCHEDULER_STATUS__NONE]: { backgroundColor: "lightblue" },
+    [SCHEDULER_STATUS__RUNNING]: { backgroundColor: "lime" },
     [SCHEDULER_STATUS__ERROR]: { backgroundColor: "red", color: "white" },
     [SCHEDULER_STATUS__CANCEL]: { backgroundColor: "pink" },
     [SCHEDULER_STATUS__SUCCESS]: { backgroundColor: "green", color: "white" },
-    [SCHEDULER_STATUS__SKIPPED_UNUSED]: { backgroundColor: "gray", color: "white" },
-  }
+    [SCHEDULER_STATUS__SKIPPED_UNUSED]: {
+      backgroundColor: "gray",
+      color: "white",
+    },
+  };
   const tagColorMapping = {
-    "DAG": { backgroundColor: "rgb(88, 187, 151)", color: "white" },
-    "Group": { backgroundColor: "rgb(76, 172, 229)", color: "white" },
-  }
+    DAG: { backgroundColor: "rgb(88, 187, 151)", color: "white" },
+    Group: { backgroundColor: "rgb(76, 172, 229)", color: "white" },
+  };
   function Error({ dags, errors, hasError }) {
     if (!dags || !hasError) {
-      return <div></div>
+      return <div></div>;
     }
     return (
       <div class="notification is-danger mt-0 mb-0">
         <div>Please check the below errors!</div>
         <div class="content">
           <ul>
-            {dags.filter((dag) => dag.Error).map((dag) => {
-              const url = encodeURI(dag.File);
-              return <li><a href={url}>{dag.File}</a>: {dag.ErrorT} </li>
-            })}
-            {errors.map(e => <li>{e}</li>)}
+            {dags
+              .filter((dag) => dag.Error)
+              .map((dag) => {
+                const url = encodeURI(dag.File);
+                return (
+                  <li>
+                    <a href={url}>{dag.File}</a>: {dag.ErrorT}{" "}
+                  </li>
+                );
+              })}
+            {errors.map((e) => (
+              <li>{e}</li>
+            ))}
           </ul>
         </div>
       </div>
-    )
+    );
   }
   function App() {
     const [data, setData] = React.useState();
     async function getData() {
-      let url = "?format=json"
-      url += "&group={{.Group}}"
+      let url = "?format=json";
+      url += "&group={{.Group}}";
       const resp = await fetch(url, {
         method: "GET",
-        cache: 'no-store',
+        cache: "no-store",
         headers: {
-          'Accept': 'application/json'
+          Accept: "application/json",
         },
-      })
+      });
       if (!resp.ok) {
-        return
+        return;
       }
-      const body = await resp.json()
-      setData(body)
+      const body = await resp.json();
+      setData(body);
     }
     React.useEffect(() => {
       getData();
@@ -69,68 +120,111 @@
       return () => clearInterval(timer);
     }, []);
     if (!data) {
-      return (
-        <div>
-          Loading...
-        </div>
-      )
+      return <div>Loading...</div>;
     }
     return (
       <React.Fragment>
-        <Title></Title>
+        <Title refresh={getData}></Title>
         <div className="mx-5 mt-5">
-          <Error dags={data.DAGs} errors={data.Errors} hasError={data.HasError}></Error>
-          <DAGsTable dags={data.DAGs} groups={data.Groups} group={data.Group}></DAGsTable>
+          <Error
+            dags={data.DAGs}
+            errors={data.Errors}
+            hasError={data.HasError}
+          ></Error>
+          <DAGsTable
+            dags={data.DAGs}
+            groups={data.Groups}
+            group={data.Group}
+          ></DAGsTable>
         </div>
       </React.Fragment>
     );
   }
   function DAGItem({ dag, group }) {
-    const url = encodeURI("/dags/" + dag.File + "?group=" + group)
-    return (<tr>
-      <td className="has-text-weight-semibold"><a href={url}>{dag.File}</a></td>
-      <td><span class="tag has-text-weight-semibold" style={tagColorMapping["DAG"]}>DAG</span></td>
-      <td>{dag.Config.Name}</td>
-      <td>{dag.Config.Description}</td>
-      <td><StatusTag status={dag.Status.Status}>{dag.Status.StatusText}</StatusTag></td>
-      <td>{dag.Status.Pid == "-1" ? "" : dag.Status.Pid}</td>
-      <td>{dag.Status.StartedAt}</td>
-      <td>{dag.Status.FinishedAt}</td>
-    </tr>)
+    const url = encodeURI("/dags/" + dag.File + "?group=" + group);
+    return (
+      <tr>
+        <td className="has-text-weight-semibold">
+          <a href={url}>{dag.File}</a>
+        </td>
+        <td>
+          <span
+            class="tag has-text-weight-semibold"
+            style={tagColorMapping["DAG"]}
+          >
+            DAG
+          </span>
+        </td>
+        <td>{dag.Config.Name}</td>
+        <td>{dag.Config.Description}</td>
+        <td>
+          <StatusTag status={dag.Status.Status}>
+            {dag.Status.StatusText}
+          </StatusTag>
+        </td>
+        <td>{dag.Status.Pid == "-1" ? "" : dag.Status.Pid}</td>
+        <td>{dag.Status.StartedAt}</td>
+        <td>{dag.Status.FinishedAt}</td>
+      </tr>
+    );
   }
   function StatusTag({ status, children }) {
     const style = React.useMemo(() => {
       return statusColorMapping[status] || {};
-    }, [status])
+    }, [status]);
     return (
-      <span class="tag has-text-weight-semibold" style={style}>{children}</span>
-    )
+      <span class="tag has-text-weight-semibold" style={style}>
+        {children}
+      </span>
+    );
   }
   function GroupItemBack({ group }) {
-    const url = encodeURI("/dags/")
-    return (<tr>
-      <td className="has-text-weight-semibold"><a href={url}>../ (upper group)</a></td>
-      <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>)
+    const url = encodeURI("/dags/");
+    return (
+      <tr>
+        <td className="has-text-weight-semibold">
+          <a href={url}>../ (upper group)</a>
+        </td>
+        <td>
+          <span
+            className="tag has-text-weight-semibold"
+            style={tagColorMapping["Group"]}
+          >
+            Group
+          </span>
+        </td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+    );
   }
   function GroupItem({ group }) {
-    const url = encodeURI("/dags/?group=" + group.Name)
-    return (<tr>
-      <td className="has-text-weight-semibold"><a href={url}>{group.Name}</a></td>
-      <td><span className="tag has-text-weight-semibold" style={tagColorMapping["Group"]}>Group</span></td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>)
+    const url = encodeURI("/dags/?group=" + group.Name);
+    return (
+      <tr>
+        <td className="has-text-weight-semibold">
+          <a href={url}>{group.Name}</a>
+        </td>
+        <td>
+          <span
+            className="tag has-text-weight-semibold"
+            style={tagColorMapping["Group"]}
+          >
+            Group
+          </span>
+        </td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+    );
   }
   function DAGsTable({ dags = [], groups = [], group = "" }) {
     const root = { Name: "" };
@@ -150,19 +244,19 @@
           </tr>
         </thead>
         <tbody>
-          {currGrp != "" ? (
-            <GroupItemBack></GroupItemBack>
-          ) : null}
+          {currGrp != "" ? <GroupItemBack></GroupItemBack> : null}
           {groups.map((item) => {
-            return <GroupItem key={item.Name} group={item}></GroupItem>
+            return <GroupItem key={item.Name} group={item}></GroupItem>;
           })}
-          {dags.filter((dag) => !dag.Error).map((dag) => {
-            return <DAGItem key={dag.File} dag={dag} group={group}></DAGItem>
-          })}
+          {dags
+            .filter((dag) => !dag.Error)
+            .map((dag) => {
+              return <DAGItem key={dag.File} dag={dag} group={group}></DAGItem>;
+            })}
         </tbody>
-      </table >
-    )
+      </table>
+    );
   }
-  ReactDOM.render(<App />, document.getElementById('root'));
+  ReactDOM.render(<App />, document.getElementById("root"));
 </script>
-{{end}}
+{{ end }}

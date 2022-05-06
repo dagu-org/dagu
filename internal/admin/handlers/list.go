@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"path"
 	"path/filepath"
 
 	"github.com/yohamta/dagu/internal/controller"
@@ -77,6 +78,29 @@ func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
 		} else {
 			renderFunc(w, data)
 		}
+	}
+}
+
+func HandlePostListAction(hc *DAGListHandlerConfig) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		action := r.FormValue("action")
+		value := r.FormValue("value")
+		group := r.FormValue("group")
+
+		switch action {
+		case "new":
+			filename := path.Join(hc.DAGsDir, group, value)
+			err := controller.NewConfig(filename)
+			if err != nil {
+				encodeError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+			return
+		}
+		encodeError(w, errInvalidArgs)
 	}
 }
 

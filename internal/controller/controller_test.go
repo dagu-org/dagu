@@ -241,3 +241,32 @@ steps:
 	b, _ := ioutil.ReadAll(saved)
 	require.Equal(t, dat, string(b))
 }
+
+func TestNewConfig(t *testing.T) {
+	tmpDir := utils.MustTempDir("controller-test-save")
+	defer os.RemoveAll(tmpDir)
+
+	// invalid filename
+	filename := path.Join(tmpDir, "test")
+	err := controller.NewConfig(filename)
+	require.Error(t, err)
+
+	// correct filename
+	filename = path.Join(tmpDir, "test.yaml")
+	err = controller.NewConfig(filename)
+	require.NoError(t, err)
+
+	// check file
+	cl := &config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+
+	cfg, err := cl.Load(filename, "")
+	require.NoError(t, err)
+	require.Equal(t, "test", cfg.Name)
+
+	steps := cfg.Steps[0]
+	require.Equal(t, "step1", steps.Name)
+	require.Equal(t, "echo", steps.Command)
+	require.Equal(t, []string{"hello"}, steps.Args)
+}
