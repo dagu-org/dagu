@@ -45,6 +45,7 @@ type dagResponse struct {
 	Group      string
 	StepLog    *stepLog
 	ScLog      *schedulerLog
+	Errors     []string
 }
 
 type schedulerLog struct {
@@ -85,6 +86,7 @@ func newDAGResponse(cfg string, dag *controller.DAG, tab dagTabType,
 		Definition: "",
 		LogData:    nil,
 		Group:      group,
+		Errors:     []string{},
 	}
 }
 
@@ -105,16 +107,21 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 
 		params := getDAGParameter(r)
 		dag, err := controller.FromConfig(filepath.Join(hc.DAGsDir, params.Group, cfg))
-		if err != nil {
+		if dag == nil {
 			encodeError(w, err)
 			return
 		}
 		c := controller.New(dag.Config)
 		data := newDAGResponse(cfg, dag, params.Tab, params.Group)
+		if err != nil {
+			data.Errors = append(data.Errors, err.Error())
+		}
 
 		switch params.Tab {
 		case DAG_TabType_Status:
-			data.Graph = models.StepGraph(dag.Status.Nodes, params.Tab != DAG_TabType_Config)
+			if dag.Status != nil {
+				data.Graph = models.StepGraph(dag.Status.Nodes, params.Tab != DAG_TabType_Config)
+			}
 
 		case DAG_TabType_Config:
 			steps := models.FromSteps(dag.Config.Steps)
@@ -168,6 +175,7 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
+		value := r.FormValue("value")
 		group := r.FormValue("group")
 		reqId := r.FormValue("request-id")
 		step := r.FormValue("step")
@@ -274,6 +282,15 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 
+		case "save":
+			err := c.Save(value)
+			if err != nil {
+				encodeError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
+			return
 		default:
 			encodeError(w, errInvalidArgs)
 			return

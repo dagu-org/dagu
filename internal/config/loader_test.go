@@ -182,6 +182,34 @@ func TestLoadDeafult(t *testing.T) {
 	assert.Equal(t, 7, cfg.HistRetentionDays)
 }
 
+func TestLoadData(t *testing.T) {
+	dat := `name: test DAG
+steps:
+  - name: "1"
+    command: "true"
+`
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	ret, err := l.LoadData([]byte(dat))
+	require.NoError(t, err)
+	require.Equal(t, ret.Name, "test DAG")
+
+	step := ret.Steps[0]
+	require.Equal(t, step.Name, "1")
+	require.Equal(t, step.Command, "true")
+
+	// error
+	dat = `invalidkey: test DAG`
+	_, err = l.LoadData([]byte(dat))
+	require.Error(t, err)
+
+	// error
+	dat = `name: test DAG`
+	_, err = l.LoadData([]byte(dat))
+	require.Error(t, err)
+}
+
 func TestLoadErrorFileNotExist(t *testing.T) {
 	l := &Loader{
 		HomeDir: utils.MustGetUserHomeDir(),

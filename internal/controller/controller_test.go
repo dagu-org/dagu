@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/agent"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/settings"
@@ -200,4 +202,42 @@ func TestRetry(t *testing.T) {
 
 	s4 := c.GetStatusHist(1)
 	require.Equal(t, s2, s4[0].Status)
+}
+
+func TestSave(t *testing.T) {
+	tmpDir := utils.MustTempDir("controller-test-save")
+	defer os.RemoveAll(tmpDir)
+	cfg := &config.Config{
+		Name:       "test",
+		ConfigPath: path.Join(tmpDir, "test.yaml"),
+	}
+
+	c := controller.New(cfg)
+
+	// invalid config
+	dat := `name: test DAG`
+	err := c.Save(dat)
+	require.Error(t, err)
+
+	// valid config
+	dat = `name: test DAG
+steps:
+  - name: "1"
+    command: "true"
+`
+	err = c.Save(dat)
+	require.Error(t, err) // no config file
+
+	// create file
+	f, _ := utils.CreateFile(cfg.ConfigPath)
+	defer f.Close()
+
+	err = c.Save(dat)
+	require.NoError(t, err) // no config file
+
+	// check file
+	saved, _ := os.Open(cfg.ConfigPath)
+	defer saved.Close()
+	b, _ := ioutil.ReadAll(saved)
+	require.Equal(t, dat, string(b))
 }

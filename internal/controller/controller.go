@@ -27,6 +27,7 @@ type Controller interface {
 	GetStatusByRequestId(requestId string) (*models.Status, error)
 	GetStatusHist(n int) []*models.StatusFile
 	UpdateStatus(*models.Status) error
+	Save(value string) error
 }
 
 func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
@@ -179,6 +180,22 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 	}
 	defer w.Close()
 	return w.Write(status)
+}
+
+func (s *controller) Save(value string) error {
+	// validate
+	cl := config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	_, err := cl.LoadData([]byte(value))
+	if err != nil {
+		return err
+	}
+	if !utils.FileExists(s.cfg.ConfigPath) {
+		return fmt.Errorf("the config file %s does not exist", s.cfg.ConfigPath)
+	}
+	err = ioutil.WriteFile(s.cfg.ConfigPath, []byte(value), 0755)
+	return err
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {
