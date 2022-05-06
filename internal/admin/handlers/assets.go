@@ -10,8 +10,8 @@ import (
 
 var assetsPath = "web/assets/"
 var (
-	jsRe  = regexp.MustCompile(`^/assets/(js/.*.js)?.*$`)
-	cssRe = regexp.MustCompile(`^/assets/(css/.*.css)?.*$`)
+	jsRe  = regexp.MustCompile(`^/assets/(js/.*)?.*$`)
+	cssRe = regexp.MustCompile(`^/assets/(css/.*)?.*$`)
 )
 
 type AssetType int
