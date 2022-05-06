@@ -32,11 +32,11 @@ func fromConfig(file string, headOnly bool) (*DAG, error) {
 	}
 	if err != nil {
 		if cfg != nil {
-			return newDAG(cfg, nil, err), err
+			return newDAG(cfg, defaultStatus(cfg), err), err
 		}
 		cfg := &config.Config{ConfigPath: file}
 		cfg.Init()
-		return newDAG(cfg, nil, err), err
+		return newDAG(cfg, defaultStatus(cfg), err), err
 	}
 	status, err := New(cfg).GetLastStatus()
 	if err != nil {

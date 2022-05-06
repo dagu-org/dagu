@@ -1,4 +1,4 @@
-name: complex DAG
+name: complex DAG3
 steps:
   - name: "Initialize"
     command: "sleep 2"

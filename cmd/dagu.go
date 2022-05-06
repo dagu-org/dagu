@@ -8,11 +8,14 @@ import (
 	"syscall"
 
 	"github.com/urfave/cli/v2"
+	"github.com/yohamta/dagu/internal/constants"
 )
 
+var version = "0.0.0"
 var stdin io.ReadCloser
 
 func main() {
+	setVersion()
 	err := run()
 	if err != nil {
 		log.Fatalf("%v", err)
@@ -28,6 +31,10 @@ func listenSignals(abortFunc func(sig os.Signal)) {
 			abortFunc(sig)
 		}
 	}()
+}
+
+func setVersion() {
+	constants.Version = version
 }
 
 func run() error {

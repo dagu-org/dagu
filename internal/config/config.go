@@ -360,20 +360,20 @@ func loadVariables(strVariables map[string]string) (map[string]string, error) {
 
 func assertDef(def *configDefinition) error {
 	if def.Name == "" {
-		return fmt.Errorf("DAG name must be specified.")
+		return fmt.Errorf("DAG name must be specified")
 	}
 	if len(def.Steps) == 0 {
-		return fmt.Errorf("at least one step must be specified.")
+		return fmt.Errorf("at least one step must be specified")
 	}
 	return nil
 }
 
 func assertStepDef(def *stepDef) error {
 	if def.Name == "" {
-		return fmt.Errorf("step name must be specified.")
+		return fmt.Errorf("step name must be specified")
 	}
 	if def.Command == "" {
-		return fmt.Errorf("step command must be specified.")
+		return fmt.Errorf("step command must be specified")
 	}
 	return nil
 }

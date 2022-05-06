@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
+	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -30,6 +31,12 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	os.RemoveAll(tempDir)
 	os.Exit(code)
+}
+
+func TestSetVersion(t *testing.T) {
+	version = "0.0.1"
+	setVersion()
+	require.Equal(t, version, constants.Version)
 }
 
 func testConfig(name string) string {

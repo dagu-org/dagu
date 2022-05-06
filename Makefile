@@ -10,10 +10,13 @@ test-clean:
 bin:
 	mkdir .bin
 
+VERSION=$(shell date +'%y%m%d%H%M%S')
+LDFLAGS=-X 'main.version=$(VERSION)'
+
 .PHONY: build
 build: bin
-	go build -o ./bin/dagu ./cmd/
+	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
 
 .PHONY: server
 server: build
-	go run ./cmd/ server
+	go run -ldflags="$(LDFLAGS)" ./cmd/ server

@@ -29,6 +29,23 @@ func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
 	return cl.loadConfig(f, "", true)
 }
 
+func (cl *Loader) LoadData(data []byte) (*Config, error) {
+	raw, err := cl.unmarshalData(data)
+	if err != nil {
+		return nil, err
+	}
+	def, err := cl.decode(raw)
+	if err != nil {
+		return nil, err
+	}
+	if err := assertDef(def); err != nil {
+		return nil, err
+	}
+	return buildFromDefinition(
+		def, nil, &BuildConfigOptions{headOnly: false},
+	)
+}
+
 func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 	if !utils.FileExists(file) {
 		return nil, nil

@@ -25,7 +25,9 @@
     [SCHEDULER_STATUS__SUCCESS]: { backgroundColor: "green", color: "white" },
     [SCHEDULER_STATUS__SKIPPED_UNUSED]: { backgroundColor: "gray", color: "white" },
   }
-  const DataContext = React.createContext(null);
+  const DataContext = React.createContext({
+    refresh: () => { },
+  });
 
   function Title({ title }) {
     return (
@@ -34,7 +36,7 @@
           <h2 className="title ml-2">{title}</h2>
           <DataContext.Consumer>
             {
-              data => <ControlButtons data={data}></ControlButtons>
+              (props) => <ControlButtons data={props.data}></ControlButtons>
             }
           </DataContext.Consumer>
         </div>
@@ -79,6 +81,21 @@
       </div>
     )
   }
+  function Error({ errors }) {
+    if (!errors || errors.length == 0) {
+      return null;
+    }
+    return (
+      <div class="notification is-danger mt-0 mb-0">
+        <div>Please check the below errors!</div>
+        <div class="content">
+          <ul>
+            {errors.map(e => <li>{e}</li>)}
+          </ul>
+        </div>
+      </div>
+    )
+  }
   function App() {
     const [data, setData] = React.useState(undefined);
     const [sub, setSub] = React.useState(0);
@@ -117,8 +134,13 @@
       [TAB_ID__STEPLOG]: <StepLogTab data={data} />,
       [TAB_ID__SC_LOG]: <ScLogTab data={data} />,
     }
+    const ctx = {
+      data: data,
+      refresh: getData,
+    }
     return (
-      <DataContext.Provider value={data}>
+      <DataContext.Provider value={ctx}>
+        <Error errors={data.Errors}></Error>
         <Title title={data.Title}></Title>
         <Tabs tab={data.Tab}></Tabs>
         <SubTabs tab={data.Tab} active={sub} setActive={setSub}></SubTabs>
@@ -128,6 +150,7 @@
       </DataContext.Provider>
     );
   }
+
   function HistTab({ data }) {
     const [idx, setIdx] = React.useState(data.LogData.Logs.length - 1);
     const [logs, gridData] = React.useMemo(() => {
@@ -237,21 +260,59 @@
       minWidth: "100%",
       minHeight: "100px",
     };
+    const [editing, setEditing] = React.useState(false);
+    const [currentValue, setCurrentValue] = React.useState(data.Definition);
     const handlers = getHandlersFromConfig(data.DAG.Config);
     return (
-      <div>
-        <MermaidC style={mermaidStyle}>{data.Graph}</MermaidC>
-        <ConfigTable config={data.DAG.Config}></ConfigTable>
-        <StepConfigTable steps={data.DAG.Config.Steps}></StepConfigTable>
-        <StepConfigTable steps={handlers}></StepConfigTable>
+      <DataContext.Consumer>
+        {
+          (props) => (
+            <div>
+              <MermaidC style={mermaidStyle}>{data.Graph}</MermaidC>
+              <ConfigTable config={data.DAG.Config}></ConfigTable>
+              <StepConfigTable steps={data.DAG.Config.Steps}></StepConfigTable>
+              <StepConfigTable steps={handlers}></StepConfigTable>
 
-        <div class="content">
-          <div class="box">
-            <h2>{data.DAG.Config.ConfigPath}</h2>
-            <pre>{data.Definition}</pre>
-          </div>
-        </div>
-      </div>
+              <div class="content">
+                <div class="box">
+                  <h2>{data.DAG.Config.ConfigPath}</h2>
+                  {editing ? (
+                    <ConfigEditor value={data.Definition}
+                      onCancel={() => setEditing(false)}
+                      onSave={async () => {
+                        const formData = new FormData();
+                        formData.append('action', 'save');
+                        formData.append('value', currentValue);
+                        const resp = await fetch("", {
+                          method: "POST",
+                          headers: {
+                            'Accept': 'application/json'
+                          },
+                          body: formData,
+                        })
+                        if (resp.ok) {
+                          setEditing(false);
+                          props.refresh();
+                        } else {
+                          const e = await resp.text();
+                          alert(e);
+                        }
+                      }}
+                      onChange={(newValue, event) => {
+                        setCurrentValue(newValue);
+                      }}
+                    ></ConfigEditor>
+                  ) : <ConfigPreview value={data.Definition}
+                    onEdit={() => {
+                      setEditing(true);
+                    }}
+                  ></ConfigPreview>}
+                </div>
+              </div>
+            </div>
+          )
+        }
+      </DataContext.Consumer>
     )
   }
   function StatusTab({ data, subTab }) {
@@ -513,7 +574,7 @@
   function NodeTable({ nodes, file = "", dag }) {
     const [modal, setModal] = React.useState(false);
     const [current, setCurrent] = React.useState(null);
-    const requireModal = (step) => { 
+    const requireModal = (step) => {
       if (dag.Status.Status == SCHEDULER_STATUS__RUNNING || dag.Status.Status == SCHEDULER_STATUS__NONE) {
         return;
       }
@@ -769,6 +830,31 @@
     }, [status])
     return (
       <span class="tag has-text-weight-semibold" style={style}>{children}</span>
+    )
+  }
+  function ConfigEditor({ value, onChange, onSave, onCancel }) {
+    const Editor = monaco_react.default;
+    return (
+      <div>
+        <Editor
+          height="60vh"
+          defaultLanguage="yaml"
+          defaultValue={value}
+          onChange={onChange}
+        />
+        <div className="mt-4">
+          <button className="button is-info" onClick={onSave}>Save</button>
+          <button className="button ml-2" onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
+  function ConfigPreview({ value, onEdit }) {
+    return (
+      <div>
+        <pre>{value}</pre>
+        <button className="button is-info" onClick={onEdit}>Edit</button>
+      </div>
     )
   }
   ReactDOM.render(<App />, document.getElementById('root'));

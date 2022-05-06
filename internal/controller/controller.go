@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,6 +29,7 @@ type Controller interface {
 	GetStatusByRequestId(requestId string) (*models.Status, error)
 	GetStatusHist(n int) []*models.StatusFile
 	UpdateStatus(*models.Status) error
+	Save(value string) error
 }
 
 func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
@@ -126,7 +129,6 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 	if err == nil {
 		return models.StatusFromJson(ret)
 	}
-	utils.LogIgnoreErr("get last status", err)
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
 		db := database.New(database.DefaultConfig())
 		status, err := db.ReadStatusToday(s.cfg.ConfigPath)
@@ -180,6 +182,37 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 	}
 	defer w.Close()
 	return w.Write(status)
+}
+
+func (s *controller) Save(value string) error {
+	// validate
+	cl := config.Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+	_, err := cl.LoadData([]byte(value))
+	if err != nil {
+		return err
+	}
+	if !utils.FileExists(s.cfg.ConfigPath) {
+		return fmt.Errorf("the config file %s does not exist", s.cfg.ConfigPath)
+	}
+	err = ioutil.WriteFile(s.cfg.ConfigPath, []byte(value), 0755)
+	return err
+}
+
+func NewConfig(file string) error {
+	if path.Ext(file) != ".yaml" {
+		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
+	}
+	if utils.FileExists(file) {
+		return fmt.Errorf("the config file %s already exists", file)
+	}
+	defaultVal := `name: ` + strings.TrimSuffix(path.Base(file), path.Ext(file)) + `
+steps:
+  - name: step1
+    command: echo hello
+`
+	return ioutil.WriteFile(file, []byte(defaultVal), 0755)
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {
