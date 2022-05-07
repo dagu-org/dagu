@@ -18,7 +18,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 		Name:       "test_write_status",
 		ConfigPath: "test_write_status.yaml",
 	}
-	dw, file, err := db.NewWriter(cfg.ConfigPath, time.Now())
+	dw, file, err := db.NewWriter(cfg.ConfigPath, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer func() {
@@ -45,7 +45,7 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 		Name:       "test_append_to_existing",
 		ConfigPath: "test_append_to_existing.yaml",
 	}
-	dw, file, err := db.NewWriter(cfg.ConfigPath, time.Now())
+	dw, file, err := db.NewWriter(cfg.ConfigPath, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
