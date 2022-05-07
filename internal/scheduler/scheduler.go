@@ -58,6 +58,7 @@ type Config struct {
 	OnSuccess     *config.Step
 	OnFailure     *config.Step
 	OnCancel      *config.Step
+	RequestId     string
 }
 
 func New(config *Config) *Scheduler {
@@ -117,7 +118,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 				}()
 
 				if !sc.Dry {
-					node.setupLog(sc.LogDir)
+					node.setupLog(sc.LogDir, sc.RequestId)
 					node.openLogFile()
 					defer node.closeLogFile()
 				}
@@ -203,7 +204,7 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 	node.updateStatus(NodeStatus_Running)
 
 	if !sc.Dry {
-		node.setupLog(sc.LogDir)
+		node.setupLog(sc.LogDir, sc.RequestId)
 		node.openLogFile()
 		defer node.closeLogFile()
 		err := node.Execute()
