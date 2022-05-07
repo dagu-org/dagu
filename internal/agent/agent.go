@@ -185,8 +185,7 @@ func (a *Agent) setupRequestId() error {
 
 func (a *Agent) setupDatabase() (err error) {
 	a.database = database.New(database.DefaultConfig())
-	//a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
-	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now())
+	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
 	return
 }
 
