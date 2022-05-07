@@ -179,7 +179,7 @@ func (db *Database) newFile(configPath string, t time.Time) (string, error) {
 	if configPath == "" {
 		return "", fmt.Errorf("configPath is empty")
 	}
-	fileName := fmt.Sprintf("%s.%s.dat", db.pattern(configPath), t.Format("20060102.15:04:05"))
+	fileName := fmt.Sprintf("%s.%s.dat", db.pattern(configPath), t.Format("20060102.15:04:05.000"))
 	return fileName, nil
 }
 
