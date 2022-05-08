@@ -52,13 +52,14 @@ func testNewDataFile(t *testing.T, db *Database) {
 		ConfigPath: "test_new_data_file.yaml",
 	}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
-	f, err := db.newFile(cfg.ConfigPath, timestamp)
+	requestId := "request-id-1"
+	f, err := db.newFile(cfg.ConfigPath, timestamp, requestId)
 	require.NoError(t, err)
 	p := utils.ValidFilename(strings.TrimSuffix(
 		path.Base(cfg.ConfigPath), path.Ext(cfg.ConfigPath)), "_")
-	assert.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.dat", p, p), f)
+	assert.Regexp(t, fmt.Sprintf("%s.*/%s.%s.20220101.00:00:00.000.dat", p, p, requestId), f)
 
-	_, err = db.newFile("", timestamp)
+	_, err = db.newFile("", timestamp, requestId)
 	require.Error(t, err)
 }
 
@@ -71,22 +72,28 @@ func testWriteAndFindFiles(t *testing.T, db *Database) {
 
 	for _, data := range []struct {
 		Status    *models.Status
+		RequestId string
 		Timestamp time.Time
 	}{
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
-		testWriteStatus(t, db, cfg, data.Status, data.Timestamp)
+		status := data.Status
+		status.RequestId = data.RequestId
+		testWriteStatus(t, db, cfg, status, data.Timestamp)
 	}
 
 	files := db.latest(db.pattern(cfg.ConfigPath)+"*.dat", 2)
@@ -142,21 +149,27 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 
 	for _, data := range []struct {
 		Status    *models.Status
+		RequestId string
 		Timestamp time.Time
 	}{
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
+		status := data.Status
+		status.RequestId = data.RequestId
 		testWriteStatus(t, db, cfg, data.Status, data.Timestamp)
 	}
 
@@ -176,7 +189,8 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 	cfg := &config.Config{
 		ConfigPath: "test_config_status_reader.yaml",
 	}
-	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now())
+	requestId := "request-id-1"
+	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now(), requestId)
 	require.NoError(t, err)
 	err = dw.Open()
 	require.NoError(t, err)
@@ -206,21 +220,27 @@ func testReadStatusN(t *testing.T, db *Database) {
 
 	for _, data := range []struct {
 		Status    *models.Status
+		RequestId string
 		Timestamp time.Time
 	}{
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
 			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
+		status := data.Status
+		status.RequestId = data.RequestId
 		testWriteStatus(t, db, cfg, data.Status, data.Timestamp)
 	}
 
@@ -238,8 +258,9 @@ func testCompactFile(t *testing.T, db *Database) {
 		Name:       "test_compact_file",
 		ConfigPath: "test_compact_file.yaml",
 	}
+	requestId := "request-id-1"
 
-	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now())
+	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now(), requestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
@@ -286,7 +307,7 @@ func testErrorReadFile(t *testing.T, db *Database) {
 	_, err := ParseFile("invalid_file.dat")
 	require.Error(t, err)
 
-	_, _, err = db.NewWriter("", time.Now())
+	_, _, err = db.NewWriter("", time.Now(), "")
 	require.Error(t, err)
 
 	_, err = db.ReadStatusToday("invalid_file.yaml")
@@ -324,7 +345,7 @@ func testErrorParseFile(t *testing.T, db *Database) {
 
 func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *models.Status, tm time.Time) {
 	t.Helper()
-	dw, _, err := db.NewWriter(cfg.ConfigPath, tm)
+	dw, _, err := db.NewWriter(cfg.ConfigPath, tm, status.RequestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer dw.Close()

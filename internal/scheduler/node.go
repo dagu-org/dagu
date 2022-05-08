@@ -124,11 +124,12 @@ func (n *Node) cancel() {
 	}
 }
 
-func (n *Node) setupLog(logDir string) {
+func (n *Node) setupLog(logDir string, requestId string) {
 	n.StartedAt = time.Now()
-	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.log",
+	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		utils.ValidFilename(n.Name, "_"),
-		n.StartedAt.Format("20060102.15:04:05"),
+		requestId,
+		n.StartedAt.Format("20060102.15:04:05.000"),
 	))
 }
 

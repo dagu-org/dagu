@@ -49,6 +49,9 @@ type RetryConfig struct {
 }
 
 func (a *Agent) Run() error {
+	if err := a.setupRequestId(); err != nil {
+		return err
+	}
 	a.init()
 	if err := a.setupGraph(); err != nil {
 		return err
@@ -61,7 +64,6 @@ func (a *Agent) Run() error {
 	}
 	setup := []func() error{
 		a.checkIsRunning,
-		a.setupRequestId,
 		a.setupDatabase,
 		a.setupSocketServer,
 	}
@@ -140,6 +142,7 @@ func (a *Agent) init() {
 			OnSuccess:     a.DAG.HandlerOn.Success,
 			OnFailure:     a.DAG.HandlerOn.Failure,
 			OnCancel:      a.DAG.HandlerOn.Cancel,
+			RequestId:     a.requestId,
 		})
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
@@ -150,9 +153,10 @@ func (a *Agent) init() {
 				}),
 		}}
 	a.logFilename = filepath.Join(
-		a.DAG.LogDir, fmt.Sprintf("%s.%s.log",
+		a.DAG.LogDir, fmt.Sprintf("%s.%s.%s.log",
 			utils.ValidFilename(a.DAG.Name, "_"),
-			time.Now().Format("20060102.15:04:05"),
+			a.requestId,
+			time.Now().Format("20060102.15:04:05.000"),
 		))
 }
 
@@ -185,7 +189,7 @@ func (a *Agent) setupRequestId() error {
 
 func (a *Agent) setupDatabase() (err error) {
 	a.database = database.New(database.DefaultConfig())
-	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now())
+	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
 	return
 }
 
