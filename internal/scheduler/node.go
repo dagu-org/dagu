@@ -128,8 +128,8 @@ func (n *Node) setupLog(logDir string, requestId string) {
 	n.StartedAt = time.Now()
 	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		utils.ValidFilename(n.Name, "_"),
-		requestId,
 		n.StartedAt.Format("20060102.15:04:05.000"),
+		utils.TruncString(requestId, 8),
 	))
 }
 

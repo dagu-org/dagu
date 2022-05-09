@@ -179,7 +179,7 @@ func (db *Database) newFile(configPath string, t time.Time, requestId string) (s
 	if configPath == "" {
 		return "", fmt.Errorf("configPath is empty")
 	}
-	fileName := fmt.Sprintf("%s.%s.%s.dat", db.pattern(configPath), requestId, t.Format("20060102.15:04:05.000"))
+	fileName := fmt.Sprintf("%s.%s.%s.dat", db.pattern(configPath), t.Format("20060102.15:04:05.000"), utils.TruncString(requestId, 8))
 	return fileName, nil
 }
 
@@ -191,7 +191,7 @@ func (db *Database) pattern(configPath string) string {
 
 func (db *Database) latestToday(configPath string, day time.Time) (string, error) {
 	var ret = []string{}
-	pattern := fmt.Sprintf("%s.*.%s*.dat", db.pattern(configPath), day.Format("20060102"))
+	pattern := fmt.Sprintf("%s.%s*.*.dat", db.pattern(configPath), day.Format("20060102"))
 	matches, err := filepath.Glob(pattern)
 	if err == nil || len(matches) > 0 {
 		ret = filterLatest(matches, 1)
