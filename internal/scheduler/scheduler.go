@@ -129,7 +129,12 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 						err = node.Execute()
 					}
 					if err != nil {
-						handleError(node)
+						if sc.IsCanceled() {
+							sc.lastError = err
+							node.updateStatus(NodeStatus_Cancel)
+						} else {
+							handleError(node)
+						}
 						switch node.ReadStatus() {
 						case NodeStatus_None:
 							// nothing to do
@@ -248,7 +253,7 @@ func (sc *Scheduler) setup() (err error) {
 	return
 }
 
-func (sc *Scheduler) HanderNode(name string) *Node {
+func (sc *Scheduler) HandlerNode(name string) *Node {
 	if v, ok := sc.handlers[name]; ok {
 		return v
 	}
