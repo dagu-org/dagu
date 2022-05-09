@@ -189,7 +189,7 @@ func TestLoadDeafult(t *testing.T) {
 	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
-	assert.Equal(t, time.Minute*5, cfg.MaxCleanUpTime)
+	assert.Equal(t, time.Second*60, cfg.MaxCleanUpTime)
 	assert.Equal(t, 7, cfg.HistRetentionDays)
 }
 

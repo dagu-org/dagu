@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/yohamta/dagu/internal/config"
@@ -68,10 +70,14 @@ type NodeState struct {
 func (n *Node) Execute() error {
 	ctx, fn := context.WithCancel(context.Background())
 	n.cancelFunc = fn
-	cmd := exec.CommandContext(ctx, n.Command, n.Args...)
-	n.cmd = cmd
+	n.cmd = exec.CommandContext(ctx, n.Command, n.Args...)
+	cmd := n.cmd
 	cmd.Dir = n.Dir
 	cmd.Env = append(cmd.Env, n.Variables...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
 
 	if n.logWriter != nil {
 		cmd.Stdout = n.logWriter
@@ -103,13 +109,8 @@ func (n *Node) updateStatus(status NodeStatus) {
 }
 
 func (n *Node) signal(sig os.Signal) {
-	status := n.ReadStatus()
-	if status == NodeStatus_None || status == NodeStatus_Running {
-		n.updateStatus(NodeStatus_Cancel)
-	}
-	if n.cmd != nil {
-		n.cmd.Process.Signal(sig)
-	}
+	log.Printf(fmt.Sprintf("Sending %s signal to %s", sig, n.Name))
+	utils.LogIgnoreErr("sending signal", syscall.Kill(-n.cmd.Process.Pid, sig.(syscall.Signal)))
 }
 
 func (n *Node) cancel() {
@@ -120,6 +121,7 @@ func (n *Node) cancel() {
 		n.Status = NodeStatus_Cancel
 	}
 	if n.cancelFunc != nil {
+		log.Printf(fmt.Sprintf("canceling node: %s", n.Step.Name))
 		n.cancelFunc()
 	}
 }
