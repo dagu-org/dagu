@@ -44,6 +44,7 @@ Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Dire
     - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
     - [How can it communicate with running processes?](#how-can-it-communicate-with-running-processes)
   - [License](#license)
+  - [Contributors](#Contributors-✨)
 
 ## Why not Airflow or Prefect?
 
@@ -353,3 +354,9 @@ Dagu uses Unix sockets to communicate with running processes.
 ## License
 
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
+
+## Contributors ✨
+
+<a href="https://github.com/yohamta/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
+</a>
