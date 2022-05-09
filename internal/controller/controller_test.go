@@ -130,7 +130,7 @@ func TestUpdateStatusError(t *testing.T) {
 
 	go func() {
 		err = a.Run()
-		require.NoError(t, err)
+		require.Error(t, err)
 	}()
 
 	time.Sleep(time.Millisecond * 30)
