@@ -44,11 +44,11 @@ Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Dire
     - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
     - [How can it communicate with running processes?](#how-can-it-communicate-with-running-processes)
   - [License](#license)
-  - [Contributors](#Contributors-✨)
+  - [Contributors](#contributors)
 
 ## Why not Airflow or Prefect?
 
-Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we have developed a No-code workflow execution engine that doesn't require writing code.
+Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we have developed a No-code workflow execution engine that doesn't require writing code. Dagu is easy to use and self-contained, making it ideal for smaller projects with fewer people.
 
 ## ️How does it work?
 
@@ -355,8 +355,10 @@ Dagu uses Unix sockets to communicate with running processes.
 
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
 
-## Contributors ✨
+## Contributors
 
 <a href="https://github.com/yohamta/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
 </a>
+
+Made with [contrib.rocks](https://contrib.rocks).
