@@ -81,7 +81,7 @@ func (c *Config) setup(file string) {
 		c.HistRetentionDays = 7
 	}
 	if c.MaxCleanUpTime == 0 {
-		c.MaxCleanUpTime = time.Minute * 5
+		c.MaxCleanUpTime = time.Second * 60
 	}
 	dir := path.Dir(file)
 	for _, step := range c.Steps {
@@ -128,10 +128,14 @@ func (c *Config) String() string {
 type BuildConfigOptions struct {
 	headOnly   bool
 	parameters string
+	noEval     bool
 }
 
 func buildFromDefinition(def *configDefinition, globalConfig *Config,
 	opts *BuildConfigOptions) (c *Config, err error) {
+	if opts == nil {
+		opts = &BuildConfigOptions{}
+	}
 	c = &Config{}
 	c.Init()
 
@@ -171,11 +175,13 @@ func buildFromDefinition(def *configDefinition, globalConfig *Config,
 
 	c.DefaultParams = def.Params
 	p := c.DefaultParams
+	eval := !opts.noEval
 	if opts != nil && opts.parameters != "" {
 		p = opts.parameters
+		eval = false
 	}
 
-	c.Params, err = parseParameters(p, true)
+	c.Params, err = parseParameters(p, eval)
 	if err != nil {
 		return nil, err
 	}

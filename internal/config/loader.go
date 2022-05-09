@@ -22,11 +22,15 @@ type Loader struct {
 }
 
 func (cl *Loader) Load(f, params string) (*Config, error) {
-	return cl.loadConfig(f, params, false)
+	return cl.loadConfig(f, params, false, false)
+}
+
+func (cl *Loader) LoadWithoutEval(f string) (*Config, error) {
+	return cl.loadConfig(f, "", false, true)
 }
 
 func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
-	return cl.loadConfig(f, "", true)
+	return cl.loadConfig(f, "", true, true)
 }
 
 func (cl *Loader) LoadData(data []byte) (*Config, error) {
@@ -42,7 +46,7 @@ func (cl *Loader) LoadData(data []byte) (*Config, error) {
 		return nil, err
 	}
 	return buildFromDefinition(
-		def, nil, &BuildConfigOptions{headOnly: false},
+		def, nil, &BuildConfigOptions{headOnly: false, noEval: true},
 	)
 }
 
@@ -72,7 +76,7 @@ func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 	)
 }
 
-func (cl *Loader) loadConfig(f, params string, headOnly bool) (*Config, error) {
+func (cl *Loader) loadConfig(f, params string, headOnly bool, noEval bool) (*Config, error) {
 	if f == "" {
 		return nil, fmt.Errorf("config file was not specified")
 	}
@@ -114,6 +118,7 @@ func (cl *Loader) loadConfig(f, params string, headOnly bool) (*Config, error) {
 		&BuildConfigOptions{
 			headOnly:   headOnly,
 			parameters: params,
+			noEval:     noEval,
 		})
 
 	if err != nil {

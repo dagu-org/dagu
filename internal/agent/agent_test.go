@@ -190,7 +190,7 @@ func TestHandleHTTP(t *testing.T) {
 
 	go func() {
 		err := a.Run()
-		require.NoError(t, err)
+		require.Error(t, err)
 	}()
 
 	<-time.After(time.Millisecond * 50)

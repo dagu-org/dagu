@@ -87,48 +87,65 @@ func (a *Agent) Status() *models.Status {
 	)
 	status.RequestId = a.requestId
 	status.Log = a.logFilename
-	if node := a.scheduler.HanderNode(constants.OnExit); node != nil {
+	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
 		status.OnExit = models.FromNode(node)
 	}
-	if node := a.scheduler.HanderNode(constants.OnSuccess); node != nil {
+	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
 		status.OnSuccess = models.FromNode(node)
 	}
-	if node := a.scheduler.HanderNode(constants.OnFailure); node != nil {
+	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
 		status.OnFailure = models.FromNode(node)
 	}
-	if node := a.scheduler.HanderNode(constants.OnCancel); node != nil {
+	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
 		status.OnCancel = models.FromNode(node)
 	}
 	return status
 }
 
 // Signal sends the signal to the processes running
-// if processes do not terminate after MaxCleanUp time,
-// will send signal -1 to the processes.
+// if processes do not terminate after MaxCleanUp time, it will send KILL signal.
 func (a *Agent) Signal(sig os.Signal) {
 	log.Printf("Sending %s signal to running child processes.", sig)
 	done := make(chan bool)
 	go func() {
 		a.scheduler.Signal(a.graph, sig, done)
 	}()
-	select {
-	case <-done:
-		log.Printf("All child processes have been terminated.")
-	case <-time.After(a.DAG.MaxCleanUpTime):
-		log.Printf("Time reached to max cleanup time")
-		a.Cancel()
-	default:
-		log.Printf("Waiting for child processes to exit...")
-		time.Sleep(time.Second * 1)
+	timeout := time.After(a.DAG.MaxCleanUpTime)
+	tick := time.After(time.Second * 5)
+	for {
+		select {
+		case <-done:
+			log.Printf("All child processes have been terminated.")
+			return
+		case <-timeout:
+			log.Printf("Time reached to max cleanup time")
+			a.Kill()
+			return
+		case <-tick:
+			log.Printf("Sending signal again")
+			a.scheduler.Signal(a.graph, sig, nil)
+			tick = time.After(time.Second * 5)
+		default:
+			log.Printf("Waiting for child processes to exit...")
+			time.Sleep(time.Second * 3)
+		}
 	}
 }
 
+// KILL kills child processes.
+func (a *Agent) Kill() {
+	log.Printf("Sending KILL signal to running child processes.")
+	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil)
+}
+
 // Cancel sends signal -1 to all child processes.
-// then it waits another 60 seconds before therminating the
-// parent process.
 func (a *Agent) Cancel() {
 	log.Printf("Sending -1 signal to running child processes.")
 	a.scheduler.Cancel(a.graph)
+	for a.scheduler.Status(a.graph) == scheduler.SchedulerStatus_Running {
+		time.Sleep(time.Second * 5)
+		a.scheduler.Cancel(a.graph)
+	}
 }
 
 func (a *Agent) init() {
@@ -332,7 +349,9 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
-		a.Signal(syscall.SIGTERM)
+		go func() {
+			a.Signal(syscall.SIGTERM)
+		}()
 	default:
 		encodeError(w, ErrNotFound)
 	}

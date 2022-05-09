@@ -28,7 +28,7 @@ func fromConfig(file string, headOnly bool) (*DAG, error) {
 	if headOnly {
 		cfg, err = cl.LoadHeadOnly(file)
 	} else {
-		cfg, err = cl.Load(file, "")
+		cfg, err = cl.LoadWithoutEval(file)
 	}
 	if err != nil {
 		if cfg != nil {
