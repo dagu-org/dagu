@@ -1,12 +1,3 @@
-.PHONY: test
-test:
-	go test ./...
-
-.PHONY: test-clean
-test-clean:
-	go clean -testcache
-	go test ./...
-
 bin:
 	mkdir .bin
 
@@ -20,3 +11,12 @@ build: bin
 .PHONY: server
 server: build
 	go run -ldflags="$(LDFLAGS)" ./cmd/ server
+
+.PHONY: test
+test: build
+	go test ./...
+
+.PHONY: test-clean
+test-clean:
+	go clean -testcache
+	go test ./...

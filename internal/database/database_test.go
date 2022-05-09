@@ -57,7 +57,7 @@ func testNewDataFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 	p := utils.ValidFilename(strings.TrimSuffix(
 		path.Base(cfg.ConfigPath), path.Ext(cfg.ConfigPath)), "_")
-	assert.Regexp(t, fmt.Sprintf("%s.*/%s.%s.20220101.00:00:00.000.dat", p, p, requestId), f)
+	assert.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
 
 	_, err = db.newFile("", timestamp, requestId)
 	require.Error(t, err)

@@ -146,3 +146,10 @@ func LogIgnoreErr(action string, err error) {
 		log.Printf("%s failed. %s", action, err)
 	}
 }
+
+func TruncString(val string, max int) string {
+	if len(val) > max {
+		return val[:max]
+	}
+	return val
+}
