@@ -132,9 +132,10 @@ func (a *Agent) Cancel() {
 }
 
 func (a *Agent) init() {
+	logDir := path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_"))
 	a.scheduler = scheduler.New(
 		&scheduler.Config{
-			LogDir:        path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_")),
+			LogDir:        logDir,
 			MaxActiveRuns: a.DAG.MaxActiveRuns,
 			Delay:         a.DAG.Delay,
 			Dry:           a.Dry,
@@ -153,10 +154,11 @@ func (a *Agent) init() {
 				}),
 		}}
 	a.logFilename = filepath.Join(
-		a.DAG.LogDir, fmt.Sprintf("%s.%s.%s.log",
+		logDir,
+		fmt.Sprintf("%s.%s.%s.log",
 			utils.ValidFilename(a.DAG.Name, "_"),
-			a.requestId,
 			time.Now().Format("20060102.15:04:05.000"),
+			utils.TruncString(a.requestId, 8),
 		))
 }
 
