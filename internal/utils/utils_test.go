@@ -183,3 +183,8 @@ func TestIgnoreErr(t *testing.T) {
 	require.Contains(t, s, "test action failed")
 	require.Contains(t, s, "test error")
 }
+
+func TestTruncString(t *testing.T) {
+	require.Equal(t, "12345678", utils.TruncString("123456789", 8))
+	require.Equal(t, "1234567", utils.TruncString("1234567", 8))
+}
