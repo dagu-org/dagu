@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"github.com/yohamta/dagu/agent"
 	"io/ioutil"
 	"os"
 	"path"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("controller_test")
 	settings.InitTest(tempDir)
 	code := m.Run()
-	os.RemoveAll(tempDir)
+	_ = os.RemoveAll(tempDir)
 	os.Exit(code)
 }
 
@@ -168,7 +168,7 @@ func TestStartStop(t *testing.T) {
 		return st.Status == scheduler.SchedulerStatus_Running
 	}, time.Millisecond*1500, time.Millisecond*100)
 
-	c.Stop()
+	_ = c.Stop()
 
 	require.Eventually(t, func() bool {
 		st, _ := c.GetLastStatus()
@@ -209,7 +209,9 @@ func TestRetry(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 	cfg := &config.Config{
 		Name:       "test",
 		ConfigPath: path.Join(tmpDir, "test.yaml"),
@@ -233,21 +235,27 @@ steps:
 
 	// create file
 	f, _ := utils.CreateFile(cfg.ConfigPath)
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	err = c.Save(dat)
 	require.NoError(t, err) // no config file
 
 	// check file
 	saved, _ := os.Open(cfg.ConfigPath)
-	defer saved.Close()
+	defer func() {
+		_ = saved.Close()
+	}()
 	b, _ := ioutil.ReadAll(saved)
 	require.Equal(t, dat, string(b))
 }
 
 func TestNewConfig(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// invalid filename
 	filename := path.Join(tmpDir, "test")

@@ -239,7 +239,9 @@ func (a *Agent) run() error {
 	if err := tl.Open(); err != nil {
 		return err
 	}
-	defer tl.Close()
+	defer func() {
+		_ = tl.Close()
+	}()
 
 	err := a.dbWriter.Open()
 	if err != nil {
@@ -252,7 +254,7 @@ func (a *Agent) run() error {
 		}
 	}()
 
-	a.dbWriter.Write(a.Status())
+	_ = a.dbWriter.Write(a.Status())
 
 	listen := make(chan error)
 	go func() {
@@ -276,8 +278,8 @@ func (a *Agent) run() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			a.dbWriter.Write(status)
-			a.reporter.ReportStep(a.DAG, status, node)
+			_ = a.dbWriter.Write(status)
+			_ = a.reporter.ReportStep(a.DAG, status, node)
 		}
 	}()
 
@@ -302,7 +304,7 @@ func (a *Agent) dryRun() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			a.reporter.ReportStep(a.DAG, status, node)
+			_ = a.reporter.ReportStep(a.DAG, status, node)
 		}
 	}()
 
@@ -345,10 +347,10 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write(b)
+		_, _ = w.Write(b)
 	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 		go func() {
 			a.Signal(syscall.SIGTERM)
 		}()

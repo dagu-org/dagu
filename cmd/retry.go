@@ -1,10 +1,10 @@
 package main
 
 import (
+	"github.com/yohamta/dagu/agent"
 	"os"
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/utils"

@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("agent_test")
 	settings.InitTest(tempDir)
 	code := m.Run()
-	os.RemoveAll(tempDir)
+	_ = os.RemoveAll(tempDir)
 	os.Exit(code)
 }
 
@@ -40,8 +40,8 @@ func TestRunDAG(t *testing.T) {
 }
 
 func TestCheckRunning(t *testing.T) {
-	config := testConfig("agent_is_running.yaml")
-	dag, err := controller.FromConfig(config)
+	cfg := testConfig("agent_is_running.yaml")
+	dag, err := controller.FromConfig(cfg)
 	require.NoError(t, err)
 
 	a := &Agent{Config: &Config{
@@ -49,7 +49,7 @@ func TestCheckRunning(t *testing.T) {
 	}}
 
 	go func() {
-		a.Run()
+		_ = a.Run()
 	}()
 
 	time.Sleep(time.Millisecond * 30)
@@ -287,7 +287,7 @@ func testDAGAsync(t *testing.T, file string) (*Agent, *controller.DAG) {
 	}}
 
 	go func() {
-		a.Run()
+		_ = a.Run()
 	}()
 
 	return a, dag

@@ -1,10 +1,10 @@
 package main
 
 import (
+	"github.com/yohamta/dagu/agent"
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
