@@ -73,7 +73,7 @@ func (cl *Loader) LoadData(data []byte) (*Config, error) {
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
+func (cl *Loader) loadGlobalConfig(file string, opts *BuildConfigOptions) (*Config, error) {
 	if !utils.FileExists(file) {
 		return nil, nil
 	}
@@ -88,16 +88,11 @@ func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 		return nil, err
 	}
 
-	for k, v := range utils.DefaultEnv() {
-		if _, ok := def.Env[v]; !ok {
-			def.Env[k] = v
-		}
-	}
-
+	buildOpts := *opts
+	buildOpts.headOnly = false
+	buildOpts.defaultEnv = utils.DefaultEnv()
 	b := &builder{
-		BuildConfigOptions: BuildConfigOptions{
-			headOnly: false,
-		},
+		BuildConfigOptions: buildOpts,
 	}
 	return b.buildFromDefinition(def, nil)
 }
@@ -115,7 +110,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 
 	if !opts.headOnly {
 		file := path.Join(cl.HomeDir, ".dagu/config.yaml")
-		dst, err = cl.loadGlobalConfig(file)
+		dst, err = cl.loadGlobalConfig(file, opts)
 		if err != nil {
 			return nil, err
 		}

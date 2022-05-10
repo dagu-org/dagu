@@ -4,7 +4,7 @@ type configDefinition struct {
 	Name              string
 	Description       string
 	LogDir            string
-	Env               map[string]string
+	Env               interface{}
 	HandlerOn         handerOnDef
 	Steps             []*stepDef
 	Smtp              smtpConfigDef
