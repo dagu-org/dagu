@@ -102,3 +102,46 @@ func TestLoadInvalidConfigError(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
+func TestLoadEnv(t *testing.T) {
+	for _, c := range []struct {
+		val, key, want string
+	}{
+		{
+			`env: 
+  VAR: "` + "`echo 1`" + `"
+`,
+			"VAR", "1",
+		},
+		{
+			`env: 
+  "1": "123"
+`,
+			"1", "123",
+		},
+		{
+			`env: 
+  - "FOO": "BAR"
+  - "FOO": "${FOO}:BAZ"
+  - "FOO": "${FOO}:BAR"
+  - "FOO": "${FOO}:FOO"
+`,
+			"FOO", "BAR:BAZ:BAR:FOO",
+		},
+	} {
+		l := &Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
+		d, err := l.unmarshalData([]byte(c.val))
+		require.NoError(t, err)
+
+		def, err := l.decode(d)
+		require.NoError(t, err)
+
+		b := &builder{}
+		_, err = b.buildFromDefinition(def, nil)
+		require.NoError(t, err)
+
+		require.Equal(t, c.want, os.Getenv(c.key))
+	}
+}

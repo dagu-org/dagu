@@ -130,6 +130,7 @@ type BuildConfigOptions struct {
 	parameters string
 	noEval     bool
 	noSetenv   bool
+	defaultEnv map[string]string
 }
 
 type builder struct {
@@ -150,7 +151,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		return c, nil
 	}
 
-	env, err := b.loadVariables(def.Env)
+	env, err := b.loadVariables(def.Env, b.defaultEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -274,16 +275,60 @@ func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
 	return ret, nil
 }
 
-func (b *builder) loadVariables(strVariables map[string]string) (map[string]string, error) {
-	vars := map[string]string{}
-	for k, v := range strVariables {
-		parsed, err := utils.ParseVariable(v)
+type envVariable struct {
+	key string
+	val string
+}
+
+func (b *builder) loadVariables(strVariables interface{}, defaults map[string]string) (
+	map[string]string, error,
+) {
+	var vals []*envVariable = []*envVariable{}
+	for k, v := range defaults {
+		vals = append(vals, &envVariable{k, v})
+	}
+
+	loadFn := func(a []*envVariable, m map[interface{}]interface{}) ([]*envVariable, error) {
+		for k, v := range m {
+			if ks, ok := k.(string); ok {
+				if vs, ok := v.(string); ok {
+					a = append(a, &envVariable{ks, vs})
+				} else {
+					return a, fmt.Errorf("invalid value for env %s", ks)
+				}
+			}
+		}
+		return a, nil
+	}
+
+	var err error
+	if a, ok := strVariables.(map[interface{}]interface{}); ok {
+		vals, err = loadFn(vals, a)
 		if err != nil {
 			return nil, err
 		}
-		vars[k] = parsed
+	}
+
+	if a, ok := strVariables.([]interface{}); ok {
+		for _, v := range a {
+			if aa, ok := v.(map[interface{}]interface{}); ok {
+				vals, err = loadFn(vals, aa)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	vars := map[string]string{}
+	for _, v := range vals {
+		parsed, err := utils.ParseVariable(v.val)
+		if err != nil {
+			return nil, err
+		}
+		vars[v.key] = parsed
 		if !b.noSetenv {
-			err = os.Setenv(k, parsed)
+			err = os.Setenv(v.key, parsed)
 			if err != nil {
 				return nil, err
 			}
