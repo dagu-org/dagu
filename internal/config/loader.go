@@ -22,15 +22,33 @@ type Loader struct {
 }
 
 func (cl *Loader) Load(f, params string) (*Config, error) {
-	return cl.loadConfig(f, params, false, false)
+	return cl.loadConfig(f,
+		&BuildConfigOptions{
+			parameters: params,
+		},
+	)
 }
 
 func (cl *Loader) LoadWithoutEval(f string) (*Config, error) {
-	return cl.loadConfig(f, "", false, true)
+	return cl.loadConfig(f,
+		&BuildConfigOptions{
+			parameters: "",
+			headOnly:   false,
+			noEval:     true,
+			noSetenv:   true,
+		},
+	)
 }
 
 func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
-	return cl.loadConfig(f, "", true, true)
+	return cl.loadConfig(f,
+		&BuildConfigOptions{
+			parameters: "",
+			headOnly:   true,
+			noEval:     true,
+			noSetenv:   true,
+		},
+	)
 }
 
 func (cl *Loader) LoadData(data []byte) (*Config, error) {
@@ -45,9 +63,14 @@ func (cl *Loader) LoadData(data []byte) (*Config, error) {
 	if err := assertDef(def); err != nil {
 		return nil, err
 	}
-	return buildFromDefinition(
-		def, nil, &BuildConfigOptions{headOnly: false, noEval: true},
-	)
+	b := &builder{
+		BuildConfigOptions: BuildConfigOptions{
+			headOnly: false,
+			noEval:   true,
+			noSetenv: true,
+		},
+	}
+	return b.buildFromDefinition(def, nil)
 }
 
 func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
@@ -71,12 +94,15 @@ func (cl *Loader) loadGlobalConfig(file string) (*Config, error) {
 		}
 	}
 
-	return buildFromDefinition(
-		def, nil, &BuildConfigOptions{headOnly: false},
-	)
+	b := &builder{
+		BuildConfigOptions: BuildConfigOptions{
+			headOnly: false,
+		},
+	}
+	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadConfig(f, params string, headOnly bool, noEval bool) (*Config, error) {
+func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error) {
 	if f == "" {
 		return nil, fmt.Errorf("config file was not specified")
 	}
@@ -87,7 +113,7 @@ func (cl *Loader) loadConfig(f, params string, headOnly bool, noEval bool) (*Con
 
 	var dst *Config = nil
 
-	if !headOnly {
+	if !opts.headOnly {
 		file := path.Join(cl.HomeDir, ".dagu/config.yaml")
 		dst, err = cl.loadGlobalConfig(file)
 		if err != nil {
@@ -114,12 +140,8 @@ func (cl *Loader) loadConfig(f, params string, headOnly bool, noEval bool) (*Con
 		return nil, err
 	}
 
-	c, err := buildFromDefinition(def, dst,
-		&BuildConfigOptions{
-			headOnly:   headOnly,
-			parameters: params,
-			noEval:     noEval,
-		})
+	b := builder{BuildConfigOptions: *opts}
+	c, err := b.buildFromDefinition(def, dst)
 
 	if err != nil {
 		return nil, err

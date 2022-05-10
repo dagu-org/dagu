@@ -97,7 +97,8 @@ func TestLoadInvalidConfigError(t *testing.T) {
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
-		_, err = buildFromDefinition(def, nil, nil)
+		b := &builder{}
+		_, err = b.buildFromDefinition(def, nil)
 		require.Error(t, err)
 	}
 }
