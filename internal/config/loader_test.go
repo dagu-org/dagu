@@ -138,6 +138,7 @@ func TestLoadGlobalConfig(t *testing.T) {
 	}
 	cfg, err := l.loadGlobalConfig(
 		path.Join(l.HomeDir, ".dagu/config.yaml"),
+		&BuildConfigOptions{},
 	)
 	require.NotNil(t, cfg)
 	require.NoError(t, err)
@@ -177,7 +178,7 @@ func TestLoadGlobalConfigError(t *testing.T) {
 		path.Join(testDir, "config_err_parse.yaml"),
 	} {
 		l := &Loader{HomeDir: utils.MustGetUserHomeDir()}
-		_, err := l.loadGlobalConfig(path)
+		_, err := l.loadGlobalConfig(path, &BuildConfigOptions{})
 		require.Error(t, err)
 	}
 }
