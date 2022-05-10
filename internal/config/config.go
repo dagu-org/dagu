@@ -129,13 +129,14 @@ type BuildConfigOptions struct {
 	headOnly   bool
 	parameters string
 	noEval     bool
+	noSetenv   bool
 }
 
-func buildFromDefinition(def *configDefinition, globalConfig *Config,
-	opts *BuildConfigOptions) (c *Config, err error) {
-	if opts == nil {
-		opts = &BuildConfigOptions{}
-	}
+type builder struct {
+	BuildConfigOptions
+}
+
+func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (c *Config, err error) {
 	c = &Config{}
 	c.Init()
 
@@ -145,11 +146,11 @@ func buildFromDefinition(def *configDefinition, globalConfig *Config,
 	c.MailOn.Success = def.MailOn.Success
 	c.Delay = time.Second * time.Duration(def.DelaySec)
 
-	if opts != nil && opts.headOnly {
+	if b.headOnly {
 		return c, nil
 	}
 
-	env, err := loadVariables(def.Env)
+	env, err := b.loadVariables(def.Env)
 	if err != nil {
 		return nil, err
 	}
@@ -175,13 +176,11 @@ func buildFromDefinition(def *configDefinition, globalConfig *Config,
 
 	c.DefaultParams = def.Params
 	p := c.DefaultParams
-	eval := !opts.noEval
-	if opts != nil && opts.parameters != "" {
-		p = opts.parameters
-		eval = false
+	if b.parameters != "" {
+		p = b.parameters
 	}
 
-	c.Params, err = parseParameters(p, eval)
+	c.Params, err = b.parseParameters(p, !b.noEval)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +244,7 @@ func buildFromDefinition(def *configDefinition, globalConfig *Config,
 	return c, nil
 }
 
-func parseParameters(value string, eval bool) ([]string, error) {
+func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
 	params := value
 	var err error
 	if eval {
@@ -263,14 +262,34 @@ func parseParameters(value string, eval bool) ([]string, error) {
 	ret := []string{}
 	for _, r := range records {
 		for i, v := range r {
-			err = os.Setenv(strconv.Itoa(i+1), v)
-			if err != nil {
-				return nil, err
+			if !b.noSetenv {
+				err = os.Setenv(strconv.Itoa(i+1), v)
+				if err != nil {
+					return nil, err
+				}
 			}
 			ret = append(ret, v)
 		}
 	}
 	return ret, nil
+}
+
+func (b *builder) loadVariables(strVariables map[string]string) (map[string]string, error) {
+	vars := map[string]string{}
+	for k, v := range strVariables {
+		parsed, err := utils.ParseVariable(v)
+		if err != nil {
+			return nil, err
+		}
+		vars[k] = parsed
+		if !b.noSetenv {
+			err = os.Setenv(k, parsed)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return vars, nil
 }
 
 func buildSmtpConfigFromDefinition(def smtpConfigDef) (*SmtpConfig, error) {
@@ -346,22 +365,6 @@ func loadPreCondition(cond []*conditionDef) []*Condition {
 		})
 	}
 	return ret
-}
-
-func loadVariables(strVariables map[string]string) (map[string]string, error) {
-	vars := map[string]string{}
-	for k, v := range strVariables {
-		parsed, err := utils.ParseVariable(v)
-		if err != nil {
-			return nil, err
-		}
-		vars[k] = parsed
-		err = os.Setenv(k, parsed)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return vars, nil
 }
 
 func assertDef(def *configDefinition) error {
