@@ -32,6 +32,10 @@ var defaultFuncs = template.FuncMap{
 		}
 		return fmt.Sprintf("background-color: %s;", c)
 	},
+	"navbarTitle": func() string {
+		val, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_TITLE)
+		return val
+	},
 }
 
 //go:embed web/templates/* web/assets/*
