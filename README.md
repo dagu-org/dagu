@@ -48,7 +48,7 @@ Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Dire
 
 ## Why not Airflow or Prefect?
 
-Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we have developed a No-code workflow execution engine that doesn't require writing code. Dagu is easy to use and self-contained, making it ideal for smaller projects with fewer people.
+Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we have developed a No-code workflow execution engine that doesn't require writing code. Dagu is easy to use and self-contained, making it ideal for smaller projects with fewer people. We hope that this tool will help others in the same situation.
 
 ## ️How does it work?
 
@@ -282,6 +282,9 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
+- `DAGU__ADMIN_PORT` - port number for web URL (default : `8000`)
+- `DAGU__ADMIN_NAVBAR_COLOR` - navigation header color for web UI (optional)
+- `DAGU__ADMIN_NAVBAR_TITLE` - navigation header title for web UI (optional)
 
 ### Web UI configuration
 
