@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"embed"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 var defaultFuncs = template.FuncMap{
@@ -22,6 +24,13 @@ var defaultFuncs = template.FuncMap{
 	},
 	"version": func() string {
 		return constants.Version
+	},
+	"navbarColor": func() string {
+		c, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_COLOR)
+		if c == "" {
+			return "background-image: linear-gradient(to right, #23282d, #666666);"
+		}
+		return fmt.Sprintf("background-color: %s;", c)
 	},
 }
 

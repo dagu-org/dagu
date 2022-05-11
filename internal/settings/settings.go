@@ -13,9 +13,10 @@ var ErrConfigNotFound = fmt.Errorf("config not found")
 var cache map[string]string = nil
 
 const (
-	CONFIG__DATA_DIR   = "DAGU__DATA"
-	CONFIG__LOGS_DIR   = "DAGU__LOGS"
-	CONFIG__ADMIN_PORT = "CONFIG__ADMIN_PORT"
+	CONFIG__DATA_DIR           = "DAGU__DATA"
+	CONFIG__LOGS_DIR           = "DAGU__LOGS"
+	CONFIG__ADMIN_PORT         = "CONFIG__ADMIN_PORT"
+	CONFIG__ADMIN_NAVBAR_COLOR = "CONFIG__ADMIN_NAVBAR_COLOR"
 )
 
 func MustGet(name string) string {
@@ -47,6 +48,7 @@ func load() {
 	cache[CONFIG__LOGS_DIR] = config(CONFIG__LOGS_DIR,
 		path.Join(dir, "/.dagu/logs"))
 	cache[CONFIG__ADMIN_PORT] = config(CONFIG__ADMIN_PORT, "8000")
+	cache[CONFIG__ADMIN_NAVBAR_COLOR] = config(CONFIG__ADMIN_NAVBAR_COLOR, "")
 }
 
 func InitTest(dir string) {

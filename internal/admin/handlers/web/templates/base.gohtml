@@ -3,17 +3,17 @@
 <html lang="en">
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="/assets/css/bulma.min.css?v={{version}}" />
-    <link href="/assets/css/lineicons.css?v={{version}}" rel="stylesheet" />
-    <script src="/assets/js/react.min.js?v={{version}}"></script>
-    <script src="/assets/js/react-dom.min.js?v={{version}}"></script>
-    <script src="/assets/js/babel.min.js?v={{version}}"></script>
-    <script src="/assets/js/mermaid.min.js?v={{version}}"></script>
-    <script src="/assets/js/moment.min.js?v={{version}}"></script>
-    <script src="/assets/js/prop-types.js?v={{version}}"></script>
-    <script src="/assets/js/state-local.min.js?v={{version}}"></script>
-    <script src="/assets/js/monaco-loader.min.js?v={{version}}"></script>
-    <script src="/assets/js/monaco-react.min.js?v={{version}}"></script>
+    <link rel="stylesheet" href="/assets/css/bulma.min.css?v={{ version }}" />
+    <link href="/assets/css/lineicons.css?v={{ version }}" rel="stylesheet" />
+    <script src="/assets/js/react.min.js?v={{ version }}"></script>
+    <script src="/assets/js/react-dom.min.js?v={{ version }}"></script>
+    <script src="/assets/js/babel.min.js?v={{ version }}"></script>
+    <script src="/assets/js/mermaid.min.js?v={{ version }}"></script>
+    <script src="/assets/js/moment.min.js?v={{ version }}"></script>
+    <script src="/assets/js/prop-types.js?v={{ version }}"></script>
+    <script src="/assets/js/state-local.min.js?v={{ version }}"></script>
+    <script src="/assets/js/monaco-loader.min.js?v={{ version }}"></script>
+    <script src="/assets/js/monaco-react.min.js?v={{ version }}"></script>
     <script>
       mermaid.initialize({ startOnLoad: true });
     </script>
@@ -31,8 +31,6 @@
 
       html,
       body {
-        /* font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, */
-        /* Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; */
         font-family: open sans, -apple-system, BlinkMacSystemFont, segoe ui,
           Roboto, helvetica neue, Arial, sans-serif, apple color emoji,
           segoe ui emoji, segoe ui symbol;
@@ -49,7 +47,7 @@
       }
 
       #nav {
-        background-image: linear-gradient(to right, #23282d, #666666);
+        {{ navbarColor }}
       }
 
       #nav-title {
