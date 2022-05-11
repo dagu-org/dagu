@@ -17,6 +17,7 @@ const (
 	CONFIG__LOGS_DIR           = "DAGU__LOGS"
 	CONFIG__ADMIN_PORT         = "CONFIG__ADMIN_PORT"
 	CONFIG__ADMIN_NAVBAR_COLOR = "CONFIG__ADMIN_NAVBAR_COLOR"
+	CONFIG__ADMIN_NAVBAR_TITLE = "CONFIG__ADMIN_NAVBAR_TITLE"
 )
 
 func MustGet(name string) string {
@@ -49,6 +50,7 @@ func load() {
 		path.Join(dir, "/.dagu/logs"))
 	cache[CONFIG__ADMIN_PORT] = config(CONFIG__ADMIN_PORT, "8000")
 	cache[CONFIG__ADMIN_NAVBAR_COLOR] = config(CONFIG__ADMIN_NAVBAR_COLOR, "")
+	cache[CONFIG__ADMIN_NAVBAR_TITLE] = config(CONFIG__ADMIN_NAVBAR_TITLE, "Dagu admin")
 }
 
 func InitTest(dir string) {
