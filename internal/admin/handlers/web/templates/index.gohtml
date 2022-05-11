@@ -4,7 +4,7 @@
   function Title({ refresh }) {
     const buttonStyle = {
       width: "100px",
-      backgroundColor: "gray",
+      backgroundColor: "chocolate",
       border: 0,
       color: "white",
     };
@@ -13,7 +13,7 @@
         <div className="is-flex is-flex-direction-row is-justify-content-space-between">
           <h2 className="title ml-2">DAGs</h2>
           <button
-            className="button mr-5 is-rounded"
+            className="button mr-5"
             style={buttonStyle}
             onClick={async () => {
               const name = window.prompt("Please input the new file name (*.yaml)", "");
