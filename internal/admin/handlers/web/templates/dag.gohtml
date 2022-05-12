@@ -46,8 +46,8 @@
   function Tabs({ tab }) {
     const classes = visibleTabs.map((elem) => elem[1] == tab ? "is-active" : "")
     return (
-      <div className="has-background-white">
-        <div className="tabs is-toggle mb-0 px-3 pb-3 has-text-weight-semibold">
+      <div className="has-background-white is-flex is-flex-direction-row is-justify-content-space-between is-align-items-center pt-2 pb-2">
+        <div className="tabs is-toggle mb-0 px-3 has-text-weight-semibold">
           <ul>
             {visibleTabs.map((elem, i) => {
               const c = classes[i];
@@ -56,6 +56,11 @@
             })}
           </ul>
         </div>
+        <DataContext.Consumer>
+          {
+            (props) => <EditControls data={props.data}></EditControls>
+          }
+        </DataContext.Consumer>
       </div>
     )
   }
@@ -773,6 +778,51 @@
             <span>Retry</span>
           </button>
         </form>
+      </div>
+    )
+  }
+  function EditControls({ data }) {
+    const buttonStyle = React.useMemo(() => ({
+      "rename": { width: "100px" },
+    }), []);
+    if ("{{.Tab}}" != TAB_ID__CONFIG) {
+      return null;
+    }
+    return (
+      <div className="mt-0 mb-0 mr-4 is-flex is-flex-direction-row">
+        <button type="submit" name="action" value="rename"
+          className="button is-info is-small is-outlined"
+          disabled={false}
+          style={buttonStyle["rename"]}
+          onClick={async () => {
+            const name = window.prompt("Please input the new file name (*.yaml)", "");
+            if (name == "") {
+              return;
+            }
+            if (name.indexOf(" ") != -1) {
+              alert("File name cannot contain space");
+              return;
+            }
+            const group = "{{.Group}}";
+            const formData = new FormData();
+            formData.append('action', 'rename');
+            formData.append('group', group);
+            formData.append('value', name);
+            const resp = await fetch("", {
+              method: "POST",
+              headers: { 'Accept': 'application/json' },
+              body: formData,
+            })
+            if (resp.ok) {
+              window.location.href = resp.url;
+            } else {
+              const e = await resp.text();
+              alert(e);
+            }
+          }}
+        >
+          <span>Rename</span>
+        </button>
       </div>
     )
   }

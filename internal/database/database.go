@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -165,6 +166,35 @@ func (db *Database) Compact(configPath, original string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (db *Database) MoveData(oldConfigPath, newConfigPath string) error {
+	oldDir := db.dir(oldConfigPath, prefix(oldConfigPath))
+	newDir := db.dir(newConfigPath, prefix(newConfigPath))
+	if !utils.FileExists(oldDir) {
+		// No need to move data
+		return nil
+	}
+	if !utils.FileExists(newDir) {
+		if err := os.MkdirAll(newDir, 0755); err != nil {
+			return err
+		}
+	}
+	matches, err := filepath.Glob(db.pattern(oldConfigPath) + "*.dat")
+	if err != nil {
+		return err
+	}
+	oldPattern := path.Base(db.pattern(oldConfigPath))
+	newPattern := path.Base(db.pattern(newConfigPath))
+	for _, m := range matches {
+		base := path.Base(m)
+		f := strings.Replace(base, oldPattern, newPattern, 1)
+		os.Rename(m, path.Join(newDir, f))
+	}
+	if files, _ := ioutil.ReadDir(oldDir); len(files) == 0 {
+		os.Remove(oldDir)
+	}
 	return nil
 }
 

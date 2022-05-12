@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	}()
 
 	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
+	status.RequestId = fmt.Sprintf("request-id-%d", time.Now().Unix())
 	require.NoError(t, dw.Write(status))
 
 	utils.AssertPattern(t, "FileName", ".*test_write_status.*", file)
@@ -38,6 +40,26 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 
 	assert.Equal(t, cfg.Name, r.Name)
+
+	err = dw.Close()
+	require.NoError(t, err)
+
+	old := cfg.ConfigPath
+	new := "text_write_status_new.yaml"
+
+	oldDir := db.dir(old, prefix(old))
+	newDir := db.dir(new, prefix(new))
+	require.DirExists(t, oldDir)
+	require.NoDirExists(t, newDir)
+
+	err = db.MoveData(old, new)
+	require.NoError(t, err)
+	require.NoDirExists(t, oldDir)
+	require.DirExists(t, newDir)
+
+	ret := db.ReadStatusHist(new, 1)
+	require.Equal(t, 1, len(ret))
+	require.Equal(t, status.RequestId, ret[0].Status.RequestId)
 }
 
 func testWriteStatusToExistingFile(t *testing.T, db *Database) {

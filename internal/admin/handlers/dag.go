@@ -291,6 +291,17 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))
 			return
+		case "rename":
+			newFile := path.Join(hc.DAGsDir, group, value)
+			err := controller.RenameConfig(file, newFile)
+			if err != nil {
+				encodeError(w, err)
+				return
+			}
+			c, _ := controller.FromConfig(newFile)
+			group := strings.TrimLeft(strings.Replace(c.Dir, hc.DAGsDir, "", 1), "/")
+			url := fmt.Sprintf("%s?group=%s&t=%d", path.Base(newFile), group, DAG_TabType_Config)
+			http.Redirect(w, r, url, http.StatusSeeOther)
 		default:
 			encodeError(w, errInvalidArgs)
 			return
