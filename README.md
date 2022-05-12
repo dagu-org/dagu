@@ -1,4 +1,4 @@
-# Dagu 
+# Dagu
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
@@ -59,7 +59,7 @@ Airflow and Prefect are powerful and valuable tools, but they require writing Py
 
 ### 1. Installation
 
-Download the latest binary from the [Releases page](https://github.com/dagu/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
+Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
 ### 2. Download an example YAML file
 
@@ -157,7 +157,7 @@ You can use command substitution in field values. I.e., a string enclosed in bac
 name: example
 env:
   TODAY: "`date '+%Y%m%d'`"
-steps:                               
+steps:
   - name: hello
     command: "echo hello, today is ${TODAY}"
 ```
@@ -245,13 +245,13 @@ mailOn:
   success: true                      # Send a mail when the DAG finished
 MaxCleanUpTimeSec: 300               # The maximum amount of time to wait after sending a TERM signal to running steps before killing them
 handlerOn:                           # Handlers on Success, Failure, Cancel, and Exit
-  success:                           
+  success:
     command: "echo succeed"          # Command to execute when the DAG execution succeed
-  failure:                           
+  failure:
     command: "echo failed"           # Command to execute when the DAG execution failed
-  cancel:                            
+  cancel:
     command: "echo canceled"         # Command to execute when the DAG execution canceled
-  exit:                              
+  exit:
     command: "echo finished"         # Command to execute when the DAG execution finished
 steps:
   - name: some task                  # Step's name
@@ -263,7 +263,7 @@ steps:
       success: true                  # Send a mail when the step finished
     continueOn:
       failed: true                   # Continue to the next regardless of the step failed or not
-      skipped: true                  # Continue to the next regardless the preconditions are met or not 
+      skipped: true                  # Continue to the next regardless the preconditions are met or not
     retryPolicy:                     # Retry policy for the step
       limit: 2                       # Retry up to 2 times when the step failed
     repeatPolicy:                    # Repeat policy for the step
@@ -291,7 +291,7 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 Please create `~/.dagu/admin.yaml`.
 
 ```yaml
-host: <hostname for web UI address>                          # default value is 127.0.0.1 
+host: <hostname for web UI address>                          # default value is 127.0.0.1
 port: <port number for web UI address>                       # default value is 8000
 dags: <the location of DAG configuration files>              # default value is current working directory
 command: <Absolute path to the dagu binary>                  # [optional] required if the dagu command not in $PATH
