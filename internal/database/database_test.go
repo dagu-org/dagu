@@ -24,7 +24,7 @@ func TestDatabase(t *testing.T) {
 		t *testing.T, db *Database,
 	){
 		"create new datafile":                 testNewDataFile,
-		"write status to file":                testWriteStatusToFile,
+		"write status to file and rename":     testWriteStatusToFile,
 		"append status to existing file":      testWriteStatusToExistingFile,
 		"write status and find files":         testWriteAndFindFiles,
 		"write status and find by request id": testWriteAndFindByRequestId,
