@@ -273,3 +273,20 @@ func TestNewConfig(t *testing.T) {
 	require.Equal(t, "echo", steps.Command)
 	require.Equal(t, []string{"hello"}, steps.Args)
 }
+
+func TestRenameConfig(t *testing.T) {
+	tmpDir := utils.MustTempDir("controller-test-rename")
+	defer os.RemoveAll(tmpDir)
+	oldFile := path.Join(tmpDir, "test.yaml")
+	newFile := path.Join(tmpDir, "test2.yaml")
+
+	err := controller.NewConfig(oldFile)
+	require.NoError(t, err)
+
+	err = controller.RenameConfig(oldFile, "invalid-config-name")
+	require.Error(t, err)
+
+	err = controller.RenameConfig(oldFile, newFile)
+	require.NoError(t, err)
+	require.FileExists(t, newFile)
+}
