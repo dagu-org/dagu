@@ -262,7 +262,7 @@ steps:
       failure: true                  # Send a mail when the step failed
       success: true                  # Send a mail when the step finished
     continueOn:
-      failed: true                   # Continue to the next regardless of the step failed or not
+      failure: true                   # Continue to the next regardless of the step failed or not
       skipped: true                  # Continue to the next regardless the preconditions are met or not
     retryPolicy:                     # Retry policy for the step
       limit: 2                       # Retry up to 2 times when the step failed
