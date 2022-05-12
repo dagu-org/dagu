@@ -201,8 +201,8 @@ func (s *controller) Save(value string) error {
 }
 
 func NewConfig(file string) error {
-	if path.Ext(file) != ".yaml" {
-		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
+	if err := assertConfigPath(file); err != nil {
+		return err
 	}
 	if utils.FileExists(file) {
 		return fmt.Errorf("the config file %s already exists", file)
@@ -213,6 +213,24 @@ steps:
     command: echo hello
 `
 	return ioutil.WriteFile(file, []byte(defaultVal), 0755)
+}
+
+func RenameConfig(oldConfigPath, newConfigPath string) error {
+	if err := assertConfigPath(newConfigPath); err != nil {
+		return err
+	}
+	if err := os.Rename(oldConfigPath, newConfigPath); err != nil {
+		return err
+	}
+	db := database.New(database.DefaultConfig())
+	return db.MoveData(oldConfigPath, newConfigPath)
+}
+
+func assertConfigPath(configPath string) error {
+	if path.Ext(configPath) != ".yaml" {
+		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
+	}
+	return nil
 }
 
 func defaultStatus(cfg *config.Config) *models.Status {
