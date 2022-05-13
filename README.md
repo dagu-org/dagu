@@ -10,9 +10,9 @@
 
 Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflows.
 
+Dagu's documentation, including concepts, a quick-start guide, and all reference, is available at [https://dagu.pages.dev/](https://dagu.pages.dev/).
+
 ## Contents
-- [Dagu](#dagu)
-  - [Contents](#contents)
   - [Motivation](#motivation)
   - [Why not Airflow or Prefect?](#why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
@@ -23,6 +23,7 @@ Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Dire
     - [4. Workflow editing](#4-workflow-editing)
     - [5. Running the example](#5-running-the-example)
   - [Command usage](#command-usage)
+  - [Documentation](#documentation)
   - [Web interface](#web-interface)
   - [YAML format](#yaml-format)
     - [Minimal](#minimal)
@@ -56,47 +57,18 @@ There were many problems in our ETL pipelines. Hundreds of cron jobs are on the 
 
 ## Why not Airflow or Prefect?
 
-Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we have developed a No-code workflow execution engine that doesn't require writing code. Dagu is easy to use and self-contained, making it ideal for smaller projects with fewer people. We hope that this tool will help others in the same situation.
+Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we've created a No-code workflow execution engine that doesn't require writing code. Dagu is easy to use and self-contained, making it ideal for smaller projects with fewer people. We hope that this tool will help others in the same situation.
 
 ## ️How does it work?
 
 - Dagu is a single command and it uses the file system to store data in JSON format. Therefore, no DBMS or cloud service is required.
 - Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
-## ️Quick start
+## Web UI
 
-### 1. Installation
-
-Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
-
-### 2. Launch the web UI
-
-Start the server with `dagu server` and browse to `http://127.0.0.1:8000` to explore the Web UI.
-
-### 3. Workflow creation
-
-Create a workflow by clicking the `New DAG` button on the top page of the web UI. Input `example.yaml` in the dialog.
-
-### 4. Workflow editing
-
-Go to the workflow detail page and click `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
-
-### 5. Running the example
-
-You can start the example by pressing `Start` button.
+Dagu inclueds web UI that can create, edit, and run workflows.
 
 ![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
-
-## Command usage
-
-- `dagu start [--params=<params>] <file>` - start a workflow
-- `dagu status <file>` - display the current status of a workflow
-- `dagu retry --req=<request-id> <file>` - retry the failed/canceled workflow
-- `dagu stop <file>` - stop a workflow execution by sending a TERM signal
-- `dagu dry [--params=<params>] <file>` - dry-run a workflow
-- `dagu server` - start a web server for web UI
-
-## Web interface
 
 You can launch the web UI by `dagu server` command. Default URL is `http://127.0.0.1:8000`.
 
@@ -117,6 +89,19 @@ You can launch the web UI by `dagu server` command. Default URL is `http://127.0
   The history page allows you to check past execution results and logs.
 
   ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
+
+## Command usage
+
+- `dagu start [--params=<params>] <file>` - start a workflow
+- `dagu status <file>` - display the current status of a workflow
+- `dagu retry --req=<request-id> <file>` - retry the failed/canceled workflow
+- `dagu stop <file>` - stop a workflow execution by sending a TERM signal
+- `dagu dry [--params=<params>] <file>` - dry-run a workflow
+- `dagu server` - start a web server for web UI
+
+## Documentation
+
+Dagu's documentation is always aviable at [https://dagu.pages.dev/](https://dagu.pages.dev/).
 
 ## YAML format
 
