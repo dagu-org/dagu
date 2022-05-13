@@ -8,9 +8,7 @@
 
 **A No-code workflow executor**
 
-Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflows.
-
-Dagu's documentation, including concepts, a quick-start guide, and all reference, is available at [https://dagu.pages.dev/](https://dagu.pages.dev/).
+[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflows.
 
 ## Contents
   - [Motivation](#motivation)
@@ -23,7 +21,6 @@ Dagu's documentation, including concepts, a quick-start guide, and all reference
     - [4. Workflow editing](#4-workflow-editing)
     - [5. Running the example](#5-running-the-example)
   - [Command usage](#command-usage)
-  - [Documentation](#documentation)
   - [Web interface](#web-interface)
   - [YAML format](#yaml-format)
     - [Minimal](#minimal)
@@ -38,6 +35,7 @@ Dagu's documentation, including concepts, a quick-start guide, and all reference
     - [Environment variables](#environment-variables-1)
     - [Web UI configuration](#web-ui-configuration)
     - [Global configuration](#global-configuration)
+  - [Documentation](#documentation)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
@@ -64,33 +62,15 @@ Airflow and Prefect are powerful and valuable tools, but they require writing Py
 - Dagu is a single command and it uses the file system to store data in JSON format. Therefore, no DBMS or cloud service is required.
 - Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
-## Web UI
+## Web User Interface
 
-Dagu inclueds web UI that can create, edit, and run workflows.
+Dagu inclueds web UI that can create, edit, and run workflows. Read the [docs](https://dagu.pages.dev/docs/web/dags) for more detail.
 
 ![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
 
-You can launch the web UI by `dagu server` command. Default URL is `http://127.0.0.1:8000`.
+You can start the web UI by `dagu server` command and browse to `http://127.0.0.1:8000`.
 
-- **DAGs**: Overview of all DAGs (workflows).
-
-  DAGs page displays all workflows and real-time status. To create a new workflow, you can click the button in the top-right corner.
-
-  ![DAGs](https://user-images.githubusercontent.com/1475839/167070248-743b5e8f-ee24-49bf-a4f4-a5225dfc755a.png)
-
-- **Detail**: Realtime status of the workflow.
-
-  The detail page displays the real-time status, logs, and all workflow configurations.
-
-  ![Detail](https://user-images.githubusercontent.com/1475839/166269521-03098e46-6608-43fa-b363-0d00b069c808.png)
-
-- **History**: History of the execution of the workflow.
-
-  The history page allows you to check past execution results and logs.
-
-  ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
-
-## Command usage
+## Command Line User Interface
 
 - `dagu start [--params=<params>] <file>` - start a workflow
 - `dagu status <file>` - display the current status of a workflow
@@ -99,15 +79,13 @@ You can launch the web UI by `dagu server` command. Default URL is `http://127.0
 - `dagu dry [--params=<params>] <file>` - dry-run a workflow
 - `dagu server` - start a web server for web UI
 
-## Documentation
+Read the [docs](https://dagu.pages.dev/docs/command-usage) for more detail.
 
-Dagu's documentation is always aviable at [https://dagu.pages.dev/](https://dagu.pages.dev/).
+## Welcome to Workflow
 
-## YAML format
+You can define workflows in a simple [YAML format](https://dagu.pages.dev/docs/yaml/minimal).
 
 ### Minimal
-
-A minimal definition is as follows:
 
 ```yaml
 name: minimal configuration          # DAG's name
@@ -120,9 +98,9 @@ steps:                               # Steps inside the DAG
       - step 1                       # [optional] Name of the step to depend on
 ```
 
-### Environment variables
+### Environment Variables
 
-You can define Environment variables and refer using `env` field.
+You can define environment variables and refer using `env` field.
 
 ```yaml
 name: example
@@ -146,7 +124,7 @@ steps:
     command: python main.py $1 $2
 ```
 
-### Command substitution
+### Command Substitution
 
 You can use command substitution in field values. I.e., a string enclosed in backquotes (`` ` ``) is evaluated as a command and replaced with the result of standard output.
 
@@ -159,7 +137,7 @@ steps:
     command: "echo hello, today is ${TODAY}"
 ```
 
-### Conditional logic
+### Conditional Logic
 
 Sometimes you have parts of a workflow that you only want to run under certain conditions. You can use the `precondition` field to add conditional branches to your workflow.
 
@@ -189,7 +167,7 @@ steps:
       skipped: true
 ```
 
-### State handlers
+### State Handlers
 
 It is often desirable to take action when a specific event happens, for example, when a workflow fails. To achieve this, you can use `handlerOn` fields.
 
@@ -205,7 +183,7 @@ steps:
     command: main.sh
 ```
 
-### Repeating task
+### Repeating Task
 
 If you want a task to repeat execution at regular intervals, you can use the `repeatPolicy` field. If you want to stop the repeating task, you can use the `stop` command to gracefully stop the task.
 
@@ -219,7 +197,7 @@ steps:
       intervalSec: 60
 ```
 
-### All available fields
+### All Available Fields
 
 Combining these settings gives you granular control over how the workflow runs.
 
@@ -272,10 +250,13 @@ steps:
 ```
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
+Read the [docs](https://dagu.pages.dev/docs/yaml/minimal) for more detail.
 
-## Admin configuration
+## Admin Configuration
 
-### Environment variables
+### Environment Variables
+
+You can customize the admin web UI by [environment variables](https://dagu.pages.dev/docs/admin/environ).
 
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
@@ -283,9 +264,9 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 - `DAGU__ADMIN_NAVBAR_COLOR` - navigation header color for web UI (optional)
 - `DAGU__ADMIN_NAVBAR_TITLE` - navigation header title for web UI (optional)
 
-### Web UI configuration
+### Web UI Configuration
 
-Please create `~/.dagu/admin.yaml`.
+Please create `~/.dagu/admin.yaml`. Read the [docs](https://dagu.pages.dev/docs/admin/web-config) for more detail.
 
 ```yaml
 host: <hostname for web UI address>                          # default value is 127.0.0.1
@@ -297,7 +278,7 @@ basicAuthUsername: <username for basic auth of web UI>       # [optional] basic 
 basicAuthPassword: <password for basic auth of web UI>       # [optional] basic auth config
 ```
 
-### Global configuration
+### Global Configuration
 
 Creating a global configuration `~/.dagu/config.yaml` is a convenient way to organize shared settings.
 
@@ -317,7 +298,13 @@ infoMail:
   prefix: <prefix of mail subject>
 ```
 
+## Documentation
+
+Dagu's documentation, including concepts, a quick-start guide, and all reference, is available at [https://dagu.pages.dev](https://dagu.pages.dev).
+
 ## FAQ
+
+Read the [docs](https://dagu.pages.dev/docs/see-also/faq) for more questions or ask us [anything](https://github.com/yohamta/dagu/issues) freely.
 
 ### How to contribute?
 
@@ -340,16 +327,6 @@ The default retention period for execution history is seven days. However, you c
 You can change the status of any task to a `failed` state. Then, when you retry the workflow, it will execute the failed one and any subsequent.
 
 ![Update Status](https://user-images.githubusercontent.com/1475839/166289470-f4af7e14-28f1-45bd-8c32-59cd59d2d583.png)
-
-### Does it have a scheduler function?
-
-No, it doesn't have scheduler functionality. It is meant to be used with cron or other schedulers.
-
-### How can it communicate with running processes?
-
-Dagu uses Unix sockets to communicate with running processes.
-
-![dagu Architecture](https://user-images.githubusercontent.com/1475839/166390371-00bb4af0-3689-406a-a4d5-af943a1fd2ce.png)
 
 ## License
 
