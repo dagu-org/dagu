@@ -8,7 +8,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: 'No-Code Workflow Executor',
   tagline: 'Define and execute workflows without code',
-  url: 'https://dagu.pages.dev/',
+  url: 'https://dagu.pages.dev',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -123,12 +123,13 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Dagu Community`,
+        copyright: `Copyright © ${new Date().getFullYear()} Dagu Authors.`,
       },
       prism: {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
       },
+      image: 'https://raw.githubusercontent.com/yohamta/dagu/22c434a8e20c91e9baa69e874d3a29e77826888a/assets/image/logo-transparent.png',
     }),
 };
 
