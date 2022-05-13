@@ -260,8 +260,8 @@
   }
   function ConfigTab({ data }) {
     const mermaidStyle = {
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: (data.DAG.Config.Steps.length * 200) + "px",
+      display: 'flex', alignItems: 'flex-center', justifyContent: 'flex-start',
+      width: (data.DAG.Config.Steps.length * 240) + "px",
       minWidth: "100%",
       minHeight: "100px",
     };
@@ -323,9 +323,9 @@
   function StatusTab({ data, subTab }) {
     const mermaidStyle = {
       display: 'flex',
-      alignItems: 'flex-start',
+      alignItems: 'flex-center',
       justifyContent: 'flex-start',
-      width: (data.DAG.Status.Nodes.length * 100) + "px",
+      width: (data.DAG.Status.Nodes.length * 240) + "px",
       minWidth: "100%",
       minHeight: "100px",
     };
@@ -900,9 +900,12 @@
     )
   }
   function ConfigPreview({ value, onEdit }) {
+    React.useEffect(() => {
+      Prism.highlightAll();
+    }, [value])
     return (
       <div>
-        <pre>{value}</pre>
+        <pre><code className="language-yaml">{value}</code></pre>
         <button className="button is-info" onClick={onEdit}>Edit</button>
       </div>
     )
