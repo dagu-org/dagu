@@ -36,7 +36,7 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`${siteConfig.title}`}
+      title={'Dagu'}
       description="No code workflow executor">
       <HomepageHeader />
       <main>

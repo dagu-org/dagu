@@ -1,5 +1,13 @@
 # FAQs
 
+  - [How to contribute?](#how-to-contribute)
+  - [Where is the history data stored?](#where-is-the-history-data-stored)
+  - [Where are the log files stored?](#where-are-the-log-files-stored)
+  - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
+  - [How can a workflow be retried from a specific task?](#how-can-a-workflow-be-retried-from-a-specific-task)
+  - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
+  - [How can it communicate with running processes?](#how-can-it-communicate-with-running-processes)
+
 ## How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thank you!

@@ -16,7 +16,7 @@ Start the server with `dagu server` and browse to `http://127.0.0.1:8000` to exp
 
 Create a workflow by clicking the `New DAG` button on the top page of the web UI. Input `hello.yaml` in the dialog.
 
-Go to the workflow detail page and click `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
+Go to the workflow detail page and click `Edit` button in the `Config` Tab. Then, copy and paste the below snippet and click the `Save` button.
 
 ```yaml
 name: your First DAG!
