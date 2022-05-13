@@ -188,7 +188,7 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 		file := filepath.Join(hc.DAGsDir, group, cfg)
 		dag, err := controller.FromConfig(file)
-		if err != nil {
+		if err != nil && action != "save" {
 			encodeError(w, err)
 			return
 		}
