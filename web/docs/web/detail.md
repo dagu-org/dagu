@@ -8,6 +8,6 @@ The detail page displays the real-time status, logs, and all workflow configurat
 
 ## Config Tab
 
-You can update the workflow from the web UI.
+You can edit the workflow from the web UI.
 
 ![Config page](https://user-images.githubusercontent.com/1475839/168244116-785b0444-228c-4919-99ae-14dd80abbf50.png)

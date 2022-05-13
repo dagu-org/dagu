@@ -18,8 +18,8 @@ const FeatureList = [
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Dagu is a single command and it uses the file system to store data in JSON format.
-        Therefore, no DBMS or cloud service is required.
+        Dagu is a simple command and uses the file system to store data in JSON format.
+        Therefore, no DBMS or cloud service is required. It is also open source.
       </>
     ),
   },
@@ -28,8 +28,8 @@ const FeatureList = [
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        It comes with a helpful web UI that visualizes task dependencies,
-        the real-time status, and the execution history etc.
+      It comes with a web UI to visualize workflows, parameters, logs, and results.
+      You can also create, edit, and execute workflows in your browser.
       </>
     ),
   },
