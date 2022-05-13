@@ -129,7 +129,7 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
       },
-      image: 'https://user-images.githubusercontent.com/1475839/168314895-79738997-7b43-43ec-bb1c-9fee9e0ab4b1.png',
+      image: 'https://user-images.githubusercontent.com/1475839/168316963-a5c15ef6-e479-425f-8fe3-0985df63bd0a.png',
     }),
 };
 
