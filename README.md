@@ -8,9 +8,7 @@
 
 **A No-code workflow executor**
 
-Dagu executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflows.
-
-Dagu's documentation, including concepts, a quick-start guide, and all reference, is available at [https://dagu.pages.dev/](https://dagu.pages.dev/).
+[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflows.
 
 ## Contents
   - [Motivation](#motivation)
@@ -23,7 +21,6 @@ Dagu's documentation, including concepts, a quick-start guide, and all reference
     - [4. Workflow editing](#4-workflow-editing)
     - [5. Running the example](#5-running-the-example)
   - [Command usage](#command-usage)
-  - [Documentation](#documentation)
   - [Web interface](#web-interface)
   - [YAML format](#yaml-format)
     - [Minimal](#minimal)
@@ -38,6 +35,7 @@ Dagu's documentation, including concepts, a quick-start guide, and all reference
     - [Environment variables](#environment-variables-1)
     - [Web UI configuration](#web-ui-configuration)
     - [Global configuration](#global-configuration)
+  - [Documentation](#documentation)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
@@ -98,10 +96,6 @@ You can launch the web UI by `dagu server` command. Default URL is `http://127.0
 - `dagu stop <file>` - stop a workflow execution by sending a TERM signal
 - `dagu dry [--params=<params>] <file>` - dry-run a workflow
 - `dagu server` - start a web server for web UI
-
-## Documentation
-
-Dagu's documentation is always aviable at [https://dagu.pages.dev/](https://dagu.pages.dev/).
 
 ## YAML format
 
@@ -316,6 +310,10 @@ infoMail:
   to: <to address>
   prefix: <prefix of mail subject>
 ```
+
+## Documentation
+
+Dagu's documentation, including concepts, a quick-start guide, and all reference, is available at [https://dagu.pages.dev/](https://dagu.pages.dev/).
 
 ## FAQ
 
