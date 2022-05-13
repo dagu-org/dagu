@@ -7,7 +7,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'No-Code Workflow Executor',
-  tagline: 'Define and execute workflows without code',
+  tagline: 'Define and execute workflows without coding',
   url: 'https://dagu.pages.dev',
   baseUrl: '/',
   onBrokenLinks: 'throw',

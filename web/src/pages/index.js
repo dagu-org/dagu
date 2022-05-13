@@ -24,7 +24,7 @@ function HomepageHeader() {
           <Link
             className="button button--secondary button--lg"
             to="/docs/getting-started">
-            Dagu Tutorial - 1min ⏱️
+            Getting Started - 3min ⏱️
           </Link>
         </div>
       </div>
