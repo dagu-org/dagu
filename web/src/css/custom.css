@@ -29,9 +29,32 @@
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
 
+[data-theme='light'] .hl-text {
+  color: GoldenRod;
+}
+
+[data-theme='dark'] .hl-text {
+  color: firebrick;
+}
+
+[data-theme='dark'] .hero__subtitle {
+  color: white;
+}
+
+[data-theme='dark'] .hero__title {
+  color: white;
+}
+
 .navbar-item-github {
   display: flex !important;
   align-items: center;
   justify-items: center;
   justify-content: end;
+}
+
+.homepage-title {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
 }

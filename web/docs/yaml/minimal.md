@@ -1,6 +1,6 @@
-# Minimal YAML Definition
+# Minimal Definition
 
-A minimal definition is as follows:
+A minimal workflow definition is as follows:
 
 ```yaml
 name: minimal configuration          # DAG's name

@@ -6,8 +6,8 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Dagu',
-  tagline: 'No-code workflow engine',
+  title: 'No-Code Workflow Executor',
+  tagline: 'Define and execute workflows without code',
   url: 'https://your-docusaurus-test-site.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',
@@ -57,7 +57,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       colorMode: {
-        defaultMode: 'dark',
+        defaultMode: 'light',
       },
       navbar: {
         title: 'Dagu',
@@ -77,6 +77,12 @@ const config = {
             docId: 'intro',
             position: 'left',
             label: 'Docs',
+          },
+          {
+            type: 'doc',
+            docId: 'yaml/minimal',
+            position: 'left',
+            label: 'YAML Format',
           },
           {
             href: 'https://github.com/yohamta/dagu',
@@ -102,7 +108,7 @@ const config = {
             title: 'Community',
             items: [
               {
-                label: 'GitHub',
+                label: 'Discussions',
                 href: 'https://github.com/yohamta/dagu/issues',
               },
             ],
@@ -117,7 +123,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Dagu Project`,
+        copyright: `Copyright © ${new Date().getFullYear()} Dagu Community`,
       },
       prism: {
         theme: lightCodeTheme,
