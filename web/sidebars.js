@@ -20,12 +20,32 @@ const sidebars = {
       items: [
         'intro',
         'getting-started',
+        'command-usage',
       ],
       collapsed: false,
     },
     {
       type: 'category',
-      label: 'YAML format',
+      label: 'Admin Settings',
+      items: [
+        'admin/environ',
+        'admin/web-config',
+      ],
+      collapsed: false,
+    },
+    {
+      type: 'category',
+      label: 'Web Interface',
+      items: [
+        'web/dags',
+        'web/detail',
+        'web/history',
+      ],
+      collapsed: false,
+    },
+    {
+      type: 'category',
+      label: 'YAML Format Reference',
       items: [
         'yaml/minimal',
         'yaml/with-environ',
@@ -35,7 +55,17 @@ const sidebars = {
         'yaml/with-conditional',
         'yaml/with-handlers',
         'yaml/with-repeat',
-        'yaml/all-options',
+        'yaml/all-fields',
+        'yaml/global',
+      ],
+      collapsed: false,
+    },
+    {
+      type: 'category',
+      label: 'See Also',
+      items: [
+        'see-also/faq',
+        'see-also/architecture',
       ],
       collapsed: false,
     },
