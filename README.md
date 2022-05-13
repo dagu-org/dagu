@@ -64,12 +64,12 @@ You can start the web UI by `dagu server` command and browse to `http://127.0.0.
 
 ## Command Line User Interface
 
-- `dagu start [--params=<params>] <file>` - start a workflow
-- `dagu status <file>` - display the current status of a workflow
-- `dagu retry --req=<request-id> <file>` - retry the failed/canceled workflow
-- `dagu stop <file>` - stop a workflow execution by sending a TERM signal
-- `dagu dry [--params=<params>] <file>` - dry-run a workflow
-- `dagu server` - start a web server for web UI
+- `dagu start [--params=<params>] <file>` - Runs the workflow
+- `dagu status <file>` - Displays the current status of the workflow
+- `dagu retry --req=<request-id> <file>` - Re-runs the specified workflow run
+- `dagu stop <file>` - Stops the workflow execution by sending TERM signals
+- `dagu dry [--params=<params>] <file>` - Dry-runs the workflow
+- `dagu server` - Starts the web server for web UI
 
 Read the [docs](https://dagu.pages.dev/docs/command-usage) for more detail.
 
