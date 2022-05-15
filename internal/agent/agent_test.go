@@ -110,9 +110,8 @@ func TestPreConditionInvalid(t *testing.T) {
 	require.Error(t, err)
 
 	assert.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
-	for _, s := range status.Nodes {
-		assert.Equal(t, scheduler.NodeStatus_Cancel, s.Status)
-	}
+	assert.Equal(t, scheduler.NodeStatus_None, status.Nodes[0].Status)
+	assert.Equal(t, scheduler.NodeStatus_None, status.Nodes[1].Status)
 }
 
 func TestPreConditionValid(t *testing.T) {
