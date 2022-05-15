@@ -13,12 +13,19 @@
 Official Website: [https://dagu.pages.dev](https://dagu.pages.dev)
 
 ## Contents
+
   - [Motivation](#motivation)
   - [Why not Airflow or Prefect?](#why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
-  - [Web User Interface](#web-user-interface)
+  - [️Quick start](#️quick-start)
+    - [1. Installation](#1-installation)
+    - [2. Launch the web UI](#2-launch-the-web-ui)
+    - [3. Create a new workflow](#3-create-a-new-workflow)
+    - [4. Edit the workflow](#4-edit-the-workflow)
+    - [5. Execute the workflow](#5-execute-the-workflow)
   - [Command Line User Interface](#command-line-user-interface)
-  - [Welcome to Workflow](#welcome-to-workflow)
+  - [Web User Interface](#web-user-interface)
+  - [YAML format](#yaml-format)
     - [Minimal](#minimal)
     - [Environment Variables](#environment-variables)
     - [Parameters](#parameters)
@@ -38,6 +45,8 @@ Official Website: [https://dagu.pages.dev](https://dagu.pages.dev)
     - [Where are the log files stored?](#where-are-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [How can a workflow be retried from a specific task?](#how-can-a-workflow-be-retried-from-a-specific-task)
+    - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
+    - [How can it communicate with running processes?](#how-can-it-communicate-with-running-processes)
   - [License](#license)
   - [Contributors](#contributors)
 
@@ -56,13 +65,29 @@ Airflow and Prefect are powerful and valuable tools, but they require writing Py
 - Dagu is a single command and it uses the file system to store data in JSON format. Therefore, no DBMS or cloud service is required.
 - Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
-## Web User Interface
+## ️Quick start
 
-Dagu inclueds web UI that can create, edit, and run workflows. Read the [docs](https://dagu.pages.dev/docs/web/dags) for more detail.
+### 1. Installation
 
+Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
+
+### 2. Launch the web UI
+
+Start the server with `dagu server` and browse to `http://127.0.0.1:8000` to explore the Web UI.
+
+### 3. Create a new workflow
+
+Create a workflow by clicking the `New DAG` button on the top page of the web UI. Input `example.yaml` in the dialog.
+
+### 4. Edit the workflow
+
+Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
+
+### 5. Execute the workflow
+
+You can execute the example by pressing the `Start` button.
+ 
 ![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
-
-You can start the web UI by `dagu server` command and browse to `http://127.0.0.1:8000`.
 
 ## Command Line User Interface
 
@@ -73,9 +98,27 @@ You can start the web UI by `dagu server` command and browse to `http://127.0.0.
 - `dagu dry [--params=<params>] <file>` - Dry-runs the workflow
 - `dagu server` - Starts the web server for web UI
 
-Read the [docs](https://dagu.pages.dev/docs/command-usage) for more detail.
+## Web User Interface
 
-## Welcome to Workflow
+- **DAGs**: Overview of all DAGs (workflows).
+
+  DAGs page displays all workflows and real-time status. To create a new workflow, you can click the button in the top-right corner.
+
+  ![DAGs](https://user-images.githubusercontent.com/1475839/167070248-743b5e8f-ee24-49bf-a4f4-a5225dfc755a.png)
+
+- **Detail**: Realtime status of the workflow.
+
+  The detail page displays the real-time status, logs, and all workflow configurations.
+
+  ![Detail](https://user-images.githubusercontent.com/1475839/166269521-03098e46-6608-43fa-b363-0d00b069c808.png)
+
+- **History**: History of the execution of the workflow.
+
+  The history page allows you to check past execution results and logs.
+
+  ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
+
+## YAML format
 
 You can define workflows in a simple [YAML format](https://dagu.pages.dev/docs/yaml/minimal).
 
@@ -244,7 +287,6 @@ steps:
 ```
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
-Read the [docs](https://dagu.pages.dev/docs/yaml/minimal) for more detail.
 
 ## Admin Configuration
 
@@ -260,7 +302,7 @@ You can customize the admin web UI by [environment variables](https://dagu.pages
 
 ### Web UI Configuration
 
-Please create `~/.dagu/admin.yaml`. Read the [docs](https://dagu.pages.dev/docs/admin/web-config) for more detail.
+Please create `~/.dagu/admin.yaml`.
 
 ```yaml
 host: <hostname for web UI address>                          # default value is 127.0.0.1
@@ -298,8 +340,6 @@ Dagu's documentation, including concepts, a quick-start guide, and all reference
 
 ## FAQ
 
-Read the [docs](https://dagu.pages.dev/docs/see-also/faq) for more questions or ask us [anything](https://github.com/yohamta/dagu/issues) freely.
-
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thank you!
@@ -321,6 +361,16 @@ The default retention period for execution history is seven days. However, you c
 You can change the status of any task to a `failed` state. Then, when you retry the workflow, it will execute the failed one and any subsequent.
 
 ![Update Status](https://user-images.githubusercontent.com/1475839/166289470-f4af7e14-28f1-45bd-8c32-59cd59d2d583.png)
+
+### Does it have a scheduler function?
+
+No, it doesn't have scheduler functionality. It is meant to be used with cron or other schedulers.
+
+### How can it communicate with running processes?
+
+Dagu uses Unix sockets to communicate with running processes.
+
+![dagu Architecture](https://user-images.githubusercontent.com/1475839/166390371-00bb4af0-3689-406a-a4d5-af943a1fd2ce.png)
 
 ## License
 
