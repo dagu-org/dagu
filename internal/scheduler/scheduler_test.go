@@ -155,7 +155,7 @@ func TestSchedulerCancel(t *testing.T) {
 	})
 
 	go func() {
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 300)
 		sc.Cancel(g)
 	}()
 
