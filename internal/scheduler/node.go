@@ -109,19 +109,27 @@ func (n *Node) updateStatus(status NodeStatus) {
 }
 
 func (n *Node) signal(sig os.Signal) {
-	log.Printf(fmt.Sprintf("Sending %s signal to %s", sig, n.Name))
-	utils.LogIgnoreErr("sending signal", syscall.Kill(-n.cmd.Process.Pid, sig.(syscall.Signal)))
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	status := n.Status
+	if status == NodeStatus_Running && n.cmd != nil {
+		log.Printf("Sending %s signal to %s", sig, n.Name)
+		utils.LogIgnoreErr("sending signal", syscall.Kill(-n.cmd.Process.Pid, sig.(syscall.Signal)))
+	}
+	if status == NodeStatus_Running {
+		n.Status = NodeStatus_Cancel
+	}
 }
 
 func (n *Node) cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.Status
-	if status == NodeStatus_None || status == NodeStatus_Running {
+	if status == NodeStatus_Running {
 		n.Status = NodeStatus_Cancel
 	}
 	if n.cancelFunc != nil {
-		log.Printf(fmt.Sprintf("canceling node: %s", n.Step.Name))
+		log.Printf("canceling node: %s", n.Step.Name)
 		n.cancelFunc()
 	}
 }
