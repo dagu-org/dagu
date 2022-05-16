@@ -9,15 +9,15 @@
 
 **Self-contained, easy-to-use workflow engine for smaller use cases**
 
-[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu is self-contained and comes with a web UI for visualizing workflows.
-
-Official Website: [https://dagu.pages.dev](https://dagu.pages.dev)
+[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. Dagu is self-contained and comes with a web UI for visualizing workflows.
 
 ## Contents
 
-  - [Motivation](#motivation)
-  - [Why not Airflow or Prefect?](#why-not-airflow-or-prefect)
+  - [Contents](#contents)
+  - [Motivation: Why not Airflow or Prefect?](#motivation-why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
+    - [Self-contained](#self-contained)
+    - [Simple YAML format](#simple-yaml-format)
   - [️Quick start](#️quick-start)
     - [1. Installation](#1-installation)
     - [2. Launch the web UI](#2-launch-the-web-ui)
@@ -51,17 +51,19 @@ Official Website: [https://dagu.pages.dev](https://dagu.pages.dev)
   - [License](#license)
   - [Contributors](#contributors)
 
-## Motivation : Why not Airflow or Prefect?
+## Motivation: Why not Airflow or Prefect?
 
 Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to manage the workflow. In many cases, there is already a large codebase written in other languages such as shell scripts or Perl. Adding another layer of Python code on top of the existing code is not ideal. Also, it is usually not practical to rewrite existing code in Python. For this reason, a more lightweight solution is needed; Dagu is easy to use and self-contained, making it ideal for small projects with a small number of people.
 
 ## ️How does it work?
 
-### Self-contained and zero dependency
-- Dagu is a single command and it uses the file system to store data in JSON format. Therefore, no DBMS or cloud service is required.
+### Self-contained
+- Dagu is a single binary and there' no dependency on any.
+- It uses the file system to store execution history data. Therefore, no DBMS or cloud service is required.
 
-### Simple YAML format to define workflows (DAGs)
-- Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
+### Simple YAML format
+- Dagu executes DAGs defined in declarative YAML format.
+- Existing programs can be used without any modification.
 
 ## ️Quick start
 
@@ -334,7 +336,7 @@ infoMail:
 
 ## Documentation
 
-Dagu's documentation, including concepts, a quick-start guide, and all reference, is available at [https://dagu.pages.dev](https://dagu.pages.dev).
+Dagu's documentation, including a quick-start guide, and all reference, is available at [https://dagu.pages.dev](https://dagu.pages.dev).
 
 ## FAQ
 
