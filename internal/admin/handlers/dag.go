@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -422,7 +422,7 @@ func readFile(f string, decorder *encoding.Decoder) ([]byte, error) {
 	}
 	defer r.Close()
 	tr := transform.NewReader(r, decorder)
-	ret, err := ioutil.ReadAll(tr)
+	ret, err := io.ReadAll(tr)
 	return ret, err
 }
 

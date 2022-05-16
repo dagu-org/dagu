@@ -1,7 +1,7 @@
 package controller_test
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -241,7 +241,7 @@ steps:
 	// check file
 	saved, _ := os.Open(cfg.ConfigPath)
 	defer saved.Close()
-	b, _ := ioutil.ReadAll(saved)
+	b, _ := io.ReadAll(saved)
 	require.Equal(t, dat, string(b))
 }
 

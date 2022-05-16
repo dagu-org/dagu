@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -74,7 +73,7 @@ func TestValidFilename(t *testing.T) {
 }
 
 func TestOpenFile(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "open")
+	tmp, err := os.MkdirTemp("", "open")
 	require.NoError(t, err)
 
 	name := path.Join(tmp, "/file.txt")
@@ -95,7 +94,7 @@ func TestOpenFile(t *testing.T) {
 }
 
 func TestOpenOrCreateFile(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "open_or_create")
+	tmp, err := os.MkdirTemp("", "open_or_create")
 	require.NoError(t, err)
 
 	name := path.Join(tmp, "/file.txt")
@@ -154,7 +153,7 @@ func TestOpenfile(t *testing.T) {
 	f2, err := os.Open(fn)
 	require.NoError(t, err)
 	defer f2.Close()
-	b, err := ioutil.ReadAll(f2)
+	b, err := io.ReadAll(f2)
 	require.NoError(t, err)
 	assert.Equal(t, "test", string(b))
 }

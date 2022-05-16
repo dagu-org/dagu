@@ -3,7 +3,7 @@ package admin
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/yohamta/dagu/internal/utils"
@@ -52,7 +52,7 @@ func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
 }
 
 func (cl *Loader) readFile(file string) (config map[string]interface{}, err error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", file, err)
 	}

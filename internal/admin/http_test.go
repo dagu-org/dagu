@@ -2,7 +2,6 @@ package admin
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestHttpServerStartShutdown(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test_http_server")
+	dir, err := os.MkdirTemp("", "test_http_server")
 	require.NoError(t, err)
 	os.RemoveAll(dir)
 
@@ -42,7 +41,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 }
 
 func TestHttpServerShutdownWithAPI(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test_http_server")
+	dir, err := os.MkdirTemp("", "test_http_server")
 	require.NoError(t, err)
 	os.RemoveAll(dir)
 
@@ -76,7 +75,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 }
 
 func TestHttpServerBasicAuth(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test_http_server")
+	dir, err := os.MkdirTemp("", "test_http_server")
 	require.NoError(t, err)
 	os.RemoveAll(dir)
 
