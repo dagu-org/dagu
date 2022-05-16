@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,7 +35,7 @@ func TestDatabase(t *testing.T) {
 		"test error parse file":               testErrorParseFile,
 	} {
 		t.Run(scenario, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "test-database")
+			dir, err := os.MkdirTemp("", "test-database")
 			db := New(&Config{
 				Dir: dir,
 			})

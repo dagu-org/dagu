@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
 
@@ -119,7 +119,7 @@ func listGroups(dir string) ([]*group, error) {
 	if !utils.FileExists(dir) {
 		return ret, nil
 	}
-	fis, err := ioutil.ReadDir(dir)
+	fis, err := os.ReadDir(dir)
 	if err != nil || fis == nil {
 		log.Printf("%v", err)
 	}

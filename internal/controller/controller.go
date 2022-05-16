@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -39,7 +38,7 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 		errs = append(errs, fmt.Sprintf("invalid DAGs directory: %s", dir))
 		return
 	}
-	fis, err := ioutil.ReadDir(dir)
+	fis, err := os.ReadDir(dir)
 	utils.LogIgnoreErr("read DAGs directory", err)
 	for _, fi := range fis {
 		ex := filepath.Ext(fi.Name())
@@ -196,7 +195,7 @@ func (s *controller) Save(value string) error {
 	if !utils.FileExists(s.cfg.ConfigPath) {
 		return fmt.Errorf("the config file %s does not exist", s.cfg.ConfigPath)
 	}
-	err = ioutil.WriteFile(s.cfg.ConfigPath, []byte(value), 0755)
+	err = os.WriteFile(s.cfg.ConfigPath, []byte(value), 0755)
 	return err
 }
 
@@ -212,7 +211,7 @@ steps:
   - name: step1
     command: echo hello
 `
-	return ioutil.WriteFile(file, []byte(defaultVal), 0755)
+	return os.WriteFile(file, []byte(defaultVal), 0755)
 }
 
 func RenameConfig(oldConfigPath, newConfigPath string) error {
