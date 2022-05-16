@@ -3,7 +3,6 @@ package sock
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestDialFail(t *testing.T) {
-	f, err := ioutil.TempFile("", "sock_client_dial_failure")
+	f, err := os.CreateTemp("", "sock_client_dial_failure")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 
@@ -25,7 +24,7 @@ func TestDialFail(t *testing.T) {
 }
 
 func TestDialTimeout(t *testing.T) {
-	f, err := ioutil.TempFile("", "sock_client_test")
+	f, err := os.CreateTemp("", "sock_client_test")
 	require.NoError(t, err)
 	defer os.Remove(f.Name())
 

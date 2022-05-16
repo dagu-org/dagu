@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"syscall"
@@ -210,7 +209,7 @@ func TestSchedulerRetryFail(t *testing.T) {
 
 func TestSchedulerRetrySuccess(t *testing.T) {
 	cmd := path.Join(testBinDir, "testfile.sh")
-	tmpDir, err := ioutil.TempDir("", "scheduler_test")
+	tmpDir, err := os.MkdirTemp("", "scheduler_test")
 	tmpFile := path.Join(tmpDir, "flag")
 
 	require.NoError(t, err)

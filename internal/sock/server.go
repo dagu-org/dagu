@@ -3,7 +3,7 @@ package sock
 import (
 	"bufio"
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -100,7 +100,7 @@ func (w *HttpResponseWriter) Write(data []byte) (int, error) {
 		StatusCode: w.statusCode,
 		ProtoMajor: 1,
 		ProtoMinor: 0,
-		Body:       ioutil.NopCloser(strings.NewReader(string(data))),
+		Body:       io.NopCloser(strings.NewReader(string(data))),
 		Header:     w.header,
 	}
 	response.Write(*w.conn)

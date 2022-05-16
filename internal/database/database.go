@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -192,7 +191,7 @@ func (db *Database) MoveData(oldConfigPath, newConfigPath string) error {
 		f := strings.Replace(base, oldPattern, newPattern, 1)
 		os.Rename(m, path.Join(newDir, f))
 	}
-	if files, _ := ioutil.ReadDir(oldDir); len(files) == 0 {
+	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
 		os.Remove(oldDir)
 	}
 	return nil

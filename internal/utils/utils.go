@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -134,7 +133,7 @@ func ParseCommand(value string) (string, error) {
 }
 
 func MustTempDir(pattern string) string {
-	t, err := ioutil.TempDir("", pattern)
+	t, err := os.MkdirTemp("", pattern)
 	if err != nil {
 		panic(err)
 	}

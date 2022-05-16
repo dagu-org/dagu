@@ -2,7 +2,6 @@ package sock
 
 import (
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	testHomeDir, err := ioutil.TempDir("", "controller_test")
+	testHomeDir, err := os.MkdirTemp("", "controller_test")
 	if err != nil {
 		panic(err)
 	}
@@ -24,7 +23,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestStartAndShutdownServer(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "test_server_start_shutdown")
+	tmpFile, err := os.CreateTemp("", "test_server_start_shutdown")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -63,7 +62,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 }
 
 func TestNoResponse(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "test_error_response")
+	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -95,7 +94,7 @@ func TestNoResponse(t *testing.T) {
 }
 
 func TestErrorResponse(t *testing.T) {
-	tmpFile, err := ioutil.TempFile("", "test_error_response")
+	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
