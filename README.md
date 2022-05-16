@@ -7,13 +7,12 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**Self-contained, easy-to-use workflow engine for smaller use cases**
+**No-code, self-contained, easy-to-use workflow engine**
 
-[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. Dagu is self-contained and comes with a web UI for visualizing workflows.
+[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. It comes with a web UI for visualizing and managing workflows.
 
 ## Contents
 
-  - [Contents](#contents)
   - [Motivation: Why not Airflow or Prefect?](#motivation-why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
     - [Self-contained](#self-contained)
@@ -53,16 +52,16 @@
 
 ## Motivation: Why not Airflow or Prefect?
 
-Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to manage the workflow. In many cases, there is already a large codebase written in other languages such as shell scripts or Perl. Adding another layer of Python code on top of the existing code is not ideal. Also, it is usually not practical to rewrite existing code in Python. For this reason, a more lightweight solution is needed; Dagu is easy to use and self-contained, making it ideal for small projects with a small number of people.
+Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to manage the workflow. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python code on top of these may not be ideal. Also, it is often not practical to rewrite everything from scratch in Python in such situations. For this reason, a more lightweight solution where you can manage DAGs without making them more complicated is needed. So we developed Dagu. It is easy to use and self-contained, making it ideal for smaller projects with fewer people.
 
 ## ️How does it work?
 
 ### Self-contained
-- Dagu is a single binary and there' no dependency on any.
+- Dagu is a single binary and there's no dependency on any.
 - It uses the file system to store execution history data. Therefore, no DBMS or cloud service is required.
 
 ### Simple YAML format
-- Dagu executes DAGs defined in declarative YAML format.
+- Dagu executes DAGs defined in a simple YAML format.
 - Existing programs can be used without any modification.
 
 ## ️Quick start
