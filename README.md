@@ -5,10 +5,11 @@
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
 [![GitHub release](https://img.shields.io/github/release/yohamta/dagu.svg)](https://github.com/yohamta/dagu/releases)
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
+![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A No-code workflow executor**
+**Self-contained, easy-to-use workflow engine for smaller use cases**
 
-[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu also comes with a web UI for visualizing workflows.
+[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) from declarative YAML definitions. Dagu is self-contained and comes with a web UI for visualizing workflows.
 
 Official Website: [https://dagu.pages.dev](https://dagu.pages.dev)
 
@@ -50,19 +51,16 @@ Official Website: [https://dagu.pages.dev](https://dagu.pages.dev)
   - [License](#license)
   - [Contributors](#contributors)
 
-## Motivation
+## Motivation : Why not Airflow or Prefect?
 
-There were many problems in our ETL pipelines. Hundreds of cron jobs are on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to rerun. We also have to SSH into the server to see the logs and run each shell script one by one manually. So We needed a tool that explicitly visualizes and allows us to manage the dependencies of the jobs in the pipeline.
-
-***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI and to be able to rerun or stop a series of jobs with just a mouse click!***
-
-## Why not Airflow or Prefect?
-
-Airflow and Prefect are powerful and valuable tools, but they require writing Python code to manage workflows. Our ETL pipeline is already hundreds of thousands of lines of complex code in Perl and shell scripts. Adding another layer of Python on top of this would make it even more complicated. Instead, we needed a more lightweight solution. So we've created a No-code workflow execution engine that doesn't require writing code. Dagu is easy to use and self-contained, making it ideal for smaller projects with fewer people. We hope that this tool will help others in the same situation.
+Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to manage the workflow. In many cases, there is already a large codebase written in other languages such as shell scripts or Perl. Adding another layer of Python code on top of the existing code is not ideal. Also, it is usually not practical to rewrite existing code in Python. For this reason, a more lightweight solution is needed; Dagu is easy to use and self-contained, making it ideal for small projects with a small number of people.
 
 ## ️How does it work?
 
+### Self-contained and zero dependency
 - Dagu is a single command and it uses the file system to store data in JSON format. Therefore, no DBMS or cloud service is required.
+
+### Simple YAML format to define workflows (DAGs)
 - Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
 ## ️Quick start

@@ -4,12 +4,11 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'No-Code',
+    title: 'Self-Contained',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        Dagu executes DAGs defined in declarative YAML format.
-        Existing programs can be used without any modification.
+        It is a single command and self-contained. There's no dependency on any.
       </>
     ),
   },
@@ -18,8 +17,8 @@ const FeatureList = [
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Dagu is a simple command and uses the file system to store data in JSON format.
-        Therefore, no DBMS or cloud service is required. It is also open source.
+        Workflows can bed defined in a simple YAML format.
+        Existing programs can be used without any modification.
       </>
     ),
   },
