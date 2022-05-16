@@ -48,9 +48,8 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 	log.Print(buf.String())
 }
 
-func (rp *Reporter) ReportMail(cfg *config.Config, status *models.Status) error {
-	switch status.Status {
-	case scheduler.SchedulerStatus_Error:
+func (rp *Reporter) ReportMail(cfg *config.Config, status *models.Status, err error) error {
+	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
 		if cfg.MailOn.Failure {
 			return rp.Mailer.SendMail(
 				cfg.ErrorMail.From,
@@ -59,7 +58,7 @@ func (rp *Reporter) ReportMail(cfg *config.Config, status *models.Status) error 
 				renderHTML(status.Nodes),
 			)
 		}
-	case scheduler.SchedulerStatus_Success:
+	} else if status.Status == scheduler.SchedulerStatus_Success {
 		if cfg.MailOn.Success {
 			rp.Mailer.SendMail(
 				cfg.InfoMail.From,

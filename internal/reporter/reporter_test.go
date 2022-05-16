@@ -3,6 +3,7 @@ package reporter
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -86,7 +87,7 @@ func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mode
 	rp.ReportMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
-	})
+	}, fmt.Errorf("Error"))
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Contains(t, mock.subject, "Error")
@@ -101,7 +102,7 @@ func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	rp.ReportMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
-	})
+	}, nil)
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Equal(t, 0, mock.count)
@@ -114,7 +115,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	rp.ReportMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Success,
 		Nodes:  nodes,
-	})
+	}, nil)
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Contains(t, mock.subject, "Success")
