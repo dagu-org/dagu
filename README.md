@@ -7,9 +7,9 @@
 [![GoDoc](https://godoc.org/github.com/dagu-go/dagu?status.svg)](https://godoc.org/github.com/dagu-go/dagu)
 ![Test](https://github.com/dagu-go/dagu/actions/workflows/test.yaml/badge.svg)
 
-**No-code, self-contained, easy-to-use workflow engine**
+**No-code, self-contained, and easy-to-use workflow engine**
 
-[Dagu](https://dagu.pages.dev/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. It comes with a web UI for visualizing and managing workflows.
+[Dagu](https://dagu-go.github.io/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. It comes with a web UI for visualizing and managing workflows.
 
 ## Contents
 
@@ -119,7 +119,7 @@ You can execute the example by pressing the `Start` button.
 
 ## YAML format
 
-You can define workflows in a simple [YAML format](https://dagu.pages.dev/docs/yaml/minimal).
+You can define workflows in a simple [YAML format](https://dagu-go.github.io/docs/yaml/minimal).
 
 ### Minimal
 
@@ -291,7 +291,7 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 ### Environment Variables
 
-You can customize the admin web UI by [environment variables](https://dagu.pages.dev/docs/admin/environ).
+You can customize the admin web UI by [environment variables](https://dagu-go.github.io/docs/admin/environ).
 
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
@@ -335,7 +335,7 @@ infoMail:
 
 ## Documentation
 
-Dagu's documentation, including a quick-start guide, and all reference, is available at [https://dagu.pages.dev](https://dagu.pages.dev).
+Dagu's documentation, including a quick-start guide, and all reference, is available at [https://dagu-go.github.io](https://dagu-go.github.io).
 
 ## FAQ
 
