@@ -1,11 +1,11 @@
 # Dagu
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
-[![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
-[![GitHub release](https://img.shields.io/github/release/yohamta/dagu.svg)](https://github.com/yohamta/dagu/releases)
-[![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
-![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dagu-go/dagu)](https://goreportcard.com/report/github.com/dagu-go/dagu)
+[![codecov](https://codecov.io/gh/dagu-go/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/dagu-go/dagu)
+[![GitHub release](https://img.shields.io/github/release/dagu-go/dagu.svg)](https://github.com/dagu-go/dagu/releases)
+[![GoDoc](https://godoc.org/github.com/dagu-go/dagu?status.svg)](https://godoc.org/github.com/dagu-go/dagu)
+![Test](https://github.com/dagu-go/dagu/actions/workflows/test.yaml/badge.svg)
 
 **No-code, self-contained, easy-to-use workflow engine**
 
@@ -68,7 +68,7 @@ Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, 
 
 ### 1. Installation
 
-Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
+Download the latest binary from the [Releases page](https://github.com/dagu-go/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
 ### 2. Launch the web UI
 
@@ -80,7 +80,7 @@ Create a workflow by clicking the `New DAG` button on the top page of the web UI
 
 ### 4. Edit the workflow
 
-Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
+Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/dagu-go/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
 
 ### 5. Execute the workflow
 
@@ -377,8 +377,8 @@ This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) 
 
 ## Contributors
 
-<a href="https://github.com/yohamta/dagu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
+<a href="https://github.com/dagu-go/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dagu-go/dagu" />
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).
