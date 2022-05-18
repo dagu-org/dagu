@@ -12,6 +12,7 @@ type Step struct {
 	Variables     []string
 	Dir           string
 	Command       string
+	Stdout        string
 	Args          []string
 	Depends       []string
 	ContinueOn    ContinueOn

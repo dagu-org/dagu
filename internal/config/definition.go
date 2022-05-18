@@ -36,6 +36,7 @@ type stepDef struct {
 	Description   string
 	Dir           string
 	Command       string
+	Stdout        string
 	Depends       []string
 	ContinueOn    *continueOnDef
 	RetryPolicy   *retryPolicyDef

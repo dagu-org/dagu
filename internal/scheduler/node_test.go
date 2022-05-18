@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"os"
+	"path"
 	"syscall"
 	"testing"
 	"time"
@@ -46,4 +48,32 @@ func TestSignal(t *testing.T) {
 
 	require.Error(t, err)
 	require.Equal(t, n.Status, NodeStatus_Cancel)
+}
+
+func TestOutputLogAndStdout(t *testing.T) {
+	n := &Node{
+		Step: &config.Step{
+			Command: "echo",
+			Args:    []string{"done"},
+			Dir:     os.Getenv("HOME"),
+			Stdout:  "stdout.log",
+		},
+	}
+	err := n.setup(os.Getenv("HOME"), "test-request-id")
+	require.NoError(t, err)
+	defer func() {
+		_ = n.teardown()
+	}()
+
+	err = n.Execute()
+	require.NoError(t, err)
+	err = n.teardown()
+	require.NoError(t, err)
+
+	f := path.Join(os.Getenv("HOME"), n.Step.Stdout)
+	dat, _ := os.ReadFile(f)
+	require.Equal(t, "done\n", string(dat))
+
+	dat, _ = os.ReadFile(n.logFile.Name())
+	require.Equal(t, "done\n", string(dat))
 }
