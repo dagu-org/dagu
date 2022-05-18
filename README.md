@@ -7,16 +7,14 @@
 [![GoDoc](https://godoc.org/github.com/dagu-go/dagu?status.svg)](https://godoc.org/github.com/dagu-go/dagu)
 ![Test](https://github.com/dagu-go/dagu/actions/workflows/test.yaml/badge.svg)
 
-**No-code, self-contained, and easy-to-use workflow engine**
+**A no-code workflow executor**
 
-[Dagu](https://dagu-go.github.io/) executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. It comes with a web UI for visualizing and managing workflows.
+[Dagu](https://dagu-go.github.io/) is an workflow engine to use for **existing code base, personal projects, or smaller use cases with fewer people**. It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. Existing programs can be used without any modification. It comes with a web UI for visualization.
 
 ## Contents
 
   - [Motivation: Why not Airflow or Prefect?](#motivation-why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
-    - [Self-contained](#self-contained)
-    - [Simple YAML format](#simple-yaml-format)
   - [️Quick start](#️quick-start)
     - [1. Installation](#1-installation)
     - [2. Launch the web UI](#2-launch-the-web-ui)
@@ -52,17 +50,14 @@
 
 ## Motivation: Why not Airflow or Prefect?
 
-Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to manage the workflow. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python code on top of these may not be ideal. Also, it is often not practical to rewrite everything from scratch in Python in such situations. For this reason, a more lightweight solution where you can manage DAGs without making them more complicated is needed. So we developed Dagu. It is easy to use and self-contained, making it ideal for smaller projects with fewer people.
+Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. Also, it is often not feasible to rewrite everything in Python in such situations. I searched all over the Internet for a lightweight workflow engine that is easy to use while still leveraging existing code, but no desirable tool existed for such a use case.
+
+So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple YAML format. So, in that sense, Dagu is **no-code** in terms of the way to manage workflows, compared to Airflow, Prefect, and Luigi. Since it's just a YAML file that define commands to execute, existing programs can be easily migrated without modification. In addition, because it is self-contained, no-dependency, and it does not require DBMS. These features make Dagu an ideal workflow engine to use for existing code base, personal projects, or smaller use cases with fewer people.
 
 ## ️How does it work?
 
-### Self-contained
-- Dagu is a single binary and there's no dependency on any.
-- It uses the file system to store execution history data. Therefore, no DBMS or cloud service is required.
-
-### Simple YAML format
-- Dagu executes DAGs defined in a simple YAML format.
-- Existing programs can be used without any modification.
+- Self-contained - Single binary with no dependency, No DBMS or cloud service is required.
+- Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
 
 ## ️Quick start
 
