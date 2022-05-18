@@ -30,6 +30,7 @@
     - [Command Substitution](#command-substitution)
     - [Conditional Logic](#conditional-logic)
     - [State Handlers](#state-handlers)
+    - [Redirection](#redirection)
     - [Repeating Task](#repeating-task)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
@@ -196,6 +197,18 @@ steps:
         expected: "01"
     continueOn:
       skipped: true
+```
+
+### Redirection
+
+Sometimes you want to redirect standard out to a file to use in subsequent tasks. You can use `stdout` field to do so.
+
+```yaml
+name: example
+steps:
+  - name: create a file
+    command: "echo hello"
+    stdout: "/tmp/hello" # the content will be "hello\n"
 ```
 
 ### State Handlers

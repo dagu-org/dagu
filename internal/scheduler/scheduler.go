@@ -118,9 +118,8 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 				}()
 
 				if !sc.Dry {
-					node.setupLog(sc.LogDir, sc.RequestId)
-					node.openLogFile()
-					defer node.closeLogFile()
+					node.setup(sc.LogDir, sc.RequestId)
+					defer node.teardown()
 				}
 
 				for !sc.IsCanceled() {
@@ -209,9 +208,8 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 	node.updateStatus(NodeStatus_Running)
 
 	if !sc.Dry {
-		node.setupLog(sc.LogDir, sc.RequestId)
-		node.openLogFile()
-		defer node.closeLogFile()
+		node.setup(sc.LogDir, sc.RequestId)
+		defer node.teardown()
 		err := node.Execute()
 		if err != nil {
 			node.updateStatus(NodeStatus_Error)
