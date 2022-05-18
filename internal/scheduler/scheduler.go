@@ -117,12 +117,18 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 					wg.Done()
 				}()
 
+				setup := true
 				if !sc.Dry {
-					node.setup(sc.LogDir, sc.RequestId)
+					if err := node.setup(sc.LogDir, sc.RequestId); err != nil {
+						setup = false
+						node.Error = err
+						sc.lastError = err
+						node.updateStatus(NodeStatus_Error)
+					}
 					defer node.teardown()
 				}
 
-				for !sc.IsCanceled() {
+				for setup && !sc.IsCanceled() {
 					var err error = nil
 					if !sc.Dry {
 						err = node.Execute()

@@ -13,6 +13,7 @@ type Step struct {
 	Dir           string
 	CmdWithArgs   string
 	Command       string
+	Script        string
 	Stdout        string
 	Output        string
 	Args          []string

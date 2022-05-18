@@ -62,6 +62,7 @@ type Node struct {
 	stdoutWriter *bufio.Writer
 	outputWriter *os.File
 	outputReader *os.File
+	scriptFile   *os.File
 }
 
 type NodeState struct {
@@ -80,7 +81,13 @@ func (n *Node) Execute() error {
 	if n.CmdWithArgs != "" {
 		n.Command, n.Args = utils.SplitCommand(os.ExpandEnv(n.CmdWithArgs))
 	}
-	n.cmd = exec.CommandContext(ctx, n.Command, n.Args...)
+	args := n.Args
+	if n.scriptFile != nil {
+		args = []string{}
+		args = append(args, n.Args...)
+		args = append(args, n.scriptFile.Name())
+	}
+	n.cmd = exec.CommandContext(ctx, n.Command, args...)
 	cmd := n.cmd
 	cmd.Dir = n.Dir
 	cmd.Env = append(cmd.Env, n.Variables...)
@@ -172,12 +179,14 @@ func (n *Node) setup(logDir string, requestId string) error {
 		n.StartedAt.Format("20060102.15:04:05.000"),
 		utils.TruncString(requestId, 8),
 	))
-	if err := n.openLog(); err != nil {
-		n.Error = err
-		return err
+	setup := []func() error{
+		n.setupLog,
+		n.setupStdout,
+		n.setupScript,
 	}
-	if n.Stdout != "" {
-		if err := n.openStdout(); err != nil {
+	for _, fn := range setup {
+		err := fn()
+		if err != nil {
 			n.Error = err
 			return err
 		}
@@ -185,22 +194,38 @@ func (n *Node) setup(logDir string, requestId string) error {
 	return nil
 }
 
-func (n *Node) openStdout() error {
-	f := n.Stdout
-	if !filepath.IsAbs(f) {
-		f = filepath.Join(n.Dir, f)
+func (n *Node) setupScript() (err error) {
+	if n.Script != "" {
+		n.scriptFile, _ = os.CreateTemp(n.Dir, "dagu_script-")
+		if _, err = n.scriptFile.WriteString(n.Script); err != nil {
+			return
+		}
+		defer func() {
+			_ = n.scriptFile.Close()
+		}()
+		err = n.scriptFile.Sync()
 	}
-	var err error
-	n.stdoutFile, err = utils.OpenOrCreateFile(f)
-	if err != nil {
-		n.Error = err
-		return err
+	return err
+}
+
+func (n *Node) setupStdout() error {
+	if n.Stdout != "" {
+		f := n.Stdout
+		if !filepath.IsAbs(f) {
+			f = filepath.Join(n.Dir, f)
+		}
+		var err error
+		n.stdoutFile, err = utils.OpenOrCreateFile(f)
+		if err != nil {
+			n.Error = err
+			return err
+		}
+		n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
 	}
-	n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
 	return nil
 }
 
-func (n *Node) openLog() error {
+func (n *Node) setupLog() error {
 	if n.Log == "" {
 		return nil
 	}
@@ -231,6 +256,9 @@ func (n *Node) teardown() error {
 		if err := n.stdoutFile.Close(); err != nil {
 			lastErr = err
 		}
+	}
+	if n.scriptFile != nil {
+		_ = os.Remove(n.scriptFile.Name())
 	}
 	return lastErr
 }

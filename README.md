@@ -29,9 +29,10 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
     - [Parameters](#parameters)
     - [Command Substitution](#command-substitution)
     - [Conditional Logic](#conditional-logic)
+    - [Run Code Snippet](#run-code-snippet)
     - [State Handlers](#state-handlers)
-    - [Redirection](#redirection)
     - [Output](#output)
+    - [Redirection](#redirection)
     - [Repeating Task](#repeating-task)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
@@ -121,9 +122,11 @@ You can define workflows in a simple [YAML format](https://yohamta.github.io/doc
 name: minimal configuration          # DAG's name
 steps:                               # Steps inside the DAG
   - name: step 1                     # Step's name (should be unique within the file)
-    command: python main_1.py        # Command and arguments to execute
+    command: ehho hello              # Command and arguments to execute
   - name: step 2
-    command: python main_2.py
+    command: bash
+    script: |                        # [optional] arbitrary script in any language
+      echo "world"
     depends:
       - step 1                       # [optional] Name of the step to depend on
 ```
@@ -198,6 +201,38 @@ steps:
       skipped: true
 ```
 
+### Run Code Snippet
+
+`script` field provides a way to run arbitrary snippets of code in any language.
+
+```yaml
+name: example
+steps:
+  - name: step 1
+    command: "bash"
+    script: |
+      cd /tmp
+      echo "hello world" > hello
+      cat hello
+    output: RESULT
+  - name: step 2
+    command: echo ${RESULT} # hello world
+    depends:
+      - step 1
+```
+
+### Output
+
+`output` field can be used to set a environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
+
+```yaml
+name: example
+steps:
+  - name: step 1
+    command: "echo foo"
+    output: FOO # will contain "foo"
+```
+
 ### Redirection
 
 `stdout` field can be used to write standard output to a file.
@@ -208,18 +243,6 @@ steps:
   - name: create a file
     command: "echo hello"
     stdout: "/tmp/hello" # the content will be "hello\n"
-```
-
-### Output
-
-`output` field can be used to write standard output to a environment variable. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
-
-```yaml
-name: example
-steps:
-  - name: step 1
-    command: "echo foo"
-    output: FOO # will contain "foo"
 ```
 
 ### State Handlers
@@ -268,8 +291,8 @@ delaySec: 1                          # Interval seconds between steps
 maxActiveRuns: 1                     # Max parallel number of running step
 params: param1 param2                # Default parameters for the DAG that can be referred to by $1, $2, and so on
 preconditions:                       # Precondisions for whether the DAG is allowed to run
-  - condition: "`echo 1`"            # Command or variables to evaluate
-    expected: "1"                    # Expected value for the condition
+  - condition: "`echo $2`"           # Command or variables to evaluate
+    expected: "param2"               # Expected value for the condition
 mailOn:
   failure: true                      # Send a mail when the DAG failed
   success: true                      # Send a mail when the DAG finished
@@ -287,7 +310,11 @@ steps:
   - name: some task                  # Step's name
     description: some task           # Step's description
     dir: ${HOME}/logs                # Working directory
-    command: python main.py $1       # Command and parameters
+    command: bash                    # Command and parameters
+    stdout: /tmp/outfile
+    ouptut: RESULT_VARIABLE
+    script: |
+      echo "any script"
     mailOn:
       failure: true                  # Send a mail when the step failed
       success: true                  # Send a mail when the step finished
@@ -300,8 +327,8 @@ steps:
       repeat: true                   # Boolean whether to repeat this step
       intervalSec: 60                # Interval time to repeat the step in seconds
     preconditions:                   # Precondisions for whether the step is allowed to run
-      - condition: "`echo 1`"        # Command or variables to evaluate
-        expected: "1"                # Expected Value for the condition
+      - condition: "`echo $1`"       # Command or variables to evaluate
+        expected: "param1"           # Expected Value for the condition
 ```
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
