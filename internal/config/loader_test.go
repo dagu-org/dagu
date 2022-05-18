@@ -23,11 +23,12 @@ func TestLoadConfig(t *testing.T) {
 
 	steps := []*Step{
 		{
-			Name:      "1",
-			Dir:       testHomeDir,
-			Command:   "true",
-			Args:      []string{},
-			Variables: testEnv,
+			Name:        "1",
+			Dir:         testHomeDir,
+			CmdWithArgs: "true",
+			Command:     "true",
+			Args:        []string{},
+			Variables:   testEnv,
 			Preconditions: []*Condition{
 				{
 					Condition: "`echo test`",
@@ -50,6 +51,7 @@ func TestLoadConfig(t *testing.T) {
 		{
 			Name:          "2",
 			Dir:           testDir,
+			CmdWithArgs:   "false",
 			Command:       "false",
 			Args:          []string{},
 			Variables:     testEnv,
@@ -65,10 +67,12 @@ func TestLoadConfig(t *testing.T) {
 	}
 
 	makeTestStepFunc := func(name string) *Step {
+		c := fmt.Sprintf("%s.sh", name)
 		return &Step{
 			Name:          name,
 			Dir:           testDir,
-			Command:       fmt.Sprintf("%s.sh", name),
+			CmdWithArgs:   c,
+			Command:       c,
 			Args:          []string{},
 			Variables:     testEnv,
 			Preconditions: []*Condition{},

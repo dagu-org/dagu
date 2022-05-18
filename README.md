@@ -31,6 +31,7 @@
     - [Conditional Logic](#conditional-logic)
     - [State Handlers](#state-handlers)
     - [Redirection](#redirection)
+    - [Output](#output)
     - [Repeating Task](#repeating-task)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
@@ -201,7 +202,7 @@ steps:
 
 ### Redirection
 
-Sometimes you want to redirect standard out to a file to use in subsequent tasks. You can use `stdout` field to do so.
+`stdout` field can be used to write standard output to a file.
 
 ```yaml
 name: example
@@ -209,6 +210,18 @@ steps:
   - name: create a file
     command: "echo hello"
     stdout: "/tmp/hello" # the content will be "hello\n"
+```
+
+### Output
+
+`output` field can be used to write standard output to a environment variable. Leading and trailing space will be trimmed automatically.
+
+```yaml
+name: example
+steps:
+  - name: step 1
+    command: "echo foo"
+    output: FOO # will contain "foo"
 ```
 
 ### State Handlers

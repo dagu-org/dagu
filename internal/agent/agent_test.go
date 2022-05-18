@@ -156,7 +156,7 @@ func TestRetry(t *testing.T) {
 	assert.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 
 	for _, n := range status.Nodes {
-		n.Command = "true"
+		n.CmdWithArgs = "true"
 	}
 	a := &Agent{
 		Config: &Config{
