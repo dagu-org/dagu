@@ -50,7 +50,7 @@ func TestSignal(t *testing.T) {
 	require.Equal(t, n.Status, NodeStatus_Cancel)
 }
 
-func TestOutputLogAndStdout(t *testing.T) {
+func TestLogAndStdout(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
 			Command: "echo",
@@ -76,4 +76,31 @@ func TestOutputLogAndStdout(t *testing.T) {
 
 	dat, _ = os.ReadFile(n.logFile.Name())
 	require.Equal(t, "done\n", string(dat))
+}
+
+func TestOutput(t *testing.T) {
+	n := &Node{
+		Step: &config.Step{
+			Command: "echo",
+			Args:    []string{"hello"},
+			Dir:     os.Getenv("HOME"),
+			Output:  "OUTPUT_TEST",
+		},
+	}
+	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
+	require.NoError(t, err)
+	defer func() {
+		_ = n.teardown()
+	}()
+
+	err = n.Execute()
+	require.NoError(t, err)
+	err = n.teardown()
+	require.NoError(t, err)
+
+	dat, _ := os.ReadFile(n.logFile.Name())
+	require.Equal(t, "hello\n", string(dat))
+
+	val := os.Getenv("OUTPUT_TEST")
+	require.Equal(t, "hello", val)
 }

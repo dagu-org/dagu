@@ -1,19 +1,19 @@
 # Dagu
 <img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/dagu-go/dagu)](https://goreportcard.com/report/github.com/dagu-go/dagu)
-[![codecov](https://codecov.io/gh/dagu-go/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/dagu-go/dagu)
-[![GitHub release](https://img.shields.io/github/release/dagu-go/dagu.svg)](https://github.com/dagu-go/dagu/releases)
-[![GoDoc](https://godoc.org/github.com/dagu-go/dagu?status.svg)](https://godoc.org/github.com/dagu-go/dagu)
-![Test](https://github.com/dagu-go/dagu/actions/workflows/test.yaml/badge.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
+[![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
+[![GitHub release](https://img.shields.io/github/release/yohamta/dagu.svg)](https://github.com/yohamta/dagu/releases)
+[![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
+![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A no-code workflow executor**
+**A No-code workflow executor with built-in web UI**
 
-[Dagu](https://dagu-go.github.io/) is an workflow engine to use for **existing code base, personal projects, or smaller use cases with fewer people**. It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. Existing programs can be used without any modification. It comes with a web UI for visualization.
+It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format.
 
 ## Contents
 
-  - [Motivation: Why not Airflow or Prefect?](#motivation-why-not-airflow-or-prefect)
+  - [Why not Airflow or Prefect?](#why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
   - [️Quick start](#️quick-start)
     - [1. Installation](#1-installation)
@@ -31,13 +31,13 @@
     - [Conditional Logic](#conditional-logic)
     - [State Handlers](#state-handlers)
     - [Redirection](#redirection)
+    - [Output](#output)
     - [Repeating Task](#repeating-task)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
     - [Web UI Configuration](#web-ui-configuration)
     - [Global Configuration](#global-configuration)
-  - [Documentation](#documentation)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
@@ -49,11 +49,9 @@
   - [License](#license)
   - [Contributors](#contributors)
 
-## Motivation: Why not Airflow or Prefect?
+## Why not Airflow or Prefect?
 
-Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. Also, it is often not feasible to rewrite everything in Python in such situations. I searched all over the Internet for a lightweight workflow engine that is easy to use while still leveraging existing code, but no desirable tool existed for such a use case.
-
-So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple YAML format. So, in that sense, Dagu is **no-code** in terms of the way to manage workflows, compared to Airflow, Prefect, and Luigi. Since it's just a YAML file that define commands to execute, existing programs can be easily migrated without modification. In addition, because it is self-contained, no-dependency, and it does not require DBMS. These features make Dagu an ideal workflow engine to use for existing code base, personal projects, or smaller use cases with fewer people.
+Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. Also, it is often not feasible to rewrite everything in Python in such situations. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple YAML format. It is self-contained, no-dependency, and it does not require DBMS.
 
 ## ️How does it work?
 
@@ -64,7 +62,7 @@ So we decided to develop a new workflow engine, Dagu, which allows you to define
 
 ### 1. Installation
 
-Download the latest binary from the [Releases page](https://github.com/dagu-go/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
+Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
 ### 2. Launch the web UI
 
@@ -76,7 +74,7 @@ Create a workflow by clicking the `New DAG` button on the top page of the web UI
 
 ### 4. Edit the workflow
 
-Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/dagu-go/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
+Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
 
 ### 5. Execute the workflow
 
@@ -115,7 +113,7 @@ You can execute the example by pressing the `Start` button.
 
 ## YAML format
 
-You can define workflows in a simple [YAML format](https://dagu-go.github.io/docs/yaml/minimal).
+You can define workflows in a simple [YAML format](https://yohamta.github.io/docs/yaml/minimal).
 
 ### Minimal
 
@@ -137,11 +135,12 @@ You can define environment variables and refer using `env` field.
 ```yaml
 name: example
 env:
-  SOME_DIR: ${HOME}/batch
+  - SOME_DIR: ${HOME}/batch
+  - SOME_FILE: ${SOME_DIR}/some_file 
 steps:
   - name: some task in some dir
     dir: ${SOME_DIR}
-    command: python main.py
+    command: python main.py ${SOME_FILE}
 ```
 
 ### Parameters
@@ -201,7 +200,7 @@ steps:
 
 ### Redirection
 
-Sometimes you want to redirect standard out to a file to use in subsequent tasks. You can use `stdout` field to do so.
+`stdout` field can be used to write standard output to a file.
 
 ```yaml
 name: example
@@ -209,6 +208,18 @@ steps:
   - name: create a file
     command: "echo hello"
     stdout: "/tmp/hello" # the content will be "hello\n"
+```
+
+### Output
+
+`output` field can be used to write standard output to a environment variable. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
+
+```yaml
+name: example
+steps:
+  - name: step 1
+    command: "echo foo"
+    output: FOO # will contain "foo"
 ```
 
 ### State Handlers
@@ -249,8 +260,8 @@ Combining these settings gives you granular control over how the workflow runs.
 name: all configuration              # DAG's name
 description: run a DAG               # DAG's description
 env:                                 # Environment variables
-  LOG_DIR: ${HOME}/logs
-  PATH: /usr/local/bin:${PATH}
+  - LOG_DIR: ${HOME}/logs
+  - PATH: /usr/local/bin:${PATH}
 logDir: ${LOG_DIR}                   # Log directory to write standard output
 histRetentionDays: 3                 # Execution history retention days (not for log files)
 delaySec: 1                          # Interval seconds between steps
@@ -299,7 +310,7 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 ### Environment Variables
 
-You can customize the admin web UI by [environment variables](https://dagu-go.github.io/docs/admin/environ).
+You can customize the admin web UI by [environment variables](https://yohamta.github.io/docs/admin/environ).
 
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
@@ -341,10 +352,6 @@ infoMail:
   prefix: <prefix of mail subject>
 ```
 
-## Documentation
-
-Dagu's documentation, including a quick-start guide, and all reference, is available at [https://dagu-go.github.io](https://dagu-go.github.io).
-
 ## FAQ
 
 ### How to contribute?
@@ -385,8 +392,8 @@ This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) 
 
 ## Contributors
 
-<a href="https://github.com/dagu-go/dagu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=dagu-go/dagu" />
+<a href="https://github.com/yohamta/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).

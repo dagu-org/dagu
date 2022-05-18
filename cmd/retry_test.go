@@ -33,7 +33,7 @@ func Test_retryCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, n := range status.Status.Nodes {
-		n.Command = "true"
+		n.CmdWithArgs = "echo parameter is $1"
 	}
 	err = dw.Write(status.Status)
 	require.NoError(t, err)

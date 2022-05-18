@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -58,6 +60,8 @@ type Node struct {
 	logWriter    *bufio.Writer
 	stdoutFile   *os.File
 	stdoutWriter *bufio.Writer
+	outputWriter *os.File
+	outputReader *os.File
 }
 
 type NodeState struct {
@@ -73,6 +77,9 @@ type NodeState struct {
 func (n *Node) Execute() error {
 	ctx, fn := context.WithCancel(context.Background())
 	n.cancelFunc = fn
+	if n.CmdWithArgs != "" {
+		n.Command, n.Args = utils.SplitCommand(os.ExpandEnv(n.CmdWithArgs))
+	}
 	n.cmd = exec.CommandContext(ctx, n.Command, n.Args...)
 	cmd := n.cmd
 	cmd.Dir = n.Dir
@@ -94,7 +101,24 @@ func (n *Node) Execute() error {
 		cmd.Stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
 	}
 
+	if n.Output != "" {
+		var err error
+		if n.outputReader, n.outputWriter, err = os.Pipe(); err != nil {
+			return err
+		}
+		cmd.Stdout = io.MultiWriter(cmd.Stdout, n.outputWriter)
+	}
+
 	n.Error = cmd.Run()
+
+	if n.outputReader != nil && n.Output != "" {
+		utils.LogIgnoreErr("close pipe writer", n.outputWriter.Close())
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, n.outputReader)
+		ret := buf.String()
+		os.Setenv(n.Output, strings.TrimSpace(ret))
+	}
+
 	return n.Error
 }
 

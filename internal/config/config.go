@@ -371,8 +371,10 @@ func buildStep(variables []string, def *stepDef) (*Step, error) {
 	step := &Step{}
 	step.Name = def.Name
 	step.Description = def.Description
-	step.Command, step.Args = utils.SplitCommand(def.Command)
+	step.CmdWithArgs = def.Command
+	step.Command, step.Args = utils.SplitCommand(step.CmdWithArgs) // Will be eva
 	step.Stdout = os.ExpandEnv(def.Stdout)
+	step.Output = def.Output
 	step.Dir = os.ExpandEnv(def.Dir)
 	step.Variables = variables
 	step.Depends = def.Depends
