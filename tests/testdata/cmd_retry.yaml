@@ -1,4 +1,4 @@
-name: "agent retry"
+name: "retry"
 params: "param-value"
 steps:
   - name: "1"

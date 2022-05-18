@@ -55,7 +55,7 @@ func FormatDuration(t time.Duration, defaultVal string) string {
 }
 
 func SplitCommand(cmd string) (program string, args []string) {
-	vals := strings.SplitN(os.ExpandEnv(cmd), " ", 2)
+	vals := strings.SplitN(cmd, " ", 2)
 	if len(vals) > 1 {
 		return vals[0], strings.Split(vals[1], " ")
 	}
