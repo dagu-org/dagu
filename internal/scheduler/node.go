@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -49,12 +50,14 @@ func (s NodeStatus) String() string {
 type Node struct {
 	*config.Step
 	NodeState
-	id         int
-	mu         sync.RWMutex
-	cmd        *exec.Cmd
-	cancelFunc func()
-	logFile    *os.File
-	logWriter  *bufio.Writer
+	id           int
+	mu           sync.RWMutex
+	cmd          *exec.Cmd
+	cancelFunc   func()
+	logFile      *os.File
+	logWriter    *bufio.Writer
+	stdoutFile   *os.File
+	stdoutWriter *bufio.Writer
 }
 
 type NodeState struct {
@@ -79,12 +82,16 @@ func (n *Node) Execute() error {
 		Pgid:    0,
 	}
 
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stdout
+
 	if n.logWriter != nil {
 		cmd.Stdout = n.logWriter
 		cmd.Stderr = n.logWriter
-	} else {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stdout
+	}
+
+	if n.stdoutWriter != nil {
+		cmd.Stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
 	}
 
 	n.Error = cmd.Run()
@@ -134,16 +141,42 @@ func (n *Node) cancel() {
 	}
 }
 
-func (n *Node) setupLog(logDir string, requestId string) {
+func (n *Node) setup(logDir string, requestId string) error {
 	n.StartedAt = time.Now()
 	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		utils.ValidFilename(n.Name, "_"),
 		n.StartedAt.Format("20060102.15:04:05.000"),
 		utils.TruncString(requestId, 8),
 	))
+	if err := n.openLog(); err != nil {
+		n.Error = err
+		return err
+	}
+	if n.Stdout != "" {
+		if err := n.openStdout(); err != nil {
+			n.Error = err
+			return err
+		}
+	}
+	return nil
 }
 
-func (n *Node) openLogFile() error {
+func (n *Node) openStdout() error {
+	f := n.Stdout
+	if !filepath.IsAbs(f) {
+		f = filepath.Join(n.Dir, f)
+	}
+	var err error
+	n.stdoutFile, err = utils.OpenOrCreateFile(f)
+	if err != nil {
+		n.Error = err
+		return err
+	}
+	n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
+	return nil
+}
+
+func (n *Node) openLog() error {
 	if n.Log == "" {
 		return nil
 	}
@@ -157,13 +190,21 @@ func (n *Node) openLogFile() error {
 	return nil
 }
 
-func (n *Node) closeLogFile() error {
+func (n *Node) teardown() error {
 	var lastErr error = nil
 	if n.logWriter != nil {
 		lastErr = n.logWriter.Flush()
 	}
 	if n.logFile != nil {
 		if err := n.logFile.Close(); err != nil {
+			lastErr = err
+		}
+	}
+	if n.stdoutWriter != nil {
+		lastErr = n.stdoutWriter.Flush()
+	}
+	if n.stdoutFile != nil {
+		if err := n.stdoutFile.Close(); err != nil {
 			lastErr = err
 		}
 	}
