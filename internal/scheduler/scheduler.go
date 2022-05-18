@@ -129,8 +129,9 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 					}
 					if err != nil {
 						if sc.IsCanceled() {
-							sc.lastError = err
-							node.updateStatus(NodeStatus_Cancel)
+							if node.ReadStatus() != NodeStatus_Cancel {
+								sc.lastError = err
+							}
 						} else {
 							handleError(node)
 						}

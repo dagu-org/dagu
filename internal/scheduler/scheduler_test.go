@@ -344,7 +344,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 	}()
 
 	err := sc.Schedule(g, nil)
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	nodes := g.Nodes()
 
@@ -370,7 +370,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 	}()
 
 	err := sc.Schedule(g, nil)
-	require.Error(t, err)
+	require.NoError(t, err)
 	<-done // Wait for canceling finished
 	assert.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
 
@@ -444,7 +444,7 @@ func TestRepeat(t *testing.T) {
 	}()
 
 	err := sc.Schedule(g, nil)
-	require.Error(t, err)
+	require.NoError(t, err)
 
 	nodes := g.Nodes()
 
