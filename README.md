@@ -383,7 +383,7 @@ infoMail:
 
 ### How to contribute?
 
-Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thank you!
+Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Take a look at this [TODO list](https://github.com/yohamta/dagu/issues/102). Thanks!
 
 ### Where is the history data stored?
 
