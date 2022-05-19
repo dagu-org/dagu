@@ -114,7 +114,7 @@ You can execute the example by pressing the `Start` button.
 
 ## YAML format
 
-You can define workflows in a simple [YAML format](https://yohamta.github.io/docs/yaml/minimal).
+You can define workflows (DAGs) in a simple YAML format.
 
 ### Minimal
 
@@ -337,7 +337,7 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 ### Environment Variables
 
-You can customize the admin web UI by [environment variables](https://yohamta.github.io/docs/admin/environ).
+You can customize the admin web UI by environment variables.
 
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
