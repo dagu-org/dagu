@@ -159,3 +159,33 @@ func TestRunScript(t *testing.T) {
 	require.Equal(t, "hello", os.Getenv("OUTPUT_TEST"))
 	require.NoFileExists(t, n.scriptFile.Name())
 }
+
+func TestTeardown(t *testing.T) {
+	n := &Node{
+		Step: &config.Step{
+			Command: testCommand,
+			Args:    []string{},
+			Dir:     os.Getenv("HOME"),
+		},
+	}
+	err := n.setup(os.Getenv("HOME"), "test-teardown")
+	require.NoError(t, err)
+
+	err = n.Execute()
+	require.NoError(t, err)
+
+	err = n.teardown()
+	require.NoError(t, err)
+	require.NoError(t, n.Error)
+
+	// no error since done flag is true
+	err = n.teardown()
+	require.NoError(t, err)
+	require.NoError(t, n.Error)
+
+	// error
+	n.done = false
+	err = n.teardown()
+	require.Error(t, err)
+	require.Error(t, n.Error)
+}

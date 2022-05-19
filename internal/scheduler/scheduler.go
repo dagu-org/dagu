@@ -170,6 +170,10 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 				if node.ReadStatus() == NodeStatus_Running {
 					node.updateStatus(NodeStatus_Success)
 				}
+				if err := node.teardown(); err != nil {
+					sc.lastError = err
+					node.updateStatus(NodeStatus_Error)
+				}
 				if done != nil {
 					done <- node
 				}

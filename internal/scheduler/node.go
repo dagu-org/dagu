@@ -63,6 +63,7 @@ type Node struct {
 	outputWriter *os.File
 	outputReader *os.File
 	scriptFile   *os.File
+	done         bool
 }
 
 type NodeState struct {
@@ -240,25 +241,32 @@ func (n *Node) setupLog() error {
 }
 
 func (n *Node) teardown() error {
+	if n.done {
+		return nil
+	}
+	n.done = true
 	var lastErr error = nil
-	if n.logWriter != nil {
-		lastErr = n.logWriter.Flush()
-	}
-	if n.logFile != nil {
-		if err := n.logFile.Close(); err != nil {
-			lastErr = err
+	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
+		if w != nil {
+			if err := w.Flush(); err != nil {
+				lastErr = err
+			}
 		}
 	}
-	if n.stdoutWriter != nil {
-		lastErr = n.stdoutWriter.Flush()
-	}
-	if n.stdoutFile != nil {
-		if err := n.stdoutFile.Close(); err != nil {
-			lastErr = err
+	for _, f := range []*os.File{n.logFile, n.stdoutFile} {
+		if f != nil {
+			if err := f.Sync(); err != nil {
+				lastErr = err
+			}
+			_ = f.Close()
 		}
 	}
+
 	if n.scriptFile != nil {
 		_ = os.Remove(n.scriptFile.Name())
+	}
+	if lastErr != nil {
+		n.Error = lastErr
 	}
 	return lastErr
 }

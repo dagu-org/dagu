@@ -546,7 +546,7 @@ func TestSchedulerStatusText(t *testing.T) {
 	}
 }
 
-func TestSetupNodeFailure(t *testing.T) {
+func TestNodeSetupFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
 		&config.Step{
 			Name:    "1",
@@ -558,12 +558,36 @@ func TestSetupNodeFailure(t *testing.T) {
 	sc := New(&Config{})
 	err := sc.Schedule(g, nil)
 	require.Error(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
 	assert.Equal(t, NodeStatus_Error, nodes[0].Status)
 	assert.Equal(t, nodes[0].DoneCount, 0)
+}
+
+func TestNodeTeardownFailure(t *testing.T) {
+	g, _ := NewExecutionGraph(
+		&config.Step{
+			Name:    "1",
+			Command: "sleep",
+			Args:    []string{"1"},
+			Dir:     "${HOME}",
+		},
+	)
+	sc := New(&Config{})
+
+	nodes := g.Nodes()
+	go func() {
+		time.Sleep(time.Millisecond * 300)
+		nodes[0].logFile.Close()
+	}()
+
+	err := sc.Schedule(g, nil)
+	require.Error(t, err)
+
+	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	assert.Equal(t, NodeStatus_Error, nodes[0].Status)
+	assert.Error(t, nodes[0].Error)
 }
 
 func step(name, command string, depends ...string) *config.Step {
