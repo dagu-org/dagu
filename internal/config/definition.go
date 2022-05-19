@@ -36,6 +36,7 @@ type stepDef struct {
 	Description   string
 	Dir           string
 	Command       string
+	Script        string
 	Stdout        string
 	Output        string
 	Depends       []string

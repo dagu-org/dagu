@@ -546,6 +546,26 @@ func TestSchedulerStatusText(t *testing.T) {
 	}
 }
 
+func TestSetupNodeFailure(t *testing.T) {
+	g, _ := NewExecutionGraph(
+		&config.Step{
+			Name:    "1",
+			Command: "sh",
+			Dir:     "~/",
+			Script:  "echo 1",
+		},
+	)
+	sc := New(&Config{})
+	err := sc.Schedule(g, nil)
+	require.Error(t, err)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+
+	nodes := g.Nodes()
+	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	assert.Equal(t, NodeStatus_Error, nodes[0].Status)
+	assert.Equal(t, nodes[0].DoneCount, 0)
+}
+
 func step(name, command string, depends ...string) *config.Step {
 	cmd, args := utils.SplitCommand(command)
 	return &config.Step{
