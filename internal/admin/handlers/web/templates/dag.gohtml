@@ -197,7 +197,13 @@
         <thead className="has-background-light">
           <th>Date</th>
           {logs.map((log, i) => {
-            const td = moment(logs[i].Status.StartedAt).format("M/D")
+            let td;
+            let startedAt = logs[i].Status.StartedAt;
+            if (startedAt && startedAt != "-") {
+              td = moment(startedAt).format("M/D")
+            } else {
+              td = moment().format("M/D");
+            }
             const flag = (i == 0 || moment(logs[i - 1].Status.StartedAt).format("M/D") != td)
             const style = Object.assign({}, colstyle);
             if (!flag) {
