@@ -7,9 +7,9 @@ import (
 
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,22 +23,20 @@ func Test_retryCommand(t *testing.T) {
 
 	dag, err := controller.FromConfig(configPath)
 	require.NoError(t, err)
-	require.Equal(t, dag.Status.Status, scheduler.SchedulerStatus_Error)
+	require.Equal(t, dag.Status.Status, scheduler.SchedulerStatus_Success)
 
 	db := database.New(database.DefaultConfig())
 	status, err := db.FindByRequestId(configPath, dag.Status.RequestId)
 	require.NoError(t, err)
-	dw := &database.Writer{Target: status.File}
-	err = dw.Open()
-	require.NoError(t, err)
+	status.Status.Nodes[0].Status = scheduler.NodeStatus_Error
+	status.Status.Status = scheduler.SchedulerStatus_Error
 
-	for _, n := range status.Status.Nodes {
-		n.CmdWithArgs = "echo parameter is $1"
-	}
-	err = dw.Write(status.Status)
-	require.NoError(t, err)
+	w := &database.Writer{Target: status.File}
+	require.NoError(t, w.Open())
+	require.NoError(t, w.Write(status.Status))
+	require.NoError(t, w.Close())
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Millisecond * 1000)
 
 	app = makeApp()
 	runAppTestOutput(app, appTest{
@@ -47,17 +45,19 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{"parameter is x"},
 	}, t)
 
-	assert.Eventually(t, func() bool {
-		dag, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
+	c := controller.New(dag.Config)
+
+	var retryStatus *models.Status
+	require.Eventually(t, func() bool {
+		retryStatus, err = c.GetLastStatus()
 		if err != nil {
 			return false
 		}
-		return dag.Status.Status == scheduler.SchedulerStatus_Success
+		return retryStatus.Status == scheduler.SchedulerStatus_Success
 	}, time.Millisecond*3000, time.Millisecond*100)
 
-	dag, err = controller.FromConfig(testConfig("cmd_retry.yaml"))
 	require.NoError(t, err)
-	require.NotEqual(t, status.Status.RequestId, dag.Status.RequestId)
+	require.NotEqual(t, retryStatus.RequestId, dag.Status.RequestId)
 }
 
 func Test_retryFail(t *testing.T) {

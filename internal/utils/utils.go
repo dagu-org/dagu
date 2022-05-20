@@ -14,6 +14,7 @@ import (
 func DefaultEnv() map[string]string {
 	return map[string]string{
 		"PATH": "${PATH}",
+		"HOME": "${HOME}",
 	}
 }
 

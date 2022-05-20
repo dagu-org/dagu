@@ -11,10 +11,6 @@ func Test_startCommand(t *testing.T) {
 			output: []string{"1 finished", "2 finished"},
 		},
 		{
-			args: []string{"", "start", testConfig("cmd_start_fail.yaml")}, errored: true,
-			output: []string{"1 failed"},
-		},
-		{
 			args: []string{"", "start", testConfig("cmd_start_with_params.yaml")}, errored: false,
 			output: []string{"params is param-value"},
 		},

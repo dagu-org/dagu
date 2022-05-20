@@ -45,7 +45,5 @@ func start(cfg *config.Config) error {
 		a.Signal(sig)
 	})
 
-	err := a.Run()
-	utils.LogIgnoreErr("running", err)
-	return nil
+	return a.Run()
 }
