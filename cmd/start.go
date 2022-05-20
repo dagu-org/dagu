@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -46,10 +45,5 @@ func start(cfg *config.Config) error {
 		a.Signal(sig)
 	})
 
-	err := a.Run()
-	if err != nil {
-		log.Printf("running agent: %v", err)
-		return err
-	}
-	return nil
+	return a.Run()
 }
