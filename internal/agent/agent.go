@@ -281,6 +281,11 @@ func (a *Agent) run() error {
 		}
 	}()
 
+	go func() {
+		time.Sleep(time.Millisecond * 100)
+		a.dbWriter.Write(a.Status())
+	}()
+
 	lastErr := a.scheduler.Schedule(a.graph, done)
 	status := a.Status()
 
