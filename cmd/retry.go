@@ -62,7 +62,5 @@ func retry(f, requestId string) error {
 		a.Signal(sig)
 	})
 
-	err = a.Run()
-	utils.LogIgnoreErr("retry", err)
-	return nil
+	return a.Run()
 }

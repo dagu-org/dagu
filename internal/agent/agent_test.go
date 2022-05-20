@@ -133,6 +133,15 @@ func TestPreConditionValid(t *testing.T) {
 	}
 }
 
+func TestStartError(t *testing.T) {
+	dag, err := controller.FromConfig(testConfig("agent_error.yaml"))
+	require.NoError(t, err)
+	status, err := testDAG(t, dag)
+	require.Error(t, err)
+
+	assert.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+}
+
 func TestOnExit(t *testing.T) {
 	dag, err := controller.FromConfig(testConfig("agent_on_exit.yaml"))
 	require.NoError(t, err)
