@@ -229,6 +229,17 @@
   function DAGsTable({ dags = [], groups = [], group = "" }) {
     const root = { Name: "" };
     const currGrp = "{{.Group}}";
+    const sortedDags = React.useMemo(() => {
+      return dags.sort((a, b) => {
+        if (a.File < b.File) {
+          return -1;
+        }
+        if (a.File > b.File) {
+          return 1;
+        }
+        return 0;
+      });
+    }, [dags])
     return (
       <table class="table is-bordered is-fullwidth card">
         <thead className="has-background-light">
@@ -248,7 +259,7 @@
           {groups.map((item) => {
             return <GroupItem key={item.Name} group={item}></GroupItem>;
           })}
-          {dags
+          {sortedDags
             .filter((dag) => !dag.Error)
             .map((dag) => {
               return <DAGItem key={dag.File} dag={dag} group={group}></DAGItem>;
