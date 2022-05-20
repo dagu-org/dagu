@@ -114,21 +114,22 @@ You can execute the example by pressing the `Start` button.
 
 ## YAML format
 
-You can define workflows (DAGs) in a simple YAML format.
-
-### Minimal
+### Minimal Example
 
 ```yaml
-name: minimal configuration          # DAG's name
-steps:                               # Steps inside the DAG
-  - name: step 1                     # Step's name (should be unique within the file)
-    command: ehho hello              # Command and arguments to execute
-  - name: step 2
-    command: bash
-    script: |                        # [optional] arbitrary script in any language
-      echo "world"
+name: create and run sql
+steps:
+ 
+  - name: create sql file
+    command: "bash"  
+    script: |
+      echo "select * from table;" > select.sql
+
+  - name: run the sql file
+    command: "psql -U username -d myDataBase -a -f psql select.sql"
+    stdout: output.txt
     depends:
-      - step 1                       # [optional] Name of the step to depend on
+      - create sql file
 ```
 
 ### Environment Variables
