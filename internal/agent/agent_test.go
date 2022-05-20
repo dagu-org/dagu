@@ -30,13 +30,19 @@ func TestMain(m *testing.M) {
 }
 
 func TestRunDAG(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_run.yaml"))
-	require.NoError(t, err)
+	_, dag := testDAGAsync(t, testConfig("agent_run.yaml"))
 
-	status, err := testDAG(t, dag)
-	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	status, _ := controller.New(dag.Config).GetLastStatus()
+	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
+	require.Equal(t, status.Nodes[0].Status, scheduler.NodeStatus_Running)
+
+	require.Eventually(t, func() bool {
+		status, err := controller.New(dag.Config).GetLastStatus()
+		require.NoError(t, err)
+		return status.Status == scheduler.SchedulerStatus_Success
+	}, time.Second*2, time.Millisecond*100)
 }
 
 func TestCheckRunning(t *testing.T) {

@@ -1,4 +1,4 @@
 name: "test"
 steps:
   - name: "1"
-    command: "true"
+    command: "sleep 1"
