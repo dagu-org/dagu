@@ -148,7 +148,7 @@ steps:
     output: YOUR_NAME
 
   - name: step 2
-    command: "echo hello world, ${USER_NAME}!"
+    command: "echo hello world, ${YOUR_NAME}!"
     stdout: /tmp/hello-world.txt
     depends:
       - step 1
