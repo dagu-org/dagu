@@ -1,0 +1,4 @@
+name: "test"
+steps:
+  - name: "1"
+    command: "false"
