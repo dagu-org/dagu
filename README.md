@@ -13,8 +13,10 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
 
 ## Contents
 
+  - [Contents](#contents)
   - [Why not Airflow or Prefect?](#why-not-airflow-or-prefect)
   - [️How does it work?](#️how-does-it-work)
+  - [Example](#example)
   - [️Quick start](#️quick-start)
     - [1. Installation](#1-installation)
     - [2. Launch the web UI](#2-launch-the-web-ui)
@@ -24,15 +26,15 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [Command Line User Interface](#command-line-user-interface)
   - [Web User Interface](#web-user-interface)
   - [YAML format](#yaml-format)
-    - [Minimal](#minimal)
+    - [Hello World](#hello-world)
     - [Environment Variables](#environment-variables)
     - [Parameters](#parameters)
     - [Command Substitution](#command-substitution)
     - [Conditional Logic](#conditional-logic)
     - [Run Code Snippet](#run-code-snippet)
-    - [State Handlers](#state-handlers)
     - [Output](#output)
     - [Redirection](#redirection)
+    - [State Handlers](#state-handlers)
     - [Repeating Task](#repeating-task)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
@@ -58,6 +60,25 @@ Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, 
 
 - Self-contained - Single binary with no dependency, No DBMS or cloud service is required.
 - Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
+
+## Example
+The below simple workflow creates and runs a sql.
+
+```yaml
+name: create and run sql
+steps:
+ 
+  - name: create sql file
+    command: "bash"  
+    script: |
+      echo "select * from table;" > select.sql
+
+  - name: run the sql file
+    command: "psql -U username -d myDataBase -a -f psql select.sql"
+    stdout: output.txt
+    depends:
+      - create sql file
+```
 
 ## ️Quick start
 
@@ -114,22 +135,23 @@ You can execute the example by pressing the `Start` button.
 
 ## YAML format
 
-### Minimal Example
+### Hello World
 
 ```yaml
-name: create and run sql
+name: hello world
 steps:
  
-  - name: create sql file
-    command: "bash"  
+  - name: step 1
+    command: bash  
     script: |
-      echo "select * from table;" > select.sql
+      echo ${USER}
+    output: YOUR_NAME
 
-  - name: run the sql file
-    command: "psql -U username -d myDataBase -a -f psql select.sql"
-    stdout: output.txt
+  - name: step 2
+    command: "echo hello world, ${USER_NAME}!"
+    stdout: /tmp/hello-world.txt
     depends:
-      - create sql file
+      - step 1
 ```
 
 ### Environment Variables
