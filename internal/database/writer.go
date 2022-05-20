@@ -43,7 +43,8 @@ func (w *Writer) Close() (err error) {
 	if !w.closed {
 		err = w.writer.Flush()
 		utils.LogIgnoreErr("flush file", err)
-		w.file.Close()
+		utils.LogIgnoreErr("file sync", w.file.Sync())
+		utils.LogIgnoreErr("file close", w.file.Close())
 		w.closed = true
 	}
 	return err
