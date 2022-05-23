@@ -119,13 +119,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 
 		switch params.Tab {
 		case DAG_TabType_Status:
-			if dag.Status != nil {
-				data.Graph = models.StepGraph(dag.Status.Nodes, params.Tab != DAG_TabType_Config)
-			}
-
 		case DAG_TabType_Config:
-			steps := models.FromSteps(dag.Config.Steps)
-			data.Graph = models.StepGraph(steps, params.Tab != DAG_TabType_Config)
 			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, params.Group, cfg))
 
 		case DAG_TabType_History:
