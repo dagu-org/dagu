@@ -25,6 +25,13 @@
     [SCHEDULER_STATUS__SUCCESS]: { backgroundColor: "green", color: "white" },
     [SCHEDULER_STATUS__SKIPPED_UNUSED]: { backgroundColor: "gray", color: "white" },
   }
+  const NODE_STATUS__NONE = 0;
+  const NODE_STATUS__RUNNING = 1
+  const NODE_STATUS__ERROR = 2;
+  const NODE_STATUS__CANCEL = 3;
+  const NODE_STATUS__SUCCESS = 4;
+  const NODE_STATUS__SKIPPED = 5;
+
   const DataContext = React.createContext({
     refresh: () => { },
   });
@@ -279,7 +286,7 @@
         {
           (props) => (
             <div>
-              <MermaidC style={mermaidStyle}>{data.Graph}</MermaidC>
+              <DagGraph steps={data.DAG.Config.Steps} type="config"></DagGraph>
               <ConfigTable config={data.DAG.Config}></ConfigTable>
               <StepConfigTable steps={data.DAG.Config.Steps}></StepConfigTable>
               <StepConfigTable steps={handlers}></StepConfigTable>
@@ -327,25 +334,69 @@
     )
   }
   function StatusTab({ data, subTab }) {
-    const mermaidStyle = {
-      display: 'flex',
-      alignItems: 'flex-center',
-      justifyContent: 'flex-start',
-      width: (data.DAG.Status.Nodes.length * 240) + "px",
-      minWidth: "100%",
-      minHeight: "100px",
-    };
     const handlers = getHandlersFromStatus(data.DAG.Status);
     return (
       <div>
         {subTab == 0 ? (
-          <MermaidC style={mermaidStyle}>{data.Graph}</MermaidC>
+          <DagGraph steps={data.DAG.Status.Nodes} type="status"></DagGraph>
         ) : (<Timeline status={data.DAG.Status}></Timeline>)}
         <StatusTable status={data.DAG.Status}></StatusTable>
         <NodeTable nodes={data.DAG.Status.Nodes} dag={data.DAG}></NodeTable>
         <NodeTable nodes={handlers}></NodeTable>
       </div>
     );
+  }
+  const graphStatusMap = {
+    [NODE_STATUS__NONE]: ":::none",
+    [NODE_STATUS__RUNNING]: ":::running",
+    [NODE_STATUS__ERROR]: ":::error",
+    [NODE_STATUS__CANCEL]: ":::cancel",
+    [NODE_STATUS__SUCCESS]: ":::done",
+    [NODE_STATUS__SKIPPED]: ":::skipped"
+  }
+  function DagGraph({ steps, type = "status" }) {
+    const mermaidStyle = {
+      display: 'flex',
+      alignItems: 'flex-center',
+      justifyContent: 'flex-start',
+      width: (steps.length * 240) + "px",
+      minWidth: "100%",
+      minHeight: "100px",
+    };
+    const graph = React.useMemo(() => {
+      if (!steps) {
+        return "";
+      }
+      let dat = [
+        "flowchart LR;"
+      ];
+      const addNodeFn = (step, status) => {
+        const id = step.Name.replaceAll(" ", "_");
+        let c = graphStatusMap[status] || "";
+        dat.push(`${id}(${step.Name})${c};`)
+        if (step.Depends) {
+          step.Depends.forEach((d) => {
+            const depId = d.replaceAll(" ", "_");
+            dat.push(`${depId}-->${id};`)
+          })
+        }
+      }
+      if (type == "status") {
+        steps.forEach(s => addNodeFn(s.Step, s.Status));
+      } else {
+        steps.forEach(s => addNodeFn(s, NODE_STATUS__NONE));
+      }
+      dat.push("classDef none fill:white,stroke:lightblue,stroke-width:2px");
+      dat.push("classDef running fill:white,stroke:lime,stroke-width:2px");
+      dat.push("classDef error fill:white,stroke:red,stroke-width:2px");
+      dat.push("classDef cancel fill:white,stroke:pink,stroke-width:2px");
+      dat.push("classDef done fill:white,stroke:green,stroke-width:2px");
+      dat.push("classDef skipped fill:white,stroke:gray,stroke-width:2px");
+      return dat.join("\n");
+    }, [steps]);
+    return (
+      <MermaidC style={mermaidStyle}>{graph}</MermaidC>
+    )
   }
   function StepLogTab({ data }) {
     return (
