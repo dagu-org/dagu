@@ -9,7 +9,7 @@ import (
 var testLoadConfigYaml = `
 dags: "` + "`echo /dags_dir`" + `"
 host: localhost
-port: 8000
+port: 8080
 command: /bin/current/dagu
 workdir: /dags_dir
 basicAuthUsername: user
@@ -31,7 +31,7 @@ func TestLoadConfig(t *testing.T) {
 	require.Equal(t, &Config{
 		DAGs:               "/dags_dir",
 		Host:               "localhost",
-		Port:               "8000",
+		Port:               "8080",
 		Command:            "/bin/current/dagu",
 		WorkDir:            "/dags_dir",
 		BasicAuthUsername:  "user",

@@ -70,7 +70,11 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Port = strconv.Itoa(def.Port)
+	if def.Port == 0 {
+		c.Port = settings.MustGet(settings.CONFIG__ADMIN_PORT)
+	} else {
+		c.Port = strconv.Itoa(def.Port)
+	}
 
 	jd, err := utils.ParseVariable(def.Dags)
 	if err != nil {

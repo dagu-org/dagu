@@ -88,7 +88,7 @@ Download the latest binary from the [Releases page](https://github.com/yohamta/d
 
 ### 2. Launch the web UI
 
-Start the server with `dagu server` and browse to `http://127.0.0.1:8000` to explore the Web UI.
+Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
 ### 3. Create a new workflow
 
@@ -364,7 +364,7 @@ You can customize the admin web UI by environment variables.
 
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
-- `DAGU__ADMIN_PORT` - port number for web URL (default : `8000`)
+- `DAGU__ADMIN_PORT` - port number for web URL (default : `8080`)
 - `DAGU__ADMIN_NAVBAR_COLOR` - navigation header color for web UI (optional)
 - `DAGU__ADMIN_NAVBAR_TITLE` - navigation header title for web UI (optional)
 

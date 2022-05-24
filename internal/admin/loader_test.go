@@ -30,7 +30,7 @@ func TestDefaultConfig(t *testing.T) {
 
 	testConfig(t, cfg, &testWant{
 		Host:    "127.0.0.1",
-		Port:    "8000",
+		Port:    "8080",
 		DAGs:    path.Join(wd),
 		Command: "dagu",
 	})
