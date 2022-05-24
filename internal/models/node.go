@@ -1,9 +1,7 @@
 package models
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -75,47 +73,6 @@ func FromSteps(steps []*config.Step) []*Node {
 		ret = append(ret, fromStepWithDefValues(s))
 	}
 	return ret
-}
-
-func StepGraph(steps []*Node, displayStatus bool) string {
-	var buf bytes.Buffer
-	buf.WriteString("flowchart LR;")
-	for _, s := range steps {
-		buf.WriteString(fmt.Sprintf("%s(%s)", graphNode(s.Name), s.Name))
-		if displayStatus {
-			switch s.Status {
-			case scheduler.NodeStatus_Running:
-				buf.WriteString(":::running")
-			case scheduler.NodeStatus_Error:
-				buf.WriteString(":::error")
-			case scheduler.NodeStatus_Cancel:
-				buf.WriteString(":::cancel")
-			case scheduler.NodeStatus_Success:
-				buf.WriteString(":::done")
-			case scheduler.NodeStatus_Skipped:
-				buf.WriteString(":::skipped")
-			default:
-				buf.WriteString(":::none")
-			}
-		} else {
-			buf.WriteString(":::none")
-		}
-		buf.WriteString(";")
-		for _, d := range s.Depends {
-			buf.WriteString(graphNode(d) + "-->" + graphNode(s.Name) + ";")
-		}
-	}
-	buf.WriteString("classDef none fill:white,stroke:lightblue,stroke-width:2px\n")
-	buf.WriteString("classDef running fill:white,stroke:lime,stroke-width:2px\n")
-	buf.WriteString("classDef error fill:white,stroke:red,stroke-width:2px\n")
-	buf.WriteString("classDef cancel fill:white,stroke:pink,stroke-width:2px\n")
-	buf.WriteString("classDef done fill:white,stroke:green,stroke-width:2px\n")
-	buf.WriteString("classDef skipped fill:white,stroke:gray,stroke-width:2px\n")
-	return buf.String()
-}
-
-func graphNode(val string) string {
-	return strings.ReplaceAll(val, " ", "_")
 }
 
 func fromStepWithDefValues(s *config.Step) *Node {

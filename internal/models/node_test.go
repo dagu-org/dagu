@@ -49,21 +49,6 @@ func TestToNode(t *testing.T) {
 	}
 }
 
-func TestStepGraph(t *testing.T) {
-	g := testRunSteps(
-		t,
-		makeStep("true"),
-	)
-	orig := g.Nodes()
-	nodes := FromNodes(orig)
-	ret := StepGraph(nodes, true)
-	require.Contains(t, ret, nodes[0].Name)
-}
-
-func TestGraphNodeString(t *testing.T) {
-	require.Equal(t, graphNode("test step"), "test_step")
-}
-
 func testRunSteps(t *testing.T, steps ...*config.Step) *scheduler.ExecutionGraph {
 	g, err := scheduler.NewExecutionGraph(steps...)
 	require.NoError(t, err)
