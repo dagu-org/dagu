@@ -344,6 +344,7 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 		status := a.Status()
+		status.Status = scheduler.SchedulerStatus_Running
 		b, err := status.ToJson()
 		if err != nil {
 			encodeError(w, err)
