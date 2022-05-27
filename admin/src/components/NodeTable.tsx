@@ -1,9 +1,11 @@
 import React, { CSSProperties } from "react";
 import { stepTabColStyles } from "../consts";
+import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
 import { Node } from "../models/Node";
 import { SchedulerStatus, Status } from "../models/Status";
 import { Step } from "../models/Step";
 import NodeTableRow from "./NodeTableRow";
+import StatusUpdateModal from "./StatusUpdateModal";
 
 type Props = {
   nodes?: Node[];
@@ -16,7 +18,13 @@ type Props = {
 
 function NodeTable({ nodes, status, group, name, refresh, file = "" }: Props) {
   const [modal, setModal] = React.useState(false);
-  const [current, setCurrent] = React.useState<Step | null>(null);
+  const [current, setCurrent] = React.useState<Step | undefined>(undefined);
+  const { doPost } = useWorkflowPostApi({
+    name,
+    group,
+    onSuccess: refresh,
+    requestId: status.RequestId,
+  });
   const requireModal = (step: Step) => {
     if (
       status?.Status != SchedulerStatus.Running &&
@@ -29,64 +37,18 @@ function NodeTable({ nodes, status, group, name, refresh, file = "" }: Props) {
   const dismissModal = React.useCallback(() => {
     setModal(false);
   }, [setModal]);
-  React.useEffect(() => {
-    const callback = (event: KeyboardEvent) => {
-      const e = event || window.event;
-      if (e.key == "Escape" || e.key == "Esc") {
-        setModal(false);
-      }
-    };
-    document.addEventListener("keydown", callback);
-    return () => {
-      document.removeEventListener("keydown", callback);
-    };
-  }, []);
   const onUpdateStatus = React.useCallback(
-    async (params: {
-      group: string;
-      name: string;
-      step: string;
-      action: string;
-      requestId: string;
-    }) => {
-      const form = new FormData();
-      form.set("group", params.group);
-      form.set("action", params.action);
-      form.set("request-id", params.requestId);
-      form.set("step", params.step);
-      const url = `${API_URL}/dags/${params.name}`;
-      const ret = await fetch(url, {
-        method: "POST",
-        mode: "cors",
-        body: form,
-      });
-      if (ret.ok) {
-        refresh();
-        dismissModal();
-      } else {
-        const e = await ret.text();
-        alert(e);
-      }
+    async (step: Step, action: string) => {
+      doPost(action, step.Name);
+      dismissModal();
     },
     [refresh, dismissModal]
   );
-  const tableStyle: CSSProperties = {
-    tableLayout: "fixed",
-    wordWrap: "break-word",
-  };
-  const divStyle: CSSProperties = {
-    overflowX: "auto",
-  };
   const styles = stepTabColStyles;
-  const modalbuttonStyle = {};
-  const modalStyle = {
-    display: modal ? "flex" : "none",
-  };
   let i = 0;
   if (!nodes || !nodes.length) {
     return null;
   }
-
   return (
     <div className="card mt-4" style={divStyle}>
       <table className="table is-bordered is-fullwidth card" style={tableStyle}>
@@ -118,66 +80,22 @@ function NodeTable({ nodes, status, group, name, refresh, file = "" }: Props) {
           ))}
         </tbody>
       </table>
-
-      {current ? (
-        <div className="modal is-active" style={modalStyle}>
-          <div className="modal-background"></div>
-          <div className="modal-card">
-            <header className="modal-card-head">
-              <p className="modal-card-title">
-                Update status of "{current.Name}"
-              </p>
-              <button
-                className="delete"
-                aria-label="close"
-                onClick={dismissModal}
-              ></button>
-            </header>
-            <section className="modal-card-body">
-              <div className="mr-4 pt-4 is-flex is-flex-direction-row">
-                <button
-                  value="mark-success"
-                  className="button is-info"
-                  style={modalbuttonStyle}
-                  onClick={() =>
-                    onUpdateStatus({
-                      group,
-                      name,
-                      requestId: status.RequestId,
-                      action: "mark-success",
-                      step: current.Name,
-                    })
-                  }
-                >
-                  <span>Mark Success</span>
-                </button>
-                <button
-                  className="button is-info ml-4"
-                  style={modalbuttonStyle}
-                  onClick={() =>
-                    onUpdateStatus({
-                      group,
-                      name,
-                      requestId: status.RequestId,
-                      action: "mark-failed",
-                      step: current.Name,
-                    })
-                  }
-                >
-                  <span>Mark Failed</span>
-                </button>
-              </div>
-            </section>
-            <footer className="modal-card-foot">
-              <button className="button" onClick={dismissModal}>
-                Cancel
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
+      <StatusUpdateModal
+        visible={modal}
+        step={current}
+        dismissModal={dismissModal}
+        onSubmit={onUpdateStatus}
+      />
     </div>
   );
 }
 
 export default NodeTable;
+
+const tableStyle: CSSProperties = {
+  tableLayout: "fixed",
+  wordWrap: "break-word",
+};
+const divStyle: CSSProperties = {
+  overflowX: "auto",
+};

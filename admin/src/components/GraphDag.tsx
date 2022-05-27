@@ -6,9 +6,10 @@ import Mermaid from "./Mermaid";
 type Props = {
   type: "status" | "config";
   steps?: Step[] | Node[];
+  onClickNode?: (id: string) => void;
 };
 
-function GraphDag({ steps, type = "status" }: Props) {
+function GraphDag({ steps, type = "status", onClickNode }: Props) {
   const mermaidStyle = {
     display: "flex",
     alignItems: "flex-center",
@@ -22,6 +23,8 @@ function GraphDag({ steps, type = "status" }: Props) {
       return "";
     }
     let dat = ["flowchart LR;"];
+    // @ts-ignore
+    window.onClickMermaidNode = onClickNode;
     const addNodeFn = (step: Step, status: NodeStatus) => {
       const id = step.Name.replace(/\s/, "_");
       let c = graphStatusMap[status] || "";
@@ -31,6 +34,9 @@ function GraphDag({ steps, type = "status" }: Props) {
           const depId = d.replace(/\s/, "_");
           dat.push(`${depId}-->${id};`);
         });
+      }
+      if (onClickNode) {
+        dat.push(`click ${id} onClickMermaidNode`);
       }
     };
     if (type == "status") {
@@ -45,7 +51,7 @@ function GraphDag({ steps, type = "status" }: Props) {
     dat.push("classDef done fill:white,stroke:green,stroke-width:2px");
     dat.push("classDef skipped fill:white,stroke:gray,stroke-width:2px");
     return dat.join("\n");
-  }, [steps]);
+  }, [steps, onClickNode]);
   return <Mermaid style={mermaidStyle}>{graph}</Mermaid>;
 }
 
