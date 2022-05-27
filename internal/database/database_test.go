@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -9,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
@@ -56,7 +56,7 @@ func testNewDataFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 	p := utils.ValidFilename(strings.TrimSuffix(
 		path.Base(cfg.ConfigPath), path.Ext(cfg.ConfigPath)), "_")
-	assert.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
+	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
 
 	_, err = db.newFile("", timestamp, requestId)
 	require.Error(t, err)
@@ -134,11 +134,11 @@ func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 
 	status, err := db.FindByRequestId(cfg.ConfigPath, "request-id-2")
 	require.NoError(t, err)
-	assert.Equal(t, status.Status.RequestId, "request-id-2")
+	require.Equal(t, status.Status.RequestId, "request-id-2")
 
 	status, err = db.FindByRequestId(cfg.ConfigPath, "request-id-10000")
-	assert.Error(t, err)
-	assert.Nil(t, status)
+	require.Error(t, err)
+	require.Nil(t, status)
 }
 
 func testRemoveOldFiles(t *testing.T, db *Database) {
@@ -206,7 +206,7 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 
 	require.NoError(t, err)
 	require.NotNil(t, ret)
-	assert.Equal(t, int(status.Pid), int(ret.Pid))
+	require.Equal(t, int(status.Pid), int(ret.Pid))
 	require.Equal(t, status.Status, ret.Status)
 
 }
@@ -248,8 +248,8 @@ func testReadStatusN(t *testing.T, db *Database) {
 	ret := db.ReadStatusHist(cfg.ConfigPath, recordMax)
 
 	require.Equal(t, recordMax, len(ret))
-	assert.Equal(t, cfg.Name, ret[0].Status.Name)
-	assert.Equal(t, cfg.Name, ret[1].Status.Name)
+	require.Equal(t, cfg.Name, ret[0].Status.Name)
+	require.Equal(t, cfg.Name, ret[1].Status.Name)
 }
 
 func testCompactFile(t *testing.T, db *Database) {
@@ -286,7 +286,7 @@ func testCompactFile(t *testing.T, db *Database) {
 
 	db2 := New(db.Config)
 	err = db2.Compact(cfg.ConfigPath, s.File)
-	assert.False(t, utils.FileExists(s.File))
+	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)
 
 	var s2 *models.StatusFile = nil
@@ -295,8 +295,8 @@ func testCompactFile(t *testing.T, db *Database) {
 	}
 	require.NotNil(t, s2)
 
-	assert.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
-	assert.Equal(t, s.Status, s2.Status)
+	require.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
+	require.Equal(t, s.Status, s2.Status)
 
 	err = db2.Compact(cfg.ConfigPath, "Invalid_file_name.dat")
 	require.Error(t, err)
@@ -364,6 +364,48 @@ func TestTimestamp(t *testing.T) {
 		{Name: "test_timestamp.20200101.10:00:00.dat", Want: "20200101.10:00:00"},
 		{Name: "test_timestamp.20200101.12:34:56_c.dat", Want: "20200101.12:34:56"},
 	} {
-		assert.Equal(t, tt.Want, timestamp(tt.Name))
+		require.Equal(t, tt.Want, timestamp(tt.Name))
 	}
+}
+
+func TestReadLine(t *testing.T) {
+	tmpDir := utils.MustTempDir("test_read_line")
+	defer os.RemoveAll(tmpDir)
+	tmpFile := filepath.Join(tmpDir, "test_read_line.dat")
+
+	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY, 0644)
+	require.NoError(t, err)
+
+	// error
+	_, err = readLineFrom(f, 0)
+	require.Error(t, err)
+
+	// write data
+	dat := []byte("line1\nline2")
+	f.Write(dat)
+
+	err = f.Sync()
+	require.NoError(t, err)
+
+	err = f.Close()
+	require.NoError(t, err)
+
+	f, err = os.Open(tmpFile)
+	require.NoError(t, err)
+
+	f.Seek(0, 0)
+	var offset int64 = 0
+	for _, tt := range []struct {
+		Want []byte
+	}{
+		{Want: []byte("line1")},
+		{Want: []byte("line2")},
+	} {
+		got, err := readLineFrom(f, offset)
+		require.NoError(t, err)
+		require.Equal(t, tt.Want, got)
+		offset += int64(len([]byte(tt.Want))) + 1 // +1 for \n
+	}
+	_, err = readLineFrom(f, offset)
+	require.Equal(t, io.EOF, err)
 }

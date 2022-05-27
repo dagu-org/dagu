@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -46,17 +47,28 @@ func ParseFile(file string) (*models.Status, error) {
 		return nil, err
 	}
 	defer f.Close()
-	l, err := findLastLine(f)
-	if err != nil {
-		log.Printf("failed to find last line. err: %v", err)
-		return nil, err
+	var offset int64 = 0
+	var ret *models.Status
+	for {
+		line, err := readLineFrom(f, offset)
+		if err == io.EOF {
+			if ret == nil {
+				return nil, err
+			}
+			return ret, nil
+		} else if err != nil {
+			return nil, err
+		}
+		offset += int64(len(line)) + 1 // +1 for newline
+		if len(line) > 0 {
+			var m *models.Status
+			m, err = models.StatusFromJson(string(line))
+			if err == nil {
+				ret = m
+				continue
+			}
+		}
 	}
-	m, err := models.StatusFromJson(l)
-	if err != nil {
-		log.Printf("failed to parse json. err: %v", err)
-		return nil, err
-	}
-	return m, nil
 }
 
 func (db *Database) NewWriter(configPath string, t time.Time, requestId string) (*Writer, string, error) {
@@ -270,41 +282,20 @@ func timestamp(file string) string {
 	return rTimestamp.FindString(file)
 }
 
-func findLastLine(f *os.File) (ret string, err error) {
-	// seek to -2 position to the end of the file
-	offset, err := f.Seek(-2, 2)
-	if err != nil {
-		return "", err
+func readLineFrom(f *os.File, offset int64) ([]byte, error) {
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		return nil, err
 	}
-
-	buf := make([]byte, 1)
-	for {
-		_, err = f.ReadAt(buf, offset)
-		if err != nil {
-			return "", err
-		}
-		// Find line break ('LF')
-		// then read the line
-		if buf[0] == byte('\n') {
-			f.Seek(offset+1, 0)
-			return readLineFrom(f)
-		}
-		// If offset == 0 then read the first line
-		if offset == 0 {
-			f.Seek(0, 0)
-			str, err := readLineFrom(f)
-			return str, err
-		}
-		offset--
-	}
-}
-
-func readLineFrom(f *os.File) (string, error) {
 	r := bufio.NewReader(f)
 	ret := []byte{}
 	for {
 		b, isPrefix, err := r.ReadLine()
-		utils.LogIgnoreErr("read line", err)
+		if err == io.EOF {
+			return ret, err
+		} else if err != nil {
+			log.Printf("read line failed. %s", err)
+			return nil, err
+		}
 		if err == nil {
 			ret = append(ret, b...)
 			if !isPrefix {
@@ -312,8 +303,7 @@ func readLineFrom(f *os.File) (string, error) {
 			}
 		}
 	}
-	return string(ret), nil
-
+	return ret, nil
 }
 
 func prefix(configPath string) string {
