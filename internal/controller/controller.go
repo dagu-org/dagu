@@ -139,6 +139,8 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 			}
 			return defaultStatus(s.cfg), readErr
 		}
+		// it is wrong status if the status is running
+		status.CorrectRunningStatus()
 		return status, nil
 	}
 	return nil, err
@@ -147,6 +149,14 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
 	db := database.New(database.DefaultConfig())
 	ret, err := db.FindByRequestId(s.cfg.ConfigPath, requestId)
+	if err != nil {
+		return nil, err
+	}
+	status, _ := s.GetStatus()
+	if status != nil && status.RequestId != requestId {
+		// if the request id is not matched then correct the status
+		ret.Status.CorrectRunningStatus()
+	}
 	return ret.Status, err
 }
 
