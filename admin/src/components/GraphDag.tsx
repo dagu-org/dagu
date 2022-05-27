@@ -26,12 +26,12 @@ function GraphDag({ steps, type = "status", onClickNode }: Props) {
     // @ts-ignore
     window.onClickMermaidNode = onClickNode;
     const addNodeFn = (step: Step, status: NodeStatus) => {
-      const id = step.Name.replace(/\s/, "_");
+      const id = step.Name.replace(/\s/g, "_");
       let c = graphStatusMap[status] || "";
       dat.push(`${id}(${step.Name})${c};`);
       if (step.Depends) {
         step.Depends.forEach((d) => {
-          const depId = d.replace(/\s/, "_");
+          const depId = d.replace(/\s/g, "_");
           dat.push(`${depId}-->${id};`);
         });
       }
