@@ -67,7 +67,13 @@ function DetailsPage() {
     [key in WorkflowTabType]: React.ReactNode;
   }> = {
     [WorkflowTabType.Status]: (
-      <WorkflowTabStatus workflow={data.DAG} subtab={sub} />
+      <WorkflowTabStatus
+        workflow={data.DAG}
+        subtab={sub}
+        group={group}
+        name={params.name || ""}
+        refresh={getData}
+      />
     ),
     [WorkflowTabType.Config]: <WorkflowTabConfig data={data} />,
     [WorkflowTabType.History]: <WorkflowTabHist logData={data.LogData} />,
