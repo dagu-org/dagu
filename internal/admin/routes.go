@@ -49,5 +49,6 @@ func defaultRoutes(cfg *Config) []*route {
 		)},
 		{http.MethodGet, `^/assets/js/.*$`, handlers.HandleGetAssets(handlers.AssetTypeJs)},
 		{http.MethodGet, `^/assets/css/.*$`, handlers.HandleGetAssets(handlers.AssetTypeCss)},
+		{http.MethodGet, `^*.woff2$|^*.ttf$`, handlers.HandleGetAssets(handlers.AssetTypeFont)},
 	}
 }
