@@ -47,7 +47,7 @@ function WorkflowTabStatus({ workflow, subtab, group, name, refresh }: Props) {
       }
       // find the clicked step
       const n = workflow.Status?.Nodes.find(
-        (n) => n.Step.Name.replace(/\s/, "_") == id
+        (n) => n.Step.Name.replace(/\s/g, "_") == id
       );
       if (n) {
         setSelectedStep(n.Step);
