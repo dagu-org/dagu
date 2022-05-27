@@ -70,8 +70,8 @@ func NewStatus(cfg *config.Config, nodes []*scheduler.Node, status scheduler.Sch
 	if e != nil {
 		finish = *e
 	}
-	models := []*Node{}
-	if nodes != nil && len(nodes) != 0 {
+	var models []*Node
+	if len(nodes) != 0 {
 		models = FromNodes(nodes)
 	} else {
 		models = FromSteps(cfg.Steps)
@@ -95,6 +95,13 @@ func NewStatus(cfg *config.Config, nodes []*scheduler.Node, status scheduler.Sch
 		StartedAt:  utils.FormatTime(start),
 		FinishedAt: utils.FormatTime(finish),
 		Params:     strings.Join(cfg.Params, " "),
+	}
+}
+
+func (sts *Status) CorrectRunningStatus() {
+	if sts.Status == scheduler.SchedulerStatus_Running {
+		sts.Status = scheduler.SchedulerStatus_Error
+		sts.StatusText = sts.Status.String()
 	}
 }
 

@@ -64,6 +64,7 @@ func ParseFile(file string) (*models.Status, error) {
 			var m *models.Status
 			m, err = models.StatusFromJson(string(line))
 			if err == nil {
+				m.CorrectRunningStatus()
 				ret = m
 				continue
 			}

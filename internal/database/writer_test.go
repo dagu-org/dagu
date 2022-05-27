@@ -71,14 +71,14 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
-	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
+	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)
 	status.RequestId = "request-id-test-write-status-to-existing-file"
 	require.NoError(t, dw.Write(status))
 	dw.Close()
 
 	data, err := db.FindByRequestId(cfg.ConfigPath, status.RequestId)
 	require.NoError(t, err)
-	assert.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Running)
+	assert.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Cancel)
 	assert.Equal(t, file, data.File)
 
 	dw = &Writer{Target: file}
