@@ -187,3 +187,8 @@ func TestTruncString(t *testing.T) {
 	require.Equal(t, "12345678", utils.TruncString("123456789", 8))
 	require.Equal(t, "1234567", utils.TruncString("1234567", 8))
 }
+
+func TestStringWithFallback(t *testing.T) {
+	require.Equal(t, "test", utils.StringWithFallback("", "test"))
+	require.Equal(t, "test", utils.StringWithFallback("test", "fallback"))
+}

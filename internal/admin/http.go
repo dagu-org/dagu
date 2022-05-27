@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type server struct {
@@ -29,7 +31,10 @@ func (svr *server) Shutdown() {
 	if err != nil {
 		log.Printf("server shutdown: %v", err)
 	}
-	close(svr.idleConnsClosed)
+	if svr.idleConnsClosed != nil {
+		close(svr.idleConnsClosed)
+		svr.idleConnsClosed = nil
+	}
 }
 
 func (svr *server) Serve() (err error) {
@@ -38,7 +43,9 @@ func (svr *server) Serve() (err error) {
 
 	svr.idleConnsClosed = make(chan struct{})
 
-	log.Printf("admin server is running at \"http://%s\"\n", svr.addr)
+	host := utils.StringWithFallback(svr.config.Host, "localhost")
+	log.Printf("admin server is running at \"http://%s:%s\"\n",
+		host, svr.config.Port)
 
 	err = svr.server.ListenAndServe()
 	if err == http.ErrServerClosed {
@@ -64,6 +71,7 @@ func (svr *server) setupServer() {
 func (svr *server) setupHandler() {
 	svr.admin.addRoute(http.MethodPost, `^/shutdown$`, svr.handleShutdown)
 	handler := requestLogger(svr.admin)
+	handler = cors(handler)
 	if svr.config.IsBasicAuth {
 		handler = basicAuth(handler,
 			svr.config.BasicAuthUsername,

@@ -1,6 +1,6 @@
-{{define "base"}}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -8,21 +8,20 @@
   <title>Dagu Admin Web</title>
   <style>
     #nav {
-      {{ navbarColor }}
+      background-image: linear-gradient(to right, #23282d, #666666);
     }
   </style>
   <script>
-    const API_URL = "";
     function getConfig() {
       return {
-        title: "{{ navbarTitle }}",
+        title: "Dagu Admin",
       }
     }
   </script>
-  <script defer="defer" src="/assets/js/bundle.js?v={{ version }}"></script>
 </head>
+
 <body>
-  {{template "content" .}}
+  <div id="root"></div>
 </body>
+
 </html>
-{{ end }}

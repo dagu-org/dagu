@@ -43,17 +43,12 @@ type dagResponse struct {
 	LogData    *Log
 	LogUrl     string
 	Group      string
-	StepLog    *stepLog
-	ScLog      *schedulerLog
+	StepLog    *logFile
+	ScLog      *logFile
 	Errors     []string
 }
 
-type schedulerLog struct {
-	LogFile string
-	Content string
-}
-
-type stepLog struct {
+type logFile struct {
 	Step    *models.Node
 	LogFile string
 	Content string
@@ -96,7 +91,7 @@ type DAGHandlerConfig struct {
 }
 
 func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
-	renderFunc := useTemplate("dag.gohtml", "dag")
+	renderFunc := useTemplate("index.gohtml", "dag")
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg, err := getPathParameter(r)
@@ -292,10 +287,8 @@ func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				encodeError(w, err)
 				return
 			}
-			c, _ := controller.FromConfig(newFile)
-			group := strings.TrimLeft(strings.Replace(c.Dir, hc.DAGsDir, "", 1), "/")
-			url := fmt.Sprintf("%s?group=%s&t=%d", path.Base(newFile), group, DAG_TabType_Config)
-			http.Redirect(w, r, url, http.StatusSeeOther)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("OK"))
 		default:
 			encodeError(w, errInvalidArgs)
 			return
@@ -325,32 +318,32 @@ func updateStatus(c controller.Controller, reqId, step string, to scheduler.Node
 	return c.UpdateStatus(status)
 }
 
-func readSchedulerLog(c controller.Controller, file string) (*schedulerLog, error) {
-	logFile := ""
+func readSchedulerLog(c controller.Controller, file string) (*logFile, error) {
+	f := ""
 	if file == "" {
 		s, err := c.GetLastStatus()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status")
 		}
-		logFile = s.Log
+		f = s.Log
 	} else {
 		s, err := database.ParseFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status file %s", file)
 		}
-		logFile = s.Log
+		f = s.Log
 	}
-	b, err := os.ReadFile(logFile)
+	b, err := os.ReadFile(f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s", logFile)
+		return nil, fmt.Errorf("failed to read file %s", f)
 	}
-	return &schedulerLog{
+	return &logFile{
 		LogFile: file,
 		Content: string(b),
 	}, nil
 }
 
-func readStepLog(c controller.Controller, file, stepName, enc string) (*stepLog, error) {
+func readStepLog(c controller.Controller, file, stepName, enc string) (*logFile, error) {
 	var steps []*models.Node = nil
 	var stepm = map[string]*models.Node{
 		constants.OnSuccess: nil,
@@ -402,7 +395,7 @@ func readStepLog(c controller.Controller, file, stepName, enc string) (*stepLog,
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s", step.Log)
 	}
-	return &stepLog{
+	return &logFile{
 		LogFile: file,
 		Step:    step,
 		Content: string(b),
@@ -473,7 +466,7 @@ func getPathParameter(r *http.Request) (string, error) {
 	if len(m) < 2 {
 		return "", fmt.Errorf("invalid URL")
 	}
-	return m[1], nil
+	return fmt.Sprintf("%s.yaml", m[1]), nil
 }
 
 func getDAGParameter(r *http.Request) *dagParameter {

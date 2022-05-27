@@ -5,11 +5,18 @@ VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(VERSION)'
 
 .PHONY: build
-build: bin
+build: build-admin bin
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
 
+.PHONY: build-admin
+build-admin:
+	cd admin; \
+		yarn && yarn build
+	cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+
 .PHONY: server
-server: build
+server:
+	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
 	go run -ldflags="$(LDFLAGS)" ./cmd/ server
 
 .PHONY: test

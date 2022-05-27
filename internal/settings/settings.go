@@ -48,7 +48,7 @@ func load() {
 		path.Join(dir, "/.dagu/data"))
 	cache[CONFIG__LOGS_DIR] = config(CONFIG__LOGS_DIR,
 		path.Join(dir, "/.dagu/logs"))
-	cache[CONFIG__ADMIN_PORT] = config(CONFIG__ADMIN_PORT, "8000")
+	cache[CONFIG__ADMIN_PORT] = config(CONFIG__ADMIN_PORT, "8080")
 	cache[CONFIG__ADMIN_NAVBAR_COLOR] = config(CONFIG__ADMIN_NAVBAR_COLOR, "")
 	cache[CONFIG__ADMIN_NAVBAR_TITLE] = config(CONFIG__ADMIN_NAVBAR_TITLE, "Dagu admin")
 }

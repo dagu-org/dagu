@@ -153,3 +153,10 @@ func TruncString(val string, max int) string {
 	}
 	return val
 }
+
+func StringWithFallback(val, fallback string) string {
+	if val == "" {
+		return fallback
+	}
+	return val
+}
