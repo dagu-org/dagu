@@ -198,7 +198,7 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil)
 	dw.Write(status)
 
-	status.Status = scheduler.SchedulerStatus_Running
+	status.Status = scheduler.SchedulerStatus_Success
 	status.Pid = 20000
 	dw.Write(status)
 

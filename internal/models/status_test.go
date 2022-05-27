@@ -63,3 +63,11 @@ func TestStatusSerialization(t *testing.T) {
 	require.Equal(t, 1, len(st_.Nodes))
 	assert.Equal(t, cfg.Steps[0].Name, st_.Nodes[0].Name)
 }
+
+func TestCorrectRunningStatus(t *testing.T) {
+	cfg := &config.Config{Name: "test"}
+	status := NewStatus(cfg, nil, scheduler.SchedulerStatus_Running,
+		10000, nil, nil)
+	status.CorrectRunningStatus()
+	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+}
