@@ -47,7 +47,7 @@ func makeApp() *cli.App {
 	return &cli.App{
 		Name:      "Dagu",
 		Usage:     "Self-contained, easy-to-use workflow engine for smaller use cases",
-		UsageText: "dagu [options] <start|status|stop|retry|dry|server> [args]",
+		UsageText: "dagu [options] <start|status|stop|retry|dry|server|version> [args]",
 		Commands: []*cli.Command{
 			newStartCommand(),
 			newStatusCommand(),
@@ -55,6 +55,7 @@ func makeApp() *cli.App {
 			newRetryCommand(),
 			newDryCommand(),
 			newServerCommand(),
+			newVersionCommand(),
 		},
 	}
 }
