@@ -7,9 +7,9 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A No-code workflow executor with built-in web UI**
+**A self-contained, standalone No-code workflow executor with built-in Web UI**
 
-It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format.
+It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format that is similar to [GitHub Actions](https://github.com/features/actions) or [Argo Workflows](https://argoproj.github.io/argo-workflows/workflow-templates/).
 
 ## Contents
 
@@ -112,6 +112,7 @@ You can execute the example by pressing the `Start` button.
 - `dagu stop <file>` - Stops the workflow execution by sending TERM signals
 - `dagu dry [--params=<params>] <file>` - Dry-runs the workflow
 - `dagu server` - Starts the web server for web UI
+- `dagu version` - Shows the current binary version
 
 ## Web User Interface
 
