@@ -4,8 +4,16 @@ import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
 import { Node } from "../models/Node";
 import { SchedulerStatus, Status } from "../models/Status";
 import { Step } from "../models/Step";
-import NodeTableRow from "./NodeTableRow";
+import NodeStatusTableRow from "./NodeStatusTableRow";
 import StatusUpdateModal from "./StatusUpdateModal";
+import {
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 
 type Props = {
   nodes?: Node[];
@@ -16,7 +24,14 @@ type Props = {
   refresh: () => void;
 };
 
-function NodeTable({ nodes, status, group, name, refresh, file = "" }: Props) {
+function NodeStatusTable({
+  nodes,
+  status,
+  group,
+  name,
+  refresh,
+  file = "",
+}: Props) {
   const [modal, setModal] = React.useState(false);
   const [current, setCurrent] = React.useState<Step | undefined>(undefined);
   const { doPost } = useWorkflowPostApi({
@@ -50,47 +65,49 @@ function NodeTable({ nodes, status, group, name, refresh, file = "" }: Props) {
     return null;
   }
   return (
-    <div className="card mt-4" style={divStyle}>
-      <table className="table is-bordered is-fullwidth card" style={tableStyle}>
-        <thead className="has-background-light">
-          <tr>
-            <th style={styles[i++]}>#</th>
-            <th style={styles[i++]}>Step Name</th>
-            <th style={styles[i++]}>Description</th>
-            <th style={styles[i++]}>Command</th>
-            <th style={styles[i++]}>Args</th>
-            <th style={styles[i++]}>Started At</th>
-            <th style={styles[i++]}>Finished At</th>
-            <th style={styles[i++]}>Status</th>
-            <th style={styles[i++]}>Error</th>
-            <th style={styles[i++]}>Log</th>
-          </tr>
-        </thead>
-        <tbody>
-          {nodes.map((n, idx) => (
-            <NodeTableRow
-              key={n.Step.Name}
-              rownum={idx + 1}
-              node={n}
-              file={file}
-              group={group}
-              name={name}
-              onRequireModal={requireModal}
-            ></NodeTableRow>
-          ))}
-        </tbody>
-      </table>
+    <React.Fragment>
+      <Paper>
+        <Table size="small" sx={tableStyle}>
+          <TableHead>
+            <TableRow>
+              <TableCell style={styles[i++]}>#</TableCell>
+              <TableCell style={styles[i++]}>Step Name</TableCell>
+              <TableCell style={styles[i++]}>Description</TableCell>
+              <TableCell style={styles[i++]}>Command</TableCell>
+              <TableCell style={styles[i++]}>Args</TableCell>
+              <TableCell style={styles[i++]}>Started At</TableCell>
+              <TableCell style={styles[i++]}>Finished At</TableCell>
+              <TableCell style={styles[i++]}>Status</TableCell>
+              <TableCell style={styles[i++]}>Error</TableCell>
+              <TableCell style={styles[i++]}>Log</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {nodes.map((n, idx) => (
+              <NodeStatusTableRow
+                key={n.Step.Name}
+                rownum={idx + 1}
+                node={n}
+                file={file}
+                group={group}
+                name={name}
+                onRequireModal={requireModal}
+              ></NodeStatusTableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Paper>
       <StatusUpdateModal
         visible={modal}
         step={current}
         dismissModal={dismissModal}
         onSubmit={onUpdateStatus}
       />
-    </div>
+    </React.Fragment>
   );
 }
 
-export default NodeTable;
+export default NodeStatusTable;
 
 const tableStyle: CSSProperties = {
   tableLayout: "fixed",

@@ -3,7 +3,9 @@ import { Node } from "../models/Node";
 import { Step } from "../models/Step";
 import { WorkflowTabType } from "../models/WorkflowTab";
 import MultilineText from "./MultilineText";
-import NodeStatusTag from "./NodeStatusTag";
+import NodeStatusChip from "./NodeStatusChip";
+import { TableCell } from "@mui/material";
+import StyledTableRow from "./StyledTableRow";
 
 type Props = {
   rownum: number;
@@ -14,7 +16,7 @@ type Props = {
   onRequireModal: (step: Step) => void;
 };
 
-function NodeTableRow({
+function NodeStatusTableRow({
   group,
   name,
   rownum,
@@ -31,26 +33,28 @@ function NodeTableRow({
     outline: "none",
   };
   return (
-    <tr>
-      <td> {rownum} </td>
-      <td> {node.Step.Name} </td>
-      <td>
+    <StyledTableRow>
+      <TableCell> {rownum} </TableCell>
+      <TableCell> {node.Step.Name} </TableCell>
+      <TableCell>
         <MultilineText>{node.Step.Description}</MultilineText>
-      </td>
-      <td> {node.Step.Command} </td>
-      <td> {node.Step.Args ? node.Step.Args.join(" ") : ""} </td>
-      <td> {node.StartedAt} </td>
-      <td> {node.FinishedAt} </td>
-      <td>
+      </TableCell>
+      <TableCell> {node.Step.Command} </TableCell>
+      <TableCell> {node.Step.Args ? node.Step.Args.join(" ") : ""} </TableCell>
+      <TableCell> {node.StartedAt} </TableCell>
+      <TableCell> {node.FinishedAt} </TableCell>
+      <TableCell>
         <button style={buttonStyle} onClick={() => onRequireModal(node.Step)}>
-          <NodeStatusTag status={node.Status}>{node.StatusText}</NodeStatusTag>
+          <NodeStatusChip status={node.Status}>
+            {node.StatusText}
+          </NodeStatusChip>
         </button>
-      </td>
-      <td> {node.Error} </td>
-      <td>
+      </TableCell>
+      <TableCell> {node.Error} </TableCell>
+      <TableCell>
         <a href={url}> {node.Log} </a>
-      </td>
-    </tr>
+      </TableCell>
+    </StyledTableRow>
   );
 }
-export default NodeTableRow;
+export default NodeStatusTableRow;

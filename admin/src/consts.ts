@@ -23,13 +23,8 @@ export const nodeStatusColorMapping = {
   [NodeStatus.Skipped]: statusColorMapping[SchedulerStatus.Skipped_Unused],
 };
 
-export const tagColorMapping = {
-  Workflow: { backgroundColor: "rgb(88, 187, 151)", color: "white" },
-  Group: { backgroundColor: "rgb(76, 172, 229)", color: "white" },
-};
-
 export const stepTabColStyles = [
-  { width: "40px" },
+  { width: "60px" },
   { width: "200px" },
   { width: "150px" },
   { width: "150px" },

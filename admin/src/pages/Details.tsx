@@ -2,15 +2,22 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import { GetWorkflowResponse } from "../api/Workflow";
 import ConfigErrors from "../components/ConfigErrors";
-import WorkflowTabStatus from "../components/WorkflowTabStatus";
-import WorkflowSubTabs from "../components/WorkflowSubTabs";
-import WorkflowTabs from "../components/WorkflowTabs";
-import WorkflowTitle from "../components/WorkflowTitle";
+import WorkflowStatus from "../components/WorkflowStatus";
 import { WorkflowContext } from "../contexts/WorkflowContext";
 import { WorkflowTabType } from "../models/WorkflowTab";
-import WorkflowTabConfig from "../components/WorkflowTabConfig";
-import WorkflowTabHist from "../components/WorkflowTabHist";
+import WorkflowConfig from "../components/WorkflowConfig";
+import WorkflowHistory from "../components/WorkflowHistory";
 import WorkflowTabLog from "../components/WorkflowTabLog";
+import {
+  Box,
+  CircularProgress,
+  Container,
+  Paper,
+  Tab,
+  Tabs,
+} from "@mui/material";
+import Title from "../components/Title";
+import WorkflowButtons from "../components/WorkflowButtons";
 
 type Params = {
   name: string;
@@ -23,6 +30,7 @@ function DetailsPage() {
   );
   const [tab, setTab] = React.useState(WorkflowTabType.Status);
   const [group, setGroup] = React.useState("");
+  const [width, setWidth] = React.useState(0);
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     let t = urlParams.get("t");
@@ -34,7 +42,6 @@ function DetailsPage() {
       setGroup(group);
     }
   }, []);
-  const [sub, setSub] = React.useState(0);
   async function getData() {
     let url = API_URL + `/dags/${params.name}?format=json`;
     const urlParams = new URLSearchParams(window.location.search);
@@ -60,23 +67,37 @@ function DetailsPage() {
       return () => clearInterval(timer);
     }
   }, [tab]);
+
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    const width = ref.current ? ref.current.offsetWidth : 0;
+    if (width) {
+      setWidth(width);
+    }
+  }, [ref.current]);
+
   if (!data || !data.DAG) {
-    return <div>Loading...</div>;
+    return (
+      <Container>
+        <CircularProgress />
+      </Container>
+    );
   }
+
   const contents: Partial<{
     [key in WorkflowTabType]: React.ReactNode;
   }> = {
     [WorkflowTabType.Status]: (
-      <WorkflowTabStatus
+      <WorkflowStatus
         workflow={data.DAG}
-        subtab={sub}
         group={group}
         name={params.name || ""}
         refresh={getData}
+        width={width}
       />
     ),
-    [WorkflowTabType.Config]: <WorkflowTabConfig data={data} />,
-    [WorkflowTabType.History]: <WorkflowTabHist logData={data.LogData} />,
+    [WorkflowTabType.Config]: <WorkflowConfig data={data} width={width} />,
+    [WorkflowTabType.History]: <WorkflowHistory logData={data.LogData} />,
     [WorkflowTabType.StepLog]: <WorkflowTabLog log={data.StepLog} />,
     [WorkflowTabType.ScLog]: <WorkflowTabLog log={data.ScLog} />,
   };
@@ -87,18 +108,74 @@ function DetailsPage() {
     group,
     name: params.name!,
   };
+
+  const baseUrl = `/dags/${params.name}?&group=${group}`;
+
   return (
     <WorkflowContext.Provider value={ctx}>
-      <ConfigErrors errors={data.Errors}></ConfigErrors>
-      <WorkflowTitle title={data.Title}></WorkflowTitle>
-      <WorkflowTabs tab={tab} group={group}></WorkflowTabs>
-      <WorkflowSubTabs
-        tab={tab}
-        active={sub}
-        setActive={setSub}
-      ></WorkflowSubTabs>
-      <div className="mx-5 mt-5">{contents[tab]}</div>
+      <Paper
+        ref={ref}
+        sx={{
+          p: 2,
+          display: "flex",
+          flexDirection: "column",
+          overflowX: "auto",
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+        }}
+      >
+        <ConfigErrors errors={data.Errors} />
+
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Title>{data.Title}</Title>
+          <WorkflowButtons
+            status={data.DAG.Status}
+            group={group}
+            name={params.name!}
+            refresh={getData}
+          />
+        </Box>
+
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Tabs value={tab}>
+            <LinkTab
+              label="Status"
+              value={WorkflowTabType.Status}
+              href={`${baseUrl}&t=${WorkflowTabType.Status}`}
+            />
+            <LinkTab
+              label="Config"
+              value={WorkflowTabType.Config}
+              href={`${baseUrl}&t=${WorkflowTabType.Config}`}
+            />
+            <LinkTab
+              label="History"
+              value={WorkflowTabType.History}
+              href={`${baseUrl}&t=${WorkflowTabType.History}`}
+            />
+          </Tabs>
+        </Box>
+      </Paper>
+
+      {contents[tab]}
     </WorkflowContext.Provider>
   );
 }
 export default DetailsPage;
+
+interface LinkTabProps {
+  label?: string;
+  href?: string;
+  value: string;
+}
+
+function LinkTab(props: LinkTabProps) {
+  return <Tab component="a" {...props} />;
+}
