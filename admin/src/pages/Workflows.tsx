@@ -1,9 +1,12 @@
 import React from "react";
 import { GetListResponse } from "../api/List";
 import WorkflowErrors from "../components/WorkflowErrors";
-import Header from "../components/Header";
+import Box from "@mui/material/Box";
+import CreateWorkflowButton from "../components/CreateWorkflowButton";
 import WithLoading from "../components/WithLoading";
 import WorkflowTable from "../components/WorkflowTable";
+import Title from "../components/Title";
+import Paper from "@mui/material/Paper";
 
 function WorkflowsPage() {
   const [data, setData] = React.useState<GetListResponse | undefined>();
@@ -41,21 +44,33 @@ function WorkflowsPage() {
   }
 
   return (
-    <WithLoading loaded={!!data}>
-      <Header refresh={getData}></Header>
-      <div className="mx-5 mt-5">
-        <WorkflowErrors
-          workflows={data.DAGs}
-          errors={data.Errors}
-          hasError={data.HasError}
-        ></WorkflowErrors>
-        <WorkflowTable
-          workflows={data.DAGs}
-          groups={data.Groups}
-          group={data.Group}
-        ></WorkflowTable>
-      </div>
-    </WithLoading>
+    <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Title>Workflows</Title>
+        <CreateWorkflowButton refresh={getData}></CreateWorkflowButton>
+      </Box>
+      <Box>
+        <WithLoading loaded={!!data}>
+          <WorkflowErrors
+            workflows={data.DAGs}
+            errors={data.Errors}
+            hasError={data.HasError}
+          ></WorkflowErrors>
+          <WorkflowTable
+            workflows={data.DAGs}
+            groups={data.Groups}
+            group={data.Group}
+          ></WorkflowTable>
+        </WithLoading>
+      </Box>
+    </Paper>
   );
 }
 export default WorkflowsPage;

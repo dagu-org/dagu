@@ -28,7 +28,7 @@ var defaultFuncs = template.FuncMap{
 	"navbarColor": func() string {
 		c, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_COLOR)
 		if c == "" {
-			return "background-image: linear-gradient(to right, #23282d, #666666);"
+			return ""
 		}
 		return fmt.Sprintf("background-color: %s;", c)
 	},

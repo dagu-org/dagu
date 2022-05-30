@@ -19,7 +19,6 @@ function Timeline({ status }: Props) {
   const graph = React.useMemo(() => {
     let ret = [
       "gantt",
-      "title Finished timeline",
       "dateFormat YYYY-MM-DD HH:mm:ss",
       "axisFormat %H:%M:%S",
       "todayMarker off",

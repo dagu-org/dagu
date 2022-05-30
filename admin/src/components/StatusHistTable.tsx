@@ -3,6 +3,13 @@ import React, { CSSProperties } from "react";
 import { DagStatus } from "../api/Workflow";
 import { StatusFile } from "../models/StatusFile";
 import StatusHistTableRow from "./StatusHistTableRow";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 
 type Props = {
   logs: StatusFile[];
@@ -13,43 +20,36 @@ type Props = {
 
 function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
   return (
-    <table className="table is-fullwidth card" style={tableStyle}>
-      <thead className="has-background-light">
-        <tr>
-          <th>Date</th>
+    <Table size="small" sx={tableStyle}>
+      <TableHead>
+        <TableRow>
+          <TableCell></TableCell>
           {logs.map((log, i) => {
-            let td;
+            let date;
             let startedAt = logs[i].Status.StartedAt;
             if (startedAt && startedAt != "-") {
-              td = moment(startedAt).format("M/D");
+              date = moment(startedAt).format("M/D");
             } else {
-              td = moment().format("M/D");
+              date = moment().format("M/D");
             }
             const flag =
               i == 0 ||
-              moment(logs[i - 1].Status.StartedAt).format("M/D") != td;
-            const style: CSSProperties = { ...colstyle };
-            if (!flag) {
-              style.borderLeft = "none";
-            }
-            if (i < logs.length - 1) {
-              style.borderRight = "none";
-            }
+              moment(logs[i - 1].Status.StartedAt).format("M/D") != date;
             return (
-              <th
+              <TableCell
                 key={log.Status.StartedAt}
-                style={style}
+                style={colStyle}
                 onClick={() => {
                   onSelect(i);
                 }}
               >
-                {flag ? td : ""}
-              </th>
+                {flag ? date : ""}
+              </TableCell>
             );
           })}
-        </tr>
-      </thead>
-      <tbody>
+        </TableRow>
+      </TableHead>
+      <TableBody>
         {gridData.map((data) => {
           return (
             <StatusHistTableRow
@@ -60,17 +60,19 @@ function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
             ></StatusHistTableRow>
           );
         })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
 export default StatusHistTable;
 
-const colstyle = {
-  minWidth: "30px",
-  maxWidth: "30px",
-  width: "30px",
+const colStyle: CSSProperties = {
+  maxWidth: "22px",
+  minWidth: "22px",
+  textAlign: "left",
 };
 
-const tableStyle: CSSProperties = { userSelect: "none" };
+const tableStyle: CSSProperties = {
+  userSelect: "none",
+};

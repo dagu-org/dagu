@@ -1,24 +1,20 @@
 import React from "react";
-import Prism from "../assets/js/prism"
+import Prism from "../assets/js/prism";
 
 type Props = {
   value: string;
-  onEdit: () => void;
 };
 
-function ConfigPreview({ value, onEdit }: Props) {
+function ConfigPreview({ value }: Props) {
   React.useEffect(() => {
     Prism.highlightAll();
   }, [value]);
   return (
-    <div>
-      <pre>
-        <code className="language-yaml">{value}</code>
-      </pre>
-      <button className="button is-info" onClick={onEdit}>
-        Edit
-      </button>
-    </div>
+    <pre style={{
+      fontSize: "0.9rem",
+    }}>
+      <code className="language-yaml">{value}</code>
+    </pre>
   );
 }
 

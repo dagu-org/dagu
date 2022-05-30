@@ -1,9 +1,15 @@
 import React from "react";
 import WorkflowTableRow from "./WorkflowTableRow";
-import GroupItem from "./GroupItem";
-import GroupItemBack from "./GroupItemBack";
+import WorkflowTableRowGroup from "./WorkflowTableRowGroup";
 import { DAG } from "../models/Dag";
 import { Group } from "../models/Group";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 
 type Props = {
   workflows: DAG[];
@@ -24,23 +30,26 @@ function WorkflowTable({ workflows = [], groups = [], group = "" }: Props) {
     });
   }, [workflows]);
   return (
-    <table className="table is-bordered is-fullwidth card">
-      <thead className="has-background-light">
-        <tr>
-          <th>Workflow</th>
-          <th>Type</th>
-          <th>Name</th>
-          <th>Description</th>
-          <th>Status</th>
-          <th>Pid</th>
-          <th>Started At</th>
-          <th>Finished At</th>
-        </tr>
-      </thead>
-      <tbody>
-        {group != "" ? <GroupItemBack></GroupItemBack> : null}
+    <Table size="small">
+      <TableHead>
+        <TableRow>
+          <TableCell>Workflow</TableCell>
+          <TableCell>Type</TableCell>
+          <TableCell>Name</TableCell>
+          <TableCell>Description</TableCell>
+          <TableCell>Status</TableCell>
+          <TableCell>Pid</TableCell>
+          <TableCell>Started At</TableCell>
+          <TableCell>Finished At</TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {group != "" ? (
+          <WorkflowTableRowGroup url={encodeURI("/dags/")} text="../"></WorkflowTableRowGroup>
+        ) : null}
         {groups.map((item) => {
-          return <GroupItem key={item.Name} group={item}></GroupItem>;
+          const url = encodeURI("/dags/?group=" + item.Name);
+          return <WorkflowTableRowGroup key={item.Name} url={url} text={item.Name} />;
         })}
         {sorted
           .filter((wf) => !wf.Error)
@@ -53,8 +62,8 @@ function WorkflowTable({ workflows = [], groups = [], group = "" }: Props) {
               ></WorkflowTableRow>
             );
           })}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 export default WorkflowTable;

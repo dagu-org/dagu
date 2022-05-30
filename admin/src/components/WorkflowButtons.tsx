@@ -1,3 +1,4 @@
+import { Box, Button, Stack } from "@mui/material";
 import React, { FormEvent } from "react";
 import { GetWorkflowResponse } from "../api/Workflow";
 import { WorkflowContext } from "../contexts/WorkflowContext";
@@ -45,29 +46,6 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
     },
     [refresh]
   );
-  const buttonStyle = React.useMemo(
-    () => ({
-      start: {
-        width: "100px",
-        backgroundColor: "gray",
-        border: 0,
-        color: "white",
-      },
-      stop: {
-        width: "100px",
-        backgroundColor: "gray",
-        border: 0,
-        color: "white",
-      },
-      retry: {
-        width: "100px",
-        backgroundColor: "gray",
-        border: 0,
-        color: "white",
-      },
-    }),
-    []
-  );
   const buttonState = React.useMemo(
     () => ({
       start: status?.Status != SchedulerStatus.Running,
@@ -78,12 +56,17 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
     [status]
   );
   return (
-    <div className="mr-4 pt-4 is-flex is-flex-direction-row">
-      <button
-        value="start"
-        className="button is-rounded"
+    <Stack direction="row" spacing={2}>
+      <Button
+        variant="contained"
+        color="info"
+        size="small"
+        startIcon={
+          <span className="icon">
+            <i className="fa-solid fa-play"></i>
+          </span>
+        }
         disabled={!buttonState["start"]}
-        style={buttonStyle["start"]}
         onClick={() =>
           onSubmit("Do you really want to start the workflow?", {
             group: group,
@@ -92,17 +75,18 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
           })
         }
       >
-        <span className="icon">
-          <i className="fa-solid fa-play"></i>
-        </span>
-        <span>Start</span>
-      </button>
-      <input type="hidden" name="group" value={group}></input>
-      <button
-        value="stop"
-        className="button is-rounded ml-4"
+        Start
+      </Button>
+      <Button
+        variant="contained"
+        color="info"
+        size="small"
+        startIcon={
+          <span className="icon">
+            <i className="fa-solid fa-stop"></i>
+          </span>
+        }
         disabled={!buttonState["stop"]}
-        style={buttonStyle["stop"]}
         onClick={() =>
           onSubmit("Do you really want to cancel the workflow?", {
             group: group,
@@ -111,16 +95,18 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
           })
         }
       >
-        <span className="icon">
-          <i className="fa-solid fa-stop"></i>
-        </span>
-        <span>Stop</span>
-      </button>
-      <button
-        value="retry"
-        className="button is-rounded ml-4"
+        Stop
+      </Button>
+      <Button
+        variant="contained"
+        color="info"
+        size="small"
+        startIcon={
+          <span className="icon">
+            <i className="fa-solid fa-reply"></i>
+          </span>
+        }
         disabled={!buttonState["retry"]}
-        style={buttonStyle["retry"]}
         onClick={() =>
           onSubmit(
             `Do you really want to rerun the last execution (${status?.RequestId}) ?`,
@@ -133,12 +119,9 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
           )
         }
       >
-        <span className="icon">
-          <i className="fa-solid fa-reply"></i>
-        </span>
-        <span>Retry</span>
-      </button>
-    </div>
+        Retry
+      </Button>
+    </Stack>
   );
 }
 export default WorkflowButtons;

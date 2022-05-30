@@ -1,5 +1,6 @@
 import React, { CSSProperties } from "react";
 import mermaidAPI from "mermaid";
+import { Box } from "@mui/material";
 
 type Props = {
   children: string;
@@ -22,7 +23,7 @@ function Mermaid({ children, style = {} }: Props) {
     try {
       mermaidAPI.initialize({
         // @ts-ignore
-        securityLevel: 'loose',
+        securityLevel: "loose",
         startOnLoad: true,
         maxTextSize: 99999999,
         flowchart: {
@@ -50,14 +51,14 @@ function Mermaid({ children, style = {} }: Props) {
   }, [children, divRef]);
   const param = { __html: html };
   return (
-    <div style={dStyle}>
-      <div
+    <Box sx={dStyle}>
+      <Box
         className="mermaid"
         dangerouslySetInnerHTML={param}
         ref={divRef}
-        style={mStyle}
-      ></div>
-    </div>
+        sx={mStyle}
+      />
+    </Box>
   );
 }
 

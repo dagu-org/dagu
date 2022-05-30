@@ -1,3 +1,4 @@
+import { CircularProgress, Container } from "@mui/material";
 import React from "react";
 
 type Props = {
@@ -7,7 +8,15 @@ type Props = {
 
 function WithLoading({ children, loaded }: Props) {
   if (!loaded) {
-    return <div>Loading...</div>;
+    return (
+      <Container
+        sx={{
+          width: "100%",
+        }}
+      >
+        <CircularProgress />
+      </Container>
+    );
   }
   return <React.Fragment>{children}</React.Fragment>;
 }

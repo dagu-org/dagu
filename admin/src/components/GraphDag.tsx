@@ -16,7 +16,7 @@ function GraphDag({ steps, type = "status", onClickNode }: Props) {
     justifyContent: "flex-start",
     width: steps ? steps.length * 240 + "px" : "100%",
     minWidth: "100%",
-    minHeight: "100px",
+    minHeight: "200px",
   };
   const graph = React.useMemo(() => {
     if (!steps) {
