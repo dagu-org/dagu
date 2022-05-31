@@ -1,5 +1,7 @@
 # build
 bin/*
+internal/admin/handlers/web/assets/fonts/*
+internal/admin/handlers/web/assets/js/*
 
 # tmp files
 tmp/*
