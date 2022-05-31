@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { statusColorMapping } from "../consts";
 import { DAG } from "../models/Dag";
 import { SchedulerStatus } from "../models/Status";
 
@@ -58,21 +59,21 @@ function DashboardTimechart({ data: input }: Props) {
         />
         <YAxis dataKey="name" type="category" hide />
         <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
-          {/* {data.map((_, index) => {
+          {data.map((_, index) => {
             const color = statusColorMapping[data[index].status];
             return <Cell fill={color.backgroundColor} />;
-          })} */}
+          })}
           <LabelList
             dataKey="name"
             position="insideLeft"
-            content={({ x, y, height, value }: LabelProps) => {
+            content={({ x, y, width, height, value }: LabelProps) => {
               return (
                 <text
-                  x={10 + Number(x)}
+                  x={Number(x) + Number(width) + 2}
                   y={Number(y) + (Number(height) || 0) / 2}
-                  fill="#222"
+                  fill="#000"
                   fontSize={12}
-                  textAnchor="middle"
+                  textAnchor="start"
                 >
                   {value}
                 </text>
