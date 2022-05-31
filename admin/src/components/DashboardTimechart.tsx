@@ -26,30 +26,36 @@ function DashboardTimechart({ data: input }: Props) {
   const [data, setData] = React.useState<DataFrame[]>([]);
   React.useEffect(() => {
     const ret: DataFrame[] = [];
-    const now = moment().unix();
+    const now = moment();
     input.forEach((wf) => {
       const status = wf.Status;
-      if (!status || !status.StartedAt || status.StartedAt == "-") {
-        return;
+      const start = status?.StartedAt;
+      if (start && start != "-") {
+        const end = status.FinishedAt;
+        let to = now.unix();
+        if (end && end != "-") {
+          to = moment(end).unix();
+        }
+        ret.push({
+          name: status.Name,
+          status: status.Status,
+          values: [moment(start).unix(), to],
+        });
       }
-      const f = status.FinishedAt;
-      const to = !f || f == "-" ? now : moment(f).unix();
-      ret.push({
-        name: status.Name,
-        status: status.Status,
-        values: [moment(status.StartedAt).unix(), to],
-      });
     });
     setData(ret);
-    console.log({ ret });
   }, [input]);
+  const now = moment();
   return (
     <ResponsiveContainer width="100%" height="90%">
       <BarChart data={data} layout="vertical">
         <XAxis
           name="Time"
-          tickFormatter={(unixTime) => moment(unixTime).format("HH:mm")}
+          tickFormatter={(unixTime) => moment.unix(unixTime).format("HH:mm")}
           type="number"
+          dataKey="values"
+          tickCount={96}
+          domain={[now.startOf("day").unix(), now.endOf("day").unix()]}
         />
         <YAxis dataKey="name" type="category" hide />
         <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
@@ -60,14 +66,14 @@ function DashboardTimechart({ data: input }: Props) {
           <LabelList
             dataKey="name"
             position="insideLeft"
-            content={({ x, y, height, value }: LabelProps) => {
+            content={({ x, y, width, height, value }: LabelProps) => {
               return (
                 <text
-                  x={10 + Number(x)}
+                  x={Number(x) + Number(width) + 2}
                   y={Number(y) + (Number(height) || 0) / 2}
-                  fill="#222"
+                  fill="#000"
                   fontSize={12}
-                  textAnchor="middle"
+                  textAnchor="start"
                 >
                   {value}
                 </text>
