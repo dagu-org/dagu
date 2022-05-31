@@ -34,7 +34,7 @@ export function useGetApi<T>(path: string, opts: Options) {
 
   React.useEffect(() => {
     doGet();
-  }, [doGet]);
+  }, []);
 
   return {
     data,
