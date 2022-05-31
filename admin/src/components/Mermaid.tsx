@@ -1,65 +1,80 @@
 import React, { CSSProperties } from "react";
 import mermaidAPI from "mermaid";
-import { Box } from "@mui/material";
 
 type Props = {
-  children: string;
+  def: string;
   style?: CSSProperties;
 };
 
-function Mermaid({ children, style = {} }: Props) {
-  const [html, setHtml] = React.useState("");
-  const divRef = React.useRef<HTMLDivElement>(null);
+mermaidAPI.initialize({
+  // @ts-ignore
+  securityLevel: "loose",
+  startOnLoad: false,
+  maxTextSize: 99999999,
+  flowchart: {
+    useMaxWidth: false,
+    htmlLabels: true,
+  },
+  logLevel: 4, // ERROR
+});
+
+function Mermaid({ def, style = {} }: Props) {
+  const ref = React.useRef<HTMLDivElement>(null);
   const mStyle = {
     ...style,
   };
   const dStyle: CSSProperties = {
     overflowX: "auto",
   };
-  React.useEffect(() => {
-    if (!divRef.current) {
+  function render() {
+    if (!ref.current) {
       return;
     }
-    try {
-      mermaidAPI.initialize({
-        // @ts-ignore
-        securityLevel: "loose",
-        startOnLoad: true,
-        maxTextSize: 99999999,
-        flowchart: {
-          useMaxWidth: false,
-          htmlLabels: true,
-        },
-      });
-      mermaidAPI.render(
-        "mermaid",
-        children,
-        (svgCode, bindFunc) => {
-          setHtml(svgCode);
-          setTimeout(() => {
-            if (divRef.current) {
-              bindFunc(divRef.current);
-            }
-          }, 500);
-        },
-        divRef.current
-      );
-    } catch (error) {
-      console.error(error);
-      console.error(children);
+    console.log({
+      def,
+    });
+    if (def.startsWith("<")) {
+      console.error("invalid definition!!");
+      return;
     }
-  }, [children, divRef]);
-  const param = { __html: html };
+    mermaidAPI.render(
+      "mermaid",
+      def,
+      (svgCode, bindFunc) => {
+        console.log({ svgCode });
+        if (ref.current) {
+          // @ts-ignore
+          ref.current.innerHTML = svgCode;
+        }
+        setTimeout(() => {
+          if (ref.current) {
+            bindFunc(ref.current);
+          }
+        }, 500);
+      },
+      ref.current
+    );
+  }
+  function renderWithRetry() {
+    try {
+      render();
+    } catch (error) {
+      console.error("error rendering mermaid, retrying, error:");
+      console.error(error);
+      console.error(def);
+      setTimeout(renderWithRetry, 1);
+    }
+  }
+  React.useEffect(() => {
+    renderWithRetry();
+  }, [def, ref.current]);
   return (
-    <Box sx={dStyle}>
-      <Box
-        className="mermaid"
-        dangerouslySetInnerHTML={param}
-        ref={divRef}
-        sx={mStyle}
-      />
-    </Box>
+    <div style={dStyle}>
+      <div className="mermaid" ref={ref} style={mStyle} />
+    </div>
   );
 }
 
-export default Mermaid;
+export default React.memo(Mermaid, (prev, next) => {
+  return prev.def == next.def;
+});

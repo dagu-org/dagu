@@ -5,7 +5,7 @@ type Props = {
   log?: LogFile;
 };
 
-function WorkflowTabLog({ log }: Props) {
+function WorkflowLog({ log }: Props) {
   if (!log) {
     return <div>No Log</div>;
   }
@@ -16,4 +16,4 @@ function WorkflowTabLog({ log }: Props) {
   );
 }
 
-export default WorkflowTabLog;
+export default WorkflowLog;

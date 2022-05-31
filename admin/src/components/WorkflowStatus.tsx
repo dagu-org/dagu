@@ -2,10 +2,10 @@ import React from "react";
 import { WorkflowContext } from "../contexts/WorkflowContext";
 import { DAG } from "../models/Dag";
 import { Handlers, SchedulerStatus } from "../models/Status";
-import GraphDag from "./GraphDag";
+import Graph from "./Graph";
 import NodeStatusTable from "./NodeStatusTable";
 import StatusInfoTable from "./StatusInfoTable";
-import Timeline from "./GraphTimeline";
+import Timeline from "./Timeline";
 import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
 import StatusUpdateModal from "./StatusUpdateModal";
 import { Step } from "../models/Step";
@@ -16,10 +16,9 @@ type Props = {
   name: string;
   group: string;
   refresh: () => void;
-  width: number;
 };
 
-function WorkflowStatus({ workflow, group, name, refresh, width }: Props) {
+function WorkflowStatus({ workflow, group, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState("0");
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
@@ -68,6 +67,7 @@ function WorkflowStatus({ workflow, group, name, refresh, width }: Props) {
         sx={{
           pb: 4,
           px: 2,
+          mx: 4,
           display: "flex",
           flexDirection: "column",
           overflowX: "auto",
@@ -99,51 +99,52 @@ function WorkflowStatus({ workflow, group, name, refresh, width }: Props) {
         </Tabs>
 
         <Box
-          maxWidth={width ? `${width - 100}px` : "100%"}
           sx={{
             overflowX: "auto",
           }}
         >
           {sub == "0" ? (
-            <GraphDag
+            <Graph
               steps={workflow.Status.Nodes}
               type="status"
               onClickNode={onSelectStepOnGraph}
-            ></GraphDag>
+            ></Graph>
           ) : (
             <Timeline status={workflow.Status}></Timeline>
           )}
         </Box>
       </Paper>
 
-      <WorkflowContext.Consumer>
-        {(props) => (
-          <React.Fragment>
-            <Box sx={{ mt: 2 }}>
-              <StatusInfoTable
-                status={workflow.Status}
-                {...props}
-              ></StatusInfoTable>
-            </Box>
+      <Box sx={{ mx: 4 }}>
+        <WorkflowContext.Consumer>
+          {(props) => (
+            <React.Fragment>
+              <Box sx={{ mt: 2 }}>
+                <StatusInfoTable
+                  status={workflow.Status}
+                  {...props}
+                ></StatusInfoTable>
+              </Box>
 
-            <Box sx={{ mt: 2 }}>
-              <NodeStatusTable
-                nodes={workflow.Status!.Nodes}
-                status={workflow.Status!}
-                {...props}
-              ></NodeStatusTable>
-            </Box>
+              <Box sx={{ mt: 2 }}>
+                <NodeStatusTable
+                  nodes={workflow.Status!.Nodes}
+                  status={workflow.Status!}
+                  {...props}
+                ></NodeStatusTable>
+              </Box>
 
-            <Box sx={{ mt: 2 }}>
-              <NodeStatusTable
-                nodes={handlers}
-                status={workflow.Status!}
-                {...props}
-              ></NodeStatusTable>
-            </Box>
-          </React.Fragment>
-        )}
-      </WorkflowContext.Consumer>
+              <Box sx={{ mt: 2 }}>
+                <NodeStatusTable
+                  nodes={handlers}
+                  status={workflow.Status!}
+                  {...props}
+                ></NodeStatusTable>
+              </Box>
+            </React.Fragment>
+          )}
+        </WorkflowContext.Consumer>
+      </Box>
 
       <StatusUpdateModal
         visible={modal}

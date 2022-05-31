@@ -7,15 +7,14 @@ import { Step } from "../models/Step";
 import ConfigEditor from "./ConfigEditor";
 import ConfigInfoTable from "./ConfigInfoTable";
 import ConfigPreview from "./ConfigPreview";
-import GraphDag from "./GraphDag";
+import Graph from "./Graph";
 import ConfigStepTable from "./ConfigStepTable";
 
 type Props = {
   data: GetWorkflowResponse;
-  width: number;
 };
 
-function WorkflowConfig({ data, width }: Props) {
+function WorkflowConfig({ data }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState(data.Definition);
   const handlers = getHandlersFromConfig(data.DAG?.Config);
@@ -32,6 +31,7 @@ function WorkflowConfig({ data, width }: Props) {
               sx={{
                 pb: 4,
                 px: 2,
+                mx: 4,
                 display: "flex",
                 flexDirection: "column",
                 overflowX: "auto",
@@ -40,31 +40,31 @@ function WorkflowConfig({ data, width }: Props) {
               }}
             >
               <Box
-                maxWidth={width ? `${width - 100}px` : "100%"}
                 sx={{
                   overflowX: "auto",
                 }}
               >
-                <GraphDag
-                  steps={data.DAG.Config.Steps}
-                  type="config"
-                ></GraphDag>
+                <Graph steps={data.DAG.Config.Steps} type="config"></Graph>
               </Box>
             </Paper>
 
-            <Box sx={{ mt: 2 }}>
-              <ConfigInfoTable config={data.DAG.Config!}></ConfigInfoTable>
-            </Box>
-            <Box sx={{ mt: 2 }}>
-              <ConfigStepTable steps={data.DAG.Config.Steps}></ConfigStepTable>
-            </Box>
-            <Box sx={{ mt: 2 }}>
-              <ConfigStepTable steps={handlers}></ConfigStepTable>
+            <Box sx={{ mx: 4 }}>
+              <Box sx={{ mt: 2 }}>
+                <ConfigInfoTable config={data.DAG.Config!}></ConfigInfoTable>
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <ConfigStepTable
+                  steps={data.DAG.Config.Steps}
+                ></ConfigStepTable>
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <ConfigStepTable steps={handlers}></ConfigStepTable>
+              </Box>
             </Box>
 
             <Paper
               sx={{
-                mt: 2,
+                mx: 4,
                 p: 2,
                 display: "flex",
                 flexDirection: "column",
