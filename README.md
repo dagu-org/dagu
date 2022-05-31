@@ -84,7 +84,7 @@ brew upgrade yohamta/tap/dagu
 ### via Bash script
 
 ```sh
-curl -L https://raw.githubusercontent.com/yohamta/dagu/scripts/downloader.sh | bash
+curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
 
 ### via GitHub Release Page 
