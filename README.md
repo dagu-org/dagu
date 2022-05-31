@@ -55,7 +55,7 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
 - ETL pipeline
 - Machine learning
 - CI/CD pipeline
-- Other workflow automations
+- Workflow automation
 
 ## Why not other popular workflow engines like Airflow?
 
