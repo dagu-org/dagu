@@ -81,8 +81,14 @@ function WorkflowConfig({ data }: Props) {
                 {editing ? (
                   <Stack direction="row">
                     <Button
+                      id="save-config"
                       color="primary"
                       variant="contained"
+                      startIcon={
+                        <span className="icon">
+                          <i className="fa-solid fa-floppy-disk"></i>
+                        </span>
+                      }
                       onClick={async () => {
                         const formData = new FormData();
                         formData.append("action", "save");
@@ -111,6 +117,11 @@ function WorkflowConfig({ data }: Props) {
                       variant="contained"
                       onClick={() => setEditing(false)}
                       sx={{ ml: 2 }}
+                      startIcon={
+                        <span className="icon">
+                          <i className="fa-solid fa-xmark"></i>
+                        </span>
+                      }
                     >
                       Cancel
                     </Button>
@@ -118,9 +129,15 @@ function WorkflowConfig({ data }: Props) {
                 ) : (
                   <Stack direction="row">
                     <Button
+                      id="edit-config"
                       variant="contained"
                       color="info"
                       onClick={() => setEditing(true)}
+                      startIcon={
+                        <span className="icon">
+                          <i className="fa-solid fa-pen-to-square"></i>
+                        </span>
+                      }
                     >
                       Edit
                     </Button>
