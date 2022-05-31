@@ -43,7 +43,10 @@ function DashboardTimechart({ data: input }: Props) {
         });
       }
     });
-    setData(ret);
+    const sorted = ret.sort((a, b) => {
+      return a.name < b.name ? -1 : 1;
+    });
+    setData(sorted);
   }, [input]);
   const now = moment();
   return (
