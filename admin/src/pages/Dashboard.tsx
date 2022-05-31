@@ -10,7 +10,7 @@ import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
 import Loading from "../components/Loading";
 
-function Workflows() {
+function Dashboard() {
   const [group] = React.useState<string>(
     new URLSearchParams(window.location.search).get("group") || ""
   );
@@ -21,6 +21,10 @@ function Workflows() {
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
   }, []);
+
+  if (!data) {
+    return <Loading />;
+  }
 
   return (
     <Paper
@@ -40,28 +44,24 @@ function Workflows() {
           justifyContent: "space-between",
         }}
       >
-        <Title>Workflows</Title>
+        <Title>Dashboard</Title>
         <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
       </Box>
       <Box>
         <WithLoading loaded={!!data}>
-          {data && (
-            <React.Fragment>
-              <WorkflowErrors
-                workflows={data.DAGs}
-                errors={data.Errors}
-                hasError={data.HasError}
-              ></WorkflowErrors>
-              <WorkflowTable
-                workflows={data.DAGs}
-                groups={data.Groups}
-                group={data.Group}
-              ></WorkflowTable>
-            </React.Fragment>
-          )}
+          <WorkflowErrors
+            workflows={data.DAGs}
+            errors={data.Errors}
+            hasError={data.HasError}
+          ></WorkflowErrors>
+          <WorkflowTable
+            workflows={data.DAGs}
+            groups={data.Groups}
+            group={data.Group}
+          ></WorkflowTable>
         </WithLoading>
       </Box>
     </Paper>
   );
 }
-export default Workflows;
+export default Dashboard;

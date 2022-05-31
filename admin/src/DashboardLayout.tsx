@@ -9,11 +9,10 @@ import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
-import Container from "@mui/material/Container";
 import Link from "@mui/material/Link";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import { mainListItems } from "./listItems";
+import { mainListItems } from "./menu";
 import { Grid, Stack } from "@mui/material";
 import Logo from "./components/Logo";
 
@@ -153,11 +152,6 @@ function DashboardContent({
                 </Typography>
               </Stack>
             </Link>
-            {/* <IconButton color="inherit">
-              <Badge badgeContent={4} color="secondary">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton> */}
           </Toolbar>
         </AppBar>
         <Drawer variant="permanent" open={open}>
@@ -203,6 +197,6 @@ function DashboardContent({
 
 type DashboardProps = DashboardContentProps;
 
-export default function Dashboard({ children, ...props }: DashboardProps) {
+export default function DashboardLayout({ children, ...props }: DashboardProps) {
   return <DashboardContent {...props}>{children}</DashboardContent>;
 }
