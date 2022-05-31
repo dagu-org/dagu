@@ -1,18 +1,13 @@
 import React from "react";
 import { GetListResponse } from "../api/List";
-import WorkflowErrors from "../components/WorkflowErrors";
-import Box from "@mui/material/Box";
-import CreateWorkflowButton from "../components/CreateWorkflowButton";
-import WithLoading from "../components/WithLoading";
-import WorkflowTable from "../components/WorkflowTable";
-import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
 import { Grid } from "@mui/material";
 import { SchedulerStatus } from "../models/Status";
 import { statusColorMapping } from "../consts";
 import Metrics from "../components/Metrics";
-import { Schedule } from "@mui/icons-material";
+import DashboardTimechart from "../components/DashboardTimechart";
+import Title from "../components/Title";
 
 type metrics = Record<SchedulerStatus, number>;
 
@@ -64,7 +59,7 @@ function Dashboard() {
           [SchedulerStatus.Cancel, "Canceled Workflows"],
         ] as Array<[SchedulerStatus, string]>
       ).map(([status, label]) => (
-        <Grid item xs={12} md={4} lg={3}>
+        <Grid item xs={12} md={4} lg={3} key={label}>
           <Paper
             sx={{
               p: 2,
@@ -81,6 +76,20 @@ function Dashboard() {
           </Paper>
         </Grid>
       ))}
+
+      {/* {data?.DAGs ? ( */}
+      <Grid item xs={12}>
+        <Paper
+          sx={{
+            p: 2,
+            height: "100%",
+          }}
+        >
+          <Title>Timeline</Title>
+          <DashboardTimechart data={data?.DAGs || []} />
+        </Paper>
+      </Grid>
+      {/* ) : null} */}
     </Grid>
   );
 }
