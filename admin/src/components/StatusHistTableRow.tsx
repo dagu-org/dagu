@@ -16,7 +16,7 @@ function StatusHistTableRow({ data, onSelect, idx }: Props) {
   }, [data]);
   return (
     <StyledTableRow>
-      <TableCell className="has-text-weight-semibold">{data.Name}</TableCell>
+      <TableCell>{data.Name}</TableCell>
       {vals.map((status, i) => {
         const style: CSSProperties = { ...circleStyle };
         const tdStyle: CSSProperties = {
