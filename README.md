@@ -15,7 +15,9 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [Usecases](#usecases)
   - [Why not other popular workflow engines like Airflow?](#why-not-other-popular-workflow-engines-like-airflow)
   - [️How does it work?](#️how-does-it-work)
-  - [Installation](#installation)
+  - [Install `dagu`](#install-dagu)
+    - [via Homebrew](#via-homebrew)
+    - [via GitHub Release Page](#via-github-release-page)
   - [️Quick start](#️quick-start)
     - [1. Launch the web UI](#1-launch-the-web-ui)
     - [2. Create a new workflow](#2-create-a-new-workflow)
@@ -55,7 +57,7 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
 - ETL pipeline
 - Machine learning
 - CI/CD pipeline
-- Other workflow automations
+- Workflow automation
 
 ## Why not other popular workflow engines like Airflow?
 
@@ -66,7 +68,19 @@ Popular workflow engines, Airflow, Prefect, or Temporal, are powerful and valuab
 - Self-contained - It is a single binary with zero dependency, No DBMS or cloud service is required.
 - Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
 
-## Installation
+## Install `dagu`
+
+### via Homebrew
+```
+brew install yohamta/tap/dagu
+```
+
+Upgrade to the latest version:
+```
+brew upgrade yohamta/tap/dagu
+```
+
+### via GitHub Release Page 
 
 Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
