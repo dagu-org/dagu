@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import Title from "../components/Title";
 import WorkflowButtons from "../components/WorkflowButtons";
+import ConfigEditButtons from "../components/ConfigEditButtons";
 
 type Params = {
   name: string;
@@ -138,23 +139,34 @@ function DetailsPage() {
           </Box>
 
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-            <Tabs value={tab}>
-              <LinkTab
-                label="Status"
-                value={WorkflowTabType.Status}
-                href={`${baseUrl}&t=${WorkflowTabType.Status}`}
-              />
-              <LinkTab
-                label="Config"
-                value={WorkflowTabType.Config}
-                href={`${baseUrl}&t=${WorkflowTabType.Config}`}
-              />
-              <LinkTab
-                label="History"
-                value={WorkflowTabType.History}
-                href={`${baseUrl}&t=${WorkflowTabType.History}`}
-              />
-            </Tabs>
+            <Stack
+              sx={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Tabs value={tab}>
+                <LinkTab
+                  label="Status"
+                  value={WorkflowTabType.Status}
+                  href={`${baseUrl}&t=${WorkflowTabType.Status}`}
+                />
+                <LinkTab
+                  label="Config"
+                  value={WorkflowTabType.Config}
+                  href={`${baseUrl}&t=${WorkflowTabType.Config}`}
+                />
+                <LinkTab
+                  label="History"
+                  value={WorkflowTabType.History}
+                  href={`${baseUrl}&t=${WorkflowTabType.History}`}
+                />
+              </Tabs>
+              {tab == WorkflowTabType.Config ? (
+                <ConfigEditButtons group={group} name={params.name} />
+              ) : null}
+            </Stack>
           </Box>
         </Paper>
 

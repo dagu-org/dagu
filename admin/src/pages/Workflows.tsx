@@ -44,7 +44,15 @@ function WorkflowsPage() {
   }
 
   return (
-    <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
+    <Paper
+      sx={{
+        p: 2,
+        mx: 4,
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+      }}
+    >
       <Box
         sx={{
           display: "flex",
