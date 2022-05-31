@@ -1,4 +1,4 @@
-# ![logo](../dagu/assets/images/logo-with-background.png)
+# ![logo](assets/images/logo-with-background.png?raw=true)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
