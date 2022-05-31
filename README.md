@@ -95,7 +95,7 @@ Create a workflow by clicking the `New DAG` button on the top page of the web UI
 
 ### 4. Edit the workflow
 
-Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
+Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example.yaml) and click the `Save` button.
 
 ### 5. Execute the workflow
 
