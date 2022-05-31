@@ -24,6 +24,7 @@ function WorkflowHistory({ logData }: Props) {
             sx={{
               pb: 4,
               px: 2,
+              mx: 4,
               display: "flex",
               flexDirection: "column",
               overflowX: "auto",
@@ -39,29 +40,31 @@ function WorkflowHistory({ logData }: Props) {
             />
           </Paper>
 
-          {logs && logs[idx] ? (
-            <React.Fragment>
-              <Box sx={{ mt: 2 }}>
-                <StatusInfoTable status={logs[idx].Status} {...props} />
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <NodeStatusTable
-                  nodes={logs[idx].Status.Nodes}
-                  status={logs[idx].Status}
-                  file={logs[idx].File}
-                  {...props}
-                />
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <NodeStatusTable
-                  nodes={Handlers(logs[idx].Status)}
-                  file={logs[idx].File}
-                  status={logs[idx].Status}
-                  {...props}
-                />
-              </Box>
-            </React.Fragment>
-          ) : null}
+          <Box sx={{ mx: 4 }}>
+            {logs && logs[idx] ? (
+              <React.Fragment>
+                <Box sx={{ mt: 2 }}>
+                  <StatusInfoTable status={logs[idx].Status} {...props} />
+                </Box>
+                <Box sx={{ mt: 2 }}>
+                  <NodeStatusTable
+                    nodes={logs[idx].Status.Nodes}
+                    status={logs[idx].Status}
+                    file={logs[idx].File}
+                    {...props}
+                  />
+                </Box>
+                <Box sx={{ mt: 2 }}>
+                  <NodeStatusTable
+                    nodes={Handlers(logs[idx].Status)}
+                    file={logs[idx].File}
+                    status={logs[idx].Status}
+                    {...props}
+                  />
+                </Box>
+              </React.Fragment>
+            ) : null}
+          </Box>
         </React.Fragment>
       )}
     </WorkflowContext.Consumer>

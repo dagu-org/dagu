@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Container,
   Paper,
+  Stack,
   Tab,
   Tabs,
 } from "@mui/material";
@@ -30,7 +31,6 @@ function DetailsPage() {
   );
   const [tab, setTab] = React.useState(WorkflowTabType.Status);
   const [group, setGroup] = React.useState("");
-  const [width, setWidth] = React.useState(0);
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     let t = urlParams.get("t");
@@ -68,14 +68,6 @@ function DetailsPage() {
     }
   }, [tab]);
 
-  const ref = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    const width = ref.current ? ref.current.offsetWidth : 0;
-    if (width) {
-      setWidth(width);
-    }
-  }, [ref.current]);
-
   if (!params.name || !data || !data.DAG) {
     return (
       <Container sx={{ width: "100%", textAlign: "center", margin: "auto" }}>
@@ -93,10 +85,9 @@ function DetailsPage() {
         group={group}
         name={params.name}
         refresh={getData}
-        width={width}
       />
     ),
-    [WorkflowTabType.Config]: <WorkflowConfig data={data} width={width} />,
+    [WorkflowTabType.Config]: <WorkflowConfig data={data} />,
     [WorkflowTabType.History]: <WorkflowHistory logData={data.LogData} />,
     [WorkflowTabType.StepLog]: <WorkflowLog log={data.StepLog} />,
     [WorkflowTabType.ScLog]: <WorkflowLog log={data.ScLog} />,
@@ -113,58 +104,62 @@ function DetailsPage() {
 
   return (
     <WorkflowContext.Provider value={ctx}>
-      <Paper
-        ref={ref}
+      <Stack
         sx={{
-          p: 2,
-          display: "flex",
-          flexDirection: "column",
-          overflowX: "auto",
-          borderBottomLeftRadius: 0,
-          borderBottomRightRadius: 0,
+          width: "100%",
+          direction: "column",
         }}
       >
-        <ConfigErrors errors={data.Errors} />
-
-        <Box
+        <Paper
           sx={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
+            mx: 4,
+            p: 2,
+            borderBottomLeftRadius: 0,
+            borderBottomRightRadius: 0,
           }}
         >
-          <Title>{data.Title}</Title>
-          <WorkflowButtons
-            status={data.DAG.Status}
-            group={group}
-            name={params.name!}
-            refresh={getData}
-          />
-        </Box>
+          <ConfigErrors errors={data.Errors} />
 
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={tab}>
-            <LinkTab
-              label="Status"
-              value={WorkflowTabType.Status}
-              href={`${baseUrl}&t=${WorkflowTabType.Status}`}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Title>{data.Title}</Title>
+            <WorkflowButtons
+              status={data.DAG.Status}
+              group={group}
+              name={params.name!}
+              refresh={getData}
             />
-            <LinkTab
-              label="Config"
-              value={WorkflowTabType.Config}
-              href={`${baseUrl}&t=${WorkflowTabType.Config}`}
-            />
-            <LinkTab
-              label="History"
-              value={WorkflowTabType.History}
-              href={`${baseUrl}&t=${WorkflowTabType.History}`}
-            />
-          </Tabs>
-        </Box>
-      </Paper>
+          </Box>
 
-      {contents[tab]}
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs value={tab}>
+              <LinkTab
+                label="Status"
+                value={WorkflowTabType.Status}
+                href={`${baseUrl}&t=${WorkflowTabType.Status}`}
+              />
+              <LinkTab
+                label="Config"
+                value={WorkflowTabType.Config}
+                href={`${baseUrl}&t=${WorkflowTabType.Config}`}
+              />
+              <LinkTab
+                label="History"
+                value={WorkflowTabType.History}
+                href={`${baseUrl}&t=${WorkflowTabType.History}`}
+              />
+            </Tabs>
+          </Box>
+        </Paper>
+
+        {contents[tab]}
+      </Stack>
     </WorkflowContext.Provider>
   );
 }

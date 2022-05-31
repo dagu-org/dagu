@@ -180,9 +180,7 @@ function DashboardContent({
         >
           <Toolbar />
           <Grid container sx={{ mt: 4, mb: 4 }}>
-            <Grid item xs={12} sx={{ ml: 4, mr: 4 }}>
-              {children}
-            </Grid>
+            {children}
             <Grid item xs={12} sx={{ mt: 4 }}>
               <Copyright />
             </Grid>
