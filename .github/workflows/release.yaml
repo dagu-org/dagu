@@ -13,8 +13,29 @@ jobs:
         with:
           go-version: 1.17.x
 
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      
+      - name: Set up yarn
+        run: npm install --global yarn
+
       - name: Check out code
         uses: actions/checkout@v3
+      
+      - name: Yarn install
+        run: yarn install
+        working-directory: admin
+
+      - name: Build web UI
+        run: yarn build
+        working-directory: admin
+
+      - name: Copy web assets
+        run: |
+        	cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+        	cp admin/dist/*.woff2 ./internal/admin/handlers/web/assets/fonts/
+        	cp admin/dist/*.ttf ./internal/admin/handlers/web/assets/fonts/
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
