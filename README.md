@@ -12,8 +12,7 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
 
 ## Contents
 
-  - [Contents](#contents)
-  - [Why not Airflow or Prefect?](#why-not-airflow-or-prefect)
+  - [Why not other popular workflow engine like Airflow?](#why-not-other-popular-workflow-engine-like-airflow)
   - [️How does it work?](#️how-does-it-work)
   - [Example](#example)
   - [️Quick start](#️quick-start)
@@ -25,7 +24,7 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [Command Line User Interface](#command-line-user-interface)
   - [Web User Interface](#web-user-interface)
   - [YAML format](#yaml-format)
-    - [Hello World](#hello-world)
+    - [Minimal Definiton](#minimal-definiton)
     - [Environment Variables](#environment-variables)
     - [Parameters](#parameters)
     - [Command Substitution](#command-substitution)
@@ -45,9 +44,9 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
     - [Where is the history data stored?](#where-is-the-history-data-stored)
     - [Where are the log files stored?](#where-are-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
-    - [How can a workflow be retried from a specific task?](#how-can-a-workflow-be-retried-from-a-specific-task)
-    - [Does it have a scheduler function?](#does-it-have-a-scheduler-function)
-    - [How can it communicate with running processes?](#how-can-it-communicate-with-running-processes)
+    - [How can I retry a workflow from a specific task?](#how-can-i-retry-a-workflow-from-a-specific-task)
+    - [Does it provide sucheduler function?](#does-it-provide-sucheduler-function)
+    - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
   - [License](#license)
   - [Contributors](#contributors)
 
@@ -101,7 +100,7 @@ Go to the workflow detail page and click the `Edit` button in the `Config` Tab. 
 
 You can execute the example by pressing the `Start` button.
  
-![example](https://user-images.githubusercontent.com/1475839/165764122-0bdf4bd5-55bb-40bb-b56f-329f5583c597.gif)
+![example](assets/images/example.gif?raw=true)
 
 ## Command Line User Interface
 
@@ -115,23 +114,29 @@ You can execute the example by pressing the `Start` button.
 
 ## Web User Interface
 
-- **DAGs**: Overview of all DAGs (workflows).
+- **Dashboard**: Overview of current workflows.
 
-  DAGs page displays all workflows and real-time status. To create a new workflow, you can click the button in the top-right corner.
+  Dashboard shows overall status of all workflowsall workflows and execution timeline on the day.
 
-  ![DAGs](https://user-images.githubusercontent.com/1475839/167070248-743b5e8f-ee24-49bf-a4f4-a5225dfc755a.png)
+  ![Workflows](assets/images/ui-dashboard.png?raw=true)
 
-- **Detail**: Realtime status of the workflow.
+- **Workflows**: List of all workflows.
 
-  The detail page displays the real-time status, logs, and all workflow configurations.
+  Workflows shows all workflows and real-time status. To create a new workflow, you can click the button in the top-right corner.
 
-  ![Detail](https://user-images.githubusercontent.com/1475839/166269521-03098e46-6608-43fa-b363-0d00b069c808.png)
+  ![Workflows](assets/images/ui-workflows.png?raw=true)
 
-- **History**: History of the execution of the workflow.
+- **Workflow Details**: Realtime status of the workflow.
 
-  The history page allows you to check past execution results and logs.
+  Workflow Details shows the real-time status, logs, and workflow configurations.
 
-  ![History](https://user-images.githubusercontent.com/1475839/166269714-18e0b85c-33a6-4da0-92bc-d8ffb7ccd992.png)
+  ![Details](assets/images/ui-details.png?raw=true)
+
+- **Execution History**: History of the execution of the workflow.
+
+  Execution History shows past execution results and logs.
+
+  ![History](assets/images/ui-history.png?raw=true)
 
 ## YAML format
 
@@ -416,21 +421,17 @@ It will store log files in the `DAGU__LOGS` environment variable path. The defau
 
 The default retention period for execution history is seven days. However, you can override the setting by the `histRetentionDays` field in a YAML file.
 
-### How can a workflow be retried from a specific task?
+### How can I retry a workflow from a specific task?
 
 You can change the status of any task to a `failed` state. Then, when you retry the workflow, it will execute the failed one and any subsequent.
 
-![Update Status](https://user-images.githubusercontent.com/1475839/166289470-f4af7e14-28f1-45bd-8c32-59cd59d2d583.png)
+### Does it provide sucheduler function?
 
-### Does it have a scheduler function?
+No, it doesn't provide scheduler function at this moment. It is meant to be used with cron or other schedulers. But we may add a scheduler functionality in the future development.
 
-No, it doesn't have scheduler functionality. It is meant to be used with cron or other schedulers.
-
-### How can it communicate with running processes?
+### How does it track running processes without DBMS?
 
 Dagu uses Unix sockets to communicate with running processes.
-
-![dagu Architecture](https://user-images.githubusercontent.com/1475839/166390371-00bb4af0-3689-406a-a4d5-af943a1fd2ce.png)
 
 ## License
 
