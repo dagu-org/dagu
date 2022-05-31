@@ -17,6 +17,7 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [️How does it work?](#️how-does-it-work)
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
+    - [via Bash script](#via-bash-script)
     - [via GitHub Release Page](#via-github-release-page)
   - [️Quick start](#️quick-start)
     - [1. Launch the web UI](#1-launch-the-web-ui)
@@ -71,13 +72,19 @@ Popular workflow engines, Airflow, Prefect, or Temporal, are powerful and valuab
 ## Install `dagu`
 
 ### via Homebrew
-```
+```sh
 brew install yohamta/tap/dagu
 ```
 
 Upgrade to the latest version:
-```
+```sh
 brew upgrade yohamta/tap/dagu
+```
+
+### via Bash script
+
+```sh
+curl -L https://raw.githubusercontent.com/yohamta/dagu/scripts/downloader.sh | bash
 ```
 
 ### via GitHub Release Page 
