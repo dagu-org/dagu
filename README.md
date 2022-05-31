@@ -6,30 +6,30 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A self-contained, standalone Low-Code workflow engnine**
+**A self-contained, standalone Low-Code workflow engine**
 
 It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format that is similar to [GitHub Actions](https://github.com/features/actions) or [Argo Workflows](https://argoproj.github.io/argo-workflows/workflow-templates/).
 
 ## Contents
 
-  - [Why not other popular workflow engine like Airflow?](#why-not-other-popular-workflow-engine-like-airflow)
+  - [Usecases](#usecases)
+  - [Why not other popular workflow engines like Airflow?](#why-not-other-popular-workflow-engines-like-airflow)
   - [️How does it work?](#️how-does-it-work)
-  - [Example](#example)
+  - [Installation](#installation)
   - [️Quick start](#️quick-start)
-    - [1. Installation](#1-installation)
-    - [2. Launch the web UI](#2-launch-the-web-ui)
-    - [3. Create a new workflow](#3-create-a-new-workflow)
-    - [4. Edit the workflow](#4-edit-the-workflow)
-    - [5. Execute the workflow](#5-execute-the-workflow)
+    - [1. Launch the web UI](#1-launch-the-web-ui)
+    - [2. Create a new workflow](#2-create-a-new-workflow)
+    - [3. Edit the workflow](#3-edit-the-workflow)
+    - [4. Execute the workflow](#4-execute-the-workflow)
   - [Command Line User Interface](#command-line-user-interface)
   - [Web User Interface](#web-user-interface)
   - [YAML format](#yaml-format)
-    - [Minimal Definiton](#minimal-definiton)
+    - [Minimal Definition](#minimal-definition)
+    - [Code Snippet](#code-snippet)
     - [Environment Variables](#environment-variables)
     - [Parameters](#parameters)
     - [Command Substitution](#command-substitution)
     - [Conditional Logic](#conditional-logic)
-    - [Run Code Snippet](#run-code-snippet)
     - [Output](#output)
     - [Redirection](#redirection)
     - [State Handlers](#state-handlers)
@@ -50,53 +50,41 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [License](#license)
   - [Contributors](#contributors)
 
-## Why not other popular workflow engine like Airflow?
+## Usecases
+- Batch processing
+- ETL pipeline
+- Machine learning
+- CI/CD pipeline
+- Other workflow automations
+
+## Why not other popular workflow engines like Airflow?
 
 Popular workflow engines, Airflow, Prefect, or Temporal, are powerful and valuable tools, but they require writing code such as Python to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it even more complicated. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple declarative YAML format without coding for workflow definition. It is self-contained, standalone, has zero dependencies, and does not require DBMS.
 
 ## ️How does it work?
 
-- Self-contained - Single binary with no dependency, No DBMS or cloud service is required.
-- Dead-simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
+- Self-contained - It is a single binary with zero dependency, No DBMS or cloud service is required.
+- Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
 
-## Example
-The below simple workflow creates and runs a sql.
-
-```yaml
-name: create and run sql
-steps:
- 
-  - name: create sql file
-    command: "bash"  
-    script: |
-      echo "select * from table;" > select.sql
-
-  - name: run the sql file
-    command: "psql -U username -d myDataBase -a -f psql select.sql"
-    stdout: output.txt
-    depends:
-      - create sql file
-```
-
-## ️Quick start
-
-### 1. Installation
+## Installation
 
 Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
 
-### 2. Launch the web UI
+## ️Quick start
+
+### 1. Launch the web UI
 
 Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-### 3. Create a new workflow
+### 2. Create a new workflow
 
 Create a workflow by clicking the `New DAG` button on the top page of the web UI. Input `example.yaml` in the dialog.
 
-### 4. Edit the workflow
+### 3. Edit the workflow
 
 Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example.yaml) and click the `Save` button.
 
-### 5. Execute the workflow
+### 4. Execute the workflow
 
 You can execute the example by pressing the `Start` button.
  
@@ -114,33 +102,25 @@ You can execute the example by pressing the `Start` button.
 
 ## Web User Interface
 
-- **Dashboard**: Overview of current workflows.
-
-  Dashboard shows overall status of all workflowsall workflows and execution timeline on the day.
+- **Dashboard**: It shows the overall status and executions timeline of the day.
 
   ![Workflows](assets/images/ui-dashboard.png?raw=true)
 
-- **Workflows**: List of all workflows.
-
-  Workflows shows all workflows and real-time status. To create a new workflow, you can click the button in the top-right corner.
+- **Workflows**: It shows all workflows and the real-time status.
 
   ![Workflows](assets/images/ui-workflows.png?raw=true)
 
-- **Workflow Details**: Realtime status of the workflow.
-
-  Workflow Details shows the real-time status, logs, and workflow configurations.
+- **Workflow Details**: It shows the real-time status, logs, and workflow configurations. You can edit workflow configurations on a browser.
 
   ![Details](assets/images/ui-details.png?raw=true)
 
-- **Execution History**: History of the execution of the workflow.
-
-  Execution History shows past execution results and logs.
+- **Execution History**: It shows past execution results and logs.
 
   ![History](assets/images/ui-history.png?raw=true)
 
 ## YAML format
 
-### Minimal Definiton
+### Minimal Definition
 
 ```yaml
 name: hello world
@@ -151,6 +131,26 @@ steps:
 
   - name: step 2
     command: echo world
+    depends:
+      - step 1
+```
+
+### Code Snippet
+
+`script` field provides a way to run arbitrary snippets of code in any language.
+
+```yaml
+name: example
+steps:
+  - name: step 1
+    command: "bash"
+    script: |
+      cd /tmp
+      echo "hello world" > hello
+      cat hello
+    output: RESULT
+  - name: step 2
+    command: echo ${RESULT} # hello world
     depends:
       - step 1
 ```
@@ -223,26 +223,6 @@ steps:
         expected: "01"
     continueOn:
       skipped: true
-```
-
-### Run Code Snippet
-
-`script` field provides a way to run arbitrary snippets of code in any language.
-
-```yaml
-name: example
-steps:
-  - name: step 1
-    command: "bash"
-    script: |
-      cd /tmp
-      echo "hello world" > hello
-      cat hello
-    output: RESULT
-  - name: step 2
-    command: echo ${RESULT} # hello world
-    depends:
-      - step 1
 ```
 
 ### Output
