@@ -14,7 +14,8 @@ import Link from "@mui/material/Link";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { mainListItems } from "./listItems";
-import { Grid } from "@mui/material";
+import { Grid, Stack } from "@mui/material";
+import Logo from "./components/Logo";
 
 function Copyright(props: any) {
   return (
@@ -133,15 +134,24 @@ function DashboardContent({
                 "&:hover": { color: "white" },
               }}
             >
-              <Typography
-                component="h1"
-                variant="h6"
-                color="inherit"
-                noWrap
-                sx={{ flexGrow: 1 }}
+              <Stack
+                sx={{
+                  flexDirection: "row",
+                  justifyContent: "flex-start",
+                  alignItems: "center",
+                }}
               >
-                {title}
-              </Typography>
+                <Logo />
+                <Typography
+                  component="h1"
+                  variant="h6"
+                  color="inherit"
+                  noWrap
+                  sx={{ flexGrow: 1, ml: 2 }}
+                >
+                  {title}
+                </Typography>
+              </Stack>
             </Link>
             {/* <IconButton color="inherit">
               <Badge badgeContent={4} color="secondary">

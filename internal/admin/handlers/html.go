@@ -18,7 +18,7 @@ var defaultFuncs = template.FuncMap{
 	"defTitle": func(ip interface{}) string {
 		v, ok := ip.(string)
 		if !ok || (ok && v == "") {
-			return "Dagu Admin"
+			return ""
 		}
 		return v
 	},
