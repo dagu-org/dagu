@@ -7,7 +7,7 @@ import { Step } from "../models/Step";
 import ConfigEditor from "./ConfigEditor";
 import ConfigInfoTable from "./ConfigInfoTable";
 import ConfigPreview from "./ConfigPreview";
-import GraphDag from "./GraphDag";
+import Graph from "./Graph";
 import ConfigStepTable from "./ConfigStepTable";
 
 type Props = {
@@ -45,10 +45,10 @@ function WorkflowConfig({ data, width }: Props) {
                   overflowX: "auto",
                 }}
               >
-                <GraphDag
+                <Graph
                   steps={data.DAG.Config.Steps}
                   type="config"
-                ></GraphDag>
+                ></Graph>
               </Box>
             </Paper>
 

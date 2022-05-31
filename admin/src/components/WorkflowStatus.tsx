@@ -2,10 +2,10 @@ import React from "react";
 import { WorkflowContext } from "../contexts/WorkflowContext";
 import { DAG } from "../models/Dag";
 import { Handlers, SchedulerStatus } from "../models/Status";
-import GraphDag from "./GraphDag";
+import Graph from "./Graph";
 import NodeStatusTable from "./NodeStatusTable";
 import StatusInfoTable from "./StatusInfoTable";
-import Timeline from "./GraphTimeline";
+import Timeline from "./Timeline";
 import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
 import StatusUpdateModal from "./StatusUpdateModal";
 import { Step } from "../models/Step";
@@ -105,11 +105,11 @@ function WorkflowStatus({ workflow, group, name, refresh, width }: Props) {
           }}
         >
           {sub == "0" ? (
-            <GraphDag
+            <Graph
               steps={workflow.Status.Nodes}
               type="status"
               onClickNode={onSelectStepOnGraph}
-            ></GraphDag>
+            ></Graph>
           ) : (
             <Timeline status={workflow.Status}></Timeline>
           )}

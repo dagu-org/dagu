@@ -7,7 +7,7 @@ import { WorkflowContext } from "../contexts/WorkflowContext";
 import { WorkflowTabType } from "../models/WorkflowTab";
 import WorkflowConfig from "../components/WorkflowConfig";
 import WorkflowHistory from "../components/WorkflowHistory";
-import WorkflowTabLog from "../components/WorkflowTabLog";
+import WorkflowLog from "../components/WorkflowLog";
 import {
   Box,
   CircularProgress,
@@ -76,9 +76,9 @@ function DetailsPage() {
     }
   }, [ref.current]);
 
-  if (!data || !data.DAG) {
+  if (!params.name || !data || !data.DAG) {
     return (
-      <Container>
+      <Container sx={{ width: "100%", textAlign: "center", margin: "auto" }}>
         <CircularProgress />
       </Container>
     );
@@ -91,25 +91,25 @@ function DetailsPage() {
       <WorkflowStatus
         workflow={data.DAG}
         group={group}
-        name={params.name || ""}
+        name={params.name}
         refresh={getData}
         width={width}
       />
     ),
     [WorkflowTabType.Config]: <WorkflowConfig data={data} width={width} />,
     [WorkflowTabType.History]: <WorkflowHistory logData={data.LogData} />,
-    [WorkflowTabType.StepLog]: <WorkflowTabLog log={data.StepLog} />,
-    [WorkflowTabType.ScLog]: <WorkflowTabLog log={data.ScLog} />,
+    [WorkflowTabType.StepLog]: <WorkflowLog log={data.StepLog} />,
+    [WorkflowTabType.ScLog]: <WorkflowLog log={data.ScLog} />,
   };
   const ctx = {
     data: data,
     refresh: getData,
     tab,
     group,
-    name: params.name!,
+    name: params.name,
   };
 
-  const baseUrl = `/dags/${params.name}?&group=${group}`;
+  const baseUrl = `/dags/${encodeURI(params.name)}?group=${encodeURI(group)}`;
 
   return (
     <WorkflowContext.Provider value={ctx}>
@@ -176,6 +176,10 @@ interface LinkTabProps {
   value: string;
 }
 
-function LinkTab(props: LinkTabProps) {
-  return <Tab component="a" {...props} />;
+function LinkTab({ href, ...props }: LinkTabProps) {
+  return (
+    <a href={href}>
+      <Tab {...props} />
+    </a>
+  );
 }

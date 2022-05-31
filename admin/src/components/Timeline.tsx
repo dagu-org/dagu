@@ -41,7 +41,7 @@ function Timeline({ status }: Props) {
       });
     return ret.join("\n");
   }, [status]);
-  return <Mermaid>{graph}</Mermaid>;
+  return <Mermaid def={graph} />;
 }
 
 export default Timeline;

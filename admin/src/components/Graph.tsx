@@ -9,7 +9,7 @@ type Props = {
   onClickNode?: (id: string) => void;
 };
 
-function GraphDag({ steps, type = "status", onClickNode }: Props) {
+function Graph({ steps, type = "status", onClickNode }: Props) {
   const mermaidStyle = {
     display: "flex",
     alignItems: "flex-center",
@@ -52,10 +52,10 @@ function GraphDag({ steps, type = "status", onClickNode }: Props) {
     dat.push("classDef skipped fill:white,stroke:gray,stroke-width:2px");
     return dat.join("\n");
   }, [steps, onClickNode]);
-  return <Mermaid style={mermaidStyle}>{graph}</Mermaid>;
+  return <Mermaid style={mermaidStyle} def={graph} />;
 }
 
-export default GraphDag;
+export default Graph;
 
 const graphStatusMap = {
   [NodeStatus.None]: ":::none",
