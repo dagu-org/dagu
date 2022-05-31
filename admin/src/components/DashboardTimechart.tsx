@@ -3,12 +3,14 @@ import React from "react";
 import {
   Bar,
   BarChart,
+  Cell,
   LabelList,
   LabelProps,
   ResponsiveContainer,
   XAxis,
   YAxis,
 } from "recharts";
+import { statusColorMapping } from "../consts";
 import { DAG } from "../models/Dag";
 import { SchedulerStatus } from "../models/Status";
 
@@ -51,6 +53,10 @@ function DashboardTimechart({ data: input }: Props) {
         />
         <YAxis dataKey="name" type="category" hide />
         <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
+          {data.map((_, index) => {
+            const color = statusColorMapping[data[index].status];
+            return <Cell fill={color.backgroundColor} />;
+          })}
           <LabelList
             dataKey="name"
             position="insideLeft"
