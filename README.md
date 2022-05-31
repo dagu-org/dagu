@@ -132,6 +132,10 @@ You can execute the example by pressing the `Start` button.
 
   ![History](assets/images/ui-history.png?raw=true)
 
+- **Workflow Execution Log**: It shows the detail log and standard output of each execution and steps.
+
+  ![Workflow Log](assets/images/ui-logoutput.png?raw=true)
+
 ## YAML format
 
 ### Minimal Definition
