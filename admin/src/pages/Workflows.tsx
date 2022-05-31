@@ -7,44 +7,31 @@ import WithLoading from "../components/WithLoading";
 import WorkflowTable from "../components/WorkflowTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
+import { useGetApi } from "../hooks/useWorkflowsGetApi";
+import Loading from "../components/Loading";
 
-function WorkflowsPage() {
-  const [data, setData] = React.useState<GetListResponse | undefined>();
-
-  async function getData() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let url = API_URL + "?format=json";
-    const group = urlParams.get("group");
-    if (group) {
-      url += `&group=${group}`;
-    }
-    const resp = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-      mode: "cors",
-      headers: {
-        Accept: "application/json",
-      },
-    });
-    if (!resp.ok) {
-      return;
-    }
-    const body = await resp.json();
-    setData(body);
-  }
-
+function Workflows() {
+  const [group] = React.useState<string>(
+    new URLSearchParams(window.location.search).get("group") || ""
+  );
+  const { data, doGet } = useGetApi<GetListResponse>("/", {
+    group: group,
+  });
   React.useEffect(() => {
-    getData();
-    const timer = setInterval(getData, 10000);
+    const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
   }, []);
 
-  if (!data) {
-    return <div>Loading...</div>;
-  }
-
   return (
-    <Paper sx={{ p: 2, display: "flex", flexDirection: "column" }}>
+    <Paper
+      sx={{
+        p: 2,
+        mx: 4,
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+      }}
+    >
       <Box
         sx={{
           display: "flex",
@@ -54,23 +41,27 @@ function WorkflowsPage() {
         }}
       >
         <Title>Workflows</Title>
-        <CreateWorkflowButton refresh={getData}></CreateWorkflowButton>
+        <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
       </Box>
       <Box>
         <WithLoading loaded={!!data}>
-          <WorkflowErrors
-            workflows={data.DAGs}
-            errors={data.Errors}
-            hasError={data.HasError}
-          ></WorkflowErrors>
-          <WorkflowTable
-            workflows={data.DAGs}
-            groups={data.Groups}
-            group={data.Group}
-          ></WorkflowTable>
+          {data && (
+            <React.Fragment>
+              <WorkflowErrors
+                workflows={data.DAGs}
+                errors={data.Errors}
+                hasError={data.HasError}
+              ></WorkflowErrors>
+              <WorkflowTable
+                workflows={data.DAGs}
+                groups={data.Groups}
+                group={data.Group}
+              ></WorkflowTable>
+            </React.Fragment>
+          )}
         </WithLoading>
       </Box>
     </Paper>
   );
 }
-export default WorkflowsPage;
+export default Workflows;

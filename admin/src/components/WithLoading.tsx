@@ -1,24 +1,13 @@
-import { CircularProgress, Container } from "@mui/material";
 import React from "react";
+import Loading from "./Loading";
 
 type Props = {
-  children?: JSX.Element | JSX.Element[];
+  children?: JSX.Element | JSX.Element[] | null;
   loaded: boolean;
 };
 
 function WithLoading({ children, loaded }: Props) {
-  if (!loaded) {
-    return (
-      <Container
-        sx={{
-          width: "100%",
-        }}
-      >
-        <CircularProgress />
-      </Container>
-    );
-  }
-  return <React.Fragment>{children}</React.Fragment>;
+  return loaded ? <React.Fragment>{children}</React.Fragment> : <Loading />;
 }
 
 export default WithLoading;

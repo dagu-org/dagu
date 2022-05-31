@@ -1,4 +1,4 @@
-name: complex DAG31
+name: Example DAG
 steps:
   - name: "Initialize"
     command: "sleep 2"

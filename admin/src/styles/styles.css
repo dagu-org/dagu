@@ -1,33 +1,24 @@
-      .code-indent {
-        display: contents;
-      }
+.code-indent {
+  display: contents;
+}
 
-      a {
-        color: #485fc7;
-        cursor: pointer;
-        text-decoration: none;
-      }
+a {
+  color: #485fc7;
+  cursor: pointer;
+  text-decoration: none;
+}
 
-      html,
-      body {
-        font-family: open sans, -apple-system, BlinkMacSystemFont, segoe ui,
-          Roboto, helvetica neue, Arial, sans-serif, apple color emoji,
-          segoe ui emoji, segoe ui symbol;
-        height: 100vh;
-        background-color: #dce6eb;
-      }
+.title {
+  margin-bottom: 0 !important;
+}
 
-      .title {
-        margin-bottom: 0 !important;
-      }
+* {
+  box-sizing: border-box;
+}
 
-      * {
-        box-sizing: border-box;
-      }
-
-      #nav-title {
-        color: white;
-        font: 20px "Arial";
-        font-weight: bold;
-        padding-left: 4px;
-      }
+#nav-title {
+  color: white;
+  font: 20px "Arial";
+  font-weight: bold;
+  padding-left: 4px;
+}

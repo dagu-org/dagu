@@ -16,7 +16,7 @@ function WorkflowTableRow({ workflow, group }: Props) {
   );
   return (
     <StyledTableRow>
-      <TableCell className="has-text-weight-semibold">
+      <TableCell>
         <Link to={url}>{workflow.File}</Link>
       </TableCell>
       <TableCell>

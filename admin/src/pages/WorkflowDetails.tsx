@@ -8,23 +8,17 @@ import { WorkflowTabType } from "../models/WorkflowTab";
 import WorkflowConfig from "../components/WorkflowConfig";
 import WorkflowHistory from "../components/WorkflowHistory";
 import WorkflowLog from "../components/WorkflowLog";
-import {
-  Box,
-  CircularProgress,
-  Container,
-  Paper,
-  Stack,
-  Tab,
-  Tabs,
-} from "@mui/material";
+import { Box, Paper, Stack, Tab, Tabs } from "@mui/material";
 import Title from "../components/Title";
 import WorkflowButtons from "../components/WorkflowButtons";
+import ConfigEditButtons from "../components/ConfigEditButtons";
+import Loading from "../components/Loading";
 
 type Params = {
   name: string;
 };
 
-function DetailsPage() {
+function WorkflowDetail() {
   const params = useParams<Params>();
   const [data, setData] = React.useState<GetWorkflowResponse | undefined>(
     undefined
@@ -69,11 +63,7 @@ function DetailsPage() {
   }, [tab]);
 
   if (!params.name || !data || !data.DAG) {
-    return (
-      <Container sx={{ width: "100%", textAlign: "center", margin: "auto" }}>
-        <CircularProgress />
-      </Container>
-    );
+    return <Loading />;
   }
 
   const contents: Partial<{
@@ -138,23 +128,34 @@ function DetailsPage() {
           </Box>
 
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-            <Tabs value={tab}>
-              <LinkTab
-                label="Status"
-                value={WorkflowTabType.Status}
-                href={`${baseUrl}&t=${WorkflowTabType.Status}`}
-              />
-              <LinkTab
-                label="Config"
-                value={WorkflowTabType.Config}
-                href={`${baseUrl}&t=${WorkflowTabType.Config}`}
-              />
-              <LinkTab
-                label="History"
-                value={WorkflowTabType.History}
-                href={`${baseUrl}&t=${WorkflowTabType.History}`}
-              />
-            </Tabs>
+            <Stack
+              sx={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Tabs value={tab}>
+                <LinkTab
+                  label="Status"
+                  value={WorkflowTabType.Status}
+                  href={`${baseUrl}&t=${WorkflowTabType.Status}`}
+                />
+                <LinkTab
+                  label="Config"
+                  value={WorkflowTabType.Config}
+                  href={`${baseUrl}&t=${WorkflowTabType.Config}`}
+                />
+                <LinkTab
+                  label="History"
+                  value={WorkflowTabType.History}
+                  href={`${baseUrl}&t=${WorkflowTabType.History}`}
+                />
+              </Tabs>
+              {tab == WorkflowTabType.Config ? (
+                <ConfigEditButtons group={group} name={params.name} />
+              ) : null}
+            </Stack>
           </Box>
         </Paper>
 
@@ -163,7 +164,7 @@ function DetailsPage() {
     </WorkflowContext.Provider>
   );
 }
-export default DetailsPage;
+export default WorkflowDetail;
 
 interface LinkTabProps {
   label?: string;

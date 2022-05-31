@@ -27,15 +27,11 @@ export function useWorkflowPostApi(opts: Options) {
         body: form,
       });
       if (ret.ok) {
-        if (opts.onSuccess) {
-          opts.onSuccess();
-        }
+        opts.onSuccess && opts.onSuccess();
       } else {
         const e = await ret.text();
         alert(e);
-        if (opts.onFailed) {
-          opts.onFailed();
-        }
+        opts.onFailed && opts.onFailed();
       }
     },
     [opts]

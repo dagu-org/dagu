@@ -1,5 +1,4 @@
-# Dagu
-<img align="right" width="150" src="https://user-images.githubusercontent.com/1475839/165412252-4fbb28ae-0845-4af2-9183-0aa1de5bf707.png" alt="dagu" title="dagu" />
+# ![logo](../dagu/assets/images/logo-with-background.png)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
@@ -7,7 +6,7 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A self-contained, standalone No-code workflow executor with built-in Web UI**
+**A self-contained, standalone Low-Code workflow engnine**
 
 It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format that is similar to [GitHub Actions](https://github.com/features/actions) or [Argo Workflows](https://argoproj.github.io/argo-workflows/workflow-templates/).
 
@@ -52,14 +51,14 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [License](#license)
   - [Contributors](#contributors)
 
-## Why not Airflow or Prefect?
+## Why not other popular workflow engine like Airflow?
 
-Popular workflow engines, Airflow and Prefect, are powerful and valuable tools, but they require writing Python code to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. Also, it is often not feasible to rewrite everything in Python in such situations. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple YAML format. It is self-contained, no-dependency, and it does not require DBMS.
+Popular workflow engines, Airflow, Prefect, or Temporal, are powerful and valuable tools, but they require writing code such as Python to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it even more complicated. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple declarative YAML format without coding for workflow definition. It is self-contained, standalone, has zero dependencies, and does not require DBMS.
 
 ## ️How does it work?
 
 - Self-contained - Single binary with no dependency, No DBMS or cloud service is required.
-- Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
+- Dead-simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
 
 ## Example
 The below simple workflow creates and runs a sql.
@@ -96,7 +95,7 @@ Create a workflow by clicking the `New DAG` button on the top page of the web UI
 
 ### 4. Edit the workflow
 
-Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/complex_dag.yaml) and click the `Save` button.
+Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example.yaml) and click the `Save` button.
 
 ### 5. Execute the workflow
 
@@ -136,21 +135,17 @@ You can execute the example by pressing the `Start` button.
 
 ## YAML format
 
-### Hello World
+### Minimal Definiton
 
 ```yaml
 name: hello world
 steps:
  
   - name: step 1
-    command: bash  
-    script: |
-      echo ${USER}
-    output: YOUR_NAME
+    command: echo hello
 
   - name: step 2
-    command: "echo hello world, ${YOUR_NAME}!"
-    stdout: /tmp/hello-world.txt
+    command: echo world
     depends:
       - step 1
 ```

@@ -1,8 +1,9 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "./Dashboard";
-import DetailsPage from "./pages/Details";
-import WorkflowsPage from "./pages/Workflows";
+import DashboardLayout from "./DashboardLayout";
+import Dashboard from "./pages/Dashboard";
+import WorkflowDetail from "./pages/WorkflowDetails";
+import Workflows from "./pages/Workflows";
 
 type Config = {
   title: string;
@@ -16,14 +17,14 @@ type Props = {
 function App({ config }: Props) {
   return (
     <BrowserRouter>
-      <Dashboard {...config}>
+      <DashboardLayout {...config}>
         <Routes>
-          <Route path="/" element={<WorkflowsPage />} />
-          <Route path="" element={<WorkflowsPage />} />
-          <Route path="/dags/" element={<WorkflowsPage />} />
-          <Route path="/dags/:name" element={<DetailsPage />} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="" element={<Workflows />} />
+          <Route path="/dags/" element={<Workflows />} />
+          <Route path="/dags/:name" element={<WorkflowDetail />} />
         </Routes>
-      </Dashboard>
+      </DashboardLayout>
     </BrowserRouter>
   );
 }
