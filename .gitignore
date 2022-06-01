@@ -1,12 +1,9 @@
 # build
 bin/*
-internal/admin/handlers/web/assets/fonts/*
-internal/admin/handlers/web/assets/js/*
+dist/
 
 # tmp files
 tmp/*
-
-dist/
 
 # MacOS
 .DS_Store
