@@ -1,4 +1,4 @@
-# ![logo](assets/images/logo-with-background.png?raw=true)
+# <img src="assets/images/logo-with-background.png?raw=true" width="200" />
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
@@ -6,14 +6,14 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A single binary workflow executor with built-in web UI**
+**An easy-to-use, self-contained, No-code workflow engine with built-in web UI**
 
-It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format that is similar to [GitHub Actions](https://github.com/features/actions).
+It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format.
 
 ## Contents
 
   - [Usecases](#usecases)
-  - [Why not other popular workflow engines like Airflow?](#why-not-other-popular-workflow-engines-like-airflow)
+  - [What's the difference from other workflow engines like Airflow?](#whats-the-difference-from-other-workflow-engines-like-airflow)
   - [️How does it work?](#️how-does-it-work)
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
@@ -60,9 +60,9 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
 - ETL pipeline
 - Machine learning / AI
 
-## Why not other popular workflow engines like Airflow?
+## What's the difference from other workflow engines like Airflow?
 
-Popular workflow engines, Airflow, Prefect, or Temporal, are powerful and valuable tools, but they require writing code such as Python to run workflows. In many cases, there are already hundreds of thousands of existing lines of code written in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it even more complicated. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple declarative YAML format without coding for workflow definition. It is self-contained, standalone, has zero dependencies, and does not require DBMS.
+Popular workflow engines, Airflow, Prefect, Luigi, or Temporal, are powerful and valuable tools, requiring users to write code such as Python or Golang to run workflows. However, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl in many cases. Adding another programming layer on top of these would increase the complexity and become hard to maintain. So instead, we decided to develop an easy-to-use workflow engine that does not need any coding. Also, it is self-contained, standalone, has zero dependencies, and does not require DBMS.
 
 ## ️How does it work?
 
@@ -150,12 +150,9 @@ You can execute the example by pressing the `Start` button.
 Minimal workflow definition is as simple as follows:
 
 ```yaml
-name: hello world
 steps:
- 
   - name: step 1
     command: echo hello
-
   - name: step 2
     command: echo world
     depends:
@@ -167,7 +164,6 @@ steps:
 `script` field provides a way to run arbitrary snippets of code in any language.
 
 ```yaml
-name: example
 steps:
   - name: step 1
     command: "bash"
@@ -187,7 +183,6 @@ steps:
 You can define environment variables and refer using `env` field.
 
 ```yaml
-name: example
 env:
   - SOME_DIR: ${HOME}/batch
   - SOME_FILE: ${SOME_DIR}/some_file 
@@ -202,7 +197,6 @@ steps:
 You can define parameters using `params` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by `--params=` parameter of `start` command.
 
 ```yaml
-name: example
 params: param1 param2
 steps:
   - name: some task with parameters
@@ -212,7 +206,6 @@ steps:
 Named parameters are also available as follows:
 
 ```yaml
-name: example
 params: ONE=1 TWO=`echo 2`
 steps:
   - name: some task with parameters
@@ -224,7 +217,6 @@ steps:
 You can use command substitution in field values. I.e., a string enclosed in backquotes (`` ` ``) is evaluated as a command and replaced with the result of standard output.
 
 ```yaml
-name: example
 env:
   TODAY: "`date '+%Y%m%d'`"
 steps:
@@ -239,7 +231,6 @@ Sometimes you have parts of a workflow that you only want to run under certain c
 For example, the below task only runs on the first date of each month.
 
 ```yaml
-name: example
 steps:
   - name: A monthly task
     command: monthly.sh
@@ -251,7 +242,6 @@ steps:
 If you want the workflow to continue to the next step regardless of the step's conditional check result, you can use the `continueOn` field:
 
 ```yaml
-name: example
 steps:
   - name: A monthly task
     command: monthly.sh
@@ -267,7 +257,6 @@ steps:
 `output` field can be used to set a environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
 
 ```yaml
-name: example
 steps:
   - name: step 1
     command: "echo foo"
@@ -279,7 +268,6 @@ steps:
 `stdout` field can be used to write standard output to a file.
 
 ```yaml
-name: example
 steps:
   - name: create a file
     command: "echo hello"
@@ -291,7 +279,6 @@ steps:
 It is often desirable to take action when a specific event happens, for example, when a workflow fails. To achieve this, you can use `handlerOn` fields.
 
 ```yaml
-name: example
 handlerOn:
   failure:
     command: notify_error.sh
@@ -307,7 +294,6 @@ steps:
 If you want a task to repeat execution at regular intervals, you can use the `repeatPolicy` field. If you want to stop the repeating task, you can use the `stop` command to gracefully stop the task.
 
 ```yaml
-name: example
 steps:
   - name: A task
     command: main.sh
@@ -321,8 +307,8 @@ steps:
 Combining these settings gives you granular control over how the workflow runs.
 
 ```yaml
-name: all configuration              # DAG's name
-description: run a DAG               # DAG's description
+name: all configuration              # name (optional, default is filename)
+description: run a DAG               # description
 tags: daily job                      # Free tags (separated by comma)
 env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
@@ -331,26 +317,26 @@ logDir: ${LOG_DIR}                   # Log directory to write standard output
 histRetentionDays: 3                 # Execution history retention days (not for log files)
 delaySec: 1                          # Interval seconds between steps
 maxActiveRuns: 1                     # Max parallel number of running step
-params: param1 param2                # Default parameters for the DAG that can be referred to by $1, $2, and so on
-preconditions:                       # Precondisions for whether the DAG is allowed to run
+params: param1 param2                # Default parameters that can be referred to by $1, $2, ...
+preconditions:                       # Precondisions for whether the it is allowed to run
   - condition: "`echo $2`"           # Command or variables to evaluate
     expected: "param2"               # Expected value for the condition
 mailOn:
-  failure: true                      # Send a mail when the DAG failed
-  success: true                      # Send a mail when the DAG finished
+  failure: true                      # Send a mail when the it failed
+  success: true                      # Send a mail when the it finished
 MaxCleanUpTimeSec: 300               # The maximum amount of time to wait after sending a TERM signal to running steps before killing them
 handlerOn:                           # Handlers on Success, Failure, Cancel, and Exit
   success:
-    command: "echo succeed"          # Command to execute when the DAG execution succeed
+    command: "echo succeed"          # Command to execute when the execution succeed
   failure:
-    command: "echo failed"           # Command to execute when the DAG execution failed
+    command: "echo failed"           # Command to execute when the execution failed
   cancel:
-    command: "echo canceled"         # Command to execute when the DAG execution canceled
+    command: "echo canceled"         # Command to execute when the execution canceled
   exit:
-    command: "echo finished"         # Command to execute when the DAG execution finished
+    command: "echo finished"         # Command to execute when the execution finished
 steps:
-  - name: some task                  # Step's name
-    description: some task           # Step's description
+  - name: some task                  # Step name
+    description: some task           # Step description
     dir: ${HOME}/logs                # Working directory
     command: bash                    # Command and parameters
     stdout: /tmp/outfile
@@ -425,7 +411,7 @@ infoMail:
 
 ### How to contribute?
 
-Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Take a look at this [TODO list](https://github.com/yohamta/dagu/issues/102). Thanks!
+Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. If you want anything needed to be done, take a look at [TODO](https://github.com/yohamta/dagu/issues/102) list. Thanks!
 
 ### Where is the history data stored?
 
