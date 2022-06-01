@@ -6,7 +6,7 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A self-contained, standalone Low-Code workflow engine**
+**A self-contained, standalone No-Code/Low-Code workflow engine**
 
 It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format that is similar to [GitHub Actions](https://github.com/features/actions) or [Argo Workflows](https://argoproj.github.io/argo-workflows/workflow-templates/).
 
@@ -54,11 +54,11 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [Contributors](#contributors)
 
 ## Usecases
+- Task automation
 - Batch processing
 - ETL pipeline
-- Machine learning
+- Machine learning / AI
 - CI/CD pipeline
-- Workflow automation
 
 ## Why not other popular workflow engines like Airflow?
 
