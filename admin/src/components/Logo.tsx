@@ -1,7 +1,8 @@
 import React from "react";
-var logo = require("../assets/images/logo.svg");
+// @ts-ignore
+import logo from "../assets/images/logo.png";
 
 function Logo() {
-  return <img alt="logo" width="170" src={logo} />;
+  return <img alt="logo" width="150" src={logo} />;
 }
 export default Logo;

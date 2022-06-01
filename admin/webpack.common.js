@@ -15,19 +15,15 @@ module.exports = {
         use: ["style-loader", "css-loader"],
       },
       {
-        test: /\.(png|jpe?g|gif)$/i,
+        test: /\.(png|jpg|gif)$/i,
         use: [
           {
-            loader: "file-loader",
+            loader: 'url-loader',
+            options: {
+              encoding: 'base64',
+            },
           },
         ],
-      },
-      {
-        test: /\.svg$/,
-        loader: "svg-url-loader",
-        options: {
-          encoding: "base64",
-        },
       },
     ],
   },
