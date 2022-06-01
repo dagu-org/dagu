@@ -266,12 +266,7 @@ func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
 			if !b.noSetenv {
 				if strings.Contains(v, "=") {
 					parts := strings.SplitN(v, "=", 2)
-					println(fmt.Sprintf("split [%s] = [%s]", parts[0], parts[1]))
-					if len(parts) == 2 {
-						os.Setenv(parts[0], parts[1])
-					} else {
-						os.Setenv(parts[0], "")
-					}
+					os.Setenv(parts[0], parts[1])
 				}
 				err = os.Setenv(strconv.Itoa(i+1), v)
 				if err != nil {
