@@ -17,12 +17,13 @@ function WorkflowTableRowGroup({ url, text }: Props) {
       <TableCell>
         <Chip color="secondary" size="small" label="Group" />
       </TableCell>
-      <TableCell>-</TableCell>
-      <TableCell>-</TableCell>
-      <TableCell>-</TableCell>
-      <TableCell>-</TableCell>
-      <TableCell>-</TableCell>
-      <TableCell>-</TableCell>
+      <TableCell></TableCell>
+      <TableCell></TableCell>
+      <TableCell></TableCell>
+      <TableCell></TableCell>
+      <TableCell></TableCell>
+      <TableCell></TableCell>
+      <TableCell></TableCell>
     </StyledTableRow>
   );
 }

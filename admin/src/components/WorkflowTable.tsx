@@ -35,6 +35,7 @@ function WorkflowTable({ workflows = [], groups = [], group = "" }: Props) {
         <TableRow>
           <TableCell>Workflow</TableCell>
           <TableCell>Type</TableCell>
+          <TableCell>Tags</TableCell>
           <TableCell>Name</TableCell>
           <TableCell>Description</TableCell>
           <TableCell>Status</TableCell>
