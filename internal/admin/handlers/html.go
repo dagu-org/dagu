@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"embed"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,10 +26,7 @@ var defaultFuncs = template.FuncMap{
 	},
 	"navbarColor": func() string {
 		c, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_COLOR)
-		if c == "" {
-			return ""
-		}
-		return fmt.Sprintf("background-color: %s;", c)
+		return c
 	},
 	"navbarTitle": func() string {
 		val, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_TITLE)
