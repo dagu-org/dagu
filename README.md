@@ -54,11 +54,11 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [Contributors](#contributors)
 
 ## Usecases
-- Task automation
+- Small projects workflow
+- Personal task automation
 - Batch processing
 - ETL pipeline
 - Machine learning / AI
-- CI/CD pipeline
 
 ## Why not other popular workflow engines like Airflow?
 
@@ -147,6 +147,8 @@ You can execute the example by pressing the `Start` button.
 
 ### Minimal Definition
 
+Minimal workflow definition is as simple as follows:
+
 ```yaml
 name: hello world
 steps:
@@ -205,6 +207,16 @@ params: param1 param2
 steps:
   - name: some task with parameters
     command: python main.py $1 $2
+```
+
+Named parameters are also available as follows:
+
+```yaml
+name: example
+params: ONE=1 TWO=`echo 2`
+steps:
+  - name: some task with parameters
+    command: python main.py $ONE $TWO
 ```
 
 ### Command Substitution
