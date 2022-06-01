@@ -17,6 +17,7 @@ type configDefinition struct {
 	MaxActiveRuns     int
 	Params            string
 	MaxCleanUpTimeSec *int
+	Tags              string
 }
 
 type conditionDef struct {

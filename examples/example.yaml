@@ -1,4 +1,5 @@
 name: Example DAG
+tags: Daily,Monthly
 steps:
   - name: "Initialize"
     command: "sleep 2"

@@ -33,6 +33,7 @@ type Config struct {
 	Params            []string
 	DefaultParams     string
 	MaxCleanUpTime    time.Duration
+	Tags              []string
 }
 
 type HandlerOn struct {
@@ -190,6 +191,8 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	if err != nil {
 		return nil, err
 	}
+
+	c.Tags = parseTags(def.Tags)
 
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
@@ -416,6 +419,18 @@ func loadPreCondition(cond []*conditionDef) []*Condition {
 			Condition: v.Condition,
 			Expected:  v.Expected,
 		})
+	}
+	return ret
+}
+
+func parseTags(value string) []string {
+	values := strings.Split(value, ",")
+	ret := []string{}
+	for _, v := range values {
+		tag := strings.ToLower(strings.TrimSpace(v))
+		if tag != "" {
+			ret = append(ret, tag)
+		}
 	}
 	return ret
 }
