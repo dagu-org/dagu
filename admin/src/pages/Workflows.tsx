@@ -8,19 +8,57 @@ import WorkflowTable from "../components/WorkflowTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import Loading from "../components/Loading";
+import { WorkflowData, WorkflowDataType } from "../models/Workflow";
+import { useLocation } from "react-router-dom";
 
 function Workflows() {
-  const [group] = React.useState<string>(
-    new URLSearchParams(window.location.search).get("group") || ""
-  );
+  const useQuery = () => new URLSearchParams(useLocation().search);
+  let query = useQuery();
+  const group = query.get("group") || "";
+
   const { data, doGet } = useGetApi<GetListResponse>("/", {
     group: group,
   });
+
   React.useEffect(() => {
+    doGet();
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [group]);
+
+  const merged = React.useMemo(() => {
+    const ret: WorkflowData[] = [];
+    if (data) {
+      // FIXME: need refactoring
+      if (group != "") {
+        ret.push({
+          Type: WorkflowDataType.Group,
+          Name: "../",
+          Group: {
+            Name: "",
+            Dir: "",
+          },
+        });
+      }
+      for (const val of data.Groups) {
+        ret.push({
+          Type: WorkflowDataType.Group,
+          Name: val.Name,
+          Group: val,
+        });
+      }
+      for (const val of data.DAGs) {
+        if (!val.Error) {
+          ret.push({
+            Type: WorkflowDataType.Workflow,
+            Name: val.Config.Name,
+            DAG: val,
+          });
+        }
+      }
+    }
+    return ret;
+  }, [data, query.get("group")]);
 
   return (
     <Paper
@@ -44,7 +82,7 @@ function Workflows() {
         <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
       </Box>
       <Box>
-        <WithLoading loaded={!!data}>
+        <WithLoading loaded={!!data && !!merged}>
           {data && (
             <React.Fragment>
               <WorkflowErrors
@@ -53,8 +91,7 @@ function Workflows() {
                 hasError={data.HasError}
               ></WorkflowErrors>
               <WorkflowTable
-                workflows={data.DAGs}
-                groups={data.Groups}
+                workflows={merged}
                 group={data.Group}
               ></WorkflowTable>
             </React.Fragment>
