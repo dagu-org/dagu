@@ -330,6 +330,7 @@ Combining these settings gives you granular control over how the workflow runs.
 ```yaml
 name: all configuration              # DAG's name
 description: run a DAG               # DAG's description
+tags: daily job                      # Free tags (separated by comma)
 env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
