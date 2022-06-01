@@ -143,6 +143,9 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	c.Init()
 
 	c.Name = def.Name
+	if def.Name != "" {
+		c.Name = def.Name
+	}
 	c.Description = def.Description
 	c.MailOn.Failure = def.MailOn.Failure
 	c.MailOn.Success = def.MailOn.Success
@@ -435,9 +438,6 @@ func parseTags(value string) []string {
 }
 
 func assertDef(def *configDefinition) error {
-	if def.Name == "" {
-		return fmt.Errorf("DAG name must be specified")
-	}
 	if len(def.Steps) == 0 {
 		return fmt.Errorf("at least one step must be specified")
 	}
