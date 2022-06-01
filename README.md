@@ -87,6 +87,12 @@ brew upgrade yohamta/tap/dagu
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
 
+### via Go install
+
+```
+go install github.com/yohamta/dagu/cmd@latest
+```
+
 ### via GitHub Release Page 
 
 Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH`. For example, you can download it in `/usr/local/bin`.
