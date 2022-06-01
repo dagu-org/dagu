@@ -3,9 +3,12 @@ import {
   createTable,
   useTableInstance,
   getCoreRowModel,
+  getSortedRowModel,
+  SortingState,
 } from "@tanstack/react-table";
 import StatusChip from "./StatusChip";
 import {
+  Box,
   Chip,
   Stack,
   Table,
@@ -13,9 +16,16 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableSortLabel,
 } from "@mui/material";
 import { Link } from "react-router-dom";
-import { WorkflowData, WorkflowDataType } from "../models/Workflow";
+import {
+  getFirstTag,
+  getStatus,
+  getStatusField,
+  WorkflowData,
+  WorkflowDataType,
+} from "../models/Workflow";
 import StyledTableRow from "./StyledTableRow";
 
 type Props = {
@@ -56,6 +66,11 @@ const defaultColumns = [
         return <Chip color="primary" size="small" label="Workflow" />;
       }
     },
+    sortingFn: (a, b) => {
+      const dataA = a.original;
+      const dataB = b.original;
+      return dataA!.Type - dataB!.Type;
+    },
   }),
   table.createDataColumn("Type", {
     id: "Tags",
@@ -74,10 +89,16 @@ const defaultColumns = [
       }
       return null;
     },
+    sortingFn: (a, b) => {
+      let valA = getFirstTag(a.original);
+      let valB = getFirstTag(b.original);
+      return valA.localeCompare(valB);
+    },
   }),
   table.createDataColumn("Type", {
     id: "Config",
     header: "Description",
+    enableSorting: false,
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == WorkflowDataType.Workflow) {
@@ -100,6 +121,11 @@ const defaultColumns = [
       }
       return null;
     },
+    sortingFn: (a, b) => {
+      let valA = getStatus(a.original);
+      let valB = getStatus(b.original);
+      return valA < valB ? -1 : 1;
+    },
   }),
   table.createDataColumn("Type", {
     id: "Started At",
@@ -110,6 +136,13 @@ const defaultColumns = [
         return data.DAG.Status?.StartedAt;
       }
       return null;
+    },
+    sortingFn: (a, b) => {
+      const dataA = a.original!;
+      const dataB = b.original!;
+      let valA = getStatusField("StartedAt", dataA);
+      let valB = getStatusField("StartedAt", dataB);
+      return valA.localeCompare(valB);
     },
   }),
   table.createDataColumn("Type", {
@@ -122,6 +155,13 @@ const defaultColumns = [
       }
       return null;
     },
+    sortingFn: (a, b) => {
+      const dataA = a.original!;
+      const dataB = b.original!;
+      let valA = getStatusField("FinishedAt", dataA);
+      let valB = getStatusField("FinishedAt", dataB);
+      return valA.localeCompare(valB);
+    },
   }),
 ];
 
@@ -130,14 +170,17 @@ function WorkflowTable({ workflows = [], group = "" }: Props) {
     ...defaultColumns,
   ]);
 
-  const sorted = React.useMemo(() => {
-    return workflows.sort((a, b) => a.Name.localeCompare(b.Name));
-  }, [workflows]);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const instance = useTableInstance(table, {
-    data: sorted,
+    data: workflows,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
     meta: {
       group,
     },
@@ -150,7 +193,22 @@ function WorkflowTable({ workflows = [], group = "" }: Props) {
           <TableRow key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
               <TableCell key={header.id} colSpan={header.colSpan}>
-                {header.isPlaceholder ? null : header.renderHeader()}
+                <Box
+                  {...{
+                    sx: {
+                      cursor: header.column.getCanSort()
+                        ? "pointer"
+                        : "default",
+                    },
+                    onClick: header.column.getToggleSortingHandler(),
+                  }}
+                >
+                  {header.isPlaceholder ? null : header.renderHeader()}
+                  {{
+                    asc: <TableSortLabel direction="asc" />,
+                    desc: <TableSortLabel direction="desc" />,
+                  }[header.column.getIsSorted() as string] ?? null}
+                </Box>
               </TableCell>
             ))}
           </TableRow>
