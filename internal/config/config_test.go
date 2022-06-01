@@ -33,10 +33,7 @@ func TestAssertDefinition(t *testing.T) {
 		HomeDir: utils.MustGetUserHomeDir(),
 	}
 
-	_, err := l.Load(path.Join(testDir, "config_err_no_name.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("DAG name must be specified"))
-
-	_, err = l.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
+	_, err := l.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("at least one step must be specified"))
 }
 
@@ -60,10 +57,6 @@ func TestConfigReadClone(t *testing.T) {
 	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
-	require.Contains(t, cfg.String(), "test DAG")
-
-	require.Equal(t, cfg.Name, "test DAG")
-
 	cfg2 := cfg.Clone()
 	require.Equal(t, cfg, cfg2)
 }
@@ -76,7 +69,7 @@ func TestConfigLoadHeadOnly(t *testing.T) {
 	cfg, err := l.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
 	require.NoError(t, err)
 
-	require.Equal(t, cfg.Name, "test DAG")
+	require.Equal(t, cfg.Name, "config_default")
 	require.True(t, len(cfg.Steps) == 0)
 }
 

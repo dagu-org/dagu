@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
@@ -120,6 +121,8 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 		dst = &Config{}
 		dst.Init()
 	}
+
+	dst.Name = strings.TrimRight(filepath.Base(file), filepath.Ext(file))
 
 	raw, err := cl.load(file)
 	if err != nil {

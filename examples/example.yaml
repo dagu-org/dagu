@@ -1,4 +1,3 @@
-name: Example DAG
 tags: Daily,Monthly
 steps:
   - name: "Initialize"
