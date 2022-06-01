@@ -1,4 +1,4 @@
-import { Chip, TableCell } from "@mui/material";
+import { Chip, Stack, TableCell } from "@mui/material";
 import React from "react";
 import { Link } from "react-router-dom";
 import { DAG } from "../models/Dag";
@@ -21,6 +21,13 @@ function WorkflowTableRow({ workflow, group }: Props) {
       </TableCell>
       <TableCell>
         <Chip color="primary" size="small" label="Workflow" />
+      </TableCell>
+      <TableCell>
+        <Stack direction="row" spacing={1}>
+          {workflow.Config!.Tags?.map((tag) => (
+            <Chip size="small" label={tag} />
+          ))}
+        </Stack>
       </TableCell>
       <TableCell>{workflow.Config!.Name}</TableCell>
       <TableCell>{workflow.Config!.Description}</TableCell>

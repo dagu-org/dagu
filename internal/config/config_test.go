@@ -190,3 +190,32 @@ params: %s
 		}
 	}
 }
+
+func TestTags(t *testing.T) {
+	for _, test := range []struct {
+		Tags string
+		Want []string
+	}{
+		{
+			Tags: "Daily, Monthly",
+			Want: []string{"daily", "monthly"},
+		},
+	} {
+		l := &Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
+		d, err := l.unmarshalData([]byte(fmt.Sprintf(`
+tags: %s
+  	`, test.Tags)))
+		require.NoError(t, err)
+
+		def, err := l.decode(d)
+		require.NoError(t, err)
+
+		b := &builder{}
+		cfg, err := b.buildFromDefinition(def, nil)
+		require.NoError(t, err)
+
+		require.Equal(t, test.Want, cfg.Tags)
+	}
+}
