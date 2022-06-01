@@ -264,6 +264,10 @@ func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
 	for _, r := range records {
 		for i, v := range r {
 			if !b.noSetenv {
+				if strings.Contains(v, "=") {
+					parts := strings.SplitN(v, "=", 2)
+					os.Setenv(parts[0], parts[1])
+				}
 				err = os.Setenv(strconv.Itoa(i+1), v)
 				if err != nil {
 					return nil, err

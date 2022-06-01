@@ -145,3 +145,48 @@ func TestLoadEnv(t *testing.T) {
 		require.Equal(t, c.want, os.Getenv(c.key))
 	}
 }
+
+func TestParseParameter(t *testing.T) {
+	for _, test := range []struct {
+		Params string
+		Env    string
+		Want   map[string]string
+	}{
+		{
+			Params: "P1=foo P2=${FOO} P3=`/bin/echo 1 X=` bar",
+			Env:    "FOO: BAR",
+			Want: map[string]string{
+				"P1": "foo",
+				"P2": "BAR",
+				"P3": "1",
+				"X":  "",
+				"1":  "P1=foo",
+				"2":  "P2=BAR",
+				"3":  "P3=1",
+				"4":  "X=",
+				"5":  "bar",
+			},
+		},
+	} {
+		l := &Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
+		d, err := l.unmarshalData([]byte(fmt.Sprintf(`
+env:
+  - %s
+params: %s
+  	`, test.Env, test.Params)))
+		require.NoError(t, err)
+
+		def, err := l.decode(d)
+		require.NoError(t, err)
+
+		b := &builder{}
+		_, err = b.buildFromDefinition(def, nil)
+		require.NoError(t, err)
+
+		for k, v := range test.Want {
+			require.Equal(t, v, os.Getenv(k))
+		}
+	}
+}
