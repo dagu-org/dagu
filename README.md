@@ -1,4 +1,5 @@
-# <img src="assets/images/logo-with-background.png?raw=true" width="300" />
+# Dagu
+<img align="right" width="150" src="./assets/images/logo-with-background.png" alt="dagu" title="dagu" />
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)

@@ -39,7 +39,7 @@ function DashboardTimechart({ data: input }: Props) {
         ret.push({
           name: status.Name,
           status: status.Status,
-          values: [moment(start).unix(), to],
+          values: [moment(start).unix()-Math.random() * 2000, to + Math.random() * 4000],
         });
       }
     });

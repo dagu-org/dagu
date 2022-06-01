@@ -1,8 +1,8 @@
 params: "`date +'%Y%m%d'`"
 steps:
   - name: step 1
-    command: python extract_data.py $1
+    command: echo $1
   - name: step 2
-    command: python process_data.py $1
+    command: echo $2
     depends:
       - step 1
