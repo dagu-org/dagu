@@ -45,9 +45,10 @@ function Dashboard() {
   }, [data]);
 
   React.useEffect(() => {
+    doGet();
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [group]);
 
   return (
     <Grid container spacing={3} sx={{ mx: 4, width: "100%" }}>

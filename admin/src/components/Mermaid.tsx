@@ -30,9 +30,6 @@ function Mermaid({ def, style = {} }: Props) {
     if (!ref.current) {
       return;
     }
-    console.log({
-      def,
-    });
     if (def.startsWith("<")) {
       console.error("invalid definition!!");
       return;
@@ -41,7 +38,6 @@ function Mermaid({ def, style = {} }: Props) {
       "mermaid",
       def,
       (svgCode, bindFunc) => {
-        console.log({ svgCode });
         if (ref.current) {
           // @ts-ignore
           ref.current.innerHTML = svgCode;
