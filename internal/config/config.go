@@ -147,6 +147,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	c.MailOn.Failure = def.MailOn.Failure
 	c.MailOn.Success = def.MailOn.Success
 	c.Delay = time.Second * time.Duration(def.DelaySec)
+	c.Tags = parseTags(def.Tags)
 
 	if b.headOnly {
 		return c, nil
@@ -191,8 +192,6 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	if err != nil {
 		return nil, err
 	}
-
-	c.Tags = parseTags(def.Tags)
 
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
