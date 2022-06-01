@@ -18,7 +18,6 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
     - [via Bash script](#via-bash-script)
-    - [via Go install](#via-go-install)
     - [via GitHub Release Page](#via-github-release-page)
   - [️Quick start](#️quick-start)
     - [1. Launch the web UI](#1-launch-the-web-ui)
@@ -86,12 +85,6 @@ brew upgrade yohamta/tap/dagu
 
 ```sh
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
-```
-
-### via Go install
-
-```
-go install github.com/yohamta/dagu/cmd@latest
 ```
 
 ### via GitHub Release Page 
