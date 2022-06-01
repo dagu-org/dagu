@@ -5,6 +5,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   SortingState,
+  getFilteredRowModel,
 } from "@tanstack/react-table";
 import StatusChip from "./StatusChip";
 import {
@@ -17,6 +18,7 @@ import {
   TableHead,
   TableRow,
   TableSortLabel,
+  TextField,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import {
@@ -33,9 +35,12 @@ type Props = {
   group: string;
 };
 
-const table = createTable().setRowType<WorkflowData>().setTableMetaType<{
-  group: string;
-}>();
+const table = createTable()
+  .setRowType<WorkflowData>()
+  .setFilterMetaType<WorkflowData>()
+  .setTableMetaType<{
+    group: string;
+  }>();
 
 const defaultColumns = [
   table.createDataColumn("Name", {
@@ -171,14 +176,42 @@ function WorkflowTable({ workflows = [], group = "" }: Props) {
   ]);
 
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = React.useState("");
 
   const instance = useTableInstance(table, {
     data: workflows,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: (row, _, globalFilter) => {
+      const data = row.original;
+      if (!data) {
+        return false;
+      }
+      if (data.Type == WorkflowDataType.Group) {
+        return data.Name.toLowerCase().includes(globalFilter);
+      }
+      const workflow = data.DAG;
+      if (workflow.Config.Name.toLowerCase().includes(globalFilter)) {
+        return true;
+      }
+      if (workflow.Config.Description.toLowerCase().includes(globalFilter)) {
+        return true;
+      }
+      const tags = workflow.Config?.Tags;
+      if (
+        tags &&
+        tags.some((tag) => tag.toLowerCase().includes(globalFilter))
+      ) {
+        return true;
+      }
+      return false;
+    },
     state: {
       sorting,
+      globalFilter,
     },
     onSortingChange: setSorting,
     meta: {
@@ -187,43 +220,57 @@ function WorkflowTable({ workflows = [], group = "" }: Props) {
   });
 
   return (
-    <Table size="small">
-      <TableHead>
-        {instance.getHeaderGroups().map((headerGroup) => (
-          <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <TableCell key={header.id} colSpan={header.colSpan}>
-                <Box
-                  {...{
-                    sx: {
-                      cursor: header.column.getCanSort()
-                        ? "pointer"
-                        : "default",
-                    },
-                    onClick: header.column.getToggleSortingHandler(),
-                  }}
-                >
-                  {header.isPlaceholder ? null : header.renderHeader()}
-                  {{
-                    asc: <TableSortLabel direction="asc" />,
-                    desc: <TableSortLabel direction="desc" />,
-                  }[header.column.getIsSorted() as string] ?? null}
-                </Box>
-              </TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </TableHead>
-      <TableBody>
-        {instance.getRowModel().rows.map((row) => (
-          <StyledTableRow key={row.id}>
-            {row.getVisibleCells().map((cell) => (
-              <TableCell key={cell.id}>{cell.renderCell()}</TableCell>
-            ))}
-          </StyledTableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <Box>
+      <TextField
+        label="Filter"
+        size="small"
+        InputProps={{
+          value: globalFilter || "",
+          onChange: (value) => {
+            const data = value.target.value;
+            setGlobalFilter(data);
+          },
+          type: "search",
+        }}
+      />
+      <Table size="small">
+        <TableHead>
+          {instance.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => (
+                <TableCell key={header.id} colSpan={header.colSpan}>
+                  <Box
+                    {...{
+                      sx: {
+                        cursor: header.column.getCanSort()
+                          ? "pointer"
+                          : "default",
+                      },
+                      onClick: header.column.getToggleSortingHandler(),
+                    }}
+                  >
+                    {header.isPlaceholder ? null : header.renderHeader()}
+                    {{
+                      asc: <TableSortLabel direction="asc" />,
+                      desc: <TableSortLabel direction="desc" />,
+                    }[header.column.getIsSorted() as string] ?? null}
+                  </Box>
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableHead>
+        <TableBody>
+          {instance.getRowModel().rows.map((row) => (
+            <StyledTableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>{cell.renderCell()}</TableCell>
+              ))}
+            </StyledTableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
   );
 }
 export default WorkflowTable;
