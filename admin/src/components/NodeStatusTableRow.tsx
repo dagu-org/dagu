@@ -1,7 +1,7 @@
 import React from "react";
 import { Node } from "../models/Node";
 import { Step } from "../models/Step";
-import { WorkflowTabType } from "../models/WorkflowTab";
+import { WorkflowTabType } from "../models/Workflow";
 import MultilineText from "./MultilineText";
 import NodeStatusChip from "./NodeStatusChip";
 import { TableCell } from "@mui/material";

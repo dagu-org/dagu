@@ -43,12 +43,12 @@ export function getStatus(data?: WorkflowData): SchedulerStatus {
 }
 
 type KeysMatching<T extends object, V> = {
-  [K in keyof T]-?: T[K] extends V ? K : never
+  [K in keyof T]-?: T[K] extends V ? K : never;
 }[keyof T];
 
 export function getStatusField(
   field: KeysMatching<Status, string>,
-  data?: WorkflowData,
+  data?: WorkflowData
 ): string {
   if (!data) {
     return "";
@@ -57,4 +57,13 @@ export function getStatusField(
     return data.DAG.Status?.[field] || "";
   }
   return "";
+}
+
+export enum WorkflowTabType {
+  Status = "0",
+  Config = "1",
+  History = "2",
+  StepLog = "3",
+  ScLog = "4",
+  None = "5",
 }
