@@ -475,7 +475,7 @@ TBU
 
 ### How to contribute?
 
-Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. If you want anything needed to be done, take a look at [TODO](https://github.com/yohamta/dagu/issues/102) list. Thanks!
+Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thanks!
 
 ### Where is the history data stored?
 
@@ -495,7 +495,7 @@ You can change the status of any task to a `failed` state. Then, when you retry 
 
 ### Does it provide sucheduler daemon?
 
-Not yet. Please use it with cron or other schedulers at this moment.
+No, not yet. It is meant to be used with cron or other schedulers. If you could implement the scheduler daemon function and create a PR, it would be greatly appreciated.
 
 ### How does it track running processes without DBMS?
 
