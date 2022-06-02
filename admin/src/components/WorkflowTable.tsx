@@ -6,10 +6,12 @@ import {
   getSortedRowModel,
   SortingState,
   getFilteredRowModel,
+  ColumnFiltersState,
 } from "@tanstack/react-table";
 import WorkflowActions from "./WorkflowActions";
 import StatusChip from "./StatusChip";
 import {
+  Autocomplete,
   Box,
   Chip,
   Stack,
@@ -90,12 +92,26 @@ const defaultColumns = [
         return (
           <Stack direction="row" spacing={1}>
             {tags?.map((tag) => (
-              <Chip key={tag} size="small" label={tag} />
+              <Chip
+                key={tag}
+                size="small"
+                label={tag}
+                onClick={() => props.column.setFilterValue(tag)}
+              />
             ))}
           </Stack>
         );
       }
       return null;
+    },
+    filterFn: (props, _, filter) => {
+      const data = props.original!;
+      if (data.Type != WorkflowDataType.Workflow) {
+        return false;
+      }
+      const tags = data.DAG.Config.Tags;
+      const ret = tags?.some((tag) => tag == filter) || false;
+      return ret;
     },
     sortingFn: (a, b) => {
       let valA = getFirstTag(a.original);
@@ -197,8 +213,31 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     ...defaultColumns,
   ]);
 
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
+
+  const selectedTag = React.useMemo(() => {
+    return (
+      (columnFilters.find((filter) => filter.id == "Tags")?.value as string) ||
+      ""
+    );
+  }, [columnFilters]);
+
+  const tagOptions = React.useMemo(() => {
+    const map: { [key: string]: boolean } = {};
+    workflows.forEach((data) => {
+      if (data.Type == WorkflowDataType.Workflow) {
+        data.DAG.Config.Tags?.forEach((tag) => {
+          map[tag] = true;
+        });
+      }
+    });
+    const ret = Object.keys(map).sort();
+    return ret;
+  }, []);
 
   const instance = useTableInstance(table, {
     data: workflows,
@@ -207,6 +246,7 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
+    onColumnFiltersChange: setColumnFilters,
     globalFilterFn: (row, _, globalFilter) => {
       const data = row.original;
       if (!data) {
@@ -234,6 +274,7 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     state: {
       sorting,
       globalFilter,
+      columnFilters,
     },
     onSortingChange: setSorting,
     meta: {
@@ -242,20 +283,44 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     },
   });
 
+  console.log({
+    columns,
+  });
+
   return (
     <Box>
-      <TextField
-        label="Filter"
-        size="small"
-        InputProps={{
-          value: globalFilter || "",
-          onChange: (value) => {
-            const data = value.target.value;
-            setGlobalFilter(data);
-          },
-          type: "search",
+      <Stack
+        sx={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "start",
+          alignContent: "flex-center",
         }}
-      />
+      >
+        <TextField
+          label="Search Text"
+          size="small"
+          InputProps={{
+            value: globalFilter || "",
+            onChange: (value) => {
+              const data = value.target.value;
+              setGlobalFilter(data);
+            },
+            type: "search",
+          }}
+        />
+        <Autocomplete<string>
+          size="small"
+          limitTags={1}
+          value={selectedTag}
+          options={tagOptions}
+          onChange={(_, value) => {
+            instance.getColumn("Tags").setFilterValue(value || "");
+          }}
+          renderInput={(params) => <TextField {...params} label="Filter Tag" />}
+          sx={{ width: "300px", ml: 1 }}
+        />
+      </Stack>
       <Table size="small">
         <TableHead>
           {instance.getHeaderGroups().map((headerGroup) => (
