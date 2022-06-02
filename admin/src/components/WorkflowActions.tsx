@@ -10,7 +10,7 @@ type Props = {
   refresh?: () => any;
 };
 
-function WorkflowButtons({
+function WorkflowActions({
   status,
   group,
   name,
@@ -123,7 +123,7 @@ function WorkflowButtons({
     </Stack>
   );
 }
-export default WorkflowButtons;
+export default WorkflowActions;
 
 interface ActionButtonProps {
   children: string;

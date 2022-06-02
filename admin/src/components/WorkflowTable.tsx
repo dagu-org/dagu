@@ -7,7 +7,7 @@ import {
   SortingState,
   getFilteredRowModel,
 } from "@tanstack/react-table";
-import WorkflowButtons from "../components/WorkflowButtons";
+import WorkflowActions from "./WorkflowActions";
 import StatusChip from "./StatusChip";
 import {
   Box,
@@ -180,7 +180,7 @@ const defaultColumns = [
         return null;
       }
       return (
-        <WorkflowButtons
+        <WorkflowActions
           status={data.DAG.Status}
           group={props.instance.options.meta?.group || ""}
           name={data.DAG.Config.Name}

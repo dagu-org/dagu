@@ -10,7 +10,7 @@ import WorkflowHistory from "../components/WorkflowHistory";
 import WorkflowLog from "../components/WorkflowLog";
 import { Box, Paper, Stack, Tab, Tabs } from "@mui/material";
 import Title from "../components/Title";
-import WorkflowButtons from "../components/WorkflowButtons";
+import WorkflowActions from "../components/WorkflowActions";
 import ConfigEditButtons from "../components/ConfigEditButtons";
 import Loading from "../components/Loading";
 
@@ -119,7 +119,7 @@ function WorkflowDetail() {
             }}
           >
             <Title>{data.Title}</Title>
-            <WorkflowButtons
+            <WorkflowActions
               status={data.DAG.Status}
               group={group}
               name={params.name!}
