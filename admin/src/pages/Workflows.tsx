@@ -29,7 +29,7 @@ function Workflows() {
   const merged = React.useMemo(() => {
     const ret: WorkflowData[] = [];
     if (data) {
-      // FIXME: need refactoring
+      // TODO: need refactoring
       if (group != "") {
         ret.push({
           Type: WorkflowDataType.Group,
@@ -93,6 +93,7 @@ function Workflows() {
               <WorkflowTable
                 workflows={merged}
                 group={data.Group}
+                refreshFn={doGet}
               ></WorkflowTable>
             </React.Fragment>
           )}
