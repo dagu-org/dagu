@@ -1,6 +1,6 @@
 import React, { CSSProperties } from "react";
 import { Status } from "../models/Status";
-import { WorkflowTabType } from "../models/WorkflowTab";
+import { WorkflowTabType } from "../models/Workflow";
 import StatusChip from "./StatusChip";
 import {
   Paper,
