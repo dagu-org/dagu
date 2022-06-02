@@ -4,7 +4,7 @@ import { GetWorkflowResponse } from "../api/Workflow";
 import ConfigErrors from "../components/ConfigErrors";
 import WorkflowStatus from "../components/WorkflowStatus";
 import { WorkflowContext } from "../contexts/WorkflowContext";
-import { WorkflowTabType } from "../models/WorkflowTab";
+import { WorkflowTabType } from "../models/Workflow";
 import WorkflowConfig from "../components/WorkflowConfig";
 import WorkflowHistory from "../components/WorkflowHistory";
 import WorkflowLog from "../components/WorkflowLog";
