@@ -7,6 +7,7 @@ import {
   SortingState,
   getFilteredRowModel,
 } from "@tanstack/react-table";
+import WorkflowButtons from "../components/WorkflowButtons";
 import StatusChip from "./StatusChip";
 import {
   Box,
@@ -33,6 +34,7 @@ import StyledTableRow from "./StyledTableRow";
 type Props = {
   workflows: WorkflowData[];
   group: string;
+  refreshFn: () => Promise<void>;
 };
 
 const table = createTable()
@@ -40,6 +42,7 @@ const table = createTable()
   .setFilterMetaType<WorkflowData>()
   .setTableMetaType<{
     group: string;
+    refreshFn: () => Promise<void>;
   }>();
 
 const defaultColumns = [
@@ -53,9 +56,9 @@ const defaultColumns = [
         return <Link to={url}>{props.getValue()}</Link>;
       } else {
         const group = props.instance.options.meta?.group || "";
-        const url = `/dags/${encodeURI(
-          data.DAG.File.replace(/\.[^/.]+$/, "")
-        )}?group=${encodeURI(group)}`;
+        const url = `/dags/${encodeURI(data.DAG.Config.Name)}?group=${encodeURI(
+          group
+        )}`;
         return <Link to={url}>{props.getValue()}</Link>;
       }
     },
@@ -168,9 +171,28 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
+  table.createDisplayColumn({
+    id: "Actions",
+    header: "Actions",
+    cell: (props) => {
+      const data = props.row.original!;
+      if (data.Type == WorkflowDataType.Group) {
+        return null;
+      }
+      return (
+        <WorkflowButtons
+          status={data.DAG.Status}
+          group={props.instance.options.meta?.group || ""}
+          name={data.DAG.Config.Name}
+          label={false}
+          refresh={props.instance.options.meta?.refreshFn}
+        />
+      );
+    },
+  }),
 ];
 
-function WorkflowTable({ workflows = [], group = "" }: Props) {
+function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
@@ -216,6 +238,7 @@ function WorkflowTable({ workflows = [], group = "" }: Props) {
     onSortingChange: setSorting,
     meta: {
       group,
+      refreshFn,
     },
   });
 

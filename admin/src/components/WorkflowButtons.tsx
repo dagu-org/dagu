@@ -1,17 +1,22 @@
-import { Box, Button, Stack } from "@mui/material";
-import React, { FormEvent } from "react";
-import { GetWorkflowResponse } from "../api/Workflow";
-import { WorkflowContext } from "../contexts/WorkflowContext";
+import { Button, IconButton, Stack } from "@mui/material";
+import React, { ReactElement } from "react";
 import { SchedulerStatus, Status } from "../models/Status";
 
 type Props = {
   status?: Status;
   group: string;
   name: string;
-  refresh: () => void;
+  label?: boolean;
+  refresh?: () => any;
 };
 
-function WorkflowButtons({ status, group, name, refresh }: Props) {
+function WorkflowButtons({
+  status,
+  group,
+  name,
+  refresh = () => {},
+  label = true,
+}: Props) {
   const onSubmit = React.useCallback(
     async (
       warn: string,
@@ -57,11 +62,9 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
   );
   return (
     <Stack direction="row" spacing={2}>
-      <Button
-        variant="contained"
-        color="info"
-        size="small"
-        startIcon={
+      <ActionButton
+        label={label}
+        icon={
           <span className="icon">
             <i className="fa-solid fa-play"></i>
           </span>
@@ -75,13 +78,11 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
           })
         }
       >
-        Start
-      </Button>
-      <Button
-        variant="contained"
-        color="info"
-        size="small"
-        startIcon={
+        {label ? "Start" : ""}
+      </ActionButton>
+      <ActionButton
+        label={label}
+        icon={
           <span className="icon">
             <i className="fa-solid fa-stop"></i>
           </span>
@@ -95,13 +96,11 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
           })
         }
       >
-        Stop
-      </Button>
-      <Button
-        variant="contained"
-        color="info"
-        size="small"
-        startIcon={
+        {label ? "Stop" : ""}
+      </ActionButton>
+      <ActionButton
+        label={label}
+        icon={
           <span className="icon">
             <i className="fa-solid fa-reply"></i>
           </span>
@@ -119,9 +118,42 @@ function WorkflowButtons({ status, group, name, refresh }: Props) {
           )
         }
       >
-        Retry
-      </Button>
+        {label ? "Retry" : ""}
+      </ActionButton>
     </Stack>
   );
 }
 export default WorkflowButtons;
+
+interface ActionButtonProps {
+  children: string;
+  label: boolean;
+  icon: ReactElement;
+  disabled: boolean;
+  onClick: () => void;
+}
+
+function ActionButton({
+  label,
+  children,
+  icon,
+  disabled,
+  onClick,
+}: ActionButtonProps) {
+  return label ? (
+    <Button
+      variant="contained"
+      color="info"
+      size="small"
+      startIcon={icon}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  ) : (
+    <IconButton color="info" size="small" onClick={onClick} disabled={disabled}>
+      {icon}
+    </IconButton>
+  );
+}
