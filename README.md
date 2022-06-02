@@ -1,5 +1,4 @@
-# Dagu
-<img align="right" width="150" src="./assets/images/logo-with-background.png" alt="dagu" title="dagu" />
+# <img src="./assets/images/logo-with-background.png" width="400">
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
@@ -7,21 +6,24 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**An easy-to-use, self-contained, No-code workflow engine with built-in web UI**
+**A No-code workflow executor with built-in web UI**
 
-It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format.
+It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format.
 
 ## Contents
 
-  - [Usecases](#usecases)
-  - [What's the difference from other workflow engines like Airflow?](#whats-the-difference-from-other-workflow-engines-like-airflow)
-  - [️How does it work?](#️how-does-it-work)
+  - [Motivation](#motivation)
+  - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
+    - [Example](#example)
+    - [Admin Web UI](#admin-web-ui)
+  - [Features](#features)
+  - [Use cases](#use-cases)
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
     - [via Bash script](#via-bash-script)
     - [via GitHub Release Page](#via-github-release-page)
   - [️Quick start](#️quick-start)
-    - [1. Launch the web UI](#1-launch-the-web-ui)
+    - [1. Launch the Admin Web UI](#1-launch-the-admin-web-ui)
     - [2. Create a new workflow](#2-create-a-new-workflow)
     - [3. Edit the workflow](#3-edit-the-workflow)
     - [4. Execute the workflow](#4-execute-the-workflow)
@@ -41,36 +43,86 @@ It executes [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Direct
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
-    - [Web UI Configuration](#web-ui-configuration)
+    - [Admin Web UI Configuration](#admin-web-ui-configuration)
     - [Global Configuration](#global-configuration)
+  - [REST API Interface](#rest-api-interface)
+    - [GET `dags/`](#get-dags)
+    - [GET `dags/<workflow name>`](#get-dagsworkflow-name)
+    - [POST `dags/<workflow name>`](#post-dagsworkflow-name)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
     - [Where are the log files stored?](#where-are-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [How can I retry a workflow from a specific task?](#how-can-i-retry-a-workflow-from-a-specific-task)
-    - [Does it provide sucheduler function?](#does-it-provide-sucheduler-function)
+    - [Does it provide sucheduler daemon?](#does-it-provide-sucheduler-daemon)
     - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
   - [License](#license)
   - [Contributors](#contributors)
 
-## Usecases
-- Workflow engine for smaller projects
-- Personal task automation
-- Batch processing
-- ETL pipeline
-- Machine learning / AI
+## Motivation
 
-## What's the difference from other workflow engines like Airflow?
+In the projects I worked on, our ETL pipeline had **many problems**. There were hundreds of cron jobs on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to rerun. We also have to SSH into the server to see the logs and run each shell script one by one. So we needed a tool that can explicitly visualize and manage the dependencies of the pipeline. ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
-Popular workflow engines, Airflow, Prefect, Luigi, or Temporal, are powerful and valuable tools, requiring users to write code such as Python or Golang to run workflows. However, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl in many cases. Adding another programming layer on top of these would increase the complexity and become hard to maintain. So instead, we decided to develop an easy-to-use workflow engine that does not need any coding. Also, it is self-contained, standalone, has zero dependencies, and does not require DBMS.
+## Why not existing tools, like Airflow?
 
-## ️How does it work?
+There are many popular workflow engines such as Airflow, Prefect, etc. They are powerful and valuable tools, but they require writing code such as Python to run workflows. In many situations like above, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it even more complicated. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple declarative YAML format without coding.
 
-- Self-contained - It is a single binary with zero dependency, No DBMS or cloud service is required.
-- Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
+Dagu is self-contained, zero dependency, and does not require DBMS. These features make it an ideal workflow scheduler to use for existing code base, personal projects, or smaller use cases with fewer groups of people.
+
+### Example
+
+Here's a simple example that creates a SQL file, executes it on a Postgres DB, and writes results to a file.
+
+```yaml
+steps:
+  - name: step1
+    command: bash" 
+    script: |
+      echo "select * from A;" > select.sql
+  - name: step2
+    command: "psql -U username -d myDataBase -f select.sql"
+    stdout: output.txt
+    depends:
+      - step1
+```
+
+### Admin Web UI
+
+Dagu also comes with a featureful admin Web UI for visualization. You can visualize, create, edit, and run workflows on a browser.
+
+![example](assets/images/example.gif?raw=true)
+
+## Features
+
+- Simple command interface
+- Simple configuration YAML format
+- Simple architecture (no DBMS or agent process is required)
+- Web UI to visualize, manage jobs and watch logs
+- Parameterization
+- Conditions
+- Automatic retry
+- Cancellation
+- Retry
+- Prallelism limits
+- Environment variables
+- Repeat
+- Basic Authentication
+- E-mail notifications
+- REST api interface
+- onExit / onSuccess / onFailure / onCancel handlers
+- Automatic data cleaning
+
+## Use cases
+- ETL Pipeline
+- Batches
+- Machine Learning
+- Data Processing
+- Automation
 
 ## Install `dagu`
+
+You can quickly install `dagu` command and try it out.
 
 ### via Homebrew
 ```sh
@@ -94,9 +146,9 @@ Download the latest binary from the [Releases page](https://github.com/yohamta/d
 
 ## ️Quick start
 
-### 1. Launch the web UI
+### 1. Launch the Admin Web UI
 
-Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
+Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Admin Web UI.
 
 ### 2. Create a new workflow
 
@@ -109,8 +161,6 @@ Go to the workflow detail page and click the `Edit` button in the `Config` Tab. 
 ### 4. Execute the workflow
 
 You can execute the example by pressing the `Start` button.
- 
-![example](assets/images/example.gif?raw=true)
 
 ## Command Line User Interface
 
@@ -374,7 +424,7 @@ You can customize the admin web UI by environment variables.
 - `DAGU__ADMIN_NAVBAR_COLOR` - navigation header color for web UI (optional)
 - `DAGU__ADMIN_NAVBAR_TITLE` - navigation header title for web UI (optional)
 
-### Web UI Configuration
+### Admin Web UI Configuration
 
 Please create `~/.dagu/admin.yaml`.
 
@@ -408,6 +458,19 @@ infoMail:
   prefix: <prefix of mail subject>
 ```
 
+## REST API Interface
+
+Dagu server has simple APIs to query and control workflows.
+
+### GET `dags/`
+TBU
+
+### GET `dags/<workflow name>`
+TBU
+
+### POST `dags/<workflow name>`
+TBU
+
 ## FAQ
 
 ### How to contribute?
@@ -430,9 +493,9 @@ The default retention period for execution history is seven days. However, you c
 
 You can change the status of any task to a `failed` state. Then, when you retry the workflow, it will execute the failed one and any subsequent.
 
-### Does it provide sucheduler function?
+### Does it provide sucheduler daemon?
 
-No, it doesn't provide scheduler function at this moment. It is meant to be used with cron or other schedulers. But we may add a scheduler functionality in the future development.
+Not yet. Please use it with cron or other schedulers at this moment.
 
 ### How does it track running processes without DBMS?
 
