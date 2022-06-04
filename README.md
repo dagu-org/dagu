@@ -13,11 +13,8 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
 ## Contents
 
   - [Motivation](#motivation)
-  - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
-    - [Example](#example)
-    - [Admin Web UI](#admin-web-ui)
-  - [Features](#features)
-  - [Use cases](#use-cases)
+  - [Problems with existing tools such as Airflow](#problems-with-existing-tools-such-as-airflow)
+  - [Solution with a simpler workflow engine](#solution-with-a-simpler-workflow-engine)
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
     - [via Bash script](#via-bash-script)
@@ -46,9 +43,12 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Admin Web UI Configuration](#admin-web-ui-configuration)
     - [Global Configuration](#global-configuration)
   - [REST API Interface](#rest-api-interface)
-    - [GET `dags/`](#get-dags)
-    - [GET `dags/<workflow name>`](#get-dagsworkflow-name)
-    - [POST `dags/<workflow name>`](#post-dagsworkflow-name)
+    - [Show Workflows `GET dags/`](#show-workflows-get-dags)
+      - [Success Response](#success-response)
+    - [Show Workflow Detail `GET dags/:name`](#show-workflow-detail-get-dagsname)
+      - [Success Response](#success-response-1)
+    - [Submit Workflow Action `POST dags/:name`](#submit-workflow-action-post-dagsname)
+      - [Success Response](#success-response-2)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
     - [Where is the history data stored?](#where-is-the-history-data-stored)
@@ -60,65 +60,16 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
   - [License](#license)
   - [Contributors](#contributors)
 
-## Motivation
+## Motivation: Why workflow engine is needed
 
 In the projects I worked on, our ETL pipeline had **many problems**. There were hundreds of cron jobs on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to rerun. We also have to SSH into the server to see the logs and run each shell script one by one. So we needed a tool that can explicitly visualize and manage the dependencies of the pipeline. ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
 
-## Why not existing tools, like Airflow?
+## Problems: Why not existing tools, like Airflow?
 
-There are many popular workflow engines such as Airflow, Prefect, etc. They are powerful and valuable tools, but they require writing code such as Python to run workflows. In many situations like above, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it even more complicated. So we decided to develop a new workflow engine, Dagu, which allows you to define DAGs in a simple declarative YAML format without coding.
+There are many popular workflow engines such as Airflow, Prefect, etc. They are powerful and valuable tools, but they require writing code such as Python to run workflows. In many situations like above, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it even more complicated. So we needed a simpler workflow engine that is easy to use with an existing code base.
 
-Dagu is self-contained, zero dependency, and does not require DBMS. These features make it an ideal workflow scheduler to use for existing code base, personal projects, or smaller use cases with fewer groups of people.
-
-### Example
-
-Here's a simple example that creates a SQL file, executes it on a Postgres DB, and writes results to a file.
-
-```yaml
-steps:
-  - name: step1
-    command: bash" 
-    script: |
-      echo "select * from A;" > select.sql
-  - name: step2
-    command: "psql -U username -d myDataBase -f select.sql"
-    stdout: output.txt
-    depends:
-      - step1
-```
-
-### Admin Web UI
-
-Dagu also comes with a featureful admin Web UI for visualization. You can visualize, create, edit, and run workflows on a browser.
-
-![example](assets/images/example.gif?raw=true)
-
-## Features
-
-- Simple command interface
-- Simple configuration YAML format
-- Simple architecture (no DBMS or agent process is required)
-- Web UI to visualize, manage jobs and watch logs
-- Parameterization
-- Conditions
-- Automatic retry
-- Cancellation
-- Retry
-- Prallelism limits
-- Environment variables
-- Repeat
-- Basic Authentication
-- E-mail notifications
-- REST api interface
-- onExit / onSuccess / onFailure / onCancel handlers
-- Automatic data cleaning
-
-## Use cases
-- ETL Pipeline
-- Batches
-- Machine Learning
-- Data Processing
-- Automation
+## Solution: A simpler workflow engine
+We have developed a simple workflow engine, Dagu, which is self-contained, has zero dependencies, and does not require DBMS since it stores data in the local files in JSON format. A workflow can be defined in a simple YAML format. No effort is needed to set up or learn how to use the tool. These features make it an ideal workflow engine to use with any existing code base, personal projects, or smaller use cases with fewer groups of people.
 
 ## Install `dagu`
 
@@ -161,6 +112,8 @@ Go to the workflow detail page and click the `Edit` button in the `Config` Tab. 
 ### 4. Execute the workflow
 
 You can execute the example by pressing the `Start` button.
+
+![example](assets/images/example.gif?raw=true)
 
 ## Command Line User Interface
 
@@ -462,14 +415,490 @@ infoMail:
 
 Dagu server has simple APIs to query and control workflows.
 
-### GET `dags/`
-TBU
+### Show Workflows `GET dags/`
+**URL** : /api/user/
+**Method** : GET
+**Header** : `Accept: application/json`
+**Query Parameters** : 
+- group=[string] where group is the sub directory name that the workflow is in.
 
-### GET `dags/<workflow name>`
-TBU
+#### Success Response
+**Code** : `200 OK`
+**Content Examples**
+```json
+{
+    "Title": "DAGList",
+    "Charset": "",
+    "DAGs": [
+        {
+            "File": "example_1.yaml",
+            "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+            "Config": {
+                "ConfigPath": "/Users/dagu/go/src/github.com/yohamta/dagu/examples/example_1.yaml",
+                "Name": "example_1",
+                "Description": "",
+                "Env": [],
+                "LogDir": "/Users/dagu/.dagu/logs/example_1",
+                "HandlerOn": {
+                    "Failure": null,
+                    "Success": null,
+                    "Cancel": null,
+                    "Exit": null
+                },
+                "Steps": [],
+                "MailOn": {
+                    "Failure": false,
+                    "Success": false
+                },
+                "ErrorMail": null,
+                "InfoMail": null,
+                "Smtp": null,
+                "Delay": 0,
+                "HistRetentionDays": 7,
+                "Preconditions": [],
+                "MaxActiveRuns": 0,
+                "Params": [],
+                "DefaultParams": "",
+                "MaxCleanUpTime": 60000000000,
+                "Tags": null
+            },
+            "Status": {
+                "RequestId": "709afe8d-0498-45ab-a055-48429efa51e5",
+                "Name": "example_1",
+                "Status": 1,
+                "StatusText": "running",
+                "Pid": 34239,
+                "Nodes": [
+                    {
+                        "Step": {
+                            "Name": "1",
+                            "Description": "",
+                            "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                            "CmdWithArgs": "echo hello world",
+                            "Command": "echo",
+                            "Script": "",
+                            "Stdout": "",
+                            "Output": "",
+                            "Args": [
+                                "hello",
+                                "world"
+                            ],
+                            "Depends": null,
+                            "ContinueOn": {
+                                "Failure": false,
+                                "Skipped": false
+                            },
+                            "RetryPolicy": null,
+                            "RepeatPolicy": {
+                                "Repeat": false,
+                                "Interval": 0
+                            },
+                            "MailOnError": false,
+                            "Preconditions": []
+                        },
+                        "Log": "/Users/dagu/.dagu/logs/example_1/example_1/1.20220604.21:19:40.873.709afe8d.log",
+                        "StartedAt": "2022-06-04 21:19:40",
+                        "FinishedAt": "2022-06-04 21:19:40",
+                        "Status": 4,
+                        "RetryCount": 0,
+                        "DoneCount": 1,
+                        "Error": "",
+                        "StatusText": "finished"
+                    },
+                    {
+                        "Step": {
+                            "Name": "2",
+                            "Description": "",
+                            "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                            "CmdWithArgs": "sleep 10",
+                            "Command": "sleep",
+                            "Script": "",
+                            "Stdout": "",
+                            "Output": "",
+                            "Args": [
+                                "10"
+                            ],
+                            "Depends": [
+                                "1"
+                            ],
+                            "ContinueOn": {
+                                "Failure": false,
+                                "Skipped": false
+                            },
+                            "RetryPolicy": null,
+                            "RepeatPolicy": {
+                                "Repeat": false,
+                                "Interval": 0
+                            },
+                            "MailOnError": false,
+                            "Preconditions": []
+                        },
+                        "Log": "/Users/dagu/.dagu/logs/example_1/example_1/2.20220604.21:19:40.974.709afe8d.log",
+                        "StartedAt": "2022-06-04 21:19:40",
+                        "FinishedAt": "-",
+                        "Status": 1,
+                        "RetryCount": 0,
+                        "DoneCount": 0,
+                        "Error": "",
+                        "StatusText": "running"
+                    },
+                    {
+                        "Step": {
+                            "Name": "3",
+                            "Description": "",
+                            "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                            "CmdWithArgs": "echo done!",
+                            "Command": "echo",
+                            "Script": "",
+                            "Stdout": "",
+                            "Output": "",
+                            "Args": [
+                                "done!"
+                            ],
+                            "Depends": [
+                                "2"
+                            ],
+                            "ContinueOn": {
+                                "Failure": false,
+                                "Skipped": false
+                            },
+                            "RetryPolicy": null,
+                            "RepeatPolicy": {
+                                "Repeat": false,
+                                "Interval": 0
+                            },
+                            "MailOnError": false,
+                            "Preconditions": []
+                        },
+                        "Log": "",
+                        "StartedAt": "-",
+                        "FinishedAt": "-",
+                        "Status": 0,
+                        "RetryCount": 0,
+                        "DoneCount": 0,
+                        "Error": "",
+                        "StatusText": "not started"
+                    }
+                ],
+                "OnExit": null,
+                "OnSuccess": null,
+                "OnFailure": null,
+                "OnCancel": null,
+                "StartedAt": "2022-06-04 21:19:40",
+                "FinishedAt": "-",
+                "Log": "/Users/dagu/.dagu/logs/example_1/example_1/example_1.20220604.21:19:40.871.709afe8d.log",
+                "Params": ""
+            },
+            "Error": null,
+            "ErrorT": null
+        },
+    ],
+    "Groups": [],
+    "Group": "",
+    "Errors": [],
+    "HasError": false
+}
+```
 
-### POST `dags/<workflow name>`
-TBU
+### Show Workflow Detail `GET dags/:name`
+**URL** : /dags/:workflow
+**URL Parameters** : 
+- name=[string] where name is the `Name` of the workflow.
+**Query Parameters** : 
+- group=[string] where group is the sub directory name that the workflow is in.
+**Method** : GET
+**Header** : `Accept: application/json`
+
+#### Success Response
+**Code** : `200 OK`
+**Content Examples**
+
+```json
+{
+    "Title": "example_1.yaml",
+    "Charset": "",
+    "DAG": {
+        "File": "example_1.yaml",
+        "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+        "Config": {
+            "ConfigPath": "/Users/dagu/go/src/github.com/yohamta/dagu/examples/example_1.yaml",
+            "Name": "example_1",
+            "Description": "",
+            "Env": [],
+            "LogDir": "/Users/dagu/.dagu/logs/example_1",
+            "HandlerOn": {
+                "Failure": null,
+                "Success": null,
+                "Cancel": null,
+                "Exit": null
+            },
+            "Steps": [
+                {
+                    "Name": "1",
+                    "Description": "",
+                    "Variables": [],
+                    "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                    "CmdWithArgs": "echo hello world",
+                    "Command": "echo",
+                    "Script": "",
+                    "Stdout": "",
+                    "Output": "",
+                    "Args": [
+                        "hello",
+                        "world"
+                    ],
+                    "Depends": null,
+                    "ContinueOn": {
+                        "Failure": false,
+                        "Skipped": false
+                    },
+                    "RetryPolicy": null,
+                    "RepeatPolicy": {
+                        "Repeat": false,
+                        "Interval": 0
+                    },
+                    "MailOnError": false,
+                    "Preconditions": []
+                },
+                {
+                    "Name": "2",
+                    "Description": "",
+                    "Variables": [],
+                    "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                    "CmdWithArgs": "sleep 10",
+                    "Command": "sleep",
+                    "Script": "",
+                    "Stdout": "",
+                    "Output": "",
+                    "Args": [
+                        "10"
+                    ],
+                    "Depends": [
+                        "1"
+                    ],
+                    "ContinueOn": {
+                        "Failure": false,
+                        "Skipped": false
+                    },
+                    "RetryPolicy": null,
+                    "RepeatPolicy": {
+                        "Repeat": false,
+                        "Interval": 0
+                    },
+                    "MailOnError": false,
+                    "Preconditions": []
+                },
+                {
+                    "Name": "3",
+                    "Description": "",
+                    "Variables": [],
+                    "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                    "CmdWithArgs": "echo done!",
+                    "Command": "echo",
+                    "Script": "",
+                    "Stdout": "",
+                    "Output": "",
+                    "Args": [
+                        "done!"
+                    ],
+                    "Depends": [
+                        "2"
+                    ],
+                    "ContinueOn": {
+                        "Failure": false,
+                        "Skipped": false
+                    },
+                    "RetryPolicy": null,
+                    "RepeatPolicy": {
+                        "Repeat": false,
+                        "Interval": 0
+                    },
+                    "MailOnError": false,
+                    "Preconditions": []
+                }
+            ],
+            "MailOn": {
+                "Failure": false,
+                "Success": false
+            },
+            "ErrorMail": {
+                "From": "",
+                "To": "",
+                "Prefix": ""
+            },
+            "InfoMail": {
+                "From": "",
+                "To": "",
+                "Prefix": ""
+            },
+            "Smtp": {
+                "Host": "",
+                "Port": ""
+            },
+            "Delay": 0,
+            "HistRetentionDays": 7,
+            "Preconditions": [],
+            "MaxActiveRuns": 0,
+            "Params": [],
+            "DefaultParams": "",
+            "MaxCleanUpTime": 60000000000,
+            "Tags": null
+        },
+        "Status": {
+            "RequestId": "709afe8d-0498-45ab-a055-48429efa51e5",
+            "Name": "example_1",
+            "Status": 4,
+            "StatusText": "finished",
+            "Pid": 34239,
+            "Nodes": [
+                {
+                    "Step": {
+                        "Name": "1",
+                        "Description": "",
+                        "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                        "CmdWithArgs": "echo hello world",
+                        "Command": "echo",
+                        "Script": "",
+                        "Stdout": "",
+                        "Output": "",
+                        "Args": [
+                            "hello",
+                            "world"
+                        ],
+                        "Depends": null,
+                        "ContinueOn": {
+                            "Failure": false,
+                            "Skipped": false
+                        },
+                        "RetryPolicy": null,
+                        "RepeatPolicy": {
+                            "Repeat": false,
+                            "Interval": 0
+                        },
+                        "MailOnError": false,
+                        "Preconditions": []
+                    },
+                    "Log": "/Users/dagu/.dagu/logs/example_1/example_1/1.20220604.21:19:40.873.709afe8d.log",
+                    "StartedAt": "2022-06-04 21:19:40",
+                    "FinishedAt": "2022-06-04 21:19:40",
+                    "Status": 4,
+                    "RetryCount": 0,
+                    "DoneCount": 1,
+                    "Error": "",
+                    "StatusText": "finished"
+                },
+                {
+                    "Step": {
+                        "Name": "2",
+                        "Description": "",
+                        "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                        "CmdWithArgs": "sleep 10",
+                        "Command": "sleep",
+                        "Script": "",
+                        "Stdout": "",
+                        "Output": "",
+                        "Args": [
+                            "10"
+                        ],
+                        "Depends": [
+                            "1"
+                        ],
+                        "ContinueOn": {
+                            "Failure": false,
+                            "Skipped": false
+                        },
+                        "RetryPolicy": null,
+                        "RepeatPolicy": {
+                            "Repeat": false,
+                            "Interval": 0
+                        },
+                        "MailOnError": false,
+                        "Preconditions": []
+                    },
+                    "Log": "/Users/dagu/.dagu/logs/example_1/example_1/2.20220604.21:19:40.974.709afe8d.log",
+                    "StartedAt": "2022-06-04 21:19:40",
+                    "FinishedAt": "2022-06-04 21:19:51",
+                    "Status": 4,
+                    "RetryCount": 0,
+                    "DoneCount": 1,
+                    "Error": "",
+                    "StatusText": "finished"
+                },
+                {
+                    "Step": {
+                        "Name": "3",
+                        "Description": "",
+                        "Dir": "/Users/dagu/go/src/github.com/yohamta/dagu/examples",
+                        "CmdWithArgs": "echo done!",
+                        "Command": "echo",
+                        "Script": "",
+                        "Stdout": "",
+                        "Output": "",
+                        "Args": [
+                            "done!"
+                        ],
+                        "Depends": [
+                            "2"
+                        ],
+                        "ContinueOn": {
+                            "Failure": false,
+                            "Skipped": false
+                        },
+                        "RetryPolicy": null,
+                        "RepeatPolicy": {
+                            "Repeat": false,
+                            "Interval": 0
+                        },
+                        "MailOnError": false,
+                        "Preconditions": []
+                    },
+                    "Log": "/Users/dagu/.dagu/logs/example_1/example_1/3.20220604.21:19:51.042.709afe8d.log",
+                    "StartedAt": "2022-06-04 21:19:51",
+                    "FinishedAt": "2022-06-04 21:19:51",
+                    "Status": 4,
+                    "RetryCount": 0,
+                    "DoneCount": 1,
+                    "Error": "",
+                    "StatusText": "finished"
+                }
+            ],
+            "OnExit": null,
+            "OnSuccess": null,
+            "OnFailure": null,
+            "OnCancel": null,
+            "StartedAt": "2022-06-04 21:19:40",
+            "FinishedAt": "2022-06-04 21:19:51",
+            "Log": "/Users/dagu/.dagu/logs/example_1/example_1/example_1.20220604.21:19:40.871.709afe8d.log",
+            "Params": ""
+        },
+        "Error": null,
+        "ErrorT": null
+    },
+    "Tab": 0,
+    "Graph": "",
+    "Definition": "",
+    "LogData": null,
+    "LogUrl": "",
+    "Group": "",
+    "StepLog": null,
+    "ScLog": null,
+    "Errors": []
+}
+```
+
+### Submit Workflow Action `POST dags/:name`
+**URL** : /dags/:workflow
+**URL Parameters** : 
+- name=[string] where name is the `Name` of the workflow.
+**Query Parameters** : 
+- group=[string] where group is the sub directory name that the workflow is in.
+**Form Parameters** :
+- action=[string] where action is `start` or `stop` or `retry`
+- request-id=[string] where request-id to `retry` action
+**Method** : POST
+
+#### Success Response
+**Code** : `200 OK`
 
 ## FAQ
 
