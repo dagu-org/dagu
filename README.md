@@ -416,14 +416,20 @@ infoMail:
 Dagu server has simple APIs to query and control workflows.
 
 ### Show Workflows `GET dags/`
-**URL** : /api/user/
-**Method** : GET
+
+**URL** : `/api/user/`
+
+**Method** : `GET`
+
 **Header** : `Accept: application/json`
+
 **Query Parameters** : 
 - group=[string] where group is the sub directory name that the workflow is in.
 
 #### Success Response
+
 **Code** : `200 OK`
+
 **Content Examples**
 ```json
 {
@@ -601,16 +607,23 @@ Dagu server has simple APIs to query and control workflows.
 ```
 
 ### Show Workflow Detail `GET dags/:name`
-**URL** : /dags/:workflow
+
+**URL** : `/dags/:workflow`
+
 **URL Parameters** : 
 - name=[string] where name is the `Name` of the workflow.
+
 **Query Parameters** : 
 - group=[string] where group is the sub directory name that the workflow is in.
-**Method** : GET
+
+**Method** : `GET`
+
 **Header** : `Accept: application/json`
 
 #### Success Response
+
 **Code** : `200 OK`
+
 **Content Examples**
 
 ```json
@@ -887,17 +900,23 @@ Dagu server has simple APIs to query and control workflows.
 ```
 
 ### Submit Workflow Action `POST dags/:name`
-**URL** : /dags/:workflow
+
+**URL** : `/dags/:workflow`
+
 **URL Parameters** : 
 - name=[string] where name is the `Name` of the workflow.
+
 **Query Parameters** : 
 - group=[string] where group is the sub directory name that the workflow is in.
+
 **Form Parameters** :
 - action=[string] where action is `start` or `stop` or `retry`
 - request-id=[string] where request-id to `retry` action
-**Method** : POST
+
+**Method** : `POST`
 
 #### Success Response
+
 **Code** : `200 OK`
 
 ## FAQ
