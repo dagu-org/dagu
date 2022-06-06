@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,11 +11,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/sock"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -50,26 +53,31 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
 
-	a := agent.Agent{Config: &agent.Config{
-		DAG: dag.Config,
-	}}
-
+	socketServer, _ := sock.NewServer(
+		&sock.Config{
+			Addr: sock.GetSockAddr(file),
+			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				status := models.NewStatus(
+					dag.Config, []*scheduler.Node{},
+					scheduler.SchedulerStatus_Running, 0, nil, nil)
+				w.WriteHeader(http.StatusOK)
+				b, _ := status.ToJson()
+				w.Write(b)
+			},
+		})
 	go func() {
-		err := a.Run()
-		require.NoError(t, err)
+		socketServer.Serve(nil)
 	}()
-	time.Sleep(time.Millisecond * 500)
+	defer socketServer.Shutdown()
 
-	st, err := controller.New(dag.Config).GetStatus()
-	require.NoError(t, err)
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Millisecond * 100)
+	st, _ := controller.New(dag.Config).GetStatus()
+	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
+	socketServer.Shutdown()
 
-	assert.Eventually(t, func() bool {
-		st, _ := controller.New(dag.Config).GetLastStatus()
-		return scheduler.SchedulerStatus_Success == st.Status
-	}, time.Millisecond*1500, time.Millisecond*100)
+	st, _ = controller.New(dag.Config).GetStatus()
+	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
 
 func TestGetDAG(t *testing.T) {
@@ -93,62 +101,68 @@ func TestUpdateStatus(t *testing.T) {
 
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
+	req := "test-update-status"
+	now := time.Now()
 
-	a := agent.Agent{Config: &agent.Config{
-		DAG: dag.Config,
-	}}
-
-	err = a.Run()
+	db := database.New(database.DefaultConfig())
+	w, _, _ := db.NewWriter(dag.Config.ConfigPath, now, req)
+	err = w.Open()
 	require.NoError(t, err)
 
-	st, err := controller.New(dag.Config).GetLastStatus()
-	require.NoError(t, err)
+	st := newStatus(dag.Config, req,
+		scheduler.SchedulerStatus_Success, scheduler.NodeStatus_Success)
 
-	require.Equal(t, 1, len(st.Nodes))
+	err = w.Write(st)
+	require.NoError(t, err)
+	w.Close()
+
+	time.Sleep(time.Millisecond * 100)
+
+	st, err = controller.New(dag.Config).GetStatusByRequestId(req)
+	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatus_Success, st.Nodes[0].Status)
 
 	st.Nodes[0].Status = scheduler.NodeStatus_Error
 	err = controller.New(dag.Config).UpdateStatus(st)
 	require.NoError(t, err)
 
-	updated, err := controller.New(dag.Config).GetLastStatus()
+	updated, err := controller.New(dag.Config).GetStatusByRequestId(req)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(st.Nodes))
 	require.Equal(t, scheduler.NodeStatus_Error, updated.Nodes[0].Status)
 }
 
-func TestUpdateStatusError(t *testing.T) {
+func TestUpdateStatusFailure(t *testing.T) {
 	file := testConfig("controller_update_status_failed.yaml")
 
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
+	req := "test-update-status-failure"
 
-	a := agent.Agent{Config: &agent.Config{
-		DAG: dag.Config,
-	}}
-
+	socketServer, _ := sock.NewServer(
+		&sock.Config{
+			Addr: sock.GetSockAddr(file),
+			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
+				st := newStatus(dag.Config, req,
+					scheduler.SchedulerStatus_Running, scheduler.NodeStatus_Success)
+				w.WriteHeader(http.StatusOK)
+				b, _ := st.ToJson()
+				w.Write(b)
+			},
+		})
 	go func() {
-		err = a.Run()
-		require.NoError(t, err)
+		socketServer.Serve(nil)
 	}()
+	defer socketServer.Shutdown()
 
-	time.Sleep(time.Millisecond * 30)
-
-	c := controller.New(dag.Config)
-	st, err := c.GetLastStatus()
-	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
-
-	st.Nodes[0].Status = scheduler.NodeStatus_Error
-	err = c.UpdateStatus(st)
+	st := newStatus(dag.Config, req,
+		scheduler.SchedulerStatus_Error, scheduler.NodeStatus_Error)
+	err = controller.New(dag.Config).UpdateStatus(st)
 	require.Error(t, err)
 
-	err = c.Stop()
-	require.NoError(t, err)
-
 	st.RequestId = "invalid request id"
-	err = c.UpdateStatus(st)
+	err = controller.New(dag.Config).UpdateStatus(st)
 	require.Error(t, err)
 }
 
@@ -289,4 +303,20 @@ func TestRenameConfig(t *testing.T) {
 	err = controller.RenameConfig(oldFile, newFile)
 	require.NoError(t, err)
 	require.FileExists(t, newFile)
+}
+
+func newStatus(cfg *config.Config, reqId string,
+	schedulerStatus scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
+	n := time.Now()
+	ret := models.NewStatus(
+		cfg, []*scheduler.Node{
+			{
+				NodeState: scheduler.NodeState{
+					Status: nodeStatus,
+				},
+			},
+		},
+		schedulerStatus, 0, &n, nil)
+	ret.RequestId = reqId
+	return ret
 }
