@@ -122,7 +122,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 		dst.Init()
 	}
 
-	dst.Name = strings.TrimRight(filepath.Base(file), filepath.Ext(file))
+	dst.Name = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 
 	raw, err := cl.load(file)
 	if err != nil {
