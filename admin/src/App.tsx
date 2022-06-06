@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import WorkflowDetail from "./pages/WorkflowDetails";
-import Workflows from "./pages/Workflows";
+import WorkflowList from "./pages/WorkflowList";
 
 type Config = {
   title: string;
@@ -20,8 +20,8 @@ function App({ config }: Props) {
       <DashboardLayout {...config}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="" element={<Workflows />} />
-          <Route path="/dags/" element={<Workflows />} />
+          <Route path="" element={<WorkflowList />} />
+          <Route path="/dags/" element={<WorkflowList />} />
           <Route path="/dags/:name" element={<WorkflowDetail />} />
         </Routes>
       </DashboardLayout>

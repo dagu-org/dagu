@@ -283,10 +283,6 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     },
   });
 
-  console.log({
-    columns,
-  });
-
   return (
     <Box>
       <Stack

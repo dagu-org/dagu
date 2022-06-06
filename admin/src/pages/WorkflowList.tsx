@@ -11,7 +11,7 @@ import { useGetApi } from "../hooks/useWorkflowsGetApi";
 import { WorkflowData, WorkflowDataType } from "../models/Workflow";
 import { useLocation } from "react-router-dom";
 
-function Workflows() {
+function WorkflowList() {
   const useQuery = () => new URLSearchParams(useLocation().search);
   let query = useQuery();
   const group = query.get("group") || "";
@@ -102,4 +102,4 @@ function Workflows() {
     </Paper>
   );
 }
-export default Workflows;
+export default WorkflowList;
