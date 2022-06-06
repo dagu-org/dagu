@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/agent"
+	"github.com/yohamta/dagu"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -36,7 +36,7 @@ func newDryCommand() *cli.Command {
 }
 
 func dryRun(cfg *config.Config) error {
-	a := &agent.Agent{Config: &agent.Config{
+	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
 		DAG: cfg,
 		Dry: true,
 	}}

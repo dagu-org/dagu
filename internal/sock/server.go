@@ -76,8 +76,10 @@ func (svr *Server) Serve(listen chan error) error {
 func (svr *Server) Shutdown() {
 	if !svr.quit {
 		svr.quit = true
-		err := svr.listener.Close()
-		utils.LogIgnoreErr("close listener", err)
+		if svr.listener != nil {
+			err := svr.listener.Close()
+			utils.LogIgnoreErr("close listener", err)
+		}
 	}
 }
 

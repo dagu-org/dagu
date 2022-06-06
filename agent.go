@@ -1,4 +1,4 @@
-package agent
+package dagu
 
 import (
 	"errors"
@@ -17,6 +17,7 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mail"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/reporter"
@@ -26,7 +27,7 @@ import (
 )
 
 type Agent struct {
-	*Config
+	*AgentConfig
 	*RetryConfig
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
@@ -39,7 +40,7 @@ type Agent struct {
 	requestId    string
 }
 
-type Config struct {
+type AgentConfig struct {
 	DAG *config.Config
 	Dry bool
 }
@@ -233,8 +234,8 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run() error {
-	tl := &teeLogger{
-		filename: a.logFilename,
+	tl := &logger.TeeLogger{
+		Filename: a.logFilename,
 	}
 	if err := tl.Open(); err != nil {
 		return err
