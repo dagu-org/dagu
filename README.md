@@ -1,4 +1,5 @@
-# <img src="./assets/images/logo-with-background.png" width="400">
+# Dagu
+<img align="right" src="./assets/images/dagu.png" width="200" alt="logo">
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
 [![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
@@ -429,6 +430,7 @@ Dagu server has simple APIs to query and control workflows.
 #### Success Response
 
 **Code** : `200 OK`
+<<<<<<< Updated upstream
 
 **Content Examples**
 ```json
@@ -605,6 +607,9 @@ Dagu server has simple APIs to query and control workflows.
     "HasError": false
 }
 ```
+=======
+**Content** : TBU
+>>>>>>> Stashed changes
 
 ### Show Workflow Detail `GET dags/:name`
 
@@ -623,6 +628,7 @@ Dagu server has simple APIs to query and control workflows.
 #### Success Response
 
 **Code** : `200 OK`
+<<<<<<< Updated upstream
 
 **Content Examples**
 
@@ -898,6 +904,9 @@ Dagu server has simple APIs to query and control workflows.
     "Errors": []
 }
 ```
+=======
+**Content** : TBU
+>>>>>>> Stashed changes
 
 ### Submit Workflow Action `POST dags/:name`
 
