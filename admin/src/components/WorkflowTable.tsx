@@ -57,8 +57,9 @@ const defaultColumns = [
         const url = `/dags/?group=${encodeURI(data.Group.Name)}`;
         return <Link to={url}>{props.getValue()}</Link>;
       } else {
+        const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, "");
         const group = props.instance.options.meta?.group || "";
-        const url = `/dags/${encodeURI(data.DAG.Config.Name)}?group=${encodeURI(
+        const url = `/dags/${encodeURI(name)}?group=${encodeURI(
           group
         )}`;
         return <Link to={url}>{props.getValue()}</Link>;
@@ -281,10 +282,6 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
       group,
       refreshFn,
     },
-  });
-
-  console.log({
-    columns,
   });
 
   return (
