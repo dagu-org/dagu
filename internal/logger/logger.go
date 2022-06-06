@@ -1,4 +1,4 @@
-package agent
+package logger
 
 import (
 	"io"
@@ -9,18 +9,18 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-type teeLogger struct {
-	filename string
+type TeeLogger struct {
+	Filename string
 	file     *os.File
 }
 
-func (l *teeLogger) Open() error {
-	dir := path.Dir(l.filename)
+func (l *TeeLogger) Open() error {
+	dir := path.Dir(l.Filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	var err error
-	l.file, err = utils.OpenOrCreateFile(l.filename)
+	l.file, err = utils.OpenOrCreateFile(l.Filename)
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (l *teeLogger) Open() error {
 	return nil
 }
 
-func (l *teeLogger) Close() error {
+func (l *TeeLogger) Close() error {
 	var lastErr error = nil
 	if l.file != nil {
 		if err := l.file.Close(); err != nil {

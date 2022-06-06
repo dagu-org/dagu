@@ -1,4 +1,4 @@
-package agent
+package dagu
 
 import (
 	"net/http"
@@ -19,7 +19,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var testsDir = path.Join(utils.MustGetwd(), "../../tests/testdata")
+var testsDir = path.Join(utils.MustGetwd(), "./tests/testdata")
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("agent_test")
@@ -50,7 +50,7 @@ func TestCheckRunning(t *testing.T) {
 	dag, err := controller.FromConfig(config)
 	require.NoError(t, err)
 
-	a := &Agent{Config: &Config{
+	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: dag.Config,
 	}}
 
@@ -73,7 +73,7 @@ func TestDryRun(t *testing.T) {
 	dag, err := controller.FromConfig(testConfig("agent_dry.yaml"))
 	require.NoError(t, err)
 
-	a := &Agent{Config: &Config{
+	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: dag.Config,
 		Dry: true,
 	}}
@@ -174,7 +174,7 @@ func TestRetry(t *testing.T) {
 		n.CmdWithArgs = "true"
 	}
 	a := &Agent{
-		Config: &Config{
+		AgentConfig: &AgentConfig{
 			DAG: dag.Config,
 		},
 		RetryConfig: &RetryConfig{
@@ -198,7 +198,7 @@ func TestHandleHTTP(t *testing.T) {
 	dag, err := controller.FromConfig(testConfig("agent_handle_http.yaml"))
 	require.NoError(t, err)
 
-	a := &Agent{Config: &Config{
+	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: dag.Config,
 	}}
 
@@ -279,7 +279,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 
 func testDAG(t *testing.T, dag *controller.DAG) (*models.Status, error) {
 	t.Helper()
-	a := &Agent{Config: &Config{
+	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: dag.Config,
 	}}
 	err := a.Run()
@@ -296,7 +296,7 @@ func testDAGAsync(t *testing.T, file string) (*Agent, *controller.DAG) {
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
 
-	a := &Agent{Config: &Config{
+	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: dag.Config,
 	}}
 
