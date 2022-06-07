@@ -28,6 +28,8 @@ type Controller interface {
 	GetStatusHist(n int) []*models.StatusFile
 	UpdateStatus(*models.Status) error
 	Save(value string) error
+	GetViews() []*models.View
+	SaveView() error
 }
 
 func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {

@@ -2,14 +2,11 @@ package models
 
 import (
 	"encoding/json"
-
-	"github.com/yohamta/dagu/internal/filters"
 )
 
 type View struct {
 	Name        string
 	ContainTags []string
-	Filter      filters.Filter
 }
 
 func ViewFromJson(s string) (*View, error) {
@@ -18,7 +15,6 @@ func ViewFromJson(s string) (*View, error) {
 	if err != nil {
 		return nil, err
 	}
-	v.Filter = &filters.ContainTags{Tags: v.ContainTags}
 	return v, err
 }
 

@@ -16,7 +16,5 @@ func TestView(t *testing.T) {
 
 	v2, err := ViewFromJson(string(js))
 	require.NoError(t, err)
-
-	v.Filter = v2.Filter
 	require.Equal(t, v, v2)
 }
