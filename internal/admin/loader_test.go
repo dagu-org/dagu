@@ -7,21 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var (
-	testsDir    = path.Join(utils.MustGetwd(), "../../tests/admin/")
-	testsConfig = path.Join(testsDir, "admin.yaml")
-)
-
-func TestMain(m *testing.M) {
-	os.Setenv("HOST", "localhost")
-	settings.InitTest(testsDir)
-	code := m.Run()
-	os.Exit(code)
-}
+var testsConfig = path.Join(testsDir, "admin.yaml")
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()

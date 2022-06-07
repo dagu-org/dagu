@@ -9,9 +9,9 @@ type View struct {
 	ContainTags []string
 }
 
-func ViewFromJson(s string) (*View, error) {
+func ViewFromJson(b []byte) (*View, error) {
 	v := &View{}
-	err := json.Unmarshal([]byte(s), v)
+	err := json.Unmarshal(b, v)
 	if err != nil {
 		return nil, err
 	}

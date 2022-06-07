@@ -14,7 +14,7 @@ func TestView(t *testing.T) {
 	js, err := v.ToJson()
 	require.NoError(t, err)
 
-	v2, err := ViewFromJson(string(js))
+	v2, err := ViewFromJson(js)
 	require.NoError(t, err)
 	require.Equal(t, v, v2)
 }

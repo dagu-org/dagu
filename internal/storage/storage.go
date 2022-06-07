@@ -3,6 +3,8 @@ package storage
 import (
 	"os"
 	"path"
+
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Storage struct {
@@ -19,6 +21,7 @@ func (s *Storage) List() ([]os.FileInfo, error) {
 }
 
 func (s *Storage) Save(file string, b []byte) error {
+	os.MkdirAll(s.Dir, 0755)
 	return os.WriteFile(path.Join(s.Dir, file), b, 0644)
 }
 
@@ -26,10 +29,8 @@ func (s *Storage) Delete(file string) error {
 	return os.Remove(path.Join(s.Dir, file))
 }
 
-func (s *Storage) Read(file string) ([]byte, error) {
+func (s *Storage) MustRead(file string) []byte {
 	b, err := os.ReadFile(path.Join(s.Dir, file))
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	utils.LogIgnoreErr("storage: read file", err)
+	return b
 }
