@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -216,12 +215,11 @@ func NewConfig(file string) error {
 	if utils.FileExists(file) {
 		return fmt.Errorf("the config file %s already exists", file)
 	}
-	defaultVal := `name: ` + strings.TrimSuffix(path.Base(file), path.Ext(file)) + `
-steps:
+	defaultVal := `steps:
   - name: step1
     command: echo hello
 `
-	return os.WriteFile(file, []byte(defaultVal), 0755)
+	return os.WriteFile(file, []byte(defaultVal), 0644)
 }
 
 func RenameConfig(oldConfigPath, newConfigPath string) error {
