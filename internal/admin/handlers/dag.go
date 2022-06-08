@@ -160,7 +160,7 @@ type PostDAGHandlerConfig struct {
 	WkDir   string
 }
 
-func HandlePostDAGAction(hc *PostDAGHandlerConfig) http.HandlerFunc {
+func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")

@@ -152,6 +152,24 @@ function DashboardContent({
                 </Typography>
               </Stack>
             </Link>
+            {[
+              ["/", "Dashboard"],
+              ["/dags", "Workflows"],
+              ["/views", "Views"],
+            ].map((v) => (
+              <Link
+                key={v[0]}
+                href={v[0]}
+                color="white"
+                underline="none"
+                sx={{
+                  "&:hover": { color: "white" },
+                  ml: 2,
+                }}
+              >
+                {v[1]}
+              </Link>
+            ))}
           </Toolbar>
         </AppBar>
         <Drawer variant="permanent" open={open}>
@@ -197,6 +215,9 @@ function DashboardContent({
 
 type DashboardProps = DashboardContentProps;
 
-export default function DashboardLayout({ children, ...props }: DashboardProps) {
+export default function DashboardLayout({
+  children,
+  ...props
+}: DashboardProps) {
   return <DashboardContent {...props}>{children}</DashboardContent>;
 }

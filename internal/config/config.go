@@ -71,6 +71,33 @@ func (c *Config) Init() {
 	}
 }
 
+func (c *Config) HasTag(tag string) bool {
+	for _, t := range c.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) Clone() *Config {
+	ret := *c
+	return &ret
+}
+
+func (c *Config) String() string {
+	ret := "{\n"
+	ret = fmt.Sprintf("%s\tName: %s\n", ret, c.Name)
+	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(c.Description))
+	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(c.Env, ", "))
+	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, c.LogDir)
+	for i, s := range c.Steps {
+		ret = fmt.Sprintf("%s\tStep%d: %v\n", ret, i, s)
+	}
+	ret = fmt.Sprintf("%s}\n", ret)
+	return ret
+}
+
 func (c *Config) setup(file string) {
 	c.ConfigPath = file
 	if c.LogDir == "" {
@@ -106,24 +133,6 @@ func (c *Config) setupStep(step *Step, defaultDir string) {
 	if step.Dir == "" {
 		step.Dir = path.Dir(c.ConfigPath)
 	}
-}
-
-func (c *Config) Clone() *Config {
-	ret := *c
-	return &ret
-}
-
-func (c *Config) String() string {
-	ret := "{\n"
-	ret = fmt.Sprintf("%s\tName: %s\n", ret, c.Name)
-	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(c.Description))
-	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(c.Env, ", "))
-	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, c.LogDir)
-	for i, s := range c.Steps {
-		ret = fmt.Sprintf("%s\tStep%d: %v\n", ret, i, s)
-	}
-	ret = fmt.Sprintf("%s}\n", ret)
-	return ret
 }
 
 type BuildConfigOptions struct {

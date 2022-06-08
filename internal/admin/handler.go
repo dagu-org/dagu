@@ -33,6 +33,10 @@ func (hdl *adminHandler) addRoute(method, pattern string, handler http.HandlerFu
 }
 
 func (hdl *adminHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if patterns, ok := hdl.routes[r.Method]; ok {
 		for re, handler := range patterns {
 			if re.MatchString(r.URL.Path) {

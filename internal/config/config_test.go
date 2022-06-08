@@ -210,5 +210,7 @@ tags: %s
 		require.NoError(t, err)
 
 		require.Equal(t, test.Want, cfg.Tags)
+
+		require.True(t, cfg.HasTag("daily"))
 	}
 }

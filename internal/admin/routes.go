@@ -19,7 +19,7 @@ func defaultRoutes(cfg *Config) []*route {
 				DAGsDir: cfg.DAGs,
 			},
 		)},
-		{http.MethodPost, `^/?$`, handlers.HandlePostListAction(
+		{http.MethodPost, `^/?$`, handlers.HandlePostList(
 			&handlers.DAGListHandlerConfig{
 				DAGsDir: cfg.DAGs,
 			},
@@ -29,7 +29,15 @@ func defaultRoutes(cfg *Config) []*route {
 				DAGsDir: cfg.DAGs,
 			},
 		)},
-		{http.MethodPost, `^/dags/?$`, handlers.HandlePostListAction(
+		{http.MethodGet, `^/views/?$`, handlers.HandleGetViewList()},
+		{http.MethodPut, `^/views/?$`, handlers.HandlePutView()},
+		{http.MethodGet, `^/views/([^/]+)?$`, handlers.HandleGetView(
+			&handlers.ViewHandlerConfig{
+				DAGsDir: cfg.DAGs,
+			},
+		)},
+		{http.MethodDelete, `^/views/([^/]+)?$`, handlers.HandleDeleteView()},
+		{http.MethodPost, `^/dags/?$`, handlers.HandlePostList(
 			&handlers.DAGListHandlerConfig{
 				DAGsDir: cfg.DAGs,
 			},
@@ -40,7 +48,7 @@ func defaultRoutes(cfg *Config) []*route {
 				LogEncodingCharset: cfg.LogEncodingCharset,
 			},
 		)},
-		{http.MethodPost, `^/dags/([^/]+)$`, handlers.HandlePostDAGAction(
+		{http.MethodPost, `^/dags/([^/]+)$`, handlers.HandlePostDAG(
 			&handlers.PostDAGHandlerConfig{
 				DAGsDir: cfg.DAGs,
 				Bin:     cfg.Command,

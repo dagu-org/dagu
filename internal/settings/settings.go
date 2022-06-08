@@ -15,6 +15,7 @@ var cache map[string]string = nil
 const (
 	CONFIG__DATA_DIR           = "DAGU__DATA"
 	CONFIG__LOGS_DIR           = "DAGU__LOGS"
+	CONFIG__VIEWS_DIR          = "DAGU__VIEWS"
 	CONFIG__ADMIN_PORT         = "DAGU__ADMIN_PORT"
 	CONFIG__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	CONFIG__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
@@ -48,6 +49,8 @@ func load() {
 		path.Join(dir, "/.dagu/data"))
 	cache[CONFIG__LOGS_DIR] = config(CONFIG__LOGS_DIR,
 		path.Join(dir, "/.dagu/logs"))
+	cache[CONFIG__VIEWS_DIR] = config(CONFIG__VIEWS_DIR,
+		path.Join(dir, "/.dagu/views"))
 	cache[CONFIG__ADMIN_PORT] = config(CONFIG__ADMIN_PORT, "8080")
 	cache[CONFIG__ADMIN_NAVBAR_COLOR] = config(CONFIG__ADMIN_NAVBAR_COLOR, "")
 	cache[CONFIG__ADMIN_NAVBAR_TITLE] = config(CONFIG__ADMIN_NAVBAR_TITLE, "Dagu admin")
