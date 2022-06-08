@@ -29,6 +29,12 @@ func defaultRoutes(cfg *Config) []*route {
 				DAGsDir: cfg.DAGs,
 			},
 		)},
+		{http.MethodGet, `^/view/?$`, handlers.HandleGetViewList()},
+		{http.MethodGet, `^/views/([^/]+)?$`, handlers.HandleGetView(
+			&handlers.ViewHandlerConfig{
+				DAGsDir: cfg.DAGs,
+			},
+		)},
 		{http.MethodPost, `^/dags/?$`, handlers.HandlePostListAction(
 			&handlers.DAGListHandlerConfig{
 				DAGsDir: cfg.DAGs,
