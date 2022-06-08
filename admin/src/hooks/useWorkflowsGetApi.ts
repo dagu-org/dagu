@@ -1,7 +1,6 @@
 import React from "react";
 
 type Options = {
-  group: string;
   onFailed?: () => void;
 };
 

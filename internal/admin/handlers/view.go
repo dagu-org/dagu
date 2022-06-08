@@ -82,6 +82,32 @@ func HandleGetView(hc *ViewHandlerConfig) http.HandlerFunc {
 	}
 }
 
+func HandleDeleteView() http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		p, err := getViewParameter(r)
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		view, err := views.GetView(p)
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		err = views.DeleteView(view)
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}
+}
+
 func getViewParameter(r *http.Request) (string, error) {
 	re := regexp.MustCompile(`/views/([^/\?]+)/?$`)
 	m := re.FindStringSubmatch(r.URL.Path)

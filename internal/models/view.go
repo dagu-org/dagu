@@ -6,6 +6,7 @@ import (
 
 type View struct {
 	Name        string
+	Desc        string
 	ContainTags []string
 }
 

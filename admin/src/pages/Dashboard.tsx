@@ -26,9 +26,7 @@ function Dashboard() {
 
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
 
-  const { data, doGet } = useGetApi<GetListResponse>("/", {
-    group: group,
-  });
+  const { data, doGet } = useGetApi<GetListResponse>("/", {});
 
   React.useEffect(() => {
     if (!data) {

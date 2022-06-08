@@ -7,6 +7,13 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+func NewStorage(dir string) *Storage {
+	os.MkdirAll(dir, 0755)
+	return &Storage{
+		Dir: dir,
+	}
+}
+
 type Storage struct {
 	Dir string
 }
@@ -21,7 +28,6 @@ func (s *Storage) List() ([]os.FileInfo, error) {
 }
 
 func (s *Storage) Save(file string, b []byte) error {
-	os.MkdirAll(s.Dir, 0755)
 	return os.WriteFile(path.Join(s.Dir, file), b, 0644)
 }
 

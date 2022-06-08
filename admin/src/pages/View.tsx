@@ -1,62 +1,57 @@
 import React from "react";
-import { GetListResponse } from "../api/List";
 import WorkflowErrors from "../components/WorkflowErrors";
 import Box from "@mui/material/Box";
-import CreateWorkflowButton from "../components/CreateWorkflowButton";
 import WithLoading from "../components/WithLoading";
 import WorkflowTable from "../components/WorkflowTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
 import { WorkflowData, WorkflowDataType } from "../models/Workflow";
-import { useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { DAG } from "../models/Dag";
 
-function WorkflowList() {
-  const useQuery = () => new URLSearchParams(useLocation().search);
-  let query = useQuery();
-  const group = query.get("group") || "";
+export type ApiResponse = {
+  Title: string;
+  Charset: string;
+  DAGs: DAG[];
+  Errors: string[];
+  HasError: boolean;
+};
 
-  const { data, doGet } = useGetApi<GetListResponse>("/", {});
+type Params = {
+  name: string;
+};
+
+function View() {
+  const params = useParams<Params>();
+
+  const { data, doGet } = useGetApi<ApiResponse>(
+    `/views/${params.name}?format=json`,
+    {}
+  );
 
   React.useEffect(() => {
     doGet();
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
-  }, [group]);
+  }, []);
 
-  const merged = React.useMemo(() => {
+  const workflows = React.useMemo(() => {
     const ret: WorkflowData[] = [];
-    if (data) {
-      // TODO: need refactoring
-      if (group != "") {
+    if (!data) {
+      return ret;
+    }
+    for (const val of data.DAGs) {
+      if (!val.Error) {
         ret.push({
-          Type: WorkflowDataType.Group,
-          Name: "../",
-          Group: {
-            Name: "",
-            Dir: "",
-          },
+          Type: WorkflowDataType.Workflow,
+          Name: val.Config.Name,
+          DAG: val,
         });
-      }
-      for (const val of data.Groups) {
-        ret.push({
-          Type: WorkflowDataType.Group,
-          Name: val.Name,
-          Group: val,
-        });
-      }
-      for (const val of data.DAGs) {
-        if (!val.Error) {
-          ret.push({
-            Type: WorkflowDataType.Workflow,
-            Name: val.Config.Name,
-            DAG: val,
-          });
-        }
       }
     }
     return ret;
-  }, [data, query.get("group")]);
+  }, [data]);
 
   return (
     <Paper
@@ -76,11 +71,10 @@ function WorkflowList() {
           justifyContent: "space-between",
         }}
       >
-        <Title>Workflows</Title>
-        <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
+        <Title>{`${decodeURI(params.name || "View")}`}</Title>
       </Box>
       <Box>
-        <WithLoading loaded={!!data && !!merged}>
+        <WithLoading loaded={!!data}>
           {data && (
             <React.Fragment>
               <WorkflowErrors
@@ -89,8 +83,8 @@ function WorkflowList() {
                 hasError={data.HasError}
               ></WorkflowErrors>
               <WorkflowTable
-                workflows={merged}
-                group={data.Group}
+                workflows={workflows}
+                group={""}
                 refreshFn={doGet}
               ></WorkflowTable>
             </React.Fragment>
@@ -100,4 +94,4 @@ function WorkflowList() {
     </Paper>
   );
 }
-export default WorkflowList;
+export default View;

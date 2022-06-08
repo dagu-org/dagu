@@ -10,9 +10,9 @@ import (
 )
 
 func GetViews() []*models.View {
-	s := &storage.Storage{
-		Dir: settings.MustGet(settings.CONFIG__VIEWS_DIR),
-	}
+	s := storage.NewStorage(
+		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+	)
 	fis, err := s.List()
 	if err != nil {
 		fmt.Println(err)
@@ -33,8 +33,11 @@ func GetViews() []*models.View {
 }
 
 func SaveView(view *models.View) error {
-	s := &storage.Storage{
-		Dir: settings.MustGet(settings.CONFIG__VIEWS_DIR),
+	s := storage.NewStorage(
+		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+	)
+	if view.Name == "" {
+		return ErrInvalidName
 	}
 	b, err := view.ToJson()
 	if err != nil {
@@ -43,12 +46,20 @@ func SaveView(view *models.View) error {
 	return s.Save(fmt.Sprintf("%s.json", view.Name), b)
 }
 
+func DeleteView(view *models.View) error {
+	s := storage.NewStorage(
+		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+	)
+	return s.Delete(fmt.Sprintf("%s.json", view.Name))
+}
+
+var ErrInvalidName = fmt.Errorf("view's name is invalid or empty")
 var ErrNotFound = fmt.Errorf("not found")
 
 func GetView(name string) (*models.View, error) {
-	s := &storage.Storage{
-		Dir: settings.MustGet(settings.CONFIG__VIEWS_DIR),
-	}
+	s := storage.NewStorage(
+		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+	)
 	dat := s.MustRead(fmt.Sprintf("%s.json", name))
 	if dat == nil {
 		return nil, ErrNotFound

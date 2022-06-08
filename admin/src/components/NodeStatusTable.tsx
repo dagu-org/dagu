@@ -113,6 +113,3 @@ const tableStyle: CSSProperties = {
   tableLayout: "fixed",
   wordWrap: "break-word",
 };
-const divStyle: CSSProperties = {
-  overflowX: "auto",
-};

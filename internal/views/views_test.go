@@ -11,6 +11,15 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+func TestMain(m *testing.M) {
+	tmpDir := utils.MustTempDir("test-views")
+	os.Setenv("HOST", "localhost")
+	settings.InitTest(tmpDir)
+	code := m.Run()
+	os.RemoveAll(tmpDir)
+	os.Exit(code)
+}
+
 func TestView(t *testing.T) {
 	viewsDir := settings.MustGet(settings.CONFIG__VIEWS_DIR)
 	defer func() {
@@ -18,11 +27,19 @@ func TestView(t *testing.T) {
 	}()
 
 	view := &models.View{
-		Name:        "test",
+		Name:        "",
 		ContainTags: []string{"a", "b"},
 	}
 
 	err := SaveView(view)
+	require.EqualError(t, err, ErrInvalidName.Error())
+
+	view = &models.View{
+		Name:        "test",
+		ContainTags: []string{"a", "b"},
+	}
+
+	err = SaveView(view)
 	require.NoError(t, err)
 
 	require.True(t, utils.FileExists(path.Join(viewsDir, "test.json")))
@@ -35,6 +52,9 @@ func TestView(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, view, v2)
 
-	_, err = GetView("no-such-view")
+	err = DeleteView(v2)
+	require.NoError(t, err)
+
+	_, err = GetView("test")
 	require.Error(t, err)
 }

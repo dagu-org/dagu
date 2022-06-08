@@ -85,7 +85,7 @@ func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
 	}
 }
 
-func HandlePostListAction(hc *DAGListHandlerConfig) http.HandlerFunc {
+func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
