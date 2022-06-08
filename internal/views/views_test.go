@@ -30,4 +30,11 @@ func TestView(t *testing.T) {
 	views := GetViews()
 	require.Equal(t, 1, len(views))
 	require.Equal(t, view, views[0])
+
+	v2, err := GetView("test")
+	require.NoError(t, err)
+	require.Equal(t, view, v2)
+
+	_, err = GetView("no-such-view")
+	require.Error(t, err)
 }

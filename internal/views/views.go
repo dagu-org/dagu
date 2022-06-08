@@ -42,3 +42,16 @@ func SaveView(view *models.View) error {
 	}
 	return s.Save(fmt.Sprintf("%s.json", view.Name), b)
 }
+
+var ErrNotFound = fmt.Errorf("not found")
+
+func GetView(name string) (*models.View, error) {
+	s := &storage.Storage{
+		Dir: settings.MustGet(settings.CONFIG__VIEWS_DIR),
+	}
+	dat := s.MustRead(fmt.Sprintf("%s.json", name))
+	if dat == nil {
+		return nil, ErrNotFound
+	}
+	return models.ViewFromJson(dat)
+}
