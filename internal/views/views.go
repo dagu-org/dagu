@@ -1,4 +1,4 @@
-package admin
+package views
 
 import (
 	"fmt"
@@ -23,10 +23,9 @@ func GetViews() []*models.View {
 		dat := s.MustRead(fi.Name())
 		if dat != nil {
 			v, err := models.ViewFromJson(dat)
+			utils.LogIgnoreErr("Controller: get views", err)
 			if err == nil {
 				ret = append(ret, v)
-			} else {
-				utils.LogIgnoreErr("Controller: get views", err)
 			}
 		}
 	}
