@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,7 +10,7 @@ import (
 var testLoadConfigYaml = `
 dags: "` + "`echo /dags_dir`" + `"
 host: localhost
-port: 8080
+port: 8081
 command: /bin/current/dagu
 workdir: /dags_dir
 basicAuthUsername: user
@@ -18,27 +19,55 @@ logEncodingCharset: utf-8
 `
 
 func TestLoadConfig(t *testing.T) {
-	l := &Loader{}
-	d, err := l.unmarshalData([]byte(testLoadConfigYaml))
-	require.NoError(t, err)
+	wd, _ := os.Getwd()
+	for _, test := range []struct {
+		Yaml string
+		Want *Config
+	}{
+		{
+			Yaml: testLoadConfigYaml,
+			Want: &Config{
+				DAGs:               "/dags_dir",
+				Host:               "localhost",
+				Port:               "8081",
+				Command:            "/bin/current/dagu",
+				WorkDir:            "/dags_dir",
+				BasicAuthUsername:  "user",
+				BasicAuthPassword:  "password",
+				LogEncodingCharset: "utf-8",
+				Env:                []string{},
+			},
+		},
+		{
+			Yaml: ``,
+			Want: &Config{
+				DAGs:               wd,
+				Host:               "127.0.0.1",
+				Port:               "8080",
+				Command:            "dagu",
+				WorkDir:            wd,
+				BasicAuthUsername:  "",
+				BasicAuthPassword:  "",
+				LogEncodingCharset: "",
+				Env:                []string{},
+			},
+		},
+	} {
+		l := &Loader{}
+		d, err := l.unmarshalData([]byte(test.Yaml))
+		require.NoError(t, err)
 
-	def, err := l.decode(d)
-	require.NoError(t, err)
+		def, err := l.decode(d)
+		require.NoError(t, err)
 
-	c, err := buildFromDefinition(def)
-	require.NoError(t, err)
+		c, err := buildFromDefinition(def)
+		require.NoError(t, err)
 
-	require.Equal(t, &Config{
-		DAGs:               "/dags_dir",
-		Host:               "localhost",
-		Port:               "8080",
-		Command:            "/bin/current/dagu",
-		WorkDir:            "/dags_dir",
-		BasicAuthUsername:  "user",
-		BasicAuthPassword:  "password",
-		LogEncodingCharset: "utf-8",
-		Env:                []string{},
-	}, c)
+		c.setup()
+		c.Env = []string{}
+
+		require.Equal(t, test.Want, c)
+	}
 }
 
 func TestLoadInvalidConfigError(t *testing.T) {

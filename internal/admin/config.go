@@ -80,12 +80,14 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if !filepath.IsAbs(jd) {
-		return nil, fmt.Errorf("DAGs directory should be absolute path. was %s", jd)
-	}
-	c.DAGs, err = filepath.Abs(jd)
-	if err != nil {
-		return nil, err
+	if len(jd) > 0 {
+		if !filepath.IsAbs(jd) {
+			return nil, fmt.Errorf("DAGs directory should be absolute path. was %s", jd)
+		}
+		c.DAGs, err = filepath.Abs(jd)
+		if err != nil {
+			return nil, err
+		}
 	}
 	c.Command, err = utils.ParseVariable(def.Command)
 	if err != nil {

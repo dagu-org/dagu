@@ -44,7 +44,12 @@ func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 		}
 	}
 
-	return buildFromDefinition(def)
+	cfg, err := buildFromDefinition(def)
+	if err != nil {
+		return nil, err
+	}
+	cfg.setup()
+	return cfg, nil
 }
 
 func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
@@ -61,7 +66,10 @@ func (cl *Loader) readFile(file string) (config map[string]interface{}, err erro
 
 func (cl *Loader) unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
-	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
+	var err error
+	if len(data) > 0 {
+		err = yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
+	}
 	return cm, err
 }
 
