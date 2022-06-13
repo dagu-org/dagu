@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/csv"
 	"fmt"
 	"os"
 	"path"
@@ -260,35 +259,49 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 }
 
 func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
-	params := value
-	var err error
-	if eval {
-		params, err = utils.ParseCommand(os.ExpandEnv(value))
-		if err != nil {
-			return nil, err
+	separated := []string{}
+	i, j, f := 0, 1, false
+
+	value = strings.TrimSpace(strings.TrimRight(strings.TrimLeft(value, "\""), "\""))
+	if len(value) > 0 {
+		if value[0] == '`' {
+			f = true
 		}
-	}
-	r := csv.NewReader(strings.NewReader(params))
-	r.Comma = ' '
-	records, err := r.ReadAll()
-	if err != nil {
-		return nil, err
+		for {
+			if j == len(value) || (value[j] == ' ' && !f) {
+				separated = append(separated, value[i:j])
+				i = j + 1
+				j = i
+			} else if value[j] == '`' {
+				f = !f
+			}
+			if j >= len(value) {
+				break
+			}
+			j++
+		}
 	}
 	ret := []string{}
-	for _, r := range records {
-		for i, v := range r {
-			if !b.noSetenv {
-				if strings.Contains(v, "=") {
-					parts := strings.SplitN(v, "=", 2)
-					os.Setenv(parts[0], parts[1])
-				}
-				err = os.Setenv(strconv.Itoa(i+1), v)
-				if err != nil {
-					return nil, err
-				}
+	var err error
+	for i, v := range separated {
+		v = strings.TrimRight(strings.TrimLeft(v, "\""), "\"")
+		if eval {
+			v, err = utils.ParseCommand(os.ExpandEnv(v))
+			if err != nil {
+				return nil, err
 			}
-			ret = append(ret, v)
 		}
+		if !b.noSetenv {
+			if strings.Contains(v, "=") {
+				parts := strings.SplitN(v, "=", 2)
+				os.Setenv(parts[0], parts[1])
+			}
+			err = os.Setenv(strconv.Itoa(i+1), v)
+			if err != nil {
+				return nil, err
+			}
+		}
+		ret = append(ret, v)
 	}
 	return ret, nil
 }
