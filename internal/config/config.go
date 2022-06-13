@@ -194,10 +194,12 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		p = b.parameters
 	}
 
-	c.Params, err = b.parseParameters(p, !b.noEval)
+	var envs []string
+	c.Params, envs, err = b.parseParameters(p, !b.noEval)
 	if err != nil {
 		return nil, err
 	}
+	c.Env = append(c.Env, envs...)
 
 	c.Steps, err = buildStepsFromDefinition(c.Env, def.Steps)
 	if err != nil {
@@ -258,7 +260,11 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	return c, nil
 }
 
-func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
+func (b *builder) parseParameters(value string, eval bool) (
+	params []string,
+	envs []string,
+	err error,
+) {
 	separated := []string{}
 	i, j, f := 0, 1, false
 
@@ -282,28 +288,28 @@ func (b *builder) parseParameters(value string, eval bool) ([]string, error) {
 		}
 	}
 	ret := []string{}
-	var err error
 	for i, v := range separated {
 		v = strings.TrimRight(strings.TrimLeft(v, "\""), "\"")
 		if eval {
 			v, err = utils.ParseCommand(os.ExpandEnv(v))
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 		if !b.noSetenv {
 			if strings.Contains(v, "=") {
 				parts := strings.SplitN(v, "=", 2)
 				os.Setenv(parts[0], parts[1])
+				envs = append(envs, v)
 			}
 			err = os.Setenv(strconv.Itoa(i+1), v)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 		ret = append(ret, v)
 	}
-	return ret, nil
+	return ret, envs, nil
 }
 
 type envVariable struct {
