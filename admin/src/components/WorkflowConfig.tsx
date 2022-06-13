@@ -93,6 +93,7 @@ function WorkflowConfig({ data }: Props) {
                         const formData = new FormData();
                         formData.append("action", "save");
                         formData.append("value", currentValue);
+                        formData.append("group", props.group);
                         const url = `${API_URL}/dags/${props.name}`;
                         const resp = await fetch(url, {
                           method: "POST",
