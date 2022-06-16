@@ -3,6 +3,7 @@ package config
 type configDefinition struct {
 	Name              string
 	Description       string
+	Schedule          string
 	LogDir            string
 	Env               interface{}
 	HandlerOn         handerOnDef

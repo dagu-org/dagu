@@ -16,6 +16,7 @@ import (
 type Config struct {
 	ConfigPath        string
 	Name              string
+	Schedule          string
 	Description       string
 	Env               []string
 	LogDir            string
@@ -154,6 +155,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	if def.Name != "" {
 		c.Name = def.Name
 	}
+	c.Schedule = def.Schedule
 	c.Description = def.Description
 	c.MailOn.Failure = def.MailOn.Failure
 	c.MailOn.Success = def.MailOn.Success
