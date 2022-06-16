@@ -39,7 +39,7 @@ function DashboardTimechart({ data: input }: Props) {
         ret.push({
           name: status.Name,
           status: status.Status,
-          values: [moment(start).unix()-Math.random() * 2000, to + Math.random() * 4000],
+          values: [moment(start).unix(), to],
         });
       }
     });
@@ -64,7 +64,7 @@ function DashboardTimechart({ data: input }: Props) {
         <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
           {data.map((_, index) => {
             const color = statusColorMapping[data[index].status];
-            return <Cell fill={color.backgroundColor} />;
+            return <Cell key={index} fill={color.backgroundColor} />;
           })}
           <LabelList
             dataKey="name"
