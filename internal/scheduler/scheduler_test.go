@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
@@ -50,12 +49,12 @@ func TestScheduler(t *testing.T) {
 		}
 	}()
 	require.Error(t, sc.Schedule(g, done))
-	assert.Equal(t, counter, 3)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, counter, 3)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Error, nodes[2].ReadStatus())
-	assert.Equal(t, NodeStatus_Cancel, nodes[3].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Cancel, nodes[3].ReadStatus())
 }
 
 func TestSchedulerParallel(t *testing.T) {
@@ -69,12 +68,12 @@ func TestSchedulerParallel(t *testing.T) {
 	)
 	err := sc.Schedule(g, nil)
 	require.NoError(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
 }
 
 func TestSchedulerFailPartially(t *testing.T) {
@@ -85,13 +84,13 @@ func TestSchedulerFailPartially(t *testing.T) {
 		step("4", testCommand, "3"),
 	)
 	require.Error(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Error, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[3].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[3].ReadStatus())
 }
 
 func TestSchedulerContinueOnFailure(t *testing.T) {
@@ -108,12 +107,12 @@ func TestSchedulerContinueOnFailure(t *testing.T) {
 		step("3", testCommand, "2"),
 	)
 	require.Error(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Error, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
 }
 
 func TestSchedulerAllowSkipped(t *testing.T) {
@@ -134,12 +133,12 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 		step("3", testCommand, "2"),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Skipped, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Skipped, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
 }
 
 func TestSchedulerCancel(t *testing.T) {
@@ -165,9 +164,9 @@ func TestSchedulerCancel(t *testing.T) {
 	}, time.Second, time.Millisecond*10)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].Status)
-	assert.Equal(t, NodeStatus_Cancel, nodes[1].Status)
-	assert.Equal(t, NodeStatus_None, nodes[2].Status)
+	require.Equal(t, NodeStatus_Success, nodes[0].Status)
+	require.Equal(t, NodeStatus_Cancel, nodes[1].Status)
+	require.Equal(t, NodeStatus_None, nodes[2].Status)
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
@@ -194,17 +193,17 @@ func TestSchedulerRetryFail(t *testing.T) {
 		},
 		step("4", cmd, "3"),
 	)
-	assert.True(t, err != nil)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.True(t, err != nil)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Error, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Error, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Error, nodes[2].ReadStatus())
-	assert.Equal(t, NodeStatus_Cancel, nodes[3].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Cancel, nodes[3].ReadStatus())
 
-	assert.Equal(t, nodes[0].ReadRetryCount(), 1)
-	assert.Equal(t, nodes[1].ReadRetryCount(), 1)
+	require.Equal(t, nodes[0].ReadRetryCount(), 1)
+	require.Equal(t, nodes[1].ReadRetryCount(), 1)
 }
 
 func TestSchedulerRetrySuccess(t *testing.T) {
@@ -233,13 +232,13 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 		},
 		step("3", testCommand, "2"),
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.NoError(t, err)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
 
 	if nodes[1].ReadRetryCount() == 0 {
 		t.Error("step 2 Should be retried")
@@ -274,14 +273,14 @@ func TestStepPreCondition(t *testing.T) {
 		step("5", testCommand, "4"),
 	)
 	require.NoError(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Skipped, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Skipped, nodes[2].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[3].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[4].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Skipped, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Skipped, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[3].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[4].ReadStatus())
 }
 
 func TestSchedulerOnExit(t *testing.T) {
@@ -298,13 +297,13 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
 
 	onExit := sc.HandlerNode(constants.OnExit)
 	require.NotNil(t, onExit)
-	assert.Equal(t, NodeStatus_Success, onExit.ReadStatus())
+	require.Equal(t, NodeStatus_Success, onExit.ReadStatus())
 }
 
 func TestSchedulerOnExitOnFail(t *testing.T) {
@@ -321,11 +320,11 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Error, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Cancel, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Cancel, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[2].ReadStatus())
 
-	assert.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).ReadStatus())
+	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).ReadStatus())
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
@@ -348,8 +347,8 @@ func TestSchedulerOnSignal(t *testing.T) {
 
 	nodes := g.Nodes()
 
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
-	assert.Equal(t, NodeStatus_Cancel, nodes[0].Status)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
+	require.Equal(t, NodeStatus_Cancel, nodes[0].Status)
 }
 
 func TestSchedulerOnCancel(t *testing.T) {
@@ -372,14 +371,14 @@ func TestSchedulerOnCancel(t *testing.T) {
 	err := sc.Schedule(g, nil)
 	require.NoError(t, err)
 	<-done // Wait for canceling finished
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Cancel, nodes[1].ReadStatus())
-	assert.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnSuccess).ReadStatus())
-	assert.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnFailure).ReadStatus())
-	assert.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnCancel).ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Cancel, nodes[1].ReadStatus())
+	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnSuccess).ReadStatus())
+	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnFailure).ReadStatus())
+	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnCancel).ReadStatus())
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
@@ -396,10 +395,10 @@ func TestSchedulerOnSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).ReadStatus())
-	assert.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnSuccess).ReadStatus())
-	assert.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnFailure).ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).ReadStatus())
+	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnSuccess).ReadStatus())
+	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnFailure).ReadStatus())
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
@@ -417,11 +416,11 @@ func TestSchedulerOnFailure(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Error, nodes[0].ReadStatus())
-	assert.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).ReadStatus())
-	assert.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnSuccess).ReadStatus())
-	assert.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnFailure).ReadStatus())
-	assert.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnCancel).ReadStatus())
+	require.Equal(t, NodeStatus_Error, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).ReadStatus())
+	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnSuccess).ReadStatus())
+	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnFailure).ReadStatus())
+	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnCancel).ReadStatus())
 }
 
 func TestRepeat(t *testing.T) {
@@ -448,9 +447,9 @@ func TestRepeat(t *testing.T) {
 
 	nodes := g.Nodes()
 
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
-	assert.Equal(t, NodeStatus_Cancel, nodes[0].Status)
-	assert.Equal(t, nodes[0].DoneCount, 2)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
+	require.Equal(t, NodeStatus_Cancel, nodes[0].Status)
+	require.Equal(t, nodes[0].DoneCount, 2)
 }
 
 func TestRepeatFail(t *testing.T) {
@@ -469,9 +468,9 @@ func TestRepeatFail(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
-	assert.Equal(t, NodeStatus_Error, nodes[0].Status)
-	assert.Equal(t, nodes[0].DoneCount, 1)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, NodeStatus_Error, nodes[0].Status)
+	require.Equal(t, nodes[0].DoneCount, 1)
 }
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
@@ -500,9 +499,9 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 
 	nodes := g.Nodes()
 
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Success)
-	assert.Equal(t, NodeStatus_Success, nodes[0].Status)
-	assert.Equal(t, nodes[0].DoneCount, 1)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, NodeStatus_Success, nodes[0].Status)
+	require.Equal(t, nodes[0].DoneCount, 1)
 }
 
 func testSchedule(t *testing.T, steps ...*config.Step) (
@@ -531,7 +530,7 @@ func TestSchedulerStatusText(t *testing.T) {
 		SchedulerStatus_Cancel:  "canceled",
 		SchedulerStatus_Success: "finished",
 	} {
-		assert.Equal(t, k.String(), v)
+		require.Equal(t, k.String(), v)
 	}
 
 	for k, v := range map[NodeStatus]string{
@@ -542,7 +541,7 @@ func TestSchedulerStatusText(t *testing.T) {
 		NodeStatus_Success: "finished",
 		NodeStatus_Skipped: "skipped",
 	} {
-		assert.Equal(t, k.String(), v)
+		require.Equal(t, k.String(), v)
 	}
 }
 
@@ -558,11 +557,11 @@ func TestNodeSetupFailure(t *testing.T) {
 	sc := New(&Config{})
 	err := sc.Schedule(g, nil)
 	require.Error(t, err)
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
 	nodes := g.Nodes()
-	assert.Equal(t, NodeStatus_Error, nodes[0].Status)
-	assert.Equal(t, nodes[0].DoneCount, 0)
+	require.Equal(t, NodeStatus_Error, nodes[0].Status)
+	require.Equal(t, nodes[0].DoneCount, 0)
 }
 
 func TestNodeTeardownFailure(t *testing.T) {
@@ -585,9 +584,9 @@ func TestNodeTeardownFailure(t *testing.T) {
 	err := sc.Schedule(g, nil)
 	require.Error(t, err)
 
-	assert.Equal(t, sc.Status(g), SchedulerStatus_Error)
-	assert.Equal(t, NodeStatus_Error, nodes[0].Status)
-	assert.Error(t, nodes[0].Error)
+	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, NodeStatus_Error, nodes[0].Status)
+	require.Error(t, nodes[0].Error)
 }
 
 func step(name, command string, depends ...string) *config.Step {

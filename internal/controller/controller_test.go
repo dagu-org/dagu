@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
@@ -44,7 +43,7 @@ func TestGetStatus(t *testing.T) {
 
 	st, err := controller.New(dag.Config).GetStatus()
 	require.NoError(t, err)
-	assert.Equal(t, scheduler.SchedulerStatus_None, st.Status)
+	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
@@ -84,7 +83,7 @@ func TestGetDAG(t *testing.T) {
 	file := testConfig("controller_get_dag.yaml")
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
-	assert.Equal(t, "test", dag.Config.Name)
+	require.Equal(t, "test", dag.Config.Name)
 }
 
 func TestGetDAGList(t *testing.T) {
@@ -93,7 +92,7 @@ func TestGetDAGList(t *testing.T) {
 	require.Equal(t, 0, len(errs))
 
 	matches, _ := filepath.Glob(path.Join(testsDir, "*.yaml"))
-	assert.Equal(t, len(matches), len(dags))
+	require.Equal(t, len(matches), len(dags))
 }
 
 func TestUpdateStatus(t *testing.T) {

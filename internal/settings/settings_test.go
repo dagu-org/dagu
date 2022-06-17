@@ -5,7 +5,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -36,8 +35,8 @@ func TestReadSetting(t *testing.T) {
 		},
 	} {
 		val, err := Get(test.Name)
-		assert.NoError(t, err)
-		assert.Equal(t, val, test.Want)
+		require.NoError(t, err)
+		require.Equal(t, val, test.Want)
 	}
 
 	// read from env variables
@@ -58,11 +57,11 @@ func TestReadSetting(t *testing.T) {
 		load()
 
 		val, err := Get(test.Name)
-		assert.NoError(t, err)
-		assert.Equal(t, val, test.Want)
+		require.NoError(t, err)
+		require.Equal(t, val, test.Want)
 
 		val = MustGet(test.Name)
-		assert.Equal(t, val, test.Want)
+		require.Equal(t, val, test.Want)
 	}
 
 	_, err := Get("Invalid_Name")

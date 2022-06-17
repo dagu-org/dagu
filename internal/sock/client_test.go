@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +48,7 @@ func TestDialTimeout(t *testing.T) {
 	client := Client{Addr: f.Name()}
 	_, err = client.Request("GET", "/status")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrTimeout))
+	require.True(t, errors.Is(err, ErrTimeout))
 }
 
 func TestProcErr(t *testing.T) {

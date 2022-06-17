@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -48,8 +47,8 @@ func TestLoadDeafult(t *testing.T) {
 	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
-	assert.Equal(t, time.Second*60, cfg.MaxCleanUpTime)
-	assert.Equal(t, 7, cfg.HistRetentionDays)
+	require.Equal(t, time.Second*60, cfg.MaxCleanUpTime)
+	require.Equal(t, 7, cfg.HistRetentionDays)
 }
 
 func TestLoadData(t *testing.T) {

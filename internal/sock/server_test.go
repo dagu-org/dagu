@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,19 +45,19 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	go func() {
 		err = unixServer.Serve(listen)
-		assert.True(t, errors.Is(ErrServerRequestedShutdown, err))
+		require.True(t, errors.Is(ErrServerRequestedShutdown, err))
 	}()
 
 	time.Sleep(time.Millisecond * 50)
 
 	ret, err := client.Request(http.MethodPost, "/")
-	assert.Equal(t, "OK", ret)
+	require.Equal(t, "OK", ret)
 
 	unixServer.Shutdown()
 
 	time.Sleep(time.Millisecond * 50)
 	_, err = client.Request(http.MethodPost, "/")
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestNoResponse(t *testing.T) {

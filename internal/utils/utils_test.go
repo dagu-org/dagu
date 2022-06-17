@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/utils"
@@ -22,7 +21,7 @@ func TestMustGetUserHomeDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	hd := utils.MustGetUserHomeDir()
-	assert.Equal(t, "/test", hd)
+	require.Equal(t, "/test", hd)
 }
 
 func TestDefaultEnv(t *testing.T) {
@@ -32,17 +31,17 @@ func TestDefaultEnv(t *testing.T) {
 
 func TestMustGetwd(t *testing.T) {
 	wd, _ := os.Getwd()
-	assert.Equal(t, utils.MustGetwd(), wd)
+	require.Equal(t, utils.MustGetwd(), wd)
 }
 
 func TestFormatTime(t *testing.T) {
 	tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location())
 	fomatted := utils.FormatTime(tm)
-	assert.Equal(t, "2022-02-01 02:02:02", fomatted)
+	require.Equal(t, "2022-02-01 02:02:02", fomatted)
 
 	parsed, err := utils.ParseTime(fomatted)
 	require.NoError(t, err)
-	assert.Equal(t, tm, parsed)
+	require.Equal(t, tm, parsed)
 
 	require.Equal(t, constants.TimeEmpty, utils.FormatTime(time.Time{}))
 	parsed, err = utils.ParseTime(constants.TimeEmpty)
@@ -52,15 +51,15 @@ func TestFormatTime(t *testing.T) {
 
 func TestFormatDuration(t *testing.T) {
 	dr := time.Second*5 + time.Millisecond*100
-	assert.Equal(t, "5.1s", utils.FormatDuration(dr, ""))
+	require.Equal(t, "5.1s", utils.FormatDuration(dr, ""))
 }
 
 func TestSplitCommand(t *testing.T) {
 	command := "ls -al test/"
 	program, args := utils.SplitCommand(command)
-	assert.Equal(t, "ls", program)
-	assert.Equal(t, "-al", args[0])
-	assert.Equal(t, "test/", args[1])
+	require.Equal(t, "ls", program)
+	require.Equal(t, "-al", args[0])
+	require.Equal(t, "test/", args[1])
 }
 
 func TestFileExits(t *testing.T) {
@@ -69,7 +68,7 @@ func TestFileExits(t *testing.T) {
 
 func TestValidFilename(t *testing.T) {
 	f := utils.ValidFilename("file\\name", "_")
-	assert.Equal(t, f, "file_name")
+	require.Equal(t, f, "file_name")
 }
 
 func TestOpenFile(t *testing.T) {
@@ -119,14 +118,14 @@ func TestParseVariable(t *testing.T) {
 	os.Setenv("TEST_VAR", "test")
 	r, err := utils.ParseVariable("${TEST_VAR}")
 	require.NoError(t, err)
-	assert.Equal(t, r, "test")
+	require.Equal(t, r, "test")
 
 	_, err = utils.ParseVariable("`ech test`")
 	require.Error(t, err)
 
 	r, err = utils.ParseVariable("`echo test`")
 	require.NoError(t, err)
-	assert.Equal(t, r, "test")
+	require.Equal(t, r, "test")
 }
 
 func TestMustTempDir(t *testing.T) {
@@ -155,7 +154,7 @@ func TestOpenfile(t *testing.T) {
 	defer f2.Close()
 	b, err := io.ReadAll(f2)
 	require.NoError(t, err)
-	assert.Equal(t, "test", string(b))
+	require.Equal(t, "test", string(b))
 }
 
 func TestIgnoreErr(t *testing.T) {

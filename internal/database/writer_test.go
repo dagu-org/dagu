@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
@@ -39,7 +38,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	r, err := models.StatusFromJson(string(dat))
 	require.NoError(t, err)
 
-	assert.Equal(t, cfg.Name, r.Name)
+	require.Equal(t, cfg.Name, r.Name)
 
 	err = dw.Close()
 	require.NoError(t, err)
@@ -78,8 +77,8 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 
 	data, err := db.FindByRequestId(cfg.ConfigPath, status.RequestId)
 	require.NoError(t, err)
-	assert.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Cancel)
-	assert.Equal(t, file, data.File)
+	require.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Cancel)
+	require.Equal(t, file, data.File)
 
 	dw = &Writer{Target: file}
 	require.NoError(t, dw.Open())
@@ -89,6 +88,6 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 
 	data, err = db.FindByRequestId(cfg.ConfigPath, status.RequestId)
 	require.NoError(t, err)
-	assert.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Success)
-	assert.Equal(t, file, data.File)
+	require.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Success)
+	require.Equal(t, file, data.File)
 }

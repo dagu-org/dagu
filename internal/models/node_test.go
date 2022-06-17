@@ -3,7 +3,6 @@ package models
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -27,8 +26,8 @@ func TestFromNodes(t *testing.T) {
 
 	ret := FromNodes(g.Nodes())
 
-	assert.Equal(t, 2, len(ret))
-	assert.NotEqual(t, "", ret[1].Error)
+	require.Equal(t, 2, len(ret))
+	require.NotEqual(t, "", ret[1].Error)
 }
 
 func TestToNode(t *testing.T) {

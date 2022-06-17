@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
@@ -83,7 +82,7 @@ func TestDryRun(t *testing.T) {
 	status := a.Status()
 	require.NoError(t, err)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 }
 
 func TestCancelDAG(t *testing.T) {
@@ -97,7 +96,7 @@ func TestCancelDAG(t *testing.T) {
 		time.Sleep(time.Millisecond * 500)
 		status, err := controller.New(dag.Config).GetLastStatus()
 		require.NoError(t, err)
-		assert.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
+		require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
 	}
 }
 
@@ -115,9 +114,9 @@ func TestPreConditionInvalid(t *testing.T) {
 	status, err := testDAG(t, dag)
 	require.Error(t, err)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
-	assert.Equal(t, scheduler.NodeStatus_None, status.Nodes[0].Status)
-	assert.Equal(t, scheduler.NodeStatus_None, status.Nodes[1].Status)
+	require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
+	require.Equal(t, scheduler.NodeStatus_None, status.Nodes[0].Status)
+	require.Equal(t, scheduler.NodeStatus_None, status.Nodes[1].Status)
 }
 
 func TestPreConditionValid(t *testing.T) {
@@ -133,9 +132,9 @@ func TestPreConditionValid(t *testing.T) {
 	status, err := testDAG(t, dag)
 	require.NoError(t, err)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 	for _, s := range status.Nodes {
-		assert.Equal(t, scheduler.NodeStatus_Success, s.Status)
+		require.Equal(t, scheduler.NodeStatus_Success, s.Status)
 	}
 }
 
@@ -145,7 +144,7 @@ func TestStartError(t *testing.T) {
 	status, err := testDAG(t, dag)
 	require.Error(t, err)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 }
 
 func TestOnExit(t *testing.T) {
@@ -154,11 +153,11 @@ func TestOnExit(t *testing.T) {
 	status, err := testDAG(t, dag)
 	require.NoError(t, err)
 
-	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 	for _, s := range status.Nodes {
-		assert.Equal(t, scheduler.NodeStatus_Success, s.Status)
+		require.Equal(t, scheduler.NodeStatus_Success, s.Status)
 	}
-	assert.Equal(t, scheduler.NodeStatus_Success, status.OnExit.Status)
+	require.Equal(t, scheduler.NodeStatus_Success, status.OnExit.Status)
 }
 
 func TestRetry(t *testing.T) {
@@ -168,7 +167,7 @@ func TestRetry(t *testing.T) {
 
 	status, err := testDAG(t, dag)
 	require.Error(t, err)
-	assert.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 
 	for _, n := range status.Nodes {
 		n.CmdWithArgs = "true"
@@ -184,7 +183,7 @@ func TestRetry(t *testing.T) {
 	err = a.Run()
 	status = a.Status()
 	require.NoError(t, err)
-	assert.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 
 	for _, n := range status.Nodes {
 		if n.Status != scheduler.NodeStatus_Success &&

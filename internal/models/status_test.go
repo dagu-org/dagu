@@ -7,7 +7,6 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/scheduler"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,9 +58,9 @@ func TestStatusSerialization(t *testing.T) {
 	st_, err := StatusFromJson(string(js))
 	require.NoError(t, err)
 
-	assert.Equal(t, st.Name, st_.Name)
+	require.Equal(t, st.Name, st_.Name)
 	require.Equal(t, 1, len(st_.Nodes))
-	assert.Equal(t, cfg.Steps[0].Name, st_.Nodes[0].Name)
+	require.Equal(t, cfg.Steps[0].Name, st_.Nodes[0].Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {

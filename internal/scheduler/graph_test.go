@@ -3,7 +3,6 @@ package scheduler
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 )
@@ -77,12 +76,12 @@ func TestRetryExecution(t *testing.T) {
 	}
 	_, err := RetryExecutionGraph(nodes...)
 	require.NoError(t, err)
-	assert.Equal(t, NodeStatus_Success, nodes[0].Status)
-	assert.Equal(t, NodeStatus_None, nodes[1].Status)
-	assert.Equal(t, NodeStatus_None, nodes[2].Status)
-	assert.Equal(t, NodeStatus_Skipped, nodes[3].Status)
-	assert.Equal(t, NodeStatus_None, nodes[4].Status)
-	assert.Equal(t, NodeStatus_None, nodes[5].Status)
-	assert.Equal(t, NodeStatus_None, nodes[6].Status)
-	assert.Equal(t, NodeStatus_Skipped, nodes[7].Status)
+	require.Equal(t, NodeStatus_Success, nodes[0].Status)
+	require.Equal(t, NodeStatus_None, nodes[1].Status)
+	require.Equal(t, NodeStatus_None, nodes[2].Status)
+	require.Equal(t, NodeStatus_Skipped, nodes[3].Status)
+	require.Equal(t, NodeStatus_None, nodes[4].Status)
+	require.Equal(t, NodeStatus_None, nodes[5].Status)
+	require.Equal(t, NodeStatus_None, nodes[6].Status)
+	require.Equal(t, NodeStatus_Skipped, nodes[7].Status)
 }

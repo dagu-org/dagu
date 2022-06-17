@@ -5,7 +5,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -66,11 +65,11 @@ func TestLoadAdminConfig(t *testing.T) {
 
 func testConfig(t *testing.T, cfg *Config, want *testWant) {
 	t.Helper()
-	assert.Equal(t, want.Host, cfg.Host)
-	assert.Equal(t, want.Port, cfg.Port)
-	assert.Equal(t, want.DAGs, cfg.DAGs)
-	assert.Equal(t, want.WorkDir, cfg.WorkDir)
-	assert.Equal(t, want.Command, cfg.Command)
+	require.Equal(t, want.Host, cfg.Host)
+	require.Equal(t, want.Port, cfg.Port)
+	require.Equal(t, want.DAGs, cfg.DAGs)
+	require.Equal(t, want.WorkDir, cfg.WorkDir)
+	require.Equal(t, want.Command, cfg.Command)
 }
 
 type testWant struct {
