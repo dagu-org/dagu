@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/mail"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
@@ -40,13 +39,13 @@ func TestReporter(t *testing.T) {
 				},
 				ErrorMail: &config.MailConfig{
 					Prefix: "Error: ",
-					From:   "from@mail.com",
-					To:     "to@mail.com",
+					From:   "from@mailer.com",
+					To:     "to@mailer.com",
 				},
 				InfoMail: &config.MailConfig{
 					Prefix: "Success: ",
-					From:   "from@mail.com",
-					To:     "to@mail.com",
+					From:   "from@mailer.com",
+					To:     "to@mailer.com",
 				},
 				Steps: []*config.Step{
 					{
@@ -217,7 +216,7 @@ type mockMailer struct {
 	count   int
 }
 
-var _ mail.Mailer = (*mockMailer)(nil)
+var _ Mailer = (*mockMailer)(nil)
 
 func (m *mockMailer) SendMail(from string, to []string, subject, body string) error {
 	m.count += 1

@@ -8,7 +8,6 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/mail"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
@@ -18,7 +17,12 @@ type Reporter struct {
 }
 
 type Config struct {
-	Mailer mail.Mailer
+	Mailer Mailer
+}
+
+// Mailer is a mailer interface.
+type Mailer interface {
+	SendMail(from string, to []string, subject, body string) error
 }
 
 func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *scheduler.Node) error {

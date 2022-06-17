@@ -18,7 +18,7 @@ import (
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/internal/mail"
+	"github.com/yohamta/dagu/internal/mailer"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/reporter"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -169,11 +169,12 @@ func (a *Agent) init() {
 		})
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
-			Mailer: mail.New(
-				&mail.Config{
+			Mailer: &mailer.Mailer{
+				Config: &mailer.Config{
 					Host: a.DAG.Smtp.Host,
 					Port: a.DAG.Smtp.Port,
-				}),
+				},
+			},
 		}}
 	a.logFilename = filepath.Join(
 		logDir,
