@@ -1,4 +1,4 @@
-package views
+package admin
 
 import (
 	"encoding/json"

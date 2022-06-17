@@ -169,7 +169,7 @@ func TestIgnoreErr(t *testing.T) {
 		log.SetOutput(origStdout)
 	}()
 
-	utils.LogIgnoreErr("test action", errors.New("test error"))
+	utils.LogErr("test action", errors.New("test error"))
 	os.Stdout = origStdout
 	w.Close()
 

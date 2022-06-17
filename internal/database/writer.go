@@ -35,16 +35,16 @@ func (w *Writer) Write(st *models.Status) error {
 	str := strings.ReplaceAll(string(jsonb), "\n", " ")
 	str = strings.ReplaceAll(str, "\r", " ")
 	_, err := w.writer.WriteString(str + "\n")
-	utils.LogIgnoreErr("write status", err)
+	utils.LogErr("write status", err)
 	return w.writer.Flush()
 }
 
 func (w *Writer) Close() (err error) {
 	if !w.closed {
 		err = w.writer.Flush()
-		utils.LogIgnoreErr("flush file", err)
-		utils.LogIgnoreErr("file sync", w.file.Sync())
-		utils.LogIgnoreErr("file close", w.file.Close())
+		utils.LogErr("flush file", err)
+		utils.LogErr("file sync", w.file.Sync())
+		utils.LogErr("file close", w.file.Close())
 		w.closed = true
 	}
 	return err

@@ -38,12 +38,12 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 		return
 	}
 	fis, err := os.ReadDir(dir)
-	utils.LogIgnoreErr("read DAGs directory", err)
+	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		ex := filepath.Ext(fi.Name())
 		if ex == ".yaml" || ex == ".yml" {
 			dag, err := fromConfig(filepath.Join(dir, fi.Name()), true)
-			utils.LogIgnoreErr("read DAG config", err)
+			utils.LogErr("read DAG config", err)
 			if dag != nil {
 				dags = append(dags, dag)
 			} else {
@@ -85,7 +85,7 @@ func (c *controller) Start(bin string, workDir string, params string) (err error
 		cmd.Env = os.Environ()
 		defer cmd.Wait()
 		err = cmd.Start()
-		utils.LogIgnoreErr("starting a DAG", err)
+		utils.LogErr("starting a DAG", err)
 	}()
 	time.Sleep(time.Millisecond * 500)
 	return
@@ -102,7 +102,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 		cmd.Env = os.Environ()
 		defer cmd.Wait()
 		err = cmd.Start()
-		utils.LogIgnoreErr("retry a DAG", err)
+		utils.LogErr("retry a DAG", err)
 	}()
 	time.Sleep(time.Millisecond * 500)
 	return

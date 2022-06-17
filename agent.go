@@ -295,13 +295,13 @@ func (a *Agent) run() error {
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	utils.LogIgnoreErr("writing status", a.dbWriter.Write(a.Status()))
+	utils.LogErr("writing status", a.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	utils.LogIgnoreErr("sending email", a.reporter.ReportMail(a.DAG, status, lastErr))
+	utils.LogErr("sending email", a.reporter.ReportMail(a.DAG, status, lastErr))
 
-	utils.LogIgnoreErr("closing data file", a.dbWriter.Close())
-	utils.LogIgnoreErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
+	utils.LogErr("closing data file", a.dbWriter.Close())
+	utils.LogErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
 
 	return lastErr
 }
