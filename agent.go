@@ -18,7 +18,7 @@ import (
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/internal/mail"
+	"github.com/yohamta/dagu/internal/mailer"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/reporter"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -169,11 +169,12 @@ func (a *Agent) init() {
 		})
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
-			Mailer: mail.New(
-				&mail.Config{
+			Mailer: &mailer.Mailer{
+				Config: &mailer.Config{
 					Host: a.DAG.Smtp.Host,
 					Port: a.DAG.Smtp.Port,
-				}),
+				},
+			},
 		}}
 	a.logFilename = filepath.Join(
 		logDir,
@@ -244,20 +245,21 @@ func (a *Agent) run() error {
 	if err := tl.Open(); err != nil {
 		return err
 	}
-	defer tl.Close()
+	defer func() {
+		utils.LogErr("close logger", tl.Close())
+	}()
 
-	err := a.dbWriter.Open()
-	if err != nil {
+	if err := a.dbWriter.Open(); err != nil {
 		return err
 	}
 
 	defer func() {
 		if err := a.dbWriter.Close(); err != nil {
-			log.Printf("failed to close db writer. err: %v", err)
+			log.Printf("failed to close db writer: %v", err)
 		}
 	}()
 
-	a.dbWriter.Write(a.Status())
+	utils.LogErr("write status", a.dbWriter.Write(a.Status()))
 
 	listen := make(chan error)
 	go func() {
@@ -268,7 +270,7 @@ func (a *Agent) run() error {
 	}()
 
 	defer func() {
-		a.socketServer.Shutdown()
+		utils.LogErr("shutdown socket server", a.socketServer.Shutdown())
 	}()
 
 	if err := <-listen; err != nil {
@@ -281,26 +283,26 @@ func (a *Agent) run() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			a.dbWriter.Write(status)
-			a.reporter.ReportStep(a.DAG, status, node)
+			utils.LogErr("write status", a.dbWriter.Write(status))
+			utils.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
 		}
 	}()
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
-		a.dbWriter.Write(a.Status())
+		utils.LogErr("write status", a.dbWriter.Write(a.Status()))
 	}()
 
 	lastErr := a.scheduler.Schedule(a.graph, done)
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	utils.LogErr("writing status", a.dbWriter.Write(a.Status()))
+	utils.LogErr("write status", a.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	utils.LogErr("sending email", a.reporter.ReportMail(a.DAG, status, lastErr))
+	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
-	utils.LogErr("closing data file", a.dbWriter.Close())
+	utils.LogErr("close data file", a.dbWriter.Close())
 	utils.LogErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
 
 	return lastErr
@@ -308,11 +310,14 @@ func (a *Agent) run() error {
 
 func (a *Agent) dryRun() error {
 	done := make(chan *scheduler.Node)
-	defer close(done)
+	defer func() {
+		close(done)
+	}()
+
 	go func() {
 		for node := range done {
 			status := a.Status()
-			a.reporter.ReportStep(a.DAG, status, node)
+			_ = a.reporter.ReportStep(a.DAG, status, node)
 		}
 	}()
 
@@ -364,15 +369,15 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			a.Signal(syscall.SIGTERM)
 		}()
 	default:
-		encodeError(w, ErrNotFound)
+		encodeError(w, errNotFound)
 	}
 }
 
-var ErrNotFound = errors.New("not found")
+var errNotFound = errors.New("not found")
 
 func encodeError(w http.ResponseWriter, err error) {
 	switch err {
-	case ErrNotFound:
+	case errNotFound:
 		http.Error(w, err.Error(), http.StatusNotFound)
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)

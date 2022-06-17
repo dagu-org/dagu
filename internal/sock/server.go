@@ -78,14 +78,16 @@ func (svr *Server) Serve(listen chan error) error {
 }
 
 // Shutdown stops the server.
-func (svr *Server) Shutdown() {
+func (svr *Server) Shutdown() error {
 	if !svr.quit {
 		svr.quit = true
 		if svr.listener != nil {
 			err := svr.listener.Close()
 			utils.LogErr("close listener", err)
+			return err
 		}
 	}
+	return nil
 }
 
 type httpResponseWriter struct {

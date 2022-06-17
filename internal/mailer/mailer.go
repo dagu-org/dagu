@@ -1,4 +1,4 @@
-package mail
+package mailer
 
 import (
 	"encoding/base64"
@@ -7,25 +7,21 @@ import (
 	"strings"
 )
 
-type Mailer interface {
-	SendMail(from string, to []string, subject, body string) error
-}
-
-type mailer struct {
+// Mailer is a mailer that sends emails.
+type Mailer struct {
 	*Config
 }
 
+// Config is a config for SMTP mailer.
 type Config struct {
-	Host, Port string
+	// Host is a hostname of a mail server.
+	Host string
+	// Port is a port of a mail server.
+	Port string
 }
 
-func New(config *Config) Mailer {
-	return &mailer{
-		Config: config,
-	}
-}
-
-func (m *mailer) SendMail(from string, to []string, subject, body string) error {
+// SendMail sends an email.
+func (m *Mailer) SendMail(from string, to []string, subject, body string) error {
 	log.Printf("Sending an email to %s, subject is \"%s\"", strings.Join(to, ","), subject)
 	r := strings.NewReplacer("\r\n", "", "\r", "", "\n", "", "%0a", "", "%0d", "")
 
@@ -33,7 +29,9 @@ func (m *mailer) SendMail(from string, to []string, subject, body string) error 
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 	if err = c.Mail(r.Replace(from)); err != nil {
 		return err
 	}
@@ -57,8 +55,7 @@ func (m *mailer) SendMail(from string, to []string, subject, body string) error 
 	if err != nil {
 		return err
 	}
-	err = wc.Close()
-	if err != nil {
+	if err := wc.Close(); err != nil {
 		return err
 	}
 	return c.Quit()

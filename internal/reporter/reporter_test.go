@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/mail"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
@@ -40,13 +39,13 @@ func TestReporter(t *testing.T) {
 				},
 				ErrorMail: &config.MailConfig{
 					Prefix: "Error: ",
-					From:   "from@mail.com",
-					To:     "to@mail.com",
+					From:   "from@mailer.com",
+					To:     "to@mailer.com",
 				},
 				InfoMail: &config.MailConfig{
 					Prefix: "Success: ",
-					From:   "from@mail.com",
-					To:     "to@mail.com",
+					From:   "from@mailer.com",
+					To:     "to@mailer.com",
 				},
 				Steps: []*config.Step{
 					{
@@ -84,7 +83,7 @@ func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mode
 	cfg.MailOn.Failure = true
 	cfg.MailOn.Success = false
 
-	rp.ReportMail(cfg, &models.Status{
+	rp.SendMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -99,7 +98,7 @@ func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	cfg.MailOn.Failure = false
 	cfg.MailOn.Success = true
 
-	rp.ReportMail(cfg, &models.Status{
+	rp.SendMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, nil)
@@ -112,7 +111,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	cfg.MailOn.Failure = true
 	cfg.MailOn.Success = true
 
-	rp.ReportMail(cfg, &models.Status{
+	rp.SendMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Success,
 		Nodes:  nodes,
 	}, nil)
@@ -217,7 +216,7 @@ type mockMailer struct {
 	count   int
 }
 
-var _ mail.Mailer = (*mockMailer)(nil)
+var _ Mailer = (*mockMailer)(nil)
 
 func (m *mockMailer) SendMail(from string, to []string, subject, body string) error {
 	m.count += 1
