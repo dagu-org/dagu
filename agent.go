@@ -26,9 +26,11 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
 	*AgentConfig
 	*RetryConfig
+
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	logFilename  string
@@ -49,6 +51,7 @@ type RetryConfig struct {
 	Status *models.Status
 }
 
+// Run starts the workflow.
 func (a *Agent) Run() error {
 	if err := a.setupRequestId(); err != nil {
 		return err
@@ -77,6 +80,7 @@ func (a *Agent) Run() error {
 	return a.run()
 }
 
+// Status returns the current status of the workflow.
 func (a *Agent) Status() *models.Status {
 	status := models.NewStatus(
 		a.DAG,
@@ -133,7 +137,7 @@ func (a *Agent) Signal(sig os.Signal) {
 	}
 }
 
-// KILL kills child processes.
+// Kill sends KILL signal to all child processes.
 func (a *Agent) Kill() {
 	log.Printf("Sending KILL signal to running child processes.")
 	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil)
