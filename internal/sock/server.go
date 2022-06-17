@@ -13,6 +13,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Server is a unix socket server that passes http requests to HandlerFunc.
 type Server struct {
 	*Config
 	listener net.Listener
@@ -24,8 +25,10 @@ type Config struct {
 	HandlerFunc HttpHandlerFunc
 }
 
+// HttpHandlerFunc is a function that handles HTTP requests.
 type HttpHandlerFunc func(w http.ResponseWriter, r *http.Request)
 
+// NewServer creates a new unix socket server.
 func NewServer(c *Config) (*Server, error) {
 	return &Server{
 		Config: c,
@@ -37,6 +40,7 @@ var (
 	ErrServerRequestedShutdown = errors.New("socket server is requested to shutdown")
 )
 
+// Serve starts listening and serving requests.
 func (svr *Server) Serve(listen chan error) error {
 	os.Remove(svr.Addr)
 	var err error
@@ -63,9 +67,9 @@ func (svr *Server) Serve(listen chan error) error {
 		if err == nil {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
-				utils.LogIgnoreErr("read request", err)
+				utils.LogErr("read request", err)
 				if err == nil {
-					svr.HandlerFunc(NewHttpResponseWriter(&conn), request)
+					svr.HandlerFunc(newHttpResponseWriter(&conn), request)
 				}
 				conn.Close()
 			}()
@@ -73,31 +77,34 @@ func (svr *Server) Serve(listen chan error) error {
 	}
 }
 
+// Shutdown stops the server.
 func (svr *Server) Shutdown() {
 	if !svr.quit {
 		svr.quit = true
 		if svr.listener != nil {
 			err := svr.listener.Close()
-			utils.LogIgnoreErr("close listener", err)
+			utils.LogErr("close listener", err)
 		}
 	}
 }
 
-type HttpResponseWriter struct {
+type httpResponseWriter struct {
 	conn       *net.Conn
 	header     http.Header
 	statusCode int
 }
 
-func NewHttpResponseWriter(conn *net.Conn) http.ResponseWriter {
-	return &HttpResponseWriter{
+var _ http.ResponseWriter = (*httpResponseWriter)(nil)
+
+func newHttpResponseWriter(conn *net.Conn) http.ResponseWriter {
+	return &httpResponseWriter{
 		conn:       conn,
 		header:     make(http.Header),
 		statusCode: http.StatusOK,
 	}
 }
 
-func (w *HttpResponseWriter) Write(data []byte) (int, error) {
+func (w *httpResponseWriter) Write(data []byte) (int, error) {
 	response := http.Response{
 		StatusCode: w.statusCode,
 		ProtoMajor: 1,
@@ -109,10 +116,10 @@ func (w *HttpResponseWriter) Write(data []byte) (int, error) {
 	return 0, nil
 }
 
-func (w *HttpResponseWriter) Header() http.Header {
+func (w *httpResponseWriter) Header() http.Header {
 	return w.header
 }
 
-func (w *HttpResponseWriter) WriteHeader(statusCode int) {
+func (w *httpResponseWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 }

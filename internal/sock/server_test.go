@@ -123,6 +123,6 @@ func TestErrorResponse(t *testing.T) {
 }
 
 func TestResponseWriter(t *testing.T) {
-	w := NewHttpResponseWriter(nil)
+	w := newHttpResponseWriter(nil)
 	require.Equal(t, make(http.Header), w.Header())
 }

@@ -67,7 +67,7 @@ func New(cfg *config.Config) Controller {
 }
 
 func (c *controller) Stop() error {
-	client := sock.Client{Addr: sock.GetSockAddr(c.cfg.ConfigPath)}
+	client := sock.Client{Addr: c.cfg.SockAddr()}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
@@ -109,7 +109,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 }
 
 func (s *controller) GetStatus() (*models.Status, error) {
-	client := sock.Client{Addr: sock.GetSockAddr(s.cfg.ConfigPath)}
+	client := sock.Client{Addr: s.cfg.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -122,7 +122,7 @@ func (s *controller) GetStatus() (*models.Status, error) {
 }
 
 func (s *controller) GetLastStatus() (*models.Status, error) {
-	client := sock.Client{Addr: sock.GetSockAddr(s.cfg.ConfigPath)}
+	client := sock.Client{Addr: s.cfg.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err == nil {
 		return models.StatusFromJson(ret)
@@ -166,7 +166,7 @@ func (s *controller) GetStatusHist(n int) []*models.StatusFile {
 }
 
 func (s *controller) UpdateStatus(status *models.Status) error {
-	client := sock.Client{Addr: sock.GetSockAddr(s.cfg.ConfigPath)}
+	client := sock.Client{Addr: s.cfg.SockAddr()}
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {

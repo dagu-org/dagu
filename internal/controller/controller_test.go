@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
@@ -43,7 +44,7 @@ func TestGetStatus(t *testing.T) {
 
 	st, err := controller.New(dag.Config).GetStatus()
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
+	assert.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
@@ -54,7 +55,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
-			Addr: sock.GetSockAddr(file),
+			Addr: dag.Config.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				status := models.NewStatus(
 					dag.Config, []*scheduler.Node{},
@@ -83,7 +84,7 @@ func TestGetDAG(t *testing.T) {
 	file := testConfig("controller_get_dag.yaml")
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
-	require.Equal(t, "test", dag.Config.Name)
+	assert.Equal(t, "test", dag.Config.Name)
 }
 
 func TestGetDAGList(t *testing.T) {
@@ -92,7 +93,7 @@ func TestGetDAGList(t *testing.T) {
 	require.Equal(t, 0, len(errs))
 
 	matches, _ := filepath.Glob(path.Join(testsDir, "*.yaml"))
-	require.Equal(t, len(matches), len(dags))
+	assert.Equal(t, len(matches), len(dags))
 }
 
 func TestUpdateStatus(t *testing.T) {
@@ -141,7 +142,7 @@ func TestUpdateStatusFailure(t *testing.T) {
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
-			Addr: sock.GetSockAddr(file),
+			Addr: dag.Config.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				st := newStatus(dag.Config, req,
 					scheduler.SchedulerStatus_Running, scheduler.NodeStatus_Success)

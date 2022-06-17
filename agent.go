@@ -220,7 +220,7 @@ func (a *Agent) setupDatabase() (err error) {
 func (a *Agent) setupSocketServer() (err error) {
 	a.socketServer, err = sock.NewServer(
 		&sock.Config{
-			Addr:        sock.GetSockAddr(a.DAG.ConfigPath),
+			Addr:        a.DAG.SockAddr(),
 			HandlerFunc: a.handleHTTP,
 		})
 	return
@@ -334,7 +334,7 @@ func (a *Agent) checkIsRunning() error {
 	}
 	if status.Status != scheduler.SchedulerStatus_None {
 		return fmt.Errorf("the DAG is already running. socket=%s",
-			sock.GetSockAddr(a.DAG.ConfigPath))
+			a.DAG.SockAddr())
 	}
 	return nil
 }

@@ -15,7 +15,9 @@ import (
 func TestDialFail(t *testing.T) {
 	f, err := os.CreateTemp("", "sock_client_dial_failure")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer func() {
+		_ = os.Remove(f.Name())
+	}()
 
 	client := Client{Addr: f.Name()}
 	_, err = client.Request("GET", "/status")
@@ -25,7 +27,9 @@ func TestDialFail(t *testing.T) {
 func TestDialTimeout(t *testing.T) {
 	f, err := os.CreateTemp("", "sock_client_test")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer func() {
+		_ = os.Remove(f.Name())
+	}()
 
 	s, err := NewServer(
 		&Config{
