@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/yohamta/dagu/internal/admin/views"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/filters"
-	"github.com/yohamta/dagu/internal/views"
 )
 
 type viewResponse struct {

@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/views"
+	"github.com/yohamta/dagu/internal/admin/views"
 )
 
 type viewListResponse struct {
 	Title   string
 	Charset string
-	Views   []*models.View
+	Views   []*views.View
 }
 
 func HandleGetViewList() http.HandlerFunc {
@@ -32,7 +31,7 @@ func HandleGetViewList() http.HandlerFunc {
 func HandlePutView() http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		var v models.View
+		var v views.View
 		err := json.NewDecoder(r.Body).Decode(&v)
 		if err != nil {
 			encodeError(w, err)
