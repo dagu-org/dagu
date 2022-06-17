@@ -236,7 +236,7 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 
 func (sc *Scheduler) setup() (err error) {
 	if sc.LogDir == "" {
-		sc.LogDir, err = settings.Get(settings.CONFIG__LOGS_DIR)
+		sc.LogDir, err = settings.Get(settings.SETTING__LOGS_DIR)
 		if err != nil {
 			return
 		}

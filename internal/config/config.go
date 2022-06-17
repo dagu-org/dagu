@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/md5"
 	"fmt"
 	"os"
 	"path"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
@@ -16,6 +18,7 @@ import (
 type Config struct {
 	ConfigPath        string
 	Name              string
+	Schedule          cron.Schedule
 	Description       string
 	Env               []string
 	LogDir            string
@@ -79,6 +82,15 @@ func (c *Config) HasTag(tag string) bool {
 	return false
 }
 
+func (c *Config) SockAddr() string {
+	s := strings.ReplaceAll(c.ConfigPath, " ", "_")
+	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
+	h := md5.New()
+	h.Write([]byte(s))
+	bs := h.Sum(nil)
+	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
+}
+
 func (c *Config) Clone() *Config {
 	ret := *c
 	return &ret
@@ -101,7 +113,7 @@ func (c *Config) setup(file string) {
 	c.ConfigPath = file
 	if c.LogDir == "" {
 		c.LogDir = path.Join(
-			settings.MustGet(settings.CONFIG__LOGS_DIR),
+			settings.MustGet(settings.SETTING__LOGS_DIR),
 			utils.ValidFilename(c.Name, "_"))
 	}
 	if c.HistRetentionDays == 0 {
@@ -146,6 +158,8 @@ type builder struct {
 	BuildConfigOptions
 }
 
+var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
 func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (c *Config, err error) {
 	c = &Config{}
 	c.Init()
@@ -159,6 +173,13 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	c.MailOn.Success = def.MailOn.Success
 	c.Delay = time.Second * time.Duration(def.DelaySec)
 	c.Tags = parseTags(def.Tags)
+
+	if def.Schedule != "" {
+		c.Schedule, err = cronParser.Parse(def.Schedule)
+		if err != nil {
+			return nil, fmt.Errorf("invalid schedule: %s", err)
+		}
+	}
 
 	if b.headOnly {
 		return c, nil

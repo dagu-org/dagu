@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -14,19 +13,19 @@ import (
 func TestMain(m *testing.M) {
 	tmpDir := utils.MustTempDir("test-views")
 	os.Setenv("HOST", "localhost")
-	settings.InitTest(tmpDir)
+	settings.ChangeHomeDir(tmpDir)
 	code := m.Run()
 	os.RemoveAll(tmpDir)
 	os.Exit(code)
 }
 
 func TestView(t *testing.T) {
-	viewsDir := settings.MustGet(settings.CONFIG__VIEWS_DIR)
+	viewsDir := settings.MustGet(settings.SETTING__VIEWS_DIR)
 	defer func() {
 		os.RemoveAll(viewsDir)
 	}()
 
-	view := &models.View{
+	view := &View{
 		Name:        "",
 		ContainTags: []string{"a", "b"},
 	}
@@ -34,7 +33,7 @@ func TestView(t *testing.T) {
 	err := SaveView(view)
 	require.EqualError(t, err, ErrInvalidName.Error())
 
-	view = &models.View{
+	view = &View{
 		Name:        "test",
 		ContainTags: []string{"a", "b"},
 	}
@@ -57,4 +56,17 @@ func TestView(t *testing.T) {
 
 	_, err = GetView("test")
 	require.Error(t, err)
+}
+
+func TestViewMarshaling(t *testing.T) {
+	v := &View{
+		Name:        "test",
+		ContainTags: []string{"a", "b"},
+	}
+	js, err := v.ToJson()
+	require.NoError(t, err)
+
+	v2, err := ViewFromJson(js)
+	require.NoError(t, err)
+	require.Equal(t, v, v2)
 }

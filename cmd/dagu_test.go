@@ -27,7 +27,7 @@ var testsDir = path.Join(utils.MustGetwd(), "../tests/testdata")
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("dagu_test")
-	settings.InitTest(tempDir)
+	settings.ChangeHomeDir(tempDir)
 	code := m.Run()
 	os.RemoveAll(tempDir)
 	os.Exit(code)

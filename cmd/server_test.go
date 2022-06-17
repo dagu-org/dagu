@@ -20,8 +20,8 @@ func Test_serverCommand(t *testing.T) {
 	os.Setenv("HOME", dir)
 
 	port := findPort(t)
-	os.Setenv(settings.CONFIG__ADMIN_PORT, port)
-	settings.InitTest(dir)
+	os.Setenv(settings.SETTING__ADMIN_PORT, port)
+	settings.ChangeHomeDir(dir)
 
 	done := make(chan struct{})
 	go func() {

@@ -25,11 +25,11 @@ var defaultFuncs = template.FuncMap{
 		return constants.Version
 	},
 	"navbarColor": func() string {
-		c, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_COLOR)
+		c, _ := settings.Get(settings.SETTING__ADMIN_NAVBAR_COLOR)
 		return c
 	},
 	"navbarTitle": func() string {
-		val, _ := settings.Get(settings.CONFIG__ADMIN_NAVBAR_TITLE)
+		val, _ := settings.Get(settings.SETTING__ADMIN_NAVBAR_TITLE)
 		return val
 	},
 }

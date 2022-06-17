@@ -4,33 +4,38 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"time"
 )
 
-var ErrTimeout = fmt.Errorf("unix socket timeout")
-var ErrConnectionRefused = fmt.Errorf("unix socket connection failed")
-var timeout = time.Millisecond * 3000
+var (
+	ErrTimeout           = fmt.Errorf("unix socket timeout")
+	ErrConnectionRefused = fmt.Errorf("unix socket connection failed")
+	timeout              = time.Millisecond * 3000
+)
 
+// Client is a unix socket client that can send requests
+// to the server over HTTP.
 type Client struct {
 	Addr string
 }
 
+// Request sends a request to the server and returns the response.
 func (cl *Client) Request(method, url string) (string, error) {
 	conn, err := net.DialTimeout("unix", cl.Addr, timeout)
 	if err != nil {
 		return "", procError("dial to socket", err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 	conn.SetDeadline((time.Now().Add(timeout)))
 	request, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		log.Printf("NewRequest %v", err)
-		return "", err
+		return "", procError("new request", err)
 	}
-	request.Write(conn)
+	_ = request.Write(conn)
 	response, err := http.ReadResponse(bufio.NewReader(conn), request)
 	if err != nil {
 		return "", procError("read response", err)
@@ -43,10 +48,8 @@ func (cl *Client) Request(method, url string) (string, error) {
 }
 
 func procError(action string, err error) error {
-	if err, ok := err.(net.Error); ok {
-		if err.Timeout() {
-			return fmt.Errorf("%s timeout %w: %s", action, ErrTimeout, err.Error())
-		}
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		return fmt.Errorf("%s timeout %w: %s", action, ErrTimeout, err.Error())
 	}
 	return fmt.Errorf("%s failed: %w", action, err)
 }

@@ -35,6 +35,6 @@ func startServer(cfg *admin.Config) error {
 	})
 
 	err := server.Serve()
-	utils.LogIgnoreErr("running server", err)
+	utils.LogErr("running server", err)
 	return err
 }

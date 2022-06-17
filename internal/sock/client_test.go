@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDialFail(t *testing.T) {
 	f, err := os.CreateTemp("", "sock_client_dial_failure")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer func() {
+		_ = os.Remove(f.Name())
+	}()
 
 	client := Client{Addr: f.Name()}
 	_, err = client.Request("GET", "/status")
@@ -26,7 +27,9 @@ func TestDialFail(t *testing.T) {
 func TestDialTimeout(t *testing.T) {
 	f, err := os.CreateTemp("", "sock_client_test")
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer func() {
+		_ = os.Remove(f.Name())
+	}()
 
 	s, err := NewServer(
 		&Config{
@@ -49,7 +52,7 @@ func TestDialTimeout(t *testing.T) {
 	client := Client{Addr: f.Name()}
 	_, err = client.Request("GET", "/status")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrTimeout))
+	require.True(t, errors.Is(err, ErrTimeout))
 }
 
 func TestProcErr(t *testing.T) {

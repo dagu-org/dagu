@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 )
@@ -18,7 +17,7 @@ func TestExecute(t *testing.T) {
 			Command: "true",
 		}}
 	require.NoError(t, n.Execute())
-	assert.Nil(t, n.Error)
+	require.Nil(t, n.Error)
 }
 
 func TestError(t *testing.T) {
@@ -27,8 +26,8 @@ func TestError(t *testing.T) {
 			Command: "false",
 		}}
 	err := n.Execute()
-	assert.True(t, err != nil)
-	assert.Equal(t, n.Error, err)
+	require.True(t, err != nil)
+	require.Equal(t, n.Error, err)
 }
 
 func TestSignal(t *testing.T) {

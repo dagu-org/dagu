@@ -36,7 +36,7 @@ func New(config *Config) *Database {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Dir: settings.MustGet(settings.CONFIG__DATA_DIR),
+		Dir: settings.MustGet(settings.SETTING__DATA_DIR),
 	}
 }
 

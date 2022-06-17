@@ -26,9 +26,11 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
 	*AgentConfig
 	*RetryConfig
+
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	logFilename  string
@@ -49,6 +51,7 @@ type RetryConfig struct {
 	Status *models.Status
 }
 
+// Run starts the workflow.
 func (a *Agent) Run() error {
 	if err := a.setupRequestId(); err != nil {
 		return err
@@ -77,6 +80,7 @@ func (a *Agent) Run() error {
 	return a.run()
 }
 
+// Status returns the current status of the workflow.
 func (a *Agent) Status() *models.Status {
 	status := models.NewStatus(
 		a.DAG,
@@ -133,7 +137,7 @@ func (a *Agent) Signal(sig os.Signal) {
 	}
 }
 
-// KILL kills child processes.
+// Kill sends KILL signal to all child processes.
 func (a *Agent) Kill() {
 	log.Printf("Sending KILL signal to running child processes.")
 	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil)
@@ -216,7 +220,7 @@ func (a *Agent) setupDatabase() (err error) {
 func (a *Agent) setupSocketServer() (err error) {
 	a.socketServer, err = sock.NewServer(
 		&sock.Config{
-			Addr:        sock.GetSockAddr(a.DAG.ConfigPath),
+			Addr:        a.DAG.SockAddr(),
 			HandlerFunc: a.handleHTTP,
 		})
 	return
@@ -291,13 +295,13 @@ func (a *Agent) run() error {
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	utils.LogIgnoreErr("writing status", a.dbWriter.Write(a.Status()))
+	utils.LogErr("writing status", a.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	utils.LogIgnoreErr("sending email", a.reporter.ReportMail(a.DAG, status, lastErr))
+	utils.LogErr("sending email", a.reporter.ReportMail(a.DAG, status, lastErr))
 
-	utils.LogIgnoreErr("closing data file", a.dbWriter.Close())
-	utils.LogIgnoreErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
+	utils.LogErr("closing data file", a.dbWriter.Close())
+	utils.LogErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
 
 	return lastErr
 }
@@ -330,7 +334,7 @@ func (a *Agent) checkIsRunning() error {
 	}
 	if status.Status != scheduler.SchedulerStatus_None {
 		return fmt.Errorf("the DAG is already running. socket=%s",
-			sock.GetSockAddr(a.DAG.ConfigPath))
+			a.DAG.SockAddr())
 	}
 	return nil
 }

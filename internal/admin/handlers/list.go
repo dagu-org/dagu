@@ -7,10 +7,9 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/yohamta/dagu/internal/admin/views"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/utils"
-	"github.com/yohamta/dagu/internal/views"
 )
 
 type dagListResponse struct {
@@ -21,7 +20,7 @@ type dagListResponse struct {
 	Group    string
 	Errors   []string
 	HasError bool
-	Views    []*models.View
+	Views    []*views.View
 }
 
 type dagListParameter struct {

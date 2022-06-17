@@ -37,6 +37,6 @@ func (s *Storage) Delete(file string) error {
 
 func (s *Storage) MustRead(file string) []byte {
 	b, err := os.ReadFile(path.Join(s.Dir, file))
-	utils.LogIgnoreErr("storage: read file", err)
+	utils.LogErr("storage: read file", err)
 	return b
 }

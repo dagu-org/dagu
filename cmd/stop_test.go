@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/database"
@@ -37,5 +36,5 @@ func Test_stopCommand(t *testing.T) {
 
 	s := db.ReadStatusHist(cfg.ConfigPath, 1)
 	require.Equal(t, 1, len(s))
-	assert.Equal(t, scheduler.SchedulerStatus_Cancel, s[0].Status.Status)
+	require.Equal(t, scheduler.SchedulerStatus_Cancel, s[0].Status.Status)
 }

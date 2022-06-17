@@ -120,7 +120,7 @@ func (n *Node) Execute() error {
 	n.Error = cmd.Run()
 
 	if n.outputReader != nil && n.Output != "" {
-		utils.LogIgnoreErr("close pipe writer", n.outputWriter.Close())
+		utils.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := buf.String()
@@ -153,7 +153,7 @@ func (n *Node) signal(sig os.Signal) {
 	status := n.Status
 	if status == NodeStatus_Running && n.cmd != nil {
 		log.Printf("Sending %s signal to %s", sig, n.Name)
-		utils.LogIgnoreErr("sending signal", syscall.Kill(-n.cmd.Process.Pid, sig.(syscall.Signal)))
+		utils.LogErr("sending signal", syscall.Kill(-n.cmd.Process.Pid, sig.(syscall.Signal)))
 	}
 	if status == NodeStatus_Running {
 		n.Status = NodeStatus_Cancel

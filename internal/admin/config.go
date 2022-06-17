@@ -44,7 +44,7 @@ func (c *Config) setup() {
 		c.Host = "127.0.0.1"
 	}
 	if c.Port == "" {
-		c.Port = settings.MustGet(settings.CONFIG__ADMIN_PORT)
+		c.Port = settings.MustGet(settings.SETTING__ADMIN_PORT)
 	}
 	if len(c.Env) == 0 {
 		env := utils.DefaultEnv()
@@ -71,7 +71,7 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 		return nil, err
 	}
 	if def.Port == 0 {
-		c.Port = settings.MustGet(settings.CONFIG__ADMIN_PORT)
+		c.Port = settings.MustGet(settings.SETTING__ADMIN_PORT)
 	} else {
 		c.Port = strconv.Itoa(def.Port)
 	}

@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,9 +15,9 @@ func TestCondition(t *testing.T) {
 		}
 		ret, err := c.Eval()
 		require.NoError(t, err)
-		assert.Equal(t, ret.Condition, c.Condition)
-		assert.Equal(t, ret.Expected, c.Expected)
-		assert.Equal(t, ret.Actual, c.Expected)
+		require.Equal(t, ret.Condition, c.Condition)
+		require.Equal(t, ret.Expected, c.Expected)
+		require.Equal(t, ret.Actual, c.Expected)
 	}
 	{
 		os.Setenv("TEST_CONDITION", "100")
@@ -28,9 +27,9 @@ func TestCondition(t *testing.T) {
 		}
 		ret, err := c.Eval()
 		require.NoError(t, err)
-		assert.Equal(t, ret.Condition, c.Condition)
-		assert.Equal(t, ret.Expected, c.Expected)
-		assert.Equal(t, ret.Actual, c.Expected)
+		require.Equal(t, ret.Condition, c.Condition)
+		require.Equal(t, ret.Expected, c.Expected)
+		require.Equal(t, ret.Actual, c.Expected)
 	}
 }
 

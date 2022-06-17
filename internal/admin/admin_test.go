@@ -13,7 +13,7 @@ var testsDir = path.Join(utils.MustGetwd(), "../../tests/admin/")
 
 func TestMain(m *testing.M) {
 	os.Setenv("HOST", "localhost")
-	settings.InitTest(testsDir)
+	settings.ChangeHomeDir(testsDir)
 	code := m.Run()
 	os.Exit(code)
 }

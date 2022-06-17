@@ -5,7 +5,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -14,57 +13,59 @@ var testHomeDir string
 
 func TestMain(m *testing.M) {
 	testHomeDir = utils.MustTempDir("settings_test")
-	InitTest(testHomeDir)
-	os.Exit(m.Run())
+	ChangeHomeDir(testHomeDir)
+	exitCode := m.Run()
+	os.RemoveAll(testHomeDir)
+	os.Exit(exitCode)
 }
 
 func TestReadSetting(t *testing.T) {
 	load()
 
-	// read default configs
+	// read default settings
 	for _, test := range []struct {
 		Name string
 		Want string
 	}{
 		{
-			Name: CONFIG__DATA_DIR,
+			Name: SETTING__DATA_DIR,
 			Want: path.Join(testHomeDir, ".dagu/data"),
 		},
 		{
-			Name: CONFIG__LOGS_DIR,
+			Name: SETTING__LOGS_DIR,
 			Want: path.Join(testHomeDir, ".dagu/logs"),
 		},
 	} {
 		val, err := Get(test.Name)
-		assert.NoError(t, err)
-		assert.Equal(t, val, test.Want)
+		require.NoError(t, err)
+		require.Equal(t, val, test.Want)
 	}
 
-	// read from env variables
+	// read from enviroment variables
 	for _, test := range []struct {
 		Name string
 		Want string
 	}{
 		{
-			Name: CONFIG__DATA_DIR,
+			Name: SETTING__DATA_DIR,
 			Want: "/home/dagu/data",
 		},
 		{
-			Name: CONFIG__LOGS_DIR,
+			Name: SETTING__LOGS_DIR,
 			Want: "/home/dagu/logs",
 		},
 	} {
-		os.Setenv(test.Name, test.Want)
+		_ = os.Setenv(test.Name, test.Want)
 		load()
 
 		val, err := Get(test.Name)
-		assert.NoError(t, err)
-		assert.Equal(t, val, test.Want)
+		require.NoError(t, err)
+		require.Equal(t, val, test.Want)
 
 		val = MustGet(test.Name)
-		assert.Equal(t, val, test.Want)
+		require.Equal(t, val, test.Want)
 	}
 
 	_, err := Get("Invalid_Name")
-	require.Equal(t, ErrConfigNotFound, err)
+	require.Equal(t, ErrSettingNotFound, err)
 }

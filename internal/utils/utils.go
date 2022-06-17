@@ -11,6 +11,7 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 )
 
+// DefaultEnv returns default value of environment variable.
 func DefaultEnv() map[string]string {
 	return map[string]string{
 		"PATH": "${PATH}",
@@ -32,6 +33,7 @@ func MustGetwd() string {
 	return wd
 }
 
+// FormatTime returns formatted time.
 func FormatTime(t time.Time) string {
 	if t.IsZero() {
 		return constants.TimeEmpty
@@ -40,6 +42,7 @@ func FormatTime(t time.Time) string {
 	}
 }
 
+// ParseTime parses time string.
 func ParseTime(val string) (time.Time, error) {
 	if val == constants.TimeEmpty {
 		return time.Time{}, nil
@@ -47,6 +50,7 @@ func ParseTime(val string) (time.Time, error) {
 	return time.ParseInLocation(constants.TimeFormat, val, time.Local)
 }
 
+// FormatDuration returns formatted duration.
 func FormatDuration(t time.Duration, defaultVal string) string {
 	if t == 0 {
 		return defaultVal
@@ -55,6 +59,7 @@ func FormatDuration(t time.Duration, defaultVal string) string {
 	}
 }
 
+// SplitCommand splits command string to program and arguments.
 func SplitCommand(cmd string) (program string, args []string) {
 	vals := strings.SplitN(cmd, " ", 2)
 	if len(vals) > 1 {
@@ -63,11 +68,13 @@ func SplitCommand(cmd string) (program string, args []string) {
 	return vals[0], []string{}
 }
 
+// FileExists returns true if file exists.
 func FileExists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
 
+// OpenOrCreateFile opens file or creates it if it doesn't exist.
 func OpenOrCreateFile(file string) (*os.File, error) {
 	if FileExists(file) {
 		return OpenFile(file)
@@ -75,6 +82,7 @@ func OpenOrCreateFile(file string) (*os.File, error) {
 	return CreateFile(file)
 }
 
+// OpenFile opens file.
 func OpenFile(file string) (*os.File, error) {
 	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0755)
 	if err != nil {
@@ -83,6 +91,7 @@ func OpenFile(file string) (*os.File, error) {
 	return outfile, nil
 }
 
+// CreateFile creates file.
 func CreateFile(file string) (*os.File, error) {
 	outfile, err := os.Create(file)
 	if err != nil {
@@ -97,12 +106,14 @@ var (
 	filenameReservedWindowsNamesRegex = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
 )
 
+// ValidFilename returns true if filename is valid.
 func ValidFilename(str, replacement string) string {
 	s := filenameReservedRegex.ReplaceAllString(str, replacement)
 	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
 	return strings.ReplaceAll(s, " ", replacement)
 }
 
+// ParseVariable parses variable string.
 func ParseVariable(value string) (string, error) {
 	val, err := ParseCommand(os.ExpandEnv(value))
 	if err != nil {
@@ -113,6 +124,7 @@ func ParseVariable(value string) (string, error) {
 
 var tickerMatcher = regexp.MustCompile("`[^`]+`")
 
+// ParseCommand substitutes command in the value string.
 func ParseCommand(value string) (string, error) {
 	matches := tickerMatcher.FindAllString(strings.TrimSpace(value), -1)
 	if matches == nil {
@@ -133,6 +145,7 @@ func ParseCommand(value string) (string, error) {
 	return ret, nil
 }
 
+// MustTempDir returns temporary directory.
 func MustTempDir(pattern string) string {
 	t, err := os.MkdirTemp("", pattern)
 	if err != nil {
@@ -141,12 +154,14 @@ func MustTempDir(pattern string) string {
 	return t
 }
 
-func LogIgnoreErr(action string, err error) {
+// LogErr logs error if it's not nil.
+func LogErr(action string, err error) {
 	if err != nil {
 		log.Printf("%s failed. %s", action, err)
 	}
 }
 
+// TrunString returns truncated string.
 func TruncString(val string, max int) string {
 	if len(val) > max {
 		return val[:max]
@@ -154,6 +169,8 @@ func TruncString(val string, max int) string {
 	return val
 }
 
+// StringsWithFallback returns the first non-empty string
+// in the parameter list.
 func StringWithFallback(val, fallback string) string {
 	if val == "" {
 		return fallback

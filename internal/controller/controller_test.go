@@ -27,7 +27,7 @@ var (
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("controller_test")
-	settings.InitTest(tempDir)
+	settings.ChangeHomeDir(tempDir)
 	code := m.Run()
 	os.RemoveAll(tempDir)
 	os.Exit(code)
@@ -55,7 +55,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
-			Addr: sock.GetSockAddr(file),
+			Addr: dag.Config.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				status := models.NewStatus(
 					dag.Config, []*scheduler.Node{},
@@ -142,7 +142,7 @@ func TestUpdateStatusFailure(t *testing.T) {
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
-			Addr: sock.GetSockAddr(file),
+			Addr: dag.Config.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				st := newStatus(dag.Config, req,
 					scheduler.SchedulerStatus_Running, scheduler.NodeStatus_Success)
