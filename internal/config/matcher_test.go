@@ -1,17 +1,16 @@
-package filters
+package config
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestContains(t *testing.T) {
-	f := &ContainTags{
+	f := &ContainTagsMatcher{
 		Tags: []string{"a", "b"},
 	}
-	cfg := &config.Config{
+	cfg := &Config{
 		Tags: []string{"a", "b", "c"},
 	}
 	require.True(t, f.Matches(cfg))

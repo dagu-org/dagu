@@ -7,8 +7,8 @@ import (
 	"regexp"
 
 	"github.com/yohamta/dagu/internal/admin/views"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/filters"
 )
 
 type viewResponse struct {
@@ -47,7 +47,7 @@ func HandleGetView(hc *ViewHandlerConfig) http.HandlerFunc {
 		}
 
 		filteredDags := []*controller.DAG{}
-		filter := &filters.ContainTags{
+		filter := &config.ContainTagsMatcher{
 			Tags: view.ContainTags,
 		}
 		for _, d := range dags {
