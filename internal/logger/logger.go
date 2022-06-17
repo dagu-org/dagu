@@ -9,11 +9,14 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// TeeLogger is a logger that writes to both stdout and a file.
 type TeeLogger struct {
 	Filename string
 	file     *os.File
 }
 
+// Open opens the file and sets the logger to write to both
+// stdout and the file.
 func (l *TeeLogger) Open() error {
 	dir := path.Dir(l.Filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -29,6 +32,7 @@ func (l *TeeLogger) Open() error {
 	return nil
 }
 
+// Close closes the file.
 func (l *TeeLogger) Close() error {
 	var lastErr error = nil
 	if l.file != nil {
