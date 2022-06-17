@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/settings"
@@ -80,6 +81,7 @@ func TestLoadInvalidConfigError(t *testing.T) {
 `,
 		`logDir: "` + "`ech foo`" + `"`,
 		`params: "` + "`ech foo`" + `"`,
+		`schedule: "` + "1" + `"`,
 	} {
 		l := &Loader{
 			HomeDir: utils.MustGetUserHomeDir(),
@@ -242,5 +244,33 @@ tags: %s
 		require.Equal(t, test.Want, cfg.Tags)
 
 		require.True(t, cfg.HasTag("daily"))
+	}
+}
+
+func TestSchedule(t *testing.T) {
+	tm := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		Schedule string
+		Want     time.Time
+	}{
+		{
+			Schedule: "*/5 * * * *",
+			Want:     tm.Add(5 * time.Minute),
+		},
+	} {
+		l := &Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
+		d, err := l.unmarshalData([]byte(fmt.Sprintf(`schedule: "%s"`, test.Schedule)))
+		require.NoError(t, err)
+
+		def, err := l.decode(d)
+		require.NoError(t, err)
+
+		b := &builder{}
+		cfg, err := b.buildFromDefinition(def, nil)
+		require.NoError(t, err)
+
+		require.Equal(t, test.Want, cfg.Schedule.Next(tm))
 	}
 }
