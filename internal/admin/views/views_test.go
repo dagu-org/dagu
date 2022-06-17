@@ -13,14 +13,14 @@ import (
 func TestMain(m *testing.M) {
 	tmpDir := utils.MustTempDir("test-views")
 	os.Setenv("HOST", "localhost")
-	settings.InitTest(tmpDir)
+	settings.ChangeHomeDir(tmpDir)
 	code := m.Run()
 	os.RemoveAll(tmpDir)
 	os.Exit(code)
 }
 
 func TestView(t *testing.T) {
-	viewsDir := settings.MustGet(settings.CONFIG__VIEWS_DIR)
+	viewsDir := settings.MustGet(settings.SETTING__VIEWS_DIR)
 	defer func() {
 		os.RemoveAll(viewsDir)
 	}()

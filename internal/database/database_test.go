@@ -353,7 +353,7 @@ func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *mod
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	require.Equal(t, cfg.Dir, settings.MustGet(settings.CONFIG__DATA_DIR))
+	require.Equal(t, cfg.Dir, settings.MustGet(settings.SETTING__DATA_DIR))
 }
 
 func TestTimestamp(t *testing.T) {

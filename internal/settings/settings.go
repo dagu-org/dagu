@@ -8,19 +8,21 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var ErrConfigNotFound = fmt.Errorf("config not found")
-
-var cache map[string]string = nil
-
-const (
-	CONFIG__DATA_DIR           = "DAGU__DATA"
-	CONFIG__LOGS_DIR           = "DAGU__LOGS"
-	CONFIG__VIEWS_DIR          = "DAGU__VIEWS"
-	CONFIG__ADMIN_PORT         = "DAGU__ADMIN_PORT"
-	CONFIG__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
-	CONFIG__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
+var (
+	ErrSettingNotFound = fmt.Errorf("setting not found")
 )
 
+const (
+	SETTING__DATA_DIR           = "DAGU__DATA"
+	SETTING__LOGS_DIR           = "DAGU__LOGS"
+	SETTING__VIEWS_DIR          = "DAGU__VIEWS"
+	SETTING__ADMIN_PORT         = "DAGU__ADMIN_PORT"
+	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
+	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
+)
+
+// MustGet returns the value of the setting or
+// panics if the setting is not found.
 func MustGet(name string) string {
 	val, err := Get(name)
 	if err != nil {
@@ -29,42 +31,46 @@ func MustGet(name string) string {
 	return val
 }
 
-func init() {
-	load()
-}
-
+// Get returns the value of the setting or ErrSettingNotFound
 func Get(name string) (string, error) {
 	if val, ok := cache[name]; ok {
 		return val, nil
 	}
-	return "", ErrConfigNotFound
+	return "", ErrSettingNotFound
+}
+
+// ChangeHomeDir changes the home directory and reloads
+// the settings.
+func ChangeHomeDir(dir string) {
+	os.Setenv("HOME", dir)
+	load()
+}
+
+var cache map[string]string = nil
+
+func init() {
+	load()
 }
 
 func load() {
 	dir := utils.MustGetUserHomeDir()
 
 	cache = map[string]string{}
-	cache[CONFIG__DATA_DIR] = config(
-		CONFIG__DATA_DIR,
+	cache[SETTING__DATA_DIR] = readEnv(
+		SETTING__DATA_DIR,
 		path.Join(dir, "/.dagu/data"))
-	cache[CONFIG__LOGS_DIR] = config(CONFIG__LOGS_DIR,
+	cache[SETTING__LOGS_DIR] = readEnv(SETTING__LOGS_DIR,
 		path.Join(dir, "/.dagu/logs"))
-	cache[CONFIG__VIEWS_DIR] = config(CONFIG__VIEWS_DIR,
+	cache[SETTING__VIEWS_DIR] = readEnv(SETTING__VIEWS_DIR,
 		path.Join(dir, "/.dagu/views"))
-	cache[CONFIG__ADMIN_PORT] = config(CONFIG__ADMIN_PORT, "8080")
-	cache[CONFIG__ADMIN_NAVBAR_COLOR] = config(CONFIG__ADMIN_NAVBAR_COLOR, "")
-	cache[CONFIG__ADMIN_NAVBAR_TITLE] = config(CONFIG__ADMIN_NAVBAR_TITLE, "Dagu admin")
+	cache[SETTING__ADMIN_PORT] = readEnv(SETTING__ADMIN_PORT, "8080")
+	cache[SETTING__ADMIN_NAVBAR_COLOR] = readEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
+	cache[SETTING__ADMIN_NAVBAR_TITLE] = readEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
 }
 
-func InitTest(dir string) {
-	os.Setenv("HOME", dir)
-	load()
-}
-
-func config(env, def string) string {
-	val := os.ExpandEnv(fmt.Sprintf("${%s}", env))
-	if val == "" {
-		return def
-	}
-	return val
+func readEnv(env, def string) string {
+	return utils.StringWithFallback(
+		os.ExpandEnv(fmt.Sprintf("${%s}", env)),
+		def,
+	)
 }

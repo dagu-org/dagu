@@ -23,7 +23,7 @@ var (
 
 func TestMain(m *testing.M) {
 	testDir = utils.MustTempDir("scheduler-test")
-	settings.InitTest(testDir)
+	settings.ChangeHomeDir(testDir)
 	code := m.Run()
 	os.RemoveAll(testDir)
 	os.Exit(code)

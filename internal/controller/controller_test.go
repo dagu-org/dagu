@@ -27,7 +27,7 @@ var (
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("controller_test")
-	settings.InitTest(tempDir)
+	settings.ChangeHomeDir(tempDir)
 	code := m.Run()
 	os.RemoveAll(tempDir)
 	os.Exit(code)

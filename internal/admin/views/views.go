@@ -27,7 +27,7 @@ func (v *View) ToJson() ([]byte, error) {
 
 func GetViews() []*View {
 	s := storage.NewStorage(
-		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+		settings.MustGet(settings.SETTING__VIEWS_DIR),
 	)
 	fis, err := s.List()
 	if err != nil {
@@ -50,7 +50,7 @@ func GetViews() []*View {
 
 func SaveView(view *View) error {
 	s := storage.NewStorage(
-		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+		settings.MustGet(settings.SETTING__VIEWS_DIR),
 	)
 	if view.Name == "" {
 		return ErrInvalidName
@@ -64,7 +64,7 @@ func SaveView(view *View) error {
 
 func DeleteView(view *View) error {
 	s := storage.NewStorage(
-		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+		settings.MustGet(settings.SETTING__VIEWS_DIR),
 	)
 	return s.Delete(fmt.Sprintf("%s.json", view.Name))
 }
@@ -74,7 +74,7 @@ var ErrNotFound = fmt.Errorf("not found")
 
 func GetView(name string) (*View, error) {
 	s := storage.NewStorage(
-		settings.MustGet(settings.CONFIG__VIEWS_DIR),
+		settings.MustGet(settings.SETTING__VIEWS_DIR),
 	)
 	dat := s.MustRead(fmt.Sprintf("%s.json", name))
 	if dat == nil {

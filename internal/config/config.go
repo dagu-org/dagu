@@ -113,7 +113,7 @@ func (c *Config) setup(file string) {
 	c.ConfigPath = file
 	if c.LogDir == "" {
 		c.LogDir = path.Join(
-			settings.MustGet(settings.CONFIG__LOGS_DIR),
+			settings.MustGet(settings.SETTING__LOGS_DIR),
 			utils.ValidFilename(c.Name, "_"))
 	}
 	if c.HistRetentionDays == 0 {
