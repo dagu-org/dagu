@@ -10,7 +10,6 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 func testWriteStatusToFile(t *testing.T, db *Database) {
@@ -29,8 +28,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
 	status.RequestId = fmt.Sprintf("request-id-%d", time.Now().Unix())
 	require.NoError(t, dw.Write(status))
-
-	utils.AssertPattern(t, "FileName", ".*test_write_status.*", file)
+	require.Regexp(t, ".*test_write_status.*", file)
 
 	dat, err := os.ReadFile(file)
 	require.NoError(t, err)
