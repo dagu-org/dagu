@@ -300,7 +300,7 @@ func (a *Agent) run() error {
 	utils.LogErr("write status", a.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	utils.LogErr("send email", a.reporter.ReportMail(a.DAG, status, lastErr))
+	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
 	utils.LogErr("close data file", a.dbWriter.Close())
 	utils.LogErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))

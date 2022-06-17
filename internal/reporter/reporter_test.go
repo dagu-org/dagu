@@ -83,7 +83,7 @@ func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mode
 	cfg.MailOn.Failure = true
 	cfg.MailOn.Success = false
 
-	rp.ReportMail(cfg, &models.Status{
+	rp.SendMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -98,7 +98,7 @@ func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	cfg.MailOn.Failure = false
 	cfg.MailOn.Success = true
 
-	rp.ReportMail(cfg, &models.Status{
+	rp.SendMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, nil)
@@ -111,7 +111,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	cfg.MailOn.Failure = true
 	cfg.MailOn.Success = true
 
-	rp.ReportMail(cfg, &models.Status{
+	rp.SendMail(cfg, &models.Status{
 		Status: scheduler.SchedulerStatus_Success,
 		Nodes:  nodes,
 	}, nil)

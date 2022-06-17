@@ -12,10 +12,13 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
+// Reporter is responsible for reporting the status of the scheduler
+// to the user.
 type Reporter struct {
 	*Config
 }
 
+// Config is the configuration for the reporter.
 type Config struct {
 	Mailer Mailer
 }
@@ -25,6 +28,7 @@ type Mailer interface {
 	SendMail(from string, to []string, subject, body string) error
 }
 
+// ReportStep is a function that reports the status of a step.
 func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *scheduler.Node) error {
 	st := node.ReadStatus()
 	if st != scheduler.NodeStatus_None {
@@ -41,6 +45,7 @@ func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *
 	return nil
 }
 
+// ReportSummary is a function that reports the status of the scheduler.
 func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 	var buf bytes.Buffer
 	buf.Write([]byte("\n"))
@@ -52,7 +57,8 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 	log.Print(buf.String())
 }
 
-func (rp *Reporter) ReportMail(cfg *config.Config, status *models.Status, err error) error {
+// SendMail is a function that sends a report mail.
+func (rp *Reporter) SendMail(cfg *config.Config, status *models.Status, err error) error {
 	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
 		if cfg.MailOn.Failure {
 			return rp.Mailer.SendMail(
