@@ -1,4 +1,4 @@
-package dagu
+package agent
 
 import (
 	"errors"

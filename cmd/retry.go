@@ -1,66 +1,40 @@
-package main
+/*
+Copyright © 2022 NAME HERE <EMAIL ADDRESS>
+
+*/
+package cmd
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 
-	"github.com/yohamta/dagu"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/utils"
-
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 )
 
-func newRetryCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "retry",
-		Usage: "dagu retry --req=<request-id> <config>",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "req",
-				Usage:    "request-id",
-				Value:    "",
-				Required: true,
-			},
-		},
-		Action: func(c *cli.Context) error {
-			f, _ := filepath.Abs(c.Args().Get(0))
-			requestId := c.String("req")
-			return retry(f, requestId)
-		},
-	}
+// retryCmd represents the retry command
+var retryCmd = &cobra.Command{
+	Use:   "retry",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("retry called")
+	},
 }
 
-func retry(f, requestId string) error {
-	cl := &config.Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+func init() {
+	rootCmd.AddCommand(retryCmd)
 
-	db := database.New(database.DefaultConfig())
-	status, err := db.FindByRequestId(f, requestId)
-	if err != nil {
-		return err
-	}
+	// Here you will define your flags and configuration settings.
 
-	cfg, err := cl.Load(f, status.Status.Params)
-	if err != nil {
-		return err
-	}
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// retryCmd.PersistentFlags().String("foo", "", "A help for foo")
 
-	a := &dagu.Agent{
-		AgentConfig: &dagu.AgentConfig{
-			DAG: cfg,
-			Dry: false,
-		},
-		RetryConfig: &dagu.RetryConfig{
-			Status: status.Status,
-		},
-	}
-
-	listenSignals(func(sig os.Signal) {
-		a.Signal(sig)
-	})
-
-	return a.Run()
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// retryCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
