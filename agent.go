@@ -155,8 +155,8 @@ func (a *Agent) Cancel() {
 
 func (a *Agent) init() {
 	logDir := path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_"))
-	a.scheduler = scheduler.New(
-		&scheduler.Config{
+	a.scheduler = &scheduler.Scheduler{
+		Config: &scheduler.Config{
 			LogDir:        logDir,
 			MaxActiveRuns: a.DAG.MaxActiveRuns,
 			Delay:         a.DAG.Delay,
@@ -166,7 +166,7 @@ func (a *Agent) init() {
 			OnFailure:     a.DAG.HandlerOn.Failure,
 			OnCancel:      a.DAG.HandlerOn.Cancel,
 			RequestId:     a.requestId,
-		})
+		}}
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{

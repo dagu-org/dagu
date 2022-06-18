@@ -49,9 +49,11 @@ func (s NodeStatus) String() string {
 	}
 }
 
+// Node is a node in a DAG. It executes a command.
 type Node struct {
 	*config.Step
 	NodeState
+
 	id           int
 	mu           sync.RWMutex
 	cmd          *exec.Cmd
@@ -66,6 +68,7 @@ type Node struct {
 	done         bool
 }
 
+// NodeState is the state of a node.
 type NodeState struct {
 	Status     NodeStatus
 	Log        string
@@ -76,6 +79,7 @@ type NodeState struct {
 	Error      error
 }
 
+// Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute() error {
 	ctx, fn := context.WithCancel(context.Background())
 	n.cancelFunc = fn
@@ -130,15 +134,28 @@ func (n *Node) Execute() error {
 	return n.Error
 }
 
-func (n *Node) clearState() {
-	n.NodeState = NodeState{}
-}
-
+// ReadStatus reads the status of a node.
 func (n *Node) ReadStatus() NodeStatus {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	ret := n.Status
 	return ret
+}
+
+func (n *Node) ReadRetryCount() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.RetryCount
+}
+
+func (n *Node) ReadDoneCount() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.DoneCount
+}
+
+func (n *Node) clearState() {
+	n.NodeState = NodeState{}
 }
 
 func (n *Node) updateStatus(status NodeStatus) {
@@ -269,18 +286,6 @@ func (n *Node) teardown() error {
 		n.Error = lastErr
 	}
 	return lastErr
-}
-
-func (n *Node) ReadRetryCount() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.RetryCount
-}
-
-func (n *Node) ReadDoneCount() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.DoneCount
 }
 
 func (n *Node) incRetryCount() {
