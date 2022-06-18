@@ -3,6 +3,7 @@ package dagu
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mailer"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/reporter"
@@ -34,6 +34,7 @@ type Agent struct {
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	logFilename  string
+	logFile      *os.File
 	reporter     *reporter.Reporter
 	database     *database.Database
 	dbFile       string
@@ -70,6 +71,7 @@ func (a *Agent) Run() error {
 		a.checkIsRunning,
 		a.setupDatabase,
 		a.setupSocketServer,
+		a.setupLogFile,
 	}
 	for _, fn := range setup {
 		err := fn()
@@ -194,6 +196,15 @@ func (a *Agent) setupGraph() (err error) {
 	return
 }
 
+func (a *Agent) setupLogFile() (err error) {
+	dir := path.Dir(a.logFilename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	a.logFile, err = utils.OpenOrCreateFile(a.logFilename)
+	return
+}
+
 func (a *Agent) setupRetry() (err error) {
 	nodes := []*scheduler.Node{}
 	for _, n := range a.RetryConfig.Status.Nodes {
@@ -241,14 +252,13 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run() error {
-	tl := &logger.TeeLogger{
-		Filename: a.logFilename,
-	}
+	tl := &teeLogger{File: a.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}
 	defer func() {
-		utils.LogErr("close logger", tl.Close())
+		utils.LogErr("close log file", a.closeLogFile())
+		tl.Close()
 	}()
 
 	if err := a.dbWriter.Open(); err != nil {
@@ -346,6 +356,13 @@ func (a *Agent) checkIsRunning() error {
 	return nil
 }
 
+func (a *Agent) closeLogFile() error {
+	if a.logFile != nil {
+		return a.logFile.Close()
+	}
+	return nil
+}
+
 var (
 	statusRe = regexp.MustCompile(`^/status[/]?$`)
 	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
@@ -384,4 +401,18 @@ func encodeError(w http.ResponseWriter, err error) {
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+type teeLogger struct {
+	*os.File
+}
+
+func (l *teeLogger) Open() error {
+	mw := io.MultiWriter(os.Stdout, l.File)
+	log.SetOutput(mw)
+	return nil
+}
+
+func (l *teeLogger) Close() {
+	log.SetOutput(os.Stdout)
 }
