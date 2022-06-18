@@ -5,36 +5,45 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/yohamta/dagu/agent"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/utils"
 )
+
+var params = ""
 
 // dryCmd represents the dry command
 var dryCmd = &cobra.Command{
 	Use:   "dry",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("dry called")
+	Short: "dagu dry [--params=\"<params>\"] <config>",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cl := &config.Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
+		config_file_path := args[0]
+		cfg, err := cl.Load(config_file_path, params)
+		if err != nil {
+			return err
+		}
+		return dryRun(cfg)
 	},
 }
 
 func init() {
+	dryCmd.Flags().StringVar(&params, "params", "", "parameters")
 	rootCmd.AddCommand(dryCmd)
+}
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// dryCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// dryCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func dryRun(cfg *config.Config) error {
+	a := &agent.Agent{AgentConfig: &agent.AgentConfig{
+		DAG: cfg,
+		Dry: true,
+	}}
+	listenSignals(func(sig os.Signal) {
+		a.Signal(sig)
+	})
+	return a.Run()
 }

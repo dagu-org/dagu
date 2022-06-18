@@ -5,36 +5,37 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 // stopCmd represents the stop command
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("stop called")
+	Short: "dagu stop <config>",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cl := &config.Loader{
+			HomeDir: utils.MustGetUserHomeDir(),
+		}
+		config_file_path := args[0]
+		cfg, err := cl.Load(config_file_path, "")
+		if err != nil {
+			return err
+		}
+		return stop(cfg)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(stopCmd)
+}
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// stopCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// stopCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func stop(cfg *config.Config) error {
+	c := controller.New(cfg)
+	log.Printf("Stopping...")
+	return c.Stop()
 }

@@ -5,36 +5,43 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"os"
+	"path"
 
 	"github.com/spf13/cobra"
+	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 // serverCmd represents the server command
 var serverCmd = &cobra.Command{
 	Use:   "server",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("server called")
+	Short: "dagu server",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		l := &admin.Loader{}
+		cfg, err := l.LoadAdminConfig(
+			path.Join(utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
+		if err == admin.ErrConfigNotFound {
+			cfg = admin.DefaultConfig()
+		} else if err != nil {
+			return err
+		}
+		return startServer(cfg)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
+}
 
-	// Here you will define your flags and configuration settings.
+func startServer(cfg *admin.Config) error {
+	server := admin.NewServer(cfg)
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// serverCmd.PersistentFlags().String("foo", "", "A help for foo")
+	listenSignals(func(sig os.Signal) {
+		server.Shutdown()
+	})
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// serverCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	err := server.Serve()
+	utils.LogErr("running server", err)
+	return err
 }

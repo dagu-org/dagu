@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -33,15 +30,4 @@ func newDryCommand() *cli.Command {
 			return dryRun(cfg)
 		},
 	}
-}
-
-func dryRun(cfg *config.Config) error {
-	a := &agent.Agent{AgentConfig: &agent.AgentConfig{
-		DAG: cfg,
-		Dry: true,
-	}}
-	listenSignals(func(sig os.Signal) {
-		a.Signal(sig)
-	})
-	return a.Run()
 }

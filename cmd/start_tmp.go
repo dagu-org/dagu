@@ -1,10 +1,7 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -33,17 +30,4 @@ func newStartCommand() *cli.Command {
 			return start(cfg)
 		},
 	}
-}
-
-func start(cfg *config.Config) error {
-	a := &agent.Agent{AgentConfig: &agent.AgentConfig{
-		DAG: cfg,
-		Dry: false,
-	}}
-
-	listenSignals(func(sig os.Signal) {
-		a.Signal(sig)
-	})
-
-	return a.Run()
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var testsDir = path.Join(utils.MustGetwd(), "./tests/testdata")
+var testsDir = path.Join(utils.MustGetwd(), "../tests/testdata")
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("agent_test")

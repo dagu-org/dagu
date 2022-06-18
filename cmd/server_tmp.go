@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"path"
 
 	"github.com/urfave/cli/v2"
@@ -25,16 +24,4 @@ func newServerCommand() *cli.Command {
 			return startServer(cfg)
 		},
 	}
-}
-
-func startServer(cfg *admin.Config) error {
-	server := admin.NewServer(cfg)
-
-	listenSignals(func(sig os.Signal) {
-		server.Shutdown()
-	})
-
-	err := server.Serve()
-	utils.LogErr("running server", err)
-	return err
 }

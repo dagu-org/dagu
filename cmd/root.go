@@ -5,26 +5,32 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"io"
+	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/yohamta/dagu/internal/constants"
 )
 
-
+var version = "0.0.0"
+var stdin io.ReadCloser
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "dagu",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Short: "Self-contained, easy-to-use workflow engine for smaller use cases",
+	Long:  "dagu [options] <start|status|stop|retry|dry|server|version> [args]",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		setVersion()
+		err := run()
+		if err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,7 +51,27 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
+func listenSignals(abortFunc func(sig os.Signal)) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range sigs {
+			log.Printf("\nSignal: %v", sig)
+			abortFunc(sig)
+		}
+	}()
+}
 
+func setVersion() {
+	constants.Version = version
+}
+
+func run() error {
+	stdin = os.Stdin
+	// app := makeApp()
+	// return app.Run(os.Args)
+	return nil
+}
