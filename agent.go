@@ -199,7 +199,7 @@ func (a *Agent) setupRetry() (err error) {
 	for _, n := range a.RetryConfig.Status.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
-	a.graph, err = scheduler.RetryExecutionGraph(nodes...)
+	a.graph, err = scheduler.NewExecutionGraphForRetry(nodes...)
 	return
 }
 

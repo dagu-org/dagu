@@ -500,24 +500,6 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	require.Equal(t, nodes[0].DoneCount, 1)
 }
 
-func testSchedule(t *testing.T, steps ...*config.Step) (
-	*ExecutionGraph, *Scheduler, error,
-) {
-	t.Helper()
-	g, sc := newTestSchedule(t,
-		&Config{MaxActiveRuns: 2}, steps...)
-	return g, sc, sc.Schedule(g, nil)
-}
-
-func newTestSchedule(t *testing.T, cfg *Config, steps ...*config.Step) (
-	*ExecutionGraph, *Scheduler,
-) {
-	t.Helper()
-	g, err := NewExecutionGraph(steps...)
-	require.NoError(t, err)
-	return g, &Scheduler{Config: cfg}
-}
-
 func TestSchedulerStatusText(t *testing.T) {
 	for k, v := range map[SchedulerStatus]string{
 		SchedulerStatus_None:    "not started",
@@ -593,4 +575,22 @@ func step(name, command string, depends ...string) *config.Step {
 		Args:    args,
 		Depends: depends,
 	}
+}
+
+func testSchedule(t *testing.T, steps ...*config.Step) (
+	*ExecutionGraph, *Scheduler, error,
+) {
+	t.Helper()
+	g, sc := newTestSchedule(t,
+		&Config{MaxActiveRuns: 2}, steps...)
+	return g, sc, sc.Schedule(g, nil)
+}
+
+func newTestSchedule(t *testing.T, cfg *Config, steps ...*config.Step) (
+	*ExecutionGraph, *Scheduler,
+) {
+	t.Helper()
+	g, err := NewExecutionGraph(steps...)
+	require.NoError(t, err)
+	return g, &Scheduler{Config: cfg}
 }

@@ -259,10 +259,26 @@ func (sc *Scheduler) Status(g *ExecutionGraph) SchedulerStatus {
 	return SchedulerStatus_Success
 }
 
+// HandlerNode returns the handler node with the given name.
+func (sc *Scheduler) HandlerNode(name string) *Node {
+	if v, ok := sc.handlers[name]; ok {
+		return v
+	}
+	return nil
+}
+
+// IsCanceled returns true if the scheduler is canceled.
+func (sc *Scheduler) IsCanceled() bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	ret := sc.canceled == 1
+	return ret
+}
+
 func isReady(g *ExecutionGraph, node *Node) (ready bool) {
 	ready = true
-	for _, dep := range g.To(node.id) {
-		n := g.Node(dep)
+	for _, dep := range g.to[node.id] {
+		n := g.node(dep)
 		switch n.ReadStatus() {
 		case NodeStatus_Success:
 			continue
@@ -340,13 +356,6 @@ func (sc *Scheduler) setup() (err error) {
 	return
 }
 
-func (sc *Scheduler) HandlerNode(name string) *Node {
-	if v, ok := sc.handlers[name]; ok {
-		return v
-	}
-	return nil
-}
-
 func handleError(node *Node) {
 	status := node.ReadStatus()
 	if status != NodeStatus_Cancel && status != NodeStatus_Success {
@@ -358,13 +367,6 @@ func handleError(node *Node) {
 			node.updateStatus(NodeStatus_Error)
 		}
 	}
-}
-
-func (sc *Scheduler) IsCanceled() bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-	ret := sc.canceled == 1
-	return ret
 }
 
 func (sc *Scheduler) setCanceled() {
