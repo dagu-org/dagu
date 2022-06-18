@@ -18,9 +18,12 @@ import (
 
 var ErrConfigNotFound = errors.New("config file was not found")
 
+// Loader is a config loader.
 type Loader struct {
 	HomeDir string
 }
+
+// Load loads config from file.
 
 func (cl *Loader) Load(f, params string) (*Config, error) {
 	return cl.loadConfig(f,
@@ -30,6 +33,7 @@ func (cl *Loader) Load(f, params string) (*Config, error) {
 	)
 }
 
+// LoadwIithoutEval loads config from file without evaluating env variables.
 func (cl *Loader) LoadWithoutEval(f string) (*Config, error) {
 	return cl.loadConfig(f,
 		&BuildConfigOptions{
@@ -41,6 +45,7 @@ func (cl *Loader) LoadWithoutEval(f string) (*Config, error) {
 	)
 }
 
+// LoadHeadOnly loads config from file and returns only the headline data.
 func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
 	return cl.loadConfig(f,
 		&BuildConfigOptions{
@@ -52,6 +57,7 @@ func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
 	)
 }
 
+// LoadData loads config from given data.
 func (cl *Loader) LoadData(data []byte) (*Config, error) {
 	raw, err := cl.unmarshalData(data)
 	if err != nil {

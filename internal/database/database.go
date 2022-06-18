@@ -27,6 +27,7 @@ import (
 // When a data is updated, it appends a new line to the file.
 // Only the latest data in a single file can be read.
 // When Compact is called, it removes old data.
+// Compact must be called only once per file.
 type Database struct {
 	*Config
 }

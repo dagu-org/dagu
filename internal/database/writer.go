@@ -11,6 +11,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Writer is the interface to write status to local file.
 type Writer struct {
 	Target string
 	writer *bufio.Writer
@@ -19,6 +20,7 @@ type Writer struct {
 	closed bool
 }
 
+// Open opens the writer.
 func (w *Writer) Open() (err error) {
 	os.MkdirAll(path.Dir(w.Target), 0755)
 	w.file, err = utils.OpenOrCreateFile(w.Target)
@@ -28,6 +30,7 @@ func (w *Writer) Open() (err error) {
 	return
 }
 
+// Writer appends the status to the local file.
 func (w *Writer) Write(st *models.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -39,6 +42,7 @@ func (w *Writer) Write(st *models.Status) error {
 	return w.writer.Flush()
 }
 
+// Close closes the writer.
 func (w *Writer) Close() (err error) {
 	if !w.closed {
 		err = w.writer.Flush()
