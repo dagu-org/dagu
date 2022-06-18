@@ -29,7 +29,9 @@ func Test_stopCommand(t *testing.T) {
 
 	runAppTest(app, test, t)
 
-	db := database.New(database.DefaultConfig())
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
 	cfg := &config.Config{
 		ConfigPath: c,
 	}

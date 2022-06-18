@@ -104,7 +104,9 @@ func TestUpdateStatus(t *testing.T) {
 	req := "test-update-status"
 	now := time.Now()
 
-	db := database.New(database.DefaultConfig())
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
 	w, _, _ := db.NewWriter(dag.Config.ConfigPath, now, req)
 	err = w.Open()
 	require.NoError(t, err)

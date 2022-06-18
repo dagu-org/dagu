@@ -213,7 +213,9 @@ func (a *Agent) setupRequestId() error {
 }
 
 func (a *Agent) setupDatabase() (err error) {
-	a.database = database.New(database.DefaultConfig())
+	a.database = &database.Database{
+		Config: database.DefaultConfig(),
+	}
 	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
 	return
 }

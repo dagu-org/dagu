@@ -36,9 +36,11 @@ func TestDatabase(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, err := os.MkdirTemp("", "test-database")
-			db := New(&Config{
-				Dir: dir,
-			})
+			db := &Database{
+				Config: &Config{
+					Dir: dir,
+				},
+			}
 			require.NoError(t, err)
 			defer os.RemoveAll(dir)
 			fn(t, db)
@@ -284,7 +286,9 @@ func testCompactFile(t *testing.T, db *Database) {
 	}
 	require.NotNil(t, s)
 
-	db2 := New(db.Config)
+	db2 := &Database{
+		Config: db.Config,
+	}
 	err = db2.Compact(cfg.ConfigPath, s.File)
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)

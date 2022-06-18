@@ -128,8 +128,7 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 		return models.StatusFromJson(ret)
 	}
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		db := database.New(database.DefaultConfig())
-		status, err := db.ReadStatusToday(s.cfg.ConfigPath)
+		status, err := defaultDb().ReadStatusToday(s.cfg.ConfigPath)
 		if err != nil {
 			var readErr error = nil
 			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
@@ -146,7 +145,9 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 }
 
 func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
-	db := database.New(database.DefaultConfig())
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
 	ret, err := db.FindByRequestId(s.cfg.ConfigPath, requestId)
 	if err != nil {
 		return nil, err
@@ -160,8 +161,7 @@ func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 }
 
 func (s *controller) GetStatusHist(n int) []*models.StatusFile {
-	db := database.New(database.DefaultConfig())
-	ret := db.ReadStatusHist(s.cfg.ConfigPath, n)
+	ret := defaultDb().ReadStatusHist(s.cfg.ConfigPath, n)
 	return ret
 }
 
@@ -179,8 +179,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	db := database.New(database.DefaultConfig())
-	toUpdate, err := db.FindByRequestId(s.cfg.ConfigPath, status.RequestId)
+	toUpdate, err := defaultDb().FindByRequestId(s.cfg.ConfigPath, status.RequestId)
 	if err != nil {
 		return err
 	}
@@ -229,8 +228,7 @@ func RenameConfig(oldConfigPath, newConfigPath string) error {
 	if err := os.Rename(oldConfigPath, newConfigPath); err != nil {
 		return err
 	}
-	db := database.New(database.DefaultConfig())
-	return db.MoveData(oldConfigPath, newConfigPath)
+	return defaultDb().MoveData(oldConfigPath, newConfigPath)
 }
 
 func assertConfigPath(configPath string) error {
@@ -246,4 +244,10 @@ func defaultStatus(cfg *config.Config) *models.Status {
 		nil,
 		scheduler.SchedulerStatus_None,
 		int(models.PidNotRunning), nil, nil)
+}
+
+func defaultDb() *database.Database {
+	return &database.Database{
+		Config: database.DefaultConfig(),
+	}
 }
