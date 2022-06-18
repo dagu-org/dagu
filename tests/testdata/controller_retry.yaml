@@ -1,4 +1,3 @@
-name: "test"
 params: "a b c"
 steps:
   - name: "1"

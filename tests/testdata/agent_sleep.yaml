@@ -1,4 +1,3 @@
-name: "sleep"
 steps:
   - name: "1"
     command: "sleep 3"
