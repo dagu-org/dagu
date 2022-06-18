@@ -33,7 +33,7 @@ var startCmd = &cobra.Command{
 }
 
 func init() {
-	startCmd.Flags().StringVar(&params, "params", "", "parameters")
+	startCmd.Flags().StringVar(&paramsStart, "params", "", "parameters")
 	rootCmd.AddCommand(startCmd)
 }
 

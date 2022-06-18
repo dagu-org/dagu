@@ -14,10 +14,11 @@ import (
 )
 
 func Test_retryCommand(t *testing.T) {
-	app := makeApp()
+	cmd := startCmd
 	configPath := testConfig("cmd_retry.yaml")
-	runAppTestOutput(app, appTest{
-		args: []string{"", "start", "--params=x", configPath}, errored: true,
+	runCmdTestOutput(cmd, appTest{
+		args: []string{configPath}, errored: true,
+		flags:  map[string]string{"params": "x"},
 		output: []string{},
 	}, t)
 
@@ -38,11 +39,12 @@ func Test_retryCommand(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 1000)
 
-	app = makeApp()
-	runAppTestOutput(app, appTest{
-		args: []string{"", "retry", fmt.Sprintf("--req=%s",
-			dag.Status.RequestId), testConfig("cmd_retry.yaml")}, errored: false,
-		output: []string{"parameter is x"},
+	cmd2 := retryCmd
+	runCmdTestOutput(cmd2, appTest{
+		args:    []string{testConfig("cmd_retry.yaml")},
+		flags:   map[string]string{"req": fmt.Sprintf("%s", dag.Status.RequestId)},
+		errored: false,
+		output:  []string{"parameter is x"},
 	}, t)
 
 	c := controller.New(dag.Config)

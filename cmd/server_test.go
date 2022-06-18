@@ -15,7 +15,7 @@ import (
 )
 
 func Test_serverCommand(t *testing.T) {
-	app := makeApp()
+	cmd := serverCmd
 	dir := utils.MustTempDir("dagu_test_server")
 	os.Setenv("HOME", dir)
 
@@ -25,10 +25,11 @@ func Test_serverCommand(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		runAppTestOutput(app, appTest{
-			args: []string{"", "server"}, errored: false,
-			output: []string{"admin server is running "},
+		runCmdTestOutput(cmd, appTest{
+			errored: false,
+			output:  []string{"admin server is running "},
 		}, t)
+
 		close(done)
 	}()
 

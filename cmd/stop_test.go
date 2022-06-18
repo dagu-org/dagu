@@ -13,21 +13,21 @@ import (
 func Test_stopCommand(t *testing.T) {
 	c := testConfig("cmd_stop_sleep.yaml")
 	test := appTest{
-		args: []string{"", "start", c}, errored: false,
+		args: []string{c}, errored: false,
 	}
 
-	app := makeApp()
-	stopper := makeApp()
+	cmd := startCmd
+	stopper := stopCmd
 
 	go func() {
 		time.Sleep(time.Millisecond * 50)
-		runAppTestOutput(stopper, appTest{
-			args: []string{"", "stop", test.args[2]}, errored: false,
+		runCmdTestOutput(stopper, appTest{
+			args: []string{test.args[0]}, errored: false,
 			output: []string{"Stopping..."},
 		}, t)
 	}()
 
-	runAppTest(app, test, t)
+	runCmdTest(cmd, test, t)
 
 	db := database.New(database.DefaultConfig())
 	cfg := &config.Config{

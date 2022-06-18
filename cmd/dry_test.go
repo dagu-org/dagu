@@ -7,13 +7,13 @@ import (
 func Test_dryCommand(t *testing.T) {
 	tests := []appTest{
 		{
-			args: []string{"", "dry", testConfig("cmd_dry.yaml")}, errored: false,
+			args: []string{testConfig("cmd_dry.yaml")}, errored: false,
 			output: []string{"Starting DRY-RUN"},
 		},
 	}
 
 	for _, v := range tests {
-		app := makeApp()
-		runAppTestOutput(app, v, t)
+		cmd := dryCmd
+		runCmdTestOutput(cmd, v, t)
 	}
 }

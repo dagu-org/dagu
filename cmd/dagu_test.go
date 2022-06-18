@@ -8,8 +8,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
@@ -17,6 +17,7 @@ import (
 
 type appTest struct {
 	args        []string
+	flags       map[string]string
 	errored     bool
 	output      []string
 	exactOutput string
@@ -43,7 +44,7 @@ func testConfig(name string) string {
 	return path.Join(testsDir, name)
 }
 
-func runAppTestOutput(app *cli.App, test appTest, t *testing.T) {
+func runCmdTestOutput(cmd *cobra.Command, test appTest, t *testing.T) {
 	t.Helper()
 
 	origStdout := os.Stdout
@@ -65,7 +66,10 @@ func runAppTestOutput(app *cli.App, test appTest, t *testing.T) {
 		}()
 	}
 
-	err = app.Run(test.args)
+	for k, v := range test.flags {
+		cmd.Flag(k).Value.Set(v)
+	}
+	err = cmd.RunE(nil, test.args)
 	os.Stdout = origStdout
 	w.Close()
 
@@ -88,10 +92,15 @@ func runAppTestOutput(app *cli.App, test appTest, t *testing.T) {
 	if test.exactOutput != "" {
 		require.Equal(t, test.exactOutput, s)
 	}
+
+	// TODO: 掃除。より良い方法がないか
+	for k := range test.flags {
+		cmd.Flag(k).Value.Set("")
+	}
 }
 
-func runAppTest(app *cli.App, test appTest, t *testing.T) {
-	err := app.Run(test.args)
+func runCmdTest(cmd *cobra.Command, test appTest, t *testing.T) {
+	err := cmd.RunE(nil, test.args)
 
 	if err != nil && !test.errored {
 		t.Fatalf("failed unexpectedly %v", err)

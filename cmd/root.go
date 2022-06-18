@@ -71,7 +71,5 @@ func setVersion() {
 
 func run() error {
 	stdin = os.Stdin
-	// app := makeApp()
-	// return app.Run(os.Args)
 	return nil
 }
