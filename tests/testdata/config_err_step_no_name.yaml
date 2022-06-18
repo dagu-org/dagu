@@ -1,3 +1,2 @@
-name: test
 steps:
   - command: "echo 1"

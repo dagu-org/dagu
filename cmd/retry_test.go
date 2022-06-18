@@ -25,7 +25,9 @@ func Test_retryCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, dag.Status.Status, scheduler.SchedulerStatus_Success)
 
-	db := database.New(database.DefaultConfig())
+	db := database.Database{
+		Config: database.DefaultConfig(),
+	}
 	status, err := db.FindByRequestId(configPath, dag.Status.RequestId)
 	require.NoError(t, err)
 	status.Status.Nodes[0].Status = scheduler.NodeStatus_Error

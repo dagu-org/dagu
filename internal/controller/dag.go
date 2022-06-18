@@ -8,6 +8,7 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
+// DAG is the struct to contain DAG configuration and status.
 type DAG struct {
 	File   string
 	Dir    string
@@ -17,6 +18,7 @@ type DAG struct {
 	ErrorT *string
 }
 
+// FromConfig loads DAG from config file.
 func FromConfig(file string) (*DAG, error) {
 	return fromConfig(file, false)
 }

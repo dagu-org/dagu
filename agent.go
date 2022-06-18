@@ -3,6 +3,7 @@ package dagu
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mailer"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/reporter"
@@ -34,6 +34,7 @@ type Agent struct {
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	logFilename  string
+	logFile      *os.File
 	reporter     *reporter.Reporter
 	database     *database.Database
 	dbFile       string
@@ -70,6 +71,7 @@ func (a *Agent) Run() error {
 		a.checkIsRunning,
 		a.setupDatabase,
 		a.setupSocketServer,
+		a.setupLogFile,
 	}
 	for _, fn := range setup {
 		err := fn()
@@ -155,8 +157,8 @@ func (a *Agent) Cancel() {
 
 func (a *Agent) init() {
 	logDir := path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_"))
-	a.scheduler = scheduler.New(
-		&scheduler.Config{
+	a.scheduler = &scheduler.Scheduler{
+		Config: &scheduler.Config{
 			LogDir:        logDir,
 			MaxActiveRuns: a.DAG.MaxActiveRuns,
 			Delay:         a.DAG.Delay,
@@ -166,7 +168,7 @@ func (a *Agent) init() {
 			OnFailure:     a.DAG.HandlerOn.Failure,
 			OnCancel:      a.DAG.HandlerOn.Cancel,
 			RequestId:     a.requestId,
-		})
+		}}
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{
@@ -194,12 +196,21 @@ func (a *Agent) setupGraph() (err error) {
 	return
 }
 
+func (a *Agent) setupLogFile() (err error) {
+	dir := path.Dir(a.logFilename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	a.logFile, err = utils.OpenOrCreateFile(a.logFilename)
+	return
+}
+
 func (a *Agent) setupRetry() (err error) {
 	nodes := []*scheduler.Node{}
 	for _, n := range a.RetryConfig.Status.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
-	a.graph, err = scheduler.RetryExecutionGraph(nodes...)
+	a.graph, err = scheduler.NewExecutionGraphForRetry(nodes...)
 	return
 }
 
@@ -213,7 +224,9 @@ func (a *Agent) setupRequestId() error {
 }
 
 func (a *Agent) setupDatabase() (err error) {
-	a.database = database.New(database.DefaultConfig())
+	a.database = &database.Database{
+		Config: database.DefaultConfig(),
+	}
 	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
 	return
 }
@@ -239,14 +252,13 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run() error {
-	tl := &logger.TeeLogger{
-		Filename: a.logFilename,
-	}
+	tl := &teeLogger{File: a.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}
 	defer func() {
-		utils.LogErr("close logger", tl.Close())
+		utils.LogErr("close log file", a.closeLogFile())
+		tl.Close()
 	}()
 
 	if err := a.dbWriter.Open(); err != nil {
@@ -344,6 +356,13 @@ func (a *Agent) checkIsRunning() error {
 	return nil
 }
 
+func (a *Agent) closeLogFile() error {
+	if a.logFile != nil {
+		return a.logFile.Close()
+	}
+	return nil
+}
+
 var (
 	statusRe = regexp.MustCompile(`^/status[/]?$`)
 	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
@@ -382,4 +401,18 @@ func encodeError(w http.ResponseWriter, err error) {
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+type teeLogger struct {
+	*os.File
+}
+
+func (l *teeLogger) Open() error {
+	mw := io.MultiWriter(os.Stdout, l.File)
+	log.SetOutput(mw)
+	return nil
+}
+
+func (l *teeLogger) Close() {
+	log.SetOutput(os.Stdout)
 }

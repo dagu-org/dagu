@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Step represents a step in a DAG.
 type Step struct {
 	Name          string
 	Description   string

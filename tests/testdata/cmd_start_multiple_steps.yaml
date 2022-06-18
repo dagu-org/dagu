@@ -1,4 +1,3 @@
-name: "multiple steps"
 steps:
   - name: "1"
     command: "true"

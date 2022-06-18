@@ -37,9 +37,7 @@ func TestScheduler(t *testing.T) {
 		step("4", testCommand, "3"),
 	)
 	require.NoError(t, err)
-	sc := New(&Config{
-		MaxActiveRuns: 1,
-	})
+	sc := &Scheduler{Config: &Config{MaxActiveRuns: 1}}
 
 	counter := 0
 	done := make(chan *Node)
@@ -148,9 +146,7 @@ func TestSchedulerCancel(t *testing.T) {
 		step("2", "sleep 1000", "1"),
 		step("3", testCommandFail, "2"),
 	)
-	sc := New(&Config{
-		MaxActiveRuns: 1,
-	})
+	sc := &Scheduler{Config: &Config{MaxActiveRuns: 1}}
 
 	go func() {
 		time.Sleep(time.Millisecond * 300)
@@ -335,7 +331,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 			Args:    []string{"10"},
 		},
 	)
-	sc := New(&Config{})
+	sc := &Scheduler{Config: &Config{}}
 
 	go func() {
 		<-time.After(time.Millisecond * 50)
@@ -435,7 +431,7 @@ func TestRepeat(t *testing.T) {
 			},
 		},
 	)
-	sc := New(&Config{})
+	sc := &Scheduler{Config: &Config{}}
 
 	go func() {
 		<-time.After(time.Millisecond * 3000)
@@ -463,7 +459,7 @@ func TestRepeatFail(t *testing.T) {
 			},
 		},
 	)
-	sc := New(&Config{})
+	sc := &Scheduler{Config: &Config{}}
 	err := sc.Schedule(g, nil)
 	require.Error(t, err)
 
@@ -485,7 +481,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 			},
 		},
 	)
-	sc := New(&Config{})
+	sc := &Scheduler{Config: &Config{}}
 
 	done := make(chan bool)
 	go func() {
@@ -502,24 +498,6 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 	require.Equal(t, NodeStatus_Success, nodes[0].Status)
 	require.Equal(t, nodes[0].DoneCount, 1)
-}
-
-func testSchedule(t *testing.T, steps ...*config.Step) (
-	*ExecutionGraph, *Scheduler, error,
-) {
-	t.Helper()
-	g, sc := newTestSchedule(t,
-		&Config{MaxActiveRuns: 2}, steps...)
-	return g, sc, sc.Schedule(g, nil)
-}
-
-func newTestSchedule(t *testing.T, c *Config, steps ...*config.Step) (
-	*ExecutionGraph, *Scheduler,
-) {
-	t.Helper()
-	g, err := NewExecutionGraph(steps...)
-	require.NoError(t, err)
-	return g, New(c)
 }
 
 func TestSchedulerStatusText(t *testing.T) {
@@ -554,7 +532,7 @@ func TestNodeSetupFailure(t *testing.T) {
 			Script:  "echo 1",
 		},
 	)
-	sc := New(&Config{})
+	sc := &Scheduler{Config: &Config{}}
 	err := sc.Schedule(g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
@@ -573,7 +551,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 			Dir:     "${HOME}",
 		},
 	)
-	sc := New(&Config{})
+	sc := &Scheduler{Config: &Config{}}
 
 	nodes := g.Nodes()
 	go func() {
@@ -597,4 +575,22 @@ func step(name, command string, depends ...string) *config.Step {
 		Args:    args,
 		Depends: depends,
 	}
+}
+
+func testSchedule(t *testing.T, steps ...*config.Step) (
+	*ExecutionGraph, *Scheduler, error,
+) {
+	t.Helper()
+	g, sc := newTestSchedule(t,
+		&Config{MaxActiveRuns: 2}, steps...)
+	return g, sc, sc.Schedule(g, nil)
+}
+
+func newTestSchedule(t *testing.T, cfg *Config, steps ...*config.Step) (
+	*ExecutionGraph, *Scheduler,
+) {
+	t.Helper()
+	g, err := NewExecutionGraph(steps...)
+	require.NoError(t, err)
+	return g, &Scheduler{Config: cfg}
 }

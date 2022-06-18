@@ -1,4 +1,3 @@
-name: "with onExit"
 handlerOn:
   Exit:
     command: "true"

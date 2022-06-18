@@ -20,6 +20,14 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Database is the interfact to store workflow status in local.
+// It stores status in JSON format in a directory as per each configPath.
+// Multiple JSON data can be stored in a single file and each data
+// is separated by newline.
+// When a data is updated, it appends a new line to the file.
+// Only the latest data in a single file can be read.
+// When Compact is called, it removes old data.
+// Compact must be called only once per file.
 type Database struct {
 	*Config
 }
@@ -28,18 +36,14 @@ type Config struct {
 	Dir string
 }
 
-func New(config *Config) *Database {
-	return &Database{
-		Config: config,
-	}
-}
-
+// DefaultConfig is the default configuration for Database.
 func DefaultConfig() *Config {
 	return &Config{
 		Dir: settings.MustGet(settings.SETTING__DATA_DIR),
 	}
 }
 
+// ParseFile parses a status file.
 func ParseFile(file string) (*models.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -71,6 +75,7 @@ func ParseFile(file string) (*models.Status, error) {
 	}
 }
 
+// NewWriter creates a new writer for a status.
 func (db *Database) NewWriter(configPath string, t time.Time, requestId string) (*Writer, string, error) {
 	f, err := db.newFile(configPath, t, requestId)
 	if err != nil {
@@ -80,6 +85,7 @@ func (db *Database) NewWriter(configPath string, t time.Time, requestId string) 
 	return w, f, nil
 }
 
+// ReadStatusHist returns a list of status files.
 func (db *Database) ReadStatusHist(configPath string, n int) []*models.StatusFile {
 	ret := make([]*models.StatusFile, 0)
 	files := db.latest(db.pattern(configPath)+"*.dat", n)
@@ -95,6 +101,7 @@ func (db *Database) ReadStatusHist(configPath string, n int) []*models.StatusFil
 	return ret
 }
 
+// ReadStatusToday returns a list of status files.
 func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
 	file, err := db.latestToday(configPath, time.Now())
 	if err != nil {
@@ -103,6 +110,7 @@ func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
 	return ParseFile(file)
 }
 
+// FindByRequestId finds a status file by requestId.
 func (db *Database) FindByRequestId(configPath string, requestId string) (*models.StatusFile, error) {
 	if requestId == "" {
 		return nil, fmt.Errorf("requestId is empty")
@@ -130,10 +138,12 @@ func (db *Database) FindByRequestId(configPath string, requestId string) (*model
 	return nil, fmt.Errorf("%w : %s", ErrRequestIdNotFound, requestId)
 }
 
+// RemoveAll removes all files in a directory.
 func (db *Database) RemoveAll(configPath string) {
 	db.RemoveOld(db.pattern(configPath)+"*.dat", 0)
 }
 
+// RemoveOld removes old files.
 func (db *Database) RemoveOld(pattern string, retentionDays int) error {
 	var lastErr error = nil
 	if retentionDays >= 0 {
@@ -151,6 +161,7 @@ func (db *Database) RemoveOld(pattern string, retentionDays int) error {
 	return lastErr
 }
 
+// Compact creates a new file with only the latest data and removes old data.
 func (db *Database) Compact(configPath, original string) error {
 	status, err := ParseFile(original)
 	if err != nil {
@@ -180,6 +191,7 @@ func (db *Database) Compact(configPath, original string) error {
 	return nil
 }
 
+// MoveData moves data from one directory to another.
 func (db *Database) MoveData(oldConfigPath, newConfigPath string) error {
 	oldDir := db.dir(oldConfigPath, prefix(oldConfigPath))
 	newDir := db.dir(newConfigPath, prefix(newConfigPath))

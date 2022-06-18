@@ -15,6 +15,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Config represents a DAG configuration.
 type Config struct {
 	ConfigPath        string
 	Name              string

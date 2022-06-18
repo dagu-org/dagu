@@ -36,8 +36,9 @@ func retry(f, requestId string) error {
 	cl := &config.Loader{
 		HomeDir: utils.MustGetUserHomeDir(),
 	}
-
-	db := database.New(database.DefaultConfig())
+	db := database.Database{
+		Config: database.DefaultConfig(),
+	}
 	status, err := db.FindByRequestId(f, requestId)
 	if err != nil {
 		return err

@@ -1,4 +1,3 @@
-name: "with params"
 params: "param-value"
 steps:
   - name: "1"

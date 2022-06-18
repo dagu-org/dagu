@@ -84,7 +84,7 @@ func TestGetDAG(t *testing.T) {
 	file := testConfig("controller_get_dag.yaml")
 	dag, err := controller.FromConfig(file)
 	require.NoError(t, err)
-	assert.Equal(t, "test", dag.Config.Name)
+	assert.Equal(t, "controller_get_dag", dag.Config.Name)
 }
 
 func TestGetDAGList(t *testing.T) {
@@ -104,7 +104,9 @@ func TestUpdateStatus(t *testing.T) {
 	req := "test-update-status"
 	now := time.Now()
 
-	db := database.New(database.DefaultConfig())
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
 	w, _, _ := db.NewWriter(dag.Config.ConfigPath, now, req)
 	err = w.Open()
 	require.NoError(t, err)

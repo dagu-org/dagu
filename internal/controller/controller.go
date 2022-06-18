@@ -18,6 +18,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+// Controller is the interface for working with DAGs.
 type Controller interface {
 	Stop() error
 	Start(bin string, workDir string, params string) error
@@ -30,6 +31,7 @@ type Controller interface {
 	Save(value string) error
 }
 
+// GetDAGs returns all DAGs in the config file.
 func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	dags = []*DAG{}
 	errs = []string{}
@@ -54,20 +56,46 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	return dags, errs, nil
 }
 
+// NewConfig returns a new config.Config.
+func NewConfig(file string) error {
+	if err := assertConfigPath(file); err != nil {
+		return err
+	}
+	if utils.FileExists(file) {
+		return fmt.Errorf("the config file %s already exists", file)
+	}
+	defaultVal := `steps:
+  - name: step1
+    command: echo hello
+`
+	return os.WriteFile(file, []byte(defaultVal), 0644)
+}
+
+// RenameConfig renames the config file and status database.
+func RenameConfig(oldConfigPath, newConfigPath string) error {
+	if err := assertConfigPath(newConfigPath); err != nil {
+		return err
+	}
+	if err := os.Rename(oldConfigPath, newConfigPath); err != nil {
+		return err
+	}
+	return defaultDb().MoveData(oldConfigPath, newConfigPath)
+}
+
 var _ Controller = (*controller)(nil)
 
 type controller struct {
-	cfg *config.Config
+	*config.Config
 }
 
 func New(cfg *config.Config) Controller {
 	return &controller{
-		cfg: cfg,
+		Config: cfg,
 	}
 }
 
 func (c *controller) Stop() error {
-	client := sock.Client{Addr: c.cfg.SockAddr()}
+	client := sock.Client{Addr: c.SockAddr()}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
@@ -78,7 +106,7 @@ func (c *controller) Start(bin string, workDir string, params string) (err error
 		if params != "" {
 			args = append(args, fmt.Sprintf("--params=\"%s\"", params))
 		}
-		args = append(args, c.cfg.ConfigPath)
+		args = append(args, c.ConfigPath)
 		cmd := exec.Command(bin, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
@@ -95,7 +123,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
-		args = append(args, c.cfg.ConfigPath)
+		args = append(args, c.ConfigPath)
 		cmd := exec.Command(bin, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
@@ -108,35 +136,34 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 	return
 }
 
-func (s *controller) GetStatus() (*models.Status, error) {
-	client := sock.Client{Addr: s.cfg.SockAddr()}
+func (c *controller) GetStatus() (*models.Status, error) {
+	client := sock.Client{Addr: c.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		} else {
-			return defaultStatus(s.cfg), nil
+			return defaultStatus(c.Config), nil
 		}
 	}
 	return models.StatusFromJson(ret)
 }
 
-func (s *controller) GetLastStatus() (*models.Status, error) {
-	client := sock.Client{Addr: s.cfg.SockAddr()}
+func (c *controller) GetLastStatus() (*models.Status, error) {
+	client := sock.Client{Addr: c.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err == nil {
 		return models.StatusFromJson(ret)
 	}
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		db := database.New(database.DefaultConfig())
-		status, err := db.ReadStatusToday(s.cfg.ConfigPath)
+		status, err := defaultDb().ReadStatusToday(c.ConfigPath)
 		if err != nil {
 			var readErr error = nil
 			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
 				fmt.Printf("read status failed : %s", err)
 				readErr = err
 			}
-			return defaultStatus(s.cfg), readErr
+			return defaultStatus(c.Config), readErr
 		}
 		// it is wrong status if the status is running
 		status.CorrectRunningStatus()
@@ -145,13 +172,15 @@ func (s *controller) GetLastStatus() (*models.Status, error) {
 	return nil, err
 }
 
-func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
-	db := database.New(database.DefaultConfig())
-	ret, err := db.FindByRequestId(s.cfg.ConfigPath, requestId)
+func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
+	ret, err := db.FindByRequestId(c.ConfigPath, requestId)
 	if err != nil {
 		return nil, err
 	}
-	status, _ := s.GetStatus()
+	status, _ := c.GetStatus()
 	if status != nil && status.RequestId != requestId {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -159,14 +188,13 @@ func (s *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 	return ret.Status, err
 }
 
-func (s *controller) GetStatusHist(n int) []*models.StatusFile {
-	db := database.New(database.DefaultConfig())
-	ret := db.ReadStatusHist(s.cfg.ConfigPath, n)
+func (c *controller) GetStatusHist(n int) []*models.StatusFile {
+	ret := defaultDb().ReadStatusHist(c.ConfigPath, n)
 	return ret
 }
 
-func (s *controller) UpdateStatus(status *models.Status) error {
-	client := sock.Client{Addr: s.cfg.SockAddr()}
+func (c *controller) UpdateStatus(status *models.Status) error {
+	client := sock.Client{Addr: c.SockAddr()}
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -179,8 +207,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	db := database.New(database.DefaultConfig())
-	toUpdate, err := db.FindByRequestId(s.cfg.ConfigPath, status.RequestId)
+	toUpdate, err := defaultDb().FindByRequestId(c.ConfigPath, status.RequestId)
 	if err != nil {
 		return err
 	}
@@ -192,7 +219,7 @@ func (s *controller) UpdateStatus(status *models.Status) error {
 	return w.Write(status)
 }
 
-func (s *controller) Save(value string) error {
+func (c *controller) Save(value string) error {
 	// validate
 	cl := config.Loader{
 		HomeDir: utils.MustGetUserHomeDir(),
@@ -201,36 +228,11 @@ func (s *controller) Save(value string) error {
 	if err != nil {
 		return err
 	}
-	if !utils.FileExists(s.cfg.ConfigPath) {
-		return fmt.Errorf("the config file %s does not exist", s.cfg.ConfigPath)
+	if !utils.FileExists(c.ConfigPath) {
+		return fmt.Errorf("the config file %s does not exist", c.ConfigPath)
 	}
-	err = os.WriteFile(s.cfg.ConfigPath, []byte(value), 0755)
+	err = os.WriteFile(c.ConfigPath, []byte(value), 0755)
 	return err
-}
-
-func NewConfig(file string) error {
-	if err := assertConfigPath(file); err != nil {
-		return err
-	}
-	if utils.FileExists(file) {
-		return fmt.Errorf("the config file %s already exists", file)
-	}
-	defaultVal := `steps:
-  - name: step1
-    command: echo hello
-`
-	return os.WriteFile(file, []byte(defaultVal), 0644)
-}
-
-func RenameConfig(oldConfigPath, newConfigPath string) error {
-	if err := assertConfigPath(newConfigPath); err != nil {
-		return err
-	}
-	if err := os.Rename(oldConfigPath, newConfigPath); err != nil {
-		return err
-	}
-	db := database.New(database.DefaultConfig())
-	return db.MoveData(oldConfigPath, newConfigPath)
 }
 
 func assertConfigPath(configPath string) error {
@@ -246,4 +248,10 @@ func defaultStatus(cfg *config.Config) *models.Status {
 		nil,
 		scheduler.SchedulerStatus_None,
 		int(models.PidNotRunning), nil, nil)
+}
+
+func defaultDb() *database.Database {
+	return &database.Database{
+		Config: database.DefaultConfig(),
+	}
 }

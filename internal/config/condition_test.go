@@ -75,3 +75,15 @@ func TestEvalConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestConditionError(t *testing.T) {
+	c := &Condition{
+		Condition: "`invalid`",
+		Expected:  "1",
+	}
+	_, err := c.Eval()
+	require.Error(t, err)
+
+	err = EvalCondition(c)
+	require.Error(t, err)
+}

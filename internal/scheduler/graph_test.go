@@ -74,7 +74,7 @@ func TestRetryExecution(t *testing.T) {
 			},
 		},
 	}
-	_, err := RetryExecutionGraph(nodes...)
+	_, err := NewExecutionGraphForRetry(nodes...)
 	require.NoError(t, err)
 	require.Equal(t, NodeStatus_Success, nodes[0].Status)
 	require.Equal(t, NodeStatus_None, nodes[1].Status)

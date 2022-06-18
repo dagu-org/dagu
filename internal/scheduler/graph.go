@@ -8,14 +8,17 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 )
 
+// ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	dict                  map[int]*Node
-	nodes                 []*Node
-	from                  map[int][]int
-	to                    map[int][]int
-	StartedAt, FinishedAt time.Time
+	StartedAt  time.Time
+	FinishedAt time.Time
+	dict       map[int]*Node
+	nodes      []*Node
+	from       map[int][]int
+	to         map[int][]int
 }
 
+// NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...*config.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		dict:  make(map[int]*Node),
@@ -35,7 +38,8 @@ func NewExecutionGraph(steps ...*config.Step) (*ExecutionGraph, error) {
 	return graph, nil
 }
 
-func RetryExecutionGraph(nodes ...*Node) (*ExecutionGraph, error) {
+// NewExecutionGraphForRetry creates a new execution graph for retry with given nodes.
+func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		dict:  make(map[int]*Node),
 		from:  make(map[int][]int),
@@ -56,6 +60,7 @@ func RetryExecutionGraph(nodes ...*Node) (*ExecutionGraph, error) {
 	return graph, nil
 }
 
+// Duration returns the duration of the execution.
 func (g *ExecutionGraph) Duration() time.Duration {
 	if g.FinishedAt.IsZero() {
 		return time.Since(g.StartedAt)
@@ -63,19 +68,12 @@ func (g *ExecutionGraph) Duration() time.Duration {
 	return g.FinishedAt.Sub(g.StartedAt)
 }
 
+// Nodes returns the nodes of the execution graph.
 func (g *ExecutionGraph) Nodes() []*Node {
 	return g.nodes
 }
 
-func (g *ExecutionGraph) From(from int) []int {
-	return g.from[from]
-}
-
-func (g *ExecutionGraph) To(to int) []int {
-	return g.to[to]
-}
-
-func (g *ExecutionGraph) Node(id int) *Node {
+func (g *ExecutionGraph) node(id int) *Node {
 	return g.dict[id]
 }
 
@@ -95,7 +93,7 @@ func (g *ExecutionGraph) setupRetry() error {
 	for len(frontier) > 0 {
 		next := []int{}
 		for _, u := range frontier {
-			if retry[u] == true || dict[u] == NodeStatus_Error || dict[u] == NodeStatus_Cancel {
+			if retry[u] || dict[u] == NodeStatus_Error || dict[u] == NodeStatus_Cancel {
 				log.Printf("clear node state: %s", g.dict[u].Name)
 				g.dict[u].clearState()
 				retry[u] = true

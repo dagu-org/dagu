@@ -40,8 +40,10 @@ func (s SchedulerStatus) String() string {
 	}
 }
 
+// Scheduler is a scheduler that runs a graph of steps.
 type Scheduler struct {
 	*Config
+
 	canceled  int32
 	mu        sync.RWMutex
 	pause     time.Duration
@@ -61,13 +63,7 @@ type Config struct {
 	RequestId     string
 }
 
-func New(config *Config) *Scheduler {
-	return &Scheduler{
-		Config: config,
-		pause:  100 * time.Millisecond,
-	}
-}
-
+// Schedule runs the graph of steps.
 func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	if err := sc.setup(); err != nil {
 		return err
@@ -211,6 +207,103 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	return sc.lastError
 }
 
+// Signal sends a signal to the scheduler.
+// for a node with repeat policy, it does not stop the node and
+// wait to finish current run.
+func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool) {
+	if !sc.IsCanceled() {
+		sc.setCanceled()
+	}
+	for _, node := range g.Nodes() {
+		if node.RepeatPolicy.Repeat {
+			// for a repetitive task, we'll wait for the job to finish
+			// until time reaches max wait time
+		} else {
+			node.signal(sig)
+		}
+	}
+	if done != nil {
+		defer func() {
+			done <- true
+		}()
+		for sc.isRunning(g) {
+			time.Sleep(sc.pause)
+		}
+	}
+}
+
+// Cancel sends -1 signal to all nodes.
+func (sc *Scheduler) Cancel(g *ExecutionGraph) {
+	sc.setCanceled()
+	for _, node := range g.Nodes() {
+		node.cancel()
+	}
+}
+
+// Status returns the status of the scheduler.
+func (sc *Scheduler) Status(g *ExecutionGraph) SchedulerStatus {
+	if sc.IsCanceled() && !sc.checkStatus(g, []NodeStatus{
+		NodeStatus_Success, NodeStatus_Skipped,
+	}) {
+		return SchedulerStatus_Cancel
+	}
+	if g.StartedAt.IsZero() {
+		return SchedulerStatus_None
+	}
+	if sc.isRunning(g) {
+		return SchedulerStatus_Running
+	}
+	if sc.lastError != nil {
+		return SchedulerStatus_Error
+	}
+	return SchedulerStatus_Success
+}
+
+// HandlerNode returns the handler node with the given name.
+func (sc *Scheduler) HandlerNode(name string) *Node {
+	if v, ok := sc.handlers[name]; ok {
+		return v
+	}
+	return nil
+}
+
+// IsCanceled returns true if the scheduler is canceled.
+func (sc *Scheduler) IsCanceled() bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	ret := sc.canceled == 1
+	return ret
+}
+
+func isReady(g *ExecutionGraph, node *Node) (ready bool) {
+	ready = true
+	for _, dep := range g.to[node.id] {
+		n := g.node(dep)
+		switch n.ReadStatus() {
+		case NodeStatus_Success:
+			continue
+		case NodeStatus_Error:
+			if !n.ContinueOn.Failure {
+				ready = false
+				node.updateStatus(NodeStatus_Cancel)
+				node.Error = fmt.Errorf("upstream failed")
+			}
+		case NodeStatus_Skipped:
+			if !n.ContinueOn.Skipped {
+				ready = false
+				node.updateStatus(NodeStatus_Skipped)
+				node.Error = fmt.Errorf("upstream skipped")
+			}
+		case NodeStatus_Cancel:
+			ready = false
+			node.updateStatus(NodeStatus_Cancel)
+		default:
+			ready = false
+		}
+	}
+	return ready
+}
+
 func (sc *Scheduler) runHandlerNode(node *Node) error {
 	defer func() {
 		node.FinishedAt = time.Now()
@@ -235,6 +328,7 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 }
 
 func (sc *Scheduler) setup() (err error) {
+	sc.pause = time.Millisecond * 100
 	if sc.LogDir == "" {
 		sc.LogDir, err = settings.Get(settings.SETTING__LOGS_DIR)
 		if err != nil {
@@ -262,13 +356,6 @@ func (sc *Scheduler) setup() (err error) {
 	return
 }
 
-func (sc *Scheduler) HandlerNode(name string) *Node {
-	if v, ok := sc.handlers[name]; ok {
-		return v
-	}
-	return nil
-}
-
 func handleError(node *Node) {
 	status := node.ReadStatus()
 	if status != NodeStatus_Cancel && status != NodeStatus_Success {
@@ -280,13 +367,6 @@ func handleError(node *Node) {
 			node.updateStatus(NodeStatus_Error)
 		}
 	}
-}
-
-func (sc *Scheduler) IsCanceled() bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-	ret := sc.canceled == 1
-	return ret
 }
 
 func (sc *Scheduler) setCanceled() {
@@ -341,80 +421,4 @@ func (sc *Scheduler) checkStatus(g *ExecutionGraph, in []NodeStatus) bool {
 		}
 	}
 	return true
-}
-
-func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool) {
-	if !sc.IsCanceled() {
-		sc.setCanceled()
-	}
-	for _, node := range g.Nodes() {
-		if node.RepeatPolicy.Repeat {
-			// for a repetitive task, we'll wait for the job to finish
-			// until time reaches max wait time
-		} else {
-			node.signal(sig)
-		}
-	}
-	if done != nil {
-		defer func() {
-			done <- true
-		}()
-		for sc.isRunning(g) {
-			time.Sleep(sc.pause)
-		}
-	}
-}
-
-func (sc *Scheduler) Cancel(g *ExecutionGraph) {
-	sc.setCanceled()
-	for _, node := range g.Nodes() {
-		node.cancel()
-	}
-}
-
-func (sc *Scheduler) Status(g *ExecutionGraph) SchedulerStatus {
-	if sc.IsCanceled() && !sc.checkStatus(g, []NodeStatus{
-		NodeStatus_Success, NodeStatus_Skipped,
-	}) {
-		return SchedulerStatus_Cancel
-	}
-	if g.StartedAt.IsZero() {
-		return SchedulerStatus_None
-	}
-	if sc.isRunning(g) {
-		return SchedulerStatus_Running
-	}
-	if sc.lastError != nil {
-		return SchedulerStatus_Error
-	}
-	return SchedulerStatus_Success
-}
-
-func isReady(g *ExecutionGraph, node *Node) (ready bool) {
-	ready = true
-	for _, dep := range g.To(node.id) {
-		n := g.Node(dep)
-		switch n.ReadStatus() {
-		case NodeStatus_Success:
-			continue
-		case NodeStatus_Error:
-			if !n.ContinueOn.Failure {
-				ready = false
-				node.updateStatus(NodeStatus_Cancel)
-				node.Error = fmt.Errorf("upstream failed")
-			}
-		case NodeStatus_Skipped:
-			if !n.ContinueOn.Skipped {
-				ready = false
-				node.updateStatus(NodeStatus_Skipped)
-				node.Error = fmt.Errorf("upstream skipped")
-			}
-		case NodeStatus_Cancel:
-			ready = false
-			node.updateStatus(NodeStatus_Cancel)
-		default:
-			ready = false
-		}
-	}
-	return ready
 }
