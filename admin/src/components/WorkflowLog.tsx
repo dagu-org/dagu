@@ -19,7 +19,8 @@ function WorkflowLog({ log }: Props) {
         mx: 4,
         display: "flex",
         flexDirection: "column",
-        overflowX: "auto",
+        height: "70vh",
+        overflow: "auto",
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
       }}
