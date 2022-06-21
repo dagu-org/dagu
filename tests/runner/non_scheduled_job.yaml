@@ -1,0 +1,3 @@
+steps:
+  - name: step 1
+    command: "true"

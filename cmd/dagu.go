@@ -22,12 +22,14 @@ func main() {
 	}
 }
 
+var sigs chan os.Signal
+
 func listenSignals(abortFunc func(sig os.Signal)) {
-	sigs := make(chan os.Signal, 1)
+	sigs = make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		for sig := range sigs {
-			log.Printf("\nSignal: %v", sig)
+			log.Printf("\nGot signal: %v", sig)
 			abortFunc(sig)
 		}
 	}()
@@ -47,7 +49,7 @@ func makeApp() *cli.App {
 	return &cli.App{
 		Name:      "Dagu",
 		Usage:     "Self-contained, easy-to-use workflow engine for smaller use cases",
-		UsageText: "dagu [options] <start|status|stop|retry|dry|server|version> [args]",
+		UsageText: "dagu [options] <start|status|stop|retry|dry|server|scheduler|version> [args]",
 		Commands: []*cli.Command{
 			newStartCommand(),
 			newStatusCommand(),
@@ -55,6 +57,7 @@ func makeApp() *cli.App {
 			newRetryCommand(),
 			newDryCommand(),
 			newServerCommand(),
+			newSchedulerCommand(),
 			newVersionCommand(),
 		},
 	}
