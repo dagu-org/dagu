@@ -60,7 +60,8 @@ type repeatPolicyDef struct {
 }
 
 type retryPolicyDef struct {
-	Limit int
+	Limit       int
+	IntervalSec int
 }
 
 type smtpConfigDef struct {

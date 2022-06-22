@@ -354,6 +354,7 @@ steps:
       skipped: true                  # Continue to the next regardless the preconditions are met or not
     retryPolicy:                     # Retry policy for the step
       limit: 2                       # Retry up to 2 times when the step failed
+      intervalSec: 5                 # Interval time before retry
     repeatPolicy:                    # Repeat policy for the step
       repeat: true                   # Boolean whether to repeat this step
       intervalSec: 60                # Interval time to repeat the step in seconds

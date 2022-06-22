@@ -210,24 +210,49 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(tmpDir)
 
+	g, sc := newTestSchedule(
+		t, &Config{MaxActiveRuns: 2},
+		step("1", testCommand),
+		&config.Step{
+			Name:    "2",
+			Command: cmd,
+			Args:    []string{tmpFile},
+			Depends: []string{"1"},
+			RetryPolicy: &config.RetryPolicy{
+				Limit:    10,
+				Interval: time.Millisecond * 800,
+			},
+		},
+		step("3", testCommand, "2"),
+	)
+
 	go func() {
+		// create file for successful retry
 		<-time.After(time.Millisecond * 300)
 		f, err := os.Create(tmpFile)
 		require.NoError(t, err)
 		f.Close()
 	}()
 
-	g, sc, err := testSchedule(t,
-		step("1", testCommand),
-		&config.Step{
-			Name:        "2",
-			Command:     cmd,
-			Args:        []string{tmpFile},
-			Depends:     []string{"1"},
-			RetryPolicy: &config.RetryPolicy{Limit: 10},
-		},
-		step("3", testCommand, "2"),
-	)
+	go func() {
+		<-time.After(time.Millisecond * 500)
+		nodes := g.Nodes()
+
+		// scheduled for retry
+		require.Equal(t, 1, nodes[1].ReadRetryCount())
+		require.Equal(t, NodeStatus_Running, nodes[1].ReadStatus())
+		startedAt := nodes[1].StartedAt
+
+		// wait for retry
+		<-time.After(time.Millisecond * 500)
+
+		// check time difference
+		retriedAt := nodes[1].ReadRetriedAt()
+		require.Greater(t, retriedAt.Sub(startedAt), time.Millisecond*500)
+	}()
+
+	err = sc.Schedule(g, nil)
+
 	require.NoError(t, err)
 	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 
