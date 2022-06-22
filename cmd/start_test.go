@@ -5,7 +5,7 @@ import (
 )
 
 func Test_startCommand(t *testing.T) {
-	tests := []appTest{
+	tests := []cmdTest{
 		{
 			args: []string{testConfig("cmd_start_multiple_steps.yaml")}, errored: false,
 			output: []string{"1 finished", "2 finished"},

@@ -25,7 +25,7 @@ func Test_serverCommand(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		runCmdTestOutput(cmd, appTest{
+		runCmdTestOutput(cmd, cmdTest{
 			errored: false,
 			output:  []string{"admin server is running "},
 		}, t)

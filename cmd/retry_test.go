@@ -16,7 +16,7 @@ import (
 func Test_retryCommand(t *testing.T) {
 	cmd := startCmd
 	configPath := testConfig("cmd_retry.yaml")
-	runCmdTestOutput(cmd, appTest{
+	runCmdTestOutput(cmd, cmdTest{
 		args: []string{configPath}, errored: true,
 		flags:  map[string]string{"params": "x"},
 		output: []string{},
@@ -40,7 +40,7 @@ func Test_retryCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 1000)
 
 	cmd2 := retryCmd
-	runCmdTestOutput(cmd2, appTest{
+	runCmdTestOutput(cmd2, cmdTest{
 		args:    []string{testConfig("cmd_retry.yaml")},
 		flags:   map[string]string{"req": fmt.Sprintf("%s", dag.Status.RequestId)},
 		errored: false,

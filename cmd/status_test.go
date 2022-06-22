@@ -6,7 +6,7 @@ import (
 )
 
 func Test_statusCommand(t *testing.T) {
-	tests := []appTest{
+	tests := []cmdTest{
 		{
 			args: []string{testConfig("cmd_status.yaml")}, errored: false,
 		},
@@ -19,7 +19,7 @@ func Test_statusCommand(t *testing.T) {
 		done := make(chan bool)
 		go func() {
 			time.Sleep(time.Millisecond * 50)
-			runCmdTestOutput(cmd2, appTest{
+			runCmdTestOutput(cmd2, cmdTest{
 				args: []string{v.args[0]}, errored: false,
 				output: []string{"Status=running"},
 			}, t)

@@ -5,7 +5,7 @@ import (
 )
 
 func Test_versionCommand(t *testing.T) {
-	tests := []appTest{
+	tests := []cmdTest{
 		{
 			errored:     false,
 			exactOutput: "0.0.1\n",

@@ -12,7 +12,7 @@ import (
 
 func Test_stopCommand(t *testing.T) {
 	c := testConfig("cmd_stop_sleep.yaml")
-	test := appTest{
+	test := cmdTest{
 		args: []string{c}, errored: false,
 	}
 
@@ -21,7 +21,7 @@ func Test_stopCommand(t *testing.T) {
 
 	go func() {
 		time.Sleep(time.Millisecond * 50)
-		runCmdTestOutput(stopper, appTest{
+		runCmdTestOutput(stopper, cmdTest{
 			args: []string{test.args[0]}, errored: false,
 			output: []string{"Stopping..."},
 		}, t)

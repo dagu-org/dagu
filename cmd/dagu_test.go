@@ -15,7 +15,7 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-type appTest struct {
+type cmdTest struct {
 	args        []string
 	flags       map[string]string
 	errored     bool
@@ -44,7 +44,7 @@ func testConfig(name string) string {
 	return path.Join(testsDir, name)
 }
 
-func runCmdTestOutput(cmd *cobra.Command, test appTest, t *testing.T) {
+func runCmdTestOutput(cmd *cobra.Command, test cmdTest, t *testing.T) {
 	t.Helper()
 
 	origStdout := os.Stdout
@@ -67,7 +67,10 @@ func runCmdTestOutput(cmd *cobra.Command, test appTest, t *testing.T) {
 	}
 
 	for k, v := range test.flags {
-		cmd.Flag(k).Value.Set(v)
+		if err := cmd.Flag(k).Value.Set(v); err != nil {
+			t.Fatalf("failed unexpectedly %v", err)
+			return
+		}
 	}
 	err = cmd.RunE(nil, test.args)
 	os.Stdout = origStdout
@@ -93,17 +96,32 @@ func runCmdTestOutput(cmd *cobra.Command, test appTest, t *testing.T) {
 		require.Equal(t, test.exactOutput, s)
 	}
 
-	// TODO: 掃除。より良い方法がないか
 	for k := range test.flags {
-		cmd.Flag(k).Value.Set("")
+		if err := cmd.Flag(k).Value.Set(""); err != nil {
+			t.Fatalf("failed unexpectedly %v", err)
+			return
+		}
 	}
 }
 
-func runCmdTest(cmd *cobra.Command, test appTest, t *testing.T) {
+func runCmdTest(cmd *cobra.Command, test cmdTest, t *testing.T) {
+	for k, v := range test.flags {
+		if err := cmd.Flag(k).Value.Set(v); err != nil {
+			t.Fatalf("failed unexpectedly %v", err)
+			return
+		}
+	}
 	err := cmd.RunE(nil, test.args)
 
 	if err != nil && !test.errored {
 		t.Fatalf("failed unexpectedly %v", err)
 		return
+	}
+
+	for k := range test.flags {
+		if err := cmd.Flag(k).Value.Set(""); err != nil {
+			t.Fatalf("failed unexpectedly %v", err)
+			return
+		}
 	}
 }
