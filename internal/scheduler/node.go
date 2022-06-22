@@ -75,6 +75,7 @@ type NodeState struct {
 	StartedAt  time.Time
 	FinishedAt time.Time
 	RetryCount int
+	RetriedAt  time.Time
 	DoneCount  int
 	Error      error
 }
@@ -146,6 +147,18 @@ func (n *Node) ReadRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.RetryCount
+}
+
+func (n *Node) SetRetriedAt(retriedAt time.Time) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.RetriedAt = retriedAt
+}
+
+func (n *Node) ReadRetriedAt() time.Time {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.RetriedAt
 }
 
 func (n *Node) ReadDoneCount() int {

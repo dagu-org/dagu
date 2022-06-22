@@ -27,7 +27,8 @@ type Step struct {
 }
 
 type RetryPolicy struct {
-	Limit int
+	Limit    int
+	Interval time.Duration
 }
 
 type RepeatPolicy struct {

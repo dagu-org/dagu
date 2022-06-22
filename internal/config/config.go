@@ -444,7 +444,8 @@ func buildStep(variables []string, def *stepDef) (*Step, error) {
 	}
 	if def.RetryPolicy != nil {
 		step.RetryPolicy = &RetryPolicy{
-			Limit: def.RetryPolicy.Limit,
+			Limit:    def.RetryPolicy.Limit,
+			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
 		}
 	}
 	if def.RepeatPolicy != nil {
