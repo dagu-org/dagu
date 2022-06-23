@@ -6,7 +6,7 @@ import Graph from "./Graph";
 import NodeStatusTable from "./NodeStatusTable";
 import StatusInfoTable from "./StatusInfoTable";
 import Timeline from "./Timeline";
-import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
+import { useDAGPostAPI } from "../hooks/useDAGPostAPI";
 import StatusUpdateModal from "./StatusUpdateModal";
 import { Step } from "../models/Step";
 import { Box, Tab, Tabs, Paper } from "@mui/material";
@@ -24,7 +24,7 @@ function DAGStatus({ DAG, group, name, refresh }: Props) {
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
     undefined
   );
-  const { doPost } = useWorkflowPostApi({
+  const { doPost } = useDAGPostAPI({
     name,
     group,
     onSuccess: refresh,

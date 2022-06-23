@@ -1,6 +1,6 @@
 import moment from "moment";
 import React, { CSSProperties } from "react";
-import { DagStatus } from "../api/Workflow";
+import { DagStatus } from "../api/DAG";
 import { StatusFile } from "../models/StatusFile";
 import StatusHistTableRow from "./StatusHistTableRow";
 import {

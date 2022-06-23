@@ -5,7 +5,7 @@ import WithLoading from "../components/WithLoading";
 import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
-import { useGetApi } from "../hooks/useWorkflowsGetApi";
+import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
 import { DAGItem, DAGDataType } from "../models/DAG";
 import { useParams } from "react-router-dom";
 import { DAG } from "../models/DAG";
@@ -25,7 +25,7 @@ type Params = {
 function View() {
   const params = useParams<Params>();
 
-  const { data, doGet } = useGetApi<ApiResponse>(
+  const { data, doGet } = useDAGGetAPI<ApiResponse>(
     `/views/${params.name}?format=json`,
     {}
   );

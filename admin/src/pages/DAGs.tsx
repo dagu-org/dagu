@@ -1,12 +1,12 @@
 import React from "react";
 import DAGErrors from "../components/DAGErrors";
 import Box from "@mui/material/Box";
-import CreateWorkflowButton from "../components/CreateWorkflowButton";
+import DAGCreationButton from "../components/DAGCreationButton";
 import WithLoading from "../components/WithLoading";
 import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
-import { useGetApi } from "../hooks/useWorkflowsGetApi";
+import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
 import { DAGItem, DAGDataType } from "../models/DAG";
 import { useLocation } from "react-router-dom";
 import { GetDAGsResponse } from "../api/DAGs";
@@ -16,7 +16,7 @@ function DAGs() {
   let query = useQuery();
   const group = query.get("group") || "";
 
-  const { data, doGet } = useGetApi<GetDAGsResponse>("/", {});
+  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
 
   React.useEffect(() => {
     doGet();
@@ -77,7 +77,7 @@ function DAGs() {
         }}
       >
         <Title>DAGs</Title>
-        <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
+        <DAGCreationButton refresh={doGet}></DAGCreationButton>
       </Box>
       <Box>
         <WithLoading loaded={!!data && !!merged}>

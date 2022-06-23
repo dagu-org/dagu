@@ -1,6 +1,6 @@
 import React, { CSSProperties } from "react";
 import { stepTabColStyles } from "../consts";
-import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
+import { useDAGPostAPI } from "../hooks/useDAGPostAPI";
 import { Node } from "../models/Node";
 import { SchedulerStatus, Status } from "../models/Status";
 import { Step } from "../models/Step";
@@ -34,7 +34,7 @@ function NodeStatusTable({
 }: Props) {
   const [modal, setModal] = React.useState(false);
   const [current, setCurrent] = React.useState<Step | undefined>(undefined);
-  const { doPost } = useWorkflowPostApi({
+  const { doPost } = useDAGPostAPI({
     name,
     group,
     onSuccess: refresh,

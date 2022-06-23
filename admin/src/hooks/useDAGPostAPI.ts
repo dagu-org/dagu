@@ -8,7 +8,7 @@ type Options = {
   onFailed?: () => void;
 };
 
-export function useWorkflowPostApi(opts: Options) {
+export function useDAGPostAPI(opts: Options) {
   const doPost = React.useCallback(
     async (action: string, step?: string) => {
       const form = new FormData();

@@ -4,7 +4,7 @@ type Options = {
   onFailed?: () => void;
 };
 
-export function useGetApi<T>(path: string, opts: Options) {
+export function useDAGGetAPI<T>(path: string, opts: Options) {
   const [data, setData] = React.useState<T | null>(null);
   const doGet = React.useCallback(async () => {
     const urlParams = new URLSearchParams(window.location.search);

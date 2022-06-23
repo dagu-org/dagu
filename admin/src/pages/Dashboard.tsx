@@ -1,7 +1,7 @@
 import React from "react";
 import { GetDAGsResponse } from "../api/DAGs";
 import Paper from "@mui/material/Paper";
-import { useGetApi } from "../hooks/useWorkflowsGetApi";
+import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
 import { Grid } from "@mui/material";
 import { SchedulerStatus } from "../models/Status";
 import { statusColorMapping } from "../consts";
@@ -26,7 +26,7 @@ function Dashboard() {
 
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
 
-  const { data, doGet } = useGetApi<GetDAGsResponse>("/", {});
+  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
 
   React.useEffect(() => {
     if (!data) {
@@ -52,10 +52,10 @@ function Dashboard() {
     <Grid container spacing={3} sx={{ mx: 4, width: "100%" }}>
       {(
         [
-          [SchedulerStatus.Success, "Successful Workflows"],
-          [SchedulerStatus.Error, "Failed Workflows"],
-          [SchedulerStatus.Running, "Running Workflows"],
-          [SchedulerStatus.Cancel, "Canceled Workflows"],
+          [SchedulerStatus.Success, "Successful DAGs"],
+          [SchedulerStatus.Error, "Failed DAGs"],
+          [SchedulerStatus.Running, "Running DAGs"],
+          [SchedulerStatus.Cancel, "Canceled DAGs"],
         ] as Array<[SchedulerStatus, string]>
       ).map(([status, label]) => (
         <Grid item xs={12} md={4} lg={3} key={label}>

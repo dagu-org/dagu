@@ -3,13 +3,13 @@ import Box from "@mui/material/Box";
 import WithLoading from "../components/WithLoading";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
-import { useGetApi } from "../hooks/useWorkflowsGetApi";
+import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
 import CreateViewButton from "../components/CreateViewButton";
 import ViewTable from "../components/ViewTable";
 import { View } from "../models/View";
 
 function ViewList() {
-  const { data, doGet } = useGetApi<{ Views: View[] }>("/views", {});
+  const { data, doGet } = useDAGGetAPI<{ Views: View[] }>("/views", {});
 
   React.useEffect(() => {
     doGet();
