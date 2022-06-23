@@ -18,6 +18,7 @@ import (
 // Config represents a DAG configuration.
 type Config struct {
 	ConfigPath        string
+	Group             string
 	Name              string
 	Schedule          cron.Schedule
 	Description       string
@@ -169,6 +170,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	if def.Name != "" {
 		c.Name = def.Name
 	}
+	c.Group = def.Group
 	c.Description = def.Description
 	c.MailOn.Failure = def.MailOn.Failure
 	c.MailOn.Success = def.MailOn.Success

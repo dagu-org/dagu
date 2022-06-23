@@ -2,6 +2,7 @@ package config
 
 type configDefinition struct {
 	Name              string
+	Group             string
 	Description       string
 	Schedule          string
 	LogDir            string
