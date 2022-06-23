@@ -18,7 +18,7 @@ type Props = {
   refresh: () => void;
 };
 
-function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
+function DAGStatus({ DAG, group, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState("0");
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
@@ -28,7 +28,7 @@ function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
     name,
     group,
     onSuccess: refresh,
-    requestId: workflow.Status?.RequestId,
+    requestId: DAG.Status?.RequestId,
   });
   const dismissModal = React.useCallback(() => {
     setModal(false);
@@ -42,12 +42,12 @@ function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
   );
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const status = workflow.Status?.Status;
+      const status = DAG.Status?.Status;
       if (status == SchedulerStatus.Running || status == SchedulerStatus.None) {
         return;
       }
       // find the clicked step
-      const n = workflow.Status?.Nodes.find(
+      const n = DAG.Status?.Nodes.find(
         (n) => n.Step.Name.replace(/\s/g, "_") == id
       );
       if (n) {
@@ -55,12 +55,12 @@ function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
         setModal(true);
       }
     },
-    [workflow]
+    [DAG]
   );
-  if (!workflow.Status) {
+  if (!DAG.Status) {
     return null;
   }
-  const handlers = Handlers(workflow.Status);
+  const handlers = Handlers(DAG.Status);
   return (
     <React.Fragment>
       <Paper
@@ -105,12 +105,12 @@ function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
         >
           {sub == "0" ? (
             <Graph
-              steps={workflow.Status.Nodes}
+              steps={DAG.Status.Nodes}
               type="status"
               onClickNode={onSelectStepOnGraph}
             ></Graph>
           ) : (
-            <Timeline status={workflow.Status}></Timeline>
+            <Timeline status={DAG.Status}></Timeline>
           )}
         </Box>
       </Paper>
@@ -121,15 +121,15 @@ function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
             <React.Fragment>
               <Box sx={{ mt: 2 }}>
                 <StatusInfoTable
-                  status={workflow.Status}
+                  status={DAG.Status}
                   {...props}
                 ></StatusInfoTable>
               </Box>
 
               <Box sx={{ mt: 2 }}>
                 <NodeStatusTable
-                  nodes={workflow.Status!.Nodes}
-                  status={workflow.Status!}
+                  nodes={DAG.Status!.Nodes}
+                  status={DAG.Status!}
                   {...props}
                 ></NodeStatusTable>
               </Box>
@@ -137,7 +137,7 @@ function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
               <Box sx={{ mt: 2 }}>
                 <NodeStatusTable
                   nodes={handlers}
-                  status={workflow.Status!}
+                  status={DAG.Status!}
                   {...props}
                 ></NodeStatusTable>
               </Box>

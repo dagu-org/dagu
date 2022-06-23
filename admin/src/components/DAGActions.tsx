@@ -71,7 +71,7 @@ function DAGActions({
         }
         disabled={!buttonState["start"]}
         onClick={() =>
-          onSubmit("Do you really want to start the workflow?", {
+          onSubmit("Do you really want to start the DAG?", {
             group: group,
             name: name,
             action: "start",
@@ -89,7 +89,7 @@ function DAGActions({
         }
         disabled={!buttonState["stop"]}
         onClick={() =>
-          onSubmit("Do you really want to cancel the workflow?", {
+          onSubmit("Do you really want to cancel the DAG?", {
             group: group,
             name: name,
             action: "stop",

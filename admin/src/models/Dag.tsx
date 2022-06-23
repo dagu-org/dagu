@@ -11,41 +11,41 @@ export type DAG = {
   ErrorT: string;
 };
 
-export enum WorkflowDataType {
-  Workflow = 0,
+export enum DAGDataType {
+  DAG = 0,
   Group,
 }
 
-export type WorkflowData = Workflow | WorkflowGroup;
+export type DAGItem = DAGData | DAGGroup;
 
-export type Workflow = {
-  Type: WorkflowDataType.Workflow;
+export type DAGData = {
+  Type: DAGDataType.DAG;
   Name: string;
   DAG: DAG;
 };
 
-export type WorkflowGroup = {
-  Type: WorkflowDataType.Group;
+export type DAGGroup = {
+  Type: DAGDataType.Group;
   Name: string;
   Group: Group;
 };
 
-export function getFirstTag(data?: WorkflowData): string {
+export function getFirstTag(data?: DAGItem): string {
   if (!data) {
     return "";
   }
-  if (data.Type == WorkflowDataType.Workflow) {
+  if (data.Type == DAGDataType.DAG) {
     const tags = data.DAG.Config.Tags;
     return tags ? tags[0] : "";
   }
   return "";
 }
 
-export function getStatus(data?: WorkflowData): SchedulerStatus {
+export function getStatus(data?: DAGItem): SchedulerStatus {
   if (!data) {
     return SchedulerStatus.None;
   }
-  if (data.Type == WorkflowDataType.Workflow) {
+  if (data.Type == DAGDataType.DAG) {
     return data.DAG.Status?.Status || SchedulerStatus.None;
   }
   return SchedulerStatus.None;
@@ -57,12 +57,12 @@ type KeysMatching<T extends object, V> = {
 
 export function getStatusField(
   field: KeysMatching<Status, string>,
-  data?: WorkflowData
+  data?: DAGItem
 ): string {
   if (!data) {
     return "";
   }
-  if (data.Type == WorkflowDataType.Workflow) {
+  if (data.Type == DAGDataType.DAG) {
     return data.DAG.Status?.[field] || "";
   }
   return "";

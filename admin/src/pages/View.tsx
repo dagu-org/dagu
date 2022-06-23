@@ -6,7 +6,7 @@ import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import { WorkflowData, WorkflowDataType } from "../models/DAG";
+import { DAGItem, DAGDataType } from "../models/DAG";
 import { useParams } from "react-router-dom";
 import { DAG } from "../models/DAG";
 
@@ -36,15 +36,15 @@ function View() {
     return () => clearInterval(timer);
   }, []);
 
-  const workflows = React.useMemo(() => {
-    const ret: WorkflowData[] = [];
+  const DAGs = React.useMemo(() => {
+    const ret: DAGItem[] = [];
     if (!data) {
       return ret;
     }
     for (const val of data.DAGs) {
       if (!val.Error) {
         ret.push({
-          Type: WorkflowDataType.Workflow,
+          Type: DAGDataType.DAG,
           Name: val.Config.Name,
           DAG: val,
         });
@@ -83,7 +83,7 @@ function View() {
                 hasError={data.HasError}
               ></DAGErrors>
               <DAGTable
-                workflows={workflows}
+                DAGs={DAGs}
                 group={""}
                 refreshFn={doGet}
               ></DAGTable>

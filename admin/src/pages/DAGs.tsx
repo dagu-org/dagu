@@ -7,7 +7,7 @@ import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import { WorkflowData, WorkflowDataType } from "../models/DAG";
+import { DAGItem, DAGDataType } from "../models/DAG";
 import { useLocation } from "react-router-dom";
 import { GetDAGsResponse } from "../api/DAGs";
 
@@ -25,12 +25,12 @@ function DAGs() {
   }, [group]);
 
   const merged = React.useMemo(() => {
-    const ret: WorkflowData[] = [];
+    const ret: DAGItem[] = [];
     if (data) {
       // TODO: need refactoring
       if (group != "") {
         ret.push({
-          Type: WorkflowDataType.Group,
+          Type: DAGDataType.Group,
           Name: "../",
           Group: {
             Name: "",
@@ -40,7 +40,7 @@ function DAGs() {
       }
       for (const val of data.Groups) {
         ret.push({
-          Type: WorkflowDataType.Group,
+          Type: DAGDataType.Group,
           Name: val.Name,
           Group: val,
         });
@@ -48,7 +48,7 @@ function DAGs() {
       for (const val of data.DAGs) {
         if (!val.Error) {
           ret.push({
-            Type: WorkflowDataType.Workflow,
+            Type: DAGDataType.DAG,
             Name: val.Config.Name,
             DAG: val,
           });
@@ -89,7 +89,7 @@ function DAGs() {
                 hasError={data.HasError}
               ></DAGErrors>
               <DAGTable
-                workflows={merged}
+                DAGs={merged}
                 group={data.Group}
                 refreshFn={doGet}
               ></DAGTable>
