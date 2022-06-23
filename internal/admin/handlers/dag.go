@@ -97,8 +97,8 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		}
 
 		params := getDAGParameter(r)
-		dag, err := controller.FromConfig(filepath.Join(hc.DAGsDir,
-			fmt.Sprintf("%s.yaml", cfg)))
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
+		dag, err := controller.FromConfig(file)
 		if dag == nil {
 			encodeError(w, err)
 			return
@@ -112,7 +112,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		switch params.Tab {
 		case DAG_TabType_Status:
 		case DAG_TabType_Config:
-			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, cfg))
+			data.Definition, _ = config.ReadConfig(file)
 
 		case DAG_TabType_History:
 			logs := controller.New(dag.Config).GetStatusHist(30)
