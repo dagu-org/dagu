@@ -2,13 +2,32 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
 const { merge } = require("webpack-merge");
 const common = require("./webpack.common.js");
+const path = require("path");
 
 module.exports = merge(common, {
   mode: "development",
-  devtool: "inline-source-map",
+  devtool: "eval-source-map",
+  profile: true,
   devServer: {
     historyApiFallback: true,
     port: 8081,
+  },
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        use: [
+          {
+            loader: "ts-loader",
+            options: {
+              transpileOnly: true,
+            },
+          },
+        ],
+        include: path.resolve(__dirname, "src"),
+        exclude: path.resolve(__dirname, "node_modules"),
+      },
+    ],
   },
   plugins: [
     new webpack.DefinePlugin({
@@ -18,4 +37,12 @@ module.exports = merge(common, {
       template: "index.html",
     }),
   ],
+  optimization: {
+    removeAvailableModules: false,
+    removeEmptyChunks: false,
+    splitChunks: false,
+  },
+  output: {
+    pathinfo: false,
+  },
 });
