@@ -1,4 +1,4 @@
-tags: Daily,Monthly
+tags: Daily
 steps:
   - name: "Initialize"
     command: "sleep 2"

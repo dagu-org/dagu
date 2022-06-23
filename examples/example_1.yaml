@@ -1,3 +1,4 @@
+group: examples
 steps:
   - name: "1"
     command: echo hello world

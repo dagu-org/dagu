@@ -1,3 +1,4 @@
+group: examples
 params: "`date +'%Y%m%d'`"
 steps:
   - name: step 1
