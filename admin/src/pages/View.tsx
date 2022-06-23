@@ -1,8 +1,8 @@
 import React from "react";
-import WorkflowErrors from "../components/WorkflowErrors";
+import DAGErrors from "../components/DAGErrors";
 import Box from "@mui/material/Box";
 import WithLoading from "../components/WithLoading";
-import WorkflowTable from "../components/WorkflowTable";
+import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
@@ -77,16 +77,16 @@ function View() {
         <WithLoading loaded={!!data}>
           {data && (
             <React.Fragment>
-              <WorkflowErrors
-                workflows={data.DAGs}
+              <DAGErrors
+                DAGs={data.DAGs}
                 errors={data.Errors}
                 hasError={data.HasError}
-              ></WorkflowErrors>
-              <WorkflowTable
+              ></DAGErrors>
+              <DAGTable
                 workflows={workflows}
                 group={""}
                 refreshFn={doGet}
-              ></WorkflowTable>
+              ></DAGTable>
             </React.Fragment>
           )}
         </WithLoading>

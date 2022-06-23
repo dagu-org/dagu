@@ -8,7 +8,7 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from "@tanstack/react-table";
-import WorkflowActions from "./WorkflowActions";
+import DAGActions from "./DAGActions";
 import StatusChip from "./StatusChip";
 import {
   Autocomplete,
@@ -197,7 +197,7 @@ const defaultColumns = [
         return null;
       }
       return (
-        <WorkflowActions
+        <DAGActions
           status={data.DAG.Status}
           group={props.instance.options.meta?.group || ""}
           name={data.DAG.Config.Name}
@@ -209,7 +209,7 @@ const defaultColumns = [
   }),
 ];
 
-function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
+function DAGTable({ workflows = [], group = "", refreshFn }: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
@@ -358,4 +358,4 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     </Box>
   );
 }
-export default WorkflowTable;
+export default DAGTable;

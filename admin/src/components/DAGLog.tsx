@@ -7,7 +7,7 @@ type Props = {
   log?: LogFile;
 };
 
-function WorkflowLog({ log }: Props) {
+function DAGLog({ log }: Props) {
   if (!log) {
     return <Loading />;
   }
@@ -38,4 +38,4 @@ function WorkflowLog({ log }: Props) {
   );
 }
 
-export default WorkflowLog;
+export default DAGLog;

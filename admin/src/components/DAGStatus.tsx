@@ -12,13 +12,13 @@ import { Step } from "../models/Step";
 import { Box, Tab, Tabs, Paper } from "@mui/material";
 
 type Props = {
-  workflow: DAG;
+  DAG: DAG;
   name: string;
   group: string;
   refresh: () => void;
 };
 
-function WorkflowStatus({ workflow, group, name, refresh }: Props) {
+function DAGStatus({ DAG: workflow, group, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState("0");
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
@@ -156,4 +156,4 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
   );
 }
 
-export default WorkflowStatus;
+export default DAGStatus;

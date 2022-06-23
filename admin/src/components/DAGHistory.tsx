@@ -1,6 +1,6 @@
 import { Box, Paper } from "@mui/material";
 import React from "react";
-import { LogData } from "../api/Workflow";
+import { LogData } from "../api/DAG";
 import { DAGContext } from "../contexts/DAGContext";
 import { Handlers } from "../models/Status";
 import NodeStatusTable from "./NodeStatusTable";
@@ -11,7 +11,7 @@ type Props = {
   logData: LogData;
 };
 
-function WorkflowHistory({ logData }: Props) {
+function DAGHistory({ logData }: Props) {
   const [idx, setIdx] = React.useState(logData.Logs.length - 1);
   const [logs, gridData] = React.useMemo(() => {
     return [logData.Logs.reverse(), logData.GridData];
@@ -71,4 +71,4 @@ function WorkflowHistory({ logData }: Props) {
   );
 }
 
-export default WorkflowHistory;
+export default DAGHistory;

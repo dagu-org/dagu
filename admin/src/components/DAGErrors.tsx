@@ -2,12 +2,12 @@ import React from "react";
 import { DAG } from "../models/DAG";
 
 type Props = {
-  workflows: DAG[];
+  DAGs: DAG[];
   errors: string[];
   hasError: boolean;
 };
 
-function WorkflowErrors({ workflows, errors, hasError }: Props) {
+function DAGErrors({ DAGs: workflows, errors, hasError }: Props) {
   if (!workflows || !hasError) {
     return <div></div>;
   }
@@ -34,4 +34,4 @@ function WorkflowErrors({ workflows, errors, hasError }: Props) {
     </div>
   );
 }
-export default WorkflowErrors;
+export default DAGErrors;

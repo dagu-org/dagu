@@ -2,15 +2,15 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import { GetDAGResponse } from "../api/DAG";
 import ConfigErrors from "../components/ConfigErrors";
-import WorkflowStatus from "../components/WorkflowStatus";
+import DAGStatus from "../components/DAGStatus";
 import { DAGContext } from "../contexts/DAGContext";
 import { DetailTabId } from "../models/DAG";
-import WorkflowConfig from "../components/WorkflowConfig";
-import WorkflowHistory from "../components/WorkflowHistory";
-import WorkflowLog from "../components/WorkflowLog";
+import DAGConfig from "../components/DAGConfig";
+import DAGHistory from "../components/DAGHistory";
+import DAGLog from "../components/DAGLog";
 import { Box, Paper, Stack, Tab, Tabs } from "@mui/material";
 import Title from "../components/Title";
-import WorkflowActions from "../components/WorkflowActions";
+import DAGActions from "../components/DAGActions";
 import ConfigEditButtons from "../components/ConfigEditButtons";
 import Loading from "../components/Loading";
 
@@ -70,17 +70,17 @@ function DAGDetails() {
     [key in DetailTabId]: React.ReactNode;
   }> = {
     [DetailTabId.Status]: (
-      <WorkflowStatus
-        workflow={data.DAG}
+      <DAGStatus
+        DAG={data.DAG}
         group={group}
         name={params.name}
         refresh={getData}
       />
     ),
-    [DetailTabId.Config]: <WorkflowConfig data={data} />,
-    [DetailTabId.History]: <WorkflowHistory logData={data.LogData} />,
-    [DetailTabId.StepLog]: <WorkflowLog log={data.StepLog} />,
-    [DetailTabId.ScLog]: <WorkflowLog log={data.ScLog} />,
+    [DetailTabId.Config]: <DAGConfig data={data} />,
+    [DetailTabId.History]: <DAGHistory logData={data.LogData} />,
+    [DetailTabId.StepLog]: <DAGLog log={data.StepLog} />,
+    [DetailTabId.ScLog]: <DAGLog log={data.ScLog} />,
   };
   const ctx = {
     data: data,
@@ -119,7 +119,7 @@ function DAGDetails() {
             }}
           >
             <Title>{data.Title}</Title>
-            <WorkflowActions
+            <DAGActions
               status={data.DAG.Status}
               group={group}
               name={params.name!}
