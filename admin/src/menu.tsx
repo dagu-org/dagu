@@ -22,7 +22,7 @@ export const mainListItems = (
         <ListItemIcon>
           <LayersIcon />
         </ListItemIcon>
-        <ListItemText primary="Workflows" />
+        <ListItemText primary="DAGs" />
       </ListItemButton>
     </Link>
     <Link to="/views">

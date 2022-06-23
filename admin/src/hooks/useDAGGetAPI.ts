@@ -4,15 +4,10 @@ type Options = {
   onFailed?: () => void;
 };
 
-export function useGetApi<T>(path: string, opts: Options) {
+export function useDAGGetAPI<T>(path: string, opts: Options) {
   const [data, setData] = React.useState<T | null>(null);
   const doGet = React.useCallback(async () => {
-    const urlParams = new URLSearchParams(window.location.search);
     let url = `${API_URL}${path}?format=json`;
-    const group = urlParams.get("group");
-    if (group) {
-      url += `&group=${encodeURI(group)}`;
-    }
     const ret = await fetch(url, {
       method: "GET",
       cache: "no-store",

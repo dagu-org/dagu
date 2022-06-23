@@ -5,7 +5,7 @@ type Props = {
   refresh: () => void;
 };
 
-function CreateWorkflowButton({ refresh }: Props) {
+function DAGCreationButton({ refresh }: Props) {
   return (
     <Button
       variant="contained"
@@ -49,4 +49,4 @@ function CreateWorkflowButton({ refresh }: Props) {
     </Button>
   );
 }
-export default CreateWorkflowButton;
+export default DAGCreationButton;

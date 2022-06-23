@@ -1,18 +1,16 @@
 import React from "react";
 
 type Options = {
-  group: string;
   name: string;
   requestId?: string;
   onSuccess?: () => void;
   onFailed?: () => void;
 };
 
-export function useWorkflowPostApi(opts: Options) {
+export function useDAGPostAPI(opts: Options) {
   const doPost = React.useCallback(
     async (action: string, step?: string) => {
       const form = new FormData();
-      form.set("group", opts.group);
       form.set("action", action);
       if (opts.requestId) {
         form.set("request-id", opts.requestId);

@@ -1,13 +1,13 @@
 import { Paper } from "@mui/material";
 import React from "react";
-import { LogFile } from "../api/Workflow";
+import { LogFile } from "../api/DAG";
 import Loading from "./Loading";
 
 type Props = {
   log?: LogFile;
 };
 
-function WorkflowLog({ log }: Props) {
+function DAGLog({ log }: Props) {
   if (!log) {
     return <Loading />;
   }
@@ -38,4 +38,4 @@ function WorkflowLog({ log }: Props) {
   );
 }
 
-export default WorkflowLog;
+export default DAGLog;

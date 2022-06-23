@@ -8,7 +8,7 @@ import {
   getFilteredRowModel,
   ColumnFiltersState,
 } from "@tanstack/react-table";
-import WorkflowActions from "./WorkflowActions";
+import DAGActions from "./DAGActions";
 import StatusChip from "./StatusChip";
 import {
   Autocomplete,
@@ -28,40 +28,48 @@ import {
   getFirstTag,
   getStatus,
   getStatusField,
-  WorkflowData,
-  WorkflowDataType,
-} from "../models/Workflow";
+  DAGItem,
+  DAGDataType,
+  DAGGroup,
+} from "../models/Dag";
 import StyledTableRow from "./StyledTableRow";
 
 type Props = {
-  workflows: WorkflowData[];
+  DAGs: DAGItem[];
   group: string;
   refreshFn: () => Promise<void>;
 };
 
 const table = createTable()
-  .setRowType<WorkflowData>()
-  .setFilterMetaType<WorkflowData>()
+  .setRowType<DAGItem>()
+  .setFilterMetaType<DAGItem>()
   .setTableMetaType<{
     group: string;
     refreshFn: () => Promise<void>;
   }>();
 
+const UpperGroup = "../";
+
 const defaultColumns = [
   table.createDataColumn("Name", {
-    id: "Workflow",
-    header: "Workflow",
+    id: "DAG",
+    header: "DAG",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Group) {
-        const url = `/dags/?group=${encodeURI(data.Group.Name)}`;
-        return <Link to={url}>{props.getValue()}</Link>;
+      if (data.Type == DAGDataType.Group) {
+        if (data.Name == UpperGroup) {
+          return <Link to={`/dags`}>{props.getValue()}</Link>;
+        } else {
+          return (
+            <Link to={`/dags/?group=${encodeURI(data.Name)}`}>
+              {props.getValue()}
+            </Link>
+          );
+        }
       } else {
         const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, "");
         const group = props.instance.options.meta?.group || "";
-        const url = `/dags/${encodeURI(name)}?group=${encodeURI(
-          group
-        )}`;
+        const url = `/dags/${encodeURI(name)}?group=${encodeURI(group)}`;
         return <Link to={url}>{props.getValue()}</Link>;
       }
     },
@@ -71,10 +79,10 @@ const defaultColumns = [
     header: "Type",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Group) {
+      if (data.Type == DAGDataType.Group) {
         return <Chip color="secondary" size="small" label="Group" />;
       } else {
-        return <Chip color="primary" size="small" label="Workflow" />;
+        return <Chip color="primary" size="small" label="DAG" />;
       }
     },
     sortingFn: (a, b) => {
@@ -88,7 +96,7 @@ const defaultColumns = [
     header: "Tags",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Workflow) {
+      if (data.Type == DAGDataType.DAG) {
         const tags = data.DAG.Config.Tags;
         return (
           <Stack direction="row" spacing={1}>
@@ -107,7 +115,7 @@ const defaultColumns = [
     },
     filterFn: (props, _, filter) => {
       const data = props.original!;
-      if (data.Type != WorkflowDataType.Workflow) {
+      if (data.Type != DAGDataType.DAG) {
         return false;
       }
       const tags = data.DAG.Config.Tags;
@@ -126,7 +134,7 @@ const defaultColumns = [
     enableSorting: false,
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Workflow) {
+      if (data.Type == DAGDataType.DAG) {
         return data.DAG.Config.Description;
       }
       return null;
@@ -137,7 +145,7 @@ const defaultColumns = [
     header: "Status",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Workflow) {
+      if (data.Type == DAGDataType.DAG) {
         return (
           <StatusChip status={data.DAG.Status?.Status}>
             {data.DAG.Status?.StatusText || ""}
@@ -157,7 +165,7 @@ const defaultColumns = [
     header: "Started At",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Workflow) {
+      if (data.Type == DAGDataType.DAG) {
         return data.DAG.Status?.StartedAt;
       }
       return null;
@@ -175,7 +183,7 @@ const defaultColumns = [
     header: "Finished At",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Workflow) {
+      if (data.Type == DAGDataType.DAG) {
         return data.DAG.Status?.FinishedAt;
       }
       return null;
@@ -193,13 +201,12 @@ const defaultColumns = [
     header: "Actions",
     cell: (props) => {
       const data = props.row.original!;
-      if (data.Type == WorkflowDataType.Group) {
+      if (data.Type == DAGDataType.Group) {
         return null;
       }
       return (
-        <WorkflowActions
+        <DAGActions
           status={data.DAG.Status}
-          group={props.instance.options.meta?.group || ""}
           name={data.DAG.Config.Name}
           label={false}
           refresh={props.instance.options.meta?.refreshFn}
@@ -209,7 +216,7 @@ const defaultColumns = [
   }),
 ];
 
-function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
+function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
@@ -227,10 +234,43 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     );
   }, [columnFilters]);
 
+  const data = React.useMemo(() => {
+    const ret: DAGItem[] = [];
+    const groups: {
+      [key: string]: DAGGroup;
+    } = {};
+    DAGs.forEach((dag) => {
+      if (dag.Type == DAGDataType.DAG) {
+        if (dag.DAG.Config.Group == group) {
+          ret.push(dag);
+        } else if (group == "") {
+          const group = dag.DAG.Config.Group;
+          if (!groups[group]) {
+            groups[group] = {
+              Type: DAGDataType.Group,
+              Name: group,
+              DAGs: [],
+            };
+          }
+          groups[group].DAGs.push(dag);
+        }
+      }
+    });
+    if (group != "") {
+      groups[UpperGroup] = {
+        Type: DAGDataType.Group,
+        Name: UpperGroup,
+        DAGs: [],
+      };
+    }
+    const groupKeys = Object.keys(groups);
+    return [...groupKeys.map((k) => groups[k]), ...ret];
+  }, [DAGs, group]);
+
   const tagOptions = React.useMemo(() => {
     const map: { [key: string]: boolean } = {};
-    workflows.forEach((data) => {
-      if (data.Type == WorkflowDataType.Workflow) {
+    DAGs.forEach((data) => {
+      if (data.Type == DAGDataType.DAG) {
         data.DAG.Config.Tags?.forEach((tag) => {
           map[tag] = true;
         });
@@ -241,7 +281,7 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
   }, []);
 
   const instance = useTableInstance(table, {
-    data: workflows,
+    data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -253,17 +293,17 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
       if (!data) {
         return false;
       }
-      if (data.Type == WorkflowDataType.Group) {
+      if (data.Type == DAGDataType.Group) {
         return data.Name.toLowerCase().includes(globalFilter);
       }
-      const workflow = data.DAG;
-      if (workflow.Config.Name.toLowerCase().includes(globalFilter)) {
+      const DAG = data.DAG;
+      if (DAG.Config.Name.toLowerCase().includes(globalFilter)) {
         return true;
       }
-      if (workflow.Config.Description.toLowerCase().includes(globalFilter)) {
+      if (DAG.Config.Description.toLowerCase().includes(globalFilter)) {
         return true;
       }
-      const tags = workflow.Config?.Tags;
+      const tags = DAG.Config?.Tags;
       if (
         tags &&
         tags.some((tag) => tag.toLowerCase().includes(globalFilter))
@@ -347,7 +387,12 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
         </TableHead>
         <TableBody>
           {instance.getRowModel().rows.map((row) => (
-            <StyledTableRow key={row.id}>
+            <StyledTableRow
+              key={row.id}
+              style={{
+                height: "50px",
+              }}
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>{cell.renderCell()}</TableCell>
               ))}
@@ -358,4 +403,4 @@ function WorkflowTable({ workflows = [], group = "", refreshFn }: Props) {
     </Box>
   );
 }
-export default WorkflowTable;
+export default DAGTable;

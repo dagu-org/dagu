@@ -4,6 +4,7 @@ import { Step } from "./Step";
 export type Config = {
   ConfigPath: string;
   Name: string;
+  Group: string;
   Tags: string[];
   Description: string;
   Env: string[];

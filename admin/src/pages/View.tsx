@@ -1,12 +1,12 @@
 import React from "react";
-import WorkflowErrors from "../components/WorkflowErrors";
+import DAGErrors from "../components/DAGErrors";
 import Box from "@mui/material/Box";
 import WithLoading from "../components/WithLoading";
-import WorkflowTable from "../components/WorkflowTable";
+import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
-import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import { WorkflowData, WorkflowDataType } from "../models/Workflow";
+import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
+import { DAGItem, DAGDataType } from "../models/Dag";
 import { useParams } from "react-router-dom";
 import { DAG } from "../models/Dag";
 
@@ -25,7 +25,7 @@ type Params = {
 function View() {
   const params = useParams<Params>();
 
-  const { data, doGet } = useGetApi<ApiResponse>(
+  const { data, doGet } = useDAGGetAPI<ApiResponse>(
     `/views/${params.name}?format=json`,
     {}
   );
@@ -36,15 +36,15 @@ function View() {
     return () => clearInterval(timer);
   }, []);
 
-  const workflows = React.useMemo(() => {
-    const ret: WorkflowData[] = [];
+  const DAGs = React.useMemo(() => {
+    const ret: DAGItem[] = [];
     if (!data) {
       return ret;
     }
     for (const val of data.DAGs) {
       if (!val.Error) {
         ret.push({
-          Type: WorkflowDataType.Workflow,
+          Type: DAGDataType.DAG,
           Name: val.Config.Name,
           DAG: val,
         });
@@ -77,16 +77,16 @@ function View() {
         <WithLoading loaded={!!data}>
           {data && (
             <React.Fragment>
-              <WorkflowErrors
-                workflows={data.DAGs}
+              <DAGErrors
+                DAGs={data.DAGs}
                 errors={data.Errors}
                 hasError={data.HasError}
-              ></WorkflowErrors>
-              <WorkflowTable
-                workflows={workflows}
+              ></DAGErrors>
+              <DAGTable
+                DAGs={DAGs}
                 group={""}
                 refreshFn={doGet}
-              ></WorkflowTable>
+              ></DAGTable>
             </React.Fragment>
           )}
         </WithLoading>

@@ -4,24 +4,16 @@ import { SchedulerStatus, Status } from "../models/Status";
 
 type Props = {
   status?: Status;
-  group: string;
   name: string;
   label?: boolean;
   refresh?: () => any;
 };
 
-function WorkflowActions({
-  status,
-  group,
-  name,
-  refresh = () => {},
-  label = true,
-}: Props) {
+function DAGActions({ status, name, refresh = () => {}, label = true }: Props) {
   const onSubmit = React.useCallback(
     async (
       warn: string,
       params: {
-        group: string;
         name: string;
         action: string;
         requestId?: string;
@@ -31,7 +23,6 @@ function WorkflowActions({
         return;
       }
       const form = new FormData();
-      form.set("group", params.group);
       form.set("action", params.action);
       if (params.requestId) {
         form.set("request-id", params.requestId);
@@ -71,8 +62,7 @@ function WorkflowActions({
         }
         disabled={!buttonState["start"]}
         onClick={() =>
-          onSubmit("Do you really want to start the workflow?", {
-            group: group,
+          onSubmit("Do you really want to start the DAG?", {
             name: name,
             action: "start",
           })
@@ -89,8 +79,7 @@ function WorkflowActions({
         }
         disabled={!buttonState["stop"]}
         onClick={() =>
-          onSubmit("Do you really want to cancel the workflow?", {
-            group: group,
+          onSubmit("Do you really want to cancel the DAG?", {
             name: name,
             action: "stop",
           })
@@ -110,7 +99,6 @@ function WorkflowActions({
           onSubmit(
             `Do you really want to rerun the last execution (${status?.RequestId}) ?`,
             {
-              group: group,
               name: name,
               requestId: status?.RequestId,
               action: "retry",
@@ -123,7 +111,7 @@ function WorkflowActions({
     </Stack>
   );
 }
-export default WorkflowActions;
+export default DAGActions;
 
 interface ActionButtonProps {
   children: string;

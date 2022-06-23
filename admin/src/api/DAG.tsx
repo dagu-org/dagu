@@ -2,7 +2,7 @@ import { DAG } from "../models/Dag";
 import { Node, NodeStatus } from "../models/Node";
 import { StatusFile } from "../models/StatusFile";
 
-export type GetWorkflowResponse = {
+export type GetDAGResponse = {
   Title: string;
   Charset: string;
   DAG?: DAG;
@@ -10,7 +10,6 @@ export type GetWorkflowResponse = {
   Definition: string;
   LogData: LogData;
   LogUrl: string;
-  Group: string;
   StepLog?: LogFile;
   ScLog?: LogFile;
   Errors: string[];

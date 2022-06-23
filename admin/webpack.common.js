@@ -6,11 +6,6 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.tsx?$/,
-        use: "ts-loader",
-        exclude: /node_modules/,
-      },
-      {
         test: /\.css$/,
         use: ["style-loader", "css-loader"],
       },
@@ -18,9 +13,9 @@ module.exports = {
         test: /\.(png|jpg|gif)$/i,
         use: [
           {
-            loader: 'url-loader',
+            loader: "url-loader",
             options: {
-              encoding: 'base64',
+              encoding: "base64",
             },
           },
         ],

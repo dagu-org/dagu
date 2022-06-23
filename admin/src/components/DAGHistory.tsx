@@ -1,7 +1,7 @@
 import { Box, Paper } from "@mui/material";
 import React from "react";
-import { LogData } from "../api/Workflow";
-import { WorkflowContext } from "../contexts/WorkflowContext";
+import { LogData } from "../api/DAG";
+import { DAGContext } from "../contexts/DAGContext";
 import { Handlers } from "../models/Status";
 import NodeStatusTable from "./NodeStatusTable";
 import StatusHistTable from "./StatusHistTable";
@@ -11,13 +11,13 @@ type Props = {
   logData: LogData;
 };
 
-function WorkflowHistory({ logData }: Props) {
+function DAGHistory({ logData }: Props) {
   const [idx, setIdx] = React.useState(logData.Logs.length - 1);
   const [logs, gridData] = React.useMemo(() => {
     return [logData.Logs.reverse(), logData.GridData];
   }, [logData]);
   return (
-    <WorkflowContext.Consumer>
+    <DAGContext.Consumer>
       {(props) => (
         <React.Fragment>
           <Paper
@@ -67,8 +67,8 @@ function WorkflowHistory({ logData }: Props) {
           </Box>
         </React.Fragment>
       )}
-    </WorkflowContext.Consumer>
+    </DAGContext.Consumer>
   );
 }
 
-export default WorkflowHistory;
+export default DAGHistory;

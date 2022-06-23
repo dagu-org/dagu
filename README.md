@@ -7,7 +7,7 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A No-code workflow executor with built-in web UI**
+**A No-code DAG executor with built-in web UI**
 
 It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format.
 
@@ -24,9 +24,9 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [via GitHub Release Page](#via-github-release-page)
   - [️Quick start](#️quick-start)
     - [1. Launch the Web UI](#1-launch-the-web-ui)
-    - [2. Create a new workflow](#2-create-a-new-workflow)
-    - [3. Edit the workflow](#3-edit-the-workflow)
-    - [4. Execute the workflow](#4-execute-the-workflow)
+    - [2. Create a new DAG](#2-create-a-new-dag)
+    - [3. Edit the DAG](#3-edit-the-dag)
+    - [4. Execute the DAG](#4-execute-the-dag)
   - [Command Line User Interface](#command-line-user-interface)
   - [Web User Interface](#web-user-interface)
   - [YAML format](#yaml-format)
@@ -51,7 +51,7 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Where is the history data stored?](#where-is-the-history-data-stored)
     - [Where are the log files stored?](#where-are-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
-    - [How can I retry a workflow from a specific task?](#how-can-i-retry-a-workflow-from-a-specific-task)
+    - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
     - [Does it provide sucheduler daemon?](#does-it-provide-sucheduler-daemon)
     - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
   - [License](#license)
@@ -63,7 +63,7 @@ In the projects I worked on, our ETL pipeline had **many problems**. There were 
 
 ## Why not existing tools, like Airflow?
 
-There are many popular workflow engines such as Airflow, Prefect, etc. They are powerful and valuable tools, but they require writing code such as Python to run workflows. In many situations like above, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. So we developed Dagu. It is easy-to-use and self-contained, making it ideal for smaller projects with fewer people.
+There are many popular workflow engines such as Airflow, Prefect, etc. They are powerful and valuable tools, but they require writing code such as Python to run DAGs. In many situations like above, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. So we developed Dagu. It is easy-to-use and self-contained, making it ideal for smaller projects with fewer people.
 
 ## How does it work?
 
@@ -100,15 +100,15 @@ Download the latest binary from the [Releases page](https://github.com/yohamta/d
 
 Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-### 2. Create a new workflow
+### 2. Create a new DAG
 
-Create a workflow by clicking the `New DAG` button on the top page of the web UI. Input `example.yaml` in the dialog.
+Create a DAG by clicking the `New DAG` button on the top page of the web UI. Input `example.yaml` in the dialog.
 
-### 3. Edit the workflow
+### 3. Edit the DAG
 
-Go to the workflow detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example.yaml) and click the `Save` button.
+Go to the DAG detail page and click the `Edit` button in the `Config` Tab. Copy and paste from this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example.yaml) and click the `Save` button.
 
-### 4. Execute the workflow
+### 4. Execute the DAG
 
 You can execute the example by pressing the `Start` button.
 
@@ -116,11 +116,11 @@ You can execute the example by pressing the `Start` button.
 
 ## Command Line User Interface
 
-- `dagu start [--params=<params>] <file>` - Runs the workflow
-- `dagu status <file>` - Displays the current status of the workflow
-- `dagu retry --req=<request-id> <file>` - Re-runs the specified workflow run
-- `dagu stop <file>` - Stops the workflow execution by sending TERM signals
-- `dagu dry [--params=<params>] <file>` - Dry-runs the workflow
+- `dagu start [--params=<params>] <file>` - Runs the DAG
+- `dagu status <file>` - Displays the current status of the DAG
+- `dagu retry --req=<request-id> <file>` - Re-runs the specified DAG run
+- `dagu stop <file>` - Stops the DAG execution by sending TERM signals
+- `dagu dry [--params=<params>] <file>` - Dry-runs the DAG
 - `dagu server` - Starts the web server for web UI
 - `dagu version` - Shows the current binary version
 
@@ -128,13 +128,13 @@ You can execute the example by pressing the `Start` button.
 
 - **Dashboard**: It shows the overall status and executions timeline of the day.
 
-  ![Workflows](assets/images/ui-dashboard.png?raw=true)
+  ![DAGs](assets/images/ui-dashboard.png?raw=true)
 
-- **Workflows**: It shows all workflows and the real-time status.
+- **DAGs**: It shows all DAGs and the real-time status.
 
-  ![Workflows](assets/images/ui-workflows.png?raw=true)
+  ![DAGs](assets/images/ui-dags.png?raw=true)
 
-- **Workflow Details**: It shows the real-time status, logs, and workflow configurations. You can edit workflow configurations on a browser.
+- **DAG Details**: It shows the real-time status, logs, and DAG configurations. You can edit DAG configurations on a browser.
 
   ![Details](assets/images/ui-details.png?raw=true)
 
@@ -142,15 +142,15 @@ You can execute the example by pressing the `Start` button.
 
   ![History](assets/images/ui-history.png?raw=true)
 
-- **Workflow Execution Log**: It shows the detail log and standard output of each execution and steps.
+- **DAG Execution Log**: It shows the detail log and standard output of each execution and steps.
 
-  ![Workflow Log](assets/images/ui-logoutput.png?raw=true)
+  ![DAG Log](assets/images/ui-logoutput.png?raw=true)
 
 ## YAML format
 
 ### Minimal Definition
 
-Minimal workflow definition is as simple as follows:
+Minimal DAG definition is as simple as follows:
 
 ```yaml
 steps:
@@ -229,7 +229,7 @@ steps:
 
 ### Conditional Logic
 
-Sometimes you have parts of a workflow that you only want to run under certain conditions. You can use the `precondition` field to add conditional branches to your workflow.
+Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `precondition` field to add conditional branches to your DAG.
 
 For example, the below task only runs on the first date of each month.
 
@@ -242,7 +242,7 @@ steps:
         expected: "01"
 ```
 
-If you want the workflow to continue to the next step regardless of the step's conditional check result, you can use the `continueOn` field:
+If you want the DAG to continue to the next step regardless of the step's conditional check result, you can use the `continueOn` field:
 
 ```yaml
 steps:
@@ -279,7 +279,7 @@ steps:
 
 ### State Handlers
 
-It is often desirable to take action when a specific event happens, for example, when a workflow fails. To achieve this, you can use `handlerOn` fields.
+It is often desirable to take action when a specific event happens, for example, when a DAG fails. To achieve this, you can use `handlerOn` fields.
 
 ```yaml
 handlerOn:
@@ -307,12 +307,13 @@ steps:
 
 ### All Available Fields
 
-Combining these settings gives you granular control over how the workflow runs.
+Combining these settings gives you granular control over how the DAG runs.
 
 ```yaml
-name: all configuration              # name (optional, default is filename)
-description: run a DAG               # description
-tags: daily job                      # Free tags (separated by comma)
+name: all configuration              # Name (optional, default is filename)
+description: run a DAG               # Description
+group: DailyJobs                     # Group name to organize DAGs (optional)
+tags: example                        # Free tags (separated by comma)
 env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
@@ -433,9 +434,9 @@ It will store log files in the `DAGU__LOGS` environment variable path. The defau
 
 The default retention period for execution history is seven days. However, you can override the setting by the `histRetentionDays` field in a YAML file.
 
-### How can I retry a workflow from a specific task?
+### How can I retry a DAG from a specific task?
 
-You can change the status of any task to a `failed` state. Then, when you retry the workflow, it will execute the failed one and any subsequent.
+You can change the status of any task to a `failed` state. Then, when you retry the DAG, it will execute the failed one and any subsequent.
 
 ### Does it provide sucheduler daemon?
 

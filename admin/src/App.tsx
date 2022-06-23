@@ -4,8 +4,8 @@ import DashboardLayout from "./DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import View from "./pages/View";
 import ViewList from "./pages/ViewList";
-import WorkflowDetail from "./pages/WorkflowDetails";
-import WorkflowList from "./pages/WorkflowList";
+import DAGDetails from "./pages/DAGDetails";
+import DAGs from "./pages/DAGs";
 
 type Config = {
   title: string;
@@ -22,11 +22,11 @@ function App({ config }: Props) {
       <DashboardLayout {...config}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="" element={<WorkflowList />} />
+          <Route path="" element={<DAGs />} />
           <Route path="/views" element={<ViewList />} />
           <Route path="/views/:name" element={<View />} />
-          <Route path="/dags/" element={<WorkflowList />} />
-          <Route path="/dags/:name" element={<WorkflowDetail />} />
+          <Route path="/dags/" element={<DAGs />} />
+          <Route path="/dags/:name" element={<DAGDetails />} />
         </Routes>
       </DashboardLayout>
     </BrowserRouter>

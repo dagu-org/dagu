@@ -1,16 +1,16 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import { GetWorkflowResponse } from "../api/Workflow";
+import { GetDAGResponse } from "../api/DAG";
 import ConfigErrors from "../components/ConfigErrors";
-import WorkflowStatus from "../components/WorkflowStatus";
-import { WorkflowContext } from "../contexts/WorkflowContext";
-import { WorkflowTabType } from "../models/Workflow";
-import WorkflowConfig from "../components/WorkflowConfig";
-import WorkflowHistory from "../components/WorkflowHistory";
-import WorkflowLog from "../components/WorkflowLog";
+import DAGStatus from "../components/DAGStatus";
+import { DAGContext } from "../contexts/DAGContext";
+import { DetailTabId } from "../models/Dag";
+import DAGConfig from "../components/DAGConfig";
+import DAGHistory from "../components/DAGHistory";
+import DAGLog from "../components/DAGLog";
 import { Box, Paper, Stack, Tab, Tabs } from "@mui/material";
 import Title from "../components/Title";
-import WorkflowActions from "../components/WorkflowActions";
+import DAGActions from "../components/DAGActions";
 import ConfigEditButtons from "../components/ConfigEditButtons";
 import Loading from "../components/Loading";
 
@@ -18,18 +18,16 @@ type Params = {
   name: string;
 };
 
-function WorkflowDetail() {
+function DAGDetails() {
   const params = useParams<Params>();
-  const [data, setData] = React.useState<GetWorkflowResponse | undefined>(
-    undefined
-  );
-  const [tab, setTab] = React.useState(WorkflowTabType.Status);
+  const [data, setData] = React.useState<GetDAGResponse | undefined>(undefined);
+  const [tab, setTab] = React.useState(DetailTabId.Status);
   const [group, setGroup] = React.useState("");
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     let t = urlParams.get("t");
     if (t) {
-      setTab(t as WorkflowTabType);
+      setTab(t as DetailTabId);
     }
     let group = urlParams.get("group");
     if (group) {
@@ -56,7 +54,7 @@ function WorkflowDetail() {
   }
   React.useEffect(() => {
     getData();
-    if (tab == WorkflowTabType.Status || tab == WorkflowTabType.Config) {
+    if (tab == DetailTabId.Status || tab == DetailTabId.Config) {
       const timer = setInterval(getData, 2000);
       return () => clearInterval(timer);
     }
@@ -67,20 +65,20 @@ function WorkflowDetail() {
   }
 
   const contents: Partial<{
-    [key in WorkflowTabType]: React.ReactNode;
+    [key in DetailTabId]: React.ReactNode;
   }> = {
-    [WorkflowTabType.Status]: (
-      <WorkflowStatus
-        workflow={data.DAG}
+    [DetailTabId.Status]: (
+      <DAGStatus
+        DAG={data.DAG}
         group={group}
         name={params.name}
         refresh={getData}
       />
     ),
-    [WorkflowTabType.Config]: <WorkflowConfig data={data} />,
-    [WorkflowTabType.History]: <WorkflowHistory logData={data.LogData} />,
-    [WorkflowTabType.StepLog]: <WorkflowLog log={data.StepLog} />,
-    [WorkflowTabType.ScLog]: <WorkflowLog log={data.ScLog} />,
+    [DetailTabId.Config]: <DAGConfig data={data} />,
+    [DetailTabId.History]: <DAGHistory logData={data.LogData} />,
+    [DetailTabId.StepLog]: <DAGLog log={data.StepLog} />,
+    [DetailTabId.ScLog]: <DAGLog log={data.ScLog} />,
   };
   const ctx = {
     data: data,
@@ -93,7 +91,7 @@ function WorkflowDetail() {
   const baseUrl = `/dags/${encodeURI(params.name)}?group=${encodeURI(group)}`;
 
   return (
-    <WorkflowContext.Provider value={ctx}>
+    <DAGContext.Provider value={ctx}>
       <Stack
         sx={{
           width: "100%",
@@ -119,9 +117,8 @@ function WorkflowDetail() {
             }}
           >
             <Title>{data.Title}</Title>
-            <WorkflowActions
+            <DAGActions
               status={data.DAG.Status}
-              group={group}
               name={params.name!}
               refresh={getData}
             />
@@ -138,21 +135,21 @@ function WorkflowDetail() {
               <Tabs value={tab}>
                 <LinkTab
                   label="Status"
-                  value={WorkflowTabType.Status}
-                  href={`${baseUrl}&t=${WorkflowTabType.Status}`}
+                  value={DetailTabId.Status}
+                  href={`${baseUrl}&t=${DetailTabId.Status}`}
                 />
                 <LinkTab
                   label="Config"
-                  value={WorkflowTabType.Config}
-                  href={`${baseUrl}&t=${WorkflowTabType.Config}`}
+                  value={DetailTabId.Config}
+                  href={`${baseUrl}&t=${DetailTabId.Config}`}
                 />
                 <LinkTab
                   label="History"
-                  value={WorkflowTabType.History}
-                  href={`${baseUrl}&t=${WorkflowTabType.History}`}
+                  value={DetailTabId.History}
+                  href={`${baseUrl}&t=${DetailTabId.History}`}
                 />
               </Tabs>
-              {tab == WorkflowTabType.Config ? (
+              {tab == DetailTabId.Config ? (
                 <ConfigEditButtons group={group} name={params.name} />
               ) : null}
             </Stack>
@@ -161,10 +158,10 @@ function WorkflowDetail() {
 
         {contents[tab]}
       </Stack>
-    </WorkflowContext.Provider>
+    </DAGContext.Provider>
   );
 }
-export default WorkflowDetail;
+export default DAGDetails;
 
 interface LinkTabProps {
   label?: string;

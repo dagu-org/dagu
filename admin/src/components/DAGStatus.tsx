@@ -1,34 +1,33 @@
 import React from "react";
-import { WorkflowContext } from "../contexts/WorkflowContext";
+import { DAGContext } from "../contexts/DAGContext";
 import { DAG } from "../models/Dag";
 import { Handlers, SchedulerStatus } from "../models/Status";
 import Graph from "./Graph";
 import NodeStatusTable from "./NodeStatusTable";
 import StatusInfoTable from "./StatusInfoTable";
 import Timeline from "./Timeline";
-import { useWorkflowPostApi } from "../hooks/useWorkflowPostApi";
+import { useDAGPostAPI } from "../hooks/useDAGPostAPI";
 import StatusUpdateModal from "./StatusUpdateModal";
 import { Step } from "../models/Step";
 import { Box, Tab, Tabs, Paper } from "@mui/material";
 
 type Props = {
-  workflow: DAG;
+  DAG: DAG;
   name: string;
   group: string;
   refresh: () => void;
 };
 
-function WorkflowStatus({ workflow, group, name, refresh }: Props) {
+function DAGStatus({ DAG, group, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState("0");
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
     undefined
   );
-  const { doPost } = useWorkflowPostApi({
+  const { doPost } = useDAGPostAPI({
     name,
-    group,
     onSuccess: refresh,
-    requestId: workflow.Status?.RequestId,
+    requestId: DAG.Status?.RequestId,
   });
   const dismissModal = React.useCallback(() => {
     setModal(false);
@@ -42,12 +41,12 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
   );
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
-      const status = workflow.Status?.Status;
+      const status = DAG.Status?.Status;
       if (status == SchedulerStatus.Running || status == SchedulerStatus.None) {
         return;
       }
       // find the clicked step
-      const n = workflow.Status?.Nodes.find(
+      const n = DAG.Status?.Nodes.find(
         (n) => n.Step.Name.replace(/\s/g, "_") == id
       );
       if (n) {
@@ -55,12 +54,12 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
         setModal(true);
       }
     },
-    [workflow]
+    [DAG]
   );
-  if (!workflow.Status) {
+  if (!DAG.Status) {
     return null;
   }
-  const handlers = Handlers(workflow.Status);
+  const handlers = Handlers(DAG.Status);
   return (
     <React.Fragment>
       <Paper
@@ -105,31 +104,31 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
         >
           {sub == "0" ? (
             <Graph
-              steps={workflow.Status.Nodes}
+              steps={DAG.Status.Nodes}
               type="status"
               onClickNode={onSelectStepOnGraph}
             ></Graph>
           ) : (
-            <Timeline status={workflow.Status}></Timeline>
+            <Timeline status={DAG.Status}></Timeline>
           )}
         </Box>
       </Paper>
 
       <Box sx={{ mx: 4 }}>
-        <WorkflowContext.Consumer>
+        <DAGContext.Consumer>
           {(props) => (
             <React.Fragment>
               <Box sx={{ mt: 2 }}>
                 <StatusInfoTable
-                  status={workflow.Status}
+                  status={DAG.Status}
                   {...props}
                 ></StatusInfoTable>
               </Box>
 
               <Box sx={{ mt: 2 }}>
                 <NodeStatusTable
-                  nodes={workflow.Status!.Nodes}
-                  status={workflow.Status!}
+                  nodes={DAG.Status!.Nodes}
+                  status={DAG.Status!}
                   {...props}
                 ></NodeStatusTable>
               </Box>
@@ -137,13 +136,13 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
               <Box sx={{ mt: 2 }}>
                 <NodeStatusTable
                   nodes={handlers}
-                  status={workflow.Status!}
+                  status={DAG.Status!}
                   {...props}
                 ></NodeStatusTable>
               </Box>
             </React.Fragment>
           )}
-        </WorkflowContext.Consumer>
+        </DAGContext.Consumer>
       </Box>
 
       <StatusUpdateModal
@@ -156,4 +155,4 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
   );
 }
 
-export default WorkflowStatus;
+export default DAGStatus;

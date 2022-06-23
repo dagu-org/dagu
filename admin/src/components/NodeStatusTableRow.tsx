@@ -1,7 +1,7 @@
 import React from "react";
 import { Node } from "../models/Node";
 import { Step } from "../models/Step";
-import { WorkflowTabType } from "../models/Workflow";
+import { DetailTabId } from "../models/Dag";
 import MultilineText from "./MultilineText";
 import NodeStatusChip from "./NodeStatusChip";
 import { TableCell } from "@mui/material";
@@ -24,7 +24,7 @@ function NodeStatusTableRow({
   file,
   onRequireModal,
 }: Props) {
-  const url = `/dags/${name}?t=${WorkflowTabType.StepLog}&group=${group}&file=${file}&step=${node.Step.Name}`;
+  const url = `/dags/${name}?t=${DetailTabId.StepLog}&group=${group}&file=${file}&step=${node.Step.Name}`;
   const buttonStyle = {
     margin: "0px",
     padding: "0px",

@@ -1,6 +1,6 @@
 import { TableCell } from "@mui/material";
 import React, { CSSProperties } from "react";
-import { DagStatus } from "../api/Workflow";
+import { DagStatus } from "../api/DAG";
 import { statusColorMapping } from "../consts";
 import StyledTableRow from "./StyledTableRow";
 

@@ -1,3 +1,4 @@
+group: example group
 env:
   LOG_DIR: ${HOME}/logs
 logDir: ${LOG_DIR}

@@ -42,7 +42,6 @@ type dagResponse struct {
 	Definition string
 	LogData    *Log
 	LogUrl     string
-	Group      string
 	StepLog    *logFile
 	ScLog      *logFile
 	Errors     []string
@@ -66,21 +65,18 @@ const (
 )
 
 type dagParameter struct {
-	Tab   dagTabType
-	Group string
-	File  string
-	Step  string
+	Tab  dagTabType
+	File string
+	Step string
 }
 
-func newDAGResponse(cfg string, dag *controller.DAG, tab dagTabType,
-	group string) *dagResponse {
+func newDAGResponse(cfg string, dag *controller.DAG, tab dagTabType) *dagResponse {
 	return &dagResponse{
 		Title:      cfg,
 		DAG:        dag,
 		Tab:        tab,
 		Definition: "",
 		LogData:    nil,
-		Group:      group,
 		Errors:     []string{},
 	}
 }
@@ -101,13 +97,14 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		}
 
 		params := getDAGParameter(r)
-		dag, err := controller.FromConfig(filepath.Join(hc.DAGsDir, params.Group, cfg))
+		dag, err := controller.FromConfig(filepath.Join(hc.DAGsDir,
+			fmt.Sprintf("%s.yaml", cfg)))
 		if dag == nil {
 			encodeError(w, err)
 			return
 		}
 		c := controller.New(dag.Config)
-		data := newDAGResponse(cfg, dag, params.Tab, params.Group)
+		data := newDAGResponse(cfg, dag, params.Tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
 		}
@@ -115,7 +112,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		switch params.Tab {
 		case DAG_TabType_Status:
 		case DAG_TabType_Config:
-			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, params.Group, cfg))
+			data.Definition, _ = config.ReadConfig(path.Join(hc.DAGsDir, cfg))
 
 		case DAG_TabType_History:
 			logs := controller.New(dag.Config).GetStatusHist(30)
@@ -165,7 +162,6 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
 		value := r.FormValue("value")
-		group := r.FormValue("group")
 		reqId := r.FormValue("request-id")
 		step := r.FormValue("step")
 
@@ -175,7 +171,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		file := filepath.Join(hc.DAGsDir, group, cfg)
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
 		dag, err := controller.FromConfig(file)
 		if err != nil && action != "save" {
 			encodeError(w, err)
@@ -280,8 +276,9 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))
 			return
+
 		case "rename":
-			newFile := path.Join(hc.DAGsDir, group, value)
+			newFile := path.Join(hc.DAGsDir, value)
 			err := controller.RenameConfig(file, newFile)
 			if err != nil {
 				encodeError(w, err)
@@ -289,12 +286,13 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("OK"))
+
 		default:
 			encodeError(w, errInvalidArgs)
 			return
 		}
 
-		http.Redirect(w, r, dag.File, http.StatusSeeOther)
+		http.Redirect(w, r, cfg, http.StatusSeeOther)
 	}
 }
 
@@ -466,13 +464,12 @@ func getPathParameter(r *http.Request) (string, error) {
 	if len(m) < 2 {
 		return "", fmt.Errorf("invalid URL")
 	}
-	return fmt.Sprintf("%s.yaml", m[1]), nil
+	return m[1], nil
 }
 
 func getDAGParameter(r *http.Request) *dagParameter {
 	p := &dagParameter{
-		Tab:   DAG_TabType_Status,
-		Group: "",
+		Tab: DAG_TabType_Status,
 	}
 	if tab, ok := r.URL.Query()["t"]; ok {
 		i, err := strconv.Atoi(tab[0])
@@ -481,9 +478,6 @@ func getDAGParameter(r *http.Request) *dagParameter {
 		} else {
 			p.Tab = dagTabType(i)
 		}
-	}
-	if group, ok := r.URL.Query()["group"]; ok {
-		p.Group = group[0]
 	}
 	if file, ok := r.URL.Query()["file"]; ok {
 		p.File = file[0]

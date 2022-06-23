@@ -1,22 +1,22 @@
 import React from "react";
-import { GetListResponse } from "../api/List";
-import WorkflowErrors from "../components/WorkflowErrors";
+import DAGErrors from "../components/DAGErrors";
 import Box from "@mui/material/Box";
-import CreateWorkflowButton from "../components/CreateWorkflowButton";
+import DAGCreationButton from "../components/DAGCreationButton";
 import WithLoading from "../components/WithLoading";
-import WorkflowTable from "../components/WorkflowTable";
+import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
-import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import { WorkflowData, WorkflowDataType } from "../models/Workflow";
+import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
+import { DAGItem, DAGDataType } from "../models/Dag";
 import { useLocation } from "react-router-dom";
+import { GetDAGsResponse } from "../api/DAGs";
 
-function WorkflowList() {
+function DAGs() {
   const useQuery = () => new URLSearchParams(useLocation().search);
   let query = useQuery();
   const group = query.get("group") || "";
 
-  const { data, doGet } = useGetApi<GetListResponse>("/", {});
+  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
 
   React.useEffect(() => {
     doGet();
@@ -25,30 +25,12 @@ function WorkflowList() {
   }, [group]);
 
   const merged = React.useMemo(() => {
-    const ret: WorkflowData[] = [];
+    const ret: DAGItem[] = [];
     if (data) {
-      // TODO: need refactoring
-      if (group != "") {
-        ret.push({
-          Type: WorkflowDataType.Group,
-          Name: "../",
-          Group: {
-            Name: "",
-            Dir: "",
-          },
-        });
-      }
-      for (const val of data.Groups) {
-        ret.push({
-          Type: WorkflowDataType.Group,
-          Name: val.Name,
-          Group: val,
-        });
-      }
       for (const val of data.DAGs) {
         if (!val.Error) {
           ret.push({
-            Type: WorkflowDataType.Workflow,
+            Type: DAGDataType.DAG,
             Name: val.Config.Name,
             DAG: val,
           });
@@ -76,23 +58,23 @@ function WorkflowList() {
           justifyContent: "space-between",
         }}
       >
-        <Title>Workflows</Title>
-        <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
+        <Title>DAGs</Title>
+        <DAGCreationButton refresh={doGet}></DAGCreationButton>
       </Box>
       <Box>
         <WithLoading loaded={!!data && !!merged}>
           {data && (
             <React.Fragment>
-              <WorkflowErrors
-                workflows={data.DAGs}
+              <DAGErrors
+                DAGs={data.DAGs}
                 errors={data.Errors}
                 hasError={data.HasError}
-              ></WorkflowErrors>
-              <WorkflowTable
-                workflows={merged}
-                group={data.Group}
+              ></DAGErrors>
+              <DAGTable
+                DAGs={merged}
+                group={group}
                 refreshFn={doGet}
-              ></WorkflowTable>
+              ></DAGTable>
             </React.Fragment>
           )}
         </WithLoading>
@@ -100,4 +82,4 @@ function WorkflowList() {
     </Paper>
   );
 }
-export default WorkflowList;
+export default DAGs;
