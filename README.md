@@ -310,9 +310,10 @@ steps:
 Combining these settings gives you granular control over how the DAG runs.
 
 ```yaml
-name: all configuration              # name (optional, default is filename)
-description: run a DAG               # description
-tags: daily job                      # Free tags (separated by comma)
+name: all configuration              # Name (optional, default is filename)
+description: run a DAG               # Description
+group: DailyJobs                     # Group name to organize DAGs (optional)
+tags: example                        # Free tags (separated by comma)
 env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
