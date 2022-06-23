@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { statusColorMapping } from "../consts";
-import { DAG } from "../models/DAG";
+import { DAG } from "../models/Dag";
 import { SchedulerStatus } from "../models/Status";
 
 type Props = { data: DAG[] };

@@ -1,6 +1,6 @@
 import React from "react";
 import { DAGContext } from "../contexts/DAGContext";
-import { DAG } from "../models/DAG";
+import { DAG } from "../models/Dag";
 import { Handlers, SchedulerStatus } from "../models/Status";
 import Graph from "./Graph";
 import NodeStatusTable from "./NodeStatusTable";

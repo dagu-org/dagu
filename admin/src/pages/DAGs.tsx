@@ -7,7 +7,7 @@ import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
-import { DAGItem, DAGDataType } from "../models/DAG";
+import { DAGItem, DAGDataType } from "../models/Dag";
 import { useLocation } from "react-router-dom";
 import { GetDAGsResponse } from "../api/DAGs";
 

@@ -30,7 +30,7 @@ import {
   getStatusField,
   DAGItem,
   DAGDataType,
-} from "../models/DAG";
+} from "../models/Dag";
 import StyledTableRow from "./StyledTableRow";
 
 type Props = {
