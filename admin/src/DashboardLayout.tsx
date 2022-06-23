@@ -154,7 +154,7 @@ function DashboardContent({
             </Link>
             {[
               ["/", "Dashboard"],
-              ["/dags", "Workflows"],
+              ["/dags", "DAGs"],
               ["/views", "Views"],
             ].map((v) => (
               <Link

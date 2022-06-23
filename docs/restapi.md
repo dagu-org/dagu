@@ -8,14 +8,14 @@ Dagu server provides simple APIs to query and control workflows.
 
 - [REST API Docs](#rest-api-docs)
   - [Contents](#contents)
-  - [Show Workflows `GET dags/`](#show-workflows-get-dags)
+  - [Show DAGs `GET dags/`](#show-workflows-get-dags)
     - [Success Response](#success-response)
   - [Show Workflow Detail `GET dags/:name`](#show-workflow-detail-get-dagsname)
     - [Success Response](#success-response-1)
   - [Submit Workflow Action `POST dags/:name`](#submit-workflow-action-post-dagsname)
     - [Success Response](#success-response-2)
 
-## Show Workflows `GET dags/`
+## Show DAGs `GET dags/`
 
 **URL** : `/api/user/`
 

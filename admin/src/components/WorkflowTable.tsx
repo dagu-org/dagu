@@ -49,8 +49,8 @@ const table = createTable()
 
 const defaultColumns = [
   table.createDataColumn("Name", {
-    id: "Workflow",
-    header: "Workflow",
+    id: "DAG",
+    header: "DAG",
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == WorkflowDataType.Group) {
@@ -74,7 +74,7 @@ const defaultColumns = [
       if (data.Type == WorkflowDataType.Group) {
         return <Chip color="secondary" size="small" label="Group" />;
       } else {
-        return <Chip color="primary" size="small" label="Workflow" />;
+        return <Chip color="primary" size="small" label="DAG" />;
       }
     },
     sortingFn: (a, b) => {

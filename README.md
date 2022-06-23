@@ -128,11 +128,11 @@ You can execute the example by pressing the `Start` button.
 
 - **Dashboard**: It shows the overall status and executions timeline of the day.
 
-  ![Workflows](assets/images/ui-dashboard.png?raw=true)
+  ![DAGs](assets/images/ui-dashboard.png?raw=true)
 
-- **Workflows**: It shows all workflows and the real-time status.
+- **DAGs**: It shows all workflows and the real-time status.
 
-  ![Workflows](assets/images/ui-workflows.png?raw=true)
+  ![DAGs](assets/images/ui-workflows.png?raw=true)
 
 - **Workflow Details**: It shows the real-time status, logs, and workflow configurations. You can edit workflow configurations on a browser.
 

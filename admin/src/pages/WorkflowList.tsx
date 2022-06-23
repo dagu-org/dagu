@@ -76,7 +76,7 @@ function WorkflowList() {
           justifyContent: "space-between",
         }}
       >
-        <Title>Workflows</Title>
+        <Title>DAGs</Title>
         <CreateWorkflowButton refresh={doGet}></CreateWorkflowButton>
       </Box>
       <Box>
