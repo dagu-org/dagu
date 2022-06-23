@@ -30,6 +30,7 @@ import {
   getStatusField,
   DAGItem,
   DAGDataType,
+  DAGGroup,
 } from "../models/Dag";
 import StyledTableRow from "./StyledTableRow";
 
@@ -47,6 +48,8 @@ const table = createTable()
     refreshFn: () => Promise<void>;
   }>();
 
+const UpperGroup = "../";
+
 const defaultColumns = [
   table.createDataColumn("Name", {
     id: "DAG",
@@ -54,14 +57,19 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.Group) {
-        const url = `/dags/?group=${encodeURI(data.Group.Name)}`;
-        return <Link to={url}>{props.getValue()}</Link>;
+        if (data.Name == UpperGroup) {
+          return <Link to={`/dags`}>{props.getValue()}</Link>;
+        } else {
+          return (
+            <Link to={`/dags/?group=${encodeURI(data.Name)}`}>
+              {props.getValue()}
+            </Link>
+          );
+        }
       } else {
         const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, "");
         const group = props.instance.options.meta?.group || "";
-        const url = `/dags/${encodeURI(name)}?group=${encodeURI(
-          group
-        )}`;
+        const url = `/dags/${encodeURI(name)}?group=${encodeURI(group)}`;
         return <Link to={url}>{props.getValue()}</Link>;
       }
     },
@@ -199,7 +207,6 @@ const defaultColumns = [
       return (
         <DAGActions
           status={data.DAG.Status}
-          group={props.instance.options.meta?.group || ""}
           name={data.DAG.Config.Name}
           label={false}
           refresh={props.instance.options.meta?.refreshFn}
@@ -227,6 +234,39 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
     );
   }, [columnFilters]);
 
+  const data = React.useMemo(() => {
+    const ret: DAGItem[] = [];
+    const groups: {
+      [key: string]: DAGGroup;
+    } = {};
+    DAGs.forEach((dag) => {
+      if (dag.Type == DAGDataType.DAG) {
+        if (dag.DAG.Config.Group == group) {
+          ret.push(dag);
+        } else if (group == "") {
+          const group = dag.DAG.Config.Group;
+          if (!groups[group]) {
+            groups[group] = {
+              Type: DAGDataType.Group,
+              Name: group,
+              DAGs: [],
+            };
+          }
+          groups[group].DAGs.push(dag);
+        }
+      }
+    });
+    if (group != "") {
+      groups[UpperGroup] = {
+        Type: DAGDataType.Group,
+        Name: UpperGroup,
+        DAGs: [],
+      };
+    }
+    const groupKeys = Object.keys(groups);
+    return [...groupKeys.map((k) => groups[k]), ...ret];
+  }, [DAGs, group]);
+
   const tagOptions = React.useMemo(() => {
     const map: { [key: string]: boolean } = {};
     DAGs.forEach((data) => {
@@ -241,7 +281,7 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
   }, []);
 
   const instance = useTableInstance(table, {
-    data: DAGs,
+    data,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -347,7 +387,12 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
         </TableHead>
         <TableBody>
           {instance.getRowModel().rows.map((row) => (
-            <StyledTableRow key={row.id}>
+            <StyledTableRow
+              key={row.id}
+              style={{
+                height: "50px",
+              }}
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>{cell.renderCell()}</TableCell>
               ))}

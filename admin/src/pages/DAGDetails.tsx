@@ -20,9 +20,7 @@ type Params = {
 
 function DAGDetails() {
   const params = useParams<Params>();
-  const [data, setData] = React.useState<GetDAGResponse | undefined>(
-    undefined
-  );
+  const [data, setData] = React.useState<GetDAGResponse | undefined>(undefined);
   const [tab, setTab] = React.useState(DetailTabId.Status);
   const [group, setGroup] = React.useState("");
   React.useEffect(() => {
@@ -121,7 +119,6 @@ function DAGDetails() {
             <Title>{data.Title}</Title>
             <DAGActions
               status={data.DAG.Status}
-              group={group}
               name={params.name!}
               refresh={getData}
             />

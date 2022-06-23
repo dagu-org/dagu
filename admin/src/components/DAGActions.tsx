@@ -4,24 +4,16 @@ import { SchedulerStatus, Status } from "../models/Status";
 
 type Props = {
   status?: Status;
-  group: string;
   name: string;
   label?: boolean;
   refresh?: () => any;
 };
 
-function DAGActions({
-  status,
-  group,
-  name,
-  refresh = () => {},
-  label = true,
-}: Props) {
+function DAGActions({ status, name, refresh = () => {}, label = true }: Props) {
   const onSubmit = React.useCallback(
     async (
       warn: string,
       params: {
-        group: string;
         name: string;
         action: string;
         requestId?: string;
@@ -31,7 +23,6 @@ function DAGActions({
         return;
       }
       const form = new FormData();
-      form.set("group", params.group);
       form.set("action", params.action);
       if (params.requestId) {
         form.set("request-id", params.requestId);
@@ -72,7 +63,6 @@ function DAGActions({
         disabled={!buttonState["start"]}
         onClick={() =>
           onSubmit("Do you really want to start the DAG?", {
-            group: group,
             name: name,
             action: "start",
           })
@@ -90,7 +80,6 @@ function DAGActions({
         disabled={!buttonState["stop"]}
         onClick={() =>
           onSubmit("Do you really want to cancel the DAG?", {
-            group: group,
             name: name,
             action: "stop",
           })
@@ -110,7 +99,6 @@ function DAGActions({
           onSubmit(
             `Do you really want to rerun the last execution (${status?.RequestId}) ?`,
             {
-              group: group,
               name: name,
               requestId: status?.RequestId,
               action: "retry",

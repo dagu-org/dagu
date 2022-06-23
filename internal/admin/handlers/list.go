@@ -1,23 +1,18 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
-	"os"
 	"path"
 	"path/filepath"
 
 	"github.com/yohamta/dagu/internal/admin/views"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 type dagListResponse struct {
 	Title    string
 	Charset  string
 	DAGs     []*controller.DAG
-	Groups   []*group
-	Group    string
 	Errors   []string
 	HasError bool
 	Views    []*views.View
@@ -39,21 +34,11 @@ type DAGListHandlerConfig struct {
 func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "index")
 	return func(w http.ResponseWriter, r *http.Request) {
-		params := getGetListParameter(r)
-		dir := filepath.Join(hc.DAGsDir, params.Group)
+		dir := filepath.Join(hc.DAGsDir)
 		dags, errs, err := controller.GetDAGs(dir)
 		if err != nil {
 			encodeError(w, err)
 			return
-		}
-
-		groups := []*group{}
-		if params.Group == "" {
-			groups, err = listGroups(dir)
-			if err != nil {
-				encodeError(w, err)
-				return
-			}
 		}
 
 		hasErr := false
@@ -70,8 +55,6 @@ func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
 		data := &dagListResponse{
 			Title:    "DAGList",
 			DAGs:     dags,
-			Groups:   groups,
-			Group:    params.Group,
 			Errors:   errs,
 			HasError: hasErr,
 			Views:    views.GetViews(),
@@ -89,11 +72,10 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
 		value := r.FormValue("value")
-		group := r.FormValue("group")
 
 		switch action {
 		case "new":
-			filename := path.Join(hc.DAGsDir, group, value)
+			filename := path.Join(hc.DAGsDir, value)
 			err := controller.NewConfig(filename)
 			if err != nil {
 				encodeError(w, err)
@@ -105,34 +87,4 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 		}
 		encodeError(w, errInvalidArgs)
 	}
-}
-
-func getGetListParameter(r *http.Request) *dagListParameter {
-	p := &dagListParameter{
-		Group: "",
-	}
-	if group, ok := r.URL.Query()["group"]; ok {
-		p.Group = group[0]
-	}
-	return p
-}
-
-func listGroups(dir string) ([]*group, error) {
-	ret := []*group{}
-	if !utils.FileExists(dir) {
-		return ret, nil
-	}
-	fis, err := os.ReadDir(dir)
-	if err != nil || fis == nil {
-		log.Printf("%v", err)
-	}
-	for _, fi := range fis {
-		if !fi.IsDir() {
-			continue
-		}
-		ret = append(ret, &group{
-			fi.Name(), filepath.Join(dir, fi.Name()),
-		})
-	}
-	return ret, nil
 }

@@ -10,7 +10,6 @@ export type GetDAGResponse = {
   Definition: string;
   LogData: LogData;
   LogUrl: string;
-  Group: string;
   StepLog?: LogFile;
   ScLog?: LogFile;
   Errors: string[];

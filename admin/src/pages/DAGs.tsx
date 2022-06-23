@@ -27,24 +27,6 @@ function DAGs() {
   const merged = React.useMemo(() => {
     const ret: DAGItem[] = [];
     if (data) {
-      // TODO: need refactoring
-      if (group != "") {
-        ret.push({
-          Type: DAGDataType.Group,
-          Name: "../",
-          Group: {
-            Name: "",
-            Dir: "",
-          },
-        });
-      }
-      for (const val of data.Groups) {
-        ret.push({
-          Type: DAGDataType.Group,
-          Name: val.Name,
-          Group: val,
-        });
-      }
       for (const val of data.DAGs) {
         if (!val.Error) {
           ret.push({
@@ -90,7 +72,7 @@ function DAGs() {
               ></DAGErrors>
               <DAGTable
                 DAGs={merged}
-                group={data.Group}
+                group={group}
                 refreshFn={doGet}
               ></DAGTable>
             </React.Fragment>

@@ -26,7 +26,6 @@ function DAGStatus({ DAG, group, name, refresh }: Props) {
   );
   const { doPost } = useDAGPostAPI({
     name,
-    group,
     onSuccess: refresh,
     requestId: DAG.Status?.RequestId,
   });

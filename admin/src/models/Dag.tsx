@@ -1,6 +1,5 @@
 import { Config } from "./Config";
 import { SchedulerStatus, Status } from "./Status";
-import { Group } from "./Group";
 
 export type DAG = {
   File: string;
@@ -27,7 +26,7 @@ export type DAGData = {
 export type DAGGroup = {
   Type: DAGDataType.Group;
   Name: string;
-  Group: Group;
+  DAGs: DAGData[];
 };
 
 export function getFirstTag(data?: DAGItem): string {

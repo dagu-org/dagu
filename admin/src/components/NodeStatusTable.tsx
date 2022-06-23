@@ -36,7 +36,6 @@ function NodeStatusTable({
   const [current, setCurrent] = React.useState<Step | undefined>(undefined);
   const { doPost } = useDAGPostAPI({
     name,
-    group,
     onSuccess: refresh,
     requestId: status.RequestId,
   });
