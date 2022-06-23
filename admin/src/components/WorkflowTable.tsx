@@ -30,7 +30,7 @@ import {
   getStatusField,
   WorkflowData,
   WorkflowDataType,
-} from "../models/Workflow";
+} from "../models/DAG";
 import StyledTableRow from "./StyledTableRow";
 
 type Props = {

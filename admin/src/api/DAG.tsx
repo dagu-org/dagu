@@ -1,8 +1,8 @@
-import { DAG } from "../models/Dag";
+import { DAG } from "../models/DAG";
 import { Node, NodeStatus } from "../models/Node";
 import { StatusFile } from "../models/StatusFile";
 
-export type GetWorkflowResponse = {
+export type GetDAGResponse = {
   Title: string;
   Charset: string;
   DAG?: DAG;

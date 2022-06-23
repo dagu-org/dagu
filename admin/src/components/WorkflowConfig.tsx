@@ -1,7 +1,7 @@
 import { Box, Button, Paper, Stack, Typography } from "@mui/material";
 import React from "react";
-import { GetWorkflowResponse } from "../api/Workflow";
-import { WorkflowContext } from "../contexts/WorkflowContext";
+import { GetDAGResponse } from "../api/DAG";
+import { DAGContext } from "../contexts/DAGContext";
 import { Config } from "../models/Config";
 import { Step } from "../models/Step";
 import ConfigEditor from "./ConfigEditor";
@@ -11,7 +11,7 @@ import Graph from "./Graph";
 import ConfigStepTable from "./ConfigStepTable";
 
 type Props = {
-  data: GetWorkflowResponse;
+  data: GetDAGResponse;
 };
 
 function WorkflowConfig({ data }: Props) {
@@ -22,7 +22,7 @@ function WorkflowConfig({ data }: Props) {
     return null;
   }
   return (
-    <WorkflowContext.Consumer>
+    <DAGContext.Consumer>
       {(props) =>
         data.DAG &&
         data.DAG.Config && (
@@ -161,7 +161,7 @@ function WorkflowConfig({ data }: Props) {
           </React.Fragment>
         )
       }
-    </WorkflowContext.Consumer>
+    </DAGContext.Consumer>
   );
 }
 export default WorkflowConfig;

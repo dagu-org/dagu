@@ -1,5 +1,5 @@
 import React from "react";
-import { GetListResponse } from "../api/List";
+import { GetDAGsResponse } from "../api/DAGs";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
 import { Grid } from "@mui/material";
@@ -26,7 +26,7 @@ function Dashboard() {
 
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
 
-  const { data, doGet } = useGetApi<GetListResponse>("/", {});
+  const { data, doGet } = useGetApi<GetDAGsResponse>("/", {});
 
   React.useEffect(() => {
     if (!data) {

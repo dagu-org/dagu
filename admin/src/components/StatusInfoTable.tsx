@@ -1,6 +1,6 @@
 import React, { CSSProperties } from "react";
 import { Status } from "../models/Status";
-import { WorkflowTabType } from "../models/Workflow";
+import { DetailTabId } from "../models/DAG";
 import StatusChip from "./StatusChip";
 import {
   Paper,
@@ -25,7 +25,7 @@ function StatusInfoTable({ status, name, group, file = "" }: Props) {
   };
   const styles = statusTabColStyles;
   const url = `/dags/${name}?t=${
-    WorkflowTabType.ScLog
+    DetailTabId.ScLog
   }&group=${group}&file=${encodeURI(file)}`;
   let i = 0;
   if (!status) {

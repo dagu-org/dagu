@@ -1,7 +1,7 @@
-import { DAG } from "../models/Dag";
+import { DAG } from "../models/DAG";
 import { Group } from "../models/Group";
 
-export type GetListResponse = {
+export type GetDAGsResponse = {
   Title: string;
   Charset: string;
   DAGs: DAG[];

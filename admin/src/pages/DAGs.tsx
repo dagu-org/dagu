@@ -1,5 +1,4 @@
 import React from "react";
-import { GetListResponse } from "../api/List";
 import WorkflowErrors from "../components/WorkflowErrors";
 import Box from "@mui/material/Box";
 import CreateWorkflowButton from "../components/CreateWorkflowButton";
@@ -8,15 +7,16 @@ import WorkflowTable from "../components/WorkflowTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import { WorkflowData, WorkflowDataType } from "../models/Workflow";
+import { WorkflowData, WorkflowDataType } from "../models/DAG";
 import { useLocation } from "react-router-dom";
+import { GetDAGsResponse } from "../api/DAGs";
 
-function WorkflowList() {
+function DAGs() {
   const useQuery = () => new URLSearchParams(useLocation().search);
   let query = useQuery();
   const group = query.get("group") || "";
 
-  const { data, doGet } = useGetApi<GetListResponse>("/", {});
+  const { data, doGet } = useGetApi<GetDAGsResponse>("/", {});
 
   React.useEffect(() => {
     doGet();
@@ -100,4 +100,4 @@ function WorkflowList() {
     </Paper>
   );
 }
-export default WorkflowList;
+export default DAGs;

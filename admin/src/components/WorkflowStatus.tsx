@@ -1,6 +1,6 @@
 import React from "react";
-import { WorkflowContext } from "../contexts/WorkflowContext";
-import { DAG } from "../models/Dag";
+import { DAGContext } from "../contexts/DAGContext";
+import { DAG } from "../models/DAG";
 import { Handlers, SchedulerStatus } from "../models/Status";
 import Graph from "./Graph";
 import NodeStatusTable from "./NodeStatusTable";
@@ -116,7 +116,7 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
       </Paper>
 
       <Box sx={{ mx: 4 }}>
-        <WorkflowContext.Consumer>
+        <DAGContext.Consumer>
           {(props) => (
             <React.Fragment>
               <Box sx={{ mt: 2 }}>
@@ -143,7 +143,7 @@ function WorkflowStatus({ workflow, group, name, refresh }: Props) {
               </Box>
             </React.Fragment>
           )}
-        </WorkflowContext.Consumer>
+        </DAGContext.Consumer>
       </Box>
 
       <StatusUpdateModal

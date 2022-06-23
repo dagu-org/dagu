@@ -1,6 +1,6 @@
 import { Paper } from "@mui/material";
 import React from "react";
-import { LogFile } from "../api/Workflow";
+import { LogFile } from "../api/DAG";
 import Loading from "./Loading";
 
 type Props = {

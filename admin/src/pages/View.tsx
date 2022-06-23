@@ -6,9 +6,9 @@ import WorkflowTable from "../components/WorkflowTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useGetApi } from "../hooks/useWorkflowsGetApi";
-import { WorkflowData, WorkflowDataType } from "../models/Workflow";
+import { WorkflowData, WorkflowDataType } from "../models/DAG";
 import { useParams } from "react-router-dom";
-import { DAG } from "../models/Dag";
+import { DAG } from "../models/DAG";
 
 export type ApiResponse = {
   Title: string;
