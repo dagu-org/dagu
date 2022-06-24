@@ -106,11 +106,13 @@ function DAGDetails() {
             }}
           >
             <Title>{data.Title}</Title>
-            <DAGActions
-              status={data.DAG.Status}
-              name={params.name!}
-              refresh={getData}
-            />
+            {tab == DetailTabId.Status ? (
+              <DAGActions
+                status={data.DAG.Status}
+                name={params.name!}
+                refresh={getData}
+              />
+            ) : null}
           </Box>
 
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
