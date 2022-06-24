@@ -1,6 +1,6 @@
 import React, { CSSProperties } from "react";
 import { Status } from "../models/Status";
-import { DetailTabId } from "../models/Dag";
+import { DetailTabId } from "../models/DAGData";
 import StatusChip from "./StatusChip";
 import {
   Paper,

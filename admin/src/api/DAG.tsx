@@ -1,4 +1,4 @@
-import { DAG } from "../models/Dag";
+import { DAG } from "../models/DAGData";
 import { Node, NodeStatus } from "../models/Node";
 import { StatusFile } from "../models/StatusFile";
 

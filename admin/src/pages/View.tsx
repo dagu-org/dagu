@@ -6,9 +6,9 @@ import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
-import { DAGItem, DAGDataType } from "../models/Dag";
+import { DAGItem, DAGDataType } from "../models/DAGData";
 import { useParams } from "react-router-dom";
-import { DAG } from "../models/Dag";
+import { DAG } from "../models/DAGData";
 
 export type ApiResponse = {
   Title: string;

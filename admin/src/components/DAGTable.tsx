@@ -31,7 +31,7 @@ import {
   DAGItem,
   DAGDataType,
   DAGGroup,
-} from "../models/Dag";
+} from "../models/DAGData";
 import StyledTableRow from "./StyledTableRow";
 
 type Props = {
