@@ -22,16 +22,11 @@ function DAGDetails() {
   const params = useParams<Params>();
   const [data, setData] = React.useState<GetDAGResponse | undefined>(undefined);
   const [tab, setTab] = React.useState(DetailTabId.Status);
-  const [group, setGroup] = React.useState("");
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     let t = urlParams.get("t");
     if (t) {
       setTab(t as DetailTabId);
-    }
-    let group = urlParams.get("group");
-    if (group) {
-      setGroup(group);
     }
   }, []);
   async function getData() {
@@ -68,12 +63,7 @@ function DAGDetails() {
     [key in DetailTabId]: React.ReactNode;
   }> = {
     [DetailTabId.Status]: (
-      <DAGStatus
-        DAG={data.DAG}
-        group={group}
-        name={params.name}
-        refresh={getData}
-      />
+      <DAGStatus DAG={data.DAG} name={params.name} refresh={getData} />
     ),
     [DetailTabId.Config]: <DAGConfig data={data} />,
     [DetailTabId.History]: <DAGHistory logData={data.LogData} />,
@@ -84,11 +74,10 @@ function DAGDetails() {
     data: data,
     refresh: getData,
     tab,
-    group,
     name: params.name,
   };
 
-  const baseUrl = `/dags/${encodeURI(params.name)}?group=${encodeURI(group)}`;
+  const baseUrl = `/dags/${encodeURI(params.name)}`;
 
   return (
     <DAGContext.Provider value={ctx}>
@@ -136,21 +125,21 @@ function DAGDetails() {
                 <LinkTab
                   label="Status"
                   value={DetailTabId.Status}
-                  href={`${baseUrl}&t=${DetailTabId.Status}`}
+                  href={`${baseUrl}?t=${DetailTabId.Status}`}
                 />
                 <LinkTab
                   label="Config"
                   value={DetailTabId.Config}
-                  href={`${baseUrl}&t=${DetailTabId.Config}`}
+                  href={`${baseUrl}?t=${DetailTabId.Config}`}
                 />
                 <LinkTab
                   label="History"
                   value={DetailTabId.History}
-                  href={`${baseUrl}&t=${DetailTabId.History}`}
+                  href={`${baseUrl}?t=${DetailTabId.History}`}
                 />
               </Tabs>
               {tab == DetailTabId.Config ? (
-                <ConfigEditButtons group={group} name={params.name} />
+                <ConfigEditButtons name={params.name} />
               ) : null}
             </Stack>
           </Box>

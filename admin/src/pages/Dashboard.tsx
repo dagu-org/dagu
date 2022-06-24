@@ -20,10 +20,6 @@ for (const value in SchedulerStatus) {
 }
 
 function Dashboard() {
-  const [group] = React.useState<string>(
-    new URLSearchParams(window.location.search).get("group") || ""
-  );
-
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
 
   const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
@@ -46,7 +42,7 @@ function Dashboard() {
     doGet();
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
-  }, [group]);
+  }, []);
 
   return (
     <Grid container spacing={3} sx={{ mx: 4, width: "100%" }}>

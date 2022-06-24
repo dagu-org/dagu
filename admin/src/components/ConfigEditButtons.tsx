@@ -2,11 +2,10 @@ import { Button } from "@mui/material";
 import React from "react";
 
 type Props = {
-  group: string;
   name: string;
 };
 
-function ConfigEditButtons({ group, name }: Props) {
+function ConfigEditButtons({ name }: Props) {
   return (
     <Button
       onClick={async () => {
@@ -23,7 +22,6 @@ function ConfigEditButtons({ group, name }: Props) {
         }
         const formData = new FormData();
         formData.append("action", "rename");
-        formData.append("group", group);
         formData.append("value", val);
         const url = `${API_URL}/dags/${name}`;
         const resp = await fetch(url, {

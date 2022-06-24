@@ -12,19 +12,17 @@ type Props = {
   node: Node;
   file: string;
   name: string;
-  group: string;
   onRequireModal: (step: Step) => void;
 };
 
 function NodeStatusTableRow({
-  group,
   name,
   rownum,
   node,
   file,
   onRequireModal,
 }: Props) {
-  const url = `/dags/${name}?t=${DetailTabId.StepLog}&group=${group}&file=${file}&step=${node.Step.Name}`;
+  const url = `/dags/${name}?t=${DetailTabId.StepLog}&file=${file}&step=${node.Step.Name}`;
   const buttonStyle = {
     margin: "0px",
     padding: "0px",

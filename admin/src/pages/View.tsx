@@ -82,11 +82,7 @@ function View() {
                 errors={data.Errors}
                 hasError={data.HasError}
               ></DAGErrors>
-              <DAGTable
-                DAGs={DAGs}
-                group={""}
-                refreshFn={doGet}
-              ></DAGTable>
+              <DAGTable DAGs={DAGs} group={""} refreshFn={doGet}></DAGTable>
             </React.Fragment>
           )}
         </WithLoading>

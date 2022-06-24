@@ -69,7 +69,7 @@ const defaultColumns = [
       } else {
         const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, "");
         const group = props.instance.options.meta?.group || "";
-        const url = `/dags/${encodeURI(name)}?group=${encodeURI(group)}`;
+        const url = `/dags/${encodeURI(name)}`;
         return <Link to={url}>{props.getValue()}</Link>;
       }
     },

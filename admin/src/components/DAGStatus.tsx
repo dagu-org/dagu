@@ -14,11 +14,10 @@ import { Box, Tab, Tabs, Paper } from "@mui/material";
 type Props = {
   DAG: DAG;
   name: string;
-  group: string;
   refresh: () => void;
 };
 
-function DAGStatus({ DAG, group, name, refresh }: Props) {
+function DAGStatus({ DAG, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
   const [sub, setSub] = React.useState("0");
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(

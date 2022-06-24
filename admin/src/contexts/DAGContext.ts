@@ -7,5 +7,4 @@ export const DAGContext = React.createContext({
   data: null as GetDAGResponse | null,
   name: "",
   tab: DetailTabId.Status,
-  group: "",
 });

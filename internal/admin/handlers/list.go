@@ -18,15 +18,6 @@ type dagListResponse struct {
 	Views    []*views.View
 }
 
-type dagListParameter struct {
-	Group string
-}
-
-type group struct {
-	Name string
-	Dir  string
-}
-
 type DAGListHandlerConfig struct {
 	DAGsDir string
 }
