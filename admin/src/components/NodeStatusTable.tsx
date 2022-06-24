@@ -20,18 +20,10 @@ type Props = {
   file?: string;
   status: Status;
   name: string;
-  group: string;
   refresh: () => void;
 };
 
-function NodeStatusTable({
-  nodes,
-  status,
-  group,
-  name,
-  refresh,
-  file = "",
-}: Props) {
+function NodeStatusTable({ nodes, status, name, refresh, file = "" }: Props) {
   const [modal, setModal] = React.useState(false);
   const [current, setCurrent] = React.useState<Step | undefined>(undefined);
   const { doPost } = useDAGPostAPI({
@@ -88,7 +80,6 @@ function NodeStatusTable({
                 rownum={idx + 1}
                 node={n}
                 file={file}
-                group={group}
                 name={name}
                 onRequireModal={requireModal}
               ></NodeStatusTableRow>

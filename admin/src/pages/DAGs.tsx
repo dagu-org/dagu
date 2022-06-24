@@ -7,13 +7,13 @@ import DAGTable from "../components/DAGTable";
 import Title from "../components/Title";
 import Paper from "@mui/material/Paper";
 import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
-import { DAGItem, DAGDataType } from "../models/Dag";
+import { DAGItem, DAGDataType } from "../models/DAGData";
 import { useLocation } from "react-router-dom";
 import { GetDAGsResponse } from "../api/DAGs";
 
 function DAGs() {
   const useQuery = () => new URLSearchParams(useLocation().search);
-  let query = useQuery();
+  const query = useQuery();
   const group = query.get("group") || "";
 
   const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
@@ -22,7 +22,7 @@ function DAGs() {
     doGet();
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
-  }, [group]);
+  }, []);
 
   const merged = React.useMemo(() => {
     const ret: DAGItem[] = [];
@@ -38,7 +38,7 @@ function DAGs() {
       }
     }
     return ret;
-  }, [data, query.get("group")]);
+  }, [data]);
 
   return (
     <Paper

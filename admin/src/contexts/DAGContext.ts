@@ -1,11 +1,10 @@
 import React from "react";
 import { GetDAGResponse } from "../api/DAG";
-import { DetailTabId } from "../models/Dag";
+import { DetailTabId } from "../models/DAGData";
 
 export const DAGContext = React.createContext({
   refresh: () => {},
   data: null as GetDAGResponse | null,
   name: "",
   tab: DetailTabId.Status,
-  group: "",
 });

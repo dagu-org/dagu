@@ -1,4 +1,4 @@
-import { DAG } from "../models/Dag";
+import { DAG } from "../models/DAGData";
 import { Group } from "../models/Group";
 
 export type GetDAGsResponse = {

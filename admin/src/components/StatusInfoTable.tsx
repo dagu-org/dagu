@@ -1,6 +1,6 @@
 import React, { CSSProperties } from "react";
 import { Status } from "../models/Status";
-import { DetailTabId } from "../models/Dag";
+import { DetailTabId } from "../models/DAGData";
 import StatusChip from "./StatusChip";
 import {
   Paper,
@@ -14,11 +14,10 @@ import {
 type Props = {
   status?: Status;
   name: string;
-  group: string;
   file?: string;
 };
 
-function StatusInfoTable({ status, name, group, file = "" }: Props) {
+function StatusInfoTable({ status, name, file = "" }: Props) {
   const tableStyle: CSSProperties = {
     tableLayout: "fixed",
     wordWrap: "break-word",
@@ -26,7 +25,7 @@ function StatusInfoTable({ status, name, group, file = "" }: Props) {
   const styles = statusTabColStyles;
   const url = `/dags/${name}?t=${
     DetailTabId.ScLog
-  }&group=${group}&file=${encodeURI(file)}`;
+  }&file=${encodeURI(file)}`;
   let i = 0;
   if (!status) {
     return null;

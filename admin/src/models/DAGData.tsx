@@ -26,7 +26,6 @@ export type DAGData = {
 export type DAGGroup = {
   Type: DAGDataType.Group;
   Name: string;
-  DAGs: DAGData[];
 };
 
 export function getFirstTag(data?: DAGItem): string {
