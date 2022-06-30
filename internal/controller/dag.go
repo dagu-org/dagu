@@ -18,12 +18,8 @@ type DAG struct {
 	ErrorT *string
 }
 
-// FromConfig loads DAG from config file.
-func FromConfig(file string) (*DAG, error) {
-	return fromConfig(file, false)
-}
-
-func fromConfig(file string, headOnly bool) (*DAG, error) {
+// NewDAG loads DAG from config file.
+func NewDAG(file string, headOnly bool) (*DAG, error) {
 	cl := config.Loader{}
 	var cfg *config.Config
 	var err error

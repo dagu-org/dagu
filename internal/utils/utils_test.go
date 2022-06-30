@@ -191,3 +191,8 @@ func TestStringWithFallback(t *testing.T) {
 	require.Equal(t, "test", utils.StringWithFallback("", "test"))
 	require.Equal(t, "test", utils.StringWithFallback("test", "fallback"))
 }
+
+func TestMatchExtension(t *testing.T) {
+	require.True(t, utils.MatchExtension("test.txt", []string{".csv", ".txt"}))
+	require.False(t, utils.MatchExtension("test.txt", []string{".csv"}))
+}

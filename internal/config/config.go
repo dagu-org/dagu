@@ -52,6 +52,8 @@ type MailOn struct {
 	Success bool
 }
 
+var EXTENSIONS = []string{".yaml", ".yml"}
+
 func ReadConfig(file string) (string, error) {
 	b, err := os.ReadFile(file)
 	if err != nil {

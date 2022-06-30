@@ -21,7 +21,7 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{},
 	}, t)
 
-	dag, err := controller.FromConfig(configPath)
+	dag, err := controller.NewDAG(configPath, false)
 	require.NoError(t, err)
 	require.Equal(t, dag.Status.Status, scheduler.SchedulerStatus_Success)
 
