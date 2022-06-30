@@ -187,11 +187,6 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 			c.StartAsync(hc.Bin, hc.WkDir, "")
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
-				return
-			}
 
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {
