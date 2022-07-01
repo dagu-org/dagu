@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"path"
 
@@ -36,6 +35,5 @@ func startScheduler(cfg *admin.Config) error {
 		agent.Stop()
 	})
 
-	log.Printf("starting dagu scheduler")
 	return agent.Start()
 }
