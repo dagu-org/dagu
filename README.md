@@ -40,6 +40,7 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Redirection](#redirection)
     - [State Handlers](#state-handlers)
     - [Repeating Task](#repeating-task)
+    - [Schedule](#schedule)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
@@ -122,6 +123,7 @@ You can execute the example by pressing the `Start` button.
 - `dagu stop <file>` - Stops the DAG execution by sending TERM signals
 - `dagu dry [--params=<params>] <file>` - Dry-runs the DAG
 - `dagu server` - Starts the web server for web UI
+- `dagu scheduler` - Starts the scheduler process
 - `dagu version` - Shows the current binary version
 
 ## Web User Interface
@@ -303,6 +305,17 @@ steps:
     repeatPolicy:
       repeat: true
       intervalSec: 60
+```
+
+### Schedule
+
+To run the DAG on a specific schedule, you can set a cron expression in the `schedule` field and start `dagu scheduler` process in the system.
+
+```yaml
+schedule: "5 4 * * *" # Run at 04:05.
+steps:
+  - name: scheduled job
+    command: job.sh
 ```
 
 ### All Available Fields
