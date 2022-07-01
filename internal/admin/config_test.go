@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 var testLoadConfigYaml = `
@@ -16,6 +17,7 @@ workdir: /dags_dir
 basicAuthUsername: user
 basicAuthPassword: password
 logEncodingCharset: utf-8
+logDir: /var/log/dagu
 `
 
 func TestLoadConfig(t *testing.T) {
@@ -36,6 +38,7 @@ func TestLoadConfig(t *testing.T) {
 				BasicAuthPassword:  "password",
 				LogEncodingCharset: "utf-8",
 				Env:                []string{},
+				LogDir:             "/var/log/dagu",
 			},
 		},
 		{
@@ -50,6 +53,8 @@ func TestLoadConfig(t *testing.T) {
 				BasicAuthPassword:  "",
 				LogEncodingCharset: "",
 				Env:                []string{},
+				LogDir: settings.MustGet(
+					settings.SETTING__ADMIN_LOGS_DIR),
 			},
 		},
 	} {

@@ -1,3 +1,4 @@
+schedule: "* * * * *"
 tags: Daily
 steps:
   - name: "Initialize"

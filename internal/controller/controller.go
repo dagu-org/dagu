@@ -22,6 +22,7 @@ import (
 type Controller interface {
 	Stop() error
 	Start(bin string, workDir string, params string) error
+	StartAsync(bin string, workDir string, params string)
 	Retry(bin string, workDir string, reqId string) error
 	GetStatus() (*models.Status, error)
 	GetLastStatus() (*models.Status, error)
@@ -42,9 +43,8 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	fis, err := os.ReadDir(dir)
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
-		ex := filepath.Ext(fi.Name())
-		if ex == ".yaml" || ex == ".yml" {
-			dag, err := fromConfig(filepath.Join(dir, fi.Name()), true)
+		if utils.MatchExtension(fi.Name(), config.EXTENSIONS) {
+			dag, err := NewDAG(filepath.Join(dir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
 			if dag != nil {
 				dags = append(dags, dag)
@@ -100,23 +100,28 @@ func (c *controller) Stop() error {
 	return err
 }
 
-func (c *controller) Start(bin string, workDir string, params string) (err error) {
+func (c *controller) StartAsync(bin string, workDir string, params string) {
 	go func() {
-		args := []string{"start"}
-		if params != "" {
-			args = append(args, fmt.Sprintf("--params=\"%s\"", params))
-		}
-		args = append(args, c.ConfigPath)
-		cmd := exec.Command(bin, args...)
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-		cmd.Dir = workDir
-		cmd.Env = os.Environ()
-		defer cmd.Wait()
-		err = cmd.Start()
+		err := c.Start(bin, workDir, params)
 		utils.LogErr("starting a DAG", err)
 	}()
-	time.Sleep(time.Millisecond * 500)
-	return
+}
+
+func (c *controller) Start(bin string, workDir string, params string) error {
+	args := []string{"start"}
+	if params != "" {
+		args = append(args, fmt.Sprintf("--params=\"%s\"", params))
+	}
+	args = append(args, c.ConfigPath)
+	cmd := exec.Command(bin, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
 }
 
 func (c *controller) Retry(bin string, workDir string, reqId string) (err error) {

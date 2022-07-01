@@ -1,9 +1,6 @@
 package dagu
 
 import (
-	"bytes"
-	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -49,7 +46,7 @@ func TestRunDAG(t *testing.T) {
 
 func TestCheckRunning(t *testing.T) {
 	config := testConfig("agent_is_running.yaml")
-	dag, err := controller.FromConfig(config)
+	dag, err := controller.NewDAG(config, false)
 	require.NoError(t, err)
 
 	a := &Agent{AgentConfig: &AgentConfig{
@@ -72,7 +69,7 @@ func TestCheckRunning(t *testing.T) {
 }
 
 func TestDryRun(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_dry.yaml"))
+	dag, err := controller.NewDAG(testConfig("agent_dry.yaml"), false)
 	require.NoError(t, err)
 
 	a := &Agent{AgentConfig: &AgentConfig{
@@ -104,7 +101,7 @@ func TestCancelDAG(t *testing.T) {
 }
 
 func TestPreConditionInvalid(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_multiple_steps.yaml"))
+	dag, err := controller.NewDAG(testConfig("agent_multiple_steps.yaml"), false)
 	require.NoError(t, err)
 
 	dag.Config.Preconditions = []*config.Condition{
@@ -123,7 +120,7 @@ func TestPreConditionInvalid(t *testing.T) {
 }
 
 func TestPreConditionValid(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_with_params.yaml"))
+	dag, err := controller.NewDAG(testConfig("agent_with_params.yaml"), false)
 	require.NoError(t, err)
 
 	dag.Config.Preconditions = []*config.Condition{
@@ -142,7 +139,7 @@ func TestPreConditionValid(t *testing.T) {
 }
 
 func TestStartError(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_error.yaml"))
+	dag, err := controller.NewDAG(testConfig("agent_error.yaml"), false)
 	require.NoError(t, err)
 	status, err := testDAG(t, dag)
 	require.Error(t, err)
@@ -151,7 +148,7 @@ func TestStartError(t *testing.T) {
 }
 
 func TestOnExit(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_on_exit.yaml"))
+	dag, err := controller.NewDAG(testConfig("agent_on_exit.yaml"), false)
 	require.NoError(t, err)
 	status, err := testDAG(t, dag)
 	require.NoError(t, err)
@@ -165,7 +162,7 @@ func TestOnExit(t *testing.T) {
 
 func TestRetry(t *testing.T) {
 	cfg := testConfig("agent_retry.yaml")
-	dag, err := controller.FromConfig(cfg)
+	dag, err := controller.NewDAG(cfg, false)
 	require.NoError(t, err)
 
 	status, err := testDAG(t, dag)
@@ -197,7 +194,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestHandleHTTP(t *testing.T) {
-	dag, err := controller.FromConfig(testConfig("agent_handle_http.yaml"))
+	dag, err := controller.NewDAG(testConfig("agent_handle_http.yaml"), false)
 	require.NoError(t, err)
 
 	a := &Agent{AgentConfig: &AgentConfig{
@@ -295,7 +292,7 @@ func testConfig(name string) string {
 func testDAGAsync(t *testing.T, file string) (*Agent, *controller.DAG) {
 	t.Helper()
 
-	dag, err := controller.FromConfig(file)
+	dag, err := controller.NewDAG(file, false)
 	require.NoError(t, err)
 
 	a := &Agent{AgentConfig: &AgentConfig{
@@ -307,44 +304,4 @@ func testDAGAsync(t *testing.T, file string) (*Agent, *controller.DAG) {
 	}()
 
 	return a, dag
-}
-
-func TestTeeLogger(t *testing.T) {
-	origStdout := os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stdout = w
-	log.SetOutput(w)
-
-	defer func() {
-		os.Stdout = origStdout
-		log.SetOutput(origStdout)
-	}()
-
-	tmpDir := utils.MustTempDir("test-tee-logger")
-	tmpFile := path.Join(tmpDir, "test.log")
-	f, err := os.Create(tmpFile)
-	require.NoError(t, err)
-	l := &teeLogger{File: f}
-	err = l.Open()
-	require.NoError(t, err)
-
-	text := "test log"
-	log.Println(text)
-	os.Stdout = origStdout
-	_ = w.Close()
-	l.Close()
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
-
-	s := buf.String()
-	require.Contains(t, s, text)
-
-	f, err = os.Open(tmpFile)
-	require.NoError(t, err)
-	b, err := io.ReadAll(f)
-	require.NoError(t, err)
-	require.Contains(t, string(b), text)
 }

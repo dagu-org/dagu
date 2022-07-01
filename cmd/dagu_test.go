@@ -23,13 +23,16 @@ type appTest struct {
 	stdin       io.ReadCloser
 }
 
-var testsDir = path.Join(utils.MustGetwd(), "../tests/testdata")
+var (
+	testsDir    = path.Join(utils.MustGetwd(), "../tests/testdata")
+	testHomeDir = ""
+)
 
 func TestMain(m *testing.M) {
-	tempDir := utils.MustTempDir("dagu_test")
-	settings.ChangeHomeDir(tempDir)
+	testHomeDir = utils.MustTempDir("dagu_test")
+	settings.ChangeHomeDir(testHomeDir)
 	code := m.Run()
-	os.RemoveAll(tempDir)
+	os.RemoveAll(testHomeDir)
 	os.Exit(code)
 }
 

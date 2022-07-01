@@ -21,6 +21,11 @@ server:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
 	go run -ldflags="$(LDFLAGS)" ./cmd/ server
 
+.PHONY: scheduler
+scheduler:
+	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
+	go run -ldflags="$(LDFLAGS)" ./cmd/ scheduler
+
 .PHONY: test
 test: build
 	go test ./...

@@ -19,6 +19,7 @@ const (
 	SETTING__ADMIN_PORT         = "DAGU__ADMIN_PORT"
 	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
+	SETTING__ADMIN_LOGS_DIR     = "DAGU__ADMIN_LOGS_DIR"
 )
 
 // MustGet returns the value of the setting or
@@ -41,8 +42,8 @@ func Get(name string) (string, error) {
 
 // ChangeHomeDir changes the home directory and reloads
 // the settings.
-func ChangeHomeDir(dir string) {
-	os.Setenv("HOME", dir)
+func ChangeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
 	load()
 }
 
@@ -53,19 +54,22 @@ func init() {
 }
 
 func load() {
-	dir := utils.MustGetUserHomeDir()
+	homeDir := utils.MustGetUserHomeDir()
 
 	cache = map[string]string{}
 	cache[SETTING__DATA_DIR] = readEnv(
 		SETTING__DATA_DIR,
-		path.Join(dir, "/.dagu/data"))
+		path.Join(homeDir, "/.dagu/data"))
 	cache[SETTING__LOGS_DIR] = readEnv(SETTING__LOGS_DIR,
-		path.Join(dir, "/.dagu/logs"))
+		path.Join(homeDir, "/.dagu/logs"))
 	cache[SETTING__VIEWS_DIR] = readEnv(SETTING__VIEWS_DIR,
-		path.Join(dir, "/.dagu/views"))
+		path.Join(homeDir, "/.dagu/views"))
+
 	cache[SETTING__ADMIN_PORT] = readEnv(SETTING__ADMIN_PORT, "8080")
 	cache[SETTING__ADMIN_NAVBAR_COLOR] = readEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
 	cache[SETTING__ADMIN_NAVBAR_TITLE] = readEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
+	cache[SETTING__ADMIN_LOGS_DIR] = readEnv(SETTING__ADMIN_LOGS_DIR,
+		path.Join(homeDir, "/.dagu/logs/admin"))
 }
 
 func readEnv(env, def string) string {

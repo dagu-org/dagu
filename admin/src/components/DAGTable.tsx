@@ -234,6 +234,23 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
+  table.createDataColumn("Type", {
+    id: "Schedule",
+    header: "Schedule",
+    enableSorting: false,
+    cell: (props) => {
+      const data = props.row.original!;
+      if (data.Type == DAGDataType.DAG) {
+        const sc = data.DAG.Config.ScheduleExp;
+        if (sc) {
+          return (
+            <Chip sx={{ fontWeight: "semibold" }} size="small" label={sc} />
+          );
+        }
+      }
+      return null;
+    },
+  }),
   table.createDisplayColumn({
     id: "Actions",
     header: "Actions",

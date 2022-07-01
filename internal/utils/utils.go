@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -176,4 +177,24 @@ func StringWithFallback(val, fallback string) string {
 		return fallback
 	}
 	return val
+}
+
+// MatchExtension returns true if extension matches.
+func MatchExtension(file string, exts []string) bool {
+	ext := filepath.Ext(file)
+	for _, e := range exts {
+		if e == ext {
+			return true
+		}
+	}
+	return false
+}
+
+var FixedTime time.Time
+
+func Now() time.Time {
+	if FixedTime.IsZero() {
+		return time.Now()
+	}
+	return FixedTime
 }

@@ -14,7 +14,8 @@ import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 
 const container = document.getElementById("root");
-const root = createRoot(container!);
+//@ts-ignore
+const root = createRoot(container);
 //@ts-ignore
 const config = getConfig();
 root.render(<App config={config} />);

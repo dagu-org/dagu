@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 
@@ -21,6 +22,7 @@ type Config struct {
 	BasicAuthUsername  string
 	BasicAuthPassword  string
 	LogEncodingCharset string
+	LogDir             string
 }
 
 func (c *Config) Init() {
@@ -39,6 +41,11 @@ func (c *Config) setup() {
 			panic(err)
 		}
 		c.DAGs = wd
+	}
+	if c.LogDir == "" {
+		c.LogDir = path.Join(
+			settings.MustGet(settings.SETTING__ADMIN_LOGS_DIR),
+		)
 	}
 	if c.Host == "" {
 		c.Host = "127.0.0.1"
@@ -89,6 +96,8 @@ func buildFromDefinition(def *configDefinition) (c *Config, err error) {
 			return nil, err
 		}
 	}
+	c.LogDir = def.LogDir
+
 	c.Command, err = utils.ParseVariable(def.Command)
 	if err != nil {
 		return nil, err

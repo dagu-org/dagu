@@ -3,7 +3,6 @@ package dagu
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mailer"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/reporter"
@@ -252,7 +252,7 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run() error {
-	tl := &teeLogger{File: a.logFile}
+	tl := &logger.TeeLogger{Writer: a.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}
@@ -401,18 +401,4 @@ func encodeError(w http.ResponseWriter, err error) {
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-type teeLogger struct {
-	*os.File
-}
-
-func (l *teeLogger) Open() error {
-	mw := io.MultiWriter(os.Stdout, l.File)
-	log.SetOutput(mw)
-	return nil
-}
-
-func (l *teeLogger) Close() {
-	log.SetOutput(os.Stdout)
 }
