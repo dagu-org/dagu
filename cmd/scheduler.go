@@ -15,6 +15,14 @@ func newSchedulerCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "scheduler",
 		Usage: "dagu scheduler",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "dags",
+				Usage:    "DAGs directory",
+				Value:    "",
+				Required: false,
+			},
+		},
 		Action: func(c *cli.Context) error {
 			cfg, err := l.LoadAdminConfig(
 				path.Join(utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
@@ -22,6 +30,10 @@ func newSchedulerCommand() *cli.Command {
 				cfg = admin.DefaultConfig()
 			} else if err != nil {
 				return err
+			}
+			dagsDir := c.String("dags")
+			if dagsDir != "" {
+				cfg.DAGs = dagsDir
 			}
 			return startScheduler(cfg)
 		},

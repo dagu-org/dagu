@@ -62,13 +62,13 @@ func TestReadEntries(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
+	utils.FixedTime = now
 
 	r := New(&Config{
 		Admin: &admin.Config{
 			Command: testBin,
 			DAGs:    testHomeDir,
 		},
-		Now: now,
 	})
 
 	tests := []struct {
@@ -106,10 +106,8 @@ func TestRun(t *testing.T) {
 
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-	r := New(&Config{
-		Now: n,
-	})
-	require.Equal(t, n, r.now())
+	utils.FixedTime = n
+	r := New(&Config{})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }

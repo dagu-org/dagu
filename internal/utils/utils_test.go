@@ -196,3 +196,11 @@ func TestMatchExtension(t *testing.T) {
 	require.True(t, utils.MatchExtension("test.txt", []string{".csv", ".txt"}))
 	require.False(t, utils.MatchExtension("test.txt", []string{".csv"}))
 }
+
+func TestFixedTIme(t *testing.T) {
+	tm := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	utils.FixedTime = tm
+	require.Equal(t, tm, utils.Now())
+	utils.FixedTime = time.Time{}
+	require.NotEqual(t, tm, utils.Now())
+}

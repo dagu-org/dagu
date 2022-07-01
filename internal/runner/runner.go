@@ -16,7 +16,6 @@ import (
 
 type Config struct {
 	Admin *admin.Config
-	Now   time.Time // For testing
 }
 
 type Runner struct {
@@ -39,14 +38,14 @@ func New(cfg *Config) *Runner {
 
 func (r *Runner) Start() {
 	r.init()
-	t := r.now().Truncate(time.Second * 60)
+	t := utils.Now().Truncate(time.Second * 60)
 	timer := time.NewTimer(0)
 	for {
 		select {
 		case <-timer.C:
 			r.run(t)
 			t = r.nextTick(t)
-			timer = time.NewTimer(t.Sub(r.now()))
+			timer = time.NewTimer(t.Sub(utils.Now()))
 		case <-r.stop:
 			_ = timer.Stop()
 			return
@@ -71,13 +70,6 @@ func (r *Runner) run(now time.Time) {
 		}
 		go runWithRecovery(e.Job)
 	}
-}
-
-func (r *Runner) now() time.Time {
-	if r.Now.IsZero() {
-		return time.Now()
-	}
-	return r.Now
 }
 
 func (r *Runner) nextTick(now time.Time) time.Time {

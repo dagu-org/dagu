@@ -16,7 +16,6 @@ import (
 
 type Agent struct {
 	*admin.Config
-	now     time.Time // For testing
 	stop    chan struct{}
 	logFile *os.File
 }
@@ -57,7 +56,7 @@ func (a *Agent) start() error {
 
 	log.Printf("starting dagu scheduler")
 	a.stop = make(chan struct{})
-	runner := New(&Config{Admin: a.Config, Now: a.now})
+	runner := New(&Config{Admin: a.Config})
 	a.registerRunnerShutdown(runner)
 
 	go runner.Start()

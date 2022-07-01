@@ -189,3 +189,12 @@ func MatchExtension(file string, exts []string) bool {
 	}
 	return false
 }
+
+var FixedTime time.Time
+
+func Now() time.Time {
+	if FixedTime.IsZero() {
+		return time.Now()
+	}
+	return FixedTime
+}
