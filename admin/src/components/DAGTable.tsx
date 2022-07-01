@@ -241,13 +241,12 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        return (
-          <Chip
-            sx={{ fontWeight: "semibold" }}
-            size="small"
-            label={data.DAG.Config.ScheduleExp}
-          />
-        );
+        const sc = data.DAG.Config.ScheduleExp;
+        if (sc) {
+          return (
+            <Chip sx={{ fontWeight: "semibold" }} size="small" label={sc} />
+          );
+        }
       }
       return null;
     },
