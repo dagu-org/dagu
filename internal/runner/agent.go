@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -81,12 +82,16 @@ func (a *Agent) registerRunnerShutdown(runner *Runner) {
 }
 
 func (a *Agent) setupLogFile() (err error) {
-	file := path.Join(a.LogDir, "scheduler.log")
-	dir := path.Dir(file)
+	filename := path.Join(
+		a.LogDir,
+		fmt.Sprintf("scheduler.%s.log",
+			time.Now().Format("20060102.15:04:05.000"),
+		))
+	dir := path.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	a.logFile, err = utils.OpenOrCreateFile(file)
+	a.logFile, err = utils.OpenOrCreateFile(filename)
 	return
 }
 
