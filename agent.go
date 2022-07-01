@@ -252,7 +252,7 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run() error {
-	tl := &logger.TeeLogger{File: a.logFile}
+	tl := &logger.TeeLogger{Writer: a.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}

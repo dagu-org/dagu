@@ -7,11 +7,11 @@ import (
 )
 
 type TeeLogger struct {
-	*os.File
+	Writer io.Writer
 }
 
 func (l *TeeLogger) Open() error {
-	mw := io.MultiWriter(os.Stdout, l.File)
+	mw := io.MultiWriter(os.Stdout, l.Writer)
 	log.SetOutput(mw)
 	return nil
 }
