@@ -123,7 +123,7 @@ You can execute the example by pressing the `Start` button.
 - `dagu stop <file>` - Stops the DAG execution by sending TERM signals
 - `dagu dry [--params=<params>] <file>` - Dry-runs the DAG
 - `dagu server` - Starts the web server for web UI
-- `dagu scheduler` - Starts the scheduler process
+- `dagu scheduler [--dags=<DAGs directory>]` - Starts the scheduler process
 - `dagu version` - Shows the current binary version
 
 ## Web User Interface
@@ -453,7 +453,7 @@ You can change the status of any task to a `failed` state. Then, when you retry 
 
 ### Does it provide sucheduler daemon?
 
-No, not yet. It is meant to be used with cron or other schedulers. If you could implement the scheduler daemon function and create a PR, it would be greatly appreciated.
+Yes. Please use `scheduler` subcommand.
 
 ### How does it track running processes without DBMS?
 
