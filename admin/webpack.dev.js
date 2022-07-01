@@ -18,9 +18,10 @@ module.exports = merge(common, {
         test: /\.tsx?$/,
         use: [
           {
-            loader: "ts-loader",
+            loader: "esbuild-loader",
             options: {
-              transpileOnly: true,
+              loader: "tsx",
+              target: "es2015",
             },
           },
         ],
