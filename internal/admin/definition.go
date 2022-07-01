@@ -7,6 +7,7 @@ type configDefinition struct {
 	Dags               string
 	Command            string
 	WorkDir            string
+	LogDir             string
 	IsBasicAuth        bool
 	BasicAuthUsername  string
 	BasicAuthPassword  string
