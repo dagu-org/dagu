@@ -21,6 +21,7 @@ type Config struct {
 	Group             string
 	Name              string
 	Schedule          cron.Schedule
+	ScheduleExp       string
 	Description       string
 	Env               []string
 	LogDir            string
@@ -179,6 +180,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	c.Delay = time.Second * time.Duration(def.DelaySec)
 	c.Tags = parseTags(def.Tags)
 
+	c.ScheduleExp = def.Schedule
 	if def.Schedule != "" {
 		c.Schedule, err = cronParser.Parse(def.Schedule)
 		if err != nil {
