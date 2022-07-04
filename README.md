@@ -45,6 +45,7 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
     - [Web UI Configuration](#web-ui-configuration)
+    - [Scheduler Log](#scheduler-log)
     - [Global Configuration](#global-configuration)
   - [REST API Interface](#rest-api-interface)
   - [FAQ](#faq)
@@ -403,6 +404,14 @@ command: <Absolute path to the dagu binary>                  # [optional] requir
 isBasicAuth: <true|false>                                    # [optional] basic auth config
 basicAuthUsername: <username for basic auth of web UI>       # [optional] basic auth config
 basicAuthPassword: <password for basic auth of web UI>       # [optional] basic auth config
+```
+
+### Scheduler Log
+
+The default path is `~/.dagu/logs/`. If you want to change this, you can set `log` field in `~/.dagu/admin.yaml`.
+
+```yaml
+logs: <path-to-log-files-for-scheduler>
 ```
 
 ### Global Configuration
