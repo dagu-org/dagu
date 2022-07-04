@@ -3,6 +3,7 @@ package logger
 import (
 	"os"
 	"path"
+	"sort"
 	"testing"
 	"time"
 
@@ -16,13 +17,13 @@ func TestSimpleLogger(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	rl := NewSimpleLogger(tmpDir, "test", time.Millisecond*200)
+	rl := NewSimpleLogger(tmpDir, "test", time.Millisecond*300)
 	rl.Open()
 
 	_, err := rl.Write([]byte("test log\n"))
 	require.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 250)
+	time.Sleep(time.Millisecond * 300)
 
 	_, err = rl.Write([]byte("test log2\n"))
 	require.NoError(t, err)
@@ -41,6 +42,10 @@ func TestSimpleLogger(t *testing.T) {
 	for _, fi := range fis {
 		require.Regexp(t, "test\\d{8}.\\d{2}:\\d{2}:\\d{2}.\\d{3}.log", fi.Name())
 	}
+
+	sort.Slice(fis, func(i, j int) bool {
+		return fis[i].Name() < fis[j].Name()
+	})
 
 	b, _ := os.ReadFile(path.Join(tmpDir, fis[0].Name()))
 	require.Equal(t, "test log\n", string(b))
