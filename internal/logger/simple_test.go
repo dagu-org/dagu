@@ -16,13 +16,13 @@ func TestSimpleLogger(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	rl := NewSimpleLogger(tmpDir, "test", time.Millisecond*100)
+	rl := NewSimpleLogger(tmpDir, "test", time.Millisecond*200)
 	rl.Open()
 
 	_, err := rl.Write([]byte("test log\n"))
 	require.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 250)
 
 	_, err = rl.Write([]byte("test log2\n"))
 	require.NoError(t, err)
@@ -47,4 +47,12 @@ func TestSimpleLogger(t *testing.T) {
 
 	b, _ = os.ReadFile(path.Join(tmpDir, fis[1].Name()))
 	require.Equal(t, "test log2\n", string(b))
+}
+
+func TestTimeToSwitchLog(t *testing.T) {
+	rl := NewSimpleLogger("", "test", time.Hour*24)
+	tm := rl.timeToSwitchLog()
+	d := time.Hour*24 - time.Until(tm)
+	require.GreaterOrEqual(t, d, time.Duration(0))
+	require.LessOrEqual(t, time.Second, d)
 }
