@@ -16,8 +16,8 @@ import (
 
 type Agent struct {
 	*admin.Config
-	stop    chan struct{}
-	logFile *os.File
+	stop   chan struct{}
+	logger *logger.SimpleLogger
 }
 
 func NewAgent(cfg *admin.Config) *Agent {
@@ -44,8 +44,7 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start() error {
-	// TODO: log rotation
-	tl := &logger.TeeLogger{Writer: a.logFile}
+	tl := &logger.TeeLogger{Writer: a.logger}
 	if err := tl.Open(); err != nil {
 		return err
 	}
@@ -90,13 +89,16 @@ func (a *Agent) setupLogFile() (err error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	a.logFile, err = utils.OpenOrCreateFile(filename)
+	a.logger = logger.NewSimpleLogger(
+		a.LogDir, "scheduler", time.Hour*24,
+	)
+	err = a.logger.Open()
 	return
 }
 
 func (a *Agent) closeLogFile() error {
-	if a.logFile != nil {
-		return a.logFile.Close()
+	if a.logger != nil {
+		return a.logger.Close()
 	}
 	return nil
 }
