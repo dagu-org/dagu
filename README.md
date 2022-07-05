@@ -310,10 +310,21 @@ steps:
 
 ### Schedule
 
-To run the DAG on a specific schedule, you can set a cron expression in the `schedule` field and start `dagu scheduler` process in the system.
+To run the DAG on a specific schedule, you can specify the schedule it with cron expression in the `schedule` field. You need to keep `dagu scheduler` process running in the system.
 
 ```yaml
 schedule: "5 4 * * *" # Run at 04:05.
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+If you want to set multiple schedules, you can do it as follows:
+
+```yaml
+schedule:
+  - "30 7 * * *" # Run at 7:30
+  - "0 20 * * *" # Also run at 20:00
 steps:
   - name: scheduled job
     command: job.sh
@@ -326,6 +337,7 @@ Combining these settings gives you granular control over how the DAG runs.
 ```yaml
 name: all configuration              # Name (optional, default is filename)
 description: run a DAG               # Description
+schedule: "0 * * * *"                # Execution schedule (cron expression)
 group: DailyJobs                     # Group name to organize DAGs (optional)
 tags: example                        # Free tags (separated by comma)
 env:                                 # Environment variables
