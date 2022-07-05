@@ -92,9 +92,9 @@ func (r *Runner) readEntries(now time.Time) (entries []*Entry, err error) {
 					log.Printf("failed to read dag config: %s", err)
 					continue
 				}
-				if dag.Schedule != nil {
+				for _, sc := range dag.Schedule {
 					entries = append(entries, &Entry{
-						Next: dag.Schedule.Next(now),
+						Next: sc.Next(now),
 						Job: &job{
 							DAG:    dag,
 							Config: r.Config.Admin,

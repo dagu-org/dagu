@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/settings"
@@ -248,20 +247,32 @@ tags: %s
 }
 
 func TestSchedule(t *testing.T) {
-	tm := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, test := range []struct {
-		Schedule string
-		Want     time.Time
+		Def  string
+		Err  bool
+		Want int
 	}{
 		{
-			Schedule: "*/5 * * * *",
-			Want:     tm.Add(5 * time.Minute),
+			Def:  "schedule: \"*/5 * * * *\"",
+			Want: 1,
+		},
+		{
+			Def: `schedule:
+  - "*/5 * * * *"
+  - "* * * * *"`,
+			Want: 2,
+		},
+		{
+			Def: `schedule:
+  - true 
+  - "* * * * *"`,
+			Err: true,
 		},
 	} {
 		l := &Loader{
 			HomeDir: utils.MustGetUserHomeDir(),
 		}
-		d, err := l.unmarshalData([]byte(fmt.Sprintf(`schedule: "%s"`, test.Schedule)))
+		d, err := l.unmarshalData([]byte(test.Def))
 		require.NoError(t, err)
 
 		def, err := l.decode(d)
@@ -269,9 +280,14 @@ func TestSchedule(t *testing.T) {
 
 		b := &builder{}
 		cfg, err := b.buildFromDefinition(def, nil)
-		require.NoError(t, err)
 
-		require.Equal(t, test.Want, cfg.Schedule.Next(tm))
+		if test.Err {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, test.Want, len(cfg.Schedule))
+		}
+
 	}
 }
 
