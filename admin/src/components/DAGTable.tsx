@@ -1,4 +1,4 @@
-import React, { HTMLProps } from "react";
+import React from "react";
 import {
   createTable,
   useTableInstance,
@@ -7,7 +7,6 @@ import {
   SortingState,
   getFilteredRowModel,
   ColumnFiltersState,
-  Row,
   ExpandedState,
   getExpandedRowModel,
 } from "@tanstack/react-table";
@@ -237,14 +236,26 @@ const defaultColumns = [
   table.createDataColumn("Type", {
     id: "Schedule",
     header: "Schedule",
-    enableSorting: false,
+    enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const sc = data.DAG.Config.ScheduleExp;
-        if (sc) {
+        const schedules = data.DAG.Config.ScheduleExp;
+        if (schedules) {
           return (
-            <Chip sx={{ fontWeight: "semibold" }} size="small" label={sc} />
+            <React.Fragment>
+              {schedules.map((s) => (
+                <Chip
+                  key={s}
+                  sx={{
+                    fontWeight: "semibold",
+                    marginRight: 1,
+                  }}
+                  size="small"
+                  label={s}
+                />
+              ))}
+            </React.Fragment>
           );
         }
       }
