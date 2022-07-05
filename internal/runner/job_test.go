@@ -38,11 +38,11 @@ func TestJob(t *testing.T) {
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 
 	// Fail to run the job because it's already finished
-	j = &job{
+	j2 := &job{
 		DAG:       dag,
 		Config:    testConfig(),
-		StartTime: time.Now().Add(-time.Minute),
+		StartTime: j.StartTime,
 	}
-	err = j.Run()
+	err = j2.Run()
 	require.Equal(t, ErrJobFinished, err)
 }

@@ -93,11 +93,13 @@ func (r *Runner) readEntries(now time.Time) (entries []*Entry, err error) {
 					continue
 				}
 				for _, sc := range dag.Schedule {
+					next := sc.Next(now)
 					entries = append(entries, &Entry{
 						Next: sc.Next(now),
 						Job: &job{
-							DAG:    dag,
-							Config: r.Config.Admin,
+							DAG:       dag,
+							Config:    r.Config.Admin,
+							StartTime: next,
 						},
 					})
 				}
