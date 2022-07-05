@@ -35,16 +35,21 @@ func (j *job) Run() error {
 	if err != nil {
 		return err
 	}
-	if s.Status == scheduler.SchedulerStatus_Running {
+	switch s.Status {
+	case scheduler.SchedulerStatus_Running:
 		// already running
 		return ErrJobRunning
-	}
-	if !j.StartTime.IsZero() {
-		// check if it's already finished
-		t, _ := utils.ParseTime(s.StartedAt)
-		if j.StartTime.Before(t) || j.StartTime.Equal(t) {
-			return ErrJobFinished
+	case scheduler.SchedulerStatus_None:
+	default:
+		// check the last execution time
+		t, err := utils.ParseTime(s.StartedAt)
+		if err == nil {
+			t = t.Truncate(time.Second * 60)
+			if t.After(j.StartTime) || j.StartTime.Equal(t) {
+				return ErrJobFinished
+			}
 		}
+		// should not be here
 	}
 	return c.Start(j.Config.Command, j.Config.WorkDir, "")
 }

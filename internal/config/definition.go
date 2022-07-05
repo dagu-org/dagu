@@ -4,7 +4,7 @@ type configDefinition struct {
 	Name              string
 	Group             string
 	Description       string
-	Schedule          string
+	Schedule          interface{}
 	LogDir            string
 	Env               interface{}
 	HandlerOn         handerOnDef

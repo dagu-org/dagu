@@ -104,6 +104,42 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestRunOnlyOnce(t *testing.T) {
+	cfg := testDag(t, "job1", "* * * * *", "true")
+	cont := controller.New(cfg)
+	// now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
+	utils.FixedTime = time.Time{}
+
+	startRunner := func() *Runner {
+		r := New(&Config{
+			Admin: &admin.Config{
+				Command: testBin,
+				DAGs:    testHomeDir,
+			},
+		})
+		go func() {
+			r.Start()
+		}()
+		return r
+	}
+
+	r := startRunner()
+	time.Sleep(time.Second + time.Millisecond*100)
+	r.Stop()
+
+	s, _ := cont.GetLastStatus()
+	require.Equal(t, scheduler.SchedulerStatus_Success, s.Status)
+	s.Status = scheduler.SchedulerStatus_Error
+	cont.UpdateStatus(s)
+
+	r = startRunner()
+	time.Sleep(time.Second + time.Millisecond*100)
+	r.Stop()
+
+	s, _ = cont.GetLastStatus()
+	require.Equal(t, scheduler.SchedulerStatus_Error, s.Status)
+}
+
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n

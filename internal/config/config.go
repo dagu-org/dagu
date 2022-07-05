@@ -20,8 +20,8 @@ type Config struct {
 	ConfigPath        string
 	Group             string
 	Name              string
-	Schedule          cron.Schedule
-	ScheduleExp       string
+	Schedule          []cron.Schedule
+	ScheduleExp       []string
 	Description       string
 	Env               []string
 	LogDir            string
@@ -180,12 +180,26 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	c.Delay = time.Second * time.Duration(def.DelaySec)
 	c.Tags = parseTags(def.Tags)
 
-	c.ScheduleExp = def.Schedule
-	if def.Schedule != "" {
-		c.Schedule, err = cronParser.Parse(def.Schedule)
-		if err != nil {
-			return nil, fmt.Errorf("invalid schedule: %s", err)
+	switch (def.Schedule).(type) {
+	case string:
+		c.ScheduleExp = []string{def.Schedule.(string)}
+	case []interface{}:
+		items := []string{}
+		for _, s := range def.Schedule.([]interface{}) {
+			if a, ok := s.(string); ok {
+				items = append(items, a)
+			} else {
+				return nil, fmt.Errorf("schedule must be a string or an array of strings")
+			}
 		}
+		c.ScheduleExp = items
+	case nil:
+	default:
+		return nil, fmt.Errorf("invalid schedule type: %T", def.Schedule)
+	}
+	c.Schedule, err = parseSchedule(c.ScheduleExp)
+	if err != nil {
+		return nil, err
 	}
 
 	if b.headOnly {
@@ -492,6 +506,18 @@ func parseTags(value string) []string {
 		}
 	}
 	return ret
+}
+
+func parseSchedule(values []string) ([]cron.Schedule, error) {
+	ret := []cron.Schedule{}
+	for _, v := range values {
+		sc, err := cronParser.Parse(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid schedule: %s", err)
+		}
+		ret = append(ret, sc)
+	}
+	return ret, nil
 }
 
 func assertDef(def *configDefinition) error {

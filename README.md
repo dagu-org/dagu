@@ -56,6 +56,7 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
     - [Does it provide sucheduler daemon?](#does-it-provide-sucheduler-daemon)
     - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
+    - [How to run scheduler process running](#how-to-run-scheduler-process-running)
   - [License](#license)
   - [Contributors](#contributors)
 
@@ -310,10 +311,21 @@ steps:
 
 ### Schedule
 
-To run the DAG on a specific schedule, you can set a cron expression in the `schedule` field and start `dagu scheduler` process in the system.
+To run the DAG on a specific schedule, you can specify the schedule it with cron expression in the `schedule` field. You need to keep `dagu scheduler` process running in the system.
 
 ```yaml
 schedule: "5 4 * * *" # Run at 04:05.
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+If you want to set multiple schedules, you can do it as follows:
+
+```yaml
+schedule:
+  - "30 7 * * *" # Run at 7:30
+  - "0 20 * * *" # Also run at 20:00
 steps:
   - name: scheduled job
     command: job.sh
@@ -326,6 +338,7 @@ Combining these settings gives you granular control over how the DAG runs.
 ```yaml
 name: all configuration              # Name (optional, default is filename)
 description: run a DAG               # Description
+schedule: "0 * * * *"                # Execution schedule (cron expression)
 group: DailyJobs                     # Group name to organize DAGs (optional)
 tags: example                        # Free tags (separated by comma)
 env:                                 # Environment variables
@@ -467,6 +480,26 @@ Yes. Please use `scheduler` subcommand.
 ### How does it track running processes without DBMS?
 
 Dagu uses Unix sockets to communicate with running processes.
+
+### How to run scheduler process running
+
+Easiest way is to create the simple script and call it every minutes using cron. It does not need root account.
+
+```bash
+#!/bin/bash
+process="dagu scheduler"
+command="/usr/bin/dagu scheduler"
+
+if ps ax | grep -v grep | grep "$process" > /dev/null
+then
+    exit
+else
+    $command &
+fi
+
+exit
+```
+
 
 ## License
 
