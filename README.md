@@ -56,7 +56,7 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
     - [Does it provide sucheduler daemon?](#does-it-provide-sucheduler-daemon)
     - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
-    - [How to run scheduler process running](#how-to-run-scheduler-process-running)
+    - [How to keep scheduler process running](#how-to-keep-scheduler-process-running)
   - [License](#license)
   - [Contributors](#contributors)
 
@@ -481,7 +481,7 @@ Yes. Please use `scheduler` subcommand.
 
 Dagu uses Unix sockets to communicate with running processes.
 
-### How to run scheduler process running
+### How to keep scheduler process running
 
 Easiest way is to create the simple script and call it every minutes using cron. It does not need root account.
 
