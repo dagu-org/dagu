@@ -33,6 +33,7 @@ import {
   getStatusField,
   DAGItem,
   DAGDataType,
+  getNextSchedule,
 } from "../models/DAGData";
 import StyledTableRow from "./StyledTableRow";
 import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material";
@@ -260,6 +261,14 @@ const defaultColumns = [
         }
       }
       return null;
+    },
+    sortingFn: (a, b) => {
+      const dataA = a.original!;
+      const dataB = b.original!;
+      if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
+        return dataA!.Type - dataB!.Type;
+      }
+      return getNextSchedule(dataA.DAG) - getNextSchedule(dataB.DAG);
     },
   }),
   table.createDisplayColumn({

@@ -1,5 +1,7 @@
 import { Config } from "./Config";
 import { SchedulerStatus, Status } from "./Status";
+import cronParser from "cron-parser";
+import moment from "moment";
 
 export type DAG = {
   File: string;
@@ -64,6 +66,16 @@ export function getStatusField(
     return data.DAG.Status?.[field] || "";
   }
   return "";
+}
+
+export function getNextSchedule(data: DAG): number {
+  const schedules = data.Config.ScheduleExp;
+  if (!schedules || schedules.length == 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const datesToRun = schedules.map((s) => cronParser.parseExpression(s).next());
+  const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
+  return sorted[0].getTime();
 }
 
 export enum DetailTabId {
