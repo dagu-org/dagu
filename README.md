@@ -40,13 +40,13 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Redirection](#redirection)
     - [State Handlers](#state-handlers)
     - [Repeating Task](#repeating-task)
-    - [Execution Schedule](#execution-schedule)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
     - [Web UI Configuration](#web-ui-configuration)
     - [Global Configuration](#global-configuration)
   - [Scheduler](#scheduler)
+    - [Execution Schedule](#execution-schedule)
     - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
     - [Scheduler Configuration](#scheduler-configuration)
     - [Example Configuration](#example-configuration)
@@ -57,7 +57,6 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Where are the log files stored?](#where-are-the-log-files-stored)
     - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
     - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
-    - [Does it provide sucheduler daemon?](#does-it-provide-sucheduler-daemon)
     - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
   - [License](#license)
   - [Contributors](#contributors)
@@ -148,7 +147,7 @@ You can execute the example by pressing the `Start` button.
 
   ![History](assets/images/ui-history.png?raw=true)
 
-- **DAG Execution Log**: It shows the detail log and standard output of each execution and steps.
+- **DAG Execution Log**: It shows the detail log and standard output of each execution and step.
 
   ![DAG Log](assets/images/ui-logoutput.png?raw=true)
 
@@ -156,7 +155,7 @@ You can execute the example by pressing the `Start` button.
 
 ### Minimal Definition
 
-Minimal DAG definition is as simple as follows:
+The minimal DAG definition is as simple as follows:
 
 ```yaml
 steps:
@@ -189,7 +188,7 @@ steps:
 
 ### Environment Variables
 
-You can define environment variables and refer using `env` field.
+You can define environment variables and refer to using `env` field.
 
 ```yaml
 env:
@@ -311,28 +310,6 @@ steps:
       intervalSec: 60
 ```
 
-### Execution Schedule
-
-To run the DAG on a specific schedule, you can specify the schedule it with cron expression in the `schedule` field. You need to keep `dagu scheduler` process running in the system.
-
-```yaml
-schedule: "5 4 * * *" # Run at 04:05.
-steps:
-  - name: scheduled job
-    command: job.sh
-```
-
-Multiple schedules can be set as follows:
-
-```yaml
-schedule:
-  - "30 7 * * *" # Run at 7:30
-  - "0 20 * * *" # Also run at 20:00
-steps:
-  - name: scheduled job
-    command: job.sh
-```
-
 ### All Available Fields
 
 Combining these settings gives you granular control over how the DAG runs.
@@ -443,11 +420,33 @@ infoMail:
 
 ## Scheduler
 
-In order for the DAG to run automatically, the `dagu scheduler` process must be running on the system.
+To run DAGs automatically, you need to run `dagu scheduler` process on your system.
+
+### Execution Schedule
+
+You can specify the schedule with cron expression in the `schedule` field in the config file as follows:
+
+```yaml
+schedule: "5 4 * * *" # Run at 04:05.
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+Or you can set multiple schedules:
+
+```yaml
+schedule:
+  - "30 7 * * *" # Run at 7:30
+  - "0 20 * * *" # Also run at 20:00
+steps:
+  - name: scheduled job
+    command: job.sh
+```
 
 ### Run Scheduler as a daemon
 
-The easiest way to make sure the process is always running is to use the script like the following:
+The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
 
 ```bash
 #!/bin/bash
@@ -466,11 +465,9 @@ exit
 
 ### Scheduler Configuration
 
-The scheduler log files will be in in the directory `~/.dagu/logs/` by default. If you need to change this, put the `logDir` field in the configuration file `~/.dagu/admin.yaml`.
+The scheduler log files will be written in the directory `~/.dagu/logs/` by default. If you need to change this location, add the `logDir` field in the configuration file (`~/.dagu/admin.yaml`).
 
 ### Example Configuration
-
-The minimum scheduler setup is as follows. The configuration file must be saved in `~/.dagu/admin.yaml`.
 
 ```yaml
 dags: <the location of DAG configuration files>    # required
@@ -479,7 +476,7 @@ logDir: <absolute-path-to-log-files-for-scheduler> # optional
 
 ## REST API Interface
 
-Please refert to [REST API Docs](./docs/restapi.md)
+Please refer to [REST API Docs](./docs/restapi.md)
 
 ## FAQ
 
@@ -502,10 +499,6 @@ The default retention period for execution history is seven days. However, you c
 ### How can I retry a DAG from a specific task?
 
 You can change the status of any task to a `failed` state. Then, when you retry the DAG, it will execute the failed one and any subsequent.
-
-### Does it provide sucheduler daemon?
-
-Yes. Please use `scheduler` subcommand.
 
 ### How does it track running processes without DBMS?
 
