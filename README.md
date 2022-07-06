@@ -40,13 +40,16 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Redirection](#redirection)
     - [State Handlers](#state-handlers)
     - [Repeating Task](#repeating-task)
-    - [Schedule](#schedule)
+    - [Execution Schedule](#execution-schedule)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
     - [Web UI Configuration](#web-ui-configuration)
-    - [Scheduler Log](#scheduler-log)
     - [Global Configuration](#global-configuration)
+  - [Scheduler](#scheduler)
+    - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
+    - [Scheduler Configuration](#scheduler-configuration)
+    - [Example Configuration](#example-configuration)
   - [REST API Interface](#rest-api-interface)
   - [FAQ](#faq)
     - [How to contribute?](#how-to-contribute)
@@ -56,7 +59,6 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
     - [Does it provide sucheduler daemon?](#does-it-provide-sucheduler-daemon)
     - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
-    - [How to keep scheduler process running](#how-to-keep-scheduler-process-running)
   - [License](#license)
   - [Contributors](#contributors)
 
@@ -309,7 +311,7 @@ steps:
       intervalSec: 60
 ```
 
-### Schedule
+### Execution Schedule
 
 To run the DAG on a specific schedule, you can specify the schedule it with cron expression in the `schedule` field. You need to keep `dagu scheduler` process running in the system.
 
@@ -320,7 +322,7 @@ steps:
     command: job.sh
 ```
 
-If you want to set multiple schedules, you can do it as follows:
+Multiple schedules can be set as follows:
 
 ```yaml
 schedule:
@@ -419,14 +421,6 @@ basicAuthUsername: <username for basic auth of web UI>       # [optional] basic 
 basicAuthPassword: <password for basic auth of web UI>       # [optional] basic auth config
 ```
 
-### Scheduler Log
-
-The default path is `~/.dagu/logs/`. If you want to change this, you can set `log` field in `~/.dagu/admin.yaml`.
-
-```yaml
-logs: <path-to-log-files-for-scheduler>
-```
-
 ### Global Configuration
 
 Creating a global configuration `~/.dagu/config.yaml` is a convenient way to organize shared settings.
@@ -445,6 +439,42 @@ infoMail:
   from: <from address>              # [optional] mail configuration for info-level
   to: <to address>
   prefix: <prefix of mail subject>
+```
+
+## Scheduler
+
+In order for the DAG to run automatically, the `dagu scheduler` process must be running on the system.
+
+### Run Scheduler as a daemon
+
+The easiest way to make sure the process is always running is to use the script like the following:
+
+```bash
+#!/bin/bash
+process="dagu scheduler"
+command="/usr/bin/dagu scheduler"
+
+if ps ax | grep -v grep | grep "$process" > /dev/null
+then
+    exit
+else
+    $command &
+fi
+
+exit
+```
+
+### Scheduler Configuration
+
+The scheduler log files will be in in the directory `~/.dagu/logs/` by default. If you need to change this, put the `logDir` field in the configuration file `~/.dagu/admin.yaml`.
+
+### Example Configuration
+
+The minimum scheduler setup is as follows. The configuration file must be saved in `~/.dagu/admin.yaml`.
+
+```yaml
+dags: <the location of DAG configuration files>    # required
+logDir: <absolute-path-to-log-files-for-scheduler> # optional
 ```
 
 ## REST API Interface
@@ -480,26 +510,6 @@ Yes. Please use `scheduler` subcommand.
 ### How does it track running processes without DBMS?
 
 Dagu uses Unix sockets to communicate with running processes.
-
-### How to keep scheduler process running
-
-Easiest way is to create the simple script and call it every minutes using cron. It does not need root account.
-
-```bash
-#!/bin/bash
-process="dagu scheduler"
-command="/usr/bin/dagu scheduler"
-
-if ps ax | grep -v grep | grep "$process" > /dev/null
-then
-    exit
-else
-    $command &
-fi
-
-exit
-```
-
 
 ## License
 
