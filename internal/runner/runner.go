@@ -1,38 +1,23 @@
 package runner
 
 import (
-	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sort"
 	"time"
 
-	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-type Config struct {
-	Admin *admin.Config
-}
-
 type Runner struct {
-	*Config
-	running bool
-	stop    chan struct{}
+	entryReader EntryReader
+	running     bool
+	stop        chan struct{}
 }
 
-type Entry struct {
-	Next time.Time
-	Job  Job
-}
-
-func New(cfg *Config) *Runner {
+func New(er EntryReader) *Runner {
 	return &Runner{
-		Config: cfg,
-		stop:   make(chan struct{}),
+		entryReader: er,
+		stop:        make(chan struct{}),
 	}
 }
 
@@ -58,7 +43,7 @@ func (r *Runner) init() {
 }
 
 func (r *Runner) run(now time.Time) {
-	entries, err := r.readEntries(now.Add(-time.Second))
+	entries, err := r.entryReader.Read(now.Add(-time.Second))
 	utils.LogErr("failed to read entries", err)
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].Next.Before(entries[j].Next)
@@ -68,45 +53,19 @@ func (r *Runner) run(now time.Time) {
 		if t.After(now) {
 			break
 		}
-		go runWithRecovery(e.Job)
+		go func(e *Entry) {
+			if e.Job != nil {
+				err := e.Job.Run()
+				if err != nil {
+					log.Printf("runner: failed to run job %s: %v", e.Job, err)
+				}
+			}
+		}(e)
 	}
 }
 
 func (r *Runner) nextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
-}
-
-func (r *Runner) readEntries(now time.Time) (entries []*Entry, err error) {
-	cl := config.Loader{}
-	for {
-		fis, err := os.ReadDir(r.Admin.DAGs)
-		if err != nil {
-			return entries, fmt.Errorf("failed to read entries directory: %w", err)
-		}
-		for _, fi := range fis {
-			if utils.MatchExtension(fi.Name(), config.EXTENSIONS) {
-				dag, err := cl.LoadHeadOnly(
-					filepath.Join(r.Admin.DAGs, fi.Name()),
-				)
-				if err != nil {
-					log.Printf("failed to read dag config: %s", err)
-					continue
-				}
-				for _, sc := range dag.Schedule {
-					next := sc.Next(now)
-					entries = append(entries, &Entry{
-						Next: sc.Next(now),
-						Job: &job{
-							DAG:       dag,
-							Config:    r.Config.Admin,
-							StartTime: next,
-						},
-					})
-				}
-			}
-		}
-		return entries, nil
-	}
 }
 
 func (r *Runner) Stop() {
@@ -115,20 +74,4 @@ func (r *Runner) Stop() {
 	}
 	r.stop <- struct{}{}
 	r.running = false
-}
-
-func runWithRecovery(j Job) {
-	defer func() {
-		if r := recover(); r != nil {
-			const size = 64 << 10
-			buf := make([]byte, size)
-			buf = buf[:runtime.Stack(buf, false)]
-			log.Printf("runner: panic running job: %v\n%s", r, buf)
-		}
-	}()
-
-	err := j.Run()
-	if err != nil {
-		log.Printf("runner: failed to run job %s: %v", j, err)
-	}
 }

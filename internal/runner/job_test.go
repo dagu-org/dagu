@@ -1,48 +1,43 @@
 package runner
 
 import (
+	"path"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-func TestJob(t *testing.T) {
-	dag := testDag(t, "job_test", "* * * * *", "sleep 1")
+func TestJobRun(t *testing.T) {
+	file := path.Join(testsDir, "testdata/runner_job_run.yaml")
+	dag, err := controller.NewDAG(file, false)
+	require.NoError(t, err)
+	c := controller.New(dag.Config)
+
 	j := &job{
-		DAG:    dag,
-		Config: testConfig(),
+		DAG:       dag.Config,
+		Config:    testConfig,
+		StartTime: time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 	}
 
-	require.Equal(t, "job_test", j.String())
-
-	ch := make(chan struct{})
 	go func() {
-		err := j.Run()
-		require.NoError(t, err)
-		ch <- struct{}{}
+		_ = j.Run()
 	}()
 
-	// Fail to run the job because it's already running
-	time.Sleep(time.Millisecond * 500)
-	err := j.Run()
+	time.Sleep(time.Millisecond * 100)
+
+	err = j.Run()
 	require.Equal(t, ErrJobRunning, err)
 
-	<-ch
+	c.Stop()
+	time.Sleep(time.Millisecond * 100)
 
-	c := controller.New(dag)
-	status, err := c.GetLastStatus()
-	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	s, _ := c.GetLastStatus()
+	require.Equal(t, scheduler.SchedulerStatus_Cancel, s.Status)
 
-	// Fail to run the job because it's already finished
-	j2 := &job{
-		DAG:       dag,
-		Config:    testConfig(),
-		StartTime: j.StartTime,
-	}
-	err = j2.Run()
+	err = j.Run()
 	require.Equal(t, ErrJobFinished, err)
 }
