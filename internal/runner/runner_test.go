@@ -22,6 +22,7 @@ import (
 var (
 	testsDir    = path.Join(utils.MustGetwd(), "../../tests")
 	testBin     = path.Join(utils.MustGetwd(), "../../bin/dagu")
+	testConfig  = &admin.Config{Command: testBin}
 	testHomeDir string
 )
 
@@ -76,16 +77,19 @@ func TestRun(t *testing.T) {
 		Want   scheduler.SchedulerStatus
 	}{
 		{
-			Config: testDag(t, "job1", "0 1 * * *", "true"),
-			Want:   scheduler.SchedulerStatus_Success,
+			Config: temporaryDAG(t, "job1",
+				testDAGConfig(t, "0 1 * * *", "true")),
+			Want: scheduler.SchedulerStatus_Success,
 		},
 		{
-			Config: testDag(t, "job2", "10 1 * * *", "true"),
-			Want:   scheduler.SchedulerStatus_None,
+			Config: temporaryDAG(t, "job2",
+				testDAGConfig(t, "10 1 * * *", "true")),
+			Want: scheduler.SchedulerStatus_None,
 		},
 		{
-			Config: testDag(t, "job3", "30 1 * * *", "true"),
-			Want:   scheduler.SchedulerStatus_None,
+			Config: temporaryDAG(t, "job3",
+				testDAGConfig(t, "30 1 * * *", "true")),
+			Want: scheduler.SchedulerStatus_None,
 		},
 	}
 
@@ -105,7 +109,8 @@ func TestRun(t *testing.T) {
 }
 
 func TestRunOnlyOnce(t *testing.T) {
-	cfg := testDag(t, "job1", "* * * * *", "true")
+	cfg := temporaryDAG(t, "job1",
+		testDAGConfig(t, "* * * * *", "true"))
 	cont := controller.New(cfg)
 	// now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
 	utils.FixedTime = time.Time{}
@@ -149,7 +154,8 @@ func TestNextTick(t *testing.T) {
 }
 
 func TestRunWithRecovery(t *testing.T) {
-	dag := testDag(t, "failure", "* * * * *", "false")
+	dag := temporaryDAG(t, "failure",
+		testDAGConfig(t, "* * * * *", "false"))
 	job := &job{
 		DAG: dag,
 		Config: &admin.Config{
@@ -188,24 +194,21 @@ func TestRunWithRecovery(t *testing.T) {
 	require.Contains(t, s, "exit status 1")
 }
 
-func testDag(t *testing.T, name, schedule, command string) *config.Config {
+func testDAGConfig(t *testing.T, schedule, command string) string {
 	t.Helper()
-	f := path.Join(testHomeDir, fmt.Sprintf("%s.yaml", name))
-	err := os.WriteFile(f, []byte(fmt.Sprintf(`schedule: "%s"
+	return fmt.Sprintf(`schedule: "%s"
 steps:
   - name: step1
-    command: "%s"
-`, schedule, command)), 0644)
+    command: "%s"`, schedule, command)
+}
+
+func temporaryDAG(t *testing.T, name, cfg string) *config.Config {
+	t.Helper()
+	f := path.Join(testHomeDir, fmt.Sprintf("%s.yaml", name))
+	err := os.WriteFile(f, []byte(cfg), 0644)
 	require.NoError(t, err)
 	cl := &config.Loader{}
 	dag, err := cl.LoadHeadOnly(f)
 	require.NoError(t, err)
 	return dag
-}
-
-func testConfig() *admin.Config {
-	return &admin.Config{
-		Command: testBin,
-		WorkDir: "",
-	}
 }

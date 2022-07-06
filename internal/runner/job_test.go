@@ -10,10 +10,11 @@ import (
 )
 
 func TestJob(t *testing.T) {
-	dag := testDag(t, "job_test", "* * * * *", "sleep 1")
+	dag := temporaryDAG(t, "job_test",
+		testDAGConfig(t, "* * * * *", "sleep 1"))
 	j := &job{
 		DAG:    dag,
-		Config: testConfig(),
+		Config: testConfig,
 	}
 
 	require.Equal(t, "job_test", j.String())
@@ -40,7 +41,7 @@ func TestJob(t *testing.T) {
 	// Fail to run the job because it's already finished
 	j2 := &job{
 		DAG:       dag,
-		Config:    testConfig(),
+		Config:    testConfig,
 		StartTime: j.StartTime,
 	}
 	err = j2.Run()
