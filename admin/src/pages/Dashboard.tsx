@@ -72,7 +72,6 @@ function Dashboard() {
         </Grid>
       ))}
 
-      {/* {data?.DAGs ? ( */}
       <Grid item xs={12}>
         <Paper
           sx={{
@@ -84,7 +83,6 @@ function Dashboard() {
           <DashboardTimechart data={data?.DAGs || []} />
         </Paper>
       </Grid>
-      {/* ) : null} */}
     </Grid>
   );
 }

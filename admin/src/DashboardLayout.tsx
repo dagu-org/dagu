@@ -155,7 +155,6 @@ function DashboardContent({
             {[
               ["/", "Dashboard"],
               ["/dags", "DAGs"],
-              ["/views", "Views"],
             ].map((v) => (
               <Link
                 key={v[0]}
@@ -203,9 +202,6 @@ function DashboardContent({
           <Toolbar />
           <Grid container sx={{ mt: 4, mb: 4 }}>
             {children}
-            {/* <Grid item xs={12} sx={{ mt: 4 }}>
-              <Copyright />
-            </Grid> */}
           </Grid>
         </Box>
       </Box>

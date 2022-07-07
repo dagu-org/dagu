@@ -5,7 +5,6 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/admin/views"
 	"github.com/yohamta/dagu/internal/controller"
 )
 
@@ -15,7 +14,6 @@ type dagListResponse struct {
 	DAGs     []*controller.DAG
 	Errors   []string
 	HasError bool
-	Views    []*views.View
 }
 
 type DAGListHandlerConfig struct {
@@ -48,7 +46,6 @@ func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
 			DAGs:     dags,
 			Errors:   errs,
 			HasError: hasErr,
-			Views:    views.GetViews(),
 		}
 		if r.Header.Get("Accept") == "application/json" {
 			renderJson(w, data)
