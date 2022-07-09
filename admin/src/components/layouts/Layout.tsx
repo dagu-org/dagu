@@ -12,27 +12,9 @@ import IconButton from "@mui/material/IconButton";
 import Link from "@mui/material/Link";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import { mainListItems } from "./menu";
+import { mainListItems } from "../../menu";
 import { Grid, Stack } from "@mui/material";
-import Logo from "./components/Logo";
-
-function Copyright(props: any) {
-  return (
-    <Typography
-      variant="body2"
-      color="text.secondary"
-      align="center"
-      {...props}
-    >
-      {"Copyright © "}
-      <Link color="inherit" href="https://github.com/yohamta/dagu">
-        Dagu Authors
-      </Link>{" "}
-      {new Date().getFullYear()}
-      {"."}
-    </Typography>
-  );
-}
+import Logo from "../Logo";
 
 const drawerWidth: number = 240;
 
@@ -92,11 +74,7 @@ type DashboardContentProps = {
   children?: React.ReactElement | React.ReactElement[];
 };
 
-function DashboardContent({
-  title,
-  navbarColor,
-  children,
-}: DashboardContentProps) {
+function Content({ title, navbarColor, children }: DashboardContentProps) {
   const [open, setOpen] = React.useState(false);
   const toggleDrawer = () => {
     setOpen(!open);
@@ -211,9 +189,6 @@ function DashboardContent({
 
 type DashboardProps = DashboardContentProps;
 
-export default function DashboardLayout({
-  children,
-  ...props
-}: DashboardProps) {
-  return <DashboardContent {...props}>{children}</DashboardContent>;
+export default function Layout({ children, ...props }: DashboardProps) {
+  return <Content {...props}>{children}</Content>;
 }
