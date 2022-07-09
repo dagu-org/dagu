@@ -6,7 +6,9 @@
   "scripts": {
     "build": "webpack --config webpack.prod.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack-dev-server --config webpack.dev.js"
+    "start": "webpack-dev-server --config webpack.dev.js",
+    "lint": "eslint --fix src/**",
+    "prettier": "prettier --write ."
   },
   "repository": {
     "type": "git",
@@ -28,8 +30,10 @@
     "babel-loader": "^8.2.5",
     "css-loader": "^6.7.1",
     "esbuild-loader": "^2.19.0",
+    "eslint": "^8.19.0",
     "html-loader": "^3.1.0",
     "html-webpack-plugin": "^5.5.0",
+    "prettier": "^2.7.1",
     "sass-loader": "^13.0.0",
     "style-loader": "^3.3.1",
     "ts-loader": "^9.3.0",
