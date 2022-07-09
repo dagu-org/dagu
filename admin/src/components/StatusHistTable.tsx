@@ -26,7 +26,7 @@ function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
           <TableCell></TableCell>
           {logs.map((log, i) => {
             let date;
-            let startedAt = logs[i].Status.StartedAt;
+            const startedAt = logs[i].Status.StartedAt;
             if (startedAt && startedAt != "-") {
               date = moment(startedAt).format("M/D");
             } else {

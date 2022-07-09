@@ -22,12 +22,12 @@ function Graph({ steps, type = "status", onClickNode }: Props) {
     if (!steps) {
       return "";
     }
-    let dat = ["flowchart LR;"];
+    const dat = ["flowchart LR;"];
     // @ts-ignore
     window.onClickMermaidNode = onClickNode;
     const addNodeFn = (step: Step, status: NodeStatus) => {
       const id = step.Name.replace(/\s/g, "_");
-      let c = graphStatusMap[status] || "";
+      const c = graphStatusMap[status] || "";
       dat.push(`${id}(${step.Name})${c};`);
       if (step.Depends) {
         step.Depends.forEach((d) => {

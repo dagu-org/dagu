@@ -24,7 +24,7 @@ function DAGDetails() {
   const [tab, setTab] = React.useState(DetailTabId.Status);
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    let t = urlParams.get("t");
+    const t = urlParams.get("t");
     if (t) {
       setTab(t as DetailTabId);
     }

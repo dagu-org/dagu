@@ -16,7 +16,7 @@ import { mainListItems } from "../../menu";
 import { Grid, Stack } from "@mui/material";
 import Logo from "../Logo";
 
-const drawerWidth: number = 240;
+const drawerWidth = 240;
 
 interface AppBarProps extends MuiAppBarProps {
   open?: boolean;

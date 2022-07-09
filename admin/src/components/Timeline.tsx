@@ -17,7 +17,7 @@ function Timeline({ status }: Props) {
     return null;
   }
   const graph = React.useMemo(() => {
-    let ret = [
+    const ret = [
       "gantt",
       "dateFormat YYYY-MM-DD HH:mm:ss",
       "axisFormat %H:%M:%S",

@@ -161,8 +161,8 @@ const defaultColumns = [
       return ret;
     },
     sortingFn: (a, b) => {
-      let valA = getFirstTag(a.original);
-      let valB = getFirstTag(b.original);
+      const valA = getFirstTag(a.original);
+      const valB = getFirstTag(b.original);
       return valA.localeCompare(valB);
     },
   }),
@@ -193,8 +193,8 @@ const defaultColumns = [
       return null;
     },
     sortingFn: (a, b) => {
-      let valA = getStatus(a.original);
-      let valB = getStatus(b.original);
+      const valA = getStatus(a.original);
+      const valB = getStatus(b.original);
       return valA < valB ? -1 : 1;
     },
   }),
@@ -211,8 +211,8 @@ const defaultColumns = [
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      let valA = getStatusField("StartedAt", dataA);
-      let valB = getStatusField("StartedAt", dataB);
+      const valA = getStatusField("StartedAt", dataA);
+      const valB = getStatusField("StartedAt", dataB);
       return valA.localeCompare(valB);
     },
   }),
@@ -229,8 +229,8 @@ const defaultColumns = [
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      let valA = getStatusField("FinishedAt", dataA);
-      let valB = getStatusField("FinishedAt", dataB);
+      const valA = getStatusField("FinishedAt", dataA);
+      const valB = getStatusField("FinishedAt", dataB);
       return valA.localeCompare(valB);
     },
   }),
