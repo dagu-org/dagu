@@ -1,14 +1,19 @@
-import React, { CSSProperties } from "react";
-import mermaidAPI from "mermaid";
+import React, { CSSProperties } from 'react';
+import mermaidAPI, { Mermaid } from 'mermaid';
 
 type Props = {
   def: string;
   style?: CSSProperties;
 };
 
+declare global {
+  interface Mermaid {
+    securityLevel: string;
+  }
+}
+
 mermaidAPI.initialize({
-  // @ts-ignore
-  securityLevel: "loose",
+  securityLevel: 'loose' as Mermaid['mermaidAPI']['SecurityLevel']['Loose'],
   startOnLoad: false,
   maxTextSize: 99999999,
   flowchart: {
@@ -24,22 +29,21 @@ function Mermaid({ def, style = {} }: Props) {
     ...style,
   };
   const dStyle: CSSProperties = {
-    overflowX: "auto",
+    overflowX: 'auto',
   };
   function render() {
     if (!ref.current) {
       return;
     }
-    if (def.startsWith("<")) {
-      console.error("invalid definition!!");
+    if (def.startsWith('<')) {
+      console.error('invalid definition!!');
       return;
     }
     mermaidAPI.render(
-      "mermaid",
+      'mermaid',
       def,
       (svgCode, bindFunc) => {
         if (ref.current) {
-          // @ts-ignore
           ref.current.innerHTML = svgCode;
         }
         setTimeout(() => {
@@ -55,7 +59,7 @@ function Mermaid({ def, style = {} }: Props) {
     try {
       render();
     } catch (error) {
-      console.error("error rendering mermaid, retrying, error:");
+      console.error('error rendering mermaid, retrying, error:');
       console.error(error);
       console.error(def);
       setTimeout(renderWithRetry, 1);

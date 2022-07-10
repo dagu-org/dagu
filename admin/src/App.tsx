@@ -5,7 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import DAGDetails from "./pages/DAGDetails";
 import DAGs from "./pages/DAGs";
 
-type Config = {
+export type Config = {
   title: string;
   navbarColor: string;
 };
