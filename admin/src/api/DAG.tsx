@@ -1,6 +1,6 @@
-import { DAG } from "../models/DAGData";
-import { Node, NodeStatus } from "../models/Node";
-import { StatusFile } from "../models/StatusFile";
+import { DAG } from '../models/DAGData';
+import { Node, NodeStatus } from '../models/Node';
+import { StatusFile } from '../models/StatusFile';
 
 export type GetDAGResponse = {
   Title: string;

@@ -1,13 +1,13 @@
-import moment from "moment";
-import React from "react";
-import { SchedulerStatus, Status } from "../models/Status";
-import Mermaid from "./Mermaid";
+import moment from 'moment';
+import React from 'react';
+import { SchedulerStatus, Status } from '../models/Status';
+import Mermaid from './Mermaid';
 
 type Props = {
   status: Status;
 };
 
-const timeFormat = "YYYY-MM-DD HH:mm:ss";
+const timeFormat = 'YYYY-MM-DD HH:mm:ss';
 
 function Timeline({ status }: Props) {
   if (
@@ -17,29 +17,29 @@ function Timeline({ status }: Props) {
     return null;
   }
   const graph = React.useMemo(() => {
-    let ret = [
-      "gantt",
-      "dateFormat YYYY-MM-DD HH:mm:ss",
-      "axisFormat %H:%M:%S",
-      "todayMarker off",
+    const ret = [
+      'gantt',
+      'dateFormat YYYY-MM-DD HH:mm:ss',
+      'axisFormat %H:%M:%S',
+      'todayMarker off',
     ];
     [...status.Nodes]
       .sort((a, b) => {
         return a.StartedAt.localeCompare(b.StartedAt);
       })
       .forEach((step) => {
-        if (!step.StartedAt || step.StartedAt == "-") {
+        if (!step.StartedAt || step.StartedAt == '-') {
           return;
         }
         ret.push(
           step.Step.Name +
-            " : " +
+            ' : ' +
             moment(step.StartedAt).format(timeFormat) +
-            "," +
+            ',' +
             moment(step.FinishedAt).format(timeFormat)
         );
       });
-    return ret.join("\n");
+    return ret.join('\n');
   }, [status]);
   return <Mermaid def={graph} />;
 }

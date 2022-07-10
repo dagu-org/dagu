@@ -1,7 +1,7 @@
-import { Chip } from "@mui/material";
-import React from "react";
-import { statusColorMapping } from "../consts";
-import { SchedulerStatus } from "../models/Status";
+import { Chip } from '@mui/material';
+import React from 'react';
+import { statusColorMapping } from '../consts';
+import { SchedulerStatus } from '../models/Status';
 
 type Props = {
   status?: SchedulerStatus;
@@ -20,7 +20,7 @@ function StatusChip({ status, children }: Props) {
       sx={[
         style,
         {
-          fontWeight: "semibold",
+          fontWeight: 'semibold',
         },
       ]}
       size="small"

@@ -1,5 +1,5 @@
-import React from "react";
-import { DAG } from "../models/DAGData";
+import React from 'react';
+import { DAG } from '../models/DAGData';
 
 type Props = {
   DAGs: DAG[];
@@ -16,11 +16,11 @@ function DAGErrors({ DAGs, errors, hasError }: Props) {
       <div>Please check the below errors!</div>
       <div className="content">
         <ul>
-          {DAGs.filter((w) => w.Error).map((w) => {
+          {DAGs.filter((w) => w.ErrorT).map((w) => {
             const url = encodeURI(w.File);
             return (
               <li>
-                <a href={url}>{w.File}</a>: {w.ErrorT}{" "}
+                <a href={url}>{w.File}</a>: {w.ErrorT}{' '}
               </li>
             );
           })}

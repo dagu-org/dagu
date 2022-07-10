@@ -1,5 +1,5 @@
-import React from "react";
-import { Step } from "../models/Step";
+import React from 'react';
+import { Step } from '../models/Step';
 
 type Props = {
   visible: boolean;
@@ -10,18 +10,18 @@ type Props = {
 
 function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
   const modalStyle = {
-    display: visible ? "flex" : "none",
+    display: visible ? 'flex' : 'none',
   };
   React.useEffect(() => {
     const callback = (event: KeyboardEvent) => {
       const e = event || window.event;
-      if (e.key == "Escape" || e.key == "Esc") {
+      if (e.key == 'Escape' || e.key == 'Esc') {
         dismissModal();
       }
     };
-    document.addEventListener("keydown", callback);
+    document.addEventListener('keydown', callback);
     return () => {
-      document.removeEventListener("keydown", callback);
+      document.removeEventListener('keydown', callback);
     };
   }, [dismissModal]);
   if (!step) {
@@ -43,13 +43,13 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           <div className="mr-4 pt-4 is-flex is-flex-direction-row">
             <button
               className="button is-info"
-              onClick={() => onSubmit(step, "mark-success")}
+              onClick={() => onSubmit(step, 'mark-success')}
             >
               <span>Mark Success</span>
             </button>
             <button
               className="button is-info ml-4"
-              onClick={() => onSubmit(step, "mark-failed")}
+              onClick={() => onSubmit(step, 'mark-failed')}
             >
               <span>Mark Failed</span>
             </button>

@@ -1,11 +1,11 @@
-import React from "react";
-import { Node } from "../models/Node";
-import { Step } from "../models/Step";
-import { DetailTabId } from "../models/DAGData";
-import MultilineText from "./MultilineText";
-import NodeStatusChip from "./NodeStatusChip";
-import { TableCell } from "@mui/material";
-import StyledTableRow from "./StyledTableRow";
+import React from 'react';
+import { Node } from '../models/Node';
+import { Step } from '../models/Step';
+import { DetailTabId } from '../models/DAGData';
+import MultilineText from './MultilineText';
+import NodeStatusChip from './NodeStatusChip';
+import { TableCell } from '@mui/material';
+import StyledTableRow from './StyledTableRow';
 
 type Props = {
   rownum: number;
@@ -24,11 +24,11 @@ function NodeStatusTableRow({
 }: Props) {
   const url = `/dags/${name}?t=${DetailTabId.StepLog}&file=${file}&step=${node.Step.Name}`;
   const buttonStyle = {
-    margin: "0px",
-    padding: "0px",
-    border: "0px",
-    background: "none",
-    outline: "none",
+    margin: '0px',
+    padding: '0px',
+    border: '0px',
+    background: 'none',
+    outline: 'none',
   };
   return (
     <StyledTableRow>
@@ -38,7 +38,7 @@ function NodeStatusTableRow({
         <MultilineText>{node.Step.Description}</MultilineText>
       </TableCell>
       <TableCell> {node.Step.Command} </TableCell>
-      <TableCell> {node.Step.Args ? node.Step.Args.join(" ") : ""} </TableCell>
+      <TableCell> {node.Step.Args ? node.Step.Args.join(' ') : ''} </TableCell>
       <TableCell> {node.StartedAt} </TableCell>
       <TableCell> {node.FinishedAt} </TableCell>
       <TableCell>

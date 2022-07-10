@@ -7,7 +7,7 @@ type Options = {
 export function useDAGGetAPI<T>(path: string, opts: Options) {
   const [data, setData] = React.useState<T | null>(null);
   const doGet = React.useCallback(async () => {
-    let url = `${API_URL}${path}?format=json`;
+    const url = `${API_URL}${path}?format=json`;
     const ret = await fetch(url, {
       method: "GET",
       cache: "no-store",

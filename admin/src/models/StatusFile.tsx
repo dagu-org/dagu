@@ -1,4 +1,4 @@
-import { Status } from "./Status";
+import { Status } from './Status';
 
 export type StatusFile = {
   File: string;

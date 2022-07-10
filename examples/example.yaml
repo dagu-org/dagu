@@ -58,3 +58,6 @@ steps:
     command: "sleep 2"
     depends:
       - Reconcile
+handlerOn:
+  exit:
+    command: echo finished

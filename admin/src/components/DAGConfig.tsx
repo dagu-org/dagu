@@ -1,14 +1,16 @@
-import { Box, Button, Paper, Stack, Typography } from "@mui/material";
-import React from "react";
-import { GetDAGResponse } from "../api/DAG";
-import { DAGContext } from "../contexts/DAGContext";
-import { Config } from "../models/Config";
-import { Step } from "../models/Step";
-import ConfigEditor from "./ConfigEditor";
-import ConfigInfoTable from "./ConfigInfoTable";
-import ConfigPreview from "./ConfigPreview";
-import Graph from "./Graph";
-import ConfigStepTable from "./ConfigStepTable";
+import { Box, Button, Stack } from '@mui/material';
+import React from 'react';
+import { GetDAGResponse } from '../api/DAG';
+import { DAGContext } from '../contexts/DAGContext';
+import { Config } from '../models/Config';
+import { Step } from '../models/Step';
+import ConfigEditor from './ConfigEditor';
+import ConfigInfoTable from './ConfigInfoTable';
+import ConfigPreview from './ConfigPreview';
+import Graph from './Graph';
+import ConfigStepTable from './ConfigStepTable';
+import BorderedBox from './BorderedBox';
+import SubTitle from './SubTitle';
 
 type Props = {
   data: GetDAGResponse;
@@ -27,136 +29,156 @@ function DAGConfig({ data }: Props) {
         data.DAG &&
         data.DAG.Config && (
           <React.Fragment>
-            <Paper
+            <BorderedBox
               sx={{
                 pb: 4,
                 px: 2,
                 mx: 4,
-                display: "flex",
-                flexDirection: "column",
-                overflowX: "auto",
+                display: 'flex',
+                flexDirection: 'column',
+                overflowX: 'auto',
+                borderTopWidth: 0,
                 borderTopLeftRadius: 0,
                 borderTopRightRadius: 0,
               }}
             >
               <Box
                 sx={{
-                  overflowX: "auto",
+                  overflowX: 'auto',
                 }}
               >
                 <Graph steps={data.DAG.Config.Steps} type="config"></Graph>
               </Box>
-            </Paper>
+            </BorderedBox>
 
             <Box sx={{ mx: 4 }}>
-              <Box sx={{ mt: 2 }}>
-                <ConfigInfoTable config={data.DAG.Config!}></ConfigInfoTable>
+              <Box sx={{ mt: 3 }}>
+                <SubTitle>DAG Config</SubTitle>
+                <Box sx={{ mt: 2 }}>
+                  <ConfigInfoTable config={data.DAG.Config!}></ConfigInfoTable>
+                </Box>
               </Box>
-              <Box sx={{ mt: 2 }}>
-                <ConfigStepTable
-                  steps={data.DAG.Config.Steps}
-                ></ConfigStepTable>
+              <Box sx={{ mt: 3 }}>
+                <Box sx={{ mt: 2 }}>
+                  <SubTitle>Step Config</SubTitle>
+                  <ConfigStepTable
+                    steps={data.DAG.Config.Steps}
+                  ></ConfigStepTable>
+                </Box>
               </Box>
-              <Box sx={{ mt: 2 }}>
-                <ConfigStepTable steps={handlers}></ConfigStepTable>
-              </Box>
-            </Box>
+              {handlers && (
+                <Box sx={{ mt: 3 }}>
+                  <SubTitle>Handler Config</SubTitle>
+                  <Box sx={{ mt: 2 }}>
+                    <ConfigStepTable steps={handlers}></ConfigStepTable>
+                  </Box>
+                </Box>
+              )}
 
-            <Paper
-              sx={{
-                mx: 4,
-                p: 2,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="body1">
-                  {data.DAG.Config.ConfigPath}
-                </Typography>
-                {editing ? (
-                  <Stack direction="row">
-                    <Button
-                      id="save-config"
-                      color="primary"
-                      variant="contained"
-                      startIcon={
-                        <span className="icon">
-                          <i className="fa-solid fa-floppy-disk"></i>
-                        </span>
-                      }
-                      onClick={async () => {
-                        const formData = new FormData();
-                        formData.append("action", "save");
-                        formData.append("value", currentValue);
-                        const url = `${API_URL}/dags/${props.name}`;
-                        const resp = await fetch(url, {
-                          method: "POST",
-                          headers: {
-                            Accept: "application/json",
-                          },
-                          body: formData,
-                        });
-                        if (resp.ok) {
-                          setEditing(false);
-                          props.refresh();
-                        } else {
-                          const e = await resp.text();
-                          alert(e);
-                        }
+              <Box sx={{ mt: 3 }}>
+                <SubTitle>Config Editor</SubTitle>
+                <BorderedBox
+                  sx={{
+                    mt: 2,
+                    px: 2,
+                    pt: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Box
+                      sx={{
+                        color: 'grey.600',
                       }}
                     >
-                      Save
-                    </Button>
-                    <Button
-                      color="error"
-                      variant="contained"
-                      onClick={() => setEditing(false)}
-                      sx={{ ml: 2 }}
-                      startIcon={
-                        <span className="icon">
-                          <i className="fa-solid fa-xmark"></i>
-                        </span>
-                      }
-                    >
-                      Cancel
-                    </Button>
+                      {data.DAG.Config.ConfigPath}
+                    </Box>
+                    {editing ? (
+                      <Stack direction="row">
+                        <Button
+                          id="save-config"
+                          color="primary"
+                          variant="contained"
+                          startIcon={
+                            <span className="icon">
+                              <i className="fa-solid fa-floppy-disk"></i>
+                            </span>
+                          }
+                          onClick={async () => {
+                            const formData = new FormData();
+                            formData.append('action', 'save');
+                            formData.append('value', currentValue);
+                            const url = `${API_URL}/dags/${props.name}`;
+                            const resp = await fetch(url, {
+                              method: 'POST',
+                              headers: {
+                                Accept: 'application/json',
+                              },
+                              body: formData,
+                            });
+                            if (resp.ok) {
+                              setEditing(false);
+                              props.refresh();
+                            } else {
+                              const e = await resp.text();
+                              alert(e);
+                            }
+                          }}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          color="error"
+                          variant="contained"
+                          onClick={() => setEditing(false)}
+                          sx={{ ml: 2 }}
+                          startIcon={
+                            <span className="icon">
+                              <i className="fa-solid fa-xmark"></i>
+                            </span>
+                          }
+                        >
+                          Cancel
+                        </Button>
+                      </Stack>
+                    ) : (
+                      <Stack direction="row">
+                        <Button
+                          id="edit-config"
+                          variant="contained"
+                          color="info"
+                          onClick={() => setEditing(true)}
+                          startIcon={
+                            <span className="icon">
+                              <i className="fa-solid fa-pen-to-square"></i>
+                            </span>
+                          }
+                        >
+                          Edit
+                        </Button>
+                      </Stack>
+                    )}
                   </Stack>
-                ) : (
-                  <Stack direction="row">
-                    <Button
-                      id="edit-config"
-                      variant="contained"
-                      color="info"
-                      onClick={() => setEditing(true)}
-                      startIcon={
-                        <span className="icon">
-                          <i className="fa-solid fa-pen-to-square"></i>
-                        </span>
-                      }
-                    >
-                      Edit
-                    </Button>
-                  </Stack>
-                )}
-              </Stack>
-              {editing ? (
-                <Box sx={{ mt: 2 }}>
-                  <ConfigEditor
-                    value={data.Definition}
-                    onChange={(newValue) => {
-                      setCurrentValue(newValue);
-                    }}
-                  ></ConfigEditor>
-                </Box>
-              ) : (
-                <ConfigPreview value={data.Definition} />
-              )}
-            </Paper>
+                  {editing ? (
+                    <Box sx={{ mt: 2 }}>
+                      <ConfigEditor
+                        value={data.Definition}
+                        onChange={(newValue) => {
+                          setCurrentValue(newValue);
+                        }}
+                      ></ConfigEditor>
+                    </Box>
+                  ) : (
+                    <ConfigPreview value={data.Definition} />
+                  )}
+                </BorderedBox>
+              </Box>
+            </Box>
           </React.Fragment>
         )
       }

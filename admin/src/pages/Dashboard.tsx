@@ -1,13 +1,12 @@
-import React from "react";
-import { GetDAGsResponse } from "../api/DAGs";
-import Paper from "@mui/material/Paper";
-import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
-import { Grid } from "@mui/material";
-import { SchedulerStatus } from "../models/Status";
-import { statusColorMapping } from "../consts";
-import Metrics from "../components/Metrics";
-import DashboardTimechart from "../components/DashboardTimechart";
-import Title from "../components/Title";
+import React from 'react';
+import { GetDAGsResponse } from '../api/DAGs';
+import { useDAGGetAPI } from '../hooks/useDAGGetAPI';
+import { Box, Grid } from '@mui/material';
+import { SchedulerStatus } from '../models/Status';
+import { statusColorMapping } from '../consts';
+import Metrics from '../components/Metrics';
+import DashboardTimechart from '../components/DashboardTimechart';
+import Title from '../components/Title';
 
 type metrics = Record<SchedulerStatus, number>;
 
@@ -22,7 +21,7 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
 
-  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
+  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>('/', {});
 
   React.useEffect(() => {
     if (!data) {
@@ -45,21 +44,21 @@ function Dashboard() {
   }, []);
 
   return (
-    <Grid container spacing={3} sx={{ mx: 4, width: "100%" }}>
+    <Grid container spacing={3} sx={{ mx: 4, width: '100%' }}>
       {(
         [
-          [SchedulerStatus.Success, "Successful DAGs"],
-          [SchedulerStatus.Error, "Failed DAGs"],
-          [SchedulerStatus.Running, "Running DAGs"],
-          [SchedulerStatus.Cancel, "Canceled DAGs"],
+          [SchedulerStatus.Success, 'Successful'],
+          [SchedulerStatus.Error, 'Failed'],
+          [SchedulerStatus.Running, 'Running'],
+          [SchedulerStatus.Cancel, 'Canceled'],
         ] as Array<[SchedulerStatus, string]>
       ).map(([status, label]) => (
         <Grid item xs={12} md={4} lg={3} key={label}>
-          <Paper
+          <Box
             sx={{
-              p: 2,
-              display: "flex",
-              flexDirection: "column",
+              px: 2,
+              display: 'flex',
+              flexDirection: 'column',
               height: 240,
             }}
           >
@@ -68,20 +67,20 @@ function Dashboard() {
               color={statusColorMapping[status].backgroundColor}
               value={metrics[status]}
             />
-          </Paper>
+          </Box>
         </Grid>
       ))}
 
       <Grid item xs={12}>
-        <Paper
+        <Box
           sx={{
             p: 2,
-            height: "100%",
+            height: '100%',
           }}
         >
           <Title>Timeline</Title>
           <DashboardTimechart data={data?.DAGs || []} />
-        </Paper>
+        </Box>
       </Grid>
     </Grid>
   );

@@ -1,14 +1,12 @@
-import { Config } from "./Config";
-import { SchedulerStatus, Status } from "./Status";
-import cronParser from "cron-parser";
-import moment from "moment";
+import { Config } from './Config';
+import { SchedulerStatus, Status } from './Status';
+import cronParser from 'cron-parser';
 
 export type DAG = {
   File: string;
   Dir: string;
   Config: Config;
   Status?: Status;
-  Error?: any;
   ErrorT: string;
 };
 
@@ -32,13 +30,13 @@ export type DAGGroup = {
 
 export function getFirstTag(data?: DAGItem): string {
   if (!data) {
-    return "";
+    return '';
   }
   if (data.Type == DAGDataType.DAG) {
     const tags = data.DAG.Config.Tags;
-    return tags ? tags[0] : "";
+    return tags ? tags[0] : '';
   }
-  return "";
+  return '';
 }
 
 export function getStatus(data?: DAGItem): SchedulerStatus {
@@ -60,12 +58,12 @@ export function getStatusField(
   data?: DAGItem
 ): string {
   if (!data) {
-    return "";
+    return '';
   }
   if (data.Type == DAGDataType.DAG) {
-    return data.DAG.Status?.[field] || "";
+    return data.DAG.Status?.[field] || '';
   }
-  return "";
+  return '';
 }
 
 export function getNextSchedule(data: DAG): number {
@@ -79,10 +77,10 @@ export function getNextSchedule(data: DAG): number {
 }
 
 export enum DetailTabId {
-  Status = "0",
-  Config = "1",
-  History = "2",
-  StepLog = "3",
-  ScLog = "4",
-  None = "5",
+  Status = '0',
+  Config = '1',
+  History = '2',
+  StepLog = '3',
+  ScLog = '4',
+  None = '5',
 }

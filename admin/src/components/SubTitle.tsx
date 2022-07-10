@@ -1,15 +1,15 @@
 import * as React from 'react';
 import Typography from '@mui/material/Typography';
 
-interface TitleProps {
+interface SubTitleProps {
   children?: React.ReactNode;
 }
 
-export default function Title(props: TitleProps) {
+export default function SubTitle(props: SubTitleProps) {
   return (
     <Typography
-      component="h2"
-      variant="h4"
+      component="h3"
+      variant="h6"
       gutterBottom
       sx={{
         fontWeight: '800',

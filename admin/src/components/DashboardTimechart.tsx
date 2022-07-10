@@ -1,5 +1,5 @@
-import moment from "moment";
-import React from "react";
+import moment from 'moment';
+import React from 'react';
 import {
   Bar,
   BarChart,
@@ -9,10 +9,10 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-} from "recharts";
-import { statusColorMapping } from "../consts";
-import { DAG } from "../models/DAGData";
-import { SchedulerStatus } from "../models/Status";
+} from 'recharts';
+import { statusColorMapping } from '../consts';
+import { DAG } from '../models/DAGData';
+import { SchedulerStatus } from '../models/Status';
 
 type Props = { data: DAG[] };
 
@@ -30,10 +30,10 @@ function DashboardTimechart({ data: input }: Props) {
     input.forEach((wf) => {
       const status = wf.Status;
       const start = status?.StartedAt;
-      if (start && start != "-") {
+      if (start && start != '-') {
         const end = status.FinishedAt;
         let to = now.unix();
-        if (end && end != "-") {
+        if (end && end != '-') {
           to = moment(end).unix();
         }
         ret.push({
@@ -54,11 +54,11 @@ function DashboardTimechart({ data: input }: Props) {
       <BarChart data={data} layout="vertical">
         <XAxis
           name="Time"
-          tickFormatter={(unixTime) => moment.unix(unixTime).format("HH:mm")}
+          tickFormatter={(unixTime) => moment.unix(unixTime).format('HH:mm')}
           type="number"
           dataKey="values"
           tickCount={96}
-          domain={[now.startOf("day").unix(), now.endOf("day").unix()]}
+          domain={[now.startOf('day').unix(), now.endOf('day').unix()]}
         />
         <YAxis dataKey="name" type="category" hide />
         <Bar background dataKey="values" fill="lightblue" minPointSize={2}>

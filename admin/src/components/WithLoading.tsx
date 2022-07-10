@@ -1,5 +1,5 @@
-import React from "react";
-import Loading from "./Loading";
+import React from 'react';
+import Loading from './Loading';
 
 type Props = {
   children?: JSX.Element | JSX.Element[] | null;
