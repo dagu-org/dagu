@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/layouts/Layout";
 import Dashboard from "./pages/Dashboard";
 import DAGDetails from "./pages/DAGDetails";
-import DAGs from "./pages/DAGs";
+import DAGList from "./pages/DAGList";
 
 export type Config = {
   title: string;
@@ -20,8 +20,8 @@ function App({ config }: Props) {
       <Layout {...config}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="" element={<DAGs />} />
-          <Route path="/dags/" element={<DAGs />} />
+          <Route path="" element={<DAGList />} />
+          <Route path="/dags/" element={<DAGList />} />
           <Route path="/dags/:name" element={<DAGDetails />} />
         </Routes>
       </Layout>

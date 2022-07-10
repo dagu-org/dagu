@@ -1,14 +1,14 @@
-import React, { CSSProperties } from "react";
-import { Step } from "../models/Step";
-import ConfigStepTableRow from "./ConfigStepTableRow";
+import React, { CSSProperties } from 'react';
+import { Step } from '../models/Step';
+import ConfigStepTableRow from './ConfigStepTableRow';
 import {
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-} from "@mui/material";
+} from '@mui/material';
+import BorderedBox from './BorderedBox';
 
 type Props = {
   steps: Step[];
@@ -16,8 +16,8 @@ type Props = {
 
 function ConfigStepTable({ steps }: Props) {
   const tableStyle: CSSProperties = {
-    tableLayout: "fixed",
-    wordWrap: "break-word",
+    tableLayout: 'fixed',
+    wordWrap: 'break-word',
   };
   const styles = StepConfigTabColStyles;
   let i = 0;
@@ -25,7 +25,7 @@ function ConfigStepTable({ steps }: Props) {
     return null;
   }
   return (
-    <Paper>
+    <BorderedBox>
       <Table size="small" sx={tableStyle}>
         <TableHead>
           <TableRow>
@@ -44,17 +44,17 @@ function ConfigStepTable({ steps }: Props) {
           ))}
         </TableBody>
       </Table>
-    </Paper>
+    </BorderedBox>
   );
 }
 export default ConfigStepTable;
 
 const StepConfigTabColStyles = [
-  { width: "200px" },
-  { width: "200px" },
-  { width: "300px" },
-  { width: "220px" },
-  { width: "150px" },
-  { width: "80px" },
+  { width: '200px' },
+  { width: '200px' },
+  { width: '300px' },
+  { width: '220px' },
+  { width: '150px' },
+  { width: '80px' },
   {},
 ];

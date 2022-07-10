@@ -1,22 +1,21 @@
-import React from "react";
-import DAGErrors from "../components/DAGErrors";
-import Box from "@mui/material/Box";
-import DAGCreationButton from "../components/DAGCreationButton";
-import WithLoading from "../components/WithLoading";
-import DAGTable from "../components/DAGTable";
-import Title from "../components/Title";
-import Paper from "@mui/material/Paper";
-import { useDAGGetAPI } from "../hooks/useDAGGetAPI";
-import { DAGItem, DAGDataType } from "../models/DAGData";
-import { useLocation } from "react-router-dom";
-import { GetDAGsResponse } from "../api/DAGs";
+import React from 'react';
+import DAGErrors from '../components/DAGErrors';
+import Box from '@mui/material/Box';
+import DAGCreationButton from '../components/DAGCreationButton';
+import WithLoading from '../components/WithLoading';
+import DAGTable from '../components/DAGTable';
+import Title from '../components/Title';
+import { useDAGGetAPI } from '../hooks/useDAGGetAPI';
+import { DAGItem, DAGDataType } from '../models/DAGData';
+import { useLocation } from 'react-router-dom';
+import { GetDAGsResponse } from '../api/DAGs';
 
-function DAGs() {
+function DAGList() {
   const useQuery = () => new URLSearchParams(useLocation().search);
   const query = useQuery();
-  const group = query.get("group") || "";
+  const group = query.get('group') || '';
 
-  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>("/", {});
+  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>('/', {});
 
   React.useEffect(() => {
     doGet();
@@ -28,7 +27,7 @@ function DAGs() {
     const ret: DAGItem[] = [];
     if (data) {
       for (const val of data.DAGs) {
-        if (!val.Error) {
+        if (!val.ErrorT) {
           ret.push({
             Type: DAGDataType.DAG,
             Name: val.Config.Name,
@@ -41,21 +40,21 @@ function DAGs() {
   }, [data]);
 
   return (
-    <Paper
+    <Box
       sx={{
-        p: 2,
+        px: 2,
         mx: 4,
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
       }}
     >
       <Box
         sx={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
         <Title>DAGs</Title>
@@ -79,7 +78,7 @@ function DAGs() {
           )}
         </WithLoading>
       </Box>
-    </Paper>
+    </Box>
   );
 }
-export default DAGs;
+export default DAGList;

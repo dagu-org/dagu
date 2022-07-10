@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 import {
   createTable,
   useTableInstance,
@@ -9,9 +9,9 @@ import {
   ColumnFiltersState,
   ExpandedState,
   getExpandedRowModel,
-} from "@tanstack/react-table";
-import DAGActions from "./DAGActions";
-import StatusChip from "./StatusChip";
+} from '@tanstack/react-table';
+import DAGActions from './DAGActions';
+import StatusChip from './StatusChip';
 import {
   Autocomplete,
   Box,
@@ -25,8 +25,8 @@ import {
   TableRow,
   TableSortLabel,
   TextField,
-} from "@mui/material";
-import { Link } from "react-router-dom";
+} from '@mui/material';
+import { Link } from 'react-router-dom';
 import {
   getFirstTag,
   getStatus,
@@ -34,9 +34,9 @@ import {
   DAGItem,
   DAGDataType,
   getNextSchedule,
-} from "../models/DAGData";
-import StyledTableRow from "./StyledTableRow";
-import { KeyboardArrowDown, KeyboardArrowUp } from "@mui/icons-material";
+} from '../models/DAGData';
+import StyledTableRow from './StyledTableRow';
+import { KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
 
 type Props = {
   DAGs: DAGItem[];
@@ -55,8 +55,8 @@ const table = createTable()
   }>();
 
 const defaultColumns = [
-  table.createDataColumn("Name", {
-    id: "Expand",
+  table.createDataColumn('Name', {
+    id: 'Expand',
     header: ({ instance }) => {
       return (
         <IconButton onClick={instance.getToggleAllRowsExpandedHandler()}>
@@ -76,18 +76,18 @@ const defaultColumns = [
           </IconButton>
         );
       }
-      return "";
+      return '';
     },
     enableSorting: false,
   }),
-  table.createDataColumn("Name", {
-    id: "Name",
+  table.createDataColumn('Name', {
+    id: 'Name',
     cell: ({ row, getValue }) => {
       const data = row.original!;
       if (data.Type == DAGDataType.Group) {
         return getValue();
       } else {
-        const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, "");
+        const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, '');
         const url = `/dags/${encodeURI(name)}`;
         return (
           <div
@@ -102,7 +102,7 @@ const defaultColumns = [
     },
     filterFn: (props, _, filter) => {
       const data = props.original!;
-      let value = "";
+      let value = '';
       if (data.Type == DAGDataType.Group) {
         value = data.Name;
       } else {
@@ -112,9 +112,9 @@ const defaultColumns = [
       return ret;
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Type",
-    header: "Type",
+  table.createDataColumn('Type', {
+    id: 'Type',
+    header: 'Type',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.Group) {
@@ -129,9 +129,9 @@ const defaultColumns = [
       return dataA!.Type - dataB!.Type;
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Tags",
-    header: "Tags",
+  table.createDataColumn('Type', {
+    id: 'Tags',
+    header: 'Tags',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
@@ -166,9 +166,9 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Config",
-    header: "Description",
+  table.createDataColumn('Type', {
+    id: 'Config',
+    header: 'Description',
     enableSorting: false,
     cell: (props) => {
       const data = props.row.original!;
@@ -178,15 +178,15 @@ const defaultColumns = [
       return null;
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Status",
-    header: "Status",
+  table.createDataColumn('Type', {
+    id: 'Status',
+    header: 'Status',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
         return (
           <StatusChip status={data.DAG.Status?.Status}>
-            {data.DAG.Status?.StatusText || ""}
+            {data.DAG.Status?.StatusText || ''}
           </StatusChip>
         );
       }
@@ -198,9 +198,9 @@ const defaultColumns = [
       return valA < valB ? -1 : 1;
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Started At",
-    header: "Started At",
+  table.createDataColumn('Type', {
+    id: 'Started At',
+    header: 'Started At',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
@@ -211,14 +211,14 @@ const defaultColumns = [
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      const valA = getStatusField("StartedAt", dataA);
-      const valB = getStatusField("StartedAt", dataB);
+      const valA = getStatusField('StartedAt', dataA);
+      const valB = getStatusField('StartedAt', dataB);
       return valA.localeCompare(valB);
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Finished At",
-    header: "Finished At",
+  table.createDataColumn('Type', {
+    id: 'Finished At',
+    header: 'Finished At',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
@@ -229,14 +229,14 @@ const defaultColumns = [
     sortingFn: (a, b) => {
       const dataA = a.original!;
       const dataB = b.original!;
-      const valA = getStatusField("FinishedAt", dataA);
-      const valB = getStatusField("FinishedAt", dataB);
+      const valA = getStatusField('FinishedAt', dataA);
+      const valB = getStatusField('FinishedAt', dataB);
       return valA.localeCompare(valB);
     },
   }),
-  table.createDataColumn("Type", {
-    id: "Schedule",
-    header: "Schedule",
+  table.createDataColumn('Type', {
+    id: 'Schedule',
+    header: 'Schedule',
     enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
@@ -249,7 +249,7 @@ const defaultColumns = [
                 <Chip
                   key={s}
                   sx={{
-                    fontWeight: "semibold",
+                    fontWeight: 'semibold',
                     marginRight: 1,
                   }}
                   size="small"
@@ -272,8 +272,8 @@ const defaultColumns = [
     },
   }),
   table.createDisplayColumn({
-    id: "Actions",
-    header: "Actions",
+    id: 'Actions',
+    header: 'Actions',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.Group) {
@@ -291,7 +291,7 @@ const defaultColumns = [
   }),
 ];
 
-function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
+function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
@@ -303,8 +303,8 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
 
   const selectedTag = React.useMemo(() => {
     return (
-      (columnFilters.find((filter) => filter.id == "Tags")?.value as string) ||
-      ""
+      (columnFilters.find((filter) => filter.id == 'Tags')?.value as string) ||
+      ''
     );
   }, [columnFilters]);
 
@@ -317,7 +317,7 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
     DAGs.forEach((dag) => {
       if (dag.Type == DAGDataType.DAG) {
         const g = dag.DAG.Config.Group;
-        if (g != "") {
+        if (g != '') {
           if (!groups[g]) {
             groups[g] = {
               Type: DAGDataType.Group,
@@ -339,14 +339,14 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
       ...DAGs.filter(
         (dag) =>
           dag.Type == DAGDataType.DAG &&
-          dag.DAG.Config.Group == "" &&
+          dag.DAG.Config.Group == '' &&
           dag.DAG.Config.Group == group
       ),
     ];
   }, [DAGs, group]);
 
   const tagOptions = React.useMemo(() => {
-    const map: { [key: string]: boolean } = { "": true };
+    const map: { [key: string]: boolean } = { '': true };
     DAGs.forEach((data) => {
       if (data.Type == DAGDataType.DAG) {
         data.DAG.Config.Tags?.forEach((tag) => {
@@ -386,21 +386,22 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
     <Box>
       <Stack
         sx={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "start",
-          alignContent: "flex-center",
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'start',
+          alignContent: 'flex-center',
         }}
       >
         <TextField
           label="Search Text"
           size="small"
+          variant="standard"
           InputProps={{
-            value: instance.getColumn("Name").getFilterValue(),
+            value: instance.getColumn('Name').getFilterValue(),
             onChange: (e) => {
-              instance.getColumn("Name").setFilterValue(e.target.value || "");
+              instance.getColumn('Name').setFilterValue(e.target.value || '');
             },
-            type: "search",
+            type: 'search',
           }}
         />
         <Autocomplete<string>
@@ -409,10 +410,12 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
           value={selectedTag}
           options={tagOptions}
           onChange={(_, value) => {
-            instance.getColumn("Tags").setFilterValue(value || "");
+            instance.getColumn('Tags').setFilterValue(value || '');
           }}
-          renderInput={(params) => <TextField {...params} label="Filter Tag" />}
-          sx={{ width: "300px", ml: 1 }}
+          renderInput={(params) => (
+            <TextField {...params} variant="standard" label="Search Tag" />
+          )}
+          sx={{ width: '300px', ml: 2 }}
         />
       </Stack>
       <Table size="small">
@@ -424,9 +427,9 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
                   key={header.id}
                   style={{
                     padding:
-                      header.id == "Expand" || header.id == "Name"
-                        ? "6px 4px"
-                        : "6px 16px",
+                      header.id == 'Expand' || header.id == 'Name'
+                        ? '6px 4px'
+                        : '6px 16px',
                   }}
                 >
                   {header.column.getCanSort() ? (
@@ -435,8 +438,8 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
                         {...{
                           sx: {
                             cursor: header.column.getCanSort()
-                              ? "pointer"
-                              : "default",
+                              ? 'pointer'
+                              : 'default',
                           },
                           onClick: header.column.getToggleSortingHandler(),
                         }}
@@ -458,17 +461,17 @@ function DAGTable({ DAGs = [], group = "", refreshFn }: Props) {
         </TableHead>
         <TableBody>
           {instance.getRowModel().rows.map((row) => (
-            <StyledTableRow key={row.id} style={{ height: "44px" }}>
+            <StyledTableRow key={row.id} style={{ height: '44px' }}>
               {row.getVisibleCells().map((cell) => (
                 <TableCell
                   key={cell.id}
                   style={{
                     padding:
-                      cell.column.id == "Expand" || cell.column.id == "Name"
-                        ? "6px 4px"
-                        : "6px 16px",
+                      cell.column.id == 'Expand' || cell.column.id == 'Name'
+                        ? '6px 4px'
+                        : '6px 16px',
                   }}
-                  width={cell.column.id == "Expand" ? "44px" : undefined}
+                  width={cell.column.id == 'Expand' ? '44px' : undefined}
                 >
                   {cell.renderCell()}
                 </TableCell>

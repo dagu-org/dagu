@@ -1,14 +1,14 @@
-import React, { CSSProperties } from "react";
-import { Config } from "../models/Config";
-import MultilineText from "./MultilineText";
+import React, { CSSProperties } from 'react';
+import { Config } from '../models/Config';
+import MultilineText from './MultilineText';
 import {
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-} from "@mui/material";
+} from '@mui/material';
+import BorderedBox from './BorderedBox';
 
 type Props = {
   config: Config;
@@ -16,20 +16,20 @@ type Props = {
 
 function ConfigInfoTable({ config }: Props) {
   const tableStyle: CSSProperties = {
-    tableLayout: "fixed",
-    wordWrap: "break-word",
+    tableLayout: 'fixed',
+    wordWrap: 'break-word',
   };
   const styles = configTabColStyles;
   const preconditions = config.Preconditions.map((c) => (
     <li>
       {c.Condition}
-      {" => "}
+      {' => '}
       {c.Expected}
     </li>
   ));
   let i = 0;
   return (
-    <Paper>
+    <BorderedBox>
       <Table sx={tableStyle}>
         <TableHead>
           <TableRow>
@@ -54,16 +54,16 @@ function ConfigInfoTable({ config }: Props) {
           </TableRow>
         </TableBody>
       </Table>
-    </Paper>
+    </BorderedBox>
   );
 }
 
 export default ConfigInfoTable;
 
 const configTabColStyles = [
-  { width: "200px" },
-  { width: "200px" },
-  { width: "150px" },
-  { width: "150px" },
+  { width: '200px' },
+  { width: '200px' },
+  { width: '150px' },
+  { width: '150px' },
   {},
 ];

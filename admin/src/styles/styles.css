@@ -18,7 +18,7 @@ a {
 
 #nav-title {
   color: white;
-  font: 20px "Arial";
+  font: 20px 'Arial';
   font-weight: bold;
   padding-left: 4px;
 }

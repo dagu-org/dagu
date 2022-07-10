@@ -1,19 +1,19 @@
-import React, { CSSProperties } from "react";
-import { stepTabColStyles } from "../consts";
-import { useDAGPostAPI } from "../hooks/useDAGPostAPI";
-import { Node } from "../models/Node";
-import { SchedulerStatus, Status } from "../models/Status";
-import { Step } from "../models/Step";
-import NodeStatusTableRow from "./NodeStatusTableRow";
-import StatusUpdateModal from "./StatusUpdateModal";
+import React, { CSSProperties } from 'react';
+import { stepTabColStyles } from '../consts';
+import { useDAGPostAPI } from '../hooks/useDAGPostAPI';
+import { Node } from '../models/Node';
+import { SchedulerStatus, Status } from '../models/Status';
+import { Step } from '../models/Step';
+import NodeStatusTableRow from './NodeStatusTableRow';
+import StatusUpdateModal from './StatusUpdateModal';
 import {
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-} from "@mui/material";
+} from '@mui/material';
+import BorderedBox from './BorderedBox';
 
 type Props = {
   nodes?: Node[];
@@ -23,7 +23,7 @@ type Props = {
   refresh: () => void;
 };
 
-function NodeStatusTable({ nodes, status, name, refresh, file = "" }: Props) {
+function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
   const [modal, setModal] = React.useState(false);
   const [current, setCurrent] = React.useState<Step | undefined>(undefined);
   const { doPost } = useDAGPostAPI({
@@ -57,11 +57,11 @@ function NodeStatusTable({ nodes, status, name, refresh, file = "" }: Props) {
   }
   return (
     <React.Fragment>
-      <Paper>
+      <BorderedBox>
         <Table size="small" sx={tableStyle}>
           <TableHead>
             <TableRow>
-              <TableCell style={styles[i++]}>#</TableCell>
+              <TableCell style={styles[i++]}>No</TableCell>
               <TableCell style={styles[i++]}>Step Name</TableCell>
               <TableCell style={styles[i++]}>Description</TableCell>
               <TableCell style={styles[i++]}>Command</TableCell>
@@ -86,7 +86,7 @@ function NodeStatusTable({ nodes, status, name, refresh, file = "" }: Props) {
             ))}
           </TableBody>
         </Table>
-      </Paper>
+      </BorderedBox>
       <StatusUpdateModal
         visible={modal}
         step={current}
@@ -100,6 +100,6 @@ function NodeStatusTable({ nodes, status, name, refresh, file = "" }: Props) {
 export default NodeStatusTable;
 
 const tableStyle: CSSProperties = {
-  tableLayout: "fixed",
-  wordWrap: "break-word",
+  tableLayout: 'fixed',
+  wordWrap: 'break-word',
 };

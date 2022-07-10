@@ -1,15 +1,17 @@
-import React from "react";
-import { DAGContext } from "../contexts/DAGContext";
-import { DAG } from "../models/DAGData";
-import { Handlers, SchedulerStatus } from "../models/Status";
-import Graph from "./Graph";
-import NodeStatusTable from "./NodeStatusTable";
-import StatusInfoTable from "./StatusInfoTable";
-import Timeline from "./Timeline";
-import { useDAGPostAPI } from "../hooks/useDAGPostAPI";
-import StatusUpdateModal from "./StatusUpdateModal";
-import { Step } from "../models/Step";
-import { Box, Tab, Tabs, Paper } from "@mui/material";
+import React from 'react';
+import { DAGContext } from '../contexts/DAGContext';
+import { DAG } from '../models/DAGData';
+import { Handlers, SchedulerStatus } from '../models/Status';
+import Graph from './Graph';
+import NodeStatusTable from './NodeStatusTable';
+import StatusInfoTable from './StatusInfoTable';
+import Timeline from './Timeline';
+import { useDAGPostAPI } from '../hooks/useDAGPostAPI';
+import StatusUpdateModal from './StatusUpdateModal';
+import { Step } from '../models/Step';
+import { Box, Tab, Tabs } from '@mui/material';
+import SubTitle from './SubTitle';
+import BorderedBox from './BorderedBox';
 
 type Props = {
   DAG: DAG;
@@ -19,7 +21,7 @@ type Props = {
 
 function DAGStatus({ DAG, name, refresh }: Props) {
   const [modal, setModal] = React.useState(false);
-  const [sub, setSub] = React.useState("0");
+  const [sub, setSub] = React.useState('0');
   const [selectedStep, setSelectedStep] = React.useState<Step | undefined>(
     undefined
   );
@@ -46,7 +48,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
       }
       // find the clicked step
       const n = DAG.Status?.Nodes.find(
-        (n) => n.Step.Name.replace(/\s/g, "_") == id
+        (n) => n.Step.Name.replace(/\s/g, '_') == id
       );
       if (n) {
         setSelectedStep(n.Step);
@@ -61,14 +63,15 @@ function DAGStatus({ DAG, name, refresh }: Props) {
   const handlers = Handlers(DAG.Status);
   return (
     <React.Fragment>
-      <Paper
+      <BorderedBox
         sx={{
           pb: 4,
           px: 2,
           mx: 4,
-          display: "flex",
-          flexDirection: "column",
-          overflowX: "auto",
+          display: 'flex',
+          flexDirection: 'column',
+          overflowX: 'auto',
+          borderTopWidth: 0,
           borderTopLeftRadius: 0,
           borderTopRightRadius: 0,
         }}
@@ -78,7 +81,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
           onChange={(_, v) => setSub(v)}
           TabIndicatorProps={{
             style: {
-              display: "none",
+              display: 'none',
             },
           }}
         >
@@ -86,22 +89,22 @@ function DAGStatus({ DAG, name, refresh }: Props) {
             value="0"
             icon={<i className="fa-solid fa-share-nodes" />}
             label="Graph"
-            sx={{ minHeight: "40px", fontSize: "0.8rem" }}
+            sx={{ minHeight: '40px', fontSize: '0.8rem' }}
           />
           <Tab
             value="1"
             icon={<i className="fa-solid fa-chart-gantt" />}
             label="Timeline"
-            sx={{ minHeight: "40px", fontSize: "0.8rem" }}
+            sx={{ minHeight: '40px', fontSize: '0.8rem' }}
           />
         </Tabs>
 
         <Box
           sx={{
-            overflowX: "auto",
+            overflowX: 'auto',
           }}
         >
-          {sub == "0" ? (
+          {sub == '0' ? (
             <Graph
               steps={DAG.Status.Nodes}
               type="status"
@@ -111,34 +114,45 @@ function DAGStatus({ DAG, name, refresh }: Props) {
             <Timeline status={DAG.Status}></Timeline>
           )}
         </Box>
-      </Paper>
+      </BorderedBox>
 
       <Box sx={{ mx: 4 }}>
         <DAGContext.Consumer>
           {(props) => (
             <React.Fragment>
-              <Box sx={{ mt: 2 }}>
-                <StatusInfoTable
-                  status={DAG.Status}
-                  {...props}
-                ></StatusInfoTable>
+              <Box sx={{ mt: 3 }}>
+                <SubTitle>DAG Status</SubTitle>
+                <Box sx={{ mt: 2 }}>
+                  <StatusInfoTable
+                    status={DAG.Status}
+                    {...props}
+                  ></StatusInfoTable>
+                </Box>
               </Box>
 
-              <Box sx={{ mt: 2 }}>
-                <NodeStatusTable
-                  nodes={DAG.Status!.Nodes}
-                  status={DAG.Status!}
-                  {...props}
-                ></NodeStatusTable>
+              <Box sx={{ mt: 3 }}>
+                <SubTitle>Step Status</SubTitle>
+                <Box sx={{ mt: 2 }}>
+                  <NodeStatusTable
+                    nodes={DAG.Status!.Nodes}
+                    status={DAG.Status!}
+                    {...props}
+                  ></NodeStatusTable>
+                </Box>
               </Box>
 
-              <Box sx={{ mt: 2 }}>
-                <NodeStatusTable
-                  nodes={handlers}
-                  status={DAG.Status!}
-                  {...props}
-                ></NodeStatusTable>
-              </Box>
+              {handlers && (
+                <Box sx={{ mt: 3 }}>
+                  <SubTitle>Handler Status</SubTitle>
+                  <Box sx={{ mt: 2 }}>
+                    <NodeStatusTable
+                      nodes={handlers}
+                      status={DAG.Status!}
+                      {...props}
+                    ></NodeStatusTable>
+                  </Box>
+                </Box>
+              )}
             </React.Fragment>
           )}
         </DAGContext.Consumer>

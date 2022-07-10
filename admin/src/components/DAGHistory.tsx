@@ -1,11 +1,13 @@
-import { Box, Paper } from "@mui/material";
-import React from "react";
-import { LogData } from "../api/DAG";
-import { DAGContext } from "../contexts/DAGContext";
-import { Handlers } from "../models/Status";
-import NodeStatusTable from "./NodeStatusTable";
-import StatusHistTable from "./StatusHistTable";
-import StatusInfoTable from "./StatusInfoTable";
+import { Box } from '@mui/material';
+import React from 'react';
+import { LogData } from '../api/DAG';
+import { DAGContext } from '../contexts/DAGContext';
+import { Handlers } from '../models/Status';
+import BorderedBox from './BorderedBox';
+import NodeStatusTable from './NodeStatusTable';
+import StatusHistTable from './StatusHistTable';
+import StatusInfoTable from './StatusInfoTable';
+import SubTitle from './SubTitle';
 
 type Props = {
   logData: LogData;
@@ -20,14 +22,15 @@ function DAGHistory({ logData }: Props) {
     <DAGContext.Consumer>
       {(props) => (
         <React.Fragment>
-          <Paper
+          <BorderedBox
             sx={{
               pb: 4,
               px: 2,
               mx: 4,
-              display: "flex",
-              flexDirection: "column",
-              overflowX: "auto",
+              display: 'flex',
+              flexDirection: 'column',
+              overflowX: 'auto',
+              borderTopWidth: 0,
               borderTopLeftRadius: 0,
               borderTopRightRadius: 0,
             }}
@@ -38,30 +41,42 @@ function DAGHistory({ logData }: Props) {
               onSelect={setIdx}
               idx={idx}
             />
-          </Paper>
+          </BorderedBox>
 
           <Box sx={{ mx: 4 }}>
             {logs && logs[idx] ? (
               <React.Fragment>
-                <Box sx={{ mt: 2 }}>
-                  <StatusInfoTable status={logs[idx].Status} {...props} />
+                <Box sx={{ mt: 3 }}>
+                  <SubTitle>DAG Status</SubTitle>
+                  <Box sx={{ mt: 2 }}>
+                    <StatusInfoTable status={logs[idx].Status} {...props} />
+                  </Box>
                 </Box>
-                <Box sx={{ mt: 2 }}>
-                  <NodeStatusTable
-                    nodes={logs[idx].Status.Nodes}
-                    status={logs[idx].Status}
-                    file={logs[idx].File}
-                    {...props}
-                  />
+                <Box sx={{ mt: 3 }}>
+                  <SubTitle>Step Status</SubTitle>
+                  <Box sx={{ mt: 2 }}>
+                    <NodeStatusTable
+                      nodes={logs[idx].Status.Nodes}
+                      status={logs[idx].Status}
+                      file={logs[idx].File}
+                      {...props}
+                    />
+                  </Box>
                 </Box>
-                <Box sx={{ mt: 2 }}>
-                  <NodeStatusTable
-                    nodes={Handlers(logs[idx].Status)}
-                    file={logs[idx].File}
-                    status={logs[idx].Status}
-                    {...props}
-                  />
-                </Box>
+
+                {Handlers(logs[idx].Status) && (
+                  <Box sx={{ mt: 3 }}>
+                    <SubTitle>Handler Status</SubTitle>
+                    <Box sx={{ mt: 2 }}>
+                      <NodeStatusTable
+                        nodes={Handlers(logs[idx].Status)}
+                        file={logs[idx].File}
+                        status={logs[idx].Status}
+                        {...props}
+                      />
+                    </Box>
+                  </Box>
+                )}
               </React.Fragment>
             ) : null}
           </Box>

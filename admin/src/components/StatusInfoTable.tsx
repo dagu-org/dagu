@@ -1,15 +1,15 @@
-import React, { CSSProperties } from "react";
-import { Status } from "../models/Status";
-import { DetailTabId } from "../models/DAGData";
-import StatusChip from "./StatusChip";
+import React, { CSSProperties } from 'react';
+import { Status } from '../models/Status';
+import { DetailTabId } from '../models/DAGData';
+import StatusChip from './StatusChip';
 import {
-  Paper,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-} from "@mui/material";
+} from '@mui/material';
+import BorderedBox from './BorderedBox';
 
 type Props = {
   status?: Status;
@@ -17,21 +17,19 @@ type Props = {
   file?: string;
 };
 
-function StatusInfoTable({ status, name, file = "" }: Props) {
+function StatusInfoTable({ status, name, file = '' }: Props) {
   const tableStyle: CSSProperties = {
-    tableLayout: "fixed",
-    wordWrap: "break-word",
+    tableLayout: 'fixed',
+    wordWrap: 'break-word',
   };
   const styles = statusTabColStyles;
-  const url = `/dags/${name}?t=${
-    DetailTabId.ScLog
-  }&file=${encodeURI(file)}`;
+  const url = `/dags/${name}?t=${DetailTabId.ScLog}&file=${encodeURI(file)}`;
   let i = 0;
   if (!status) {
     return null;
   }
   return (
-    <Paper>
+    <BorderedBox>
       <Table sx={tableStyle}>
         <TableHead>
           <TableRow>
@@ -46,7 +44,7 @@ function StatusInfoTable({ status, name, file = "" }: Props) {
         </TableHead>
         <TableBody>
           <TableRow>
-            <TableCell> {status.RequestId || "-"} </TableCell>
+            <TableCell> {status.RequestId || '-'} </TableCell>
             <TableCell> {status.Name} </TableCell>
             <TableCell> {status.StartedAt} </TableCell>
             <TableCell> {status.FinishedAt} </TableCell>
@@ -62,17 +60,17 @@ function StatusInfoTable({ status, name, file = "" }: Props) {
           </TableRow>
         </TableBody>
       </Table>
-    </Paper>
+    </BorderedBox>
   );
 }
 export default StatusInfoTable;
 
 const statusTabColStyles = [
-  { width: "240px" },
-  { width: "150px" },
-  { width: "150px" },
-  { width: "150px" },
-  { width: "130px" },
-  { width: "130px" },
+  { width: '240px' },
+  { width: '150px' },
+  { width: '150px' },
+  { width: '150px' },
+  { width: '130px' },
+  { width: '130px' },
   {},
 ];
