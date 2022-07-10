@@ -1,5 +1,5 @@
-import React from "react";
-import MonacoEditor from "react-monaco-editor";
+import React from 'react';
+import MonacoEditor from 'react-monaco-editor';
 
 type Props = {
   value: string;

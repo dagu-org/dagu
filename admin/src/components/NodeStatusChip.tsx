@@ -1,7 +1,7 @@
-import React from "react";
-import { Chip } from "@mui/material";
-import { nodeStatusColorMapping } from "../consts";
-import { NodeStatus } from "../models/Node";
+import React from 'react';
+import { Chip } from '@mui/material';
+import { nodeStatusColorMapping } from '../consts';
+import { NodeStatus } from '../models/Node';
 
 type Props = {
   status: NodeStatus;
@@ -17,7 +17,7 @@ function NodeStatusChip({ status, children }: Props) {
       sx={[
         style,
         {
-          fontWeight: "semibold",
+          fontWeight: 'semibold',
         },
       ]}
       label={children}

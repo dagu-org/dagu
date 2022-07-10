@@ -1,6 +1,6 @@
-import { Box, Typography } from "@mui/material";
-import React from "react";
-import Title from "./Title";
+import { Box, Typography } from '@mui/material';
+import React from 'react';
+import Title from './Title';
 
 type Props = {
   title: string;
@@ -14,9 +14,9 @@ function Metrics({ title, color, value }: Props) {
       <Title>{title}</Title>
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           flexGrow: 1,
         }}
       >

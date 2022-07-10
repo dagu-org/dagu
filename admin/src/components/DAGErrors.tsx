@@ -1,5 +1,5 @@
-import React from "react";
-import { DAG } from "../models/DAGData";
+import React from 'react';
+import { DAG } from '../models/DAGData';
 
 type Props = {
   DAGs: DAG[];
@@ -20,7 +20,7 @@ function DAGErrors({ DAGs, errors, hasError }: Props) {
             const url = encodeURI(w.File);
             return (
               <li>
-                <a href={url}>{w.File}</a>: {w.ErrorT}{" "}
+                <a href={url}>{w.File}</a>: {w.ErrorT}{' '}
               </li>
             );
           })}

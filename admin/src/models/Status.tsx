@@ -1,4 +1,4 @@
-import { Node } from "./Node";
+import { Node } from './Node';
 
 export enum SchedulerStatus {
   None = 0,

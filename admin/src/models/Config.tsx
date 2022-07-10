@@ -1,5 +1,5 @@
-import { Condition } from "./Condition";
-import { Step } from "./Step";
+import { Condition } from './Condition';
+import { Step } from './Step';
 
 export type Config = {
   ConfigPath: string;
@@ -17,8 +17,8 @@ export type Config = {
   MaxActiveRuns: number;
   Params: string[];
   DefaultParams: string;
-	Delay             :number
-	MaxCleanUpTime    :number
+  Delay: number;
+  MaxCleanUpTime: number;
 };
 
 export type HandlerOn = {

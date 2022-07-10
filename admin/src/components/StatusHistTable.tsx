@@ -1,15 +1,15 @@
-import moment from "moment";
-import React, { CSSProperties } from "react";
-import { DagStatus } from "../api/DAG";
-import { StatusFile } from "../models/StatusFile";
-import StatusHistTableRow from "./StatusHistTableRow";
+import moment from 'moment';
+import React, { CSSProperties } from 'react';
+import { DagStatus } from '../api/DAG';
+import { StatusFile } from '../models/StatusFile';
+import StatusHistTableRow from './StatusHistTableRow';
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-} from "@mui/material";
+} from '@mui/material';
 
 type Props = {
   logs: StatusFile[];
@@ -27,14 +27,14 @@ function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
           {logs.map((log, i) => {
             let date;
             const startedAt = logs[i].Status.StartedAt;
-            if (startedAt && startedAt != "-") {
-              date = moment(startedAt).format("M/D");
+            if (startedAt && startedAt != '-') {
+              date = moment(startedAt).format('M/D');
             } else {
-              date = moment().format("M/D");
+              date = moment().format('M/D');
             }
             const flag =
               i == 0 ||
-              moment(logs[i - 1].Status.StartedAt).format("M/D") != date;
+              moment(logs[i - 1].Status.StartedAt).format('M/D') != date;
             return (
               <TableCell
                 key={log.Status.StartedAt}
@@ -43,7 +43,7 @@ function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
                   onSelect(i);
                 }}
               >
-                {flag ? date : ""}
+                {flag ? date : ''}
               </TableCell>
             );
           })}
@@ -68,11 +68,11 @@ function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
 export default StatusHistTable;
 
 const colStyle: CSSProperties = {
-  maxWidth: "22px",
-  minWidth: "22px",
-  textAlign: "left",
+  maxWidth: '22px',
+  minWidth: '22px',
+  textAlign: 'left',
 };
 
 const tableStyle: CSSProperties = {
-  userSelect: "none",
+  userSelect: 'none',
 };

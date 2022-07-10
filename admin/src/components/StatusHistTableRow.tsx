@@ -1,8 +1,8 @@
-import { TableCell } from "@mui/material";
-import React, { CSSProperties } from "react";
-import { DagStatus } from "../api/DAG";
-import { statusColorMapping } from "../consts";
-import StyledTableRow from "./StyledTableRow";
+import { TableCell } from '@mui/material';
+import React, { CSSProperties } from 'react';
+import { DagStatus } from '../api/DAG';
+import { statusColorMapping } from '../consts';
+import StyledTableRow from './StyledTableRow';
 
 type Props = {
   data: DagStatus;
@@ -20,12 +20,12 @@ function StatusHistTableRow({ data, onSelect, idx }: Props) {
       {vals.map((status, i) => {
         const style: CSSProperties = { ...circleStyle };
         const tdStyle: CSSProperties = {
-          maxWidth: "22px",
-          minWidth: "22px",
-          textAlign: "center",
+          maxWidth: '22px',
+          minWidth: '22px',
+          textAlign: 'center',
         };
         if (i == idx) {
-          tdStyle.backgroundColor = "#FFDDAD";
+          tdStyle.backgroundColor = '#FFDDAD';
         }
         if (status != 0) {
           style.backgroundColor = statusColorMapping[status].backgroundColor;
@@ -39,7 +39,7 @@ function StatusHistTableRow({ data, onSelect, idx }: Props) {
             }}
             style={tdStyle}
           >
-            {status != 0 ? <div style={style}></div> : ""}
+            {status != 0 ? <div style={style}></div> : ''}
           </TableCell>
         );
       })}
@@ -50,8 +50,8 @@ function StatusHistTableRow({ data, onSelect, idx }: Props) {
 export default StatusHistTableRow;
 
 const circleStyle = {
-  width: "14px",
-  height: "14px",
-  borderRadius: "50%",
-  backgroundColor: "#000000",
+  width: '14px',
+  height: '14px',
+  borderRadius: '50%',
+  backgroundColor: '#000000',
 };
