@@ -16,7 +16,7 @@ function DAGErrors({ DAGs, errors, hasError }: Props) {
       <div>Please check the below errors!</div>
       <div className="content">
         <ul>
-          {DAGs.filter((w) => w.Error).map((w) => {
+          {DAGs.filter((w) => w.ErrorT).map((w) => {
             const url = encodeURI(w.File);
             return (
               <li>
