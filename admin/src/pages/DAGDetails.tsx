@@ -114,50 +114,41 @@ function DAGDetails() {
           ) : null}
         </Box>
 
-        <BorderedBox
+        <Stack
           sx={{
             mx: 4,
-            p: 2,
-            borderBottomLeftRadius: 0,
-            borderBottomRightRadius: 0,
-            borderBottomWidth: 0,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
+          <Tabs value={tab}>
+            <LinkTab
+              label="Status"
+              value={DetailTabId.Status}
+              href={`${baseUrl}?t=${DetailTabId.Status}`}
+            />
+            <LinkTab
+              label="Config"
+              value={DetailTabId.Config}
+              href={`${baseUrl}?t=${DetailTabId.Config}`}
+            />
+            <LinkTab
+              label="History"
+              value={DetailTabId.History}
+              href={`${baseUrl}?t=${DetailTabId.History}`}
+            />
+          </Tabs>
+          {tab == DetailTabId.Config ? (
+            <ConfigEditButtons name={params.name} />
+          ) : null}
+        </Stack>
+
+        <Box sx={{ mt: 2, mx: 4 }}>
           <ConfigErrors errors={data.Errors} />
+        </Box>
 
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-            <Stack
-              sx={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Tabs value={tab}>
-                <LinkTab
-                  label="Status"
-                  value={DetailTabId.Status}
-                  href={`${baseUrl}?t=${DetailTabId.Status}`}
-                />
-                <LinkTab
-                  label="Config"
-                  value={DetailTabId.Config}
-                  href={`${baseUrl}?t=${DetailTabId.Config}`}
-                />
-                <LinkTab
-                  label="History"
-                  value={DetailTabId.History}
-                  href={`${baseUrl}?t=${DetailTabId.History}`}
-                />
-              </Tabs>
-              {tab == DetailTabId.Config ? (
-                <ConfigEditButtons name={params.name} />
-              ) : null}
-            </Stack>
-          </Box>
-        </BorderedBox>
-
-        {contents[tab]}
+        <Box sx={{ mx: 4 }}>{contents[tab]}</Box>
       </Stack>
     </DAGContext.Provider>
   );

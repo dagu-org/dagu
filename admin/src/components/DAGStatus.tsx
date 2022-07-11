@@ -63,60 +63,60 @@ function DAGStatus({ DAG, name, refresh }: Props) {
   const handlers = Handlers(DAG.Status);
   return (
     <React.Fragment>
-      <BorderedBox
-        sx={{
-          pb: 4,
-          px: 2,
-          mx: 4,
-          display: 'flex',
-          flexDirection: 'column',
-          overflowX: 'auto',
-          borderTopWidth: 0,
-          borderTopLeftRadius: 0,
-          borderTopRightRadius: 0,
-        }}
-      >
-        <Tabs
-          value={sub}
-          onChange={(_, v) => setSub(v)}
-          TabIndicatorProps={{
-            style: {
-              display: 'none',
-            },
-          }}
-        >
-          <Tab
-            value="0"
-            icon={<i className="fa-solid fa-share-nodes" />}
-            label="Graph"
-            sx={{ minHeight: '40px', fontSize: '0.8rem' }}
-          />
-          <Tab
-            value="1"
-            icon={<i className="fa-solid fa-chart-gantt" />}
-            label="Timeline"
-            sx={{ minHeight: '40px', fontSize: '0.8rem' }}
-          />
-        </Tabs>
-
-        <Box
+      <Box>
+        <SubTitle>Status</SubTitle>
+        <BorderedBox
           sx={{
+            mt: 2,
+            py: 2,
+            px: 2,
+            display: 'flex',
+            flexDirection: 'column',
             overflowX: 'auto',
           }}
         >
-          {sub == '0' ? (
-            <Graph
-              steps={DAG.Status.Nodes}
-              type="status"
-              onClickNode={onSelectStepOnGraph}
-            ></Graph>
-          ) : (
-            <Timeline status={DAG.Status}></Timeline>
-          )}
-        </Box>
-      </BorderedBox>
+          <Tabs
+            value={sub}
+            onChange={(_, v) => setSub(v)}
+            TabIndicatorProps={{
+              style: {
+                display: 'none',
+              },
+            }}
+          >
+            <Tab
+              value="0"
+              icon={<i className="fa-solid fa-share-nodes" />}
+              label="Graph"
+              sx={{ minHeight: '40px', fontSize: '0.8rem' }}
+            />
+            <Tab
+              value="1"
+              icon={<i className="fa-solid fa-chart-gantt" />}
+              label="Timeline"
+              sx={{ minHeight: '40px', fontSize: '0.8rem' }}
+            />
+          </Tabs>
 
-      <Box sx={{ mx: 4 }}>
+          <Box
+            sx={{
+              overflowX: 'auto',
+            }}
+          >
+            {sub == '0' ? (
+              <Graph
+                steps={DAG.Status.Nodes}
+                type="status"
+                onClickNode={onSelectStepOnGraph}
+              ></Graph>
+            ) : (
+              <Timeline status={DAG.Status}></Timeline>
+            )}
+          </Box>
+        </BorderedBox>
+      </Box>
+
+      <Box>
         <DAGContext.Consumer>
           {(props) => (
             <React.Fragment>
