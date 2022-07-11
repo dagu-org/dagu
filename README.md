@@ -18,6 +18,7 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
   - [Motivation](#motivation)
   - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
   - [How does it work?](#how-does-it-work)
+  - [Todo](#todo)
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
     - [via Bash script](#via-bash-script)
@@ -73,6 +74,15 @@ There are many popular workflow engines such as Airflow, Prefect, etc. They are 
 
 - Self-contained - It is a single binary with zero dependency, No DBMS or cloud service is required.
 - Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
+
+## Todo
+
+If you are interested in contributing, please help me with the following tasks or anything you've noticed. Even one line code fix will be very welcomed :)
+
+- [ ] fix: linter errors (run `make lint` to see errors)
+- [ ] test: increase the test coverage (see [codecov](https://app.codecov.io/gh/yohamta/dagu))
+- [ ] test: fix race conditions (run `go test --race ./...`)
+- [ ] feat: add Windows support
 
 ## Install `dagu`
 
