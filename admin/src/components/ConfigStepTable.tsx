@@ -50,11 +50,11 @@ function ConfigStepTable({ steps }: Props) {
 export default ConfigStepTable;
 
 const StepConfigTabColStyles = [
-  { width: '200px' },
-  { width: '200px' },
-  { width: '300px' },
-  { width: '220px' },
-  { width: '150px' },
-  { width: '80px' },
+  { maxWidth: '200px' },
+  { maxWidth: '200px' },
+  { maxWidth: '300px' },
+  { maxWidth: '220px' },
+  { maxWidth: '150px' },
+  { maxWidth: '80px' },
   {},
 ];

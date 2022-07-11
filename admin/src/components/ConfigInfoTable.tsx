@@ -61,9 +61,9 @@ function ConfigInfoTable({ config }: Props) {
 export default ConfigInfoTable;
 
 const configTabColStyles = [
-  { width: '200px' },
-  { width: '200px' },
-  { width: '150px' },
-  { width: '150px' },
+  { maxWidth: '200px' },
+  { maxWidth: '200px' },
+  { maxWidth: '150px' },
+  { maxWidth: '150px' },
   {},
 ];
