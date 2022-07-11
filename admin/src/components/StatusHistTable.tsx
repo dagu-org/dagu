@@ -10,6 +10,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import BorderedBox from './BorderedBox';
 
 type Props = {
   logs: StatusFile[];
@@ -20,48 +21,50 @@ type Props = {
 
 function StatusHistTable({ logs, gridData, onSelect, idx }: Props) {
   return (
-    <Table size="small" sx={tableStyle}>
-      <TableHead>
-        <TableRow>
-          <TableCell></TableCell>
-          {logs.map((log, i) => {
-            let date;
-            const startedAt = logs[i].Status.StartedAt;
-            if (startedAt && startedAt != '-') {
-              date = moment(startedAt).format('M/D');
-            } else {
-              date = moment().format('M/D');
-            }
-            const flag =
-              i == 0 ||
-              moment(logs[i - 1].Status.StartedAt).format('M/D') != date;
+    <BorderedBox>
+      <Table size="small" sx={tableStyle}>
+        <TableHead>
+          <TableRow>
+            <TableCell></TableCell>
+            {logs.map((log, i) => {
+              let date;
+              const startedAt = logs[i].Status.StartedAt;
+              if (startedAt && startedAt != '-') {
+                date = moment(startedAt).format('M/D');
+              } else {
+                date = moment().format('M/D');
+              }
+              const flag =
+                i == 0 ||
+                moment(logs[i - 1].Status.StartedAt).format('M/D') != date;
+              return (
+                <TableCell
+                  key={log.Status.StartedAt}
+                  style={colStyle}
+                  onClick={() => {
+                    onSelect(i);
+                  }}
+                >
+                  {flag ? date : ''}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {gridData.map((data) => {
             return (
-              <TableCell
-                key={log.Status.StartedAt}
-                style={colStyle}
-                onClick={() => {
-                  onSelect(i);
-                }}
-              >
-                {flag ? date : ''}
-              </TableCell>
+              <StatusHistTableRow
+                key={data.Name}
+                data={data}
+                onSelect={onSelect}
+                idx={idx}
+              ></StatusHistTableRow>
             );
           })}
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {gridData.map((data) => {
-          return (
-            <StatusHistTableRow
-              key={data.Name}
-              data={data}
-              onSelect={onSelect}
-              idx={idx}
-            ></StatusHistTableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+        </TableBody>
+      </Table>
+    </BorderedBox>
   );
 }
 

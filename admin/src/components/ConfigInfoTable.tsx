@@ -1,25 +1,13 @@
-import React, { CSSProperties } from 'react';
+import React from 'react';
 import { Config } from '../models/Config';
-import MultilineText from './MultilineText';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@mui/material';
-import BorderedBox from './BorderedBox';
+import { Stack, Box } from '@mui/material';
+import LabeledItem from './LabeledItem';
 
 type Props = {
   config: Config;
 };
 
 function ConfigInfoTable({ config }: Props) {
-  const tableStyle: CSSProperties = {
-    tableLayout: 'fixed',
-    wordWrap: 'break-word',
-  };
-  const styles = configTabColStyles;
   const preconditions = config.Preconditions.map((c) => (
     <li>
       {c.Condition}
@@ -27,43 +15,22 @@ function ConfigInfoTable({ config }: Props) {
       {c.Expected}
     </li>
   ));
-  let i = 0;
   return (
-    <BorderedBox>
-      <Table sx={tableStyle}>
-        <TableHead>
-          <TableRow>
-            <TableCell style={styles[i++]}>Name</TableCell>
-            <TableCell style={styles[i++]}>Description</TableCell>
-            <TableCell style={styles[i++]}>MaxActiveRuns</TableCell>
-            <TableCell style={styles[i++]}>Params</TableCell>
-            <TableCell style={styles[i++]}>Preconditions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          <TableRow>
-            <TableCell> {config.Name} </TableCell>
-            <TableCell>
-              <MultilineText>{config.Description}</MultilineText>
-            </TableCell>
-            <TableCell> {config.MaxActiveRuns} </TableCell>
-            <TableCell> {config.DefaultParams} </TableCell>
-            <TableCell>
-              <ul>{preconditions}</ul>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </BorderedBox>
+    <Stack direction="column" spacing={1}>
+      <LabeledItem label="Name">{config.Name}</LabeledItem>
+      <LabeledItem label="Description">{config.Description}</LabeledItem>
+      <LabeledItem label="Max Active Runs">{config.MaxActiveRuns}</LabeledItem>
+      <LabeledItem label="Params">{config.Params}</LabeledItem>
+      <Stack direction={'column'}>
+        <React.Fragment>
+          <LabeledItem label="Pre Conditions">{null}</LabeledItem>
+          <Box sx={{ pl: 2 }}>
+            <ul>{preconditions}</ul>
+          </Box>
+        </React.Fragment>
+      </Stack>
+    </Stack>
   );
 }
 
 export default ConfigInfoTable;
-
-const configTabColStyles = [
-  { maxWidth: '200px' },
-  { maxWidth: '200px' },
-  { maxWidth: '150px' },
-  { maxWidth: '150px' },
-  {},
-];

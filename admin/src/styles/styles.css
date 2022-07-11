@@ -22,3 +22,13 @@ a {
   font-weight: bold;
   padding-left: 4px;
 }
+
+.MuiTableRow-root th {
+  background-color: #485fc7;
+  color: #fff;
+  font-weight: 600;
+}
+
+.MuiTableRow-root td {
+  font-weight: 600;
+}

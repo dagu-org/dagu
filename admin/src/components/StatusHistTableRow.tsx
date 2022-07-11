@@ -19,11 +19,7 @@ function StatusHistTableRow({ data, onSelect, idx }: Props) {
       <TableCell>{data.Name}</TableCell>
       {vals.map((status, i) => {
         const style: CSSProperties = { ...circleStyle };
-        const tdStyle: CSSProperties = {
-          maxWidth: '22px',
-          minWidth: '22px',
-          textAlign: 'center',
-        };
+        const tdStyle: CSSProperties = { maxWidth: '22px' };
         if (i == idx) {
           tdStyle.backgroundColor = '#FFDDAD';
         }
