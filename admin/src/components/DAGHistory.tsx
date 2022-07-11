@@ -49,7 +49,11 @@ function DAGHistory({ logData }: Props) {
                 <Box sx={{ mt: 3 }}>
                   <SubTitle>DAG Status</SubTitle>
                   <Box sx={{ mt: 2 }}>
-                    <StatusInfoTable status={logs[idx].Status} {...props} />
+                    <StatusInfoTable
+                      status={logs[idx].Status}
+                      file={logs[idx].File}
+                      {...props}
+                    />
                   </Box>
                 </Box>
                 <Box sx={{ mt: 3 }}>
