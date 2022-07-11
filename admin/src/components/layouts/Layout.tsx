@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import { mainListItems } from '../../menu';
 import { Grid, IconButton } from '@mui/material';
 import icon from '../../assets/images/dagu.png';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 const drawerWidthClosed = 64;
 const drawerWidth = 240;
@@ -79,7 +80,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
   const toggleDrawer = () => {
     setOpen(!open);
   };
-  const [border, setBorder] = React.useState(false);
+  const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const gradientColor = navbarColor || '#323232';
 
@@ -140,7 +141,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
             sx={{
               width: '100%',
               backgroundColor: 'white',
-              borderBottom: border ? 1 : 0,
+              borderBottom: scrolled ? 1 : 0,
               borderColor: 'grey.300',
               pr: 2,
               position: 'relative',
@@ -153,22 +154,19 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
                 backgroundColor: 'white',
                 display: 'flex',
                 direction: 'row',
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 flex: 1,
               }}
             >
-              <Typography
-                component="h1"
-                variant="h6"
-                gutterBottom
-                sx={{
-                  fontWeight: '800',
-                  color: navbarColor || '#404040',
-                }}
-              >
-                {title || 'dagu'}
-              </Typography>
+              <AppBarContext.Consumer>
+                {(context) => (
+                  <NavBarTitleText visible={scrolled}>
+                    {context.title}
+                  </NavBarTitleText>
+                )}
+              </AppBarContext.Consumer>
+              <NavBarTitleText>{title || 'dagu'}</NavBarTitleText>
             </Toolbar>
           </AppBar>
           <Grid
@@ -183,7 +181,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
             onScroll={() => {
               const curr = containerRef.current;
               if (curr) {
-                setBorder(curr.scrollTop > 0);
+                setScrolled(curr.scrollTop > 54);
               }
             }}
           >
@@ -194,6 +192,30 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
     </ThemeProvider>
   );
 }
+
+type NavBarTitleTextProps = {
+  children: string;
+  visible?: boolean;
+};
+
+const NavBarTitleText = ({
+  children,
+  visible = true,
+}: NavBarTitleTextProps) => (
+  <Typography
+    component="h1"
+    variant="h6"
+    gutterBottom
+    sx={{
+      fontWeight: '800',
+      color: '#404040',
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 0.2s',
+    }}
+  >
+    {children}
+  </Typography>
+);
 
 type DashboardProps = DashboardContentProps;
 

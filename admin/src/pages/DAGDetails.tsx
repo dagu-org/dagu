@@ -14,6 +14,7 @@ import DAGActions from '../components/DAGActions';
 import ConfigEditButtons from '../components/ConfigEditButtons';
 import Loading from '../components/Loading';
 import BorderedBox from '../components/BorderedBox';
+import { AppBarContext } from '../contexts/AppBarContext';
 
 type Params = {
   name: string;
@@ -23,6 +24,7 @@ function DAGDetails() {
   const params = useParams<Params>();
   const [data, setData] = React.useState<GetDAGResponse | undefined>(undefined);
   const [tab, setTab] = React.useState(DetailTabId.Status);
+  const appBarContext = React.useContext(AppBarContext);
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const t = urlParams.get('t');
@@ -48,6 +50,11 @@ function DAGDetails() {
     const body = await resp.json();
     setData(body);
   }
+  React.useEffect(() => {
+    if (data) {
+      appBarContext.setTitle(data.Title);
+    }
+  }, [data, appBarContext]);
   React.useEffect(() => {
     getData();
     if (tab == DetailTabId.Status || tab == DetailTabId.Config) {
@@ -88,6 +95,25 @@ function DAGDetails() {
           direction: 'column',
         }}
       >
+        <Box
+          sx={{
+            mx: 4,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Title>{data.Title}</Title>
+          {tab == DetailTabId.Status ? (
+            <DAGActions
+              status={data.DAG.Status}
+              name={params.name!}
+              refresh={getData}
+            />
+          ) : null}
+        </Box>
+
         <BorderedBox
           sx={{
             mx: 4,
@@ -98,24 +124,6 @@ function DAGDetails() {
           }}
         >
           <ConfigErrors errors={data.Errors} />
-
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Title>{data.Title}</Title>
-            {tab == DetailTabId.Status ? (
-              <DAGActions
-                status={data.DAG.Status}
-                name={params.name!}
-                refresh={getData}
-              />
-            ) : null}
-          </Box>
 
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Stack
