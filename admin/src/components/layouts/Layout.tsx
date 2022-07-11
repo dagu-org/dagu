@@ -81,38 +81,46 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
   };
   const [border, setBorder] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const gradientColor = navbarColor || '#323232';
 
   return (
     <ThemeProvider theme={mdTheme}>
       <Box sx={{ display: 'flex', flexDirection: 'row', width: '100vw' }}>
         <CssBaseline />
         <Drawer variant="permanent" open={open}>
-          <Toolbar
+          <Box
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              background: `linear-gradient(0deg, rgba(210,210,210,1) 0%, ${gradientColor} 100%);`,
+              height: '100%',
             }}
           >
-            <IconButton onClick={toggleDrawer}>
-              <img
-                src={icon}
-                alt="dagu"
-                width={64}
-                style={{
-                  maxWidth: '64px',
-                }}
-              />
-            </IconButton>
-          </Toolbar>
-          <List
-            component="nav"
-            sx={{
-              pl: '6px',
-            }}
-          >
-            {mainListItems}
-          </List>
+            <Toolbar
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <IconButton onClick={toggleDrawer}>
+                <img
+                  src={icon}
+                  alt="dagu"
+                  width={64}
+                  style={{
+                    maxWidth: '64px',
+                  }}
+                />
+              </IconButton>
+            </Toolbar>
+            <List
+              component="nav"
+              sx={{
+                pl: '6px',
+              }}
+            >
+              {mainListItems}
+            </List>
+          </Box>
         </Drawer>
         <Box
           component="main"
