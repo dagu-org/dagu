@@ -81,7 +81,7 @@ function DAGConfig({ data }: Props) {
                   sx={{
                     mt: 2,
                     px: 2,
-                    pt: 1,
+                    py: 1,
                     display: 'flex',
                     flexDirection: 'column',
                   }}

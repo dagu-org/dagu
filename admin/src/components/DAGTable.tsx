@@ -395,7 +395,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
         <TextField
           label="Search Text"
           size="small"
-          variant="standard"
+          variant="filled"
           InputProps={{
             value: instance.getColumn('Name').getFilterValue(),
             onChange: (e) => {
@@ -413,73 +413,81 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
             instance.getColumn('Tags').setFilterValue(value || '');
           }}
           renderInput={(params) => (
-            <TextField {...params} variant="standard" label="Search Tag" />
+            <TextField {...params} variant="filled" label="Search Tag" />
           )}
           sx={{ width: '300px', ml: 2 }}
         />
       </Stack>
-      <Table size="small">
-        <TableHead>
-          {instance.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <TableCell
-                  key={header.id}
-                  style={{
-                    padding:
-                      header.id == 'Expand' || header.id == 'Name'
-                        ? '6px 4px'
-                        : '6px 16px',
-                  }}
-                >
-                  {header.column.getCanSort() ? (
-                    <Stack direction="column" spacing={1}>
-                      <Box
-                        {...{
-                          sx: {
-                            cursor: header.column.getCanSort()
-                              ? 'pointer'
-                              : 'default',
-                          },
-                          onClick: header.column.getToggleSortingHandler(),
-                        }}
-                      >
-                        {header.isPlaceholder ? null : header.renderHeader()}
-                        {{
-                          asc: <TableSortLabel direction="asc" />,
-                          desc: <TableSortLabel direction="desc" />,
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </Box>
-                    </Stack>
-                  ) : (
-                    header.renderHeader()
-                  )}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableHead>
-        <TableBody>
-          {instance.getRowModel().rows.map((row) => (
-            <StyledTableRow key={row.id} style={{ height: '44px' }}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  style={{
-                    padding:
-                      cell.column.id == 'Expand' || cell.column.id == 'Name'
-                        ? '6px 4px'
-                        : '6px 16px',
-                  }}
-                  width={cell.column.id == 'Expand' ? '44px' : undefined}
-                >
-                  {cell.renderCell()}
-                </TableCell>
-              ))}
-            </StyledTableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <Box
+        sx={{
+          border: '1px solid #485fc7',
+          borderRadius: '6px',
+          mt: 2,
+        }}
+      >
+        <Table size="small">
+          <TableHead>
+            {instance.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableCell
+                    key={header.id}
+                    style={{
+                      padding:
+                        header.id == 'Expand' || header.id == 'Name'
+                          ? '6px 4px'
+                          : '6px 16px',
+                    }}
+                  >
+                    {header.column.getCanSort() ? (
+                      <Stack direction="column" spacing={1}>
+                        <Box
+                          {...{
+                            sx: {
+                              cursor: header.column.getCanSort()
+                                ? 'pointer'
+                                : 'default',
+                            },
+                            onClick: header.column.getToggleSortingHandler(),
+                          }}
+                        >
+                          {header.isPlaceholder ? null : header.renderHeader()}
+                          {{
+                            asc: <TableSortLabel direction="asc" />,
+                            desc: <TableSortLabel direction="desc" />,
+                          }[header.column.getIsSorted() as string] ?? null}
+                        </Box>
+                      </Stack>
+                    ) : (
+                      header.renderHeader()
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableHead>
+          <TableBody>
+            {instance.getRowModel().rows.map((row) => (
+              <StyledTableRow key={row.id} style={{ height: '44px' }}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    key={cell.id}
+                    style={{
+                      padding:
+                        cell.column.id == 'Expand' || cell.column.id == 'Name'
+                          ? '6px 4px'
+                          : '6px 16px',
+                    }}
+                    width={cell.column.id == 'Expand' ? '44px' : undefined}
+                  >
+                    {cell.renderCell()}
+                  </TableCell>
+                ))}
+              </StyledTableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
     </Box>
   );
 }

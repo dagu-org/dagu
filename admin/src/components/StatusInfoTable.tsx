@@ -30,7 +30,7 @@ function StatusInfoTable({ status, name, file = '' }: Props) {
   }
   return (
     <BorderedBox>
-      <Table sx={tableStyle}>
+      <Table sx={tableStyle} size="small">
         <TableHead>
           <TableRow>
             <TableCell style={styles[i++]}>Request ID</TableCell>

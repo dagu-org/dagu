@@ -13,7 +13,7 @@ export default function BorderedBox({
     <Box
       sx={{
         border: 1,
-        borderColor: 'grey.300',
+        borderColor: '#485fc7',
         borderRadius: '6px',
         ...sx,
       }}

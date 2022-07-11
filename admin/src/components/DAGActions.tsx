@@ -133,7 +133,7 @@ function ActionButton({
   return label ? (
     <Button
       variant="contained"
-      color="info"
+      color="primary"
       size="small"
       startIcon={icon}
       disabled={disabled}
@@ -142,7 +142,7 @@ function ActionButton({
       {children}
     </Button>
   ) : (
-    <IconButton color="info" size="small" onClick={onClick} disabled={disabled}>
+    <IconButton color="primary" size="small" onClick={onClick} disabled={disabled}>
       {icon}
     </IconButton>
   );

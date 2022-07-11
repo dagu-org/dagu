@@ -67,6 +67,11 @@ const mdTheme = createTheme({
     fontFamily:
       "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
   },
+  palette: {
+    primary: {
+      main: '#485fc7',
+    }
+  },
 });
 
 type DashboardContentProps = {
@@ -82,7 +87,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
   };
   const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const gradientColor = navbarColor || '#323232';
+  const gradientColor = navbarColor || '#040404';
 
   return (
     <ThemeProvider theme={mdTheme}>
