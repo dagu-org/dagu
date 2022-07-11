@@ -3,7 +3,6 @@ import React from 'react';
 import { LogData } from '../api/DAG';
 import { DAGContext } from '../contexts/DAGContext';
 import { Handlers } from '../models/Status';
-import BorderedBox from './BorderedBox';
 import NodeStatusTable from './NodeStatusTable';
 import StatusHistTable from './StatusHistTable';
 import StatusInfoTable from './StatusInfoTable';
@@ -18,6 +17,7 @@ function DAGHistory({ logData }: Props) {
   const [logs, gridData] = React.useMemo(() => {
     return [logData.Logs.reverse(), logData.GridData];
   }, [logData]);
+  const handlers = Handlers(logs[idx].Status);
   return (
     <DAGContext.Consumer>
       {(props) => (
@@ -56,7 +56,7 @@ function DAGHistory({ logData }: Props) {
                 </Box>
               </Box>
 
-              {Handlers(logs[idx].Status) && (
+              {handlers && handlers.length ? (
                 <Box sx={{ mt: 3 }}>
                   <SubTitle>Handler Status</SubTitle>
                   <Box sx={{ mt: 2 }}>
@@ -68,7 +68,7 @@ function DAGHistory({ logData }: Props) {
                     />
                   </Box>
                 </Box>
-              )}
+              ) : null}
             </React.Fragment>
           ) : null}
         </React.Fragment>

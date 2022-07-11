@@ -65,14 +65,14 @@ function DAGConfig({ data }: Props) {
                 ></ConfigStepTable>
               </Box>
             </Box>
-            {handlers && (
+            {handlers && handlers.length ? (
               <Box sx={{ mt: 3 }}>
                 <SubTitle>Handler Config</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <ConfigStepTable steps={handlers}></ConfigStepTable>
                 </Box>
               </Box>
-            )}
+            ) : null}
 
             <Box sx={{ mt: 3 }}>
               <SubTitle>Config Editor</SubTitle>

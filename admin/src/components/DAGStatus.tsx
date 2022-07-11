@@ -141,7 +141,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
                 </Box>
               </Box>
 
-              {handlers && (
+              {handlers && handlers.length ? (
                 <Box sx={{ mt: 3 }}>
                   <SubTitle>Handler Status</SubTitle>
                   <Box sx={{ mt: 2 }}>
@@ -152,7 +152,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
                     ></NodeStatusTable>
                   </Box>
                 </Box>
-              )}
+              ) : null}
             </React.Fragment>
           )}
         </DAGContext.Consumer>

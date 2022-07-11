@@ -13,7 +13,6 @@ import Title from '../components/Title';
 import DAGActions from '../components/DAGActions';
 import ConfigEditButtons from '../components/ConfigEditButtons';
 import Loading from '../components/Loading';
-import BorderedBox from '../components/BorderedBox';
 import { AppBarContext } from '../contexts/AppBarContext';
 
 type Params = {

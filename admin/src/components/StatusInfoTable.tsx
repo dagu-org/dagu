@@ -1,15 +1,9 @@
-import React, { CSSProperties } from 'react';
+import React from 'react';
 import { Status } from '../models/Status';
 import { DetailTabId } from '../models/DAGData';
 import StatusChip from './StatusChip';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@mui/material';
-import BorderedBox from './BorderedBox';
+import { Stack } from '@mui/material';
+import LabeledItem from './LabeledItem';
 
 type Props = {
   status?: Status;
@@ -18,59 +12,25 @@ type Props = {
 };
 
 function StatusInfoTable({ status, name, file = '' }: Props) {
-  const tableStyle: CSSProperties = {
-    tableLayout: 'fixed',
-    wordWrap: 'break-word',
-  };
-  const styles = statusTabColStyles;
   const url = `/dags/${name}?t=${DetailTabId.ScLog}&file=${encodeURI(file)}`;
-  let i = 0;
   if (!status) {
     return null;
   }
   return (
-    <BorderedBox>
-      <Table sx={tableStyle} size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell style={styles[i++]}>Request ID</TableCell>
-            <TableCell style={styles[i++]}>DAG Name</TableCell>
-            <TableCell style={styles[i++]}>Started At</TableCell>
-            <TableCell style={styles[i++]}>Finished At</TableCell>
-            <TableCell style={styles[i++]}>Status</TableCell>
-            <TableCell style={styles[i++]}>Params</TableCell>
-            <TableCell style={styles[i++]}>Scheduler Log</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          <TableRow>
-            <TableCell> {status.RequestId || '-'} </TableCell>
-            <TableCell> {status.Name} </TableCell>
-            <TableCell> {status.StartedAt} </TableCell>
-            <TableCell> {status.FinishedAt} </TableCell>
-            <TableCell>
-              <StatusChip status={status.Status}>
-                {status.StatusText}
-              </StatusChip>
-            </TableCell>
-            <TableCell> {status.Params} </TableCell>
-            <TableCell>
-              <a href={url}> {status.Log} </a>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </BorderedBox>
+    <Stack direction="column" spacing={1}>
+      <LabeledItem label="Status">
+        <StatusChip status={status.Status}>{status.StatusText}</StatusChip>
+      </LabeledItem>
+      <LabeledItem label="Request ID">{status.RequestId}</LabeledItem>
+      <Stack direction="row" sx={{ alignItems: 'center' }} spacing={2}>
+        <LabeledItem label="Started At">{status.StartedAt}</LabeledItem>
+        <LabeledItem label="Finished At">{status.FinishedAt}</LabeledItem>
+      </Stack>
+      <LabeledItem label="Params">{status.Params}</LabeledItem>
+      <LabeledItem label="Scheduler Log">
+        <a href={url}> {status.Log} </a>
+      </LabeledItem>
+    </Stack>
   );
 }
 export default StatusInfoTable;
-
-const statusTabColStyles = [
-  { maxWidth: '240px' },
-  { maxWidth: '150px' },
-  { maxWidth: '150px' },
-  { maxWidth: '150px' },
-  { maxWidth: '130px' },
-  { maxWidth: '130px' },
-  {},
-];
