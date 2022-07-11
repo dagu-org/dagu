@@ -9,7 +9,7 @@ import (
 
 func newVersionCommand() *cli.Command {
 	return &cli.Command{
-		Name: "version",
+		Name:  "version",
 		Usage: "dagu version",
 		Action: func(c *cli.Context) error {
 			if constants.Version != "" {
