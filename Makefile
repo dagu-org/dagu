@@ -34,3 +34,7 @@ test: build
 test-clean:
 	go clean -testcache
 	go test ./...
+
+.PHONY: lint
+lint:
+	golangci-lint run ./...
