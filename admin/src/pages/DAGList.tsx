@@ -9,11 +9,13 @@ import { useDAGGetAPI } from '../hooks/useDAGGetAPI';
 import { DAGItem, DAGDataType } from '../models/DAGData';
 import { useLocation } from 'react-router-dom';
 import { GetDAGsResponse } from '../api/DAGs';
+import { AppBarContext } from '../contexts/AppBarContext';
 
 function DAGList() {
   const useQuery = () => new URLSearchParams(useLocation().search);
   const query = useQuery();
   const group = query.get('group') || '';
+  const appBarContext = React.useContext(AppBarContext);
 
   const { data, doGet } = useDAGGetAPI<GetDAGsResponse>('/', {});
 
@@ -22,6 +24,9 @@ function DAGList() {
     const timer = setInterval(doGet, 10000);
     return () => clearInterval(timer);
   }, []);
+  React.useEffect(() => {
+    appBarContext.setTitle('DAGs');
+  }, [appBarContext]);
 
   const merged = React.useMemo(() => {
     const ret: DAGItem[] = [];

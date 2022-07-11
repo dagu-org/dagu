@@ -66,11 +66,11 @@ function StatusInfoTable({ status, name, file = '' }: Props) {
 export default StatusInfoTable;
 
 const statusTabColStyles = [
-  { width: '240px' },
-  { width: '150px' },
-  { width: '150px' },
-  { width: '150px' },
-  { width: '130px' },
-  { width: '130px' },
+  { maxWidth: '240px' },
+  { maxWidth: '150px' },
+  { maxWidth: '150px' },
+  { maxWidth: '150px' },
+  { maxWidth: '130px' },
+  { maxWidth: '130px' },
   {},
 ];

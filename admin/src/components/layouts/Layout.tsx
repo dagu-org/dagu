@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import { mainListItems } from '../../menu';
 import { Grid, IconButton } from '@mui/material';
 import icon from '../../assets/images/dagu.png';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 const drawerWidthClosed = 64;
 const drawerWidth = 240;
@@ -22,16 +23,13 @@ const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== 'open',
 })<AppBarProps>(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer - 1,
-  transition: theme.transitions.create(['width', 'margin'], {
+  transition: theme.transitions.create(['width', 'margin', 'border'], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  marginLeft: drawerWidthClosed,
-  width: `calc(100% - ${drawerWidthClosed}px)`,
+  width: '100%',
   ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
+    transition: theme.transitions.create(['width', 'margin', 'border'], {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
     }),
@@ -82,78 +80,111 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
   const toggleDrawer = () => {
     setOpen(!open);
   };
+  const [scrolled, setScrolled] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const gradientColor = navbarColor || '#323232';
 
   return (
     <ThemeProvider theme={mdTheme}>
-      <Box sx={{ display: 'flex' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'row', width: '100vw' }}>
         <CssBaseline />
-        <AppBar
-          position="absolute"
-          open={open}
-          elevation={0}
-          sx={{
-            borderBottom: 1,
-            borderColor: 'grey.300',
-          }}
-        >
-          <Toolbar
+        <Drawer variant="permanent" open={open}>
+          <Box
             sx={{
-              pr: '24px', // keep right padding when drawer closed
-              backgroundColor: 'white',
+              background: `linear-gradient(0deg, rgba(210,210,210,1) 0%, ${gradientColor} 100%);`,
+              height: '100%',
             }}
           >
-            <Typography
-              component="h1"
-              variant="h6"
-              gutterBottom
+            <Toolbar
               sx={{
-                fontWeight: '800',
-                color: navbarColor || '#404040',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {title || 'dagu'}
-            </Typography>
-          </Toolbar>
-        </AppBar>
-        <Drawer variant="permanent" open={open}>
-          <Toolbar
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IconButton onClick={toggleDrawer}>
-              <img
-                src={icon}
-                alt="dagu"
-                width={64}
-                style={{
-                  maxWidth: '64px',
-                }}
-              />
-            </IconButton>
-          </Toolbar>
-          <List
-            component="nav"
-            sx={{
-              pl: '6px',
-            }}
-          >
-            {mainListItems}
-          </List>
+              <IconButton onClick={toggleDrawer}>
+                <img
+                  src={icon}
+                  alt="dagu"
+                  width={64}
+                  style={{
+                    maxWidth: '64px',
+                  }}
+                />
+              </IconButton>
+            </Toolbar>
+            <List
+              component="nav"
+              sx={{
+                pl: '6px',
+              }}
+            >
+              {mainListItems}
+            </List>
+          </Box>
         </Drawer>
         <Box
           component="main"
           sx={{
+            display: 'flex',
+            flexDirection: 'column',
             backgroundColor: 'white',
-            flexGrow: 1,
             height: '100vh',
+            width: '100%',
+            maxWidth: '100%',
             overflow: 'auto',
           }}
         >
-          <Toolbar />
-          <Grid container sx={{ mt: 4, mb: 4 }}>
+          <AppBar
+            open={open}
+            elevation={0}
+            sx={{
+              width: '100%',
+              backgroundColor: 'white',
+              borderBottom: scrolled ? 1 : 0,
+              borderColor: 'grey.300',
+              pr: 2,
+              position: 'relative',
+              display: 'block',
+            }}
+          >
+            <Toolbar
+              sx={{
+                width: '100%',
+                backgroundColor: 'white',
+                display: 'flex',
+                direction: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flex: 1,
+              }}
+            >
+              <AppBarContext.Consumer>
+                {(context) => (
+                  <NavBarTitleText visible={scrolled}>
+                    {context.title}
+                  </NavBarTitleText>
+                )}
+              </AppBarContext.Consumer>
+              <NavBarTitleText>{title || 'dagu'}</NavBarTitleText>
+            </Toolbar>
+          </AppBar>
+          <Grid
+            container
+            ref={containerRef}
+            sx={{
+              flex: 1,
+              pt: 2,
+              pb: 4,
+              overflow: 'auto',
+            }}
+            onScroll={() => {
+              const curr = containerRef.current;
+              if (curr) {
+                setScrolled(curr.scrollTop > 54);
+              }
+            }}
+          >
             {children}
           </Grid>
         </Box>
@@ -161,6 +192,30 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
     </ThemeProvider>
   );
 }
+
+type NavBarTitleTextProps = {
+  children: string;
+  visible?: boolean;
+};
+
+const NavBarTitleText = ({
+  children,
+  visible = true,
+}: NavBarTitleTextProps) => (
+  <Typography
+    component="h1"
+    variant="h6"
+    gutterBottom
+    sx={{
+      fontWeight: '800',
+      color: '#404040',
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 0.2s',
+    }}
+  >
+    {children}
+  </Typography>
+);
 
 type DashboardProps = DashboardContentProps;
 

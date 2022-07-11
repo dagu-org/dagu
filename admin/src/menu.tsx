@@ -4,24 +4,46 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import { Link } from 'react-router-dom';
 import { TimelineOutlined, TocOutlined } from '@mui/icons-material';
+import { Typography } from '@mui/material';
 
 export const mainListItems = (
   <React.Fragment>
     <Link to="/">
-      <ListItemButton>
-        <ListItemIcon>
-          <TimelineOutlined />
-        </ListItemIcon>
-        <ListItemText primary="Dashboard" />
-      </ListItemButton>
+      <ListItem text="Dashboard" icon={<TimelineOutlined />} />
     </Link>
     <Link to="/dags">
-      <ListItemButton>
-        <ListItemIcon>
-          <TocOutlined />
-        </ListItemIcon>
-        <ListItemText primary="DAGs" />
-      </ListItemButton>
+      <ListItem text="DAGs" icon={<TocOutlined />} />
     </Link>
   </React.Fragment>
 );
+
+type ListItemProps = {
+  icon: React.ReactNode;
+  text: string;
+};
+
+function ListItem({ icon, text }: ListItemProps) {
+  return (
+    <ListItemButton>
+      <ListItemIcon
+        sx={{
+          color: 'white',
+        }}
+      >
+        {icon}
+      </ListItemIcon>
+      <ListItemText
+        primary={
+          <Typography
+            sx={{
+              color: 'white',
+              fontWeight: '600',
+            }}
+          >
+            {text}
+          </Typography>
+        }
+      />
+    </ListItemButton>
+  );
+}

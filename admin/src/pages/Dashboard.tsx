@@ -7,6 +7,7 @@ import { statusColorMapping } from '../consts';
 import Metrics from '../components/Metrics';
 import DashboardTimechart from '../components/DashboardTimechart';
 import Title from '../components/Title';
+import { AppBarContext } from '../contexts/AppBarContext';
 
 type metrics = Record<SchedulerStatus, number>;
 
@@ -20,6 +21,7 @@ for (const value in SchedulerStatus) {
 
 function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
+  const appBarContext = React.useContext(AppBarContext);
 
   const { data, doGet } = useDAGGetAPI<GetDAGsResponse>('/', {});
 
@@ -36,6 +38,10 @@ function Dashboard() {
     });
     setMetrics(m as metrics);
   }, [data]);
+
+  React.useEffect(() => {
+    appBarContext.setTitle('Dashboard');
+  }, [appBarContext]);
 
   React.useEffect(() => {
     doGet();
