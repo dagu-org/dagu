@@ -10,8 +10,3 @@ steps:
     command: echo done!
     depends:
       - "2"
-preconditions:
-  - condition: "`date '+%d'`"
-    expected: "01"
-  - condition: "`date '+%d'`"
-    expected: "01"
