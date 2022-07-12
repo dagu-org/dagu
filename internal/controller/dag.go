@@ -6,13 +6,23 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/storage"
+	"github.com/yohamta/dagu/internal/suspend"
 )
 
 type DAGReader struct {
+	suspendChecker *suspend.SuspendChecker
 }
 
 func NewDAGReader() *DAGReader {
-	return &DAGReader{}
+	return &DAGReader{
+		suspendChecker: suspend.NewSuspendChecker(
+			storage.NewStorage(
+				settings.MustGet(settings.SETTING__SUSPEND_FLAGS_DIR),
+			),
+		),
+	}
 }
 
 // DAG is the struct to contain DAG configuration and status.
@@ -38,11 +48,11 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	}
 	if err != nil {
 		if cfg != nil {
-			return newDAG(cfg, defaultStatus(cfg), err), err
+			return dr.newDAG(cfg, defaultStatus(cfg), err), err
 		}
 		cfg := &config.Config{ConfigPath: file}
 		cfg.Init()
-		return newDAG(cfg, defaultStatus(cfg), err), err
+		return dr.newDAG(cfg, defaultStatus(cfg), err), err
 	}
 	status, err := New(cfg).GetLastStatus()
 	if err != nil {
@@ -50,19 +60,20 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	}
 	if !headOnly {
 		if _, err := scheduler.NewExecutionGraph(cfg.Steps...); err != nil {
-			return newDAG(cfg, status, err), err
+			return dr.newDAG(cfg, status, err), err
 		}
 	}
-	return newDAG(cfg, status, err), nil
+	return dr.newDAG(cfg, status, err), nil
 }
 
-func newDAG(cfg *config.Config, s *models.Status, err error) *DAG {
+func (dr *DAGReader) newDAG(cfg *config.Config, s *models.Status, err error) *DAG {
 	ret := &DAG{
-		File:   filepath.Base(cfg.ConfigPath),
-		Dir:    filepath.Dir(cfg.ConfigPath),
-		Config: cfg,
-		Status: s,
-		Error:  err,
+		File:      filepath.Base(cfg.ConfigPath),
+		Dir:       filepath.Dir(cfg.ConfigPath),
+		Config:    cfg,
+		Status:    s,
+		Suspended: dr.suspendChecker.IsSuspended(cfg),
+		Error:     err,
 	}
 	if err != nil {
 		errT := err.Error()
