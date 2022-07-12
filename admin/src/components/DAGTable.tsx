@@ -382,6 +382,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     },
   });
 
+  React.useEffect(() => {
+    instance.toggleAllRowsExpanded(true);
+  }, []);
+
   return (
     <Box>
       <Stack
