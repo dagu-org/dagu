@@ -18,6 +18,9 @@ import (
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/storage"
+	"github.com/yohamta/dagu/internal/suspend"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
@@ -189,6 +192,16 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 			c.StartAsync(hc.Bin, hc.WkDir, "")
+
+		case "suspend":
+			sc := suspend.NewSuspendChecker(
+				storage.NewStorage(
+					settings.MustGet(
+						settings.SETTING__SUSPEND_FLAGS_DIR,
+					),
+				),
+			)
+			sc.ToggleSuspend(dag.Config, value == "true")
 
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {

@@ -7,6 +7,7 @@ export type DAG = {
   Dir: string;
   Config: Config;
   Status?: Status;
+	Suspended: boolean;
   ErrorT: string;
 };
 
