@@ -38,7 +38,7 @@ function DAGCreationButton({ refresh }: Props) {
           body: formData,
         });
         if (resp.ok) {
-          refresh();
+          window.location.href = `/dags/${name.replace(/.yaml$/, '')}?t=1`;
         } else {
           const e = await resp.text();
           alert(e);

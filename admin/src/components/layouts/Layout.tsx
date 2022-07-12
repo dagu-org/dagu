@@ -96,7 +96,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
         <Drawer variant="permanent" open={open}>
           <Box
             sx={{
-              background: `linear-gradient(0deg, rgba(210,210,210,1) 0%, ${gradientColor} 70%, ${gradientColor} 100%);`,
+              background: `linear-gradient(0deg, #fff 0%, ${gradientColor} 70%, ${gradientColor} 100%);`,
               height: '100%',
             }}
           >

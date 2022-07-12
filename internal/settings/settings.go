@@ -15,7 +15,7 @@ var (
 const (
 	SETTING__DATA_DIR           = "DAGU__DATA"
 	SETTING__LOGS_DIR           = "DAGU__LOGS"
-	SETTING__VIEWS_DIR          = "DAGU__VIEWS"
+	SETTING__SUSPEND_FLAGS_DIR  = "DAGU__SUSPEND_FLAGS_DIR"
 	SETTING__ADMIN_PORT         = "DAGU__ADMIN_PORT"
 	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
@@ -62,8 +62,8 @@ func load() {
 		path.Join(homeDir, "/.dagu/data"))
 	cache[SETTING__LOGS_DIR] = readEnv(SETTING__LOGS_DIR,
 		path.Join(homeDir, "/.dagu/logs"))
-	cache[SETTING__VIEWS_DIR] = readEnv(SETTING__VIEWS_DIR,
-		path.Join(homeDir, "/.dagu/views"))
+	cache[SETTING__SUSPEND_FLAGS_DIR] = readEnv(SETTING__SUSPEND_FLAGS_DIR,
+		path.Join(homeDir, "/.dagu/suspend"))
 
 	cache[SETTING__ADMIN_PORT] = readEnv(SETTING__ADMIN_PORT, "8080")
 	cache[SETTING__ADMIN_NAVBAR_COLOR] = readEnv(SETTING__ADMIN_NAVBAR_COLOR, "")

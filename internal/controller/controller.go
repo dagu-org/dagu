@@ -42,9 +42,10 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	}
 	fis, err := os.ReadDir(dir)
 	utils.LogErr("read DAGs directory", err)
+	dr := NewDAGReader()
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), config.EXTENSIONS) {
-			dag, err := NewDAG(filepath.Join(dir, fi.Name()), true)
+			dag, err := dr.ReadDAG(filepath.Join(dir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
 			if dag != nil {
 				dags = append(dags, dag)

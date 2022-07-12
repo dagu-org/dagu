@@ -18,6 +18,7 @@ import {
   Chip,
   IconButton,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -37,6 +38,7 @@ import {
 } from '../models/DAGData';
 import StyledTableRow from './StyledTableRow';
 import { KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
+import DAGSwitch from './DAGSwitch';
 
 type Props = {
   DAGs: DAGItem[];
@@ -271,6 +273,22 @@ const defaultColumns = [
       return getNextSchedule(dataA.DAG) - getNextSchedule(dataB.DAG);
     },
   }),
+  table.createDataColumn('Type', {
+    id: 'On/Off',
+    header: 'On/Off',
+    cell: (props) => {
+      const data = props.row.original!;
+      if (data.Type != DAGDataType.DAG) {
+        return false;
+      }
+      return (
+        <DAGSwitch
+          DAG={data.DAG}
+          refresh={props.instance.options.meta?.refreshFn}
+        />
+      );
+    },
+  }),
   table.createDisplayColumn({
     id: 'Actions',
     header: 'Actions',
@@ -381,6 +399,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       refreshFn,
     },
   });
+
+  React.useEffect(() => {
+    instance.toggleAllRowsExpanded(true);
+  }, []);
 
   return (
     <Box>
