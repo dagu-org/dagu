@@ -9,6 +9,9 @@ import (
 
 	"github.com/yohamta/dagu/internal/admin"
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/storage"
+	"github.com/yohamta/dagu/internal/suspend"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -21,8 +24,20 @@ type EntryReader interface {
 	Read(now time.Time) ([]*Entry, error)
 }
 
+func NewEntryReader(cfg *admin.Config) *entryReader {
+	return &entryReader{
+		Admin: cfg,
+		suspendChecker: suspend.NewSuspendChecker(
+			storage.NewStorage(
+				settings.MustGet(settings.SETTING__SUSPEND_FLAGS_DIR),
+			),
+		),
+	}
+}
+
 type entryReader struct {
-	Admin *admin.Config
+	Admin          *admin.Config
+	suspendChecker *suspend.SuspendChecker
 }
 
 var _ EntryReader = (*entryReader)(nil)
@@ -42,6 +57,9 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 				)
 				if err != nil {
 					log.Printf("failed to read dag config: %s", err)
+					continue
+				}
+				if er.suspendChecker.IsSuspended(dag) {
 					continue
 				}
 				for _, sc := range dag.Schedule {
