@@ -7,7 +7,7 @@
 [![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
 ![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
 
-**A dead simple workflow scheduler with no product lock-in**
+**A No-Code workflow scheduler**
 
 It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple, declarative YAML format.
 
@@ -15,9 +15,9 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
 
 - [Dagu](#dagu)
   - [Contents](#contents)
+  - [Highlights](#highlights)
   - [Motivation](#motivation)
   - [Why not existing tools, like Airflow?](#why-not-existing-tools-like-airflow)
-  - [How does it work?](#how-does-it-work)
   - [Todo](#todo)
   - [Install `dagu`](#install-dagu)
     - [via Homebrew](#via-homebrew)
@@ -62,6 +62,15 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
   - [License](#license)
   - [Contributors](#contributors)
 
+## Highlights
+
+- Install just by placing a single binary with zero dependency
+- Run without DBMS or any cloud service
+- Define workflows (DAG) in a simple YAML format
+- Use existing programs without any modification
+- Use as a simpler replacement for Airflow
+- Schedule workflows with cron expressions
+
 ## Motivation
 
 In the projects I worked on, our ETL pipeline had **many problems**. There were hundreds of cron jobs on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to rerun. We also have to SSH into the server to see the logs and run each shell script one by one. So we needed a tool that can explicitly visualize and manage the dependencies of the pipeline. ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI, and to be able to rerun or stop a series of jobs with just a mouse click!***
@@ -69,11 +78,6 @@ In the projects I worked on, our ETL pipeline had **many problems**. There were 
 ## Why not existing tools, like Airflow?
 
 There are many popular workflow engines such as Airflow, Prefect, etc. They are powerful and valuable tools, but they require writing code such as Python to run DAGs. In many situations like above, there are already hundreds of thousands of existing lines of code in other languages such as shell scripts or Perl. Adding another layer of Python on top of these would make it more complicated. So we developed Dagu. It is easy-to-use and self-contained, making it ideal for smaller projects with fewer people.
-
-## How does it work?
-
-- Self-contained - It is a single binary with zero dependency, No DBMS or cloud service is required.
-- Simple - It executes DAGs defined in a simple declarative YAML format. Existing programs can be used without any modification.
 
 ## Todo
 
