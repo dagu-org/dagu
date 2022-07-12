@@ -98,7 +98,8 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 
 		params := getDAGParameter(r)
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
-		dag, err := controller.NewDAG(file, false)
+		dr := controller.NewDAGReader()
+		dag, err := dr.ReadDAG(file, false)
 		if dag == nil {
 			encodeError(w, err)
 			return
@@ -172,7 +173,8 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		}
 
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
-		dag, err := controller.NewDAG(file, false)
+		dr := controller.NewDAGReader()
+		dag, err := dr.ReadDAG(file, false)
 		if err != nil && action != "save" {
 			encodeError(w, err)
 			return

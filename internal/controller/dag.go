@@ -8,18 +8,26 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-// DAG is the struct to contain DAG configuration and status.
-type DAG struct {
-	File   string
-	Dir    string
-	Config *config.Config
-	Status *models.Status
-	Error  error
-	ErrorT *string
+type DAGReader struct {
 }
 
-// NewDAG loads DAG from config file.
-func NewDAG(file string, headOnly bool) (*DAG, error) {
+func NewDAGReader() *DAGReader {
+	return &DAGReader{}
+}
+
+// DAG is the struct to contain DAG configuration and status.
+type DAG struct {
+	File      string
+	Dir       string
+	Config    *config.Config
+	Status    *models.Status
+	Suspended bool
+	Error     error
+	ErrorT    *string
+}
+
+// ReadDAG loads DAG from config file.
+func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	cl := config.Loader{}
 	var cfg *config.Config
 	var err error
