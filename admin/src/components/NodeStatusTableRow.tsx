@@ -1,11 +1,12 @@
 import React from 'react';
-import { Node } from '../models/Node';
+import { Node, NodeStatus } from '../models/Node';
 import { Step } from '../models/Step';
 import { DetailTabId } from '../models/DAGData';
 import MultilineText from './MultilineText';
 import NodeStatusChip from './NodeStatusChip';
 import { TableCell } from '@mui/material';
 import StyledTableRow from './StyledTableRow';
+import { OpenInNew } from '@mui/icons-material';
 
 type Props = {
   rownum: number;
@@ -50,7 +51,11 @@ function NodeStatusTableRow({
       </TableCell>
       <TableCell> {node.Error} </TableCell>
       <TableCell>
-        <a href={url}> {node.Log} </a>
+        {node.Log ? (
+          <a href={url}>
+            <OpenInNew />
+          </a>
+        ) : null}
       </TableCell>
     </StyledTableRow>
   );
