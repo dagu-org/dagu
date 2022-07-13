@@ -137,6 +137,9 @@ function DAGDetails() {
               value={DetailTabId.History}
               href={`${baseUrl}?t=${DetailTabId.History}`}
             />
+            {tab >= DetailTabId.StepLog && tab <= DetailTabId.ScLog ? (
+              <LinkTab label="Log" value={tab} />
+            ) : null}
           </Tabs>
           {tab == DetailTabId.Config ? (
             <ConfigEditButtons name={params.name} />
@@ -147,7 +150,7 @@ function DAGDetails() {
           <ConfigErrors errors={data.Errors} />
         </Box>
 
-        <Box sx={{ mx: 4 }}>{contents[tab]}</Box>
+        <Box sx={{ mx: 4, flex: 1 }}>{contents[tab]}</Box>
       </Stack>
     </DAGContext.Provider>
   );

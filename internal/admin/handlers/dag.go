@@ -346,7 +346,7 @@ func readSchedulerLog(c controller.Controller, file string) (*logFile, error) {
 		return nil, fmt.Errorf("failed to read file %s", f)
 	}
 	return &logFile{
-		LogFile: file,
+		LogFile: f,
 		Content: string(b),
 	}, nil
 }
@@ -404,7 +404,7 @@ func readStepLog(c controller.Controller, file, stepName, enc string) (*logFile,
 		return nil, fmt.Errorf("failed to read file %s", step.Log)
 	}
 	return &logFile{
-		LogFile: file,
+		LogFile: step.Log,
 		Step:    step,
 		Content: string(b),
 	}, nil

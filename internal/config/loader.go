@@ -156,7 +156,11 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 		return nil, err
 	}
 
-	dst.setup(file)
+	dst.ConfigPath = file
+
+	if !opts.noSetenv {
+		dst.setup()
+	}
 
 	return dst, nil
 }

@@ -215,6 +215,15 @@ params: %s
 	}
 }
 
+func TestExpandEnv(t *testing.T) {
+	b := &builder{}
+	os.Setenv("FOO", "BAR")
+	require.Equal(t, b.expandEnv("${FOO}"), "BAR")
+
+	b.noEval = true
+	require.Equal(t, b.expandEnv("${FOO}"), "${FOO}")
+}
+
 func TestTags(t *testing.T) {
 	for _, test := range []struct {
 		Tags string
