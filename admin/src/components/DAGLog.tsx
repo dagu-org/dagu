@@ -31,6 +31,7 @@ function DAGLog({ log }: Props) {
           style={{
             backgroundColor: 'black',
             color: 'white',
+            height: '100%',
             fontFamily: 'Courier New, Courier, monospace',
           }}
         >
