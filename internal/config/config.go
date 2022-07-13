@@ -114,8 +114,7 @@ func (c *Config) String() string {
 	return ret
 }
 
-func (c *Config) setup(file string) {
-	c.ConfigPath = file
+func (c *Config) setup() {
 	if c.LogDir == "" {
 		c.LogDir = path.Join(
 			settings.MustGet(settings.SETTING__LOGS_DIR),
@@ -127,7 +126,7 @@ func (c *Config) setup(file string) {
 	if c.MaxCleanUpTime == 0 {
 		c.MaxCleanUpTime = time.Second * 60
 	}
-	dir := path.Dir(file)
+	dir := path.Dir(c.ConfigPath)
 	for _, step := range c.Steps {
 		c.setupStep(step, dir)
 	}
@@ -243,14 +242,14 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	}
 	c.Env = append(c.Env, envs...)
 
-	c.Steps, err = buildStepsFromDefinition(c.Env, def.Steps)
+	c.Steps, err = b.buildStepsFromDefinition(c.Env, def.Steps)
 	if err != nil {
 		return nil, err
 	}
 
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
-		c.HandlerOn.Exit, err = buildStep(c.Env, def.HandlerOn.Exit)
+		c.HandlerOn.Exit, err = b.buildStep(c.Env, def.HandlerOn.Exit)
 		if err != nil {
 			return nil, err
 		}
@@ -258,7 +257,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HandlerOn.Success != nil {
 		def.HandlerOn.Success.Name = constants.OnSuccess
-		c.HandlerOn.Success, err = buildStep(c.Env, def.HandlerOn.Success)
+		c.HandlerOn.Success, err = b.buildStep(c.Env, def.HandlerOn.Success)
 		if err != nil {
 			return nil, err
 		}
@@ -266,7 +265,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HandlerOn.Failure != nil {
 		def.HandlerOn.Failure.Name = constants.OnFailure
-		c.HandlerOn.Failure, err = buildStep(c.Env, def.HandlerOn.Failure)
+		c.HandlerOn.Failure, err = b.buildStep(c.Env, def.HandlerOn.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +273,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HandlerOn.Cancel != nil {
 		def.HandlerOn.Cancel.Name = constants.OnCancel
-		c.HandlerOn.Cancel, err = buildStep(c.Env, def.HandlerOn.Cancel)
+		c.HandlerOn.Cancel, err = b.buildStep(c.Env, def.HandlerOn.Cancel)
 		if err != nil {
 			return nil, err
 		}
@@ -431,10 +430,10 @@ func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
 	return c, nil
 }
 
-func buildStepsFromDefinition(variables []string, stepDefs []*stepDef) ([]*Step, error) {
+func (b *builder) buildStepsFromDefinition(variables []string, stepDefs []*stepDef) ([]*Step, error) {
 	ret := []*Step{}
 	for _, def := range stepDefs {
-		step, err := buildStep(variables, def)
+		step, err := b.buildStep(variables, def)
 		if err != nil {
 			return nil, err
 		}
@@ -443,7 +442,7 @@ func buildStepsFromDefinition(variables []string, stepDefs []*stepDef) ([]*Step,
 	return ret, nil
 }
 
-func buildStep(variables []string, def *stepDef) (*Step, error) {
+func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	if err := assertStepDef(def); err != nil {
 		return nil, err
 	}
@@ -453,9 +452,9 @@ func buildStep(variables []string, def *stepDef) (*Step, error) {
 	step.CmdWithArgs = def.Command
 	step.Command, step.Args = utils.SplitCommand(step.CmdWithArgs)
 	step.Script = def.Script
-	step.Stdout = os.ExpandEnv(def.Stdout)
+	step.Stdout = b.expandEnv(def.Stdout)
 	step.Output = def.Output
-	step.Dir = os.ExpandEnv(def.Dir)
+	step.Dir = b.expandEnv(def.Dir)
 	step.Variables = variables
 	step.Depends = def.Depends
 	if def.ContinueOn != nil {
@@ -475,6 +474,13 @@ func buildStep(variables []string, def *stepDef) (*Step, error) {
 	step.MailOnError = def.MailOnError
 	step.Preconditions = loadPreCondition(def.Preconditions)
 	return step, nil
+}
+
+func (b *builder) expandEnv(val string) string {
+	if b.noEval {
+		return val
+	}
+	return os.ExpandEnv(val)
 }
 
 func buildConfigEnv(vars map[string]string) []string {
