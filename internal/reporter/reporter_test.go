@@ -34,7 +34,7 @@ func TestReporter(t *testing.T) {
 
 			cfg := &config.Config{
 				Name: "test DAG",
-				MailOn: config.MailOn{
+				MailOn: &config.MailOn{
 					Failure: true,
 				},
 				ErrorMail: &config.MailConfig{

@@ -304,3 +304,23 @@ func TestSockAddr(t *testing.T) {
 	cfg := &Config{ConfigPath: "testdata/testDag.yml"}
 	require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, cfg.SockAddr())
 }
+
+func TestOverwriteGlobalConfig(t *testing.T) {
+	l := &Loader{HomeDir: utils.MustGetUserHomeDir()}
+
+	cfg, err := l.Load(path.Join(testDir, "config_overwrite.yaml"), "")
+	require.NoError(t, err)
+
+	require.Equal(t, &MailOn{
+		Failure: false,
+		Success: false,
+	}, cfg.MailOn)
+
+	cfg, err = l.Load(path.Join(testDir, "config_no_overwrite.yaml"), "")
+	require.NoError(t, err)
+
+	require.Equal(t, &MailOn{
+		Failure: true,
+		Success: false,
+	}, cfg.MailOn)
+}

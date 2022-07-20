@@ -27,7 +27,7 @@ type Config struct {
 	LogDir            string
 	HandlerOn         HandlerOn
 	Steps             []*Step
-	MailOn            MailOn
+	MailOn            *MailOn
 	ErrorMail         *MailConfig
 	InfoMail          *MailConfig
 	Smtp              *SmtpConfig
@@ -174,8 +174,12 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	}
 	c.Group = def.Group
 	c.Description = def.Description
-	c.MailOn.Failure = def.MailOn.Failure
-	c.MailOn.Success = def.MailOn.Success
+	if def.MailOn != nil {
+		c.MailOn = &MailOn{
+			Failure: def.MailOn.Failure,
+			Success: def.MailOn.Success,
+		}
+	}
 	c.Delay = time.Second * time.Duration(def.DelaySec)
 	c.Tags = parseTags(def.Tags)
 
