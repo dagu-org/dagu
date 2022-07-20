@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/imdario/mergo"
@@ -165,8 +166,27 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 	return dst, nil
 }
 
+type mergeTranformer struct {
+}
+
+var _ mergo.Transformers = (*mergeTranformer)(nil)
+
+func (mt *mergeTranformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+	if typ == reflect.TypeOf(MailOn{}) {
+		return func(dst, src reflect.Value) error {
+			if dst.CanSet() {
+				dst.Set(src)
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
 func (cl *Loader) merge(dst, src *Config) error {
-	return mergo.MergeWithOverwrite(dst, src)
+	err := mergo.Merge(dst, src, mergo.WithOverride,
+		mergo.WithTransformers(&mergeTranformer{}))
+	return err
 }
 
 func (cl *Loader) load(file string) (config map[string]interface{}, err error) {

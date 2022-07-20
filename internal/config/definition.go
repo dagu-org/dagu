@@ -10,7 +10,7 @@ type configDefinition struct {
 	HandlerOn         handerOnDef
 	Steps             []*stepDef
 	Smtp              smtpConfigDef
-	MailOn            mailOnDef
+	MailOn            *mailOnDef
 	ErrorMail         mailConfigDef
 	InfoMail          mailConfigDef
 	DelaySec          int

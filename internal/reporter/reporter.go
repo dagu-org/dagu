@@ -60,7 +60,7 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 // SendMail is a function that sends a report mail.
 func (rp *Reporter) SendMail(cfg *config.Config, status *models.Status, err error) error {
 	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
-		if cfg.MailOn.Failure {
+		if cfg.MailOn != nil && cfg.MailOn.Failure {
 			return rp.Mailer.SendMail(
 				cfg.ErrorMail.From,
 				[]string{cfg.ErrorMail.To},
@@ -69,7 +69,7 @@ func (rp *Reporter) SendMail(cfg *config.Config, status *models.Status, err erro
 			)
 		}
 	} else if status.Status == scheduler.SchedulerStatus_Success {
-		if cfg.MailOn.Success {
+		if cfg.MailOn != nil && cfg.MailOn.Success {
 			rp.Mailer.SendMail(
 				cfg.InfoMail.From,
 				[]string{cfg.InfoMail.To},

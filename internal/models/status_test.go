@@ -39,7 +39,7 @@ func TestStatusSerialization(t *testing.T) {
 				RepeatPolicy: config.RepeatPolicy{}, Preconditions: []*config.Condition{},
 			},
 		},
-		MailOn:            config.MailOn{},
+		MailOn:            &config.MailOn{},
 		ErrorMail:         &config.MailConfig{},
 		InfoMail:          &config.MailConfig{},
 		Smtp:              &config.SmtpConfig{},
