@@ -177,7 +177,7 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 	files := db.latest(db.pattern(cfg.ConfigPath)+"*.dat", 3)
 	require.Equal(t, 3, len(files))
 
-	db.RemoveOld(db.pattern(cfg.ConfigPath)+"*.dat", 0)
+	db.RemoveOld(cfg.ConfigPath, 0)
 
 	files = db.latest(db.pattern(cfg.ConfigPath)+"*.dat", 3)
 	require.Equal(t, 0, len(files))

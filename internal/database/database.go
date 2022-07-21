@@ -140,11 +140,12 @@ func (db *Database) FindByRequestId(configPath string, requestId string) (*model
 
 // RemoveAll removes all files in a directory.
 func (db *Database) RemoveAll(configPath string) {
-	db.RemoveOld(db.pattern(configPath)+"*.dat", 0)
+	db.RemoveOld(configPath, 0)
 }
 
 // RemoveOld removes old files.
-func (db *Database) RemoveOld(pattern string, retentionDays int) error {
+func (db *Database) RemoveOld(configPath string, retentionDays int) error {
+	pattern := db.pattern(configPath) + "*.dat"
 	var lastErr error = nil
 	if retentionDays >= 0 {
 		matches, _ := filepath.Glob(pattern)
