@@ -1,5 +1,5 @@
 bin:
-	mkdir .bin
+	mkdir ./bin
 
 VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(VERSION)'
