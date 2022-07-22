@@ -1,6 +1,8 @@
 mailOn:
   failure: false
 
+histRetentionDays: 7
+
 steps:
   - name: "1"
     command: "true"

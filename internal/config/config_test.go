@@ -311,16 +311,12 @@ func TestOverwriteGlobalConfig(t *testing.T) {
 	cfg, err := l.Load(path.Join(testDir, "config_overwrite.yaml"), "")
 	require.NoError(t, err)
 
-	require.Equal(t, &MailOn{
-		Failure: false,
-		Success: false,
-	}, cfg.MailOn)
+	require.Equal(t, &MailOn{Failure: false, Success: false}, cfg.MailOn)
+	require.Equal(t, cfg.HistRetentionDays, 7)
 
 	cfg, err = l.Load(path.Join(testDir, "config_no_overwrite.yaml"), "")
 	require.NoError(t, err)
 
-	require.Equal(t, &MailOn{
-		Failure: true,
-		Success: false,
-	}, cfg.MailOn)
+	require.Equal(t, &MailOn{Failure: true, Success: false}, cfg.MailOn)
+	require.Equal(t, cfg.HistRetentionDays, 30)
 }
