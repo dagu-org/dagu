@@ -29,19 +29,33 @@ func TestMain(m *testing.M) {
 }
 
 func TestRunDAG(t *testing.T) {
-	_, cfg := testDAGAsync(t, "agent_run.yaml")
+	cfg := testLoadDAG(t, "agent_run.yaml")
 
-	time.Sleep(100 * time.Millisecond)
+	a := &Agent{AgentConfig: &AgentConfig{DAG: cfg}}
 
 	status, _ := controller.New(cfg).GetLastStatus()
-	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
-	require.Equal(t, status.Nodes[0].Status, scheduler.NodeStatus_Running)
+	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
+
+	go func() {
+		err := a.Run()
+		require.NoError(t, err)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		status, err := controller.New(cfg).GetLastStatus()
 		require.NoError(t, err)
 		return status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*2, time.Millisecond*100)
+
+	// check deletion of expired history files
+	cfg.HistRetentionDays = 0
+	a = &Agent{AgentConfig: &AgentConfig{DAG: cfg}}
+	err := a.Run()
+	require.NoError(t, err)
+	statusList := controller.New(cfg).GetStatusHist(100)
+	require.Equal(t, 1, len(statusList))
 }
 
 func TestCheckRunning(t *testing.T) {
