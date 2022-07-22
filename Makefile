@@ -1,11 +1,12 @@
-bin:
-	mkdir ./bin
-
 VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(VERSION)'
 
+.PHONY: build-dir
+build-dir:
+	mkdir -p ./bin
+
 .PHONY: build
-build: build-admin bin
+build: build-admin build-dir
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
 
 .PHONY: build-admin
@@ -17,14 +18,14 @@ build-admin:
 	cp admin/dist/*.ttf ./internal/admin/handlers/web/assets/fonts/
 
 .PHONY: server
-server:
+server: build-dir
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
-	go run -ldflags="$(LDFLAGS)" ./cmd/ server
+	./bin/dagu server
 
 .PHONY: scheduler
-scheduler:
+scheduler: build-dir
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu ./cmd/
-	go run -ldflags="$(LDFLAGS)" ./cmd/ scheduler
+	./bin/dagu scheduler
 
 .PHONY: test
 test: build
@@ -38,3 +39,7 @@ test-clean:
 .PHONY: lint
 lint:
 	golangci-lint run ./...
+
+.PHONY: clean
+clean:
+	rm -rf bin admin/dist
