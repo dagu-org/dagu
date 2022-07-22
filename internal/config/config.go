@@ -121,7 +121,7 @@ func (c *Config) setup() {
 			utils.ValidFilename(c.Name, "_"))
 	}
 	if c.HistRetentionDays == 0 {
-		c.HistRetentionDays = 7
+		c.HistRetentionDays = 30
 	}
 	if c.MaxCleanUpTime == 0 {
 		c.MaxCleanUpTime = time.Second * 60

@@ -502,7 +502,7 @@ It will store log files in the `DAGU__LOGS` environment variable path. The defau
 
 ### How long will the history data be stored?
 
-The default retention period for execution history is seven days. However, you can override the setting by the `histRetentionDays` field in a YAML file.
+The default retention period for execution history is 30 days. However, you can override the setting by the `histRetentionDays` field in a YAML file.
 
 ### How can I retry a DAG from a specific task?
 

@@ -228,6 +228,8 @@ func (a *Agent) setupDatabase() (err error) {
 		Config: database.DefaultConfig(),
 	}
 	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
+	utils.LogErr("clean old history data",
+		a.database.RemoveOld(a.DAG.ConfigPath, a.DAG.HistRetentionDays))
 	return
 }
 

@@ -22,7 +22,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	require.NoError(t, dw.Open())
 	defer func() {
 		dw.Close()
-		db.RemoveOld(db.pattern(cfg.ConfigPath)+"*.dat", 0)
+		db.RemoveOld(cfg.ConfigPath, 0)
 	}()
 
 	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
