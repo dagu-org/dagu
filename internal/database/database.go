@@ -149,7 +149,7 @@ func (db *Database) RemoveOld(configPath string, retentionDays int) error {
 	var lastErr error = nil
 	if retentionDays >= 0 {
 		matches, _ := filepath.Glob(pattern)
-		ot := time.Now().AddDate(-1*retentionDays, 0, 0)
+		ot := time.Now().AddDate(0, 0, -1*retentionDays)
 		for _, m := range matches {
 			info, err := os.Stat(m)
 			if err == nil {
