@@ -12,6 +12,5 @@ infoMail:
   from: "system@mail.com"
   to: "info@mail.com"
   prefix: "[INFO]"
-histRetentionDays: 7
 mailOn:
   failure: true

@@ -48,7 +48,7 @@ func TestLoadDeafult(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, time.Second*60, cfg.MaxCleanUpTime)
-	require.Equal(t, 7, cfg.HistRetentionDays)
+	require.Equal(t, 30, cfg.HistRetentionDays)
 }
 
 func TestLoadData(t *testing.T) {
