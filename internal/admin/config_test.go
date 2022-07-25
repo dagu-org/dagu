@@ -44,7 +44,8 @@ func TestLoadConfig(t *testing.T) {
 		{
 			Yaml: ``,
 			Want: &Config{
-				DAGs:               wd,
+				DAGs: settings.MustGet(
+					settings.SETTING__ADMIN_DAGS_DIR),
 				Host:               "127.0.0.1",
 				Port:               "8080",
 				Command:            "dagu",

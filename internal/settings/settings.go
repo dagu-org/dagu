@@ -20,6 +20,7 @@ const (
 	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
 	SETTING__ADMIN_LOGS_DIR     = "DAGU__ADMIN_LOGS_DIR"
+	SETTING__ADMIN_DAGS_DIR     = "DAGU__ADMIN_DAGS_DIR"
 )
 
 // MustGet returns the value of the setting or
@@ -65,6 +66,7 @@ func load() {
 	cacheEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
 	cacheEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
 	cacheEnv(SETTING__ADMIN_LOGS_DIR, path.Join(homeDir, "/.dagu/logs/admin"))
+	cacheEnv(SETTING__ADMIN_DAGS_DIR, path.Join(homeDir, "/.dagu/dags"))
 }
 
 func cacheEnv(key, def string) {
