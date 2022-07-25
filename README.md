@@ -110,7 +110,7 @@ Download the latest binary from the [Releases page](https://github.com/yohamta/d
 
 Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-Note: Dagu reads YAML files placed in the current directory by default. To change the DAGs directory please create a config file. See [Admin Configuration](#admin-configuration) for more detail. Will fix this behavior soon.
+*Note: Dagu reads YAML files placed in `~/.dagu/dags` by default. To change the DAGs directory please create a config file. See [Admin Configuration](#admin-configuration) for more detail.*
 
 ### 2. Create a new DAG
 
@@ -386,6 +386,7 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 You can customize the admin web UI by environment variables.
 
+- `DAGU__DAGS` - path to directory for DAG files (default : `~/.dagu/dags`)
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
 - `DAGU__ADMIN_PORT` - port number for web URL (default : `8080`)
@@ -399,7 +400,7 @@ Please create `~/.dagu/admin.yaml`.
 ```yaml
 host: <hostname for web UI address>                          # default value is 127.0.0.1
 port: <port number for web UI address>                       # default value is 8000
-dags: <the location of DAG configuration files>              # default value is current working directory
+dags: <the location of DAG configuration files>              # [optional] default value is ~/.dagu/dags
 command: <Absolute path to the dagu binary>                  # [optional] required if the dagu command not in $PATH
 isBasicAuth: <true|false>                                    # [optional] basic auth config
 basicAuthUsername: <username for basic auth of web UI>       # [optional] basic auth config

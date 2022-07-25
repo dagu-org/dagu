@@ -36,11 +36,9 @@ func (c *Config) setup() {
 		c.Command = "dagu"
 	}
 	if c.DAGs == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			panic(err)
-		}
-		c.DAGs = wd
+		c.DAGs = path.Join(
+			settings.MustGet(settings.SETTING__ADMIN_DAGS_DIR),
+		)
 	}
 	if c.LogDir == "" {
 		c.LogDir = path.Join(
