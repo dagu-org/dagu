@@ -80,6 +80,8 @@ type NodeState struct {
 	Error      error
 }
 
+var outputVariables = map[string]string{}
+
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute() error {
 	ctx, fn := context.WithCancel(context.Background())
@@ -97,6 +99,9 @@ func (n *Node) Execute() error {
 	cmd := n.cmd
 	cmd.Dir = n.Dir
 	cmd.Env = append(cmd.Env, n.Variables...)
+	for _, v := range outputVariables {
+		cmd.Env = append(cmd.Env, v)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,
@@ -128,8 +133,9 @@ func (n *Node) Execute() error {
 		utils.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
 		_, _ = io.Copy(&buf, n.outputReader)
-		ret := buf.String()
-		os.Setenv(n.Output, strings.TrimSpace(ret))
+		ret := strings.TrimSpace(buf.String())
+		os.Setenv(n.Output, ret)
+		outputVariables[n.Output] = fmt.Sprintf("%s=%s", n.Output, ret)
 	}
 
 	return n.Error

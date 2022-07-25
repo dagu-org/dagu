@@ -592,6 +592,25 @@ func TestNodeTeardownFailure(t *testing.T) {
 	require.Error(t, nodes[0].Error)
 }
 
+func TestTakeOutputFromPrevStep(t *testing.T) {
+	s1 := step("1", "echo take-output")
+	s1.Output = "PREV_OUT"
+
+	s2 := step("2", "sh", "1")
+	s2.Script = "echo $PREV_OUT"
+	s2.Output = "TOOK_PREV_OUT"
+
+	g, sc := newTestSchedule(t, &Config{}, s1, s2)
+	err := sc.Schedule(g, nil)
+	require.NoError(t, err)
+
+	nodes := g.Nodes()
+	require.Equal(t, NodeStatus_Success, nodes[0].ReadStatus())
+	require.Equal(t, NodeStatus_Success, nodes[1].ReadStatus())
+
+	require.Equal(t, "take-output", os.ExpandEnv("$TOOK_PREV_OUT"))
+}
+
 func step(name, command string, depends ...string) *config.Step {
 	cmd, args := utils.SplitCommand(command)
 	return &config.Step{
