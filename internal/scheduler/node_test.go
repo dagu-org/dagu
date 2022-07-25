@@ -1,6 +1,8 @@
 package scheduler
 
 import (
+	"fmt"
+	"math/rand"
 	"os"
 	"path"
 	"syscall"
@@ -58,16 +60,8 @@ func TestLogAndStdout(t *testing.T) {
 			Stdout:  "stdout.log",
 		},
 	}
-	err := n.setup(os.Getenv("HOME"), "test-request-id")
-	require.NoError(t, err)
-	defer func() {
-		_ = n.teardown()
-	}()
 
-	err = n.Execute()
-	require.NoError(t, err)
-	err = n.teardown()
-	require.NoError(t, err)
+	runTestNode(t, n)
 
 	f := path.Join(os.Getenv("HOME"), n.Step.Stdout)
 	dat, _ := os.ReadFile(f)
@@ -82,7 +76,6 @@ func TestNode(t *testing.T) {
 		Step: &config.Step{
 			Command: "echo",
 			Args:    []string{"hello"},
-			Dir:     os.Getenv("HOME"),
 		},
 	}
 	n.incDoneCount()
@@ -103,10 +96,8 @@ func TestNode(t *testing.T) {
 func TestOutput(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: "echo",
-			Args:    []string{"hello"},
-			Dir:     os.Getenv("HOME"),
-			Output:  "OUTPUT_TEST",
+			CmdWithArgs: "echo hello",
+			Output:      "OUTPUT_TEST",
 		},
 	}
 	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
@@ -115,16 +106,34 @@ func TestOutput(t *testing.T) {
 		_ = n.teardown()
 	}()
 
-	err = n.Execute()
-	require.NoError(t, err)
-	err = n.teardown()
-	require.NoError(t, err)
+	runTestNode(t, n)
 
 	dat, _ := os.ReadFile(n.logFile.Name())
 	require.Equal(t, "hello\n", string(dat))
+	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST"))
 
-	val := os.Getenv("OUTPUT_TEST")
-	require.Equal(t, "hello", val)
+	// Use the previous output in the subsequent step
+	n2 := &Node{
+		Step: &config.Step{
+			CmdWithArgs: "echo $OUTPUT_TEST",
+			Output:      "OUTPUT_TEST2",
+		},
+	}
+
+	runTestNode(t, n2)
+	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST2"))
+
+	// Use the previous output in the subsequent step inside a script
+	n3 := &Node{
+		Step: &config.Step{
+			Command: "sh",
+			Script:  "echo $OUTPUT_TEST2",
+			Output:  "OUTPUT_TEST3",
+		},
+	}
+
+	runTestNode(t, n3)
+	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST3"))
 }
 
 func TestRunScript(t *testing.T) {
@@ -132,30 +141,28 @@ func TestRunScript(t *testing.T) {
 		Step: &config.Step{
 			Command: "sh",
 			Args:    []string{},
-			Dir:     os.Getenv("HOME"),
 			Script: `
 			  echo hello
 			`,
-			Output: "OUTPUT_TEST",
+			Output: "SCRIPT_TEST",
 		},
 	}
-	err := n.setup(os.Getenv("HOME"), "test-request-id")
-	require.FileExists(t, n.logFile.Name())
 
+	err := n.setup(os.Getenv("HOME"),
+		fmt.Sprintf("test-request-id-%d", rand.Int()))
 	require.NoError(t, err)
-	defer func() {
-		_ = n.teardown()
-	}()
 
+	require.FileExists(t, n.logFile.Name())
 	b, _ := os.ReadFile(n.scriptFile.Name())
 	require.Equal(t, n.Script, string(b))
 
+	require.NoError(t, err)
 	err = n.Execute()
 	require.NoError(t, err)
 	err = n.teardown()
 	require.NoError(t, err)
 
-	require.Equal(t, "hello", os.Getenv("OUTPUT_TEST"))
+	require.Equal(t, "hello", os.Getenv("SCRIPT_TEST"))
 	require.NoFileExists(t, n.scriptFile.Name())
 }
 
@@ -164,21 +171,13 @@ func TestTeardown(t *testing.T) {
 		Step: &config.Step{
 			Command: testCommand,
 			Args:    []string{},
-			Dir:     os.Getenv("HOME"),
 		},
 	}
-	err := n.setup(os.Getenv("HOME"), "test-teardown")
-	require.NoError(t, err)
 
-	err = n.Execute()
-	require.NoError(t, err)
-
-	err = n.teardown()
-	require.NoError(t, err)
-	require.NoError(t, n.Error)
+	runTestNode(t, n)
 
 	// no error since done flag is true
-	err = n.teardown()
+	err := n.teardown()
 	require.NoError(t, err)
 	require.NoError(t, n.Error)
 
@@ -187,4 +186,15 @@ func TestTeardown(t *testing.T) {
 	err = n.teardown()
 	require.Error(t, err)
 	require.Error(t, n.Error)
+}
+
+func runTestNode(t *testing.T, n *Node) {
+	t.Helper()
+	err := n.setup(os.Getenv("HOME"),
+		fmt.Sprintf("test-request-id-%d", rand.Int()))
+	require.NoError(t, err)
+	err = n.Execute()
+	require.NoError(t, err)
+	err = n.teardown()
+	require.NoError(t, err)
 }
