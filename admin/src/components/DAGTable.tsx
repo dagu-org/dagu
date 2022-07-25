@@ -18,7 +18,6 @@ import {
   Chip,
   IconButton,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -112,6 +111,11 @@ const defaultColumns = [
       }
       const ret = value.toLowerCase().includes(filter.toLowerCase());
       return ret;
+    },
+    sortingFn: (a, b) => {
+      const dataA = a.original!.Name.toLowerCase();
+      const dataB = b.original!.Name.toLowerCase();
+      return dataA.localeCompare(dataB);
     },
   }),
   table.createDataColumn('Type', {
@@ -317,7 +321,12 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>([
+    {
+      id: 'Name',
+      desc: false,
+    },
+  ]);
 
   const selectedTag = React.useMemo(() => {
     return (
