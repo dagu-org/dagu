@@ -110,11 +110,11 @@ Download the latest binary from the [Releases page](https://github.com/yohamta/d
 
 Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-*Note: Dagu reads YAML files placed in `~/.dagu/dags` by default. See [Admin Configuration](#admin-configuration) for more detail.*
-
 ### 2. Create a new DAG
 
 Create a DAG by clicking the `New DAG` button on the top page of the web UI. Input `example.yaml` in the dialog.
+
+*Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Admin Configuration](#admin-configuration) for more detail.*
 
 ### 3. Edit the DAG
 
