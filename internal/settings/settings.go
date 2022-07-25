@@ -57,19 +57,18 @@ func load() {
 	homeDir := utils.MustGetUserHomeDir()
 
 	cache = map[string]string{}
-	cache[SETTING__DATA_DIR] = readEnv(
-		SETTING__DATA_DIR,
-		path.Join(homeDir, "/.dagu/data"))
-	cache[SETTING__LOGS_DIR] = readEnv(SETTING__LOGS_DIR,
-		path.Join(homeDir, "/.dagu/logs"))
-	cache[SETTING__SUSPEND_FLAGS_DIR] = readEnv(SETTING__SUSPEND_FLAGS_DIR,
-		path.Join(homeDir, "/.dagu/suspend"))
 
-	cache[SETTING__ADMIN_PORT] = readEnv(SETTING__ADMIN_PORT, "8080")
-	cache[SETTING__ADMIN_NAVBAR_COLOR] = readEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
-	cache[SETTING__ADMIN_NAVBAR_TITLE] = readEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
-	cache[SETTING__ADMIN_LOGS_DIR] = readEnv(SETTING__ADMIN_LOGS_DIR,
-		path.Join(homeDir, "/.dagu/logs/admin"))
+	cacheEnv(SETTING__DATA_DIR, path.Join(homeDir, "/.dagu/data"))
+	cacheEnv(SETTING__LOGS_DIR, path.Join(homeDir, "/.dagu/logs"))
+	cacheEnv(SETTING__SUSPEND_FLAGS_DIR, path.Join(homeDir, "/.dagu/suspend"))
+	cacheEnv(SETTING__ADMIN_PORT, "8080")
+	cacheEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
+	cacheEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
+	cacheEnv(SETTING__ADMIN_LOGS_DIR, path.Join(homeDir, "/.dagu/logs/admin"))
+}
+
+func cacheEnv(key, def string) {
+	cache[key] = readEnv(key, def)
 }
 
 func readEnv(env, def string) string {
