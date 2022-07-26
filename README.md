@@ -386,9 +386,9 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 You can customize the admin web UI by environment variables.
 
-- `DAGU__DAGS` - path to directory for DAG files (default : `~/.dagu/dags`)
 - `DAGU__DATA` - path to directory for internal use by dagu (default : `~/.dagu/data`)
 - `DAGU__LOGS` - path to directory for logging (default : `~/.dagu/logs`)
+- `DAGU__ADMIN_DAGS` - path to directory for DAG files (default : `~/.dagu/dags`)
 - `DAGU__ADMIN_PORT` - port number for web URL (default : `8080`)
 - `DAGU__ADMIN_NAVBAR_COLOR` - navigation header color for web UI (optional)
 - `DAGU__ADMIN_NAVBAR_TITLE` - navigation header title for web UI (optional)
