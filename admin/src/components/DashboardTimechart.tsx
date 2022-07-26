@@ -44,7 +44,7 @@ function DashboardTimechart({ data: input }: Props) {
       }
     });
     const sorted = ret.sort((a, b) => {
-      return a.name < b.name ? -1 : 1;
+      return a.values[0] < b.values[0] ? -1 : 1;
     });
     setData(sorted);
   }, [input]);
