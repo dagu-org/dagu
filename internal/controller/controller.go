@@ -37,8 +37,10 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	dags = []*DAG{}
 	errs = []string{}
 	if !utils.FileExists(dir) {
-		errs = append(errs, fmt.Sprintf("invalid DAGs directory: %s", dir))
-		return
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			errs = append(errs, err.Error())
+			return
+		}
 	}
 	fis, err := os.ReadDir(dir)
 	utils.LogErr("read DAGs directory", err)
