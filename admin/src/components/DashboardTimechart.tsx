@@ -1,3 +1,4 @@
+import { Box } from '@mui/material';
 import moment from 'moment';
 import React from 'react';
 import {
@@ -49,44 +50,75 @@ function DashboardTimechart({ data: input }: Props) {
     setData(sorted);
   }, [input]);
   const now = moment();
+  const shouldScroll = data.length >= 40;
   return (
-    <ResponsiveContainer width="100%" height="90%">
-      <BarChart data={data} layout="vertical">
-        <XAxis
-          name="Time"
-          tickFormatter={(unixTime) => moment.unix(unixTime).format('HH:mm')}
-          type="number"
-          dataKey="values"
-          tickCount={96}
-          domain={[now.startOf('day').unix(), now.endOf('day').unix()]}
-        />
-        <YAxis dataKey="name" type="category" hide />
-        <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
-          {data.map((_, index) => {
-            const color = statusColorMapping[data[index].status];
-            return <Cell key={index} fill={color.backgroundColor} />;
-          })}
-          <LabelList
-            dataKey="name"
-            position="insideLeft"
-            content={({ x, y, width, height, value }: LabelProps) => {
-              return (
-                <text
-                  x={Number(x) + Number(width) + 2}
-                  y={Number(y) + (Number(height) || 0) / 2}
-                  fill="#000"
-                  fontSize={12}
-                  textAnchor="start"
-                >
-                  {value}
-                </text>
-              );
-            }}
+    <TimelineWrapper shouldScroll={shouldScroll}>
+      <ResponsiveContainer
+        width="100%"
+        minHeight={shouldScroll ? data.length * 12 : undefined}
+        height={shouldScroll ? undefined : '90%'}
+      >
+        <BarChart data={data} layout="vertical">
+          <XAxis
+            name="Time"
+            tickFormatter={(unixTime) => moment.unix(unixTime).format('HH:mm')}
+            type="number"
+            dataKey="values"
+            tickCount={96}
+            domain={[now.startOf('day').unix(), now.endOf('day').unix()]}
           />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+          <YAxis dataKey="name" type="category" hide />
+          <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
+            {data.map((_, index) => {
+              const color = statusColorMapping[data[index].status];
+              return <Cell key={index} fill={color.backgroundColor} />;
+            })}
+            <LabelList
+              dataKey="name"
+              position="insideLeft"
+              content={({ x, y, width, height, value }: LabelProps) => {
+                return (
+                  <text
+                    x={Number(x) + Number(width) + 2}
+                    y={Number(y) + (Number(height) || 0) / 2}
+                    fill="#000"
+                    fontSize={12}
+                    textAnchor="start"
+                  >
+                    {value}
+                  </text>
+                );
+              }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </TimelineWrapper>
   );
+}
+
+function TimelineWrapper({
+  children,
+  shouldScroll,
+}: {
+  children: React.ReactNode;
+  shouldScroll: boolean;
+}) {
+  if (shouldScroll) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          maxWidth: '100%',
+          height: '90%',
+          overflow: 'auto',
+        }}
+      >
+        {children}
+      </Box>
+    );
+  }
+  return <React.Fragment>{children}</React.Fragment>;
 }
 
 export default DashboardTimechart;
