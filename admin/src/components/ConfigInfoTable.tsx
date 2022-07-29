@@ -23,7 +23,7 @@ function ConfigInfoTable({ config }: Props) {
       <LabeledItem label="Params">{config.Params}</LabeledItem>
       <Stack direction={'column'}>
         <React.Fragment>
-          <LabeledItem label="Pre Conditions">{null}</LabeledItem>
+          <LabeledItem label="Preconditions">{null}</LabeledItem>
           <Box sx={{ pl: 2 }}>
             <ul>{preconditions}</ul>
           </Box>
