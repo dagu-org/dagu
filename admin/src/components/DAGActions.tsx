@@ -6,10 +6,17 @@ type Props = {
   status?: Status;
   name: string;
   label?: boolean;
+  redirectTo?: string;
   refresh?: () => void;
 };
 
-function DAGActions({ status, name, refresh, label = true }: Props) {
+function DAGActions({
+  status,
+  name,
+  refresh,
+  redirectTo,
+  label = true,
+}: Props) {
   const onSubmit = React.useCallback(
     async (
       warn: string,
@@ -33,6 +40,9 @@ function DAGActions({ status, name, refresh, label = true }: Props) {
         mode: 'cors',
         body: form,
       });
+      if (redirectTo) {
+        window.location.href = redirectTo;
+      }
       if (ret.ok) {
         if (refresh) {
           refresh();
@@ -142,7 +152,12 @@ function ActionButton({
       {children}
     </Button>
   ) : (
-    <IconButton color="primary" size="small" onClick={onClick} disabled={disabled}>
+    <IconButton
+      color="primary"
+      size="small"
+      onClick={onClick}
+      disabled={disabled}
+    >
       {icon}
     </IconButton>
   );

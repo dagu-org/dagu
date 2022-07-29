@@ -104,11 +104,16 @@ function DAGDetails() {
           }}
         >
           <Title>{data.Title}</Title>
-          {tab == DetailTabId.Status ? (
+          {tab == DetailTabId.Status || tab == DetailTabId.Config ? (
             <DAGActions
               status={data.DAG.Status}
               name={params.name!}
               refresh={getData}
+              redirectTo={
+                tab == DetailTabId.Config
+                  ? `${baseUrl}?t=${DetailTabId.Status}`
+                  : undefined
+              }
             />
           ) : null}
         </Box>
