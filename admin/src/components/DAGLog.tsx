@@ -17,7 +17,7 @@ function DAGLog({ log }: Props) {
   }
   return (
     <Box>
-      <SubTitle>Log</SubTitle>
+      <SubTitle>Log Output</SubTitle>
       <Stack spacing={1} direction="column" sx={{ width: '100%' }}>
         <LabeledItem label="Log File">{log.LogFile}</LabeledItem>
         {log.Step ? (
