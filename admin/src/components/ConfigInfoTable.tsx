@@ -1,6 +1,6 @@
 import React from 'react';
 import { Config } from '../models/Config';
-import { Stack, Box } from '@mui/material';
+import { Stack, Box, Chip } from '@mui/material';
 import LabeledItem from './LabeledItem';
 
 type Props = {
@@ -18,6 +18,21 @@ function ConfigInfoTable({ config }: Props) {
   return (
     <Stack direction="column" spacing={1}>
       <LabeledItem label="Name">{config.Name}</LabeledItem>
+      <LabeledItem label="Schedule">
+        <Stack direction={'row'}>
+          {config.ScheduleExp.map((s) => (
+            <Chip
+              key={s}
+              sx={{
+                fontWeight: 'semibold',
+                marginRight: 1,
+              }}
+              size="small"
+              label={s}
+            />
+          ))}
+        </Stack>
+      </LabeledItem>
       <LabeledItem label="Description">{config.Description}</LabeledItem>
       <LabeledItem label="Max Active Runs">{config.MaxActiveRuns}</LabeledItem>
       <LabeledItem label="Params">{config.Params}</LabeledItem>
