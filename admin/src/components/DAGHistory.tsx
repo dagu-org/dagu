@@ -23,7 +23,7 @@ function DAGHistory({ logData }: Props) {
       {(props) => (
         <React.Fragment>
           <Box>
-            <SubTitle>Config</SubTitle>
+            <SubTitle>Execution History</SubTitle>
             <StatusHistTable
               logs={logs}
               gridData={gridData}
