@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-shellwords"
 	"github.com/yohamta/dagu/internal/constants"
 )
 
@@ -64,7 +65,14 @@ func FormatDuration(t time.Duration, defaultVal string) string {
 func SplitCommand(cmd string) (program string, args []string) {
 	vals := strings.SplitN(cmd, " ", 2)
 	if len(vals) > 1 {
-		return vals[0], strings.Split(vals[1], " ")
+		program = vals[0]
+		parser := shellwords.NewParser()
+		args, err := parser.Parse(vals[1])
+		if err != nil {
+			//if parse shell world error use all substring as args
+			return program, []string{vals[1]}
+		}
+		return program, args
 	}
 	return vals[0], []string{}
 }
