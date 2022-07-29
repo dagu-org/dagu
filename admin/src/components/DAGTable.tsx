@@ -60,7 +60,12 @@ const defaultColumns = [
     id: 'Expand',
     header: ({ instance }) => {
       return (
-        <IconButton onClick={instance.getToggleAllRowsExpandedHandler()}>
+        <IconButton
+          onClick={instance.getToggleAllRowsExpandedHandler()}
+          sx={{
+            color: 'white',
+          }}
+        >
           {instance.getIsAllRowsExpanded() ? (
             <KeyboardArrowUp />
           ) : (
