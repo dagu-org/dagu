@@ -244,7 +244,7 @@ func (a *Agent) setupSocketServer() (err error) {
 
 func (a *Agent) checkPreconditions() error {
 	if len(a.DAG.Preconditions) > 0 {
-		log.Printf("checking pre conditions for \"%s\"", a.DAG.Name)
+		log.Printf("checking preconditions for \"%s\"", a.DAG.Name)
 		if err := config.EvalConditions(a.DAG.Preconditions); err != nil {
 			a.scheduler.Cancel(a.graph)
 			return err
