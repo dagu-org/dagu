@@ -180,7 +180,7 @@ func (a *Agent) init() {
 		}}
 	a.logFilename = filepath.Join(
 		logDir,
-		fmt.Sprintf("%s.%s.%s.log",
+		fmt.Sprintf("agent_%s.%s.%s.log",
 			utils.ValidFilename(a.DAG.Name, "_"),
 			time.Now().Format("20060102.15:04:05.000"),
 			utils.TruncString(a.requestId, 8),

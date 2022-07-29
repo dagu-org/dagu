@@ -13,13 +13,12 @@ var testsConfig = path.Join(testsDir, "admin.yaml")
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	wd, err := os.Getwd()
+	home, err := os.UserHomeDir()
 	require.NoError(t, err)
-
 	testConfig(t, cfg, &testWant{
 		Host:    "127.0.0.1",
 		Port:    "8080",
-		DAGs:    path.Join(wd),
+		DAGs:    path.Join(home, ".dagu/dags"),
 		Command: "dagu",
 	})
 }
