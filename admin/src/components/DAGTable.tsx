@@ -23,7 +23,6 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TableSortLabel,
   TextField,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
@@ -36,7 +35,12 @@ import {
   getNextSchedule,
 } from '../models/DAGData';
 import StyledTableRow from './StyledTableRow';
-import { KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
+import {
+  ArrowDownward,
+  ArrowUpward,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
+} from '@mui/icons-material';
 import DAGSwitch from './DAGSwitch';
 
 type Props = {
@@ -476,24 +480,40 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                     }}
                   >
                     {header.column.getCanSort() ? (
-                      <Stack direction="column" spacing={1}>
-                        <Box
-                          {...{
-                            sx: {
-                              cursor: header.column.getCanSort()
-                                ? 'pointer'
-                                : 'default',
-                            },
-                            onClick: header.column.getToggleSortingHandler(),
-                          }}
-                        >
+                      <Box
+                        {...{
+                          sx: {
+                            cursor: header.column.getCanSort()
+                              ? 'pointer'
+                              : 'default',
+                          },
+                          onClick: header.column.getToggleSortingHandler(),
+                        }}
+                      >
+                        <Stack direction="row" alignItems="center">
                           {header.isPlaceholder ? null : header.renderHeader()}
                           {{
-                            asc: <TableSortLabel direction="asc" />,
-                            desc: <TableSortLabel direction="desc" />,
+                            asc: (
+                              <ArrowUpward
+                                sx={{
+                                  color: 'white',
+                                  fontSize: '0.95rem',
+                                  ml: 1,
+                                }}
+                              />
+                            ),
+                            desc: (
+                              <ArrowDownward
+                                sx={{
+                                  color: 'white',
+                                  fontSize: '0.95rem',
+                                  ml: 1,
+                                }}
+                              />
+                            ),
                           }[header.column.getIsSorted() as string] ?? null}
-                        </Box>
-                      </Stack>
+                        </Stack>
+                      </Box>
                     ) : (
                       header.renderHeader()
                     )}
