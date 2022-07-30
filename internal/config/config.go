@@ -209,71 +209,27 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		{
 			BuildFn: b.buildStepsFromDefinition,
 		},
+		{
+			BuildFn: b.buildHandlers,
+		},
+		{
+			BuildFn: b.buildConfig,
+		},
+		{
+			BuildFn: buildSmtpConfigFromDefinition,
+		},
+		{
+			BuildFn: buildErrorMailConfig,
+		},
+		{
+			BuildFn: buildInfoMailConfig,
+		},
 	} {
 		if (b.headOnly && bs.Headline) || !b.headOnly {
 			if err = bs.BuildFn(def, cfg); err != nil {
 				return
 			}
 		}
-	}
-
-	if b.headOnly {
-		return cfg, nil
-	}
-
-	if def.HistRetentionDays != nil {
-		cfg.HistRetentionDays = *def.HistRetentionDays
-	}
-
-	if def.HandlerOn.Exit != nil {
-		def.HandlerOn.Exit.Name = constants.OnExit
-		cfg.HandlerOn.Exit, err = b.buildStep(cfg.Env, def.HandlerOn.Exit)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if def.HandlerOn.Success != nil {
-		def.HandlerOn.Success.Name = constants.OnSuccess
-		cfg.HandlerOn.Success, err = b.buildStep(cfg.Env, def.HandlerOn.Success)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if def.HandlerOn.Failure != nil {
-		def.HandlerOn.Failure.Name = constants.OnFailure
-		cfg.HandlerOn.Failure, err = b.buildStep(cfg.Env, def.HandlerOn.Failure)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if def.HandlerOn.Cancel != nil {
-		def.HandlerOn.Cancel.Name = constants.OnCancel
-		cfg.HandlerOn.Cancel, err = b.buildStep(cfg.Env, def.HandlerOn.Cancel)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	cfg.Smtp, err = buildSmtpConfigFromDefinition(def.Smtp)
-	if err != nil {
-		return nil, err
-	}
-	cfg.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
-	if err != nil {
-		return nil, err
-	}
-	cfg.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Preconditions = loadPreCondition(def.Preconditions)
-	cfg.MaxActiveRuns = def.MaxActiveRuns
-
-	if def.MaxCleanUpTimeSec != nil {
-		cfg.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
 	}
 
 	return cfg, nil
@@ -335,6 +291,50 @@ func (b *builder) buildParameters(def *configDefinition, cfg *Config) (err error
 		cfg.Env = append(cfg.Env, envs...)
 	}
 	return
+}
+
+func (b *builder) buildHandlers(def *configDefinition, cfg *Config) (err error) {
+	if def.HandlerOn.Exit != nil {
+		def.HandlerOn.Exit.Name = constants.OnExit
+		if cfg.HandlerOn.Exit, err = b.buildStep(cfg.Env, def.HandlerOn.Exit); err != nil {
+			return err
+		}
+	}
+
+	if def.HandlerOn.Success != nil {
+		def.HandlerOn.Success.Name = constants.OnSuccess
+		if cfg.HandlerOn.Success, err = b.buildStep(cfg.Env, def.HandlerOn.Success); err != nil {
+			return
+		}
+	}
+
+	if def.HandlerOn.Failure != nil {
+		def.HandlerOn.Failure.Name = constants.OnFailure
+		if cfg.HandlerOn.Failure, err = b.buildStep(cfg.Env, def.HandlerOn.Failure); err != nil {
+			return
+		}
+	}
+
+	if def.HandlerOn.Cancel != nil {
+		def.HandlerOn.Cancel.Name = constants.OnCancel
+		if cfg.HandlerOn.Cancel, err = b.buildStep(cfg.Env, def.HandlerOn.Cancel); err != nil {
+			return
+		}
+	}
+	return nil
+}
+
+func (b *builder) buildConfig(def *configDefinition, cfg *Config) (err error) {
+	if def.HistRetentionDays != nil {
+		cfg.HistRetentionDays = *def.HistRetentionDays
+	}
+	cfg.Preconditions = loadPreCondition(def.Preconditions)
+	cfg.MaxActiveRuns = def.MaxActiveRuns
+
+	if def.MaxCleanUpTimeSec != nil {
+		cfg.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
+	}
+	return nil
 }
 
 func (b *builder) parseParameters(value string, eval bool) (
@@ -492,19 +492,30 @@ func (b *builder) expandEnv(val string) string {
 	return os.ExpandEnv(val)
 }
 
-func buildSmtpConfigFromDefinition(def smtpConfigDef) (*SmtpConfig, error) {
+func buildSmtpConfigFromDefinition(def *configDefinition, cfg *Config) (err error) {
 	smtp := &SmtpConfig{}
-	smtp.Host = def.Host
-	smtp.Port = def.Port
-	return smtp, nil
+	smtp.Host = def.Smtp.Host
+	smtp.Port = def.Smtp.Port
+	cfg.Smtp = smtp
+	return nil
+}
+
+func buildErrorMailConfig(def *configDefinition, cfg *Config) (err error) {
+	cfg.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
+	return
+}
+
+func buildInfoMailConfig(def *configDefinition, cfg *Config) (err error) {
+	cfg.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
+	return
 }
 
 func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
-	c := &MailConfig{}
-	c.From = def.From
-	c.To = def.To
-	c.Prefix = def.Prefix
-	return c, nil
+	cfg := &MailConfig{}
+	cfg.From = def.From
+	cfg.To = def.To
+	cfg.Prefix = def.Prefix
+	return cfg, nil
 }
 
 func buildConfigEnv(vars map[string]string) []string {
