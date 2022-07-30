@@ -58,10 +58,7 @@ var EXTENSIONS = []string{".yaml", ".yml"}
 
 func ReadConfig(file string) (string, error) {
 	b, err := os.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return string(b), err
 }
 
 func (c *Config) Init() {

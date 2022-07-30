@@ -61,6 +61,37 @@ func TestConfigReadClone(t *testing.T) {
 	require.Equal(t, cfg, cfg2)
 }
 
+func TestToString(t *testing.T) {
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
+	}
+
+	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
+	require.NoError(t, err)
+
+	ret := cfg.String()
+	require.Contains(t, ret, "Name: config_default")
+}
+
+func TestReadConfig(t *testing.T) {
+	tmpDir := utils.MustTempDir("read-config-test")
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	tmpFile := path.Join(tmpDir, "config.yaml")
+	testConfig := `steps:
+  - name: step 1
+    command: echo test
+`
+	err := os.WriteFile(tmpFile, []byte(testConfig), 0644)
+	require.NoError(t, err)
+
+	ret, err := ReadConfig(tmpFile)
+	require.NoError(t, err)
+	require.Equal(t, testConfig, ret)
+}
+
 func TestConfigLoadHeadOnly(t *testing.T) {
 	l := &Loader{
 		HomeDir: utils.MustGetUserHomeDir(),
@@ -227,34 +258,27 @@ func TestExpandEnv(t *testing.T) {
 }
 
 func TestTags(t *testing.T) {
-	for _, test := range []struct {
-		Tags string
-		Want []string
-	}{
-		{
-			Tags: "Daily, Monthly",
-			Want: []string{"daily", "monthly"},
-		},
-	} {
-		l := &Loader{
-			HomeDir: utils.MustGetUserHomeDir(),
-		}
-		d, err := l.unmarshalData([]byte(fmt.Sprintf(`
-tags: %s
-  	`, test.Tags)))
-		require.NoError(t, err)
-
-		def, err := l.decode(d)
-		require.NoError(t, err)
-
-		b := &builder{}
-		cfg, err := b.buildFromDefinition(def, nil)
-		require.NoError(t, err)
-
-		require.Equal(t, test.Want, cfg.Tags)
-
-		require.True(t, cfg.HasTag("daily"))
+	tags := "Daily, Monthly"
+	wants := []string{"daily", "monthly"}
+	l := &Loader{
+		HomeDir: utils.MustGetUserHomeDir(),
 	}
+	d, err := l.unmarshalData([]byte(fmt.Sprintf(`
+tags: %s
+  	`, tags)))
+	require.NoError(t, err)
+
+	def, err := l.decode(d)
+	require.NoError(t, err)
+
+	b := &builder{}
+	cfg, err := b.buildFromDefinition(def, nil)
+	require.NoError(t, err)
+
+	require.Equal(t, wants, cfg.Tags)
+
+	require.True(t, cfg.HasTag("daily"))
+	require.False(t, cfg.HasTag("weekly"))
 }
 
 func TestSchedule(t *testing.T) {
