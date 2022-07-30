@@ -161,11 +161,19 @@ type BuildConfigOptions struct {
 
 type builder struct {
 	BuildConfigOptions
+	globalConfig *Config
+}
+
+type buildStep struct {
+	BuildFn  func(def *configDefinition, cfg *Config) error
+	Headline bool
 }
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
 func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (cfg *Config, err error) {
+	b.globalConfig = globalConfig
+
 	cfg = &Config{}
 	cfg.Init()
 
@@ -184,31 +192,24 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	cfg.Delay = time.Second * time.Duration(def.DelaySec)
 	cfg.Tags = parseTags(def.Tags)
 
-	for _, fn := range []func(def *configDefinition, cfg *Config) error{
-		b.buildSchedule,
+	for _, bs := range []buildStep{
+		{
+			BuildFn:  b.buildSchedule,
+			Headline: true,
+		},
+		{
+			BuildFn: b.buildEnvVariables,
+		},
 	} {
-		if err = fn(def, cfg); err != nil {
-			return
+		if (b.headOnly && bs.Headline) || !b.headOnly {
+			if err = bs.BuildFn(def, cfg); err != nil {
+				return
+			}
 		}
 	}
 
 	if b.headOnly {
 		return cfg, nil
-	}
-
-	env, err := b.loadVariables(def.Env, b.defaultEnv)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg.Env = buildConfigEnv(env)
-	if globalConfig != nil {
-		for _, e := range globalConfig.Env {
-			key := strings.SplitN(e, "=", 2)[0]
-			if _, ok := env[key]; !ok {
-				cfg.Env = append(cfg.Env, e)
-			}
-		}
 	}
 
 	logDir, err := utils.ParseVariable(def.LogDir)
@@ -311,6 +312,23 @@ func (b *builder) buildSchedule(def *configDefinition, cfg *Config) (err error) 
 		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
 	}
 	cfg.Schedule, err = parseSchedule(cfg.ScheduleExp)
+	return
+}
+
+func (b *builder) buildEnvVariables(def *configDefinition, cfg *Config) (err error) {
+	var env map[string]string
+	env, err = b.loadVariables(def.Env, b.defaultEnv)
+	if err == nil {
+		cfg.Env = buildConfigEnv(env)
+		if b.globalConfig != nil {
+			for _, e := range b.globalConfig.Env {
+				key := strings.SplitN(e, "=", 2)[0]
+				if _, ok := env[key]; !ok {
+					cfg.Env = append(cfg.Env, e)
+				}
+			}
+		}
+	}
 	return
 }
 
