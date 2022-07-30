@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-shellwords"
 	"github.com/robfig/cron/v3"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/settings"
@@ -57,10 +58,7 @@ var EXTENSIONS = []string{".yaml", ".yml"}
 
 func ReadConfig(file string) (string, error) {
 	b, err := os.ReadFile(file)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return string(b), err
 }
 
 func (c *Config) Init() {
@@ -160,149 +158,180 @@ type BuildConfigOptions struct {
 
 type builder struct {
 	BuildConfigOptions
+	globalConfig *Config
+}
+
+type buildStep struct {
+	BuildFn  func(def *configDefinition, cfg *Config) error
+	Headline bool
 }
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (c *Config, err error) {
-	c = &Config{}
-	c.Init()
+func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (cfg *Config, err error) {
+	b.globalConfig = globalConfig
 
-	c.Name = def.Name
+	cfg = &Config{}
+	cfg.Init()
+
+	cfg.Name = def.Name
 	if def.Name != "" {
-		c.Name = def.Name
+		cfg.Name = def.Name
 	}
-	c.Group = def.Group
-	c.Description = def.Description
+	cfg.Group = def.Group
+	cfg.Description = def.Description
 	if def.MailOn != nil {
-		c.MailOn = &MailOn{
+		cfg.MailOn = &MailOn{
 			Failure: def.MailOn.Failure,
 			Success: def.MailOn.Success,
 		}
 	}
-	c.Delay = time.Second * time.Duration(def.DelaySec)
-	c.Tags = parseTags(def.Tags)
+	cfg.Delay = time.Second * time.Duration(def.DelaySec)
+	cfg.Tags = parseTags(def.Tags)
 
+	for _, bs := range []buildStep{
+		{
+			BuildFn:  b.buildSchedule,
+			Headline: true,
+		},
+		{
+			BuildFn: b.buildEnvVariables,
+		},
+		{
+			BuildFn: b.buildLogdir,
+		},
+		{
+			BuildFn: b.buildParameters,
+		},
+		{
+			BuildFn: b.buildStepsFromDefinition,
+		},
+		{
+			BuildFn: b.buildHandlers,
+		},
+		{
+			BuildFn: b.buildConfig,
+		},
+		{
+			BuildFn: buildSmtpConfigFromDefinition,
+		},
+		{
+			BuildFn: buildErrorMailConfig,
+		},
+		{
+			BuildFn: buildInfoMailConfig,
+		},
+	} {
+		if (b.headOnly && bs.Headline) || !b.headOnly {
+			if err = bs.BuildFn(def, cfg); err != nil {
+				return
+			}
+		}
+	}
+
+	return cfg, nil
+}
+
+func (b *builder) buildSchedule(def *configDefinition, cfg *Config) (err error) {
 	switch (def.Schedule).(type) {
 	case string:
-		c.ScheduleExp = []string{def.Schedule.(string)}
+		cfg.ScheduleExp = []string{def.Schedule.(string)}
 	case []interface{}:
 		items := []string{}
 		for _, s := range def.Schedule.([]interface{}) {
 			if a, ok := s.(string); ok {
 				items = append(items, a)
 			} else {
-				return nil, fmt.Errorf("schedule must be a string or an array of strings")
+				return fmt.Errorf("schedule must be a string or an array of strings")
 			}
 		}
-		c.ScheduleExp = items
+		cfg.ScheduleExp = items
 	case nil:
 	default:
-		return nil, fmt.Errorf("invalid schedule type: %T", def.Schedule)
+		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
 	}
-	c.Schedule, err = parseSchedule(c.ScheduleExp)
-	if err != nil {
-		return nil, err
-	}
+	cfg.Schedule, err = parseSchedule(cfg.ScheduleExp)
+	return
+}
 
-	if b.headOnly {
-		return c, nil
-	}
-
-	env, err := b.loadVariables(def.Env, b.defaultEnv)
-	if err != nil {
-		return nil, err
-	}
-
-	c.Env = buildConfigEnv(env)
-	if globalConfig != nil {
-		for _, e := range globalConfig.Env {
-			key := strings.SplitN(e, "=", 2)[0]
-			if _, ok := env[key]; !ok {
-				c.Env = append(c.Env, e)
+func (b *builder) buildEnvVariables(def *configDefinition, cfg *Config) (err error) {
+	var env map[string]string
+	env, err = b.loadVariables(def.Env, b.defaultEnv)
+	if err == nil {
+		cfg.Env = buildConfigEnv(env)
+		if b.globalConfig != nil {
+			for _, e := range b.globalConfig.Env {
+				key := strings.SplitN(e, "=", 2)[0]
+				if _, ok := env[key]; !ok {
+					cfg.Env = append(cfg.Env, e)
+				}
 			}
 		}
 	}
+	return
+}
 
-	logDir, err := utils.ParseVariable(def.LogDir)
-	if err != nil {
-		return nil, err
-	}
-	c.LogDir = logDir
-	if def.HistRetentionDays != nil {
-		c.HistRetentionDays = *def.HistRetentionDays
-	}
+func (b *builder) buildLogdir(def *configDefinition, cfg *Config) (err error) {
+	cfg.LogDir, err = utils.ParseVariable(def.LogDir)
+	return err
+}
 
-	c.DefaultParams = def.Params
-	p := c.DefaultParams
+func (b *builder) buildParameters(def *configDefinition, cfg *Config) (err error) {
+	cfg.DefaultParams = def.Params
+	p := cfg.DefaultParams
 	if b.parameters != "" {
 		p = b.parameters
 	}
-
 	var envs []string
-	c.Params, envs, err = b.parseParameters(p, !b.noEval)
-	if err != nil {
-		return nil, err
+	cfg.Params, envs, err = b.parseParameters(p, !b.noEval)
+	if err == nil {
+		cfg.Env = append(cfg.Env, envs...)
 	}
-	c.Env = append(c.Env, envs...)
+	return
+}
 
-	c.Steps, err = b.buildStepsFromDefinition(c.Env, def.Steps)
-	if err != nil {
-		return nil, err
-	}
-
+func (b *builder) buildHandlers(def *configDefinition, cfg *Config) (err error) {
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
-		c.HandlerOn.Exit, err = b.buildStep(c.Env, def.HandlerOn.Exit)
-		if err != nil {
-			return nil, err
+		if cfg.HandlerOn.Exit, err = b.buildStep(cfg.Env, def.HandlerOn.Exit); err != nil {
+			return err
 		}
 	}
 
 	if def.HandlerOn.Success != nil {
 		def.HandlerOn.Success.Name = constants.OnSuccess
-		c.HandlerOn.Success, err = b.buildStep(c.Env, def.HandlerOn.Success)
-		if err != nil {
-			return nil, err
+		if cfg.HandlerOn.Success, err = b.buildStep(cfg.Env, def.HandlerOn.Success); err != nil {
+			return
 		}
 	}
 
 	if def.HandlerOn.Failure != nil {
 		def.HandlerOn.Failure.Name = constants.OnFailure
-		c.HandlerOn.Failure, err = b.buildStep(c.Env, def.HandlerOn.Failure)
-		if err != nil {
-			return nil, err
+		if cfg.HandlerOn.Failure, err = b.buildStep(cfg.Env, def.HandlerOn.Failure); err != nil {
+			return
 		}
 	}
 
 	if def.HandlerOn.Cancel != nil {
 		def.HandlerOn.Cancel.Name = constants.OnCancel
-		c.HandlerOn.Cancel, err = b.buildStep(c.Env, def.HandlerOn.Cancel)
-		if err != nil {
-			return nil, err
+		if cfg.HandlerOn.Cancel, err = b.buildStep(cfg.Env, def.HandlerOn.Cancel); err != nil {
+			return
 		}
 	}
+	return nil
+}
 
-	c.Smtp, err = buildSmtpConfigFromDefinition(def.Smtp)
-	if err != nil {
-		return nil, err
+func (b *builder) buildConfig(def *configDefinition, cfg *Config) (err error) {
+	if def.HistRetentionDays != nil {
+		cfg.HistRetentionDays = *def.HistRetentionDays
 	}
-	c.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
-	if err != nil {
-		return nil, err
-	}
-	c.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
-	if err != nil {
-		return nil, err
-	}
-	c.Preconditions = loadPreCondition(def.Preconditions)
-	c.MaxActiveRuns = def.MaxActiveRuns
+	cfg.Preconditions = loadPreCondition(def.Preconditions)
+	cfg.MaxActiveRuns = def.MaxActiveRuns
 
 	if def.MaxCleanUpTimeSec != nil {
-		c.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
+		cfg.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
 	}
-
-	return c, nil
+	return nil
 }
 
 func (b *builder) parseParameters(value string, eval bool) (
@@ -310,31 +339,18 @@ func (b *builder) parseParameters(value string, eval bool) (
 	envs []string,
 	err error,
 ) {
-	separated := []string{}
-	i, j, f := 0, 1, false
+	parser := shellwords.NewParser()
+	parser.ParseBacktick = false
+	parser.ParseEnv = false
 
-	value = strings.TrimSpace(strings.TrimRight(strings.TrimLeft(value, "\""), "\""))
-	if len(value) > 0 {
-		if value[0] == '`' {
-			f = true
-		}
-		for {
-			if j == len(value) || (value[j] == ' ' && !f) {
-				separated = append(separated, value[i:j])
-				i = j + 1
-				j = i
-			} else if value[j] == '`' {
-				f = !f
-			}
-			if j >= len(value) {
-				break
-			}
-			j++
-		}
+	var parsed []string
+	parsed, err = parser.Parse(value)
+	if err != nil {
+		return
 	}
+
 	ret := []string{}
-	for i, v := range separated {
-		v = strings.TrimRight(strings.TrimLeft(v, "\""), "\"")
+	for i, v := range parsed {
 		if eval {
 			v, err = utils.ParseCommand(os.ExpandEnv(v))
 			if err != nil {
@@ -419,31 +435,17 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 	return vars, nil
 }
 
-func buildSmtpConfigFromDefinition(def smtpConfigDef) (*SmtpConfig, error) {
-	smtp := &SmtpConfig{}
-	smtp.Host = def.Host
-	smtp.Port = def.Port
-	return smtp, nil
-}
-
-func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
-	c := &MailConfig{}
-	c.From = def.From
-	c.To = def.To
-	c.Prefix = def.Prefix
-	return c, nil
-}
-
-func (b *builder) buildStepsFromDefinition(variables []string, stepDefs []*stepDef) ([]*Step, error) {
+func (b *builder) buildStepsFromDefinition(def *configDefinition, cfg *Config) error {
 	ret := []*Step{}
-	for _, def := range stepDefs {
-		step, err := b.buildStep(variables, def)
+	for _, stepDef := range def.Steps {
+		step, err := b.buildStep(cfg.Env, stepDef)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		ret = append(ret, step)
 	}
-	return ret, nil
+	cfg.Steps = ret
+	return nil
 }
 
 func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
@@ -485,6 +487,32 @@ func (b *builder) expandEnv(val string) string {
 		return val
 	}
 	return os.ExpandEnv(val)
+}
+
+func buildSmtpConfigFromDefinition(def *configDefinition, cfg *Config) (err error) {
+	smtp := &SmtpConfig{}
+	smtp.Host = def.Smtp.Host
+	smtp.Port = def.Smtp.Port
+	cfg.Smtp = smtp
+	return nil
+}
+
+func buildErrorMailConfig(def *configDefinition, cfg *Config) (err error) {
+	cfg.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
+	return
+}
+
+func buildInfoMailConfig(def *configDefinition, cfg *Config) (err error) {
+	cfg.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
+	return
+}
+
+func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
+	cfg := &MailConfig{}
+	cfg.From = def.From
+	cfg.To = def.To
+	cfg.Prefix = def.Prefix
+	return cfg, nil
 }
 
 func buildConfigEnv(vars map[string]string) []string {
