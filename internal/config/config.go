@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-shellwords"
 	"github.com/robfig/cron/v3"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/settings"
@@ -310,31 +311,18 @@ func (b *builder) parseParameters(value string, eval bool) (
 	envs []string,
 	err error,
 ) {
-	separated := []string{}
-	i, j, f := 0, 1, false
+	parser := shellwords.NewParser()
+	parser.ParseBacktick = false
+	parser.ParseEnv = false
 
-	value = strings.TrimSpace(strings.TrimRight(strings.TrimLeft(value, "\""), "\""))
-	if len(value) > 0 {
-		if value[0] == '`' {
-			f = true
-		}
-		for {
-			if j == len(value) || (value[j] == ' ' && !f) {
-				separated = append(separated, value[i:j])
-				i = j + 1
-				j = i
-			} else if value[j] == '`' {
-				f = !f
-			}
-			if j >= len(value) {
-				break
-			}
-			j++
-		}
+	var parsed []string
+	parsed, err = parser.Parse(value)
+	if err != nil {
+		return
 	}
+
 	ret := []string{}
-	for i, v := range separated {
-		v = strings.TrimRight(strings.TrimLeft(v, "\""), "\"")
+	for i, v := range parsed {
 		if eval {
 			v, err = utils.ParseCommand(os.ExpandEnv(v))
 			if err != nil {

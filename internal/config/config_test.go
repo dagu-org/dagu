@@ -175,7 +175,7 @@ func TestParseParameter(t *testing.T) {
 			},
 		},
 		{
-			Params: "first P1=foo P2=${FOO} P3=`/bin/echo ${P2}` X=bar Y=${P1}",
+			Params: "first P1=foo P2=${FOO} P3=`/bin/echo ${P2}` X=bar Y=${P1} Z=\"A B C\"",
 			Env:    "FOO: BAR",
 			Want: map[string]string{
 				"P1": "foo",
@@ -183,12 +183,14 @@ func TestParseParameter(t *testing.T) {
 				"P3": "BAR",
 				"X":  "bar",
 				"Y":  "foo",
+				"Z":  "A B C",
 				"1":  "first",
 				"2":  "P1=foo",
 				"3":  "P2=BAR",
 				"4":  "P3=BAR",
 				"5":  "X=bar",
 				"6":  "Y=foo",
+				"7":  "Z=A B C",
 			},
 		},
 	} {
