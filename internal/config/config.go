@@ -203,6 +203,12 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		{
 			BuildFn: b.buildLogdir,
 		},
+		{
+			BuildFn: b.buildParameters,
+		},
+		{
+			BuildFn: b.buildStepsFromDefinition,
+		},
 	} {
 		if (b.headOnly && bs.Headline) || !b.headOnly {
 			if err = bs.BuildFn(def, cfg); err != nil {
@@ -217,24 +223,6 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HistRetentionDays != nil {
 		cfg.HistRetentionDays = *def.HistRetentionDays
-	}
-
-	cfg.DefaultParams = def.Params
-	p := cfg.DefaultParams
-	if b.parameters != "" {
-		p = b.parameters
-	}
-
-	var envs []string
-	cfg.Params, envs, err = b.parseParameters(p, !b.noEval)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Env = append(cfg.Env, envs...)
-
-	cfg.Steps, err = b.buildStepsFromDefinition(cfg.Env, def.Steps)
-	if err != nil {
-		return nil, err
 	}
 
 	if def.HandlerOn.Exit != nil {
@@ -333,6 +321,20 @@ func (b *builder) buildEnvVariables(def *configDefinition, cfg *Config) (err err
 func (b *builder) buildLogdir(def *configDefinition, cfg *Config) (err error) {
 	cfg.LogDir, err = utils.ParseVariable(def.LogDir)
 	return err
+}
+
+func (b *builder) buildParameters(def *configDefinition, cfg *Config) (err error) {
+	cfg.DefaultParams = def.Params
+	p := cfg.DefaultParams
+	if b.parameters != "" {
+		p = b.parameters
+	}
+	var envs []string
+	cfg.Params, envs, err = b.parseParameters(p, !b.noEval)
+	if err == nil {
+		cfg.Env = append(cfg.Env, envs...)
+	}
+	return
 }
 
 func (b *builder) parseParameters(value string, eval bool) (
@@ -436,31 +438,17 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 	return vars, nil
 }
 
-func buildSmtpConfigFromDefinition(def smtpConfigDef) (*SmtpConfig, error) {
-	smtp := &SmtpConfig{}
-	smtp.Host = def.Host
-	smtp.Port = def.Port
-	return smtp, nil
-}
-
-func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
-	c := &MailConfig{}
-	c.From = def.From
-	c.To = def.To
-	c.Prefix = def.Prefix
-	return c, nil
-}
-
-func (b *builder) buildStepsFromDefinition(variables []string, stepDefs []*stepDef) ([]*Step, error) {
+func (b *builder) buildStepsFromDefinition(def *configDefinition, cfg *Config) error {
 	ret := []*Step{}
-	for _, def := range stepDefs {
-		step, err := b.buildStep(variables, def)
+	for _, stepDef := range def.Steps {
+		step, err := b.buildStep(cfg.Env, stepDef)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		ret = append(ret, step)
 	}
-	return ret, nil
+	cfg.Steps = ret
+	return nil
 }
 
 func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
@@ -502,6 +490,21 @@ func (b *builder) expandEnv(val string) string {
 		return val
 	}
 	return os.ExpandEnv(val)
+}
+
+func buildSmtpConfigFromDefinition(def smtpConfigDef) (*SmtpConfig, error) {
+	smtp := &SmtpConfig{}
+	smtp.Host = def.Host
+	smtp.Port = def.Port
+	return smtp, nil
+}
+
+func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
+	c := &MailConfig{}
+	c.From = def.From
+	c.To = def.To
+	c.Prefix = def.Prefix
+	return c, nil
 }
 
 func buildConfigEnv(vars map[string]string) []string {
