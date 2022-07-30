@@ -165,49 +165,35 @@ type builder struct {
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (c *Config, err error) {
-	c = &Config{}
-	c.Init()
+func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (cfg *Config, err error) {
+	cfg = &Config{}
+	cfg.Init()
 
-	c.Name = def.Name
+	cfg.Name = def.Name
 	if def.Name != "" {
-		c.Name = def.Name
+		cfg.Name = def.Name
 	}
-	c.Group = def.Group
-	c.Description = def.Description
+	cfg.Group = def.Group
+	cfg.Description = def.Description
 	if def.MailOn != nil {
-		c.MailOn = &MailOn{
+		cfg.MailOn = &MailOn{
 			Failure: def.MailOn.Failure,
 			Success: def.MailOn.Success,
 		}
 	}
-	c.Delay = time.Second * time.Duration(def.DelaySec)
-	c.Tags = parseTags(def.Tags)
+	cfg.Delay = time.Second * time.Duration(def.DelaySec)
+	cfg.Tags = parseTags(def.Tags)
 
-	switch (def.Schedule).(type) {
-	case string:
-		c.ScheduleExp = []string{def.Schedule.(string)}
-	case []interface{}:
-		items := []string{}
-		for _, s := range def.Schedule.([]interface{}) {
-			if a, ok := s.(string); ok {
-				items = append(items, a)
-			} else {
-				return nil, fmt.Errorf("schedule must be a string or an array of strings")
-			}
+	for _, fn := range []func(def *configDefinition, cfg *Config) error{
+		b.buildSchedule,
+	} {
+		if err = fn(def, cfg); err != nil {
+			return
 		}
-		c.ScheduleExp = items
-	case nil:
-	default:
-		return nil, fmt.Errorf("invalid schedule type: %T", def.Schedule)
-	}
-	c.Schedule, err = parseSchedule(c.ScheduleExp)
-	if err != nil {
-		return nil, err
 	}
 
 	if b.headOnly {
-		return c, nil
+		return cfg, nil
 	}
 
 	env, err := b.loadVariables(def.Env, b.defaultEnv)
@@ -215,12 +201,12 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		return nil, err
 	}
 
-	c.Env = buildConfigEnv(env)
+	cfg.Env = buildConfigEnv(env)
 	if globalConfig != nil {
 		for _, e := range globalConfig.Env {
 			key := strings.SplitN(e, "=", 2)[0]
 			if _, ok := env[key]; !ok {
-				c.Env = append(c.Env, e)
+				cfg.Env = append(cfg.Env, e)
 			}
 		}
 	}
@@ -229,32 +215,32 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	if err != nil {
 		return nil, err
 	}
-	c.LogDir = logDir
+	cfg.LogDir = logDir
 	if def.HistRetentionDays != nil {
-		c.HistRetentionDays = *def.HistRetentionDays
+		cfg.HistRetentionDays = *def.HistRetentionDays
 	}
 
-	c.DefaultParams = def.Params
-	p := c.DefaultParams
+	cfg.DefaultParams = def.Params
+	p := cfg.DefaultParams
 	if b.parameters != "" {
 		p = b.parameters
 	}
 
 	var envs []string
-	c.Params, envs, err = b.parseParameters(p, !b.noEval)
+	cfg.Params, envs, err = b.parseParameters(p, !b.noEval)
 	if err != nil {
 		return nil, err
 	}
-	c.Env = append(c.Env, envs...)
+	cfg.Env = append(cfg.Env, envs...)
 
-	c.Steps, err = b.buildStepsFromDefinition(c.Env, def.Steps)
+	cfg.Steps, err = b.buildStepsFromDefinition(cfg.Env, def.Steps)
 	if err != nil {
 		return nil, err
 	}
 
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
-		c.HandlerOn.Exit, err = b.buildStep(c.Env, def.HandlerOn.Exit)
+		cfg.HandlerOn.Exit, err = b.buildStep(cfg.Env, def.HandlerOn.Exit)
 		if err != nil {
 			return nil, err
 		}
@@ -262,7 +248,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HandlerOn.Success != nil {
 		def.HandlerOn.Success.Name = constants.OnSuccess
-		c.HandlerOn.Success, err = b.buildStep(c.Env, def.HandlerOn.Success)
+		cfg.HandlerOn.Success, err = b.buildStep(cfg.Env, def.HandlerOn.Success)
 		if err != nil {
 			return nil, err
 		}
@@ -270,7 +256,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HandlerOn.Failure != nil {
 		def.HandlerOn.Failure.Name = constants.OnFailure
-		c.HandlerOn.Failure, err = b.buildStep(c.Env, def.HandlerOn.Failure)
+		cfg.HandlerOn.Failure, err = b.buildStep(cfg.Env, def.HandlerOn.Failure)
 		if err != nil {
 			return nil, err
 		}
@@ -278,32 +264,54 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 
 	if def.HandlerOn.Cancel != nil {
 		def.HandlerOn.Cancel.Name = constants.OnCancel
-		c.HandlerOn.Cancel, err = b.buildStep(c.Env, def.HandlerOn.Cancel)
+		cfg.HandlerOn.Cancel, err = b.buildStep(cfg.Env, def.HandlerOn.Cancel)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	c.Smtp, err = buildSmtpConfigFromDefinition(def.Smtp)
+	cfg.Smtp, err = buildSmtpConfigFromDefinition(def.Smtp)
 	if err != nil {
 		return nil, err
 	}
-	c.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
+	cfg.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
 	if err != nil {
 		return nil, err
 	}
-	c.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
+	cfg.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
 	if err != nil {
 		return nil, err
 	}
-	c.Preconditions = loadPreCondition(def.Preconditions)
-	c.MaxActiveRuns = def.MaxActiveRuns
+	cfg.Preconditions = loadPreCondition(def.Preconditions)
+	cfg.MaxActiveRuns = def.MaxActiveRuns
 
 	if def.MaxCleanUpTimeSec != nil {
-		c.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
+		cfg.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
 	}
 
-	return c, nil
+	return cfg, nil
+}
+
+func (b *builder) buildSchedule(def *configDefinition, cfg *Config) (err error) {
+	switch (def.Schedule).(type) {
+	case string:
+		cfg.ScheduleExp = []string{def.Schedule.(string)}
+	case []interface{}:
+		items := []string{}
+		for _, s := range def.Schedule.([]interface{}) {
+			if a, ok := s.(string); ok {
+				items = append(items, a)
+			} else {
+				return fmt.Errorf("schedule must be a string or an array of strings")
+			}
+		}
+		cfg.ScheduleExp = items
+	case nil:
+	default:
+		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
+	}
+	cfg.Schedule, err = parseSchedule(cfg.ScheduleExp)
+	return
 }
 
 func (b *builder) parseParameters(value string, eval bool) (
