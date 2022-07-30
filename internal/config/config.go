@@ -200,6 +200,9 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		{
 			BuildFn: b.buildEnvVariables,
 		},
+		{
+			BuildFn: b.buildLogdir,
+		},
 	} {
 		if (b.headOnly && bs.Headline) || !b.headOnly {
 			if err = bs.BuildFn(def, cfg); err != nil {
@@ -212,11 +215,6 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 		return cfg, nil
 	}
 
-	logDir, err := utils.ParseVariable(def.LogDir)
-	if err != nil {
-		return nil, err
-	}
-	cfg.LogDir = logDir
 	if def.HistRetentionDays != nil {
 		cfg.HistRetentionDays = *def.HistRetentionDays
 	}
@@ -330,6 +328,11 @@ func (b *builder) buildEnvVariables(def *configDefinition, cfg *Config) (err err
 		}
 	}
 	return
+}
+
+func (b *builder) buildLogdir(def *configDefinition, cfg *Config) (err error) {
+	cfg.LogDir, err = utils.ParseVariable(def.LogDir)
+	return err
 }
 
 func (b *builder) parseParameters(value string, eval bool) (
