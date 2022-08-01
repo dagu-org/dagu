@@ -8,7 +8,7 @@ type Props = {
 };
 
 function ConfigInfoTable({ config }: Props) {
-  const preconditions = config.Preconditions.map((c) => (
+  const preconditions = config.Preconditions?.map((c) => (
     <li>
       {c.Condition}
       {' => '}
@@ -20,7 +20,7 @@ function ConfigInfoTable({ config }: Props) {
       <LabeledItem label="Name">{config.Name}</LabeledItem>
       <LabeledItem label="Schedule">
         <Stack direction={'row'}>
-          {config.ScheduleExp.map((s) => (
+          {config.ScheduleExp?.map((s) => (
             <Chip
               key={s}
               sx={{
