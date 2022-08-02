@@ -15,10 +15,7 @@ function DAGCreationButton({ refresh }: Props) {
         border: 0,
       }}
       onClick={async () => {
-        const name = window.prompt(
-          'Please input the new file name (*.yaml)',
-          ''
-        );
+        const name = window.prompt('Please input the new DAG name', '');
         if (name == '') {
           return;
         }
@@ -38,7 +35,7 @@ function DAGCreationButton({ refresh }: Props) {
           body: formData,
         });
         if (resp.ok) {
-          window.location.href = `/dags/${name.replace(/.yaml$/, '')}?t=1`;
+          window.location.href = `/dags/${name.replace(/.yaml$/, "")}?t=1`;
         } else {
           const e = await resp.text();
           alert(e);
