@@ -288,8 +288,8 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 
 		case "rename":
-			newFile := path.Join(hc.DAGsDir, value)
-			err := controller.RenameConfig(file, newFile)
+			newfile := nameWithExt(path.Join(hc.DAGsDir, value))
+			err := controller.RenameConfig(file, newfile)
 			if err != nil {
 				encodeError(w, err)
 				return

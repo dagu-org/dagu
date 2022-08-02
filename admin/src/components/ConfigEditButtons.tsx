@@ -9,15 +9,12 @@ function ConfigEditButtons({ name }: Props) {
   return (
     <Button
       onClick={async () => {
-        const val = window.prompt(
-          'Please input the new file name (*.yaml)',
-          ''
-        );
+        const val = window.prompt('Please input the new DAG name', '');
         if (!val) {
           return;
         }
         if (val.indexOf(' ') != -1) {
-          alert('File name cannot contain space');
+          alert('DAG name cannot contain space');
           return;
         }
         const formData = new FormData();
@@ -30,7 +27,7 @@ function ConfigEditButtons({ name }: Props) {
           body: formData,
         });
         if (resp.ok) {
-          window.location.href = `/dags/${val.replace(/.yaml$/, '')}`;
+          window.location.href = `/dags/${val}`;
         } else {
           const e = await resp.text();
           alert(e);

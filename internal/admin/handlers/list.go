@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/yohamta/dagu/internal/controller"
 )
@@ -63,7 +65,7 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 
 		switch action {
 		case "new":
-			filename := path.Join(hc.DAGsDir, value)
+			filename := nameWithExt(path.Join(hc.DAGsDir, value))
 			err := controller.NewConfig(filename)
 			if err != nil {
 				encodeError(w, err)
@@ -75,4 +77,9 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 		}
 		encodeError(w, errInvalidArgs)
 	}
+}
+
+func nameWithExt(name string) string {
+	s := strings.TrimSuffix(name, ".yaml")
+	return fmt.Sprintf("%s.yaml", s)
 }
