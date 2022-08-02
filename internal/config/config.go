@@ -461,6 +461,7 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	step.Stdout = b.expandEnv(def.Stdout)
 	step.Output = def.Output
 	step.Dir = b.expandEnv(def.Dir)
+	step.Executor = def.Executor
 	step.Variables = variables
 	step.Depends = def.Depends
 	if def.ContinueOn != nil {

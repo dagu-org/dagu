@@ -38,6 +38,7 @@ type stepDef struct {
 	Name          string
 	Description   string
 	Dir           string
+	Executor      string
 	Command       string
 	Script        string
 	Stdout        string

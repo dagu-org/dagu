@@ -3,27 +3,30 @@ package config
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Step represents a step in a DAG.
 type Step struct {
-	Name          string
-	Description   string
-	Variables     []string
-	Dir           string
-	CmdWithArgs   string
-	Command       string
-	Script        string
-	Stdout        string
-	Output        string
-	Args          []string
-	Depends       []string
-	ContinueOn    ContinueOn
-	RetryPolicy   *RetryPolicy
-	RepeatPolicy  RepeatPolicy
-	MailOnError   bool
-	Preconditions []*Condition
+	Name            string
+	Description     string
+	Variables       []string
+	OutputVariables *sync.Map
+	Dir             string
+	Executor        string
+	CmdWithArgs     string
+	Command         string
+	Script          string
+	Stdout          string
+	Output          string
+	Args            []string
+	Depends         []string
+	ContinueOn      ContinueOn
+	RetryPolicy     *RetryPolicy
+	RepeatPolicy    RepeatPolicy
+	MailOnError     bool
+	Preconditions   []*Condition
 }
 
 type RetryPolicy struct {
