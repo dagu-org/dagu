@@ -28,10 +28,12 @@ function DashboardTimechart({ data: input }: Props) {
   React.useEffect(() => {
     const ret: DataFrame[] = [];
     const now = moment();
+    const startOfDayUnix = moment().startOf('day').unix();
     input.forEach((wf) => {
       const status = wf.Status;
       const start = status?.StartedAt;
       if (start && start != '-') {
+        const startUnix = Math.max(moment(start).unix(), startOfDayUnix);
         const end = status.FinishedAt;
         let to = now.unix();
         if (end && end != '-') {
@@ -40,7 +42,7 @@ function DashboardTimechart({ data: input }: Props) {
         ret.push({
           name: status.Name,
           status: status.Status,
-          values: [moment(start).unix(), to],
+          values: [startUnix, to],
         });
       }
     });
