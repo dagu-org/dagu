@@ -42,6 +42,9 @@ import {
   KeyboardArrowUp,
 } from '@mui/icons-material';
 import DAGSwitch from './DAGSwitch';
+import moment from 'moment';
+import 'moment-duration-format';
+import Ticker from './Ticker';
 
 type Props = {
   DAGs: DAGItem[];
@@ -50,6 +53,9 @@ type Props = {
 };
 
 type DAGRow = DAGItem & { subRows?: DAGItem[] };
+
+const durFormatSec = 's [seconds], m [minutes], h [hours], d [days]';
+const durFormatMin = 'm [minutes], h [hours], d [days]';
 
 const table = createTable()
   .setRowType<DAGRow>()
@@ -259,6 +265,50 @@ const defaultColumns = [
                   label={s}
                 />
               ))}
+            </React.Fragment>
+          );
+        }
+      }
+      return null;
+    },
+    sortingFn: (a, b) => {
+      const dataA = a.original!;
+      const dataB = b.original!;
+      if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
+        return dataA!.Type - dataB!.Type;
+      }
+      return getNextSchedule(dataA.DAG) - getNextSchedule(dataB.DAG);
+    },
+  }),
+  table.createDataColumn('Type', {
+    id: 'NextRun',
+    header: 'Next Run',
+    enableSorting: true,
+    cell: (props) => {
+      const data = props.row.original!;
+      if (data.Type == DAGDataType.DAG) {
+        const schedules = data.DAG.Config.ScheduleExp;
+        if (schedules && !data.DAG.Suspended) {
+          return (
+            <React.Fragment>
+              in{' '}
+              <Ticker intervalMs={1000}>
+                {() => {
+                  const ms = moment
+                    .unix(getNextSchedule(data.DAG))
+                    .diff(moment.now());
+                  const format = ms / 1000 > 60 ? durFormatMin : durFormatSec;
+                  return (
+                    <span>
+                      {moment
+                        .duration(ms)
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-ignore
+                        .format(format)}
+                    </span>
+                  );
+                }}
+              </Ticker>
             </React.Fragment>
           );
         }
