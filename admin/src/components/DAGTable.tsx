@@ -182,18 +182,6 @@ const defaultColumns = [
     },
   }),
   table.createDataColumn('Type', {
-    id: 'Config',
-    header: 'Description',
-    enableSorting: false,
-    cell: (props) => {
-      const data = props.row.original!;
-      if (data.Type == DAGDataType.DAG) {
-        return data.DAG.Config.Description;
-      }
-      return null;
-    },
-  }),
-  table.createDataColumn('Type', {
     id: 'Status',
     header: 'Status',
     cell: (props) => {
@@ -284,6 +272,18 @@ const defaultColumns = [
         return dataA!.Type - dataB!.Type;
       }
       return getNextSchedule(dataA.DAG) - getNextSchedule(dataB.DAG);
+    },
+  }),
+  table.createDataColumn('Type', {
+    id: 'Config',
+    header: 'Description',
+    enableSorting: false,
+    cell: (props) => {
+      const data = props.row.original!;
+      if (data.Type == DAGDataType.DAG) {
+        return data.DAG.Config.Description;
+      }
+      return null;
     },
   }),
   table.createDataColumn('Type', {
