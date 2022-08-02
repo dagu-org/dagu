@@ -195,6 +195,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
 			log.Println(fmt.Sprintf("%s started", n.Name))
+			n.OutputVariables = g.outputVariables
 			err := sc.runHandlerNode(n)
 			if err != nil {
 				sc.lastError = err

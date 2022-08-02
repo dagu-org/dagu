@@ -3,6 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/yohamta/dagu/internal/config"
@@ -10,23 +11,26 @@ import (
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	StartedAt  time.Time
-	FinishedAt time.Time
-	dict       map[int]*Node
-	nodes      []*Node
-	from       map[int][]int
-	to         map[int][]int
+	StartedAt       time.Time
+	FinishedAt      time.Time
+	outputVariables *sync.Map
+	dict            map[int]*Node
+	nodes           []*Node
+	from            map[int][]int
+	to              map[int][]int
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...*config.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		dict:  make(map[int]*Node),
-		from:  make(map[int][]int),
-		to:    make(map[int][]int),
-		nodes: []*Node{},
+		outputVariables: &sync.Map{},
+		dict:            make(map[int]*Node),
+		from:            make(map[int][]int),
+		to:              make(map[int][]int),
+		nodes:           []*Node{},
 	}
 	for _, step := range steps {
+		step.OutputVariables = graph.outputVariables
 		node := &Node{Step: step}
 		node.init()
 		graph.dict[node.id] = node
@@ -41,12 +45,14 @@ func NewExecutionGraph(steps ...*config.Step) (*ExecutionGraph, error) {
 // NewExecutionGraphForRetry creates a new execution graph for retry with given nodes.
 func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		dict:  make(map[int]*Node),
-		from:  make(map[int][]int),
-		to:    make(map[int][]int),
-		nodes: []*Node{},
+		outputVariables: &sync.Map{},
+		dict:            make(map[int]*Node),
+		from:            make(map[int][]int),
+		to:              make(map[int][]int),
+		nodes:           []*Node{},
 	}
 	for _, node := range nodes {
+		node.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)

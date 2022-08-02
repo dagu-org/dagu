@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -16,7 +17,8 @@ import (
 func TestExecute(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: "true",
+			Command:         "true",
+			OutputVariables: &sync.Map{},
 		}}
 	require.NoError(t, n.Execute())
 	require.Nil(t, n.Error)
@@ -25,7 +27,8 @@ func TestExecute(t *testing.T) {
 func TestError(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: "false",
+			Command:         "false",
+			OutputVariables: &sync.Map{},
 		}}
 	err := n.Execute()
 	require.True(t, err != nil)
@@ -35,8 +38,9 @@ func TestError(t *testing.T) {
 func TestSignal(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: "sleep",
-			Args:    []string{"100"},
+			Command:         "sleep",
+			Args:            []string{"100"},
+			OutputVariables: &sync.Map{},
 		}}
 
 	go func() {
@@ -54,10 +58,11 @@ func TestSignal(t *testing.T) {
 func TestLogAndStdout(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: "echo",
-			Args:    []string{"done"},
-			Dir:     os.Getenv("HOME"),
-			Stdout:  "stdout.log",
+			Command:         "echo",
+			Args:            []string{"done"},
+			Dir:             os.Getenv("HOME"),
+			Stdout:          "stdout.log",
+			OutputVariables: &sync.Map{},
 		},
 	}
 
@@ -74,8 +79,9 @@ func TestLogAndStdout(t *testing.T) {
 func TestNode(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: "echo",
-			Args:    []string{"hello"},
+			Command:         "echo",
+			Args:            []string{"hello"},
+			OutputVariables: &sync.Map{},
 		},
 	}
 	n.incDoneCount()
@@ -96,8 +102,9 @@ func TestNode(t *testing.T) {
 func TestOutput(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			CmdWithArgs: "echo hello",
-			Output:      "OUTPUT_TEST",
+			CmdWithArgs:     "echo hello",
+			Output:          "OUTPUT_TEST",
+			OutputVariables: &sync.Map{},
 		},
 	}
 	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
@@ -115,8 +122,9 @@ func TestOutput(t *testing.T) {
 	// Use the previous output in the subsequent step
 	n2 := &Node{
 		Step: &config.Step{
-			CmdWithArgs: "echo $OUTPUT_TEST",
-			Output:      "OUTPUT_TEST2",
+			CmdWithArgs:     "echo $OUTPUT_TEST",
+			Output:          "OUTPUT_TEST2",
+			OutputVariables: &sync.Map{},
 		},
 	}
 
@@ -126,9 +134,10 @@ func TestOutput(t *testing.T) {
 	// Use the previous output in the subsequent step inside a script
 	n3 := &Node{
 		Step: &config.Step{
-			Command: "sh",
-			Script:  "echo $OUTPUT_TEST2",
-			Output:  "OUTPUT_TEST3",
+			Command:         "sh",
+			Script:          "echo $OUTPUT_TEST2",
+			Output:          "OUTPUT_TEST3",
+			OutputVariables: &sync.Map{},
 		},
 	}
 
@@ -144,7 +153,8 @@ func TestRunScript(t *testing.T) {
 			Script: `
 			  echo hello
 			`,
-			Output: "SCRIPT_TEST",
+			Output:          "SCRIPT_TEST",
+			OutputVariables: &sync.Map{},
 		},
 	}
 
@@ -169,8 +179,9 @@ func TestRunScript(t *testing.T) {
 func TestTeardown(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
-			Command: testCommand,
-			Args:    []string{},
+			Command:         testCommand,
+			Args:            []string{},
+			OutputVariables: &sync.Map{},
 		},
 	}
 

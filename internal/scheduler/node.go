@@ -8,14 +8,13 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/executor"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -56,7 +55,7 @@ type Node struct {
 
 	id           int
 	mu           sync.RWMutex
-	cmd          *exec.Cmd
+	cmd          executor.Executor
 	cancelFunc   func()
 	logFile      *os.File
 	logWriter    *bufio.Writer
@@ -80,43 +79,36 @@ type NodeState struct {
 	Error      error
 }
 
-var outputVariables = map[string]string{}
-
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute() error {
 	ctx, fn := context.WithCancel(context.Background())
 	n.cancelFunc = fn
+
 	if n.CmdWithArgs != "" {
 		n.Command, n.Args = utils.SplitCommand(os.ExpandEnv(n.CmdWithArgs))
 	}
-	args := n.Args
+
 	if n.scriptFile != nil {
-		args = []string{}
+		args := []string{}
 		args = append(args, n.Args...)
-		args = append(args, n.scriptFile.Name())
-	}
-	n.cmd = exec.CommandContext(ctx, n.Command, args...)
-	cmd := n.cmd
-	cmd.Dir = n.Dir
-	cmd.Env = append(cmd.Env, n.Variables...)
-	for _, v := range outputVariables {
-		cmd.Env = append(cmd.Env, v)
-	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0,
+		n.Args = append(args, n.scriptFile.Name())
 	}
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stdout
+	cmd, err := executor.CreateExecutor(ctx, n.Step)
+	if err != nil {
+		return err
+	}
+	n.cmd = cmd
+
+	var stdout io.Writer
 
 	if n.logWriter != nil {
-		cmd.Stdout = n.logWriter
-		cmd.Stderr = n.logWriter
+		stdout = n.logWriter
+		cmd.SetStderr(stdout)
 	}
 
 	if n.stdoutWriter != nil {
-		cmd.Stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
+		stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
 	}
 
 	if n.Output != "" {
@@ -124,8 +116,10 @@ func (n *Node) Execute() error {
 		if n.outputReader, n.outputWriter, err = os.Pipe(); err != nil {
 			return err
 		}
-		cmd.Stdout = io.MultiWriter(cmd.Stdout, n.outputWriter)
+		stdout = io.MultiWriter(stdout, n.outputWriter)
 	}
+
+	cmd.SetStdout(stdout)
 
 	n.Error = cmd.Run()
 
@@ -135,7 +129,7 @@ func (n *Node) Execute() error {
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
 		os.Setenv(n.Output, ret)
-		outputVariables[n.Output] = fmt.Sprintf("%s=%s", n.Output, ret)
+		n.OutputVariables.Store(n.Output, fmt.Sprintf("%s=%s", n.Output, ret))
 	}
 
 	return n.Error
@@ -189,7 +183,7 @@ func (n *Node) signal(sig os.Signal) {
 	status := n.Status
 	if status == NodeStatus_Running && n.cmd != nil {
 		log.Printf("Sending %s signal to %s", sig, n.Name)
-		utils.LogErr("sending signal", syscall.Kill(-n.cmd.Process.Pid, sig.(syscall.Signal)))
+		utils.LogErr("sending signal", n.cmd.Kill(sig))
 	}
 	if status == NodeStatus_Running {
 		n.Status = NodeStatus_Cancel
