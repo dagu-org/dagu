@@ -45,12 +45,14 @@ func NewExecutionGraph(steps ...*config.Step) (*ExecutionGraph, error) {
 // NewExecutionGraphForRetry creates a new execution graph for retry with given nodes.
 func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		dict:  make(map[int]*Node),
-		from:  make(map[int][]int),
-		to:    make(map[int][]int),
-		nodes: []*Node{},
+		outputVariables: &sync.Map{},
+		dict:            make(map[int]*Node),
+		from:            make(map[int][]int),
+		to:              make(map[int][]int),
+		nodes:           []*Node{},
 	}
 	for _, node := range nodes {
+		node.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)

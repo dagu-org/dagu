@@ -98,6 +98,7 @@ func (n *Node) Execute() error {
 	if err != nil {
 		return err
 	}
+	n.cmd = cmd
 
 	var stdout io.Writer
 
