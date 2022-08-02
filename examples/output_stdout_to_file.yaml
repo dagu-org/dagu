@@ -1,0 +1,4 @@
+steps:
+  - name: step1
+    command: echo hello
+    stdout: /tmp/dagu_output_stdout_to_file.txt
