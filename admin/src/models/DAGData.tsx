@@ -74,7 +74,7 @@ export function getNextSchedule(data: DAG): number {
   }
   const datesToRun = schedules.map((s) => cronParser.parseExpression(s).next());
   const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
-  return sorted[0].getTime();
+  return sorted[0].getTime() / 1000;
 }
 
 export enum DetailTabId {

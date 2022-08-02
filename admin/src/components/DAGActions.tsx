@@ -43,14 +43,11 @@ function DAGActions({
       if (redirectTo) {
         window.location.href = redirectTo;
       }
-      if (ret.ok) {
-        if (refresh) {
-          refresh();
-        }
-      } else {
+      if (!ret.ok) {
         const e = await ret.text();
-        alert(e);
+        alert(e || 'Failed to submit');
       }
+      refresh && refresh();
     },
     [refresh]
   );
