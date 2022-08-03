@@ -145,6 +145,27 @@ func TestOutput(t *testing.T) {
 	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST3"))
 }
 
+func TestOutputJson(t *testing.T) {
+	n := &Node{
+		Step: &config.Step{
+			CmdWithArgs:     "echo {\"key\":\"value\"}",
+			Output:          "OUTPUT_JSON_TEST",
+			OutputVariables: &sync.Map{},
+		},
+	}
+	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
+	require.NoError(t, err)
+	defer func() {
+		_ = n.teardown()
+	}()
+
+	runTestNode(t, n)
+
+	v, _ := n.OutputVariables.Load("OUTPUT_JSON_TEST")
+	require.Equal(t, "OUTPUT_JSON_TEST={\"key\":\"value\"}", v)
+	require.Equal(t, "{\"key\":\"value\"}", os.ExpandEnv("$OUTPUT_JSON_TEST"))
+}
+
 func TestRunScript(t *testing.T) {
 	n := &Node{
 		Step: &config.Step{
