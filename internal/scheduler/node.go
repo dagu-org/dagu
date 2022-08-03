@@ -85,7 +85,8 @@ func (n *Node) Execute() error {
 	n.cancelFunc = fn
 
 	if n.CmdWithArgs != "" {
-		n.Command, n.Args = utils.SplitCommand(os.ExpandEnv(n.CmdWithArgs))
+		val := os.ExpandEnv(n.CmdWithArgs)
+		n.Command, n.Args = utils.SplitCommand(val)
 	}
 
 	if n.scriptFile != nil {
