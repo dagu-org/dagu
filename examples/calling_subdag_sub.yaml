@@ -1,0 +1,3 @@
+steps:
+  - name: step1
+    command: echo hello

@@ -15,6 +15,11 @@ func TestLoadConfig(t *testing.T) {
 	}
 	_, err := l.Load(testConfig, "")
 	require.NoError(t, err)
+
+	// without .yaml
+	s := path.Join(testDir, "config_load")
+	_, err = l.Load(s, "")
+	require.NoError(t, err)
 }
 
 func TestLoadGlobalConfig(t *testing.T) {
