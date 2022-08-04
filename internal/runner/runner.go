@@ -55,6 +55,7 @@ func (r *Runner) run(now time.Time) {
 		}
 		go func(e *Entry) {
 			if e.Job != nil {
+				log.Printf("[%s] %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
 				err := e.Job.Run()
 				if err != nil {
 					log.Printf("runner: failed to run job %s: %v", e.Job, err)
