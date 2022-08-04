@@ -54,8 +54,8 @@ type Props = {
 
 type DAGRow = DAGItem & { subRows?: DAGItem[] };
 
-const durFormatSec = 's [seconds], m [minutes], h [hours], d [days]';
-const durFormatMin = 'm [minutes], h [hours], d [days]';
+const durFormatSec = 's[s]m[m]h[h]d[d]';
+const durFormatMin = 'm[m]h[h]d[d]';
 
 const table = createTable()
   .setRowType<DAGRow>()
