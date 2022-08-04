@@ -1,23 +1,21 @@
 package runner
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"path"
 	"syscall"
-	"time"
 
 	"github.com/yohamta/dagu/internal/admin"
 	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/internal/utils"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type Agent struct {
 	*admin.Config
+	logger *logger.TeeLogger
 	stop   chan struct{}
-	logger *logger.SimpleLogger
 }
 
 func NewAgent(cfg *admin.Config) *Agent {
@@ -44,13 +42,11 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start() error {
-	tl := &logger.TeeLogger{Writer: a.logger}
-	if err := tl.Open(); err != nil {
+	if err := a.logger.Open(); err != nil {
 		return err
 	}
 	defer func() {
-		utils.LogErr("close log file", a.closeLogFile())
-		tl.Close()
+		a.logger.Close()
 	}()
 
 	log.Printf("starting dagu scheduler")
@@ -80,25 +76,23 @@ func (a *Agent) registerRunnerShutdown(runner *Runner) {
 }
 
 func (a *Agent) setupLogFile() (err error) {
-	filename := path.Join(
-		a.LogDir,
-		fmt.Sprintf("scheduler.%s.log",
-			time.Now().Format("20060102.15:04:05.000"),
-		))
+	filename := path.Join(a.LogDir, "scheduler.log")
 	dir := path.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	a.logger = logger.NewSimpleLogger(
-		a.LogDir, "scheduler", time.Hour*24,
-	)
-	err = a.logger.Open()
-	return
-}
+	log.Printf("setup log file: %s", filename)
 
-func (a *Agent) closeLogFile() error {
-	if a.logger != nil {
-		return a.logger.Close()
+	a.logger = &logger.TeeLogger{
+		Writer: &lumberjack.Logger{
+			Filename:   filename,
+			MaxSize:    20, // megabytes
+			MaxBackups: 3,
+			MaxAge:     28,    //days
+			Compress:   false, // disabled by default
+		},
 	}
-	return nil
+
+	log.Print("log file setuped")
+	return
 }
