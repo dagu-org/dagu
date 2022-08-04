@@ -18,6 +18,10 @@ func Test_startCommand(t *testing.T) {
 			args: []string{"", "start", "--params=x y", testConfig("cmd_start_with_params_2.yaml")}, errored: false,
 			output: []string{"params are x and y"},
 		},
+		{
+			args: []string{"", "start", testConfig("cmd_start_success")}, errored: false,
+			output: []string{"1 finished"},
+		},
 	}
 
 	for _, v := range tests {

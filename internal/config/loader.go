@@ -109,6 +109,9 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 	if f == "" {
 		return nil, fmt.Errorf("config file was not specified")
 	}
+	if !strings.HasSuffix(f, ".yaml") && !strings.HasSuffix(f, ".yml") {
+		f = fmt.Sprintf("%s.yaml", f)
+	}
 	file, err := filepath.Abs(f)
 	if err != nil {
 		return nil, err
