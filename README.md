@@ -355,7 +355,7 @@ handlerOn:                           # Handlers on Success, Failure, Cancel, and
 steps:
   - name: some task                  # Step name
     description: some task           # Step description
-    dir: ${HOME}/logs                # Working directory
+    dir: ${HOME}/logs                # Working directory (default: the same directory of the DAG file)
     command: bash                    # Command and parameters
     stdout: /tmp/outfile
     ouptut: RESULT_VARIABLE
