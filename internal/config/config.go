@@ -456,7 +456,7 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	step.Name = def.Name
 	step.Description = def.Description
 	step.CmdWithArgs = def.Command
-	step.Command, step.Args = utils.SplitCommand(step.CmdWithArgs)
+	step.Command, step.Args = utils.SplitCommand(step.CmdWithArgs, false)
 	step.Script = def.Script
 	step.Stdout = b.expandEnv(def.Stdout)
 	step.Output = def.Output

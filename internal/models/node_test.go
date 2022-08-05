@@ -13,7 +13,7 @@ func makeStep(cmd string) *config.Step {
 	step := &config.Step{
 		Name: "test step",
 	}
-	step.Command, step.Args = utils.SplitCommand(cmd)
+	step.Command, step.Args = utils.SplitCommand(cmd, false)
 	return step
 }
 

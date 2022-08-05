@@ -612,7 +612,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 }
 
 func step(name, command string, depends ...string) *config.Step {
-	cmd, args := utils.SplitCommand(command)
+	cmd, args := utils.SplitCommand(command, false)
 	return &config.Step{
 		Name:    name,
 		Command: cmd,

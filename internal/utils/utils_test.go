@@ -56,7 +56,7 @@ func TestFormatDuration(t *testing.T) {
 
 func TestSplitCommand(t *testing.T) {
 	command := "ls -al test/"
-	program, args := utils.SplitCommand(command)
+	program, args := utils.SplitCommand(command, false)
 	require.Equal(t, "ls", program)
 	require.Equal(t, "-al", args[0])
 	require.Equal(t, "test/", args[1])

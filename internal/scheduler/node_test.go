@@ -146,24 +146,45 @@ func TestOutput(t *testing.T) {
 }
 
 func TestOutputJson(t *testing.T) {
-	n := &Node{
-		Step: &config.Step{
-			CmdWithArgs:     "echo {\"key\":\"value\"}",
-			Output:          "OUTPUT_JSON_TEST",
-			OutputVariables: &sync.Map{},
+	for i, test := range []struct {
+		CmdWithArgs string
+		Want        string
+		WantArgs    int
+	}{
+		{
+			CmdWithArgs: `echo {\"key\":\"value\"}`,
+			Want:        `{"key":"value"}`,
+			WantArgs:    1,
 		},
+		{
+			CmdWithArgs: `echo "{\"key\": \"value\"}"`,
+			Want:        `{"key": "value"}`,
+			WantArgs:    1,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			n := &Node{
+				Step: &config.Step{
+					CmdWithArgs:     test.CmdWithArgs,
+					Output:          "OUTPUT_JSON_TEST",
+					OutputVariables: &sync.Map{},
+				},
+			}
+			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-json-%d", i))
+			require.NoError(t, err)
+			defer func() {
+				_ = n.teardown()
+			}()
+
+			runTestNode(t, n)
+
+			require.Equal(t, test.WantArgs, len(n.Args))
+
+			v, _ := n.OutputVariables.Load("OUTPUT_JSON_TEST")
+			require.Equal(t, fmt.Sprintf("OUTPUT_JSON_TEST=%s", test.Want), v)
+			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_JSON_TEST"))
+		})
 	}
-	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
-	require.NoError(t, err)
-	defer func() {
-		_ = n.teardown()
-	}()
-
-	runTestNode(t, n)
-
-	v, _ := n.OutputVariables.Load("OUTPUT_JSON_TEST")
-	require.Equal(t, "OUTPUT_JSON_TEST={\"key\":\"value\"}", v)
-	require.Equal(t, "{\"key\":\"value\"}", os.ExpandEnv("$OUTPUT_JSON_TEST"))
 }
 
 func TestRunScript(t *testing.T) {
