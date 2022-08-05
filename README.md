@@ -39,8 +39,9 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
     - [Conditional Logic](#conditional-logic)
     - [Output](#output)
     - [Redirection](#redirection)
-    - [State Handlers](#state-handlers)
+    - [Lifecycle Hooks](#lifecycle-hooks)
     - [Repeating Task](#repeating-task)
+    - [Calling Sub DAGs](#calling-sub-dags)
     - [All Available Fields](#all-available-fields)
   - [Admin Configuration](#admin-configuration)
     - [Environment Variables](#environment-variables-1)
@@ -290,7 +291,7 @@ steps:
     stdout: "/tmp/hello" # the content will be "hello\n"
 ```
 
-### State Handlers
+### Lifecycle Hooks
 
 It is often desirable to take action when a specific event happens, for example, when a DAG fails. To achieve this, you can use `handlerOn` fields.
 
@@ -316,6 +317,16 @@ steps:
     repeatPolicy:
       repeat: true
       intervalSec: 60
+```
+
+### Calling Sub DAGs
+
+You can call other DAGs in the same directory by using `dagu start` command.
+
+```yaml
+steps:
+  - name: Sub DAG
+    command: dagu start other_dag.yaml
 ```
 
 ### All Available Fields
