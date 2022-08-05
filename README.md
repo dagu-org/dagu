@@ -321,12 +321,20 @@ steps:
 
 ### Calling Sub DAGs
 
-You can call other DAGs in the same directory by using `dagu start` command.
+You can call other DAGs in the same directory by using `dagu start` command (you can omit `.yaml`).
 
 ```yaml
 steps:
   - name: Sub DAG
-    command: dagu start other_dag.yaml
+    command: dagu start other_dag
+```
+
+If you want to call DAGs in other directory you can specify the DAG by absolute path.
+
+```yaml
+steps:
+  - name: Sub DAG
+    command: dagu start /path/to/dag.yaml
 ```
 
 ### All Available Fields
