@@ -69,7 +69,7 @@ const mdTheme = createTheme({
   },
   palette: {
     primary: {
-      main: '#485fc7',
+      main: '#6149d8',
     }
   },
 });
@@ -87,7 +87,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
   };
   const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const gradientColor = navbarColor || '#485fc7';
+  const gradientColor = navbarColor || '#6149d8';
 
   return (
     <ThemeProvider theme={mdTheme}>
