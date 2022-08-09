@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestLoadInvalidConfigError(t *testing.T) {
-	for _, c := range []string{
+	for i, c := range []string{
 		`dags: ./relative`,
 		`dags: "` + "`ech /dags_dir`" + `"`,
 		`command: "` + "`ech cmd`" + `"`,
@@ -86,14 +87,16 @@ func TestLoadInvalidConfigError(t *testing.T) {
 		`basicAuthPassword: "` + "`ech foo`" + `"`,
 		`logEncodingCharset: "` + "`ech foo`" + `"`,
 	} {
-		l := &Loader{}
-		d, err := l.unmarshalData([]byte(c))
-		require.NoError(t, err)
+		t.Run(fmt.Sprintf("test-invalid-cfg-%d", i), func(t *testing.T) {
+			l := &Loader{}
+			d, err := l.unmarshalData([]byte(c))
+			require.NoError(t, err)
 
-		def, err := l.decode(d)
-		require.NoError(t, err)
+			def, err := l.decode(d)
+			require.NoError(t, err)
 
-		_, err = buildFromDefinition(def)
-		require.Error(t, err)
+			_, err = buildFromDefinition(def)
+			require.Error(t, err)
+		})
 	}
 }

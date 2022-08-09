@@ -3,9 +3,9 @@ package admin
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
@@ -25,105 +25,119 @@ type Config struct {
 	LogDir             string
 }
 
-func (c *Config) Init() {
-	if c.Env == nil {
-		c.Env = []string{}
+func (cfg *Config) Init() {
+	if cfg.Env == nil {
+		cfg.Env = []string{}
 	}
 }
 
-func (c *Config) setup() {
-	if c.Command == "" {
-		c.Command = "dagu"
-	}
-	if c.DAGs == "" {
-		c.DAGs = path.Join(
-			settings.MustGet(settings.SETTING__ADMIN_DAGS_DIR),
-		)
-	}
-	if c.LogDir == "" {
-		c.LogDir = path.Join(
-			settings.MustGet(settings.SETTING__ADMIN_LOGS_DIR),
-		)
-	}
-	if c.Host == "" {
-		c.Host = "127.0.0.1"
-	}
-	if c.Port == "" {
-		c.Port = settings.MustGet(settings.SETTING__ADMIN_PORT)
-	}
-	if len(c.Env) == 0 {
+func (cfg *Config) setup() {
+	cfg.Command = utils.StringWithFallback(cfg.Command, "dagu")
+	cfg.DAGs = utils.StringWithFallback(cfg.DAGs,
+		settings.MustGet(settings.SETTING__ADMIN_DAGS_DIR))
+	cfg.LogDir = utils.StringWithFallback(cfg.LogDir,
+		settings.MustGet(settings.SETTING__ADMIN_LOGS_DIR))
+	cfg.Host = utils.StringWithFallback(cfg.Host, "127.0.0.1")
+	cfg.Port = utils.StringWithFallback(cfg.Port,
+		settings.MustGet(settings.SETTING__ADMIN_PORT))
+	if len(cfg.Env) == 0 {
 		env := utils.DefaultEnv()
 		env, err := loadVariables(env)
 		if err != nil {
 			panic(err)
 		}
-		c.Env = buildConfigEnv(env)
+		cfg.Env = buildConfigEnv(env)
 	}
 }
 
-func buildFromDefinition(def *configDefinition) (c *Config, err error) {
-	c = &Config{}
-	c.Init()
+func buildFromDefinition(def *configDefinition) (cfg *Config, err error) {
+	cfg = &Config{}
+	cfg.Init()
 
+	for _, fn := range []func(cfg *Config, def *configDefinition) error{
+		buildEnvs,
+		buildHostPort,
+		buildDAGsDir,
+		buildCommand,
+		buildWorkDir,
+		buildBasicAuthOpts,
+		buidEncodingOpts,
+	} {
+		if err := fn(cfg, def); err != nil {
+			return nil, err
+		}
+	}
+
+	cfg.LogDir = def.LogDir
+	cfg.IsBasicAuth = def.IsBasicAuth
+
+	return cfg, nil
+}
+
+func buildEnvs(cfg *Config, def *configDefinition) error {
 	env, err := loadVariables(def.Env)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	c.Env = buildConfigEnv(env)
+	cfg.Env = buildConfigEnv(env)
+	return nil
+}
 
-	c.Host, err = utils.ParseVariable(def.Host)
-	if err != nil {
-		return nil, err
-	}
+func buildHostPort(cfg *Config, def *configDefinition) (err error) {
+	cfg.Host, err = utils.ParseVariable(def.Host)
 	if def.Port == 0 {
-		c.Port = settings.MustGet(settings.SETTING__ADMIN_PORT)
+		cfg.Port = settings.MustGet(settings.SETTING__ADMIN_PORT)
 	} else {
-		c.Port = strconv.Itoa(def.Port)
+		cfg.Port = strconv.Itoa(def.Port)
 	}
+	return err
+}
 
-	jd, err := utils.ParseVariable(def.Dags)
-	if err != nil {
-		return nil, err
-	}
-	if len(jd) > 0 {
-		if !filepath.IsAbs(jd) {
-			return nil, fmt.Errorf("DAGs directory should be absolute path. was %s", jd)
+func buildDAGsDir(cfg *Config, def *configDefinition) (err error) {
+	val, err := utils.ParseVariable(def.Dags)
+	if err == nil && len(val) > 0 {
+		if !filepath.IsAbs(val) {
+			return fmt.Errorf("DAGs directory should be absolute path. was %s", val)
 		}
-		c.DAGs, err = filepath.Abs(jd)
+		cfg.DAGs, err = filepath.Abs(val)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("failed to resolve DAGs directory: %w", err)
 		}
 	}
-	c.LogDir = def.LogDir
+	return err
+}
 
-	c.Command, err = utils.ParseVariable(def.Command)
-	if err != nil {
-		return nil, err
-	}
-	c.WorkDir, err = utils.ParseVariable(def.WorkDir)
-	if err != nil {
-		return nil, err
-	}
-	if c.WorkDir == "" {
-		c.WorkDir, err = os.Getwd()
+func buildCommand(cfg *Config, def *configDefinition) (err error) {
+	cfg.Command, err = utils.ParseVariable(def.Command)
+	return err
+}
+
+func buildWorkDir(cfg *Config, def *configDefinition) (err error) {
+	cfg.WorkDir, err = utils.ParseVariable(def.WorkDir)
+	if err == nil && strings.TrimSpace(cfg.WorkDir) == "" {
+		cfg.WorkDir, err = os.Getwd()
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("failed to resolve working directory: %w", err)
 		}
 	}
-	c.IsBasicAuth = def.IsBasicAuth
-	c.BasicAuthUsername, err = utils.ParseVariable(def.BasicAuthUsername)
+	return err
+}
+
+func buildBasicAuthOpts(cfg *Config, def *configDefinition) (err error) {
+	cfg.BasicAuthUsername, err = utils.ParseVariable(def.BasicAuthUsername)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	c.BasicAuthPassword, err = utils.ParseVariable(def.BasicAuthPassword)
+	cfg.BasicAuthPassword, err = utils.ParseVariable(def.BasicAuthPassword)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	c.LogEncodingCharset, err = utils.ParseVariable(def.LogEncodingCharset)
-	if err != nil {
-		return nil, err
-	}
-	return c, nil
+	return nil
+}
+
+func buidEncodingOpts(cfg *Config, def *configDefinition) (err error) {
+	cfg.LogEncodingCharset, err = utils.ParseVariable(def.LogEncodingCharset)
+	return err
 }
 
 func buildConfigEnv(vars map[string]string) []string {
