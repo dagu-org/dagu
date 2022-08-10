@@ -110,7 +110,10 @@ func buildDAGsDir(cfg *Config, def *configDefinition) (err error) {
 }
 
 func buildBaseConfig(cfg *Config, def *configDefinition) (err error) {
-	cfg.BaseConfig = strings.TrimSpace(def.BaseConfig)
+	cfg.BaseConfig, err = utils.ParseVariable(strings.TrimSpace(def.BaseConfig))
+	if err != nil {
+		return err
+	}
 	if cfg.BaseConfig == "" {
 		cfg.BaseConfig = settings.MustGet(settings.SETTING__BASE_CONFIG)
 	}
