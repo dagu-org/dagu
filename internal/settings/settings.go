@@ -13,10 +13,14 @@ var (
 )
 
 const (
+	SETTING__HOME = "DAGU_HOME"
+
+	// TODO: consider declaring these consts as enum when changed not to read from env
 	SETTING__DATA_DIR           = "DAGU__DATA"
 	SETTING__LOGS_DIR           = "DAGU__LOGS"
 	SETTING__SUSPEND_FLAGS_DIR  = "DAGU__SUSPEND_FLAGS_DIR"
 	SETTING__BASE_CONFIG        = "DAGU__BASE_CONFIG"
+	SETTING__ADMIN_CONFIG       = "DAGU__ADMIN_CONFIG"
 	SETTING__ADMIN_PORT         = "DAGU__ADMIN_PORT"
 	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
@@ -56,20 +60,23 @@ func init() {
 }
 
 func load() {
-	homeDir := utils.MustGetUserHomeDir()
+	cache = map[string]string{}
+	cacheEnv(SETTING__HOME, path.Join(utils.MustGetUserHomeDir(), "/.dagu/"))
 
-	cache = map[string]string{
-		SETTING__BASE_CONFIG: path.Join(homeDir, "/.dagu/config.yaml"),
-	}
+	dh := MustGet(SETTING__HOME)
 
-	cacheEnv(SETTING__DATA_DIR, path.Join(homeDir, "/.dagu/data"))
-	cacheEnv(SETTING__LOGS_DIR, path.Join(homeDir, "/.dagu/logs"))
-	cacheEnv(SETTING__SUSPEND_FLAGS_DIR, path.Join(homeDir, "/.dagu/suspend"))
-	cacheEnv(SETTING__ADMIN_PORT, "8080")
+	cache[SETTING__ADMIN_CONFIG] = path.Join(dh, "admin.yaml")
+	cache[SETTING__BASE_CONFIG] = path.Join(dh, "config.yaml")
+
+	// TODO: consider reading these settings from env
+	cacheEnv(SETTING__DATA_DIR, path.Join(dh, "/data"))
+	cacheEnv(SETTING__LOGS_DIR, path.Join(dh, "/logs"))
+	cacheEnv(SETTING__SUSPEND_FLAGS_DIR, path.Join(dh, "/suspend"))
 	cacheEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
 	cacheEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
-	cacheEnv(SETTING__ADMIN_LOGS_DIR, path.Join(homeDir, "/.dagu/logs/admin"))
-	cacheEnv(SETTING__ADMIN_DAGS_DIR, path.Join(homeDir, "/.dagu/dags"))
+	cacheEnv(SETTING__ADMIN_PORT, "8080")
+	cacheEnv(SETTING__ADMIN_LOGS_DIR, path.Join(dh, "/logs/admin"))
+	cacheEnv(SETTING__ADMIN_DAGS_DIR, path.Join(dh, "/dags"))
 }
 
 func cacheEnv(key, def string) {
