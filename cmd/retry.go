@@ -5,7 +5,9 @@ import (
 	"path/filepath"
 
 	"github.com/yohamta/dagu"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/models"
 
 	"github.com/urfave/cli/v2"
 )
@@ -13,36 +15,31 @@ import (
 func newRetryCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "retry",
-		Usage: "dagu retry --req=<request-id> <config>",
-		Flags: []cli.Flag{
+		Usage: "dagu retry --req=<request-id> <DAG file>",
+		Flags: append(
+			globalFlags,
 			&cli.StringFlag{
 				Name:     "req",
 				Usage:    "request-id",
 				Value:    "",
 				Required: true,
 			},
-		},
+		),
 		Action: func(c *cli.Context) error {
 			f, _ := filepath.Abs(c.Args().Get(0))
+			db := database.Database{Config: database.DefaultConfig()}
 			requestId := c.String("req")
-			return retry(f, requestId)
+			status, err := db.FindByRequestId(f, requestId)
+			if err != nil {
+				return err
+			}
+			cfg, err := loadDAG(c, c.Args().Get(0), status.Status.Params)
+			return retry(cfg, status)
 		},
 	}
 }
 
-func retry(f, requestId string) error {
-	db := database.Database{
-		Config: database.DefaultConfig(),
-	}
-	status, err := db.FindByRequestId(f, requestId)
-	if err != nil {
-		return err
-	}
-	cfg, err := loadDAG(f, status.Status.Params)
-	if err != nil {
-		return err
-	}
-
+func retry(cfg *config.Config, status *models.StatusFile) error {
 	a := &dagu.Agent{
 		AgentConfig: &dagu.AgentConfig{
 			DAG: cfg,

@@ -64,6 +64,10 @@ func Test_retryCommand(t *testing.T) {
 }
 
 func Test_retryFail(t *testing.T) {
-	configPath := testConfig("cmd_retry.yaml")
-	require.Error(t, retry(configPath, "invalid-request-id"))
+	app := makeApp()
+	runAppTestOutput(app, appTest{
+		args: []string{"", "retry", fmt.Sprintf("--req=%s",
+			"invalid-request-id"), testConfig("cmd_retry.yaml")}, errored: true,
+		errMessage: []string{"request id not found"},
+	}, t)
 }

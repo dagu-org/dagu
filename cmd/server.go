@@ -12,8 +12,13 @@ func newServerCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "server",
 		Usage: "dagu server",
+		Flags: globalFlags,
 		Action: func(c *cli.Context) error {
-			return startServer(globalConfig)
+			cfg, err := loadGlobalConfig(c)
+			if err != nil {
+				return err
+			}
+			return startServer(cfg)
 		},
 	}
 }

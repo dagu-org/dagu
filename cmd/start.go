@@ -11,18 +11,18 @@ import (
 func newStartCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "start",
-		Usage: "dagu start [--params=\"<params>\"] <config>",
-		Flags: []cli.Flag{
+		Usage: "dagu start [--params=\"<params>\"] <DAG file>",
+		Flags: append(
+			globalFlags,
 			&cli.StringFlag{
 				Name:     "params",
 				Usage:    "parameters",
 				Value:    "",
 				Required: false,
 			},
-		},
+		),
 		Action: func(c *cli.Context) error {
-			config_file_path := c.Args().Get(0)
-			cfg, err := loadDAG(config_file_path, c.String("params"))
+			cfg, err := loadDAG(c, c.Args().Get(0), c.String("params"))
 			if err != nil {
 				return err
 			}

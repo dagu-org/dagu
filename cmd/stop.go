@@ -11,9 +11,10 @@ import (
 func newStopCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "stop",
-		Usage: "dagu stop <config>",
+		Usage: "dagu stop <DAG file>",
+		Flags: globalFlags,
 		Action: func(c *cli.Context) error {
-			cfg, err := loadDAG(c.Args().Get(0), "")
+			cfg, err := loadDAG(c, c.Args().Get(0), "")
 			if err != nil {
 				return err
 			}

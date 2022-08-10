@@ -19,6 +19,7 @@ type appTest struct {
 	args        []string
 	errored     bool
 	output      []string
+	errMessage  []string
 	exactOutput string
 	stdin       io.ReadCloser
 }
@@ -75,6 +76,12 @@ func runAppTestOutput(app *cli.App, test appTest, t *testing.T) {
 	if err != nil && !test.errored {
 		t.Fatalf("failed unexpectedly %v", err)
 		return
+	}
+
+	if err != nil && len(test.errMessage) > 0 {
+		for _, v := range test.errMessage {
+			require.Contains(t, err.Error(), v)
+		}
 	}
 
 	var buf bytes.Buffer

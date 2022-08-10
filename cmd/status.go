@@ -13,9 +13,10 @@ import (
 func newStatusCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "status",
-		Usage: "dagu status <config>",
+		Usage: "dagu status <DAG file>",
+		Flags: globalFlags,
 		Action: func(c *cli.Context) error {
-			cfg, err := loadDAG(c.Args().Get(0), "")
+			cfg, err := loadDAG(c, c.Args().Get(0), "")
 			if err != nil {
 				return err
 			}

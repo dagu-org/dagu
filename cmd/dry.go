@@ -12,16 +12,17 @@ func newDryCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "dry",
 		Usage: "dagu dry [--params=\"<params>\"] <config>",
-		Flags: []cli.Flag{
+		Flags: append(
+			globalFlags,
 			&cli.StringFlag{
 				Name:     "params",
 				Usage:    "parameters",
 				Value:    "",
 				Required: false,
 			},
-		},
+		),
 		Action: func(c *cli.Context) error {
-			cfg, err := loadDAG(c.Args().Get(0), c.String("params"))
+			cfg, err := loadDAG(c, c.Args().Get(0), c.String("params"))
 			if err != nil {
 				return err
 			}

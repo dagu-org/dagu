@@ -12,20 +12,25 @@ func newSchedulerCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "scheduler",
 		Usage: "dagu scheduler",
-		Flags: []cli.Flag{
+		Flags: append(
+			globalFlags,
 			&cli.StringFlag{
 				Name:     "dags",
 				Usage:    "DAGs directory",
 				Value:    "",
 				Required: false,
 			},
-		},
+		),
 		Action: func(c *cli.Context) error {
+			cfg, err := loadGlobalConfig(c)
+			if err != nil {
+				return err
+			}
 			dagsDir := c.String("dags")
 			if dagsDir != "" {
-				globalConfig.DAGs = dagsDir
+				cfg.DAGs = dagsDir
 			}
-			return startScheduler(globalConfig)
+			return startScheduler(cfg)
 		},
 	}
 }
