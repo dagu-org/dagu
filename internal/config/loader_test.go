@@ -6,13 +6,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 func TestLoadConfig(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 	_, err := l.Load(testConfig, "")
 	require.NoError(t, err)
 
@@ -22,33 +20,29 @@ func TestLoadConfig(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestLoadGlobalConfig(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
-	cfg, err := l.loadGlobalConfig(
-		path.Join(l.HomeDir, ".dagu/config.yaml"),
+func TestLoadBaseConfig(t *testing.T) {
+	l := &Loader{}
+	cfg, err := l.loadBaseConfig(
+		settings.MustGet(settings.SETTING__BASE_CONFIG),
 		&BuildConfigOptions{},
 	)
 	require.NotNil(t, cfg)
 	require.NoError(t, err)
 }
 
-func TestLoadGlobalConfigError(t *testing.T) {
-	for _, path := range []string{
+func TestLoadBaseConfigError(t *testing.T) {
+	for _, f := range []string{
 		path.Join(testDir, "config_err_decode.yaml"),
 		path.Join(testDir, "config_err_parse.yaml"),
 	} {
-		l := &Loader{HomeDir: utils.MustGetUserHomeDir()}
-		_, err := l.loadGlobalConfig(path, &BuildConfigOptions{})
+		l := &Loader{}
+		_, err := l.loadBaseConfig(f, &BuildConfigOptions{})
 		require.Error(t, err)
 	}
 }
 
 func TestLoadDeafult(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
@@ -62,9 +56,7 @@ steps:
   - name: "1"
     command: "true"
 `
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 	ret, err := l.LoadData([]byte(dat))
 	require.NoError(t, err)
 	require.Equal(t, ret.Name, "test DAG")
@@ -90,17 +82,13 @@ steps:
 }
 
 func TestLoadErrorFileNotExist(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 	_, err := l.Load(path.Join(testDir, "not_existing_file.yaml"), "")
 	require.Error(t, err)
 }
 
 func TestGlobalConfigNotExist(t *testing.T) {
-	l := &Loader{
-		HomeDir: "/not_existing_dir",
-	}
+	l := &Loader{}
 
 	file := path.Join(testDir, "config_default.yaml")
 	_, err := l.Load(file, "")
@@ -108,9 +96,7 @@ func TestGlobalConfigNotExist(t *testing.T) {
 }
 
 func TestDecodeError(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 	file := path.Join(testDir, "config_err_decode.yaml")
 	_, err := l.Load(file, "")
 	require.Error(t, err)

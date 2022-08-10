@@ -29,18 +29,14 @@ func TestMain(m *testing.M) {
 }
 
 func TestAssertDefinition(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 
 	_, err := l.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("at least one step must be specified"))
 }
 
 func TestAssertStepDefinition(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 
 	_, err := l.Load(path.Join(testDir, "config_err_step_no_name.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("step name must be specified"))
@@ -50,9 +46,7 @@ func TestAssertStepDefinition(t *testing.T) {
 }
 
 func TestConfigReadClone(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 
 	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
@@ -62,9 +56,7 @@ func TestConfigReadClone(t *testing.T) {
 }
 
 func TestToString(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 
 	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
@@ -93,9 +85,7 @@ func TestReadConfig(t *testing.T) {
 }
 
 func TestConfigLoadHeadOnly(t *testing.T) {
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 
 	cfg, err := l.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
 	require.NoError(t, err)
@@ -113,9 +103,7 @@ func TestLoadInvalidConfigError(t *testing.T) {
 		`params: "` + "`ech foo`" + `"`,
 		`schedule: "` + "1" + `"`,
 	} {
-		l := &Loader{
-			HomeDir: utils.MustGetUserHomeDir(),
-		}
+		l := &Loader{}
 		d, err := l.unmarshalData([]byte(c))
 		require.NoError(t, err)
 
@@ -154,9 +142,7 @@ func TestLoadEnv(t *testing.T) {
 			"FOO", "BAR:BAZ:BAR:FOO",
 		},
 	} {
-		l := &Loader{
-			HomeDir: utils.MustGetUserHomeDir(),
-		}
+		l := &Loader{}
 		d, err := l.unmarshalData([]byte(c.val))
 		require.NoError(t, err)
 
@@ -225,9 +211,7 @@ func TestParseParameter(t *testing.T) {
 			},
 		},
 	} {
-		l := &Loader{
-			HomeDir: utils.MustGetUserHomeDir(),
-		}
+		l := &Loader{}
 		d, err := l.unmarshalData([]byte(fmt.Sprintf(`
 env:
   - %s
@@ -260,9 +244,7 @@ func TestExpandEnv(t *testing.T) {
 func TestTags(t *testing.T) {
 	tags := "Daily, Monthly"
 	wants := []string{"daily", "monthly"}
-	l := &Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	l := &Loader{}
 	d, err := l.unmarshalData([]byte(fmt.Sprintf(`
 tags: %s
   	`, tags)))
@@ -304,9 +286,7 @@ func TestSchedule(t *testing.T) {
 			Err: true,
 		},
 	} {
-		l := &Loader{
-			HomeDir: utils.MustGetUserHomeDir(),
-		}
+		l := &Loader{}
 		d, err := l.unmarshalData([]byte(test.Def))
 		require.NoError(t, err)
 
@@ -332,7 +312,7 @@ func TestSockAddr(t *testing.T) {
 }
 
 func TestOverwriteGlobalConfig(t *testing.T) {
-	l := &Loader{HomeDir: utils.MustGetUserHomeDir()}
+	l := &Loader{BaseConfig: settings.MustGet(settings.SETTING__BASE_CONFIG)}
 
 	cfg, err := l.Load(path.Join(testDir, "config_overwrite.yaml"), "")
 	require.NoError(t, err)
