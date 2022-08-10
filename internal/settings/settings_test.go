@@ -68,4 +68,11 @@ func TestReadSetting(t *testing.T) {
 
 	_, err := Get("Invalid_Name")
 	require.Equal(t, ErrSettingNotFound, err)
+
+	// check $DAGU_HOME
+	os.Setenv("DAGU_HOME", "/home/dagu")
+	load()
+
+	require.Equal(t, MustGet(SETTING__HOME), "/home/dagu")
+	require.Equal(t, MustGet(SETTING__ADMIN_CONFIG), "/home/dagu/admin.yaml")
 }

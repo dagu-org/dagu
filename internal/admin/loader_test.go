@@ -1,24 +1,21 @@
 package admin
 
 import (
-	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 var testsConfig = path.Join(testsDir, "admin.yaml")
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	home, err := os.UserHomeDir()
-	require.NoError(t, err)
 	testConfig(t, cfg, &testWant{
 		Host:    "127.0.0.1",
 		Port:    "8080",
-		DAGs:    path.Join(home, ".dagu/dags"),
+		DAGs:    settings.MustGet(settings.SETTING__ADMIN_DAGS_DIR),
 		Command: "dagu",
 	})
 }
@@ -29,8 +26,7 @@ func TestHomeAdminConfig(t *testing.T) {
 	_, err := l.LoadAdminConfig("no-existing-file.yaml")
 	require.Equal(t, ErrConfigNotFound, err)
 
-	cfg, err := l.LoadAdminConfig(
-		path.Join(utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
+	cfg, err := l.LoadAdminConfig(settings.MustGet(settings.SETTING__ADMIN_CONFIG))
 	require.NoError(t, err)
 
 	testConfig(t, cfg, &testWant{

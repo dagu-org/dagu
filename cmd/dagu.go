@@ -6,14 +6,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path"
 	"syscall"
 
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu/internal/admin"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagu/internal/settings"
 )
 
 var (
@@ -75,8 +74,7 @@ func makeApp() *cli.App {
 		},
 		Before: func(c *cli.Context) error {
 			l := &admin.Loader{}
-			cfg, err := l.LoadAdminConfig(path.Join(
-				utils.MustGetUserHomeDir(), ".dagu/admin.yaml"))
+			cfg, err := l.LoadAdminConfig(settings.MustGet(settings.SETTING__ADMIN_CONFIG))
 			if err == admin.ErrConfigNotFound {
 				cfg = admin.DefaultConfig()
 				err = nil
