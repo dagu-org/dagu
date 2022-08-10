@@ -16,6 +16,7 @@ const (
 	SETTING__DATA_DIR           = "DAGU__DATA"
 	SETTING__LOGS_DIR           = "DAGU__LOGS"
 	SETTING__SUSPEND_FLAGS_DIR  = "DAGU__SUSPEND_FLAGS_DIR"
+	SETTING__BASE_CONFIG        = "DAGU__BASE_CONFIG"
 	SETTING__ADMIN_PORT         = "DAGU__ADMIN_PORT"
 	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
@@ -57,7 +58,9 @@ func init() {
 func load() {
 	homeDir := utils.MustGetUserHomeDir()
 
-	cache = map[string]string{}
+	cache = map[string]string{
+		SETTING__BASE_CONFIG: path.Join(homeDir, "/.dagu/config.yaml"),
+	}
 
 	cacheEnv(SETTING__DATA_DIR, path.Join(homeDir, "/.dagu/data"))
 	cacheEnv(SETTING__LOGS_DIR, path.Join(homeDir, "/.dagu/logs"))

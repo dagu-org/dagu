@@ -23,6 +23,7 @@ type Config struct {
 	BasicAuthPassword  string
 	LogEncodingCharset string
 	LogDir             string
+	BaseConfig         string
 }
 
 func (cfg *Config) Init() {
@@ -62,6 +63,7 @@ func buildFromDefinition(def *configDefinition) (cfg *Config, err error) {
 		buildWorkDir,
 		buildBasicAuthOpts,
 		buidEncodingOpts,
+		buildBaseConfig,
 	} {
 		if err := fn(cfg, def); err != nil {
 			return nil, err
@@ -105,6 +107,14 @@ func buildDAGsDir(cfg *Config, def *configDefinition) (err error) {
 		}
 	}
 	return err
+}
+
+func buildBaseConfig(cfg *Config, def *configDefinition) (err error) {
+	cfg.BaseConfig = strings.TrimSpace(def.BaseConfig)
+	if cfg.BaseConfig == "" {
+		cfg.BaseConfig = settings.MustGet(settings.SETTING__BASE_CONFIG)
+	}
+	return nil
 }
 
 func buildCommand(cfg *Config, def *configDefinition) (err error) {

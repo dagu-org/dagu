@@ -290,9 +290,7 @@ func testDAG(t *testing.T, cfg *config.Config) (*models.Status, error) {
 
 func testLoadDAG(t *testing.T, name string) *config.Config {
 	file := path.Join(testsDir, name)
-	cl := &config.Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	cl := &config.Loader{}
 	cfg, err := cl.Load(file, "")
 	require.NoError(t, err)
 	return cfg

@@ -25,29 +25,43 @@ func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 		return nil, ErrConfigNotFound
 	}
 
-	raw, err := cl.load(file)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		raw map[string]interface{} = nil
+		def *configDefinition      = nil
+		cfg *Config                = nil
+	)
 
-	def, err := cl.decode(raw)
-	if err != nil {
-		return nil, err
-	}
+	for _, fn := range []func() error{
+		func() (err error) {
+			raw, err = cl.load(file)
+			return err
+		},
+		func() (err error) {
+			def, err = cl.decode(raw)
+			return err
+		},
+		func() (err error) {
+			if def.Env == nil {
+				def.Env = map[string]string{}
+			}
 
-	if def.Env == nil {
-		def.Env = map[string]string{}
-	}
-	for k, v := range utils.DefaultEnv() {
-		if _, ok := def.Env[v]; !ok {
-			def.Env[k] = v
+			for k, v := range utils.DefaultEnv() {
+				if _, ok := def.Env[v]; !ok {
+					def.Env[k] = v
+				}
+			}
+			return nil
+		},
+		func() (err error) {
+			cfg, err = buildFromDefinition(def)
+			return err
+		},
+	} {
+		if err := fn(); err != nil {
+			return nil, err
 		}
 	}
 
-	cfg, err := buildFromDefinition(def)
-	if err != nil {
-		return nil, err
-	}
 	cfg.setup()
 	return cfg, nil
 }

@@ -293,9 +293,7 @@ func TestNewConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// check file
-	cl := &config.Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	cl := &config.Loader{}
 
 	cfg, err := cl.Load(filename, "")
 	require.NoError(t, err)

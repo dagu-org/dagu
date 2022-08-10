@@ -4,6 +4,7 @@ type configDefinition struct {
 	Host               string
 	Port               int
 	Env                map[string]string
+	BaseConfig         string
 	Dags               string
 	Command            string
 	WorkDir            string

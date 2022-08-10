@@ -5,9 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/yohamta/dagu"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/utils"
 
 	"github.com/urfave/cli/v2"
 )
@@ -33,9 +31,6 @@ func newRetryCommand() *cli.Command {
 }
 
 func retry(f, requestId string) error {
-	cl := &config.Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
 	db := database.Database{
 		Config: database.DefaultConfig(),
 	}
@@ -43,8 +38,7 @@ func retry(f, requestId string) error {
 	if err != nil {
 		return err
 	}
-
-	cfg, err := cl.Load(f, status.Status.Params)
+	cfg, err := loadDAG(f, status.Status.Params)
 	if err != nil {
 		return err
 	}

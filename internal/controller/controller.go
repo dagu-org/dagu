@@ -229,9 +229,7 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 
 func (c *controller) Save(value string) error {
 	// validate
-	cl := config.Loader{
-		HomeDir: utils.MustGetUserHomeDir(),
-	}
+	cl := config.Loader{}
 	_, err := cl.LoadData([]byte(value))
 	if err != nil {
 		return err

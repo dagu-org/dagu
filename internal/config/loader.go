@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -21,7 +20,7 @@ var ErrConfigNotFound = errors.New("config file was not found")
 
 // Loader is a config loader.
 type Loader struct {
-	HomeDir string
+	BaseConfig string
 }
 
 // Load loads config from file.
@@ -81,7 +80,7 @@ func (cl *Loader) LoadData(data []byte) (*Config, error) {
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadGlobalConfig(file string, opts *BuildConfigOptions) (*Config, error) {
+func (cl *Loader) loadBaseConfig(file string, opts *BuildConfigOptions) (*Config, error) {
 	if !utils.FileExists(file) {
 		return nil, nil
 	}
@@ -119,9 +118,8 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 
 	var dst *Config = nil
 
-	if !opts.headOnly {
-		file := path.Join(cl.HomeDir, ".dagu/config.yaml")
-		dst, err = cl.loadGlobalConfig(file, opts)
+	if !opts.headOnly && cl.BaseConfig != "" {
+		dst, err = cl.loadBaseConfig(cl.BaseConfig, opts)
 		if err != nil {
 			return nil, err
 		}
