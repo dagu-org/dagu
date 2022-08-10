@@ -16,10 +16,17 @@ import (
 )
 
 var (
-	version      = "0.0.0"
-	stdin        io.ReadCloser
-	sigs         chan os.Signal
-	globalConfig *admin.Config
+	version     = "0.0.0"
+	stdin       io.ReadCloser
+	sigs        chan os.Signal
+	globalFlags = []cli.Flag{
+		&cli.StringFlag{
+			Name:     "config",
+			Usage:    "Admin config",
+			Value:    "",
+			Required: false,
+		},
+	}
 )
 
 func main() {
@@ -30,10 +37,31 @@ func main() {
 	}
 }
 
-func loadDAG(dagPath, params string) (cfg *config.Config, err error) {
-	cl := &config.Loader{BaseConfig: globalConfig.BaseConfig}
-	cfg, err = cl.Load(dagPath, params)
-	return
+func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
+	l := &admin.Loader{}
+	cfgFile := c.String("config")
+	if cfgFile == "" {
+		cfgFile = settings.MustGet(settings.SETTING__ADMIN_CONFIG)
+	}
+	cfg, err = l.LoadAdminConfig(cfgFile)
+	if err == admin.ErrConfigNotFound {
+		cfg = admin.DefaultConfig()
+		err = nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("loading admin config failed: %w", err)
+	}
+	return cfg, err
+}
+
+func loadDAG(c *cli.Context, dagPath, params string) (dag *config.Config, err error) {
+	cfg, err := loadGlobalConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	cl := &config.Loader{BaseConfig: cfg.BaseConfig}
+	dag, err = cl.Load(dagPath, params)
+	return dag, err
 }
 
 func listenSignals(abortFunc func(sig os.Signal)) {
@@ -71,19 +99,6 @@ func makeApp() *cli.App {
 			newServerCommand(),
 			newSchedulerCommand(),
 			newVersionCommand(),
-		},
-		Before: func(c *cli.Context) error {
-			l := &admin.Loader{}
-			cfg, err := l.LoadAdminConfig(settings.MustGet(settings.SETTING__ADMIN_CONFIG))
-			if err == admin.ErrConfigNotFound {
-				cfg = admin.DefaultConfig()
-				err = nil
-			}
-			if err != nil {
-				return fmt.Errorf("loading admin config failed: %w", err)
-			}
-			globalConfig = cfg
-			return nil
 		},
 	}
 }

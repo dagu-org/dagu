@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"testing"
 )
 
@@ -22,7 +24,16 @@ func Test_startCommand(t *testing.T) {
 			args: []string{"", "start", testConfig("cmd_start_success")}, errored: false,
 			output: []string{"1 finished"},
 		},
+		{
+			args: []string{"", "start",
+				fmt.Sprintf("--config=%s", testConfig("cmd_start_global_config.yaml")),
+				testConfig("cmd_start_global_config_check.yaml")}, errored: false,
+			output: []string{"GLOBAL_ENV_VAR"},
+		},
 	}
+
+	// For testing --config parameter we need to set the environment variable for now.
+	os.Setenv("TEST_CONFIG_BASE", testsDir)
 
 	for _, v := range tests {
 		app := makeApp()
