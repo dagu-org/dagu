@@ -21,9 +21,7 @@ func newDryCommand() *cli.Command {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			config_file_path := c.Args().Get(0)
-			cl := &config.Loader{BaseConfig: globalConfig.BaseConfig}
-			cfg, err := cl.Load(config_file_path, c.String("params"))
+			cfg, err := loadDAG(c.Args().Get(0), c.String("params"))
 			if err != nil {
 				return err
 			}
