@@ -19,6 +19,7 @@ basicAuthUsername: user
 basicAuthPassword: password
 logEncodingCharset: utf-8
 logDir: /var/log/dagu
+baseConfig: /dagu/config.yaml
 `
 
 func TestLoadConfig(t *testing.T) {
@@ -40,6 +41,7 @@ func TestLoadConfig(t *testing.T) {
 				LogEncodingCharset: "utf-8",
 				Env:                []string{},
 				LogDir:             "/var/log/dagu",
+				BaseConfig:         "/dagu/config.yaml",
 			},
 		},
 		{
@@ -57,6 +59,7 @@ func TestLoadConfig(t *testing.T) {
 				Env:                []string{},
 				LogDir: settings.MustGet(
 					settings.SETTING__ADMIN_LOGS_DIR),
+				BaseConfig: settings.MustGet(settings.SETTING__BASE_CONFIG),
 			},
 		},
 	} {
