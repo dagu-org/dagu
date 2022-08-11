@@ -1,11 +1,11 @@
-import { Config } from './Config';
+import { DAG } from './DAG';
 import { SchedulerStatus, Status } from './Status';
 import cronParser from 'cron-parser';
 
 export type DAGStatus = {
   File: string;
   Dir: string;
-  DAG: Config;
+  DAG: DAG;
   Status?: Status;
 	Suspended: boolean;
   ErrorT: string;
