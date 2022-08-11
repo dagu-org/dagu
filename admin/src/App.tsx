@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './components/layouts/Layout';
-import Dashboard from './pages/Dashboard';
-import DAGDetails from './pages/DAGDetails';
-import DAGList from './pages/DAGList';
+import Layout from './Layout';
+import Dashboard from './pages';
+import DAGDetails from './pages/dags/dag';
+import DAGs from './pages/dags';
 import { AppBarContext } from './contexts/AppBarContext';
 
 export type Config = {
@@ -28,8 +28,8 @@ function App({ config }: Props) {
         <Layout {...config}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="" element={<DAGList />} />
-            <Route path="/dags/" element={<DAGList />} />
+            <Route path="" element={<DAGs />} />
+            <Route path="/dags/" element={<DAGs />} />
             <Route path="/dags/:name" element={<DAGDetails />} />
           </Routes>
         </Layout>
