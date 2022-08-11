@@ -134,23 +134,6 @@ const defaultColumns = [
     },
   }),
   table.createDataColumn('Type', {
-    id: 'Type',
-    header: 'Type',
-    cell: (props) => {
-      const data = props.row.original!;
-      if (data.Type == DAGDataType.Group) {
-        return <Chip color="secondary" size="small" label="Group" />;
-      } else {
-        return <Chip color="primary" size="small" label="DAG" />;
-      }
-    },
-    sortingFn: (a, b) => {
-      const dataA = a.original;
-      const dataB = b.original;
-      return dataA!.Type - dataB!.Type;
-    },
-  }),
-  table.createDataColumn('Type', {
     id: 'Tags',
     header: 'Tags',
     cell: (props) => {
