@@ -33,7 +33,7 @@ import {
   DAGItem,
   DAGDataType,
   getNextSchedule,
-} from '../models/DAGData';
+} from '../models';
 import StyledTableRow from './StyledTableRow';
 import {
   ArrowDownward,

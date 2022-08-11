@@ -1,5 +1,5 @@
 import React from 'react';
-import { Config } from '../models/Config';
+import { Config } from '../models';
 import { Stack, Box, Chip } from '@mui/material';
 import LabeledItem from './LabeledItem';
 

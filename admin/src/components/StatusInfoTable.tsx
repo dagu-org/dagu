@@ -1,6 +1,6 @@
 import React from 'react';
-import { Status } from '../models/Status';
-import { DetailTabId } from '../models/DAGData';
+import { Status } from '../models';
+import { DetailTabId } from '../models';
 import StatusChip from './StatusChip';
 import { Stack } from '@mui/material';
 import LabeledItem from './LabeledItem';

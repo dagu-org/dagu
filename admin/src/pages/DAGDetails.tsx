@@ -4,7 +4,7 @@ import { GetDAGResponse } from '../api/DAG';
 import ConfigErrors from '../components/ConfigErrors';
 import DAGStatus from '../components/DAGStatus';
 import { DAGContext } from '../contexts/DAGContext';
-import { DetailTabId } from '../models/DAGData';
+import { DetailTabId } from '../models';
 import DAGConfig from '../components/DAGConfig';
 import DAGHistory from '../components/DAGHistory';
 import DAGLog from '../components/DAGLog';

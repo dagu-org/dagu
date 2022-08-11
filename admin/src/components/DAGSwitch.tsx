@@ -1,6 +1,6 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { DAGStatus } from '../models/DAGData';
+import { DAGStatus } from '../models';
 
 type Props = {
   DAG: DAGStatus;

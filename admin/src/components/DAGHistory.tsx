@@ -2,7 +2,7 @@ import { Box } from '@mui/material';
 import React from 'react';
 import { LogData } from '../api/DAG';
 import { DAGContext } from '../contexts/DAGContext';
-import { Handlers } from '../models/Status';
+import { Handlers } from '../models';
 import NodeStatusTable from './NodeStatusTable';
 import StatusHistTable from './StatusHistTable';
 import StatusInfoTable from './StatusInfoTable';

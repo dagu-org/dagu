@@ -1,5 +1,5 @@
-import { DAGStatus } from '../models/DAGData';
-import { Group } from '../models/Group';
+import { DAGStatus } from '../models';
+import { Group } from '../models';
 
 export type GetDAGsResponse = {
   Title: string;

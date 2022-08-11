@@ -1,6 +1,6 @@
 import { CSSProperties } from 'react';
-import { NodeStatus } from './models/Node';
-import { SchedulerStatus } from './models/Status';
+import { NodeStatus } from './models';
+import { SchedulerStatus } from './models';
 
 type statusColorMapping = {
   [key: number]: CSSProperties;

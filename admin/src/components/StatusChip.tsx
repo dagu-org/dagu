@@ -1,7 +1,7 @@
 import { Chip } from '@mui/material';
 import React from 'react';
 import { statusColorMapping } from '../consts';
-import { SchedulerStatus } from '../models/Status';
+import { SchedulerStatus } from '../models';
 
 type Props = {
   status?: SchedulerStatus;

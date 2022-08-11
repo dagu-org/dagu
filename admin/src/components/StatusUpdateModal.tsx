@@ -1,5 +1,5 @@
 import React from 'react';
-import { Step } from '../models/Step';
+import { Step } from '../models';
 
 type Props = {
   visible: boolean;

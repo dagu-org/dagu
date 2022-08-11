@@ -1,5 +1,5 @@
 import React from 'react';
-import { DAGStatus } from '../models/DAGData';
+import { DAGStatus } from '../models';
 
 type Props = {
   DAGs: DAGStatus[];

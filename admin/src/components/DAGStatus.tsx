@@ -1,14 +1,14 @@
 import React from 'react';
 import { DAGContext } from '../contexts/DAGContext';
-import { DAGStatus } from '../models/DAGData';
-import { Handlers, SchedulerStatus } from '../models/Status';
+import { DAGStatus } from '../models';
+import { Handlers, SchedulerStatus } from '../models';
 import Graph from './Graph';
 import NodeStatusTable from './NodeStatusTable';
 import StatusInfoTable from './StatusInfoTable';
 import Timeline from './Timeline';
 import { useDAGPostAPI } from '../hooks/useDAGPostAPI';
 import StatusUpdateModal from './StatusUpdateModal';
-import { Step } from '../models/Step';
+import { Step } from '../models';
 import { Box, Tab, Tabs } from '@mui/material';
 import SubTitle from './SubTitle';
 import BorderedBox from './BorderedBox';
