@@ -22,18 +22,18 @@ func newStartCommand() *cli.Command {
 			},
 		),
 		Action: func(c *cli.Context) error {
-			cfg, err := loadDAG(c, c.Args().Get(0), c.String("params"))
+			d, err := loadDAG(c, c.Args().Get(0), c.String("params"))
 			if err != nil {
 				return err
 			}
-			return start(cfg)
+			return start(d)
 		},
 	}
 }
 
-func start(cfg *dag.DAG) error {
+func start(d *dag.DAG) error {
 	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
-		DAG: cfg,
+		DAG: d,
 		Dry: false,
 	}}
 

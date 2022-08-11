@@ -49,15 +49,15 @@ func TestDatabase(t *testing.T) {
 }
 
 func testNewDataFile(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		ConfigPath: "test_new_data_file.yaml",
 	}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
 	requestId := "request-id-1"
-	f, err := db.newFile(cfg.ConfigPath, timestamp, requestId)
+	f, err := db.newFile(d.ConfigPath, timestamp, requestId)
 	require.NoError(t, err)
 	p := utils.ValidFilename(strings.TrimSuffix(
-		path.Base(cfg.ConfigPath), path.Ext(cfg.ConfigPath)), "_")
+		path.Base(d.ConfigPath), path.Ext(d.ConfigPath)), "_")
 	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
 
 	_, err = db.newFile("", timestamp, requestId)
@@ -65,11 +65,11 @@ func testNewDataFile(t *testing.T, db *Database) {
 }
 
 func testWriteAndFindFiles(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		Name:       "test_read_status_n",
 		ConfigPath: "test_data_files_n.yaml",
 	}
-	defer db.RemoveAll(cfg.ConfigPath)
+	defer db.RemoveAll(d.ConfigPath)
 
 	for _, data := range []struct {
 		Status    *models.Status
@@ -77,36 +77,36 @@ func testWriteAndFindFiles(t *testing.T, db *Database) {
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
 		status := data.Status
 		status.RequestId = data.RequestId
-		testWriteStatus(t, db, cfg, status, data.Timestamp)
+		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
-	files := db.latest(db.pattern(cfg.ConfigPath)+"*.dat", 2)
+	files := db.latest(db.pattern(d.ConfigPath)+"*.dat", 2)
 	require.Equal(t, 2, len(files))
 }
 
 func testWriteAndFindByRequestId(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		Name:       "test_find_by_request_id",
 		ConfigPath: "test_find_by_request_id.yaml",
 	}
-	defer db.RemoveAll(cfg.ConfigPath)
+	defer db.RemoveAll(d.ConfigPath)
 
 	for _, data := range []struct {
 		Status    *models.Status
@@ -114,37 +114,37 @@ func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
 		status := data.Status
 		status.RequestId = data.RequestId
-		testWriteStatus(t, db, cfg, status, data.Timestamp)
+		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
-	status, err := db.FindByRequestId(cfg.ConfigPath, "request-id-2")
+	status, err := db.FindByRequestId(d.ConfigPath, "request-id-2")
 	require.NoError(t, err)
 	require.Equal(t, status.Status.RequestId, "request-id-2")
 
-	status, err = db.FindByRequestId(cfg.ConfigPath, "request-id-10000")
+	status, err = db.FindByRequestId(d.ConfigPath, "request-id-10000")
 	require.Error(t, err)
 	require.Nil(t, status)
 }
 
 func testRemoveOldFiles(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		ConfigPath: "test_remove_old.yaml",
 	}
 
@@ -154,32 +154,32 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
 		status := data.Status
 		status.RequestId = data.RequestId
-		testWriteStatus(t, db, cfg, data.Status, data.Timestamp)
+		testWriteStatus(t, db, d, data.Status, data.Timestamp)
 	}
 
-	files := db.latest(db.pattern(cfg.ConfigPath)+"*.dat", 3)
+	files := db.latest(db.pattern(d.ConfigPath)+"*.dat", 3)
 	require.Equal(t, 3, len(files))
 
-	db.RemoveOld(cfg.ConfigPath, 0)
+	db.RemoveOld(d.ConfigPath, 0)
 
-	files = db.latest(db.pattern(cfg.ConfigPath)+"*.dat", 3)
+	files = db.latest(db.pattern(d.ConfigPath)+"*.dat", 3)
 	require.Equal(t, 0, len(files))
 
 	m := db.latest("invalid-pattern", 3)
@@ -187,24 +187,24 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 }
 
 func testReadLatestStatus(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		ConfigPath: "test_config_status_reader.yaml",
 	}
 	requestId := "request-id-1"
-	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now(), requestId)
+	dw, _, err := db.NewWriter(d.ConfigPath, time.Now(), requestId)
 	require.NoError(t, err)
 	err = dw.Open()
 	require.NoError(t, err)
 	defer dw.Close()
 
-	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil)
+	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil)
 	dw.Write(status)
 
 	status.Status = scheduler.SchedulerStatus_Success
 	status.Pid = 20000
 	dw.Write(status)
 
-	ret, err := db.ReadStatusToday(cfg.ConfigPath)
+	ret, err := db.ReadStatusToday(d.ConfigPath)
 
 	require.NoError(t, err)
 	require.NotNil(t, ret)
@@ -214,7 +214,7 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 }
 
 func testReadStatusN(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		Name:       "test_read_status_n",
 		ConfigPath: "test_config_status_reader_hist.yaml",
 	}
@@ -225,43 +225,43 @@ func testReadStatusN(t *testing.T, db *Database) {
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(cfg, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
 	} {
 		status := data.Status
 		status.RequestId = data.RequestId
-		testWriteStatus(t, db, cfg, data.Status, data.Timestamp)
+		testWriteStatus(t, db, d, data.Status, data.Timestamp)
 	}
 
 	recordMax := 2
 
-	ret := db.ReadStatusHist(cfg.ConfigPath, recordMax)
+	ret := db.ReadStatusHist(d.ConfigPath, recordMax)
 
 	require.Equal(t, recordMax, len(ret))
-	require.Equal(t, cfg.Name, ret[0].Status.Name)
-	require.Equal(t, cfg.Name, ret[1].Status.Name)
+	require.Equal(t, d.Name, ret[0].Status.Name)
+	require.Equal(t, d.Name, ret[1].Status.Name)
 }
 
 func testCompactFile(t *testing.T, db *Database) {
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		Name:       "test_compact_file",
 		ConfigPath: "test_compact_file.yaml",
 	}
 	requestId := "request-id-1"
 
-	dw, _, err := db.NewWriter(cfg.ConfigPath, time.Now(), requestId)
+	dw, _, err := db.NewWriter(d.ConfigPath, time.Now(), requestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
@@ -269,11 +269,11 @@ func testCompactFile(t *testing.T, db *Database) {
 		Status *models.Status
 	}{
 		{models.NewStatus(
-			cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)},
+			d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)},
 		{models.NewStatus(
-			cfg, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)},
+			d, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)},
 		{models.NewStatus(
-			cfg, nil, scheduler.SchedulerStatus_Success, 10000, nil, nil)},
+			d, nil, scheduler.SchedulerStatus_Success, 10000, nil, nil)},
 	} {
 		require.NoError(t, dw.Write(data.Status))
 	}
@@ -281,7 +281,7 @@ func testCompactFile(t *testing.T, db *Database) {
 	dw.Close()
 
 	var s *models.StatusFile = nil
-	if h := db.ReadStatusHist(cfg.ConfigPath, 1); len(h) > 0 {
+	if h := db.ReadStatusHist(d.ConfigPath, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
@@ -289,12 +289,12 @@ func testCompactFile(t *testing.T, db *Database) {
 	db2 := &Database{
 		Config: db.Config,
 	}
-	err = db2.Compact(cfg.ConfigPath, s.File)
+	err = db2.Compact(d.ConfigPath, s.File)
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)
 
 	var s2 *models.StatusFile = nil
-	if h := db2.ReadStatusHist(cfg.ConfigPath, 1); len(h) > 0 {
+	if h := db2.ReadStatusHist(d.ConfigPath, 1); len(h) > 0 {
 		s2 = h[0]
 	}
 	require.NotNil(t, s2)
@@ -302,7 +302,7 @@ func testCompactFile(t *testing.T, db *Database) {
 	require.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
 	require.Equal(t, s.Status, s2.Status)
 
-	err = db2.Compact(cfg.ConfigPath, "Invalid_file_name.dat")
+	err = db2.Compact(d.ConfigPath, "Invalid_file_name.dat")
 	require.Error(t, err)
 }
 
@@ -346,9 +346,9 @@ func testErrorParseFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 }
 
-func testWriteStatus(t *testing.T, db *Database, cfg *dag.DAG, status *models.Status, tm time.Time) {
+func testWriteStatus(t *testing.T, db *Database, d *dag.DAG, status *models.Status, tm time.Time) {
 	t.Helper()
-	dw, _, err := db.NewWriter(cfg.ConfigPath, tm, status.RequestId)
+	dw, _, err := db.NewWriter(d.ConfigPath, tm, status.RequestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer dw.Close()
@@ -356,8 +356,8 @@ func testWriteStatus(t *testing.T, db *Database, cfg *dag.DAG, status *models.St
 }
 
 func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	require.Equal(t, cfg.Dir, settings.MustGet(settings.SETTING__DATA_DIR))
+	d := DefaultConfig()
+	require.Equal(t, d.Dir, settings.MustGet(settings.SETTING__DATA_DIR))
 }
 
 func TestTimestamp(t *testing.T) {

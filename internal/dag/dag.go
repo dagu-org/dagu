@@ -162,32 +162,32 @@ type builder struct {
 }
 
 type buildStep struct {
-	BuildFn  func(def *configDefinition, cfg *DAG) error
+	BuildFn  func(def *configDefinition, d *DAG) error
 	Headline bool
 }
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *DAG) (cfg *DAG, err error) {
+func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *DAG) (d *DAG, err error) {
 	b.globalConfig = globalConfig
 
-	cfg = &DAG{}
-	cfg.Init()
+	d = &DAG{}
+	d.Init()
 
-	cfg.Name = def.Name
+	d.Name = def.Name
 	if def.Name != "" {
-		cfg.Name = def.Name
+		d.Name = def.Name
 	}
-	cfg.Group = def.Group
-	cfg.Description = def.Description
+	d.Group = def.Group
+	d.Description = def.Description
 	if def.MailOn != nil {
-		cfg.MailOn = &MailOn{
+		d.MailOn = &MailOn{
 			Failure: def.MailOn.Failure,
 			Success: def.MailOn.Success,
 		}
 	}
-	cfg.Delay = time.Second * time.Duration(def.DelaySec)
-	cfg.Tags = parseTags(def.Tags)
+	d.Delay = time.Second * time.Duration(def.DelaySec)
+	d.Tags = parseTags(def.Tags)
 
 	for _, bs := range []buildStep{
 		{
@@ -223,19 +223,19 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *DAG) 
 		},
 	} {
 		if (b.headOnly && bs.Headline) || !b.headOnly {
-			if err = bs.BuildFn(def, cfg); err != nil {
+			if err = bs.BuildFn(def, d); err != nil {
 				return
 			}
 		}
 	}
 
-	return cfg, nil
+	return d, nil
 }
 
-func (b *builder) buildSchedule(def *configDefinition, cfg *DAG) (err error) {
+func (b *builder) buildSchedule(def *configDefinition, d *DAG) (err error) {
 	switch (def.Schedule).(type) {
 	case string:
-		cfg.ScheduleExp = []string{def.Schedule.(string)}
+		d.ScheduleExp = []string{def.Schedule.(string)}
 	case []interface{}:
 		items := []string{}
 		for _, s := range def.Schedule.([]interface{}) {
@@ -245,25 +245,25 @@ func (b *builder) buildSchedule(def *configDefinition, cfg *DAG) (err error) {
 				return fmt.Errorf("schedule must be a string or an array of strings")
 			}
 		}
-		cfg.ScheduleExp = items
+		d.ScheduleExp = items
 	case nil:
 	default:
 		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
 	}
-	cfg.Schedule, err = parseSchedule(cfg.ScheduleExp)
+	d.Schedule, err = parseSchedule(d.ScheduleExp)
 	return
 }
 
-func (b *builder) buildEnvVariables(def *configDefinition, cfg *DAG) (err error) {
+func (b *builder) buildEnvVariables(def *configDefinition, d *DAG) (err error) {
 	var env map[string]string
 	env, err = b.loadVariables(def.Env, b.defaultEnv)
 	if err == nil {
-		cfg.Env = buildConfigEnv(env)
+		d.Env = buildConfigEnv(env)
 		if b.globalConfig != nil {
 			for _, e := range b.globalConfig.Env {
 				key := strings.SplitN(e, "=", 2)[0]
 				if _, ok := env[key]; !ok {
-					cfg.Env = append(cfg.Env, e)
+					d.Env = append(d.Env, e)
 				}
 			}
 		}
@@ -271,65 +271,65 @@ func (b *builder) buildEnvVariables(def *configDefinition, cfg *DAG) (err error)
 	return
 }
 
-func (b *builder) buildLogdir(def *configDefinition, cfg *DAG) (err error) {
-	cfg.LogDir, err = utils.ParseVariable(def.LogDir)
+func (b *builder) buildLogdir(def *configDefinition, d *DAG) (err error) {
+	d.LogDir, err = utils.ParseVariable(def.LogDir)
 	return err
 }
 
-func (b *builder) buildParameters(def *configDefinition, cfg *DAG) (err error) {
-	cfg.DefaultParams = def.Params
-	p := cfg.DefaultParams
+func (b *builder) buildParameters(def *configDefinition, d *DAG) (err error) {
+	d.DefaultParams = def.Params
+	p := d.DefaultParams
 	if b.parameters != "" {
 		p = b.parameters
 	}
 	var envs []string
-	cfg.Params, envs, err = b.parseParameters(p, !b.noEval)
+	d.Params, envs, err = b.parseParameters(p, !b.noEval)
 	if err == nil {
-		cfg.Env = append(cfg.Env, envs...)
+		d.Env = append(d.Env, envs...)
 	}
 	return
 }
 
-func (b *builder) buildHandlers(def *configDefinition, cfg *DAG) (err error) {
+func (b *builder) buildHandlers(def *configDefinition, d *DAG) (err error) {
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
-		if cfg.HandlerOn.Exit, err = b.buildStep(cfg.Env, def.HandlerOn.Exit); err != nil {
+		if d.HandlerOn.Exit, err = b.buildStep(d.Env, def.HandlerOn.Exit); err != nil {
 			return err
 		}
 	}
 
 	if def.HandlerOn.Success != nil {
 		def.HandlerOn.Success.Name = constants.OnSuccess
-		if cfg.HandlerOn.Success, err = b.buildStep(cfg.Env, def.HandlerOn.Success); err != nil {
+		if d.HandlerOn.Success, err = b.buildStep(d.Env, def.HandlerOn.Success); err != nil {
 			return
 		}
 	}
 
 	if def.HandlerOn.Failure != nil {
 		def.HandlerOn.Failure.Name = constants.OnFailure
-		if cfg.HandlerOn.Failure, err = b.buildStep(cfg.Env, def.HandlerOn.Failure); err != nil {
+		if d.HandlerOn.Failure, err = b.buildStep(d.Env, def.HandlerOn.Failure); err != nil {
 			return
 		}
 	}
 
 	if def.HandlerOn.Cancel != nil {
 		def.HandlerOn.Cancel.Name = constants.OnCancel
-		if cfg.HandlerOn.Cancel, err = b.buildStep(cfg.Env, def.HandlerOn.Cancel); err != nil {
+		if d.HandlerOn.Cancel, err = b.buildStep(d.Env, def.HandlerOn.Cancel); err != nil {
 			return
 		}
 	}
 	return nil
 }
 
-func (b *builder) buildConfig(def *configDefinition, cfg *DAG) (err error) {
+func (b *builder) buildConfig(def *configDefinition, d *DAG) (err error) {
 	if def.HistRetentionDays != nil {
-		cfg.HistRetentionDays = *def.HistRetentionDays
+		d.HistRetentionDays = *def.HistRetentionDays
 	}
-	cfg.Preconditions = loadPreCondition(def.Preconditions)
-	cfg.MaxActiveRuns = def.MaxActiveRuns
+	d.Preconditions = loadPreCondition(def.Preconditions)
+	d.MaxActiveRuns = def.MaxActiveRuns
 
 	if def.MaxCleanUpTimeSec != nil {
-		cfg.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
+		d.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
 	}
 	return nil
 }
@@ -435,16 +435,16 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 	return vars, nil
 }
 
-func (b *builder) buildStepsFromDefinition(def *configDefinition, cfg *DAG) error {
+func (b *builder) buildStepsFromDefinition(def *configDefinition, d *DAG) error {
 	ret := []*Step{}
 	for _, stepDef := range def.Steps {
-		step, err := b.buildStep(cfg.Env, stepDef)
+		step, err := b.buildStep(d.Env, stepDef)
 		if err != nil {
 			return err
 		}
 		ret = append(ret, step)
 	}
-	cfg.Steps = ret
+	d.Steps = ret
 	return nil
 }
 
@@ -490,30 +490,30 @@ func (b *builder) expandEnv(val string) string {
 	return os.ExpandEnv(val)
 }
 
-func buildSmtpConfigFromDefinition(def *configDefinition, cfg *DAG) (err error) {
+func buildSmtpConfigFromDefinition(def *configDefinition, d *DAG) (err error) {
 	smtp := &SmtpConfig{}
 	smtp.Host = def.Smtp.Host
 	smtp.Port = def.Smtp.Port
-	cfg.Smtp = smtp
+	d.Smtp = smtp
 	return nil
 }
 
-func buildErrorMailConfig(def *configDefinition, cfg *DAG) (err error) {
-	cfg.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
+func buildErrorMailConfig(def *configDefinition, d *DAG) (err error) {
+	d.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
 	return
 }
 
-func buildInfoMailConfig(def *configDefinition, cfg *DAG) (err error) {
-	cfg.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
+func buildInfoMailConfig(def *configDefinition, d *DAG) (err error) {
+	d.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
 	return
 }
 
 func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
-	cfg := &MailConfig{}
-	cfg.From = def.From
-	cfg.To = def.To
-	cfg.Prefix = def.Prefix
-	return cfg, nil
+	d := &MailConfig{}
+	d.From = def.From
+	d.To = def.To
+	d.Prefix = def.Prefix
+	return d, nil
 }
 
 func buildConfigEnv(vars map[string]string) []string {

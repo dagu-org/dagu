@@ -16,17 +16,17 @@ func newStatusCommand() *cli.Command {
 		Usage: "dagu status <DAG file>",
 		Flags: globalFlags,
 		Action: func(c *cli.Context) error {
-			cfg, err := loadDAG(c, c.Args().Get(0), "")
+			d, err := loadDAG(c, c.Args().Get(0), "")
 			if err != nil {
 				return err
 			}
-			return queryStatus(cfg)
+			return queryStatus(d)
 		},
 	}
 }
 
-func queryStatus(cfg *dag.DAG) error {
-	status, err := controller.New(cfg).GetStatus()
+func queryStatus(d *dag.DAG) error {
+	status, err := controller.New(d).GetStatus()
 	if err != nil {
 		return err
 	}

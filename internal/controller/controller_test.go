@@ -243,12 +243,12 @@ func TestRetry(t *testing.T) {
 func TestSave(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
 	defer os.RemoveAll(tmpDir)
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		Name:       "test",
 		ConfigPath: path.Join(tmpDir, "test.yaml"),
 	}
 
-	c := controller.New(cfg)
+	c := controller.New(d)
 
 	// invalid config
 	dat := `name: test DAG`
@@ -265,14 +265,14 @@ steps:
 	require.Error(t, err) // no config file
 
 	// create file
-	f, _ := utils.CreateFile(cfg.ConfigPath)
+	f, _ := utils.CreateFile(d.ConfigPath)
 	defer f.Close()
 
 	err = c.Save(dat)
 	require.NoError(t, err) // no config file
 
 	// check file
-	saved, _ := os.Open(cfg.ConfigPath)
+	saved, _ := os.Open(d.ConfigPath)
 	defer saved.Close()
 	b, _ := io.ReadAll(saved)
 	require.Equal(t, dat, string(b))
@@ -295,11 +295,11 @@ func TestNewConfig(t *testing.T) {
 	// check file
 	cl := &dag.Loader{}
 
-	cfg, err := cl.Load(filename, "")
+	d, err := cl.Load(filename, "")
 	require.NoError(t, err)
-	require.Equal(t, "test", cfg.Name)
+	require.Equal(t, "test", d.Name)
 
-	steps := cfg.Steps[0]
+	steps := d.Steps[0]
 	require.Equal(t, "step1", steps.Name)
 	require.Equal(t, "echo", steps.Command)
 	require.Equal(t, []string{"hello"}, steps.Args)
@@ -322,11 +322,11 @@ func TestRenameConfig(t *testing.T) {
 	require.FileExists(t, newFile)
 }
 
-func newStatus(cfg *dag.DAG, reqId string,
+func newStatus(d *dag.DAG, reqId string,
 	schedulerStatus scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
 	n := time.Now()
 	ret := models.NewStatus(
-		cfg, []*scheduler.Node{
+		d, []*scheduler.Node{
 			{
 				NodeState: scheduler.NodeState{
 					Status: nodeStatus,

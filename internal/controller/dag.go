@@ -39,40 +39,40 @@ type DAG struct {
 // ReadDAG loads DAG from config file.
 func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	cl := dag.Loader{}
-	var cfg *dag.DAG
+	var d *dag.DAG
 	var err error
 	if headOnly {
-		cfg, err = cl.LoadHeadOnly(file)
+		d, err = cl.LoadHeadOnly(file)
 	} else {
-		cfg, err = cl.LoadWithoutEval(file)
+		d, err = cl.LoadWithoutEval(file)
 	}
 	if err != nil {
-		if cfg != nil {
-			return dr.newDAG(cfg, defaultStatus(cfg), err), err
+		if d != nil {
+			return dr.newDAG(d, defaultStatus(d), err), err
 		}
-		cfg := &dag.DAG{ConfigPath: file}
-		cfg.Init()
-		return dr.newDAG(cfg, defaultStatus(cfg), err), err
+		d := &dag.DAG{ConfigPath: file}
+		d.Init()
+		return dr.newDAG(d, defaultStatus(d), err), err
 	}
-	status, err := New(cfg).GetLastStatus()
+	status, err := New(d).GetLastStatus()
 	if err != nil {
 		return nil, err
 	}
 	if !headOnly {
-		if _, err := scheduler.NewExecutionGraph(cfg.Steps...); err != nil {
-			return dr.newDAG(cfg, status, err), err
+		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
+			return dr.newDAG(d, status, err), err
 		}
 	}
-	return dr.newDAG(cfg, status, err), nil
+	return dr.newDAG(d, status, err), nil
 }
 
-func (dr *DAGReader) newDAG(cfg *dag.DAG, s *models.Status, err error) *DAG {
+func (dr *DAGReader) newDAG(d *dag.DAG, s *models.Status, err error) *DAG {
 	ret := &DAG{
-		File:      filepath.Base(cfg.ConfigPath),
-		Dir:       filepath.Dir(cfg.ConfigPath),
-		Config:    cfg,
+		File:      filepath.Base(d.ConfigPath),
+		Dir:       filepath.Dir(d.ConfigPath),
+		Config:    d,
 		Status:    s,
-		Suspended: dr.suspendChecker.IsSuspended(cfg),
+		Suspended: dr.suspendChecker.IsSuspended(d),
 		Error:     err,
 	}
 	if err != nil {

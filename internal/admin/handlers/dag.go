@@ -73,9 +73,9 @@ type dagParameter struct {
 	Step string
 }
 
-func newDAGResponse(cfg string, dag *controller.DAG, tab dagTabType) *dagResponse {
+func newDAGResponse(dagName string, dag *controller.DAG, tab dagTabType) *dagResponse {
 	return &dagResponse{
-		Title:      cfg,
+		Title:      dagName,
 		DAG:        dag,
 		Tab:        tab,
 		Definition: "",
@@ -93,14 +93,14 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "dag")
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		cfg, err := getPathParameter(r)
+		dn, err := getPathParameter(r)
 		if err != nil {
 			encodeError(w, err)
 			return
 		}
 
 		params := getDAGParameter(r)
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGReader()
 		d, err := dr.ReadDAG(file, false)
 		if d == nil {
@@ -108,7 +108,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 			return
 		}
 		c := controller.New(d.Config)
-		data := newDAGResponse(cfg, d, params.Tab)
+		data := newDAGResponse(dn, d, params.Tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
 		}
@@ -169,13 +169,13 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		reqId := r.FormValue("request-id")
 		step := r.FormValue("step")
 
-		cfg, err := getPathParameter(r)
+		dn, err := getPathParameter(r)
 		if err != nil {
 			encodeError(w, err)
 			return
 		}
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGReader()
 		dag, err := dr.ReadDAG(file, false)
 		if err != nil && action != "save" {
@@ -302,7 +302,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, cfg, http.StatusSeeOther)
+		http.Redirect(w, r, dn, http.StatusSeeOther)
 	}
 }
 

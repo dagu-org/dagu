@@ -29,11 +29,10 @@ func TestMain(m *testing.M) {
 }
 
 func TestRunDAG(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_run.yaml")
+	d := testLoadDAG(t, "agent_run.yaml")
+	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
-	a := &Agent{AgentConfig: &AgentConfig{DAG: cfg}}
-
-	status, _ := controller.New(cfg).GetLastStatus()
+	status, _ := controller.New(d).GetLastStatus()
 	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
 
 	go func() {
@@ -44,26 +43,24 @@ func TestRunDAG(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	require.Eventually(t, func() bool {
-		status, err := controller.New(cfg).GetLastStatus()
+		status, err := controller.New(d).GetLastStatus()
 		require.NoError(t, err)
 		return status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*2, time.Millisecond*100)
 
 	// check deletion of expired history files
-	cfg.HistRetentionDays = 0
-	a = &Agent{AgentConfig: &AgentConfig{DAG: cfg}}
+	d.HistRetentionDays = 0
+	a = &Agent{AgentConfig: &AgentConfig{DAG: d}}
 	err := a.Run()
 	require.NoError(t, err)
-	statusList := controller.New(cfg).GetStatusHist(100)
+	statusList := controller.New(d).GetStatusHist(100)
 	require.Equal(t, 1, len(statusList))
 }
 
 func TestCheckRunning(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_is_running.yaml")
+	d := testLoadDAG(t, "agent_is_running.yaml")
 
-	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: cfg,
-	}}
+	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
 	go func() {
 		a.Run()
@@ -75,16 +72,14 @@ func TestCheckRunning(t *testing.T) {
 	require.NotNil(t, status)
 	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
 
-	_, err := testDAG(t, cfg)
+	_, err := testDAG(t, d)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "is already running")
 }
 
 func TestDryRun(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_dry.yaml")
-
 	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: cfg,
+		DAG: testLoadDAG(t, "agent_dry.yaml"),
 		Dry: true,
 	}}
 	err := a.Run()
@@ -101,26 +96,26 @@ func TestCancelDAG(t *testing.T) {
 		func(a *Agent) { a.Signal(syscall.SIGTERM) },
 		func(a *Agent) { a.Cancel() },
 	} {
-		a, cfg := testDAGAsync(t, "agent_sleep.yaml")
+		a, d := testDAGAsync(t, "agent_sleep.yaml")
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
-		status, err := controller.New(cfg).GetLastStatus()
+		status, err := controller.New(d).GetLastStatus()
 		require.NoError(t, err)
 		require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
 	}
 }
 
 func TestPreConditionInvalid(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_multiple_steps.yaml")
-	cfg.Preconditions = []*dag.Condition{
+	d := testLoadDAG(t, "agent_multiple_steps.yaml")
+	d.Preconditions = []*dag.Condition{
 		{
 			Condition: "`echo 1`",
 			Expected:  "0",
 		},
 	}
 
-	status, err := testDAG(t, cfg)
+	status, err := testDAG(t, d)
 	require.Error(t, err)
 
 	require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
@@ -129,15 +124,15 @@ func TestPreConditionInvalid(t *testing.T) {
 }
 
 func TestPreConditionValid(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_with_params.yaml")
+	d := testLoadDAG(t, "agent_with_params.yaml")
 
-	cfg.Preconditions = []*dag.Condition{
+	d.Preconditions = []*dag.Condition{
 		{
 			Condition: "`echo 1`",
 			Expected:  "1",
 		},
 	}
-	status, err := testDAG(t, cfg)
+	status, err := testDAG(t, d)
 	require.NoError(t, err)
 
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
@@ -147,16 +142,16 @@ func TestPreConditionValid(t *testing.T) {
 }
 
 func TestStartError(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_error.yaml")
-	status, err := testDAG(t, cfg)
+	d := testLoadDAG(t, "agent_error.yaml")
+	status, err := testDAG(t, d)
 	require.Error(t, err)
 
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 }
 
 func TestOnExit(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_on_exit.yaml")
-	status, err := testDAG(t, cfg)
+	d := testLoadDAG(t, "agent_on_exit.yaml")
+	status, err := testDAG(t, d)
 	require.NoError(t, err)
 
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
@@ -167,9 +162,9 @@ func TestOnExit(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_retry.yaml")
+	d := testLoadDAG(t, "agent_retry.yaml")
 
-	status, err := testDAG(t, cfg)
+	status, err := testDAG(t, d)
 	require.Error(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 
@@ -178,7 +173,7 @@ func TestRetry(t *testing.T) {
 	}
 	a := &Agent{
 		AgentConfig: &AgentConfig{
-			DAG: cfg,
+			DAG: d,
 		},
 		RetryConfig: &RetryConfig{
 			Status: status,
@@ -198,10 +193,10 @@ func TestRetry(t *testing.T) {
 }
 
 func TestHandleHTTP(t *testing.T) {
-	cfg := testLoadDAG(t, "agent_handle_http.yaml")
+	d := testLoadDAG(t, "agent_handle_http.yaml")
 
 	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: cfg,
+		DAG: d,
 	}}
 
 	go func() {
@@ -279,10 +274,10 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
 }
 
-func testDAG(t *testing.T, cfg *dag.DAG) (*models.Status, error) {
+func testDAG(t *testing.T, d *dag.DAG) (*models.Status, error) {
 	t.Helper()
 	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: cfg,
+		DAG: d,
 	}}
 	err := a.Run()
 	return a.Status(), err
@@ -291,22 +286,22 @@ func testDAG(t *testing.T, cfg *dag.DAG) (*models.Status, error) {
 func testLoadDAG(t *testing.T, name string) *dag.DAG {
 	file := path.Join(testsDir, name)
 	cl := &dag.Loader{}
-	cfg, err := cl.Load(file, "")
+	d, err := cl.Load(file, "")
 	require.NoError(t, err)
-	return cfg
+	return d
 }
 
 func testDAGAsync(t *testing.T, file string) (*Agent, *dag.DAG) {
 	t.Helper()
 
-	cfg := testLoadDAG(t, file)
+	d := testLoadDAG(t, file)
 	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: cfg,
+		DAG: d,
 	}}
 
 	go func() {
 		a.Run()
 	}()
 
-	return a, cfg
+	return a, d
 }

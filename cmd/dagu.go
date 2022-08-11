@@ -13,6 +13,7 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 var (
@@ -39,11 +40,8 @@ func main() {
 
 func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	l := &admin.Loader{}
-	cfgFile := c.String("config")
-	if cfgFile == "" {
-		cfgFile = settings.MustGet(settings.SETTING__ADMIN_CONFIG)
-	}
-	cfg, err = l.LoadAdminConfig(cfgFile)
+	cf := utils.StringWithFallback(c.String("config"), settings.MustGet(settings.SETTING__ADMIN_CONFIG))
+	cfg, err = l.LoadAdminConfig(cf)
 	if err == admin.ErrConfigNotFound {
 		cfg = admin.DefaultConfig()
 		err = nil

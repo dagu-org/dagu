@@ -91,9 +91,9 @@ type controller struct {
 	*dag.DAG
 }
 
-func New(cfg *dag.DAG) Controller {
+func New(d *dag.DAG) Controller {
 	return &controller{
-		DAG: cfg,
+		DAG: d,
 	}
 }
 
@@ -248,9 +248,9 @@ func assertConfigPath(configPath string) error {
 	return nil
 }
 
-func defaultStatus(cfg *dag.DAG) *models.Status {
+func defaultStatus(d *dag.DAG) *models.Status {
 	return models.NewStatus(
-		cfg,
+		d,
 		nil,
 		scheduler.SchedulerStatus_None,
 		int(models.PidNotRunning), nil, nil)

@@ -23,7 +23,7 @@ func TestPid(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	cfg := &dag.DAG{
+	d := &dag.DAG{
 		ConfigPath:  "",
 		Name:        "",
 		Description: "",
@@ -50,7 +50,7 @@ func TestStatusSerialization(t *testing.T) {
 		Params:            []string{},
 		DefaultParams:     "",
 	}
-	st := NewStatus(cfg, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
+	st := NewStatus(d, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
 
 	js, err := st.ToJson()
 	require.NoError(t, err)
@@ -60,12 +60,12 @@ func TestStatusSerialization(t *testing.T) {
 
 	require.Equal(t, st.Name, st_.Name)
 	require.Equal(t, 1, len(st_.Nodes))
-	require.Equal(t, cfg.Steps[0].Name, st_.Nodes[0].Name)
+	require.Equal(t, d.Steps[0].Name, st_.Nodes[0].Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	cfg := &dag.DAG{Name: "test"}
-	status := NewStatus(cfg, nil, scheduler.SchedulerStatus_Running,
+	d := &dag.DAG{Name: "test"}
+	status := NewStatus(d, nil, scheduler.SchedulerStatus_Running,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)

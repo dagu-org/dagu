@@ -61,7 +61,7 @@ func StatusFromJson(s string) (*Status, error) {
 	return status, err
 }
 
-func NewStatus(cfg *dag.DAG, nodes []*scheduler.Node, status scheduler.SchedulerStatus,
+func NewStatus(d *dag.DAG, nodes []*scheduler.Node, status scheduler.SchedulerStatus,
 	pid int, s, e *time.Time) *Status {
 	finish, start := time.Time{}, time.Time{}
 	if s != nil {
@@ -74,16 +74,16 @@ func NewStatus(cfg *dag.DAG, nodes []*scheduler.Node, status scheduler.Scheduler
 	if len(nodes) != 0 {
 		models = FromNodes(nodes)
 	} else {
-		models = FromSteps(cfg.Steps)
+		models = FromSteps(d.Steps)
 	}
 	var onExit, onSuccess, onFailure, onCancel *Node = nil, nil, nil, nil
-	onExit = fromStepWithDefValues(cfg.HandlerOn.Exit)
-	onSuccess = fromStepWithDefValues(cfg.HandlerOn.Success)
-	onFailure = fromStepWithDefValues(cfg.HandlerOn.Failure)
-	onCancel = fromStepWithDefValues(cfg.HandlerOn.Cancel)
+	onExit = fromStepWithDefValues(d.HandlerOn.Exit)
+	onSuccess = fromStepWithDefValues(d.HandlerOn.Success)
+	onFailure = fromStepWithDefValues(d.HandlerOn.Failure)
+	onCancel = fromStepWithDefValues(d.HandlerOn.Cancel)
 	return &Status{
 		RequestId:  "",
-		Name:       cfg.Name,
+		Name:       d.Name,
 		Status:     status,
 		StatusText: status.String(),
 		Pid:        Pid(pid),
@@ -94,7 +94,7 @@ func NewStatus(cfg *dag.DAG, nodes []*scheduler.Node, status scheduler.Scheduler
 		OnCancel:   onCancel,
 		StartedAt:  utils.FormatTime(start),
 		FinishedAt: utils.FormatTime(finish),
-		Params:     strings.Join(cfg.Params, " "),
+		Params:     strings.Join(d.Params, " "),
 	}
 }
 

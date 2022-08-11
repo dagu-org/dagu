@@ -22,11 +22,11 @@ func TestLoadConfig(t *testing.T) {
 
 func TestLoadBaseConfig(t *testing.T) {
 	l := &Loader{}
-	cfg, err := l.loadBaseConfig(
+	d, err := l.loadBaseConfig(
 		settings.MustGet(settings.SETTING__BASE_CONFIG),
 		&BuildConfigOptions{},
 	)
-	require.NotNil(t, cfg)
+	require.NotNil(t, d)
 	require.NoError(t, err)
 }
 
@@ -43,11 +43,11 @@ func TestLoadBaseConfigError(t *testing.T) {
 
 func TestLoadDeafult(t *testing.T) {
 	l := &Loader{}
-	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
+	d, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
-	require.Equal(t, time.Second*60, cfg.MaxCleanUpTime)
-	require.Equal(t, 30, cfg.HistRetentionDays)
+	require.Equal(t, time.Second*60, d.MaxCleanUpTime)
+	require.Equal(t, 30, d.HistRetentionDays)
 }
 
 func TestLoadData(t *testing.T) {
