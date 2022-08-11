@@ -8,7 +8,12 @@ type Props = {
 
 function DAGEditor({ value, onChange }: Props) {
   return (
-    <MonacoEditor height="60vh" defaultValue={value} onChange={onChange} />
+    <MonacoEditor
+      height="60vh"
+      defaultValue={value}
+      onChange={onChange}
+      language="yaml"
+    />
   );
 }
 

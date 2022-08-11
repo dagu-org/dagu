@@ -1,4 +1,5 @@
 group: example group
+name: ジョブ名称
 steps:
   - name: "1"
     command: echo hello world
