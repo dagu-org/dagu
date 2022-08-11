@@ -108,7 +108,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 			return
 		}
 		c := controller.New(d.DAG)
-		data := newDAGResponse(dn, d, params.Tab)
+		data := newDAGResponse(d.DAG.Name, d, params.Tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
 		}
