@@ -25,11 +25,11 @@ func NewDAGReader() *DAGReader {
 	}
 }
 
-// DAG is the struct to contain DAG configuration and status.
+// DAG is the struct to contain DAG spec and status.
 type DAG struct {
 	File      string
 	Dir       string
-	Config    *dag.DAG
+	DAG       *dag.DAG
 	Status    *models.Status
 	Suspended bool
 	Error     error
@@ -70,7 +70,7 @@ func (dr *DAGReader) newDAG(d *dag.DAG, s *models.Status, err error) *DAG {
 	ret := &DAG{
 		File:      filepath.Base(d.ConfigPath),
 		Dir:       filepath.Dir(d.ConfigPath),
-		Config:    d,
+		DAG:       d,
 		Status:    s,
 		Suspended: dr.suspendChecker.IsSuspended(d),
 		Error:     err,

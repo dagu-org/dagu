@@ -48,7 +48,7 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{"parameter is x"},
 	}, t)
 
-	c := controller.New(dag.Config)
+	c := controller.New(dag.DAG)
 
 	var retryStatus *models.Status
 	require.Eventually(t, func() bool {

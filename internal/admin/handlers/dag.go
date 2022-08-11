@@ -107,7 +107,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(d.Config)
+		c := controller.New(d.DAG)
 		data := newDAGResponse(dn, d, params.Tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
@@ -119,7 +119,7 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 			data.Definition, _ = dag.ReadConfig(file)
 
 		case DAG_TabType_History:
-			logs := controller.New(d.Config).GetStatusHist(30)
+			logs := controller.New(d.DAG).GetStatusHist(30)
 			data.LogData = buildLog(logs)
 
 		case DAG_TabType_StepLog:
@@ -182,7 +182,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(dag.Config)
+		c := controller.New(dag.DAG)
 
 		switch action {
 		case "start":
@@ -201,7 +201,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 					),
 				),
 			)
-			sc.ToggleSuspend(dag.Config, value == "true")
+			sc.ToggleSuspend(dag.DAG, value == "true")
 
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {

@@ -19,15 +19,15 @@ type Props = {
 function DAGConfig({ data }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState(data.Definition);
-  const handlers = getHandlersFromConfig(data.DAG?.Config);
-  if (data.DAG?.Config == null) {
+  const handlers = getHandlersFromConfig(data.DAG?.DAG);
+  if (data.DAG?.DAG == null) {
     return null;
   }
   return (
     <DAGContext.Consumer>
       {(props) =>
         data.DAG &&
-        data.DAG.Config && (
+        data.DAG.DAG && (
           <React.Fragment>
             <Box>
               <SubTitle>Config</SubTitle>
@@ -46,7 +46,7 @@ function DAGConfig({ data }: Props) {
                     overflowX: 'auto',
                   }}
                 >
-                  <Graph steps={data.DAG.Config.Steps} type="config"></Graph>
+                  <Graph steps={data.DAG.DAG.Steps} type="config"></Graph>
                 </Box>
               </BorderedBox>
             </Box>
@@ -54,14 +54,14 @@ function DAGConfig({ data }: Props) {
             <Box sx={{ mt: 3 }}>
               <SubTitle>DAG Config</SubTitle>
               <Box sx={{ mt: 2 }}>
-                <ConfigInfoTable config={data.DAG.Config!}></ConfigInfoTable>
+                <ConfigInfoTable config={data.DAG.DAG!}></ConfigInfoTable>
               </Box>
             </Box>
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
                 <SubTitle>Step Config</SubTitle>
                 <ConfigStepTable
-                  steps={data.DAG.Config.Steps}
+                  steps={data.DAG.DAG.Steps}
                 ></ConfigStepTable>
               </Box>
             </Box>
@@ -95,7 +95,7 @@ function DAGConfig({ data }: Props) {
                       color: 'grey.600',
                     }}
                   >
-                    {data.DAG.Config.ConfigPath}
+                    {data.DAG.DAG.ConfigPath}
                   </Box>
                   {editing ? (
                     <Stack direction="row">

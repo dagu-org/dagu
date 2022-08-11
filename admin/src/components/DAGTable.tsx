@@ -122,7 +122,7 @@ const defaultColumns = [
       if (data.Type == DAGDataType.Group) {
         value = data.Name;
       } else {
-        value = data.DAG.Config.Name;
+        value = data.DAG.DAG.Name;
       }
       const ret = value.toLowerCase().includes(filter.toLowerCase());
       return ret;
@@ -156,7 +156,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const tags = data.DAG.Config.Tags;
+        const tags = data.DAG.DAG.Tags;
         return (
           <Stack direction="row" spacing={1}>
             {tags?.map((tag) => (
@@ -177,7 +177,7 @@ const defaultColumns = [
       if (data.Type != DAGDataType.DAG) {
         return false;
       }
-      const tags = data.DAG.Config.Tags;
+      const tags = data.DAG.DAG.Tags;
       const ret = tags?.some((tag) => tag == filter) || false;
       return ret;
     },
@@ -250,7 +250,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAG.Config.ScheduleExp;
+        const schedules = data.DAG.DAG.ScheduleExp;
         if (schedules) {
           return (
             <React.Fragment>
@@ -287,7 +287,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAG.Config.ScheduleExp;
+        const schedules = data.DAG.DAG.ScheduleExp;
         if (schedules && !data.DAG.Suspended) {
           return (
             <React.Fragment>
@@ -331,7 +331,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        return data.DAG.Config.Description;
+        return data.DAG.DAG.Description;
       }
       return null;
     },
@@ -363,7 +363,7 @@ const defaultColumns = [
       return (
         <DAGActions
           status={data.DAG.Status}
-          name={data.DAG.Config.Name}
+          name={data.DAG.DAG.Name}
           label={false}
           refresh={props.instance.options.meta?.refreshFn}
         />
@@ -402,7 +402,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     } = {};
     DAGs.forEach((dag) => {
       if (dag.Type == DAGDataType.DAG) {
-        const g = dag.DAG.Config.Group;
+        const g = dag.DAG.DAG.Group;
         if (g != '') {
           if (!groups[g]) {
             groups[g] = {
@@ -425,8 +425,8 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       ...DAGs.filter(
         (dag) =>
           dag.Type == DAGDataType.DAG &&
-          dag.DAG.Config.Group == '' &&
-          dag.DAG.Config.Group == group
+          dag.DAG.DAG.Group == '' &&
+          dag.DAG.DAG.Group == group
       ),
     ];
   }, [DAGs, group]);
@@ -435,7 +435,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     const map: { [key: string]: boolean } = { '': true };
     DAGs.forEach((data) => {
       if (data.Type == DAGDataType.DAG) {
-        data.DAG.Config.Tags?.forEach((tag) => {
+        data.DAG.DAG.Tags?.forEach((tag) => {
           map[tag] = true;
         });
       }

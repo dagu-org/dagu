@@ -35,7 +35,7 @@ function DAGList() {
         if (!val.ErrorT) {
           ret.push({
             Type: DAGDataType.DAG,
-            Name: val.Config.Name,
+            Name: val.DAG.Name,
             DAG: val,
           });
         }

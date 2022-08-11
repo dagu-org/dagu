@@ -37,7 +37,7 @@ function DAGSwitch({ DAG, refresh }: Props) {
     const enabled = !checked;
     setChecked(enabled);
     onSubmit({
-      name: DAG.Config.Name,
+      name: DAG.DAG.Name,
       action: 'suspend',
       value: enabled ? 'false' : 'true',
     });

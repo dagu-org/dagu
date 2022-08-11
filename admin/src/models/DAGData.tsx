@@ -5,7 +5,7 @@ import cronParser from 'cron-parser';
 export type DAG = {
   File: string;
   Dir: string;
-  Config: Config;
+  DAG: Config;
   Status?: Status;
 	Suspended: boolean;
   ErrorT: string;
@@ -34,7 +34,7 @@ export function getFirstTag(data?: DAGItem): string {
     return '';
   }
   if (data.Type == DAGDataType.DAG) {
-    const tags = data.DAG.Config.Tags;
+    const tags = data.DAG.DAG.Tags;
     return tags ? tags[0] : '';
   }
   return '';
@@ -68,7 +68,7 @@ export function getStatusField(
 }
 
 export function getNextSchedule(data: DAG): number {
-  const schedules = data.Config.ScheduleExp;
+  const schedules = data.DAG.ScheduleExp;
   if (!schedules || schedules.length == 0) {
     return Number.MAX_SAFE_INTEGER;
   }
