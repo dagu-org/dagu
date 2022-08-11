@@ -227,9 +227,9 @@ func (a *Agent) setupDatabase() (err error) {
 	a.database = &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
+	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.Path, time.Now(), a.requestId)
 	utils.LogErr("clean old history data",
-		a.database.RemoveOld(a.DAG.ConfigPath, a.DAG.HistRetentionDays))
+		a.database.RemoveOld(a.DAG.Path, a.DAG.HistRetentionDays))
 	return
 }
 
@@ -317,7 +317,7 @@ func (a *Agent) run() error {
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
 	utils.LogErr("close data file", a.dbWriter.Close())
-	utils.LogErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
+	utils.LogErr("data compaction", a.database.Compact(a.DAG.Path, a.dbFile))
 
 	return lastErr
 }

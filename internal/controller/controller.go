@@ -61,7 +61,7 @@ func GetDAGs(dir string) (dags []*DAGStatus, errs []string, err error) {
 
 // NewConfig returns a new config.Config.
 func NewConfig(file string) error {
-	if err := assertConfigPath(file); err != nil {
+	if err := assertPath(file); err != nil {
 		return err
 	}
 	if utils.FileExists(file) {
@@ -75,14 +75,14 @@ func NewConfig(file string) error {
 }
 
 // RenameConfig renames the config file and status database.
-func RenameConfig(oldConfigPath, newConfigPath string) error {
-	if err := assertConfigPath(newConfigPath); err != nil {
+func RenameConfig(oldPath, newPath string) error {
+	if err := assertPath(newPath); err != nil {
 		return err
 	}
-	if err := os.Rename(oldConfigPath, newConfigPath); err != nil {
+	if err := os.Rename(oldPath, newPath); err != nil {
 		return err
 	}
-	return defaultDb().MoveData(oldConfigPath, newConfigPath)
+	return defaultDb().MoveData(oldPath, newPath)
 }
 
 var _ Controller = (*controller)(nil)
@@ -115,7 +115,7 @@ func (c *controller) Start(bin string, workDir string, params string) error {
 	if params != "" {
 		args = append(args, fmt.Sprintf("--params=\"%s\"", params))
 	}
-	args = append(args, c.ConfigPath)
+	args = append(args, c.Path)
 	cmd := exec.Command(bin, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
@@ -131,7 +131,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
-		args = append(args, c.ConfigPath)
+		args = append(args, c.Path)
 		cmd := exec.Command(bin, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
@@ -164,7 +164,7 @@ func (c *controller) GetLastStatus() (*models.Status, error) {
 		return models.StatusFromJson(ret)
 	}
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		status, err := defaultDb().ReadStatusToday(c.ConfigPath)
+		status, err := defaultDb().ReadStatusToday(c.Path)
 		if err != nil {
 			var readErr error = nil
 			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
@@ -184,7 +184,7 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	ret, err := db.FindByRequestId(c.ConfigPath, requestId)
+	ret, err := db.FindByRequestId(c.Path, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 }
 
 func (c *controller) GetStatusHist(n int) []*models.StatusFile {
-	ret := defaultDb().ReadStatusHist(c.ConfigPath, n)
+	ret := defaultDb().ReadStatusHist(c.Path, n)
 	return ret
 }
 
@@ -215,7 +215,7 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	toUpdate, err := defaultDb().FindByRequestId(c.ConfigPath, status.RequestId)
+	toUpdate, err := defaultDb().FindByRequestId(c.Path, status.RequestId)
 	if err != nil {
 		return err
 	}
@@ -234,14 +234,14 @@ func (c *controller) Save(value string) error {
 	if err != nil {
 		return err
 	}
-	if !utils.FileExists(c.ConfigPath) {
-		return fmt.Errorf("the config file %s does not exist", c.ConfigPath)
+	if !utils.FileExists(c.Path) {
+		return fmt.Errorf("the config file %s does not exist", c.Path)
 	}
-	err = os.WriteFile(c.ConfigPath, []byte(value), 0755)
+	err = os.WriteFile(c.Path, []byte(value), 0755)
 	return err
 }
 
-func assertConfigPath(configPath string) error {
+func assertPath(configPath string) error {
 	if path.Ext(configPath) != ".yaml" {
 		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
 	}

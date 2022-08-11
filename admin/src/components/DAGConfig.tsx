@@ -52,7 +52,7 @@ function DAGConfig({ data }: Props) {
 
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
-                <ConfigInfoTable config={data.DAG.DAG!}></ConfigInfoTable>
+                <ConfigInfoTable dag={data.DAG.DAG!}></ConfigInfoTable>
               </Box>
             </Box>
             <Box sx={{ mt: 3 }}>
@@ -93,7 +93,7 @@ function DAGConfig({ data }: Props) {
                       color: 'grey.600',
                     }}
                   >
-                    {data.DAG.DAG.ConfigPath}
+                    {data.DAG.DAG.Path}
                   </Box>
                   {editing ? (
                     <Stack direction="row">

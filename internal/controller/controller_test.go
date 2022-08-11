@@ -111,7 +111,7 @@ func TestUpdateStatus(t *testing.T) {
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	w, _, _ := db.NewWriter(dag.DAG.ConfigPath, now, req)
+	w, _, _ := db.NewWriter(dag.DAG.Path, now, req)
 	err = w.Open()
 	require.NoError(t, err)
 
@@ -244,8 +244,8 @@ func TestSave(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
 	defer os.RemoveAll(tmpDir)
 	d := &dag.DAG{
-		Name:       "test",
-		ConfigPath: path.Join(tmpDir, "test.yaml"),
+		Name: "test",
+		Path: path.Join(tmpDir, "test.yaml"),
 	}
 
 	c := controller.New(d)
@@ -265,14 +265,14 @@ steps:
 	require.Error(t, err) // no config file
 
 	// create file
-	f, _ := utils.CreateFile(d.ConfigPath)
+	f, _ := utils.CreateFile(d.Path)
 	defer f.Close()
 
 	err = c.Save(dat)
 	require.NoError(t, err) // no config file
 
 	// check file
-	saved, _ := os.Open(d.ConfigPath)
+	saved, _ := os.Open(d.Path)
 	defer saved.Close()
 	b, _ := io.ReadAll(saved)
 	require.Equal(t, dat, string(b))

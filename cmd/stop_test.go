@@ -33,10 +33,10 @@ func Test_stopCommand(t *testing.T) {
 		Config: database.DefaultConfig(),
 	}
 	d := &dag.DAG{
-		ConfigPath: c,
+		Path: c,
 	}
 
-	s := db.ReadStatusHist(d.ConfigPath, 1)
+	s := db.ReadStatusHist(d.Path, 1)
 	require.Equal(t, 1, len(s))
 	require.Equal(t, scheduler.SchedulerStatus_Cancel, s[0].Status.Status)
 }

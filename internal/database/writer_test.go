@@ -14,15 +14,15 @@ import (
 
 func testWriteStatusToFile(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		Name:       "test_write_status",
-		ConfigPath: "test_write_status.yaml",
+		Name: "test_write_status",
+		Path: "test_write_status.yaml",
 	}
-	dw, file, err := db.NewWriter(d.ConfigPath, time.Now(), "request-id-1")
+	dw, file, err := db.NewWriter(d.Path, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer func() {
 		dw.Close()
-		db.RemoveOld(d.ConfigPath, 0)
+		db.RemoveOld(d.Path, 0)
 	}()
 
 	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
@@ -41,7 +41,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	err = dw.Close()
 	require.NoError(t, err)
 
-	old := d.ConfigPath
+	old := d.Path
 	new := "text_write_status_new.yaml"
 
 	oldDir := db.dir(old, prefix(old))
@@ -61,10 +61,10 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 
 func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		Name:       "test_append_to_existing",
-		ConfigPath: "test_append_to_existing.yaml",
+		Name: "test_append_to_existing",
+		Path: "test_append_to_existing.yaml",
 	}
-	dw, file, err := db.NewWriter(d.ConfigPath, time.Now(), "request-id-1")
+	dw, file, err := db.NewWriter(d.Path, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
@@ -73,7 +73,7 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 	require.NoError(t, dw.Write(status))
 	dw.Close()
 
-	data, err := db.FindByRequestId(d.ConfigPath, status.RequestId)
+	data, err := db.FindByRequestId(d.Path, status.RequestId)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Cancel)
 	require.Equal(t, file, data.File)
@@ -84,7 +84,7 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 	require.NoError(t, dw.Write(status))
 	dw.Close()
 
-	data, err = db.FindByRequestId(d.ConfigPath, status.RequestId)
+	data, err = db.FindByRequestId(d.Path, status.RequestId)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Success)
 	require.Equal(t, file, data.File)

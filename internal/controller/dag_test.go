@@ -14,5 +14,5 @@ func TestLoadConfig(t *testing.T) {
 	require.Error(t, err)
 	require.NotNil(t, dag)
 	require.Error(t, dag.Error)
-	require.Equal(t, file, dag.DAG.ConfigPath)
+	require.Equal(t, file, dag.DAG.Path)
 }

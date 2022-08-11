@@ -24,7 +24,7 @@ func TestPid(t *testing.T) {
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
 	d := &dag.DAG{
-		ConfigPath:  "",
+		Path:        "",
 		Name:        "",
 		Description: "",
 		Env:         []string{},

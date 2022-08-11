@@ -50,14 +50,14 @@ func TestDatabase(t *testing.T) {
 
 func testNewDataFile(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		ConfigPath: "test_new_data_file.yaml",
+		Path: "test_new_data_file.yaml",
 	}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
 	requestId := "request-id-1"
-	f, err := db.newFile(d.ConfigPath, timestamp, requestId)
+	f, err := db.newFile(d.Path, timestamp, requestId)
 	require.NoError(t, err)
 	p := utils.ValidFilename(strings.TrimSuffix(
-		path.Base(d.ConfigPath), path.Ext(d.ConfigPath)), "_")
+		path.Base(d.Path), path.Ext(d.Path)), "_")
 	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
 
 	_, err = db.newFile("", timestamp, requestId)
@@ -66,10 +66,10 @@ func testNewDataFile(t *testing.T, db *Database) {
 
 func testWriteAndFindFiles(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		Name:       "test_read_status_n",
-		ConfigPath: "test_data_files_n.yaml",
+		Name: "test_read_status_n",
+		Path: "test_data_files_n.yaml",
 	}
-	defer db.RemoveAll(d.ConfigPath)
+	defer db.RemoveAll(d.Path)
 
 	for _, data := range []struct {
 		Status    *models.Status
@@ -97,16 +97,16 @@ func testWriteAndFindFiles(t *testing.T, db *Database) {
 		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
-	files := db.latest(db.pattern(d.ConfigPath)+"*.dat", 2)
+	files := db.latest(db.pattern(d.Path)+"*.dat", 2)
 	require.Equal(t, 2, len(files))
 }
 
 func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		Name:       "test_find_by_request_id",
-		ConfigPath: "test_find_by_request_id.yaml",
+		Name: "test_find_by_request_id",
+		Path: "test_find_by_request_id.yaml",
 	}
-	defer db.RemoveAll(d.ConfigPath)
+	defer db.RemoveAll(d.Path)
 
 	for _, data := range []struct {
 		Status    *models.Status
@@ -134,18 +134,18 @@ func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
-	status, err := db.FindByRequestId(d.ConfigPath, "request-id-2")
+	status, err := db.FindByRequestId(d.Path, "request-id-2")
 	require.NoError(t, err)
 	require.Equal(t, status.Status.RequestId, "request-id-2")
 
-	status, err = db.FindByRequestId(d.ConfigPath, "request-id-10000")
+	status, err = db.FindByRequestId(d.Path, "request-id-10000")
 	require.Error(t, err)
 	require.Nil(t, status)
 }
 
 func testRemoveOldFiles(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		ConfigPath: "test_remove_old.yaml",
+		Path: "test_remove_old.yaml",
 	}
 
 	for _, data := range []struct {
@@ -174,12 +174,12 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 		testWriteStatus(t, db, d, data.Status, data.Timestamp)
 	}
 
-	files := db.latest(db.pattern(d.ConfigPath)+"*.dat", 3)
+	files := db.latest(db.pattern(d.Path)+"*.dat", 3)
 	require.Equal(t, 3, len(files))
 
-	db.RemoveOld(d.ConfigPath, 0)
+	db.RemoveOld(d.Path, 0)
 
-	files = db.latest(db.pattern(d.ConfigPath)+"*.dat", 3)
+	files = db.latest(db.pattern(d.Path)+"*.dat", 3)
 	require.Equal(t, 0, len(files))
 
 	m := db.latest("invalid-pattern", 3)
@@ -188,10 +188,10 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 
 func testReadLatestStatus(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		ConfigPath: "test_config_status_reader.yaml",
+		Path: "test_config_status_reader.yaml",
 	}
 	requestId := "request-id-1"
-	dw, _, err := db.NewWriter(d.ConfigPath, time.Now(), requestId)
+	dw, _, err := db.NewWriter(d.Path, time.Now(), requestId)
 	require.NoError(t, err)
 	err = dw.Open()
 	require.NoError(t, err)
@@ -204,7 +204,7 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 	status.Pid = 20000
 	dw.Write(status)
 
-	ret, err := db.ReadStatusToday(d.ConfigPath)
+	ret, err := db.ReadStatusToday(d.Path)
 
 	require.NoError(t, err)
 	require.NotNil(t, ret)
@@ -215,8 +215,8 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 
 func testReadStatusN(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		Name:       "test_read_status_n",
-		ConfigPath: "test_config_status_reader_hist.yaml",
+		Name: "test_read_status_n",
+		Path: "test_config_status_reader_hist.yaml",
 	}
 
 	for _, data := range []struct {
@@ -247,7 +247,7 @@ func testReadStatusN(t *testing.T, db *Database) {
 
 	recordMax := 2
 
-	ret := db.ReadStatusHist(d.ConfigPath, recordMax)
+	ret := db.ReadStatusHist(d.Path, recordMax)
 
 	require.Equal(t, recordMax, len(ret))
 	require.Equal(t, d.Name, ret[0].Status.Name)
@@ -256,12 +256,12 @@ func testReadStatusN(t *testing.T, db *Database) {
 
 func testCompactFile(t *testing.T, db *Database) {
 	d := &dag.DAG{
-		Name:       "test_compact_file",
-		ConfigPath: "test_compact_file.yaml",
+		Name: "test_compact_file",
+		Path: "test_compact_file.yaml",
 	}
 	requestId := "request-id-1"
 
-	dw, _, err := db.NewWriter(d.ConfigPath, time.Now(), requestId)
+	dw, _, err := db.NewWriter(d.Path, time.Now(), requestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
@@ -281,7 +281,7 @@ func testCompactFile(t *testing.T, db *Database) {
 	dw.Close()
 
 	var s *models.StatusFile = nil
-	if h := db.ReadStatusHist(d.ConfigPath, 1); len(h) > 0 {
+	if h := db.ReadStatusHist(d.Path, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
@@ -289,12 +289,12 @@ func testCompactFile(t *testing.T, db *Database) {
 	db2 := &Database{
 		Config: db.Config,
 	}
-	err = db2.Compact(d.ConfigPath, s.File)
+	err = db2.Compact(d.Path, s.File)
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)
 
 	var s2 *models.StatusFile = nil
-	if h := db2.ReadStatusHist(d.ConfigPath, 1); len(h) > 0 {
+	if h := db2.ReadStatusHist(d.Path, 1); len(h) > 0 {
 		s2 = h[0]
 	}
 	require.NotNil(t, s2)
@@ -302,7 +302,7 @@ func testCompactFile(t *testing.T, db *Database) {
 	require.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
 	require.Equal(t, s.Status, s2.Status)
 
-	err = db2.Compact(d.ConfigPath, "Invalid_file_name.dat")
+	err = db2.Compact(d.Path, "Invalid_file_name.dat")
 	require.Error(t, err)
 }
 
@@ -348,7 +348,7 @@ func testErrorParseFile(t *testing.T, db *Database) {
 
 func testWriteStatus(t *testing.T, db *Database, d *dag.DAG, status *models.Status, tm time.Time) {
 	t.Helper()
-	dw, _, err := db.NewWriter(d.ConfigPath, tm, status.RequestId)
+	dw, _, err := db.NewWriter(d.Path, tm, status.RequestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer dw.Close()
