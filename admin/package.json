@@ -8,7 +8,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "webpack-dev-server --config webpack.dev.js",
     "lint": "eslint --fix --ext .ts,.tsx .",
-    "prettier": "prettier --write src/**/*.ts[x]"
+    "prettier": "prettier --write src/**/*.ts[x]",
+    "typecheck": "tsc",
+    "typecheck:watch": "tsc -w"
   },
   "repository": {
     "type": "git",
