@@ -243,7 +243,7 @@ func TestRetry(t *testing.T) {
 func TestSave(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
 	defer os.RemoveAll(tmpDir)
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test",
 		ConfigPath: path.Join(tmpDir, "test.yaml"),
 	}
@@ -322,7 +322,7 @@ func TestRenameConfig(t *testing.T) {
 	require.FileExists(t, newFile)
 }
 
-func newStatus(cfg *config.Config, reqId string,
+func newStatus(cfg *config.DAG, reqId string,
 	schedulerStatus scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
 	n := time.Now()
 	ret := models.NewStatus(

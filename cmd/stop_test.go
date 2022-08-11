@@ -32,7 +32,7 @@ func Test_stopCommand(t *testing.T) {
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		ConfigPath: c,
 	}
 

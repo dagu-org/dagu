@@ -18,7 +18,7 @@ func NewSuspendChecker(s *storage.Storage) *SuspendChecker {
 	}
 }
 
-func (s *SuspendChecker) ToggleSuspend(cfg *config.Config, suspend bool) error {
+func (s *SuspendChecker) ToggleSuspend(cfg *config.DAG, suspend bool) error {
 	if suspend {
 		return s.storage.Create(fileName(cfg))
 	} else if s.IsSuspended(cfg) {
@@ -27,10 +27,10 @@ func (s *SuspendChecker) ToggleSuspend(cfg *config.Config, suspend bool) error {
 	return nil
 }
 
-func (s *SuspendChecker) IsSuspended(cfg *config.Config) bool {
+func (s *SuspendChecker) IsSuspended(cfg *config.DAG) bool {
 	return s.storage.Exists(fileName(cfg))
 }
 
-func fileName(cfg *config.Config) string {
+func fileName(cfg *config.DAG) string {
 	return fmt.Sprintf("%s.suspend", utils.ValidFilename(cfg.Name, "-"))
 }

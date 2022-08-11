@@ -61,7 +61,7 @@ func StatusFromJson(s string) (*Status, error) {
 	return status, err
 }
 
-func NewStatus(cfg *config.Config, nodes []*scheduler.Node, status scheduler.SchedulerStatus,
+func NewStatus(cfg *config.DAG, nodes []*scheduler.Node, status scheduler.SchedulerStatus,
 	pid int, s, e *time.Time) *Status {
 	finish, start := time.Time{}, time.Time{}
 	if s != nil {

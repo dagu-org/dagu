@@ -39,7 +39,7 @@ func newRetryCommand() *cli.Command {
 	}
 }
 
-func retry(cfg *config.Config, status *models.StatusFile) error {
+func retry(cfg *config.DAG, status *models.StatusFile) error {
 	a := &dagu.Agent{
 		AgentConfig: &dagu.AgentConfig{
 			DAG: cfg,

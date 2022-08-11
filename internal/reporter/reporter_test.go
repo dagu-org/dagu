@@ -20,7 +20,7 @@ import (
 func TestReporter(t *testing.T) {
 
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node,
+		t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node,
 	){
 		"create errormail":   testErrorMail,
 		"no errormail":       testNoErrorMail,
@@ -32,7 +32,7 @@ func TestReporter(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
-			cfg := &config.Config{
+			cfg := &config.DAG{
 				Name: "test DAG",
 				MailOn: &config.MailOn{
 					Failure: true,
@@ -79,7 +79,7 @@ func TestReporter(t *testing.T) {
 	}
 }
 
-func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testErrorMail(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	cfg.MailOn.Failure = true
 	cfg.MailOn.Success = false
 
@@ -94,7 +94,7 @@ func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mode
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	cfg.MailOn.Failure = false
 	cfg.MailOn.Success = true
 
@@ -107,7 +107,7 @@ func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	cfg.MailOn.Failure = true
 	cfg.MailOn.Success = true
 
@@ -122,7 +122,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	require.Equal(t, 1, mock.count)
 }
 
-func testReportSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testReportSummary(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func testReportSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*
 	require.Contains(t, s, "test error")
 }
 
-func testReportStep(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testReportStep(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func testReportStep(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mod
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testRenderSummary(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	status := &models.Status{
 		Name:   cfg.Name,
 		Status: scheduler.SchedulerStatus_Error,
@@ -202,7 +202,7 @@ func testRenderSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*
 	require.Contains(t, summary, cfg.Name)
 }
 
-func testRenderTable(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testRenderTable(t *testing.T, rp *Reporter, cfg *config.DAG, nodes []*models.Node) {
 	summary := renderTable(nodes)
 	require.Contains(t, summary, nodes[0].Name)
 	require.Contains(t, summary, nodes[0].Args[0])

@@ -31,7 +31,7 @@ func newStartCommand() *cli.Command {
 	}
 }
 
-func start(cfg *config.Config) error {
+func start(cfg *config.DAG) error {
 	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
 		DAG: cfg,
 		Dry: false,

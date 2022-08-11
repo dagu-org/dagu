@@ -29,7 +29,7 @@ func NewDAGReader() *DAGReader {
 type DAG struct {
 	File      string
 	Dir       string
-	Config    *config.Config
+	Config    *config.DAG
 	Status    *models.Status
 	Suspended bool
 	Error     error
@@ -39,7 +39,7 @@ type DAG struct {
 // ReadDAG loads DAG from config file.
 func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	cl := config.Loader{}
-	var cfg *config.Config
+	var cfg *config.DAG
 	var err error
 	if headOnly {
 		cfg, err = cl.LoadHeadOnly(file)
@@ -50,7 +50,7 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 		if cfg != nil {
 			return dr.newDAG(cfg, defaultStatus(cfg), err), err
 		}
-		cfg := &config.Config{ConfigPath: file}
+		cfg := &config.DAG{ConfigPath: file}
 		cfg.Init()
 		return dr.newDAG(cfg, defaultStatus(cfg), err), err
 	}
@@ -66,7 +66,7 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	return dr.newDAG(cfg, status, err), nil
 }
 
-func (dr *DAGReader) newDAG(cfg *config.Config, s *models.Status, err error) *DAG {
+func (dr *DAGReader) newDAG(cfg *config.DAG, s *models.Status, err error) *DAG {
 	ret := &DAG{
 		File:      filepath.Base(cfg.ConfigPath),
 		Dir:       filepath.Dir(cfg.ConfigPath),

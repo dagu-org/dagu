@@ -18,7 +18,7 @@ func TestSuspendChecker(t *testing.T) {
 
 	sc := NewSuspendChecker(s)
 
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name: "test",
 	}
 

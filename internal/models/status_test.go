@@ -23,7 +23,7 @@ func TestPid(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		ConfigPath:  "",
 		Name:        "",
 		Description: "",
@@ -64,7 +64,7 @@ func TestStatusSerialization(t *testing.T) {
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	cfg := &config.Config{Name: "test"}
+	cfg := &config.DAG{Name: "test"}
 	status := NewStatus(cfg, nil, scheduler.SchedulerStatus_Running,
 		10000, nil, nil)
 	status.CorrectRunningStatus()

@@ -49,7 +49,7 @@ func TestDatabase(t *testing.T) {
 }
 
 func testNewDataFile(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		ConfigPath: "test_new_data_file.yaml",
 	}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
@@ -65,7 +65,7 @@ func testNewDataFile(t *testing.T, db *Database) {
 }
 
 func testWriteAndFindFiles(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test_read_status_n",
 		ConfigPath: "test_data_files_n.yaml",
 	}
@@ -102,7 +102,7 @@ func testWriteAndFindFiles(t *testing.T, db *Database) {
 }
 
 func testWriteAndFindByRequestId(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test_find_by_request_id",
 		ConfigPath: "test_find_by_request_id.yaml",
 	}
@@ -144,7 +144,7 @@ func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 }
 
 func testRemoveOldFiles(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		ConfigPath: "test_remove_old.yaml",
 	}
 
@@ -187,7 +187,7 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 }
 
 func testReadLatestStatus(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		ConfigPath: "test_config_status_reader.yaml",
 	}
 	requestId := "request-id-1"
@@ -214,7 +214,7 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 }
 
 func testReadStatusN(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test_read_status_n",
 		ConfigPath: "test_config_status_reader_hist.yaml",
 	}
@@ -255,7 +255,7 @@ func testReadStatusN(t *testing.T, db *Database) {
 }
 
 func testCompactFile(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test_compact_file",
 		ConfigPath: "test_compact_file.yaml",
 	}
@@ -346,7 +346,7 @@ func testErrorParseFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 }
 
-func testWriteStatus(t *testing.T, db *Database, cfg *config.Config, status *models.Status, tm time.Time) {
+func testWriteStatus(t *testing.T, db *Database, cfg *config.DAG, status *models.Status, tm time.Time) {
 	t.Helper()
 	dw, _, err := db.NewWriter(cfg.ConfigPath, tm, status.RequestId)
 	require.NoError(t, err)

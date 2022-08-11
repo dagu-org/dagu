@@ -16,8 +16,8 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-// Config represents a DAG configuration.
-type Config struct {
+// DAG represents a DAG configuration.
+type DAG struct {
 	ConfigPath        string
 	Group             string
 	Name              string
@@ -61,7 +61,7 @@ func ReadConfig(file string) (string, error) {
 	return string(b), err
 }
 
-func (c *Config) Init() {
+func (c *DAG) Init() {
 	if c.Env == nil {
 		c.Env = []string{}
 	}
@@ -76,7 +76,7 @@ func (c *Config) Init() {
 	}
 }
 
-func (c *Config) HasTag(tag string) bool {
+func (c *DAG) HasTag(tag string) bool {
 	for _, t := range c.Tags {
 		if t == tag {
 			return true
@@ -85,7 +85,7 @@ func (c *Config) HasTag(tag string) bool {
 	return false
 }
 
-func (c *Config) SockAddr() string {
+func (c *DAG) SockAddr() string {
 	s := strings.ReplaceAll(c.ConfigPath, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
 	h := md5.New()
@@ -94,12 +94,12 @@ func (c *Config) SockAddr() string {
 	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
 }
 
-func (c *Config) Clone() *Config {
+func (c *DAG) Clone() *DAG {
 	ret := *c
 	return &ret
 }
 
-func (c *Config) String() string {
+func (c *DAG) String() string {
 	ret := "{\n"
 	ret = fmt.Sprintf("%s\tName: %s\n", ret, c.Name)
 	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(c.Description))
@@ -112,7 +112,7 @@ func (c *Config) String() string {
 	return ret
 }
 
-func (c *Config) setup() {
+func (c *DAG) setup() {
 	if c.LogDir == "" {
 		c.LogDir = path.Join(
 			settings.MustGet(settings.SETTING__LOGS_DIR),
@@ -142,7 +142,7 @@ func (c *Config) setup() {
 	}
 }
 
-func (c *Config) setupStep(step *Step, defaultDir string) {
+func (c *DAG) setupStep(step *Step, defaultDir string) {
 	if step.Dir == "" {
 		step.Dir = path.Dir(c.ConfigPath)
 	}
@@ -158,20 +158,20 @@ type BuildConfigOptions struct {
 
 type builder struct {
 	BuildConfigOptions
-	globalConfig *Config
+	globalConfig *DAG
 }
 
 type buildStep struct {
-	BuildFn  func(def *configDefinition, cfg *Config) error
+	BuildFn  func(def *configDefinition, cfg *DAG) error
 	Headline bool
 }
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Config) (cfg *Config, err error) {
+func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *DAG) (cfg *DAG, err error) {
 	b.globalConfig = globalConfig
 
-	cfg = &Config{}
+	cfg = &DAG{}
 	cfg.Init()
 
 	cfg.Name = def.Name
@@ -232,7 +232,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *Confi
 	return cfg, nil
 }
 
-func (b *builder) buildSchedule(def *configDefinition, cfg *Config) (err error) {
+func (b *builder) buildSchedule(def *configDefinition, cfg *DAG) (err error) {
 	switch (def.Schedule).(type) {
 	case string:
 		cfg.ScheduleExp = []string{def.Schedule.(string)}
@@ -254,7 +254,7 @@ func (b *builder) buildSchedule(def *configDefinition, cfg *Config) (err error) 
 	return
 }
 
-func (b *builder) buildEnvVariables(def *configDefinition, cfg *Config) (err error) {
+func (b *builder) buildEnvVariables(def *configDefinition, cfg *DAG) (err error) {
 	var env map[string]string
 	env, err = b.loadVariables(def.Env, b.defaultEnv)
 	if err == nil {
@@ -271,12 +271,12 @@ func (b *builder) buildEnvVariables(def *configDefinition, cfg *Config) (err err
 	return
 }
 
-func (b *builder) buildLogdir(def *configDefinition, cfg *Config) (err error) {
+func (b *builder) buildLogdir(def *configDefinition, cfg *DAG) (err error) {
 	cfg.LogDir, err = utils.ParseVariable(def.LogDir)
 	return err
 }
 
-func (b *builder) buildParameters(def *configDefinition, cfg *Config) (err error) {
+func (b *builder) buildParameters(def *configDefinition, cfg *DAG) (err error) {
 	cfg.DefaultParams = def.Params
 	p := cfg.DefaultParams
 	if b.parameters != "" {
@@ -290,7 +290,7 @@ func (b *builder) buildParameters(def *configDefinition, cfg *Config) (err error
 	return
 }
 
-func (b *builder) buildHandlers(def *configDefinition, cfg *Config) (err error) {
+func (b *builder) buildHandlers(def *configDefinition, cfg *DAG) (err error) {
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
 		if cfg.HandlerOn.Exit, err = b.buildStep(cfg.Env, def.HandlerOn.Exit); err != nil {
@@ -321,7 +321,7 @@ func (b *builder) buildHandlers(def *configDefinition, cfg *Config) (err error) 
 	return nil
 }
 
-func (b *builder) buildConfig(def *configDefinition, cfg *Config) (err error) {
+func (b *builder) buildConfig(def *configDefinition, cfg *DAG) (err error) {
 	if def.HistRetentionDays != nil {
 		cfg.HistRetentionDays = *def.HistRetentionDays
 	}
@@ -435,7 +435,7 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 	return vars, nil
 }
 
-func (b *builder) buildStepsFromDefinition(def *configDefinition, cfg *Config) error {
+func (b *builder) buildStepsFromDefinition(def *configDefinition, cfg *DAG) error {
 	ret := []*Step{}
 	for _, stepDef := range def.Steps {
 		step, err := b.buildStep(cfg.Env, stepDef)
@@ -490,7 +490,7 @@ func (b *builder) expandEnv(val string) string {
 	return os.ExpandEnv(val)
 }
 
-func buildSmtpConfigFromDefinition(def *configDefinition, cfg *Config) (err error) {
+func buildSmtpConfigFromDefinition(def *configDefinition, cfg *DAG) (err error) {
 	smtp := &SmtpConfig{}
 	smtp.Host = def.Smtp.Host
 	smtp.Port = def.Smtp.Port
@@ -498,12 +498,12 @@ func buildSmtpConfigFromDefinition(def *configDefinition, cfg *Config) (err erro
 	return nil
 }
 
-func buildErrorMailConfig(def *configDefinition, cfg *Config) (err error) {
+func buildErrorMailConfig(def *configDefinition, cfg *DAG) (err error) {
 	cfg.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
 	return
 }
 
-func buildInfoMailConfig(def *configDefinition, cfg *Config) (err error) {
+func buildInfoMailConfig(def *configDefinition, cfg *DAG) (err error) {
 	cfg.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
 	return
 }

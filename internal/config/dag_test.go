@@ -307,7 +307,7 @@ func TestSchedule(t *testing.T) {
 }
 
 func TestSockAddr(t *testing.T) {
-	cfg := &Config{ConfigPath: "testdata/testDag.yml"}
+	cfg := &DAG{ConfigPath: "testdata/testDag.yml"}
 	require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, cfg.SockAddr())
 }
 

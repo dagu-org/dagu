@@ -29,7 +29,7 @@ type Mailer interface {
 }
 
 // ReportStep is a function that reports the status of a step.
-func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *scheduler.Node) error {
+func (rp *Reporter) ReportStep(cfg *config.DAG, status *models.Status, node *scheduler.Node) error {
 	st := node.ReadStatus()
 	if st != scheduler.NodeStatus_None {
 		log.Printf("%s %s", node.Name, status.StatusText)
@@ -58,7 +58,7 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 }
 
 // SendMail is a function that sends a report mail.
-func (rp *Reporter) SendMail(cfg *config.Config, status *models.Status, err error) error {
+func (rp *Reporter) SendMail(cfg *config.DAG, status *models.Status, err error) error {
 	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
 		if cfg.MailOn != nil && cfg.MailOn.Failure {
 			return rp.Mailer.SendMail(

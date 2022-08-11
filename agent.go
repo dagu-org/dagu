@@ -44,7 +44,7 @@ type Agent struct {
 }
 
 type AgentConfig struct {
-	DAG *config.Config
+	DAG *config.DAG
 	Dry bool
 }
 

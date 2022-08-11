@@ -23,7 +23,7 @@ func newStopCommand() *cli.Command {
 	}
 }
 
-func stop(cfg *config.Config) error {
+func stop(cfg *config.DAG) error {
 	c := controller.New(cfg)
 	log.Printf("Stopping...")
 	return c.Stop()

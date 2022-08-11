@@ -25,7 +25,7 @@ func newStatusCommand() *cli.Command {
 	}
 }
 
-func queryStatus(cfg *config.Config) error {
+func queryStatus(cfg *config.DAG) error {
 	status, err := controller.New(cfg).GetStatus()
 	if err != nil {
 		return err

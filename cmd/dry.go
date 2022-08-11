@@ -31,7 +31,7 @@ func newDryCommand() *cli.Command {
 	}
 }
 
-func dryRun(cfg *config.Config) error {
+func dryRun(cfg *config.DAG) error {
 	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
 		DAG: cfg,
 		Dry: true,

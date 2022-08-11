@@ -17,7 +17,7 @@ type Job interface {
 }
 
 type job struct {
-	DAG       *config.Config
+	DAG       *config.DAG
 	Config    *admin.Config
 	StartTime time.Time
 }

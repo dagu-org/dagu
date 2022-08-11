@@ -88,12 +88,12 @@ func RenameConfig(oldConfigPath, newConfigPath string) error {
 var _ Controller = (*controller)(nil)
 
 type controller struct {
-	*config.Config
+	*config.DAG
 }
 
-func New(cfg *config.Config) Controller {
+func New(cfg *config.DAG) Controller {
 	return &controller{
-		Config: cfg,
+		DAG: cfg,
 	}
 }
 
@@ -151,7 +151,7 @@ func (c *controller) GetStatus() (*models.Status, error) {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		} else {
-			return defaultStatus(c.Config), nil
+			return defaultStatus(c.DAG), nil
 		}
 	}
 	return models.StatusFromJson(ret)
@@ -171,7 +171,7 @@ func (c *controller) GetLastStatus() (*models.Status, error) {
 				fmt.Printf("read status failed : %s", err)
 				readErr = err
 			}
-			return defaultStatus(c.Config), readErr
+			return defaultStatus(c.DAG), readErr
 		}
 		// it is wrong status if the status is running
 		status.CorrectRunningStatus()
@@ -248,7 +248,7 @@ func assertConfigPath(configPath string) error {
 	return nil
 }
 
-func defaultStatus(cfg *config.Config) *models.Status {
+func defaultStatus(cfg *config.DAG) *models.Status {
 	return models.NewStatus(
 		cfg,
 		nil,

@@ -54,7 +54,7 @@ func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	return cfg, err
 }
 
-func loadDAG(c *cli.Context, dagPath, params string) (dag *config.Config, err error) {
+func loadDAG(c *cli.Context, dagPath, params string) (dag *config.DAG, err error) {
 	cfg, err := loadGlobalConfig(c)
 	if err != nil {
 		return nil, err

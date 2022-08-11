@@ -13,7 +13,7 @@ import (
 )
 
 func testWriteStatusToFile(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test_write_status",
 		ConfigPath: "test_write_status.yaml",
 	}
@@ -60,7 +60,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 }
 
 func testWriteStatusToExistingFile(t *testing.T, db *Database) {
-	cfg := &config.Config{
+	cfg := &config.DAG{
 		Name:       "test_append_to_existing",
 		ConfigPath: "test_append_to_existing.yaml",
 	}

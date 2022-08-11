@@ -279,7 +279,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
 }
 
-func testDAG(t *testing.T, cfg *config.Config) (*models.Status, error) {
+func testDAG(t *testing.T, cfg *config.DAG) (*models.Status, error) {
 	t.Helper()
 	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: cfg,
@@ -288,7 +288,7 @@ func testDAG(t *testing.T, cfg *config.Config) (*models.Status, error) {
 	return a.Status(), err
 }
 
-func testLoadDAG(t *testing.T, name string) *config.Config {
+func testLoadDAG(t *testing.T, name string) *config.DAG {
 	file := path.Join(testsDir, name)
 	cl := &config.Loader{}
 	cfg, err := cl.Load(file, "")
@@ -296,7 +296,7 @@ func testLoadDAG(t *testing.T, name string) *config.Config {
 	return cfg
 }
 
-func testDAGAsync(t *testing.T, file string) (*Agent, *config.Config) {
+func testDAGAsync(t *testing.T, file string) (*Agent, *config.DAG) {
 	t.Helper()
 
 	cfg := testLoadDAG(t, file)
