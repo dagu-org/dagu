@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
@@ -32,7 +32,7 @@ func Test_stopCommand(t *testing.T) {
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	cfg := &config.DAG{
+	cfg := &dag.DAG{
 		ConfigPath: c,
 	}
 

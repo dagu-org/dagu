@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
 func testWriteStatusToFile(t *testing.T, db *Database) {
-	cfg := &config.DAG{
+	cfg := &dag.DAG{
 		Name:       "test_write_status",
 		ConfigPath: "test_write_status.yaml",
 	}
@@ -60,7 +60,7 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 }
 
 func testWriteStatusToExistingFile(t *testing.T, db *Database) {
-	cfg := &config.DAG{
+	cfg := &dag.DAG{
 		Name:       "test_append_to_existing",
 		ConfigPath: "test_append_to_existing.yaml",
 	}

@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -102,13 +102,13 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		params := getDAGParameter(r)
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
 		dr := controller.NewDAGReader()
-		dag, err := dr.ReadDAG(file, false)
-		if dag == nil {
+		d, err := dr.ReadDAG(file, false)
+		if d == nil {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(dag.Config)
-		data := newDAGResponse(cfg, dag, params.Tab)
+		c := controller.New(d.Config)
+		data := newDAGResponse(cfg, d, params.Tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
 		}
@@ -116,10 +116,10 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		switch params.Tab {
 		case DAG_TabType_Status:
 		case DAG_TabType_Config:
-			data.Definition, _ = config.ReadConfig(file)
+			data.Definition, _ = dag.ReadConfig(file)
 
 		case DAG_TabType_History:
-			logs := controller.New(dag.Config).GetStatusHist(30)
+			logs := controller.New(d.Config).GetStatusHist(30)
 			data.LogData = buildLog(logs)
 
 		case DAG_TabType_StepLog:

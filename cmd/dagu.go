@@ -10,8 +10,8 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/settings"
 )
 
@@ -54,14 +54,14 @@ func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	return cfg, err
 }
 
-func loadDAG(c *cli.Context, dagPath, params string) (dag *config.DAG, err error) {
+func loadDAG(c *cli.Context, dagPath, params string) (d *dag.DAG, err error) {
 	cfg, err := loadGlobalConfig(c)
 	if err != nil {
 		return nil, err
 	}
-	cl := &config.Loader{BaseConfig: cfg.BaseConfig}
-	dag, err = cl.Load(dagPath, params)
-	return dag, err
+	cl := &dag.Loader{BaseConfig: cfg.BaseConfig}
+	d, err = cl.Load(dagPath, params)
+	return d, err
 }
 
 func listenSignals(abortFunc func(sig os.Signal)) {

@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 func newStopCommand() *cli.Command {
@@ -23,7 +23,7 @@ func newStopCommand() *cli.Command {
 	}
 }
 
-func stop(cfg *config.DAG) error {
+func stop(cfg *dag.DAG) error {
 	c := controller.New(cfg)
 	log.Printf("Stopping...")
 	return c.Stop()

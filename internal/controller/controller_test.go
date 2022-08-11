@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -40,10 +40,10 @@ func testConfig(name string) string {
 func TestGetStatus(t *testing.T) {
 	file := testConfig("controller_success.yaml")
 	dr := controller.NewDAGReader()
-	dag, err := dr.ReadDAG(file, false)
+	d, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
 
-	st, err := controller.New(dag.Config).GetStatus()
+	st, err := controller.New(d.Config).GetStatus()
 	require.NoError(t, err)
 	assert.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
@@ -243,7 +243,7 @@ func TestRetry(t *testing.T) {
 func TestSave(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
 	defer os.RemoveAll(tmpDir)
-	cfg := &config.DAG{
+	cfg := &dag.DAG{
 		Name:       "test",
 		ConfigPath: path.Join(tmpDir, "test.yaml"),
 	}
@@ -293,7 +293,7 @@ func TestNewConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// check file
-	cl := &config.Loader{}
+	cl := &dag.Loader{}
 
 	cfg, err := cl.Load(filename, "")
 	require.NoError(t, err)
@@ -322,7 +322,7 @@ func TestRenameConfig(t *testing.T) {
 	require.FileExists(t, newFile)
 }
 
-func newStatus(cfg *config.DAG, reqId string,
+func newStatus(cfg *dag.DAG, reqId string,
 	schedulerStatus scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
 	n := time.Now()
 	ret := models.NewStatus(

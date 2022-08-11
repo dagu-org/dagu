@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -35,7 +35,7 @@ func TestAgent(t *testing.T) {
 	}()
 
 	f := path.Join(testsDir, "runner/scheduled_job.yaml")
-	cl := &config.Loader{}
+	cl := &dag.Loader{}
 	dag, err := cl.LoadHeadOnly(f)
 	require.NoError(t, err)
 	c := controller.New(dag)

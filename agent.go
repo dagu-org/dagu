@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mailer"
@@ -44,7 +44,7 @@ type Agent struct {
 }
 
 type AgentConfig struct {
-	DAG *config.DAG
+	DAG *dag.DAG
 	Dry bool
 }
 
@@ -245,7 +245,7 @@ func (a *Agent) setupSocketServer() (err error) {
 func (a *Agent) checkPreconditions() error {
 	if len(a.DAG.Preconditions) > 0 {
 		log.Printf("checking preconditions for \"%s\"", a.DAG.Name)
-		if err := config.EvalConditions(a.DAG.Preconditions); err != nil {
+		if err := dag.EvalConditions(a.DAG.Preconditions); err != nil {
 			a.scheduler.Cancel(a.graph)
 			return err
 		}

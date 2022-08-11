@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -94,11 +94,11 @@ func TestSchedulerFailPartially(t *testing.T) {
 func TestSchedulerContinueOnFailure(t *testing.T) {
 	g, sc, err := testSchedule(t,
 		step("1", testCommand),
-		&config.Step{
+		&dag.Step{
 			Name:    "2",
 			Command: testCommandFail,
 			Depends: []string{"1"},
-			ContinueOn: config.ContinueOn{
+			ContinueOn: dag.ContinueOn{
 				Failure: true,
 			},
 		},
@@ -116,17 +116,17 @@ func TestSchedulerContinueOnFailure(t *testing.T) {
 func TestSchedulerAllowSkipped(t *testing.T) {
 	g, sc, err := testSchedule(t,
 		step("1", testCommand),
-		&config.Step{
+		&dag.Step{
 			Name:    "2",
 			Command: testCommand,
 			Depends: []string{"1"},
-			Preconditions: []*config.Condition{
+			Preconditions: []*dag.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "0",
 				},
 			},
-			ContinueOn: config.ContinueOn{Skipped: true},
+			ContinueOn: dag.ContinueOn{Skipped: true},
 		},
 		step("3", testCommand, "2"),
 	)
@@ -168,21 +168,21 @@ func TestSchedulerCancel(t *testing.T) {
 func TestSchedulerRetryFail(t *testing.T) {
 	cmd := path.Join(testBinDir, "testfile.sh")
 	g, sc, err := testSchedule(t,
-		&config.Step{
+		&dag.Step{
 			Name:        "1",
 			Command:     cmd,
-			ContinueOn:  config.ContinueOn{Failure: true},
-			RetryPolicy: &config.RetryPolicy{Limit: 1},
+			ContinueOn:  dag.ContinueOn{Failure: true},
+			RetryPolicy: &dag.RetryPolicy{Limit: 1},
 		},
-		&config.Step{
+		&dag.Step{
 			Name:        "2",
 			Command:     cmd,
 			Args:        []string{"flag"},
-			ContinueOn:  config.ContinueOn{Failure: true},
-			RetryPolicy: &config.RetryPolicy{Limit: 1},
+			ContinueOn:  dag.ContinueOn{Failure: true},
+			RetryPolicy: &dag.RetryPolicy{Limit: 1},
 			Depends:     []string{"1"},
 		},
-		&config.Step{
+		&dag.Step{
 			Name:    "3",
 			Command: cmd,
 			Depends: []string{"2"},
@@ -213,12 +213,12 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	g, sc := newTestSchedule(
 		t, &Config{MaxActiveRuns: 2},
 		step("1", testCommand),
-		&config.Step{
+		&dag.Step{
 			Name:    "2",
 			Command: cmd,
 			Args:    []string{tmpFile},
 			Depends: []string{"1"},
-			RetryPolicy: &config.RetryPolicy{
+			RetryPolicy: &dag.RetryPolicy{
 				Limit:    10,
 				Interval: time.Millisecond * 800,
 			},
@@ -269,11 +269,11 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 func TestStepPreCondition(t *testing.T) {
 	g, sc, err := testSchedule(t,
 		step("1", testCommand),
-		&config.Step{
+		&dag.Step{
 			Name:    "2",
 			Command: testCommand,
 			Depends: []string{"1"},
-			Preconditions: []*config.Condition{
+			Preconditions: []*dag.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "0",
@@ -281,10 +281,10 @@ func TestStepPreCondition(t *testing.T) {
 			},
 		},
 		step("3", testCommand, "2"),
-		&config.Step{
+		&dag.Step{
 			Name:    "4",
 			Command: testCommand,
-			Preconditions: []*config.Condition{
+			Preconditions: []*dag.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -350,7 +350,7 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 
 func TestSchedulerOnSignal(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&config.Step{
+		&dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"10"},
@@ -446,11 +446,11 @@ func TestSchedulerOnFailure(t *testing.T) {
 
 func TestRepeat(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&config.Step{
+		&dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
-			RepeatPolicy: config.RepeatPolicy{
+			RepeatPolicy: dag.RepeatPolicy{
 				Repeat:   true,
 				Interval: time.Millisecond * 300,
 			},
@@ -475,10 +475,10 @@ func TestRepeat(t *testing.T) {
 
 func TestRepeatFail(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&config.Step{
+		&dag.Step{
 			Name:    "1",
 			Command: testCommandFail,
-			RepeatPolicy: config.RepeatPolicy{
+			RepeatPolicy: dag.RepeatPolicy{
 				Repeat:   true,
 				Interval: time.Millisecond * 300,
 			},
@@ -496,11 +496,11 @@ func TestRepeatFail(t *testing.T) {
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&config.Step{
+		&dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
-			RepeatPolicy: config.RepeatPolicy{
+			RepeatPolicy: dag.RepeatPolicy{
 				Repeat:   true,
 				Interval: time.Millisecond * 300,
 			},
@@ -550,7 +550,7 @@ func TestSchedulerStatusText(t *testing.T) {
 
 func TestNodeSetupFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&config.Step{
+		&dag.Step{
 			Name:    "1",
 			Command: "sh",
 			Dir:     "~/",
@@ -569,7 +569,7 @@ func TestNodeSetupFailure(t *testing.T) {
 
 func TestNodeTeardownFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&config.Step{
+		&dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
@@ -611,9 +611,9 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	require.Equal(t, "take-output", os.ExpandEnv("$TOOK_PREV_OUT"))
 }
 
-func step(name, command string, depends ...string) *config.Step {
+func step(name, command string, depends ...string) *dag.Step {
 	cmd, args := utils.SplitCommand(command, false)
-	return &config.Step{
+	return &dag.Step{
 		Name:    name,
 		Command: cmd,
 		Args:    args,
@@ -621,7 +621,7 @@ func step(name, command string, depends ...string) *config.Step {
 	}
 }
 
-func testSchedule(t *testing.T, steps ...*config.Step) (
+func testSchedule(t *testing.T, steps ...*dag.Step) (
 	*ExecutionGraph, *Scheduler, error,
 ) {
 	t.Helper()
@@ -630,7 +630,7 @@ func testSchedule(t *testing.T, steps ...*config.Step) (
 	return g, sc, sc.Schedule(g, nil)
 }
 
-func newTestSchedule(t *testing.T, cfg *Config, steps ...*config.Step) (
+func newTestSchedule(t *testing.T, cfg *Config, steps ...*dag.Step) (
 	*ExecutionGraph, *Scheduler,
 ) {
 	t.Helper()

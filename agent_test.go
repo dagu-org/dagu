@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/settings"
@@ -113,7 +113,7 @@ func TestCancelDAG(t *testing.T) {
 
 func TestPreConditionInvalid(t *testing.T) {
 	cfg := testLoadDAG(t, "agent_multiple_steps.yaml")
-	cfg.Preconditions = []*config.Condition{
+	cfg.Preconditions = []*dag.Condition{
 		{
 			Condition: "`echo 1`",
 			Expected:  "0",
@@ -131,7 +131,7 @@ func TestPreConditionInvalid(t *testing.T) {
 func TestPreConditionValid(t *testing.T) {
 	cfg := testLoadDAG(t, "agent_with_params.yaml")
 
-	cfg.Preconditions = []*config.Condition{
+	cfg.Preconditions = []*dag.Condition{
 		{
 			Condition: "`echo 1`",
 			Expected:  "1",
@@ -279,7 +279,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
 }
 
-func testDAG(t *testing.T, cfg *config.DAG) (*models.Status, error) {
+func testDAG(t *testing.T, cfg *dag.DAG) (*models.Status, error) {
 	t.Helper()
 	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: cfg,
@@ -288,15 +288,15 @@ func testDAG(t *testing.T, cfg *config.DAG) (*models.Status, error) {
 	return a.Status(), err
 }
 
-func testLoadDAG(t *testing.T, name string) *config.DAG {
+func testLoadDAG(t *testing.T, name string) *dag.DAG {
 	file := path.Join(testsDir, name)
-	cl := &config.Loader{}
+	cl := &dag.Loader{}
 	cfg, err := cl.Load(file, "")
 	require.NoError(t, err)
 	return cfg
 }
 
-func testDAGAsync(t *testing.T, file string) (*Agent, *config.DAG) {
+func testDAGAsync(t *testing.T, file string) (*Agent, *dag.DAG) {
 	t.Helper()
 
 	cfg := testLoadDAG(t, file)

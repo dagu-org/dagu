@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -46,7 +46,7 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	utils.LogErr("read DAGs directory", err)
 	dr := NewDAGReader()
 	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), config.EXTENSIONS) {
+		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			dag, err := dr.ReadDAG(filepath.Join(dir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
 			if dag != nil {
@@ -88,10 +88,10 @@ func RenameConfig(oldConfigPath, newConfigPath string) error {
 var _ Controller = (*controller)(nil)
 
 type controller struct {
-	*config.DAG
+	*dag.DAG
 }
 
-func New(cfg *config.DAG) Controller {
+func New(cfg *dag.DAG) Controller {
 	return &controller{
 		DAG: cfg,
 	}
@@ -229,7 +229,7 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 
 func (c *controller) Save(value string) error {
 	// validate
-	cl := config.Loader{}
+	cl := dag.Loader{}
 	_, err := cl.LoadData([]byte(value))
 	if err != nil {
 		return err
@@ -248,7 +248,7 @@ func assertConfigPath(configPath string) error {
 	return nil
 }
 
-func defaultStatus(cfg *config.DAG) *models.Status {
+func defaultStatus(cfg *dag.DAG) *models.Status {
 	return models.NewStatus(
 		cfg,
 		nil,

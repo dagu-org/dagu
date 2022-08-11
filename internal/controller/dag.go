@@ -3,7 +3,7 @@ package controller
 import (
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/settings"
@@ -29,7 +29,7 @@ func NewDAGReader() *DAGReader {
 type DAG struct {
 	File      string
 	Dir       string
-	Config    *config.DAG
+	Config    *dag.DAG
 	Status    *models.Status
 	Suspended bool
 	Error     error
@@ -38,8 +38,8 @@ type DAG struct {
 
 // ReadDAG loads DAG from config file.
 func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
-	cl := config.Loader{}
-	var cfg *config.DAG
+	cl := dag.Loader{}
+	var cfg *dag.DAG
 	var err error
 	if headOnly {
 		cfg, err = cl.LoadHeadOnly(file)
@@ -50,7 +50,7 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 		if cfg != nil {
 			return dr.newDAG(cfg, defaultStatus(cfg), err), err
 		}
-		cfg := &config.DAG{ConfigPath: file}
+		cfg := &dag.DAG{ConfigPath: file}
 		cfg.Init()
 		return dr.newDAG(cfg, defaultStatus(cfg), err), err
 	}
@@ -66,7 +66,7 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	return dr.newDAG(cfg, status, err), nil
 }
 
-func (dr *DAGReader) newDAG(cfg *config.DAG, s *models.Status, err error) *DAG {
+func (dr *DAGReader) newDAG(cfg *dag.DAG, s *models.Status, err error) *DAG {
 	ret := &DAG{
 		File:      filepath.Base(cfg.ConfigPath),
 		Dir:       filepath.Dir(cfg.ConfigPath),

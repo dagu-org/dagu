@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 
 	"github.com/stretchr/testify/require"
@@ -23,29 +23,29 @@ func TestPid(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	cfg := &config.DAG{
+	cfg := &dag.DAG{
 		ConfigPath:  "",
 		Name:        "",
 		Description: "",
 		Env:         []string{},
 		LogDir:      "",
-		HandlerOn:   config.HandlerOn{},
-		Steps: []*config.Step{
+		HandlerOn:   dag.HandlerOn{},
+		Steps: []*dag.Step{
 			{
 				Name: "1", Description: "", Variables: []string{},
 				Dir: "dir", Command: "echo 1", Args: []string{},
-				Depends: []string{}, ContinueOn: config.ContinueOn{},
-				RetryPolicy: &config.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: config.RepeatPolicy{}, Preconditions: []*config.Condition{},
+				Depends: []string{}, ContinueOn: dag.ContinueOn{},
+				RetryPolicy: &dag.RetryPolicy{}, MailOnError: false,
+				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []*dag.Condition{},
 			},
 		},
-		MailOn:            &config.MailOn{},
-		ErrorMail:         &config.MailConfig{},
-		InfoMail:          &config.MailConfig{},
-		Smtp:              &config.SmtpConfig{},
+		MailOn:            &dag.MailOn{},
+		ErrorMail:         &dag.MailConfig{},
+		InfoMail:          &dag.MailConfig{},
+		Smtp:              &dag.SmtpConfig{},
 		Delay:             0,
 		HistRetentionDays: 0,
-		Preconditions:     []*config.Condition{},
+		Preconditions:     []*dag.Condition{},
 		MaxActiveRuns:     0,
 		Params:            []string{},
 		DefaultParams:     "",
@@ -64,7 +64,7 @@ func TestStatusSerialization(t *testing.T) {
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	cfg := &config.DAG{Name: "test"}
+	cfg := &dag.DAG{Name: "test"}
 	status := NewStatus(cfg, nil, scheduler.SchedulerStatus_Running,
 		10000, nil, nil)
 	status.CorrectRunningStatus()

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -18,7 +18,7 @@ func TestSuspendChecker(t *testing.T) {
 
 	sc := NewSuspendChecker(s)
 
-	cfg := &config.DAG{
+	cfg := &dag.DAG{
 		Name: "test",
 	}
 

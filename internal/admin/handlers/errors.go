@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 var (
@@ -19,7 +19,7 @@ func formatError(err error) string {
 
 func encodeError(w http.ResponseWriter, err error) {
 	switch err {
-	case config.ErrConfigNotFound:
+	case dag.ErrConfigNotFound:
 		http.Error(w, formatError(err), http.StatusNotFound)
 	case errInvalidArgs:
 		http.Error(w, formatError(err), http.StatusBadRequest)

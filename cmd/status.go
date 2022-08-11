@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 
 	"github.com/urfave/cli/v2"
@@ -25,7 +25,7 @@ func newStatusCommand() *cli.Command {
 	}
 }
 
-func queryStatus(cfg *config.DAG) error {
+func queryStatus(cfg *dag.DAG) error {
 	status, err := controller.New(cfg).GetStatus()
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 type HTTPExecutor struct {
@@ -61,7 +61,7 @@ func (e *HTTPExecutor) Run() error {
 	return nil
 }
 
-func CreateHTTPExecutor(ctx context.Context, step *config.Step) (Executor, error) {
+func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 	var reqCfg HTTPConfig
 	if len(step.Script) > 0 {
 		if err := json.Unmarshal([]byte(step.Script), &reqCfg); err != nil {

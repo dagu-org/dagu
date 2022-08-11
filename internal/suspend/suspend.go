@@ -3,7 +3,7 @@ package suspend
 import (
 	"fmt"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -18,7 +18,7 @@ func NewSuspendChecker(s *storage.Storage) *SuspendChecker {
 	}
 }
 
-func (s *SuspendChecker) ToggleSuspend(cfg *config.DAG, suspend bool) error {
+func (s *SuspendChecker) ToggleSuspend(cfg *dag.DAG, suspend bool) error {
 	if suspend {
 		return s.storage.Create(fileName(cfg))
 	} else if s.IsSuspended(cfg) {
@@ -27,10 +27,10 @@ func (s *SuspendChecker) ToggleSuspend(cfg *config.DAG, suspend bool) error {
 	return nil
 }
 
-func (s *SuspendChecker) IsSuspended(cfg *config.DAG) bool {
+func (s *SuspendChecker) IsSuspended(cfg *dag.DAG) bool {
 	return s.storage.Exists(fileName(cfg))
 }
 
-func fileName(cfg *config.DAG) string {
+func fileName(cfg *dag.DAG) string {
 	return fmt.Sprintf("%s.suspend", utils.ValidFilename(cfg.Name, "-"))
 }

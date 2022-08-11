@@ -5,7 +5,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 func newStartCommand() *cli.Command {
@@ -31,7 +31,7 @@ func newStartCommand() *cli.Command {
 	}
 }
 
-func start(cfg *config.DAG) error {
+func start(cfg *dag.DAG) error {
 	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
 		DAG: cfg,
 		Dry: false,

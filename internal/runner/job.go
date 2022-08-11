@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -17,7 +17,7 @@ type Job interface {
 }
 
 type job struct {
-	DAG       *config.DAG
+	DAG       *dag.DAG
 	Config    *admin.Config
 	StartTime time.Time
 }

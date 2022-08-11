@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 type Executor interface {
@@ -16,7 +16,7 @@ type Executor interface {
 	Run() error
 }
 
-type Creator func(ctx context.Context, step *config.Step) (Executor, error)
+type Creator func(ctx context.Context, step *dag.Step) (Executor, error)
 
 var executors = make(map[string]Creator)
 
@@ -24,7 +24,7 @@ func Register(name string, register Creator) {
 	executors[name] = register
 }
 
-func CreateExecutor(ctx context.Context, step *config.Step) (Executor, error) {
+func CreateExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 	f, ok := executors[step.Executor]
 	if ok {
 		return f(ctx, step)

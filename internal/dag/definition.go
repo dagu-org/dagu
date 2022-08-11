@@ -1,4 +1,4 @@
-package config
+package dag
 
 type configDefinition struct {
 	Name              string

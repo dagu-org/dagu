@@ -1,4 +1,4 @@
-package config
+package dag
 
 // Matcher is a function that returns true
 // if the given config matches the filter.
