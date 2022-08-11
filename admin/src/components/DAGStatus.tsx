@@ -64,7 +64,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
   return (
     <React.Fragment>
       <Box>
-        <SubTitle>Status</SubTitle>
+        <SubTitle>Overview</SubTitle>
         <BorderedBox
           sx={{
             mt: 2,
@@ -121,7 +121,6 @@ function DAGStatus({ DAG, name, refresh }: Props) {
           {(props) => (
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
-                <SubTitle>DAG Status</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <StatusInfoTable
                     status={DAG.Status}
@@ -131,7 +130,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
               </Box>
 
               <Box sx={{ mt: 3 }}>
-                <SubTitle>Step Status</SubTitle>
+                <SubTitle>Steps</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <NodeStatusTable
                     nodes={DAG.Status!.Nodes}
@@ -143,7 +142,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
 
               {handlers && handlers.length ? (
                 <Box sx={{ mt: 3 }}>
-                  <SubTitle>Handler Status</SubTitle>
+                  <SubTitle>Lifecycle Hooks</SubTitle>
                   <Box sx={{ mt: 2 }}>
                     <NodeStatusTable
                       nodes={handlers}

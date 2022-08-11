@@ -152,7 +152,7 @@ export function getNextSchedule(data: DAGStatus): number {
 
 export enum DetailTabId {
   Status = '0',
-  Config = '1',
+  Spec = '1',
   History = '2',
   StepLog = '3',
   ScLog = '4',

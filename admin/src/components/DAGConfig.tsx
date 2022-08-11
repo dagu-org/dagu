@@ -2,8 +2,7 @@ import { Box, Button, Stack } from '@mui/material';
 import React from 'react';
 import { GetDAGResponse } from '../api/DAG';
 import { DAGContext } from '../contexts/DAGContext';
-import { Config } from '../models';
-import { Step } from '../models';
+import { DAG, Step } from '../models';
 import ConfigEditor from './ConfigEditor';
 import ConfigInfoTable from './ConfigInfoTable';
 import ConfigPreview from './ConfigPreview';
@@ -19,7 +18,7 @@ type Props = {
 function DAGConfig({ data }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState(data.Definition);
-  const handlers = getHandlersFromConfig(data.DAG?.DAG);
+  const handlers = getHandlers(data.DAG?.DAG);
   if (data.DAG?.DAG == null) {
     return null;
   }
@@ -30,7 +29,7 @@ function DAGConfig({ data }: Props) {
         data.DAG.DAG && (
           <React.Fragment>
             <Box>
-              <SubTitle>Config</SubTitle>
+              <SubTitle>Overview</SubTitle>
               <BorderedBox
                 sx={{
                   mt: 2,
@@ -52,14 +51,13 @@ function DAGConfig({ data }: Props) {
             </Box>
 
             <Box sx={{ mt: 3 }}>
-              <SubTitle>DAG Config</SubTitle>
               <Box sx={{ mt: 2 }}>
                 <ConfigInfoTable config={data.DAG.DAG!}></ConfigInfoTable>
               </Box>
             </Box>
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
-                <SubTitle>Step Config</SubTitle>
+                <SubTitle>Steps</SubTitle>
                 <ConfigStepTable
                   steps={data.DAG.DAG.Steps}
                 ></ConfigStepTable>
@@ -67,7 +65,7 @@ function DAGConfig({ data }: Props) {
             </Box>
             {handlers && handlers.length ? (
               <Box sx={{ mt: 3 }}>
-                <SubTitle>Handler Config</SubTitle>
+                <SubTitle>Lifecycle Hooks</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <ConfigStepTable steps={handlers}></ConfigStepTable>
                 </Box>
@@ -75,7 +73,7 @@ function DAGConfig({ data }: Props) {
             ) : null}
 
             <Box sx={{ mt: 3 }}>
-              <SubTitle>Config Editor</SubTitle>
+              <SubTitle>Spec</SubTitle>
               <BorderedBox
                 sx={{
                   mt: 2,
@@ -185,12 +183,12 @@ function DAGConfig({ data }: Props) {
 }
 export default DAGConfig;
 
-function getHandlersFromConfig(cfg?: Config) {
+function getHandlers(dag?: DAG) {
   const r: Step[] = [];
-  if (!cfg) {
+  if (!dag) {
     return r;
   }
-  const h = cfg.HandlerOn;
+  const h = dag.HandlerOn;
   if (h.Success) {
     r.push(h.Success);
   }

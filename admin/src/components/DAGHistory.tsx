@@ -35,7 +35,7 @@ function DAGHistory({ logData }: Props) {
           {logs && logs[idx] ? (
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
-                <SubTitle>DAG Status</SubTitle>
+                <SubTitle>Status</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <StatusInfoTable
                     status={logs[idx].Status}
@@ -45,7 +45,7 @@ function DAGHistory({ logData }: Props) {
                 </Box>
               </Box>
               <Box sx={{ mt: 3 }}>
-                <SubTitle>Step Status</SubTitle>
+                <SubTitle>Steps</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <NodeStatusTable
                     nodes={logs[idx].Status.Nodes}
@@ -58,7 +58,7 @@ function DAGHistory({ logData }: Props) {
 
               {handlers && handlers.length ? (
                 <Box sx={{ mt: 3 }}>
-                  <SubTitle>Handler Status</SubTitle>
+                  <SubTitle>Lifecycle Hooks</SubTitle>
                   <Box sx={{ mt: 2 }}>
                     <NodeStatusTable
                       nodes={Handlers(logs[idx].Status)}

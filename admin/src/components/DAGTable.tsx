@@ -338,7 +338,7 @@ const defaultColumns = [
   }),
   table.createDataColumn('Type', {
     id: 'On/Off',
-    header: 'On/Off',
+    header: 'Live',
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type != DAGDataType.DAG) {
