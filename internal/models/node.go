@@ -3,21 +3,21 @@ package models
 import (
 	"fmt"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Node struct {
-	*config.Step `json:"Step"`
-	Log          string               `json:"Log"`
-	StartedAt    string               `json:"StartedAt"`
-	FinishedAt   string               `json:"FinishedAt"`
-	Status       scheduler.NodeStatus `json:"Status"`
-	RetryCount   int                  `json:"RetryCount"`
-	DoneCount    int                  `json:"DoneCount"`
-	Error        string               `json:"Error"`
-	StatusText   string               `json:"StatusText"`
+	*dag.Step  `json:"Step"`
+	Log        string               `json:"Log"`
+	StartedAt  string               `json:"StartedAt"`
+	FinishedAt string               `json:"FinishedAt"`
+	Status     scheduler.NodeStatus `json:"Status"`
+	RetryCount int                  `json:"RetryCount"`
+	DoneCount  int                  `json:"DoneCount"`
+	Error      string               `json:"Error"`
+	StatusText string               `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *scheduler.Node {
@@ -67,7 +67,7 @@ func FromNodes(nodes []*scheduler.Node) []*Node {
 	return ret
 }
 
-func FromSteps(steps []*config.Step) []*Node {
+func FromSteps(steps []*dag.Step) []*Node {
 	ret := []*Node{}
 	for _, s := range steps {
 		ret = append(ret, fromStepWithDefValues(s))
@@ -75,7 +75,7 @@ func FromSteps(steps []*config.Step) []*Node {
 	return ret
 }
 
-func fromStepWithDefValues(s *config.Step) *Node {
+func fromStepWithDefValues(s *dag.Step) *Node {
 	if s == nil {
 		return nil
 	}

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
@@ -20,7 +20,7 @@ import (
 func TestReporter(t *testing.T) {
 
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node,
+		t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node,
 	){
 		"create errormail":   testErrorMail,
 		"no errormail":       testNoErrorMail,
@@ -32,22 +32,22 @@ func TestReporter(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
-			cfg := &config.Config{
+			d := &dag.DAG{
 				Name: "test DAG",
-				MailOn: &config.MailOn{
+				MailOn: &dag.MailOn{
 					Failure: true,
 				},
-				ErrorMail: &config.MailConfig{
+				ErrorMail: &dag.MailConfig{
 					Prefix: "Error: ",
 					From:   "from@mailer.com",
 					To:     "to@mailer.com",
 				},
-				InfoMail: &config.MailConfig{
+				InfoMail: &dag.MailConfig{
 					Prefix: "Success: ",
 					From:   "from@mailer.com",
 					To:     "to@mailer.com",
 				},
-				Steps: []*config.Step{
+				Steps: []*dag.Step{
 					{
 						Name:    "test-step",
 						Command: "true",
@@ -57,7 +57,7 @@ func TestReporter(t *testing.T) {
 
 			nodes := []*models.Node{
 				{
-					Step: &config.Step{
+					Step: &dag.Step{
 						Name:    "test-step",
 						Command: "true",
 						Args:    []string{"param-x"},
@@ -74,16 +74,16 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			fn(t, rp, cfg, nodes)
+			fn(t, rp, d, nodes)
 		})
 	}
 }
 
-func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
-	cfg.MailOn.Failure = true
-	cfg.MailOn.Success = false
+func testErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
+	d.MailOn.Failure = true
+	d.MailOn.Success = false
 
-	rp.SendMail(cfg, &models.Status{
+	rp.SendMail(d, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -94,11 +94,11 @@ func testErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mode
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
-	cfg.MailOn.Failure = false
-	cfg.MailOn.Success = true
+func testNoErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
+	d.MailOn.Failure = false
+	d.MailOn.Success = true
 
-	rp.SendMail(cfg, &models.Status{
+	rp.SendMail(d, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, nil)
@@ -107,11 +107,11 @@ func testNoErrorMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
-	cfg.MailOn.Failure = true
-	cfg.MailOn.Success = true
+func testSuccessMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
+	d.MailOn.Failure = true
+	d.MailOn.Success = true
 
-	rp.SendMail(cfg, &models.Status{
+	rp.SendMail(d, &models.Status{
 		Status: scheduler.SchedulerStatus_Success,
 		Nodes:  nodes,
 	}, nil)
@@ -122,7 +122,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mo
 	require.Equal(t, 1, mock.count)
 }
 
-func testReportSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testReportSummary(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func testReportSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*
 	require.Contains(t, s, "test error")
 }
 
-func testReportStep(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -162,15 +162,15 @@ func testReportStep(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mod
 		log.SetOutput(origStdout)
 	}()
 
-	cfg.Steps[0].MailOnError = true
+	d.Steps[0].MailOnError = true
 	rp.ReportStep(
-		cfg,
+		d,
 		&models.Status{
 			Status: scheduler.SchedulerStatus_Running,
 			Nodes:  nodes,
 		},
 		&scheduler.Node{
-			Step: cfg.Steps[0],
+			Step: d.Steps[0],
 			NodeState: scheduler.NodeState{
 				Status: scheduler.NodeStatus_Error,
 			},
@@ -185,24 +185,24 @@ func testReportStep(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*mod
 	require.NoError(t, err)
 
 	s := buf.String()
-	require.Contains(t, s, cfg.Steps[0].Name)
+	require.Contains(t, s, d.Steps[0].Name)
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testRenderSummary(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
 	status := &models.Status{
-		Name:   cfg.Name,
+		Name:   d.Name,
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}
 	summary := renderSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
-	require.Contains(t, summary, cfg.Name)
+	require.Contains(t, summary, d.Name)
 }
 
-func testRenderTable(t *testing.T, rp *Reporter, cfg *config.Config, nodes []*models.Node) {
+func testRenderTable(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node) {
 	summary := renderTable(nodes)
 	require.Contains(t, summary, nodes[0].Name)
 	require.Contains(t, summary, nodes[0].Args[0])

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
@@ -29,16 +29,16 @@ type Mailer interface {
 }
 
 // ReportStep is a function that reports the status of a step.
-func (rp *Reporter) ReportStep(cfg *config.Config, status *models.Status, node *scheduler.Node) error {
+func (rp *Reporter) ReportStep(d *dag.DAG, status *models.Status, node *scheduler.Node) error {
 	st := node.ReadStatus()
 	if st != scheduler.NodeStatus_None {
 		log.Printf("%s %s", node.Name, status.StatusText)
 	}
 	if st == scheduler.NodeStatus_Error && node.MailOnError {
 		return rp.Mailer.SendMail(
-			cfg.ErrorMail.From,
-			[]string{cfg.ErrorMail.To},
-			fmt.Sprintf("%s %s (%s)", cfg.ErrorMail.Prefix, cfg.Name, status.Status),
+			d.ErrorMail.From,
+			[]string{d.ErrorMail.To},
+			fmt.Sprintf("%s %s (%s)", d.ErrorMail.Prefix, d.Name, status.Status),
 			renderHTML(status.Nodes),
 		)
 	}
@@ -58,22 +58,22 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 }
 
 // SendMail is a function that sends a report mail.
-func (rp *Reporter) SendMail(cfg *config.Config, status *models.Status, err error) error {
+func (rp *Reporter) SendMail(d *dag.DAG, status *models.Status, err error) error {
 	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
-		if cfg.MailOn != nil && cfg.MailOn.Failure {
+		if d.MailOn != nil && d.MailOn.Failure {
 			return rp.Mailer.SendMail(
-				cfg.ErrorMail.From,
-				[]string{cfg.ErrorMail.To},
-				fmt.Sprintf("%s %s (%s)", cfg.ErrorMail.Prefix, cfg.Name, status.Status),
+				d.ErrorMail.From,
+				[]string{d.ErrorMail.To},
+				fmt.Sprintf("%s %s (%s)", d.ErrorMail.Prefix, d.Name, status.Status),
 				renderHTML(status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.SchedulerStatus_Success {
-		if cfg.MailOn != nil && cfg.MailOn.Success {
+		if d.MailOn != nil && d.MailOn.Success {
 			rp.Mailer.SendMail(
-				cfg.InfoMail.From,
-				[]string{cfg.InfoMail.To},
-				fmt.Sprintf("%s %s (%s)", cfg.InfoMail.Prefix, cfg.Name, status.Status),
+				d.InfoMail.From,
+				[]string{d.InfoMail.To},
+				fmt.Sprintf("%s %s (%s)", d.InfoMail.Prefix, d.Name, status.Status),
 				renderHTML(status.Nodes),
 			)
 		}

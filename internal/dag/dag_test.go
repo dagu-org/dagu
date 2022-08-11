@@ -1,4 +1,4 @@
-package config
+package dag
 
 import (
 	"fmt"
@@ -48,20 +48,20 @@ func TestAssertStepDefinition(t *testing.T) {
 func TestConfigReadClone(t *testing.T) {
 	l := &Loader{}
 
-	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
+	d, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
-	cfg2 := cfg.Clone()
-	require.Equal(t, cfg, cfg2)
+	dd := d.Clone()
+	require.Equal(t, d, dd)
 }
 
 func TestToString(t *testing.T) {
 	l := &Loader{}
 
-	cfg, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
+	d, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
-	ret := cfg.String()
+	ret := d.String()
 	require.Contains(t, ret, "Name: config_default")
 }
 
@@ -87,11 +87,11 @@ func TestReadConfig(t *testing.T) {
 func TestConfigLoadHeadOnly(t *testing.T) {
 	l := &Loader{}
 
-	cfg, err := l.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
+	d, err := l.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
 	require.NoError(t, err)
 
-	require.Equal(t, cfg.Name, "config_default")
-	require.True(t, len(cfg.Steps) == 0)
+	require.Equal(t, d.Name, "config_default")
+	require.True(t, len(d.Steps) == 0)
 }
 
 func TestLoadInvalidConfigError(t *testing.T) {
@@ -245,22 +245,22 @@ func TestTags(t *testing.T) {
 	tags := "Daily, Monthly"
 	wants := []string{"daily", "monthly"}
 	l := &Loader{}
-	d, err := l.unmarshalData([]byte(fmt.Sprintf(`
+	m, err := l.unmarshalData([]byte(fmt.Sprintf(`
 tags: %s
   	`, tags)))
 	require.NoError(t, err)
 
-	def, err := l.decode(d)
+	def, err := l.decode(m)
 	require.NoError(t, err)
 
 	b := &builder{}
-	cfg, err := b.buildFromDefinition(def, nil)
+	d, err := b.buildFromDefinition(def, nil)
 	require.NoError(t, err)
 
-	require.Equal(t, wants, cfg.Tags)
+	require.Equal(t, wants, d.Tags)
 
-	require.True(t, cfg.HasTag("daily"))
-	require.False(t, cfg.HasTag("weekly"))
+	require.True(t, d.HasTag("daily"))
+	require.False(t, d.HasTag("weekly"))
 }
 
 func TestSchedule(t *testing.T) {
@@ -287,42 +287,41 @@ func TestSchedule(t *testing.T) {
 		},
 	} {
 		l := &Loader{}
-		d, err := l.unmarshalData([]byte(test.Def))
+		m, err := l.unmarshalData([]byte(test.Def))
 		require.NoError(t, err)
 
-		def, err := l.decode(d)
+		def, err := l.decode(m)
 		require.NoError(t, err)
 
 		b := &builder{}
-		cfg, err := b.buildFromDefinition(def, nil)
+		d, err := b.buildFromDefinition(def, nil)
 
 		if test.Err {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, test.Want, len(cfg.Schedule))
+			require.Equal(t, test.Want, len(d.Schedule))
 		}
-
 	}
 }
 
 func TestSockAddr(t *testing.T) {
-	cfg := &Config{ConfigPath: "testdata/testDag.yml"}
-	require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, cfg.SockAddr())
+	d := &DAG{Path: "testdata/testDag.yml"}
+	require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, d.SockAddr())
 }
 
 func TestOverwriteGlobalConfig(t *testing.T) {
 	l := &Loader{BaseConfig: settings.MustGet(settings.SETTING__BASE_CONFIG)}
 
-	cfg, err := l.Load(path.Join(testDir, "config_overwrite.yaml"), "")
+	d, err := l.Load(path.Join(testDir, "config_overwrite.yaml"), "")
 	require.NoError(t, err)
 
-	require.Equal(t, &MailOn{Failure: false, Success: false}, cfg.MailOn)
-	require.Equal(t, cfg.HistRetentionDays, 7)
+	require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
+	require.Equal(t, d.HistRetentionDays, 7)
 
-	cfg, err = l.Load(path.Join(testDir, "config_no_overwrite.yaml"), "")
+	d, err = l.Load(path.Join(testDir, "config_no_overwrite.yaml"), "")
 	require.NoError(t, err)
 
-	require.Equal(t, &MailOn{Failure: true, Success: false}, cfg.MailOn)
-	require.Equal(t, cfg.HistRetentionDays, 30)
+	require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
+	require.Equal(t, d.HistRetentionDays, 30)
 }

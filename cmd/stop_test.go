@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
@@ -32,11 +32,11 @@ func Test_stopCommand(t *testing.T) {
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	cfg := &config.Config{
-		ConfigPath: c,
+	d := &dag.DAG{
+		Path: c,
 	}
 
-	s := db.ReadStatusHist(cfg.ConfigPath, 1)
+	s := db.ReadStatusHist(d.Path, 1)
 	require.Equal(t, 1, len(s))
 	require.Equal(t, scheduler.SchedulerStatus_Cancel, s[0].Status.Status)
 }

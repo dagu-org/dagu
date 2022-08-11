@@ -1,4 +1,4 @@
-package config
+package dag
 
 import (
 	"testing"
@@ -10,8 +10,8 @@ func TestContains(t *testing.T) {
 	f := &ContainTagsMatcher{
 		Tags: []string{"a", "b"},
 	}
-	cfg := &Config{
+	d := &DAG{
 		Tags: []string{"a", "b", "c"},
 	}
-	require.True(t, f.Matches(cfg))
+	require.True(t, f.Matches(d))
 }

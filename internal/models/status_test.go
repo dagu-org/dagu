@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 
 	"github.com/stretchr/testify/require"
@@ -23,34 +23,34 @@ func TestPid(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	cfg := &config.Config{
-		ConfigPath:  "",
+	d := &dag.DAG{
+		Path:        "",
 		Name:        "",
 		Description: "",
 		Env:         []string{},
 		LogDir:      "",
-		HandlerOn:   config.HandlerOn{},
-		Steps: []*config.Step{
+		HandlerOn:   dag.HandlerOn{},
+		Steps: []*dag.Step{
 			{
 				Name: "1", Description: "", Variables: []string{},
 				Dir: "dir", Command: "echo 1", Args: []string{},
-				Depends: []string{}, ContinueOn: config.ContinueOn{},
-				RetryPolicy: &config.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: config.RepeatPolicy{}, Preconditions: []*config.Condition{},
+				Depends: []string{}, ContinueOn: dag.ContinueOn{},
+				RetryPolicy: &dag.RetryPolicy{}, MailOnError: false,
+				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []*dag.Condition{},
 			},
 		},
-		MailOn:            &config.MailOn{},
-		ErrorMail:         &config.MailConfig{},
-		InfoMail:          &config.MailConfig{},
-		Smtp:              &config.SmtpConfig{},
+		MailOn:            &dag.MailOn{},
+		ErrorMail:         &dag.MailConfig{},
+		InfoMail:          &dag.MailConfig{},
+		Smtp:              &dag.SmtpConfig{},
 		Delay:             0,
 		HistRetentionDays: 0,
-		Preconditions:     []*config.Condition{},
+		Preconditions:     []*dag.Condition{},
 		MaxActiveRuns:     0,
 		Params:            []string{},
 		DefaultParams:     "",
 	}
-	st := NewStatus(cfg, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
+	st := NewStatus(d, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
 
 	js, err := st.ToJson()
 	require.NoError(t, err)
@@ -60,12 +60,12 @@ func TestStatusSerialization(t *testing.T) {
 
 	require.Equal(t, st.Name, st_.Name)
 	require.Equal(t, 1, len(st_.Nodes))
-	require.Equal(t, cfg.Steps[0].Name, st_.Nodes[0].Name)
+	require.Equal(t, d.Steps[0].Name, st_.Nodes[0].Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	cfg := &config.Config{Name: "test"}
-	status := NewStatus(cfg, nil, scheduler.SchedulerStatus_Running,
+	d := &dag.DAG{Name: "test"}
+	status := NewStatus(d, nil, scheduler.SchedulerStatus_Running,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)

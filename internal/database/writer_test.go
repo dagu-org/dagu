@@ -7,25 +7,25 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
 func testWriteStatusToFile(t *testing.T, db *Database) {
-	cfg := &config.Config{
-		Name:       "test_write_status",
-		ConfigPath: "test_write_status.yaml",
+	d := &dag.DAG{
+		Name: "test_write_status",
+		Path: "test_write_status.yaml",
 	}
-	dw, file, err := db.NewWriter(cfg.ConfigPath, time.Now(), "request-id-1")
+	dw, file, err := db.NewWriter(d.Path, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer func() {
 		dw.Close()
-		db.RemoveOld(cfg.ConfigPath, 0)
+		db.RemoveOld(d.Path, 0)
 	}()
 
-	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
+	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
 	status.RequestId = fmt.Sprintf("request-id-%d", time.Now().Unix())
 	require.NoError(t, dw.Write(status))
 	require.Regexp(t, ".*test_write_status.*", file)
@@ -36,12 +36,12 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	r, err := models.StatusFromJson(string(dat))
 	require.NoError(t, err)
 
-	require.Equal(t, cfg.Name, r.Name)
+	require.Equal(t, d.Name, r.Name)
 
 	err = dw.Close()
 	require.NoError(t, err)
 
-	old := cfg.ConfigPath
+	old := d.Path
 	new := "text_write_status_new.yaml"
 
 	oldDir := db.dir(old, prefix(old))
@@ -60,20 +60,20 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 }
 
 func testWriteStatusToExistingFile(t *testing.T, db *Database) {
-	cfg := &config.Config{
-		Name:       "test_append_to_existing",
-		ConfigPath: "test_append_to_existing.yaml",
+	d := &dag.DAG{
+		Name: "test_append_to_existing",
+		Path: "test_append_to_existing.yaml",
 	}
-	dw, file, err := db.NewWriter(cfg.ConfigPath, time.Now(), "request-id-1")
+	dw, file, err := db.NewWriter(d.Path, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 
-	status := models.NewStatus(cfg, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)
+	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)
 	status.RequestId = "request-id-test-write-status-to-existing-file"
 	require.NoError(t, dw.Write(status))
 	dw.Close()
 
-	data, err := db.FindByRequestId(cfg.ConfigPath, status.RequestId)
+	data, err := db.FindByRequestId(d.Path, status.RequestId)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Cancel)
 	require.Equal(t, file, data.File)
@@ -84,7 +84,7 @@ func testWriteStatusToExistingFile(t *testing.T, db *Database) {
 	require.NoError(t, dw.Write(status))
 	dw.Close()
 
-	data, err = db.FindByRequestId(cfg.ConfigPath, status.RequestId)
+	data, err = db.FindByRequestId(d.Path, status.RequestId)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.SchedulerStatus_Success)
 	require.Equal(t, file, data.File)

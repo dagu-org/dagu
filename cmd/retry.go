@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/yohamta/dagu"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 
@@ -33,16 +33,16 @@ func newRetryCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			cfg, err := loadDAG(c, c.Args().Get(0), status.Status.Params)
-			return retry(cfg, status)
+			d, err := loadDAG(c, c.Args().Get(0), status.Status.Params)
+			return retry(d, status)
 		},
 	}
 }
 
-func retry(cfg *config.Config, status *models.StatusFile) error {
+func retry(d *dag.DAG, status *models.StatusFile) error {
 	a := &dagu.Agent{
 		AgentConfig: &dagu.AgentConfig{
-			DAG: cfg,
+			DAG: d,
 			Dry: false,
 		},
 		RetryConfig: &dagu.RetryConfig{

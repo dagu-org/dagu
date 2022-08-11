@@ -1,4 +1,4 @@
-package config
+package dag
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var ErrConfigNotFound = errors.New("config file was not found")
+var ErrDAGNotFound = errors.New("DAG was not found")
 
 // Loader is a config loader.
 type Loader struct {
@@ -25,18 +25,18 @@ type Loader struct {
 
 // Load loads config from file.
 
-func (cl *Loader) Load(f, params string) (*Config, error) {
-	return cl.loadConfig(f,
-		&BuildConfigOptions{
+func (cl *Loader) Load(f, params string) (*DAG, error) {
+	return cl.loadDAG(f,
+		&BuildDAGOptions{
 			parameters: params,
 		},
 	)
 }
 
 // LoadwIithoutEval loads config from file without evaluating env variables.
-func (cl *Loader) LoadWithoutEval(f string) (*Config, error) {
-	return cl.loadConfig(f,
-		&BuildConfigOptions{
+func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
+	return cl.loadDAG(f,
+		&BuildDAGOptions{
 			parameters: "",
 			headOnly:   false,
 			noEval:     true,
@@ -46,9 +46,9 @@ func (cl *Loader) LoadWithoutEval(f string) (*Config, error) {
 }
 
 // LoadHeadOnly loads config from file and returns only the headline data.
-func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
-	return cl.loadConfig(f,
-		&BuildConfigOptions{
+func (cl *Loader) LoadHeadOnly(f string) (*DAG, error) {
+	return cl.loadDAG(f,
+		&BuildDAGOptions{
 			parameters: "",
 			headOnly:   true,
 			noEval:     true,
@@ -58,7 +58,7 @@ func (cl *Loader) LoadHeadOnly(f string) (*Config, error) {
 }
 
 // LoadData loads config from given data.
-func (cl *Loader) LoadData(data []byte) (*Config, error) {
+func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 	raw, err := cl.unmarshalData(data)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (cl *Loader) LoadData(data []byte) (*Config, error) {
 		return nil, err
 	}
 	b := &builder{
-		BuildConfigOptions: BuildConfigOptions{
+		BuildDAGOptions: BuildDAGOptions{
 			headOnly: false,
 			noEval:   true,
 			noSetenv: true,
@@ -80,7 +80,7 @@ func (cl *Loader) LoadData(data []byte) (*Config, error) {
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadBaseConfig(file string, opts *BuildConfigOptions) (*Config, error) {
+func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, error) {
 	if !utils.FileExists(file) {
 		return nil, nil
 	}
@@ -99,12 +99,12 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildConfigOptions) (*Config
 	buildOpts.headOnly = false
 	buildOpts.defaultEnv = utils.DefaultEnv()
 	b := &builder{
-		BuildConfigOptions: buildOpts,
+		BuildDAGOptions: buildOpts,
 	}
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error) {
+func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 	if f == "" {
 		return nil, fmt.Errorf("config file was not specified")
 	}
@@ -116,7 +116,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 		return nil, err
 	}
 
-	var dst *Config = nil
+	var dst *DAG = nil
 
 	if !opts.headOnly && cl.BaseConfig != "" {
 		dst, err = cl.loadBaseConfig(cl.BaseConfig, opts)
@@ -126,7 +126,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 	}
 
 	if dst == nil {
-		dst = &Config{}
+		dst = &DAG{}
 		dst.Init()
 	}
 
@@ -146,7 +146,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 		return nil, err
 	}
 
-	b := builder{BuildConfigOptions: *opts}
+	b := builder{BuildDAGOptions: *opts}
 	c, err := b.buildFromDefinition(def, dst)
 
 	if err != nil {
@@ -158,7 +158,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*Config, error
 		return nil, err
 	}
 
-	dst.ConfigPath = file
+	dst.Path = file
 
 	if !opts.noSetenv {
 		dst.setup()
@@ -184,7 +184,7 @@ func (mt *mergeTranformer) Transformer(typ reflect.Type) func(dst, src reflect.V
 	return nil
 }
 
-func (cl *Loader) merge(dst, src *Config) error {
+func (cl *Loader) merge(dst, src *DAG) error {
 	err := mergo.Merge(dst, src, mergo.WithOverride,
 		mergo.WithTransformers(&mergeTranformer{}))
 	return err

@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-func makeStep(cmd string) *config.Step {
-	step := &config.Step{
+func makeStep(cmd string) *dag.Step {
+	step := &dag.Step{
 		Name: "test step",
 	}
 	step.Command, step.Args = utils.SplitCommand(cmd, false)
@@ -48,7 +48,7 @@ func TestToNode(t *testing.T) {
 	}
 }
 
-func testRunSteps(t *testing.T, steps ...*config.Step) *scheduler.ExecutionGraph {
+func testRunSteps(t *testing.T, steps ...*dag.Step) *scheduler.ExecutionGraph {
 	g, err := scheduler.NewExecutionGraph(steps...)
 	require.NoError(t, err)
 	for _, n := range g.Nodes() {

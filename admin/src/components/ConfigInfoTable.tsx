@@ -1,13 +1,13 @@
 import React from 'react';
-import { Config } from '../models/Config';
 import { Stack, Box, Chip } from '@mui/material';
 import LabeledItem from './LabeledItem';
+import { DAG } from '../models';
 
 type Props = {
-  config: Config;
+  dag: DAG;
 };
 
-function ConfigInfoTable({ config }: Props) {
+function ConfigInfoTable({ dag: config }: Props) {
   const preconditions = config.Preconditions?.map((c) => (
     <li>
       {c.Condition}

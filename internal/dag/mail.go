@@ -1,4 +1,4 @@
-package config
+package dag
 
 type SmtpConfig struct {
 	Host string

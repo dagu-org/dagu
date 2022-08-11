@@ -1,9 +1,9 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { DAG } from '../models/DAGData';
+import { DAGStatus } from '../models';
 
 type Props = {
-  DAG: DAG;
+  DAG: DAGStatus;
   refresh?: () => void;
 };
 
@@ -37,7 +37,7 @@ function DAGSwitch({ DAG, refresh }: Props) {
     const enabled = !checked;
     setChecked(enabled);
     onSubmit({
-      name: DAG.Config.Name,
+      name: DAG.DAG.Name,
       action: 'suspend',
       value: enabled ? 'false' : 'true',
     });

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 // ExecutionGraph represents a graph of steps.
@@ -21,7 +21,7 @@ type ExecutionGraph struct {
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
-func NewExecutionGraph(steps ...*config.Step) (*ExecutionGraph, error) {
+func NewExecutionGraph(steps ...*dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		outputVariables: &sync.Map{},
 		dict:            make(map[int]*Node),

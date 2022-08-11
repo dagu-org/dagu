@@ -4,7 +4,7 @@ import { GetDAGResponse } from '../api/DAG';
 import ConfigErrors from '../components/ConfigErrors';
 import DAGStatus from '../components/DAGStatus';
 import { DAGContext } from '../contexts/DAGContext';
-import { DetailTabId } from '../models/DAGData';
+import { DetailTabId } from '../models';
 import DAGConfig from '../components/DAGConfig';
 import DAGHistory from '../components/DAGHistory';
 import DAGLog from '../components/DAGLog';
@@ -56,7 +56,7 @@ function DAGDetails() {
   }, [data, appBarContext]);
   React.useEffect(() => {
     getData();
-    if (tab == DetailTabId.Status || tab == DetailTabId.Config) {
+    if (tab == DetailTabId.Status || tab == DetailTabId.Spec) {
       const timer = setInterval(getData, 2000);
       return () => clearInterval(timer);
     }
@@ -72,7 +72,7 @@ function DAGDetails() {
     [DetailTabId.Status]: (
       <DAGStatus DAG={data.DAG} name={params.name} refresh={getData} />
     ),
-    [DetailTabId.Config]: <DAGConfig data={data} />,
+    [DetailTabId.Spec]: <DAGConfig data={data} />,
     [DetailTabId.History]: <DAGHistory logData={data.LogData} />,
     [DetailTabId.StepLog]: <DAGLog log={data.StepLog} />,
     [DetailTabId.ScLog]: <DAGLog log={data.ScLog} />,
@@ -104,13 +104,13 @@ function DAGDetails() {
           }}
         >
           <Title>{data.Title}</Title>
-          {tab == DetailTabId.Status || tab == DetailTabId.Config ? (
+          {tab == DetailTabId.Status || tab == DetailTabId.Spec ? (
             <DAGActions
               status={data.DAG.Status}
               name={params.name!}
               refresh={getData}
               redirectTo={
-                tab == DetailTabId.Config
+                tab == DetailTabId.Spec
                   ? `${baseUrl}?t=${DetailTabId.Status}`
                   : undefined
               }
@@ -133,9 +133,9 @@ function DAGDetails() {
               href={`${baseUrl}?t=${DetailTabId.Status}`}
             />
             <LinkTab
-              label="Config"
-              value={DetailTabId.Config}
-              href={`${baseUrl}?t=${DetailTabId.Config}`}
+              label="Spec"
+              value={DetailTabId.Spec}
+              href={`${baseUrl}?t=${DetailTabId.Spec}`}
             />
             <LinkTab
               label="History"
@@ -146,7 +146,7 @@ function DAGDetails() {
               <LinkTab label="Log" value={tab} />
             ) : null}
           </Tabs>
-          {tab == DetailTabId.Config ? (
+          {tab == DetailTabId.Spec ? (
             <ConfigEditButtons name={params.name} />
           ) : null}
         </Stack>

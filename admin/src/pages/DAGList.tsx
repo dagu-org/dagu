@@ -6,7 +6,7 @@ import WithLoading from '../components/WithLoading';
 import DAGTable from '../components/DAGTable';
 import Title from '../components/Title';
 import { useDAGGetAPI } from '../hooks/useDAGGetAPI';
-import { DAGItem, DAGDataType } from '../models/DAGData';
+import { DAGItem, DAGDataType } from '../models';
 import { useLocation } from 'react-router-dom';
 import { GetDAGsResponse } from '../api/DAGs';
 import { AppBarContext } from '../contexts/AppBarContext';
@@ -35,8 +35,8 @@ function DAGList() {
         if (!val.ErrorT) {
           ret.push({
             Type: DAGDataType.DAG,
-            Name: val.Config.Name,
-            DAG: val,
+            Name: val.DAG.Name,
+            DAGStatus: val,
           });
         }
       }

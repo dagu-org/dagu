@@ -1,5 +1,5 @@
 import React, { CSSProperties } from 'react';
-import { Step } from '../models/Step';
+import { Step } from '../models';
 import ConfigStepTableRow from './ConfigStepTableRow';
 import {
   Table,

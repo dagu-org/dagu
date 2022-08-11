@@ -1,20 +1,20 @@
 import React from 'react';
 import { DAGContext } from '../contexts/DAGContext';
-import { DAG } from '../models/DAGData';
-import { Handlers, SchedulerStatus } from '../models/Status';
+import { DAGStatus } from '../models';
+import { Handlers, SchedulerStatus } from '../models';
 import Graph from './Graph';
 import NodeStatusTable from './NodeStatusTable';
 import StatusInfoTable from './StatusInfoTable';
 import Timeline from './Timeline';
 import { useDAGPostAPI } from '../hooks/useDAGPostAPI';
 import StatusUpdateModal from './StatusUpdateModal';
-import { Step } from '../models/Step';
+import { Step } from '../models';
 import { Box, Tab, Tabs } from '@mui/material';
 import SubTitle from './SubTitle';
 import BorderedBox from './BorderedBox';
 
 type Props = {
-  DAG: DAG;
+  DAG: DAGStatus;
   name: string;
   refresh: () => void;
 };
@@ -64,7 +64,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
   return (
     <React.Fragment>
       <Box>
-        <SubTitle>Status</SubTitle>
+        <SubTitle>Overview</SubTitle>
         <BorderedBox
           sx={{
             mt: 2,
@@ -121,7 +121,6 @@ function DAGStatus({ DAG, name, refresh }: Props) {
           {(props) => (
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
-                <SubTitle>DAG Status</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <StatusInfoTable
                     status={DAG.Status}
@@ -131,7 +130,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
               </Box>
 
               <Box sx={{ mt: 3 }}>
-                <SubTitle>Step Status</SubTitle>
+                <SubTitle>Steps</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <NodeStatusTable
                     nodes={DAG.Status!.Nodes}
@@ -143,7 +142,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
 
               {handlers && handlers.length ? (
                 <Box sx={{ mt: 3 }}>
-                  <SubTitle>Handler Status</SubTitle>
+                  <SubTitle>Lifecycle Hooks</SubTitle>
                   <Box sx={{ mt: 2 }}>
                     <NodeStatusTable
                       nodes={handlers}

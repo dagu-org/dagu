@@ -3,7 +3,7 @@ package controller
 import (
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/settings"
@@ -25,11 +25,11 @@ func NewDAGReader() *DAGReader {
 	}
 }
 
-// DAG is the struct to contain DAG configuration and status.
-type DAG struct {
+// DAGStatus is the struct to contain DAGStatus spec and status.
+type DAGStatus struct {
 	File      string
 	Dir       string
-	Config    *config.Config
+	DAG       *dag.DAG
 	Status    *models.Status
 	Suspended bool
 	Error     error
@@ -37,42 +37,42 @@ type DAG struct {
 }
 
 // ReadDAG loads DAG from config file.
-func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
-	cl := config.Loader{}
-	var cfg *config.Config
+func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAGStatus, error) {
+	cl := dag.Loader{}
+	var d *dag.DAG
 	var err error
 	if headOnly {
-		cfg, err = cl.LoadHeadOnly(file)
+		d, err = cl.LoadHeadOnly(file)
 	} else {
-		cfg, err = cl.LoadWithoutEval(file)
+		d, err = cl.LoadWithoutEval(file)
 	}
 	if err != nil {
-		if cfg != nil {
-			return dr.newDAG(cfg, defaultStatus(cfg), err), err
+		if d != nil {
+			return dr.newDAG(d, defaultStatus(d), err), err
 		}
-		cfg := &config.Config{ConfigPath: file}
-		cfg.Init()
-		return dr.newDAG(cfg, defaultStatus(cfg), err), err
+		d := &dag.DAG{Path: file}
+		d.Init()
+		return dr.newDAG(d, defaultStatus(d), err), err
 	}
-	status, err := New(cfg).GetLastStatus()
+	status, err := New(d).GetLastStatus()
 	if err != nil {
 		return nil, err
 	}
 	if !headOnly {
-		if _, err := scheduler.NewExecutionGraph(cfg.Steps...); err != nil {
-			return dr.newDAG(cfg, status, err), err
+		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
+			return dr.newDAG(d, status, err), err
 		}
 	}
-	return dr.newDAG(cfg, status, err), nil
+	return dr.newDAG(d, status, err), nil
 }
 
-func (dr *DAGReader) newDAG(cfg *config.Config, s *models.Status, err error) *DAG {
-	ret := &DAG{
-		File:      filepath.Base(cfg.ConfigPath),
-		Dir:       filepath.Dir(cfg.ConfigPath),
-		Config:    cfg,
+func (dr *DAGReader) newDAG(d *dag.DAG, s *models.Status, err error) *DAGStatus {
+	ret := &DAGStatus{
+		File:      filepath.Base(d.Path),
+		Dir:       filepath.Dir(d.Path),
+		DAG:       d,
 		Status:    s,
-		Suspended: dr.suspendChecker.IsSuspended(cfg),
+		Suspended: dr.suspendChecker.IsSuspended(d),
 		Error:     err,
 	}
 	if err != nil {

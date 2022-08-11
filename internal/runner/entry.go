@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
@@ -43,7 +43,7 @@ type entryReader struct {
 var _ EntryReader = (*entryReader)(nil)
 
 func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
-	cl := config.Loader{}
+	cl := dag.Loader{}
 	entries := []*Entry{}
 	for {
 		fis, err := os.ReadDir(er.Admin.DAGs)
@@ -51,7 +51,7 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 			return nil, fmt.Errorf("failed to read entries directory: %w", err)
 		}
 		for _, fi := range fis {
-			if utils.MatchExtension(fi.Name(), config.EXTENSIONS) {
+			if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 				dag, err := cl.LoadHeadOnly(
 					filepath.Join(er.Admin.DAGs, fi.Name()),
 				)

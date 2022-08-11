@@ -193,9 +193,9 @@ func (db *Database) Compact(configPath, original string) error {
 }
 
 // MoveData moves data from one directory to another.
-func (db *Database) MoveData(oldConfigPath, newConfigPath string) error {
-	oldDir := db.dir(oldConfigPath, prefix(oldConfigPath))
-	newDir := db.dir(newConfigPath, prefix(newConfigPath))
+func (db *Database) MoveData(oldPath, newPath string) error {
+	oldDir := db.dir(oldPath, prefix(oldPath))
+	newDir := db.dir(newPath, prefix(newPath))
 	if !utils.FileExists(oldDir) {
 		// No need to move data
 		return nil
@@ -205,12 +205,12 @@ func (db *Database) MoveData(oldConfigPath, newConfigPath string) error {
 			return err
 		}
 	}
-	matches, err := filepath.Glob(db.pattern(oldConfigPath) + "*.dat")
+	matches, err := filepath.Glob(db.pattern(oldPath) + "*.dat")
 	if err != nil {
 		return err
 	}
-	oldPattern := path.Base(db.pattern(oldConfigPath))
-	newPattern := path.Base(db.pattern(newConfigPath))
+	oldPattern := path.Base(db.pattern(oldPath))
+	newPattern := path.Base(db.pattern(newPath))
 	for _, m := range matches {
 		base := path.Base(m)
 		f := strings.Replace(base, oldPattern, newPattern, 1)

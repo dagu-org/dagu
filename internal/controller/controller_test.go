@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -33,23 +33,23 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func testConfig(name string) string {
+func testDAG(name string) string {
 	return path.Join(testsDir, name)
 }
 
 func TestGetStatus(t *testing.T) {
-	file := testConfig("controller_success.yaml")
+	file := testDAG("controller_success.yaml")
 	dr := controller.NewDAGReader()
-	dag, err := dr.ReadDAG(file, false)
+	d, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
 
-	st, err := controller.New(dag.Config).GetStatus()
+	st, err := controller.New(d.DAG).GetStatus()
 	require.NoError(t, err)
 	assert.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
-	file := testConfig("controller_status.yaml")
+	file := testDAG("controller_status.yaml")
 
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
@@ -57,10 +57,10 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
-			Addr: dag.Config.SockAddr(),
+			Addr: dag.DAG.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				status := models.NewStatus(
-					dag.Config, []*scheduler.Node{},
+					dag.DAG, []*scheduler.Node{},
 					scheduler.SchedulerStatus_Running, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJson()
@@ -73,21 +73,21 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	defer socketServer.Shutdown()
 
 	time.Sleep(time.Millisecond * 100)
-	st, _ := controller.New(dag.Config).GetStatus()
+	st, _ := controller.New(dag.DAG).GetStatus()
 	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
 
 	socketServer.Shutdown()
 
-	st, _ = controller.New(dag.Config).GetStatus()
+	st, _ = controller.New(dag.DAG).GetStatus()
 	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
 
 func TestGetDAG(t *testing.T) {
-	file := testConfig("controller_get_dag.yaml")
+	file := testDAG("controller_get_dag.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
-	assert.Equal(t, "controller_get_dag", dag.Config.Name)
+	assert.Equal(t, "controller_get_dag", dag.DAG.Name)
 }
 
 func TestGetDAGList(t *testing.T) {
@@ -100,7 +100,7 @@ func TestGetDAGList(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
-	file := testConfig("controller_update_status.yaml")
+	file := testDAG("controller_update_status.yaml")
 
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
@@ -111,11 +111,11 @@ func TestUpdateStatus(t *testing.T) {
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	w, _, _ := db.NewWriter(dag.Config.ConfigPath, now, req)
+	w, _, _ := db.NewWriter(dag.DAG.Path, now, req)
 	err = w.Open()
 	require.NoError(t, err)
 
-	st := newStatus(dag.Config, req,
+	st := newStatus(dag.DAG, req,
 		scheduler.SchedulerStatus_Success, scheduler.NodeStatus_Success)
 
 	err = w.Write(st)
@@ -124,15 +124,15 @@ func TestUpdateStatus(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	st, err = controller.New(dag.Config).GetStatusByRequestId(req)
+	st, err = controller.New(dag.DAG).GetStatusByRequestId(req)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatus_Success, st.Nodes[0].Status)
 
 	st.Nodes[0].Status = scheduler.NodeStatus_Error
-	err = controller.New(dag.Config).UpdateStatus(st)
+	err = controller.New(dag.DAG).UpdateStatus(st)
 	require.NoError(t, err)
 
-	updated, err := controller.New(dag.Config).GetStatusByRequestId(req)
+	updated, err := controller.New(dag.DAG).GetStatusByRequestId(req)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(st.Nodes))
@@ -140,7 +140,7 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestUpdateStatusFailure(t *testing.T) {
-	file := testConfig("controller_update_status_failed.yaml")
+	file := testDAG("controller_update_status_failed.yaml")
 
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
@@ -149,9 +149,9 @@ func TestUpdateStatusFailure(t *testing.T) {
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
-			Addr: dag.Config.SockAddr(),
+			Addr: dag.DAG.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				st := newStatus(dag.Config, req,
+				st := newStatus(dag.DAG, req,
 					scheduler.SchedulerStatus_Running, scheduler.NodeStatus_Success)
 				w.WriteHeader(http.StatusOK)
 				b, _ := st.ToJson()
@@ -163,23 +163,23 @@ func TestUpdateStatusFailure(t *testing.T) {
 	}()
 	defer socketServer.Shutdown()
 
-	st := newStatus(dag.Config, req,
+	st := newStatus(dag.DAG, req,
 		scheduler.SchedulerStatus_Error, scheduler.NodeStatus_Error)
-	err = controller.New(dag.Config).UpdateStatus(st)
+	err = controller.New(dag.DAG).UpdateStatus(st)
 	require.Error(t, err)
 
 	st.RequestId = "invalid request id"
-	err = controller.New(dag.Config).UpdateStatus(st)
+	err = controller.New(dag.DAG).UpdateStatus(st)
 	require.Error(t, err)
 }
 
 func TestStart(t *testing.T) {
-	file := testConfig("controller_start_err.yaml")
+	file := testDAG("controller_start_err.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
 
-	c := controller.New(dag.Config)
+	c := controller.New(dag.DAG)
 	err = c.Start(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
 	require.Error(t, err)
 
@@ -189,12 +189,12 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartStop(t *testing.T) {
-	file := testConfig("controller_start_stop.yaml")
+	file := testDAG("controller_start_stop.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
 
-	c := controller.New(dag.Config)
+	c := controller.New(dag.DAG)
 	c.StartAsync(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
 
 	require.Eventually(t, func() bool {
@@ -211,12 +211,12 @@ func TestStartStop(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	file := testConfig("controller_retry.yaml")
+	file := testDAG("controller_retry.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
 
-	c := controller.New(dag.Config)
+	c := controller.New(dag.DAG)
 	err = c.Start(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "x y z")
 	require.NoError(t, err)
 
@@ -243,12 +243,12 @@ func TestRetry(t *testing.T) {
 func TestSave(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
 	defer os.RemoveAll(tmpDir)
-	cfg := &config.Config{
-		Name:       "test",
-		ConfigPath: path.Join(tmpDir, "test.yaml"),
+	d := &dag.DAG{
+		Name: "test",
+		Path: path.Join(tmpDir, "test.yaml"),
 	}
 
-	c := controller.New(cfg)
+	c := controller.New(d)
 
 	// invalid config
 	dat := `name: test DAG`
@@ -265,14 +265,14 @@ steps:
 	require.Error(t, err) // no config file
 
 	// create file
-	f, _ := utils.CreateFile(cfg.ConfigPath)
+	f, _ := utils.CreateFile(d.Path)
 	defer f.Close()
 
 	err = c.Save(dat)
 	require.NoError(t, err) // no config file
 
 	// check file
-	saved, _ := os.Open(cfg.ConfigPath)
+	saved, _ := os.Open(d.Path)
 	defer saved.Close()
 	b, _ := io.ReadAll(saved)
 	require.Equal(t, dat, string(b))
@@ -293,13 +293,13 @@ func TestNewConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// check file
-	cl := &config.Loader{}
+	cl := &dag.Loader{}
 
-	cfg, err := cl.Load(filename, "")
+	d, err := cl.Load(filename, "")
 	require.NoError(t, err)
-	require.Equal(t, "test", cfg.Name)
+	require.Equal(t, "test", d.Name)
 
-	steps := cfg.Steps[0]
+	steps := d.Steps[0]
 	require.Equal(t, "step1", steps.Name)
 	require.Equal(t, "echo", steps.Command)
 	require.Equal(t, []string{"hello"}, steps.Args)
@@ -322,11 +322,11 @@ func TestRenameConfig(t *testing.T) {
 	require.FileExists(t, newFile)
 }
 
-func newStatus(cfg *config.Config, reqId string,
+func newStatus(d *dag.DAG, reqId string,
 	schedulerStatus scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
 	n := time.Now()
 	ret := models.NewStatus(
-		cfg, []*scheduler.Node{
+		d, []*scheduler.Node{
 			{
 				NodeState: scheduler.NodeState{
 					Status: nodeStatus,

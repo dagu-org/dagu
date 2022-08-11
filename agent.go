@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mailer"
@@ -44,7 +44,7 @@ type Agent struct {
 }
 
 type AgentConfig struct {
-	DAG *config.Config
+	DAG *dag.DAG
 	Dry bool
 }
 
@@ -227,9 +227,9 @@ func (a *Agent) setupDatabase() (err error) {
 	a.database = &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.ConfigPath, time.Now(), a.requestId)
+	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.Path, time.Now(), a.requestId)
 	utils.LogErr("clean old history data",
-		a.database.RemoveOld(a.DAG.ConfigPath, a.DAG.HistRetentionDays))
+		a.database.RemoveOld(a.DAG.Path, a.DAG.HistRetentionDays))
 	return
 }
 
@@ -245,7 +245,7 @@ func (a *Agent) setupSocketServer() (err error) {
 func (a *Agent) checkPreconditions() error {
 	if len(a.DAG.Preconditions) > 0 {
 		log.Printf("checking preconditions for \"%s\"", a.DAG.Name)
-		if err := config.EvalConditions(a.DAG.Preconditions); err != nil {
+		if err := dag.EvalConditions(a.DAG.Preconditions); err != nil {
 			a.scheduler.Cancel(a.graph)
 			return err
 		}
@@ -317,7 +317,7 @@ func (a *Agent) run() error {
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
 	utils.LogErr("close data file", a.dbWriter.Close())
-	utils.LogErr("data compaction", a.database.Compact(a.DAG.ConfigPath, a.dbFile))
+	utils.LogErr("data compaction", a.database.Compact(a.DAG.Path, a.dbFile))
 
 	return lastErr
 }

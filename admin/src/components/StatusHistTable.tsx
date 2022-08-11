@@ -1,7 +1,7 @@
 import moment from 'moment';
 import React, { CSSProperties } from 'react';
 import { DagStatus } from '../api/DAG';
-import { StatusFile } from '../models/StatusFile';
+import { StatusFile } from '../models';
 import StatusHistTableRow from './StatusHistTableRow';
 import {
   Table,

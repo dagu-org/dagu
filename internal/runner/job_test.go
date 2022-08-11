@@ -16,10 +16,10 @@ func TestJobRun(t *testing.T) {
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
-	c := controller.New(dag.Config)
+	c := controller.New(dag.DAG)
 
 	j := &job{
-		DAG:       dag.Config,
+		DAG:       dag.DAG,
 		Config:    testConfig,
 		StartTime: time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 	}

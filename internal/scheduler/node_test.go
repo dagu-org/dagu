@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 func TestExecute(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         "true",
 			OutputVariables: &sync.Map{},
 		}}
@@ -26,7 +26,7 @@ func TestExecute(t *testing.T) {
 
 func TestError(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         "false",
 			OutputVariables: &sync.Map{},
 		}}
@@ -37,7 +37,7 @@ func TestError(t *testing.T) {
 
 func TestSignal(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &sync.Map{},
@@ -57,7 +57,7 @@ func TestSignal(t *testing.T) {
 
 func TestLogAndStdout(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
@@ -78,7 +78,7 @@ func TestLogAndStdout(t *testing.T) {
 
 func TestNode(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
 			OutputVariables: &sync.Map{},
@@ -101,7 +101,7 @@ func TestNode(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
 			OutputVariables: &sync.Map{},
@@ -121,7 +121,7 @@ func TestOutput(t *testing.T) {
 
 	// Use the previous output in the subsequent step
 	n2 := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
 			OutputVariables: &sync.Map{},
@@ -133,7 +133,7 @@ func TestOutput(t *testing.T) {
 
 	// Use the previous output in the subsequent step inside a script
 	n3 := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
@@ -164,7 +164,7 @@ func TestOutputJson(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			n := &Node{
-				Step: &config.Step{
+				Step: &dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
 					OutputVariables: &sync.Map{},
@@ -189,7 +189,7 @@ func TestOutputJson(t *testing.T) {
 
 func TestRunScript(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command: "sh",
 			Args:    []string{},
 			Script: `
@@ -220,7 +220,7 @@ func TestRunScript(t *testing.T) {
 
 func TestTeardown(t *testing.T) {
 	n := &Node{
-		Step: &config.Step{
+		Step: &dag.Step{
 			Command:         testCommand,
 			Args:            []string{},
 			OutputVariables: &sync.Map{},

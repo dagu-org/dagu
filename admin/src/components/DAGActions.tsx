@@ -1,6 +1,6 @@
 import { Button, IconButton, Stack } from '@mui/material';
 import React, { ReactElement } from 'react';
-import { SchedulerStatus, Status } from '../models/Status';
+import { SchedulerStatus, Status } from '../models';
 
 type Props = {
   status?: Status;

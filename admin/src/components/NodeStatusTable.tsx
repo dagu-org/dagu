@@ -1,9 +1,9 @@
 import React, { CSSProperties } from 'react';
 import { stepTabColStyles } from '../consts';
 import { useDAGPostAPI } from '../hooks/useDAGPostAPI';
-import { Node } from '../models/Node';
-import { SchedulerStatus, Status } from '../models/Status';
-import { Step } from '../models/Step';
+import { Node } from '../models';
+import { SchedulerStatus, Status } from '../models';
+import { Step } from '../models';
 import NodeStatusTableRow from './NodeStatusTableRow';
 import StatusUpdateModal from './StatusUpdateModal';
 import {

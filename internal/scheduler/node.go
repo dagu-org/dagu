@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/executor"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -50,7 +50,7 @@ func (s NodeStatus) String() string {
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {
-	*config.Step
+	*dag.Step
 	NodeState
 
 	id           int
@@ -328,6 +328,6 @@ func (n *Node) init() {
 		n.Variables = []string{}
 	}
 	if n.Preconditions == nil {
-		n.Preconditions = []*config.Condition{}
+		n.Preconditions = []*dag.Condition{}
 	}
 }

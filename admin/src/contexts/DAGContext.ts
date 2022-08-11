@@ -1,6 +1,6 @@
 import React from 'react';
 import { GetDAGResponse } from '../api/DAG';
-import { DetailTabId } from '../models/DAGData';
+import { DetailTabId } from '../models';
 
 export const DAGContext = React.createContext({
   refresh: () => {

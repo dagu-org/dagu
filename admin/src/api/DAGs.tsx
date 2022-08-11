@@ -1,12 +1,9 @@
-import { DAG } from '../models/DAGData';
-import { Group } from '../models/Group';
+import { DAGStatus } from '../models';
 
 export type GetDAGsResponse = {
   Title: string;
   Charset: string;
-  DAGs: DAG[];
-  Groups: Group[];
-  Group: string;
+  DAGs: DAGStatus[];
   Errors: string[];
   HasError: boolean;
 };

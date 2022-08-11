@@ -1,5 +1,5 @@
 import React from 'react';
-import { Step } from '../models/Step';
+import { Step } from '../models';
 import MultilineText from './MultilineText';
 import { TableCell } from '@mui/material';
 import StyledTableRow from './StyledTableRow';

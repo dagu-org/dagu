@@ -1,6 +1,6 @@
 import moment from 'moment';
 import React from 'react';
-import { SchedulerStatus, Status } from '../models/Status';
+import { SchedulerStatus, Status } from '../models';
 import Mermaid from './Mermaid';
 
 type Props = {

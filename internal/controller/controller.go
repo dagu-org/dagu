@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -33,8 +33,8 @@ type Controller interface {
 }
 
 // GetDAGs returns all DAGs in the config file.
-func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
-	dags = []*DAG{}
+func GetDAGs(dir string) (dags []*DAGStatus, errs []string, err error) {
+	dags = []*DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(dir) {
 		if err = os.MkdirAll(dir, 0755); err != nil {
@@ -46,7 +46,7 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 	utils.LogErr("read DAGs directory", err)
 	dr := NewDAGReader()
 	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), config.EXTENSIONS) {
+		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			dag, err := dr.ReadDAG(filepath.Join(dir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
 			if dag != nil {
@@ -61,7 +61,7 @@ func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
 
 // NewConfig returns a new config.Config.
 func NewConfig(file string) error {
-	if err := assertConfigPath(file); err != nil {
+	if err := assertPath(file); err != nil {
 		return err
 	}
 	if utils.FileExists(file) {
@@ -75,25 +75,25 @@ func NewConfig(file string) error {
 }
 
 // RenameConfig renames the config file and status database.
-func RenameConfig(oldConfigPath, newConfigPath string) error {
-	if err := assertConfigPath(newConfigPath); err != nil {
+func RenameConfig(oldPath, newPath string) error {
+	if err := assertPath(newPath); err != nil {
 		return err
 	}
-	if err := os.Rename(oldConfigPath, newConfigPath); err != nil {
+	if err := os.Rename(oldPath, newPath); err != nil {
 		return err
 	}
-	return defaultDb().MoveData(oldConfigPath, newConfigPath)
+	return defaultDb().MoveData(oldPath, newPath)
 }
 
 var _ Controller = (*controller)(nil)
 
 type controller struct {
-	*config.Config
+	*dag.DAG
 }
 
-func New(cfg *config.Config) Controller {
+func New(d *dag.DAG) Controller {
 	return &controller{
-		Config: cfg,
+		DAG: d,
 	}
 }
 
@@ -115,7 +115,7 @@ func (c *controller) Start(bin string, workDir string, params string) error {
 	if params != "" {
 		args = append(args, fmt.Sprintf("--params=\"%s\"", params))
 	}
-	args = append(args, c.ConfigPath)
+	args = append(args, c.Path)
 	cmd := exec.Command(bin, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
@@ -131,7 +131,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
-		args = append(args, c.ConfigPath)
+		args = append(args, c.Path)
 		cmd := exec.Command(bin, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
@@ -151,7 +151,7 @@ func (c *controller) GetStatus() (*models.Status, error) {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		} else {
-			return defaultStatus(c.Config), nil
+			return defaultStatus(c.DAG), nil
 		}
 	}
 	return models.StatusFromJson(ret)
@@ -164,14 +164,14 @@ func (c *controller) GetLastStatus() (*models.Status, error) {
 		return models.StatusFromJson(ret)
 	}
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		status, err := defaultDb().ReadStatusToday(c.ConfigPath)
+		status, err := defaultDb().ReadStatusToday(c.Path)
 		if err != nil {
 			var readErr error = nil
 			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
 				fmt.Printf("read status failed : %s", err)
 				readErr = err
 			}
-			return defaultStatus(c.Config), readErr
+			return defaultStatus(c.DAG), readErr
 		}
 		// it is wrong status if the status is running
 		status.CorrectRunningStatus()
@@ -184,7 +184,7 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	ret, err := db.FindByRequestId(c.ConfigPath, requestId)
+	ret, err := db.FindByRequestId(c.Path, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 }
 
 func (c *controller) GetStatusHist(n int) []*models.StatusFile {
-	ret := defaultDb().ReadStatusHist(c.ConfigPath, n)
+	ret := defaultDb().ReadStatusHist(c.Path, n)
 	return ret
 }
 
@@ -215,7 +215,7 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	toUpdate, err := defaultDb().FindByRequestId(c.ConfigPath, status.RequestId)
+	toUpdate, err := defaultDb().FindByRequestId(c.Path, status.RequestId)
 	if err != nil {
 		return err
 	}
@@ -229,28 +229,28 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 
 func (c *controller) Save(value string) error {
 	// validate
-	cl := config.Loader{}
+	cl := dag.Loader{}
 	_, err := cl.LoadData([]byte(value))
 	if err != nil {
 		return err
 	}
-	if !utils.FileExists(c.ConfigPath) {
-		return fmt.Errorf("the config file %s does not exist", c.ConfigPath)
+	if !utils.FileExists(c.Path) {
+		return fmt.Errorf("the config file %s does not exist", c.Path)
 	}
-	err = os.WriteFile(c.ConfigPath, []byte(value), 0755)
+	err = os.WriteFile(c.Path, []byte(value), 0755)
 	return err
 }
 
-func assertConfigPath(configPath string) error {
+func assertPath(configPath string) error {
 	if path.Ext(configPath) != ".yaml" {
 		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
 	}
 	return nil
 }
 
-func defaultStatus(cfg *config.Config) *models.Status {
+func defaultStatus(d *dag.DAG) *models.Status {
 	return models.NewStatus(
-		cfg,
+		d,
 		nil,
 		scheduler.SchedulerStatus_None,
 		int(models.PidNotRunning), nil, nil)

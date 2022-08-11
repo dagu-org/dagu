@@ -1,7 +1,7 @@
 import React from 'react';
-import { Node, NodeStatus } from '../models/Node';
-import { Step } from '../models/Step';
-import { DetailTabId } from '../models/DAGData';
+import { Node, NodeStatus } from '../models';
+import { Step } from '../models';
+import { DetailTabId } from '../models';
 import MultilineText from './MultilineText';
 import NodeStatusChip from './NodeStatusChip';
 import { TableCell } from '@mui/material';

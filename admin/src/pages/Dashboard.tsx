@@ -2,7 +2,7 @@ import React from 'react';
 import { GetDAGsResponse } from '../api/DAGs';
 import { useDAGGetAPI } from '../hooks/useDAGGetAPI';
 import { Box, Grid } from '@mui/material';
-import { SchedulerStatus } from '../models/Status';
+import { SchedulerStatus } from '../models';
 import { statusColorMapping } from '../consts';
 import Metrics from '../components/Metrics';
 import DashboardTimechart from '../components/DashboardTimechart';

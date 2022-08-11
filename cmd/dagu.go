@@ -10,9 +10,10 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 var (
@@ -39,11 +40,8 @@ func main() {
 
 func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	l := &admin.Loader{}
-	cfgFile := c.String("config")
-	if cfgFile == "" {
-		cfgFile = settings.MustGet(settings.SETTING__ADMIN_CONFIG)
-	}
-	cfg, err = l.LoadAdminConfig(cfgFile)
+	cf := utils.StringWithFallback(c.String("config"), settings.MustGet(settings.SETTING__ADMIN_CONFIG))
+	cfg, err = l.LoadAdminConfig(cf)
 	if err == admin.ErrConfigNotFound {
 		cfg = admin.DefaultConfig()
 		err = nil
@@ -54,14 +52,14 @@ func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	return cfg, err
 }
 
-func loadDAG(c *cli.Context, dagPath, params string) (dag *config.Config, err error) {
+func loadDAG(c *cli.Context, dagPath, params string) (d *dag.DAG, err error) {
 	cfg, err := loadGlobalConfig(c)
 	if err != nil {
 		return nil, err
 	}
-	cl := &config.Loader{BaseConfig: cfg.BaseConfig}
-	dag, err = cl.Load(dagPath, params)
-	return dag, err
+	cl := &dag.Loader{BaseConfig: cfg.BaseConfig}
+	d, err = cl.Load(dagPath, params)
+	return d, err
 }
 
 func listenSignals(abortFunc func(sig os.Signal)) {

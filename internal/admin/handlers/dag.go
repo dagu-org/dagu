@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -39,7 +39,7 @@ type Log struct {
 type dagResponse struct {
 	Title      string
 	Charset    string
-	DAG        *controller.DAG
+	DAG        *controller.DAGStatus
 	Tab        dagTabType
 	Graph      string
 	Definition string
@@ -73,9 +73,9 @@ type dagParameter struct {
 	Step string
 }
 
-func newDAGResponse(cfg string, dag *controller.DAG, tab dagTabType) *dagResponse {
+func newDAGResponse(dagName string, dag *controller.DAGStatus, tab dagTabType) *dagResponse {
 	return &dagResponse{
-		Title:      cfg,
+		Title:      dagName,
 		DAG:        dag,
 		Tab:        tab,
 		Definition: "",
@@ -93,22 +93,22 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "dag")
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		cfg, err := getPathParameter(r)
+		dn, err := getPathParameter(r)
 		if err != nil {
 			encodeError(w, err)
 			return
 		}
 
 		params := getDAGParameter(r)
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGReader()
-		dag, err := dr.ReadDAG(file, false)
-		if dag == nil {
+		d, err := dr.ReadDAG(file, false)
+		if d == nil {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(dag.Config)
-		data := newDAGResponse(cfg, dag, params.Tab)
+		c := controller.New(d.DAG)
+		data := newDAGResponse(dn, d, params.Tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
 		}
@@ -116,10 +116,10 @@ func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
 		switch params.Tab {
 		case DAG_TabType_Status:
 		case DAG_TabType_Config:
-			data.Definition, _ = config.ReadConfig(file)
+			data.Definition, _ = dag.ReadConfig(file)
 
 		case DAG_TabType_History:
-			logs := controller.New(dag.Config).GetStatusHist(30)
+			logs := controller.New(d.DAG).GetStatusHist(30)
 			data.LogData = buildLog(logs)
 
 		case DAG_TabType_StepLog:
@@ -169,20 +169,20 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		reqId := r.FormValue("request-id")
 		step := r.FormValue("step")
 
-		cfg, err := getPathParameter(r)
+		dn, err := getPathParameter(r)
 		if err != nil {
 			encodeError(w, err)
 			return
 		}
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", cfg))
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGReader()
 		dag, err := dr.ReadDAG(file, false)
 		if err != nil && action != "save" {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(dag.Config)
+		c := controller.New(dag.DAG)
 
 		switch action {
 		case "start":
@@ -201,7 +201,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 					),
 				),
 			)
-			sc.ToggleSuspend(dag.Config, value == "true")
+			sc.ToggleSuspend(dag.DAG, value == "true")
 
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {
@@ -302,7 +302,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		http.Redirect(w, r, cfg, http.StatusSeeOther)
+		http.Redirect(w, r, dn, http.StatusSeeOther)
 	}
 }
 

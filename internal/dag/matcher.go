@@ -1,9 +1,9 @@
-package config
+package dag
 
 // Matcher is a function that returns true
 // if the given config matches the filter.
 type Matcher interface {
-	Matches(cfg *Config) bool
+	Matches(d *DAG) bool
 }
 
 // ContainTagsMatcher checks if the config contains
@@ -14,9 +14,9 @@ type ContainTagsMatcher struct {
 
 var _ Matcher = (*ContainTagsMatcher)(nil)
 
-func (ct *ContainTagsMatcher) Matches(cfg *Config) bool {
+func (ct *ContainTagsMatcher) Matches(d *DAG) bool {
 	for _, tag := range ct.Tags {
-		if !cfg.HasTag(tag) {
+		if !d.HasTag(tag) {
 			return false
 		}
 	}

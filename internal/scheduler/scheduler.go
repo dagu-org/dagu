@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/settings"
 )
 
@@ -56,10 +56,10 @@ type Config struct {
 	MaxActiveRuns int
 	Delay         time.Duration
 	Dry           bool
-	OnExit        *config.Step
-	OnSuccess     *config.Step
-	OnFailure     *config.Step
-	OnCancel      *config.Step
+	OnExit        *dag.Step
+	OnSuccess     *dag.Step
+	OnFailure     *dag.Step
+	OnCancel      *dag.Step
 	RequestId     string
 }
 
@@ -96,7 +96,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 			}
 			if len(node.Preconditions) > 0 {
 				log.Printf("checking pre conditions for \"%s\"", node.Name)
-				if err := config.EvalConditions(node.Preconditions); err != nil {
+				if err := dag.EvalConditions(node.Preconditions); err != nil {
 					log.Printf("%s", err.Error())
 					node.updateStatus(NodeStatus_Skipped)
 					node.Error = err

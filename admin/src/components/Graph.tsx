@@ -1,6 +1,6 @@
 import React from 'react';
-import { Node, NodeStatus } from '../models/Node';
-import { Step } from '../models/Step';
+import { Node, NodeStatus } from '../models';
+import { Step } from '../models';
 import Mermaid from './Mermaid';
 
 type onClickNode = (name: string) => void;

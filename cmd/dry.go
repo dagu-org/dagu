@@ -5,7 +5,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/dag"
 )
 
 func newDryCommand() *cli.Command {
@@ -22,18 +22,18 @@ func newDryCommand() *cli.Command {
 			},
 		),
 		Action: func(c *cli.Context) error {
-			cfg, err := loadDAG(c, c.Args().Get(0), c.String("params"))
+			d, err := loadDAG(c, c.Args().Get(0), c.String("params"))
 			if err != nil {
 				return err
 			}
-			return dryRun(cfg)
+			return dryRun(d)
 		},
 	}
 }
 
-func dryRun(cfg *config.Config) error {
+func dryRun(d *dag.DAG) error {
 	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
-		DAG: cfg,
+		DAG: d,
 		Dry: true,
 	}}
 	listenSignals(func(sig os.Signal) {
