@@ -2,7 +2,7 @@ import { Config } from './Config';
 import { SchedulerStatus, Status } from './Status';
 import cronParser from 'cron-parser';
 
-export type DAG = {
+export type DAGStatus = {
   File: string;
   Dir: string;
   DAG: Config;
@@ -21,7 +21,7 @@ export type DAGItem = DAGData | DAGGroup;
 export type DAGData = {
   Type: DAGDataType.DAG;
   Name: string;
-  DAGStatus: DAG;
+  DAGStatus: DAGStatus;
 };
 
 export type DAGGroup = {
@@ -67,7 +67,7 @@ export function getStatusField(
   return '';
 }
 
-export function getNextSchedule(data: DAG): number {
+export function getNextSchedule(data: DAGStatus): number {
   const schedules = data.DAG.ScheduleExp;
   if (!schedules || schedules.length == 0) {
     return Number.MAX_SAFE_INTEGER;

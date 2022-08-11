@@ -12,10 +12,10 @@ import {
   YAxis,
 } from 'recharts';
 import { statusColorMapping } from '../consts';
-import { DAG } from '../models/DAGData';
+import { DAGStatus } from '../models/DAGData';
 import { SchedulerStatus } from '../models/Status';
 
-type Props = { data: DAG[] };
+type Props = { data: DAGStatus[] };
 
 type DataFrame = {
   name: string;

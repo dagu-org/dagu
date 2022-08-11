@@ -1,8 +1,8 @@
 import React from 'react';
-import { DAG } from '../models/DAGData';
+import { DAGStatus } from '../models/DAGData';
 
 type Props = {
-  DAGs: DAG[];
+  DAGs: DAGStatus[];
   errors: string[];
   hasError: boolean;
 };

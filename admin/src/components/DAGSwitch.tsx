@@ -1,9 +1,9 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { DAG } from '../models/DAGData';
+import { DAGStatus } from '../models/DAGData';
 
 type Props = {
-  DAG: DAG;
+  DAG: DAGStatus;
   refresh?: () => void;
 };
 
