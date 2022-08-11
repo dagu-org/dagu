@@ -65,7 +65,7 @@ const Drawer = styled(MuiDrawer, {
 const mdTheme = createTheme({
   typography: {
     fontFamily:
-      "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
+      "'Roboto','Noto Sans JP','SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
   },
   palette: {
     primary: {
@@ -171,7 +171,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
                   </NavBarTitleText>
                 )}
               </AppBarContext.Consumer>
-              <NavBarTitleText>{title || 'dagu'}</NavBarTitleText>
+              <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
             </Toolbar>
           </AppBar>
           <Grid

@@ -20,7 +20,7 @@ function StatusChip({ status, children }: Props) {
       sx={[
         style,
         {
-          fontWeight: 'semibold',
+          fontWeight: 'bolder',
         },
       ]}
       size="small"

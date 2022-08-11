@@ -21,6 +21,7 @@ mermaidAPI.initialize({
     htmlLabels: true,
   },
   logLevel: 4, // ERROR
+  fontFamily: "'Antonio', sans-serif;",
 });
 
 function Mermaid({ def, style = {} }: Props) {
@@ -30,6 +31,7 @@ function Mermaid({ def, style = {} }: Props) {
   };
   const dStyle: CSSProperties = {
     overflowX: 'auto',
+    padding: "2em",
   };
   function render() {
     if (!ref.current) {
