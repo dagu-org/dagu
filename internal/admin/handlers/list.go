@@ -13,7 +13,7 @@ import (
 type dagListResponse struct {
 	Title    string
 	Charset  string
-	DAGs     []*controller.DAG
+	DAGs     []*controller.DAGStatus
 	Errors   []string
 	HasError bool
 }

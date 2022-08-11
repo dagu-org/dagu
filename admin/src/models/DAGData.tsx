@@ -21,7 +21,7 @@ export type DAGItem = DAGData | DAGGroup;
 export type DAGData = {
   Type: DAGDataType.DAG;
   Name: string;
-  DAG: DAG;
+  DAGStatus: DAG;
 };
 
 export type DAGGroup = {
@@ -34,7 +34,7 @@ export function getFirstTag(data?: DAGItem): string {
     return '';
   }
   if (data.Type == DAGDataType.DAG) {
-    const tags = data.DAG.DAG.Tags;
+    const tags = data.DAGStatus.DAG.Tags;
     return tags ? tags[0] : '';
   }
   return '';
@@ -45,7 +45,7 @@ export function getStatus(data?: DAGItem): SchedulerStatus {
     return SchedulerStatus.None;
   }
   if (data.Type == DAGDataType.DAG) {
-    return data.DAG.Status?.Status || SchedulerStatus.None;
+    return data.DAGStatus.Status?.Status || SchedulerStatus.None;
   }
   return SchedulerStatus.None;
 }
@@ -62,7 +62,7 @@ export function getStatusField(
     return '';
   }
   if (data.Type == DAGDataType.DAG) {
-    return data.DAG.Status?.[field] || '';
+    return data.DAGStatus.Status?.[field] || '';
   }
   return '';
 }

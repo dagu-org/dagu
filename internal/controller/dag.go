@@ -25,8 +25,8 @@ func NewDAGReader() *DAGReader {
 	}
 }
 
-// DAG is the struct to contain DAG spec and status.
-type DAG struct {
+// DAGStatus is the struct to contain DAGStatus spec and status.
+type DAGStatus struct {
 	File      string
 	Dir       string
 	DAG       *dag.DAG
@@ -37,7 +37,7 @@ type DAG struct {
 }
 
 // ReadDAG loads DAG from config file.
-func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
+func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAGStatus, error) {
 	cl := dag.Loader{}
 	var d *dag.DAG
 	var err error
@@ -66,8 +66,8 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAG, error) {
 	return dr.newDAG(d, status, err), nil
 }
 
-func (dr *DAGReader) newDAG(d *dag.DAG, s *models.Status, err error) *DAG {
-	ret := &DAG{
+func (dr *DAGReader) newDAG(d *dag.DAG, s *models.Status, err error) *DAGStatus {
+	ret := &DAGStatus{
 		File:      filepath.Base(d.ConfigPath),
 		Dir:       filepath.Dir(d.ConfigPath),
 		DAG:       d,

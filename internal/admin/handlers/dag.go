@@ -39,7 +39,7 @@ type Log struct {
 type dagResponse struct {
 	Title      string
 	Charset    string
-	DAG        *controller.DAG
+	DAG        *controller.DAGStatus
 	Tab        dagTabType
 	Graph      string
 	Definition string
@@ -73,7 +73,7 @@ type dagParameter struct {
 	Step string
 }
 
-func newDAGResponse(dagName string, dag *controller.DAG, tab dagTabType) *dagResponse {
+func newDAGResponse(dagName string, dag *controller.DAGStatus, tab dagTabType) *dagResponse {
 	return &dagResponse{
 		Title:      dagName,
 		DAG:        dag,

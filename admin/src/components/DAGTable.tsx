@@ -103,7 +103,7 @@ const defaultColumns = [
       if (data.Type == DAGDataType.Group) {
         return getValue();
       } else {
-        const name = data.DAG.File.replace(/.y[a]{0,1}ml$/, '');
+        const name = data.DAGStatus.File.replace(/.y[a]{0,1}ml$/, '');
         const url = `/dags/${encodeURI(name)}`;
         return (
           <div
@@ -122,7 +122,7 @@ const defaultColumns = [
       if (data.Type == DAGDataType.Group) {
         value = data.Name;
       } else {
-        value = data.DAG.DAG.Name;
+        value = data.DAGStatus.DAG.Name;
       }
       const ret = value.toLowerCase().includes(filter.toLowerCase());
       return ret;
@@ -156,7 +156,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const tags = data.DAG.DAG.Tags;
+        const tags = data.DAGStatus.DAG.Tags;
         return (
           <Stack direction="row" spacing={1}>
             {tags?.map((tag) => (
@@ -177,7 +177,7 @@ const defaultColumns = [
       if (data.Type != DAGDataType.DAG) {
         return false;
       }
-      const tags = data.DAG.DAG.Tags;
+      const tags = data.DAGStatus.DAG.Tags;
       const ret = tags?.some((tag) => tag == filter) || false;
       return ret;
     },
@@ -194,8 +194,8 @@ const defaultColumns = [
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
         return (
-          <StatusChip status={data.DAG.Status?.Status}>
-            {data.DAG.Status?.StatusText || ''}
+          <StatusChip status={data.DAGStatus.Status?.Status}>
+            {data.DAGStatus.Status?.StatusText || ''}
           </StatusChip>
         );
       }
@@ -213,7 +213,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        return data.DAG.Status?.StartedAt;
+        return data.DAGStatus.Status?.StartedAt;
       }
       return null;
     },
@@ -231,7 +231,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        return data.DAG.Status?.FinishedAt;
+        return data.DAGStatus.Status?.FinishedAt;
       }
       return null;
     },
@@ -250,7 +250,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAG.DAG.ScheduleExp;
+        const schedules = data.DAGStatus.DAG.ScheduleExp;
         if (schedules) {
           return (
             <React.Fragment>
@@ -277,7 +277,7 @@ const defaultColumns = [
       if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
         return dataA!.Type - dataB!.Type;
       }
-      return getNextSchedule(dataA.DAG) - getNextSchedule(dataB.DAG);
+      return getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus);
     },
   }),
   table.createDataColumn('Type', {
@@ -287,15 +287,15 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAG.DAG.ScheduleExp;
-        if (schedules && !data.DAG.Suspended) {
+        const schedules = data.DAGStatus.DAG.ScheduleExp;
+        if (schedules && !data.DAGStatus.Suspended) {
           return (
             <React.Fragment>
               in{' '}
               <Ticker intervalMs={1000}>
                 {() => {
                   const ms = moment
-                    .unix(getNextSchedule(data.DAG))
+                    .unix(getNextSchedule(data.DAGStatus))
                     .diff(moment.now());
                   const format = ms / 1000 > 60 ? durFormatMin : durFormatSec;
                   return (
@@ -321,7 +321,7 @@ const defaultColumns = [
       if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
         return dataA!.Type - dataB!.Type;
       }
-      return getNextSchedule(dataA.DAG) - getNextSchedule(dataB.DAG);
+      return getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus);
     },
   }),
   table.createDataColumn('Type', {
@@ -331,7 +331,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        return data.DAG.DAG.Description;
+        return data.DAGStatus.DAG.Description;
       }
       return null;
     },
@@ -346,7 +346,7 @@ const defaultColumns = [
       }
       return (
         <DAGSwitch
-          DAG={data.DAG}
+          DAG={data.DAGStatus}
           refresh={props.instance.options.meta?.refreshFn}
         />
       );
@@ -362,8 +362,8 @@ const defaultColumns = [
       }
       return (
         <DAGActions
-          status={data.DAG.Status}
-          name={data.DAG.DAG.Name}
+          status={data.DAGStatus.Status}
+          name={data.DAGStatus.DAG.Name}
           label={false}
           refresh={props.instance.options.meta?.refreshFn}
         />
@@ -402,7 +402,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     } = {};
     DAGs.forEach((dag) => {
       if (dag.Type == DAGDataType.DAG) {
-        const g = dag.DAG.DAG.Group;
+        const g = dag.DAGStatus.DAG.Group;
         if (g != '') {
           if (!groups[g]) {
             groups[g] = {
@@ -425,8 +425,8 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       ...DAGs.filter(
         (dag) =>
           dag.Type == DAGDataType.DAG &&
-          dag.DAG.DAG.Group == '' &&
-          dag.DAG.DAG.Group == group
+          dag.DAGStatus.DAG.Group == '' &&
+          dag.DAGStatus.DAG.Group == group
       ),
     ];
   }, [DAGs, group]);
@@ -435,7 +435,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     const map: { [key: string]: boolean } = { '': true };
     DAGs.forEach((data) => {
       if (data.Type == DAGDataType.DAG) {
-        data.DAG.DAG.Tags?.forEach((tag) => {
+        data.DAGStatus.DAG.Tags?.forEach((tag) => {
           map[tag] = true;
         });
       }

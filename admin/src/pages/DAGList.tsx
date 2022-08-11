@@ -36,7 +36,7 @@ function DAGList() {
           ret.push({
             Type: DAGDataType.DAG,
             Name: val.DAG.Name,
-            DAG: val,
+            DAGStatus: val,
           });
         }
       }

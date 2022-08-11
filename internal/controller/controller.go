@@ -33,8 +33,8 @@ type Controller interface {
 }
 
 // GetDAGs returns all DAGs in the config file.
-func GetDAGs(dir string) (dags []*DAG, errs []string, err error) {
-	dags = []*DAG{}
+func GetDAGs(dir string) (dags []*DAGStatus, errs []string, err error) {
+	dags = []*DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(dir) {
 		if err = os.MkdirAll(dir, 0755); err != nil {
