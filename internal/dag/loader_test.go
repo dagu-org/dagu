@@ -24,7 +24,7 @@ func TestLoadBaseConfig(t *testing.T) {
 	l := &Loader{}
 	d, err := l.loadBaseConfig(
 		settings.MustGet(settings.SETTING__BASE_CONFIG),
-		&BuildConfigOptions{},
+		&BuildDAGOptions{},
 	)
 	require.NotNil(t, d)
 	require.NoError(t, err)
@@ -36,7 +36,7 @@ func TestLoadBaseConfigError(t *testing.T) {
 		path.Join(testDir, "config_err_parse.yaml"),
 	} {
 		l := &Loader{}
-		_, err := l.loadBaseConfig(f, &BuildConfigOptions{})
+		_, err := l.loadBaseConfig(f, &BuildDAGOptions{})
 		require.Error(t, err)
 	}
 }

@@ -19,7 +19,7 @@ func formatError(err error) string {
 
 func encodeError(w http.ResponseWriter, err error) {
 	switch err {
-	case dag.ErrConfigNotFound:
+	case dag.ErrDAGNotFound:
 		http.Error(w, formatError(err), http.StatusNotFound)
 	case errInvalidArgs:
 		http.Error(w, formatError(err), http.StatusBadRequest)

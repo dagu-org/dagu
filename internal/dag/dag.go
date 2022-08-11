@@ -148,7 +148,7 @@ func (c *DAG) setupStep(step *Step, defaultDir string) {
 	}
 }
 
-type BuildConfigOptions struct {
+type BuildDAGOptions struct {
 	headOnly   bool
 	parameters string
 	noEval     bool
@@ -157,8 +157,8 @@ type BuildConfigOptions struct {
 }
 
 type builder struct {
-	BuildConfigOptions
-	globalConfig *DAG
+	BuildDAGOptions
+	baseConfig *DAG
 }
 
 type buildStep struct {
@@ -168,8 +168,8 @@ type buildStep struct {
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-func (b *builder) buildFromDefinition(def *configDefinition, globalConfig *DAG) (d *DAG, err error) {
-	b.globalConfig = globalConfig
+func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
+	b.baseConfig = baseConfig
 
 	d = &DAG{}
 	d.Init()
@@ -259,8 +259,8 @@ func (b *builder) buildEnvVariables(def *configDefinition, d *DAG) (err error) {
 	env, err = b.loadVariables(def.Env, b.defaultEnv)
 	if err == nil {
 		d.Env = buildConfigEnv(env)
-		if b.globalConfig != nil {
-			for _, e := range b.globalConfig.Env {
+		if b.baseConfig != nil {
+			for _, e := range b.baseConfig.Env {
 				key := strings.SplitN(e, "=", 2)[0]
 				if _, ok := env[key]; !ok {
 					d.Env = append(d.Env, e)

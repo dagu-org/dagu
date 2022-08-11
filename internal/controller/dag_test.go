@@ -8,7 +8,7 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
-	file := testConfig("controller_config_error.yaml")
+	file := testDAG("controller_config_error.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.Error(t, err)

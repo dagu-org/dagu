@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var ErrConfigNotFound = errors.New("config file was not found")
+var ErrDAGNotFound = errors.New("DAG was not found")
 
 // Loader is a config loader.
 type Loader struct {
@@ -26,8 +26,8 @@ type Loader struct {
 // Load loads config from file.
 
 func (cl *Loader) Load(f, params string) (*DAG, error) {
-	return cl.loadConfig(f,
-		&BuildConfigOptions{
+	return cl.loadDAG(f,
+		&BuildDAGOptions{
 			parameters: params,
 		},
 	)
@@ -35,8 +35,8 @@ func (cl *Loader) Load(f, params string) (*DAG, error) {
 
 // LoadwIithoutEval loads config from file without evaluating env variables.
 func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
-	return cl.loadConfig(f,
-		&BuildConfigOptions{
+	return cl.loadDAG(f,
+		&BuildDAGOptions{
 			parameters: "",
 			headOnly:   false,
 			noEval:     true,
@@ -47,8 +47,8 @@ func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
 
 // LoadHeadOnly loads config from file and returns only the headline data.
 func (cl *Loader) LoadHeadOnly(f string) (*DAG, error) {
-	return cl.loadConfig(f,
-		&BuildConfigOptions{
+	return cl.loadDAG(f,
+		&BuildDAGOptions{
 			parameters: "",
 			headOnly:   true,
 			noEval:     true,
@@ -71,7 +71,7 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 		return nil, err
 	}
 	b := &builder{
-		BuildConfigOptions: BuildConfigOptions{
+		BuildDAGOptions: BuildDAGOptions{
 			headOnly: false,
 			noEval:   true,
 			noSetenv: true,
@@ -80,7 +80,7 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadBaseConfig(file string, opts *BuildConfigOptions) (*DAG, error) {
+func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, error) {
 	if !utils.FileExists(file) {
 		return nil, nil
 	}
@@ -99,12 +99,12 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildConfigOptions) (*DAG, e
 	buildOpts.headOnly = false
 	buildOpts.defaultEnv = utils.DefaultEnv()
 	b := &builder{
-		BuildConfigOptions: buildOpts,
+		BuildDAGOptions: buildOpts,
 	}
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*DAG, error) {
+func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 	if f == "" {
 		return nil, fmt.Errorf("config file was not specified")
 	}
@@ -146,7 +146,7 @@ func (cl *Loader) loadConfig(f string, opts *BuildConfigOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	b := builder{BuildConfigOptions: *opts}
+	b := builder{BuildDAGOptions: *opts}
 	c, err := b.buildFromDefinition(def, dst)
 
 	if err != nil {
