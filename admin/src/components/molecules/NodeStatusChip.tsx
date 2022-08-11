@@ -17,7 +17,7 @@ function NodeStatusChip({ status, children }: Props) {
       sx={[
         style,
         {
-          fontWeight: 'semibold',
+          fontWeight: 'bolder',
         },
       ]}
       label={children}

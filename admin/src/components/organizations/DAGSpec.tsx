@@ -148,7 +148,7 @@ function DAGSpec({ data }: Props) {
                       <Button
                         id="edit-config"
                         variant="contained"
-                        color="info"
+                        color="primary"
                         onClick={() => setEditing(true)}
                         startIcon={
                           <span className="icon">
