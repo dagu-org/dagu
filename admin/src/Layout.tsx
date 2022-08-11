@@ -7,10 +7,10 @@ import MuiAppBar, { AppBarProps as MuiAppBarProps } from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import List from '@mui/material/List';
 import Typography from '@mui/material/Typography';
-import { mainListItems } from '../../menu';
+import { mainListItems } from './menu';
 import { Grid, IconButton } from '@mui/material';
 import icon from '../../assets/images/dagu.png';
-import { AppBarContext } from '../../contexts/AppBarContext';
+import { AppBarContext } from './contexts/AppBarContext';
 
 const drawerWidthClosed = 64;
 const drawerWidth = 240;
