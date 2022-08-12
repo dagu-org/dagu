@@ -49,7 +49,7 @@ import Ticker from '../atoms/Ticker';
 type Props = {
   DAGs: DAGItem[];
   group: string;
-  refreshFn: () => Promise<void>;
+  refreshFn: () => void;
 };
 
 type DAGRow = DAGItem & { subRows?: DAGItem[] };
@@ -62,7 +62,7 @@ const table = createTable()
   .setFilterMetaType<DAGRow>()
   .setTableMetaType<{
     group: string;
-    refreshFn: () => Promise<void>;
+    refreshFn: () => void;
   }>();
 
 const defaultColumns = [
@@ -260,7 +260,9 @@ const defaultColumns = [
       if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
         return dataA!.Type - dataB!.Type;
       }
-      return getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus);
+      return (
+        getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus)
+      );
     },
   }),
   table.createDataColumn('Type', {
@@ -304,7 +306,9 @@ const defaultColumns = [
       if (dataA.Type != DAGDataType.DAG || dataB.Type != DAGDataType.DAG) {
         return dataA!.Type - dataB!.Type;
       }
-      return getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus);
+      return (
+        getNextSchedule(dataA.DAGStatus) - getNextSchedule(dataB.DAGStatus)
+      );
     },
   }),
   table.createDataColumn('Type', {

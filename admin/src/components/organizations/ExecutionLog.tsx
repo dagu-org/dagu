@@ -1,6 +1,6 @@
 import { Box, Stack } from '@mui/material';
 import React from 'react';
-import { LogFile } from '../../api/DAG';
+import { LogFile } from '../../models/api';
 import BorderedBox from '../atoms/BorderedBox';
 import LabeledItem from '../atoms/LabeledItem';
 import LoadingIndicator from '../atoms/LoadingIndicator';

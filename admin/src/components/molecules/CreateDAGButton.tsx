@@ -31,7 +31,7 @@ function CreateDAGButton() {
           body: formData,
         });
         if (resp.ok) {
-          window.location.href = `/dags/${name.replace(/.yaml$/, '')}?t=1`;
+          window.location.href = `/dags/${name.replace(/.yaml$/, '')}/spec`;
         } else {
           const e = await resp.text();
           alert(e);

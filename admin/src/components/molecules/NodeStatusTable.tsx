@@ -47,6 +47,7 @@ function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
     async (step: Step, action: string) => {
       doPost(action, step.Name);
       dismissModal();
+      refresh();
     },
     [refresh, dismissModal]
   );

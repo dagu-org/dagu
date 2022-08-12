@@ -1,10 +1,9 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import { GetDAGResponse } from '../../../api/DAG';
+import React, { useMemo } from 'react';
+import { Link, useParams, Routes, Route, useLocation } from 'react-router-dom';
+import { GetDAGResponse } from '../../../models/api';
 import DAGSpecErrors from '../../../components/molecules/DAGSpecErrors';
 import DAGStatus from '../../../components/organizations/DAGStatus';
 import { DAGContext } from '../../../contexts/DAGContext';
-import { DetailTabId } from '../../../models';
 import DAGSpec from '../../../components/organizations/DAGSpec';
 import DAGHistory from '../../../components/organizations/ExecutionHistory';
 import ExecutionLog from '../../../components/organizations/ExecutionLog';
@@ -14,6 +13,7 @@ import DAGActions from '../../../components/molecules/DAGActions';
 import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
 import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
+import useSWR, { useSWRConfig } from 'swr';
 
 type Params = {
   name: string;
@@ -21,70 +21,41 @@ type Params = {
 
 function DAGDetails() {
   const params = useParams<Params>();
-  const [data, setData] = React.useState<GetDAGResponse | undefined>(undefined);
-  const [tab, setTab] = React.useState(DetailTabId.Status);
   const appBarContext = React.useContext(AppBarContext);
-  React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const t = urlParams.get('t');
-    if (t) {
-      setTab(t as DetailTabId);
+  const path = useLocation().pathname;
+  const baseUrl = useMemo(
+    () => `/dags/${encodeURI(params.name!)}`,
+    [params.name]
+  );
+  const { data, isValidating } = useSWR<GetDAGResponse>(
+    `${path}?${new URLSearchParams(window.location.search).toString()}`,
+    null,
+    {
+      refreshInterval: 2000,
     }
-  }, []);
-  async function getData() {
-    let url = API_URL + `/dags/${params.name}?format=json`;
-    const urlParams = new URLSearchParams(window.location.search);
-    url += '&' + urlParams.toString();
-    const resp = await fetch(url, {
-      method: 'GET',
-      cache: 'no-store',
-      mode: 'cors',
-      headers: {
-        Accept: 'application/json',
-      },
-    });
-    if (!resp.ok) {
-      return;
-    }
-    const body = await resp.json();
-    setData(body);
-  }
+  );
+  const { mutate } = useSWRConfig();
+
+  const refreshFn = React.useCallback(() => {
+    mutate(baseUrl);
+    return;
+  }, [mutate, baseUrl]);
+
   React.useEffect(() => {
     if (data) {
       appBarContext.setTitle(data.Title);
     }
   }, [data, appBarContext]);
-  React.useEffect(() => {
-    getData();
-    if (tab == DetailTabId.Status || tab == DetailTabId.Spec) {
-      const timer = setInterval(getData, 2000);
-      return () => clearInterval(timer);
-    }
-  }, [tab]);
 
   if (!params.name || !data || !data.DAG) {
     return <LoadingIndicator />;
   }
 
-  const contents: Partial<{
-    [key in DetailTabId]: React.ReactNode;
-  }> = {
-    [DetailTabId.Status]: (
-      <DAGStatus DAG={data.DAG} name={params.name} refresh={getData} />
-    ),
-    [DetailTabId.Spec]: <DAGSpec data={data} />,
-    [DetailTabId.History]: <DAGHistory logData={data.LogData} />,
-    [DetailTabId.StepLog]: <ExecutionLog log={data.StepLog} />,
-    [DetailTabId.ScLog]: <ExecutionLog log={data.ScLog} />,
-  };
   const ctx = {
     data: data,
-    refresh: getData,
-    tab,
+    refresh: refreshFn,
     name: params.name,
   };
-
-  const baseUrl = `/dags/${encodeURI(params.name)}`;
 
   return (
     <DAGContext.Provider value={ctx}>
@@ -104,18 +75,12 @@ function DAGDetails() {
           }}
         >
           <Title>{data.Title}</Title>
-          {tab == DetailTabId.Status || tab == DetailTabId.Spec ? (
-            <DAGActions
-              status={data.DAG.Status}
-              name={params.name!}
-              refresh={getData}
-              redirectTo={
-                tab == DetailTabId.Spec
-                  ? `${baseUrl}?t=${DetailTabId.Status}`
-                  : undefined
-              }
-            />
-          ) : null}
+          <DAGActions
+            status={data.DAG.Status}
+            name={params.name!}
+            refresh={refreshFn}
+            redirectTo={`${baseUrl}`}
+          />
         </Box>
 
         <Stack
@@ -126,27 +91,15 @@ function DAGDetails() {
             alignItems: 'center',
           }}
         >
-          <Tabs value={tab}>
-            <LinkTab
-              label="Status"
-              value={DetailTabId.Status}
-              href={`${baseUrl}?t=${DetailTabId.Status}`}
-            />
-            <LinkTab
-              label="Spec"
-              value={DetailTabId.Spec}
-              href={`${baseUrl}?t=${DetailTabId.Spec}`}
-            />
-            <LinkTab
-              label="History"
-              value={DetailTabId.History}
-              href={`${baseUrl}?t=${DetailTabId.History}`}
-            />
-            {tab >= DetailTabId.StepLog && tab <= DetailTabId.ScLog ? (
-              <LinkTab label="Log" value={tab} />
+          <Tabs value={`${path}`}>
+            <LinkTab label="Status" value={`${baseUrl}`} />
+            <LinkTab label="Spec" value={`${baseUrl}/spec`} />
+            <LinkTab label="History" value={`${baseUrl}/history`} />
+            {path == `${baseUrl}/log` || path == `${baseUrl}/scheduler-log` ? (
+              <Tab label="Log" value={path} />
             ) : null}
           </Tabs>
-          {tab == DetailTabId.Spec ? (
+          {path == `${baseUrl}/spec` ? (
             <DAGEditButtons name={params.name} />
           ) : null}
         </Stack>
@@ -155,7 +108,35 @@ function DAGDetails() {
           <DAGSpecErrors errors={data.Errors} />
         </Box>
 
-        <Box sx={{ mx: 4, flex: 1 }}>{contents[tab]}</Box>
+        <Box sx={{ mx: 4, flex: 1 }}>
+          <Routes>
+            <Route
+              index
+              element={
+                <DAGStatus
+                  DAG={data.DAG}
+                  name={params.name}
+                  refresh={refreshFn}
+                />
+              }
+            />
+            <Route path={'/spec'} element={<DAGSpec data={data} />} />
+            <Route
+              path={'/history'}
+              element={
+                <DAGHistory logData={data.LogData} isLoading={isValidating} />
+              }
+            />
+            <Route
+              path={'/scheduler-log'}
+              element={<ExecutionLog log={data.ScLog} />}
+            />
+            <Route
+              path={'/log'}
+              element={<ExecutionLog log={data.StepLog} />}
+            />
+          </Routes>
+        </Box>
       </Stack>
     </DAGContext.Provider>
   );
@@ -164,14 +145,13 @@ export default DAGDetails;
 
 interface LinkTabProps {
   label?: string;
-  href?: string;
   value: string;
 }
 
-function LinkTab({ href, ...props }: LinkTabProps) {
+function LinkTab({ value, ...props }: LinkTabProps) {
   return (
-    <a href={href}>
-      <Tab {...props} />
-    </a>
+    <Link to={value}>
+      <Tab value={value} {...props} />
+    </Link>
   );
 }

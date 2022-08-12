@@ -1,6 +1,6 @@
 import moment from 'moment';
 import React, { CSSProperties } from 'react';
-import { DagStatus } from '../../api/DAG';
+import { GridData } from '../../models/api';
 import { StatusFile } from '../../models';
 import HistoryTableRow from './HistoryTableRow';
 import {
@@ -14,7 +14,7 @@ import BorderedBox from '../atoms/BorderedBox';
 
 type Props = {
   logs: StatusFile[];
-  gridData: DagStatus[];
+  gridData: GridData[];
   onSelect: (idx: number) => void;
   idx: number;
 };

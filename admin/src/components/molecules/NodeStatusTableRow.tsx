@@ -1,10 +1,11 @@
 import React from 'react';
-import { Node, Step, DetailTabId } from '../../models';
+import { Node, Step } from '../../models';
 import MultilineText from '../atoms/MultilineText';
 import NodeStatusChip from '../molecules/NodeStatusChip';
 import { TableCell } from '@mui/material';
 import StyledTableRow from '../atoms/StyledTableRow';
 import { OpenInNew } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 
 type Props = {
   rownum: number;
@@ -21,7 +22,7 @@ function NodeStatusTableRow({
   file,
   onRequireModal,
 }: Props) {
-  const url = `/dags/${name}?t=${DetailTabId.StepLog}&file=${file}&step=${node.Step.Name}`;
+  const url = `/dags/${name}/log?file=${file}&step=${node.Step.Name}`;
   const buttonStyle = {
     margin: '0px',
     padding: '0px',
@@ -50,9 +51,9 @@ function NodeStatusTableRow({
       <TableCell> {node.Error} </TableCell>
       <TableCell>
         {node.Log ? (
-          <a href={url}>
+          <Link to={url}>
             <OpenInNew />
-          </a>
+          </Link>
         ) : null}
       </TableCell>
     </StyledTableRow>

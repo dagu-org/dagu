@@ -150,15 +150,6 @@ export function getNextSchedule(data: DAGStatus): number {
   return sorted[0].getTime() / 1000;
 }
 
-export enum DetailTabId {
-  Status = '0',
-  Spec = '1',
-  History = '2',
-  StepLog = '3',
-  ScLog = '4',
-  None = '5',
-}
-
 export enum NodeStatus {
   None = 0,
   Running,
