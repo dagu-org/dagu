@@ -11,7 +11,8 @@ import (
 var testsConfig = path.Join(testsDir, "admin.yaml")
 
 func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
+	cfg, err := DefaultConfig()
+	require.NoError(t, err)
 	testConfig(t, cfg, &testWant{
 		Host:    "127.0.0.1",
 		Port:    "8080",

@@ -18,10 +18,10 @@ func Test_serverCommand(t *testing.T) {
 	app := makeApp()
 	dir := utils.MustTempDir("dagu_test_server")
 	os.Setenv("HOME", dir)
+	settings.ChangeHomeDir(dir)
 
 	port := findPort(t)
-	os.Setenv(settings.SETTING__ADMIN_PORT, port)
-	settings.ChangeHomeDir(dir)
+	settings.Set(settings.SETTING__ADMIN_PORT, port)
 
 	done := make(chan struct{})
 	go func() {
@@ -34,7 +34,9 @@ func Test_serverCommand(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	cfg := admin.DefaultConfig()
+	cfg, err := admin.DefaultConfig()
+	require.NoError(t, err)
+
 	res, err := http.Post(
 		fmt.Sprintf("http://%s:%s/shutdown", cfg.Host, cfg.Port),
 		"application/json",

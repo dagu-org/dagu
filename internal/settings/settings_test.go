@@ -42,17 +42,18 @@ func TestReadSetting(t *testing.T) {
 	}
 
 	// read from enviroment variables
+	_ = os.Setenv(SETTING__HOME, "/tmp/dagu/")
 	for _, test := range []struct {
 		Name string
 		Want string
 	}{
 		{
 			Name: SETTING__DATA_DIR,
-			Want: "/home/dagu/data",
+			Want: "/tmp/dagu/data",
 		},
 		{
 			Name: SETTING__LOGS_DIR,
-			Want: "/home/dagu/logs",
+			Want: "/tmp/dagu/logs",
 		},
 	} {
 		_ = os.Setenv(test.Name, test.Want)
@@ -60,10 +61,10 @@ func TestReadSetting(t *testing.T) {
 
 		val, err := Get(test.Name)
 		require.NoError(t, err)
-		require.Equal(t, val, test.Want)
+		require.Equal(t, test.Want, val)
 
 		val = MustGet(test.Name)
-		require.Equal(t, val, test.Want)
+		require.Equal(t, test.Want, val)
 	}
 
 	_, err := Get("Invalid_Name")

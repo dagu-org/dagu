@@ -13,19 +13,18 @@ var (
 )
 
 const (
-	SETTING__HOME = "DAGU_HOME"
-
-	// TODO: consider declaring these consts as enum when changed not to read from env
-	SETTING__DATA_DIR           = "DAGU__DATA"
-	SETTING__LOGS_DIR           = "DAGU__LOGS"
-	SETTING__SUSPEND_FLAGS_DIR  = "DAGU__SUSPEND_FLAGS_DIR"
-	SETTING__BASE_CONFIG        = "DAGU__BASE_CONFIG"
-	SETTING__ADMIN_CONFIG       = "DAGU__ADMIN_CONFIG"
-	SETTING__ADMIN_PORT         = "DAGU__ADMIN_PORT"
+	SETTING__HOME               = "DAGU_HOME"
 	SETTING__ADMIN_NAVBAR_COLOR = "DAGU__ADMIN_NAVBAR_COLOR"
 	SETTING__ADMIN_NAVBAR_TITLE = "DAGU__ADMIN_NAVBAR_TITLE"
-	SETTING__ADMIN_LOGS_DIR     = "DAGU__ADMIN_LOGS_DIR"
-	SETTING__ADMIN_DAGS_DIR     = "DAGU__ADMIN_DAGS_DIR"
+
+	SETTING__ADMIN_PORT        = "DAGU__ADMIN_PORT"
+	SETTING__DATA_DIR          = "DAGU__DATA"
+	SETTING__LOGS_DIR          = "DAGU__LOGS"
+	SETTING__SUSPEND_FLAGS_DIR = "DAGU__SUSPEND_FLAGS_DIR"
+	SETTING__BASE_CONFIG       = "DAGU__BASE_CONFIG"
+	SETTING__ADMIN_CONFIG      = "DAGU__ADMIN_CONFIG"
+	SETTING__ADMIN_LOGS_DIR    = "DAGU__ADMIN_LOGS_DIR"
+	SETTING__ADMIN_DAGS_DIR    = "DAGU__ADMIN_DAGS_DIR"
 )
 
 // MustGet returns the value of the setting or
@@ -44,6 +43,11 @@ func Get(name string) (string, error) {
 		return val, nil
 	}
 	return "", ErrSettingNotFound
+}
+
+// Set sets the value of the setting.
+func Set(key, val string) {
+	cache[key] = val
 }
 
 // ChangeHomeDir changes the home directory and reloads
@@ -67,16 +71,14 @@ func load() {
 
 	cache[SETTING__ADMIN_CONFIG] = path.Join(dh, "admin.yaml")
 	cache[SETTING__BASE_CONFIG] = path.Join(dh, "config.yaml")
-
-	// TODO: consider reading these settings from env
-	cacheEnv(SETTING__DATA_DIR, path.Join(dh, "/data"))
-	cacheEnv(SETTING__LOGS_DIR, path.Join(dh, "/logs"))
-	cacheEnv(SETTING__SUSPEND_FLAGS_DIR, path.Join(dh, "/suspend"))
-	cacheEnv(SETTING__ADMIN_NAVBAR_COLOR, "")
-	cacheEnv(SETTING__ADMIN_NAVBAR_TITLE, "Dagu admin")
-	cacheEnv(SETTING__ADMIN_PORT, "8080")
-	cacheEnv(SETTING__ADMIN_LOGS_DIR, path.Join(dh, "/logs/admin"))
-	cacheEnv(SETTING__ADMIN_DAGS_DIR, path.Join(dh, "/dags"))
+	cache[SETTING__DATA_DIR] = path.Join(dh, "/data")
+	cache[SETTING__LOGS_DIR] = path.Join(dh, "/logs")
+	cache[SETTING__SUSPEND_FLAGS_DIR] = path.Join(dh, "/suspend")
+	cache[SETTING__ADMIN_LOGS_DIR] = path.Join(dh, "/logs/admin")
+	cache[SETTING__ADMIN_DAGS_DIR] = path.Join(dh, "/dags")
+	cache[SETTING__ADMIN_PORT] = "8080"
+	cache[SETTING__ADMIN_NAVBAR_COLOR] = ""
+	cache[SETTING__ADMIN_NAVBAR_TITLE] = "Dagu"
 }
 
 func cacheEnv(key, def string) {

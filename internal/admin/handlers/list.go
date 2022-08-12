@@ -22,8 +22,8 @@ type DAGListHandlerConfig struct {
 	DAGsDir string
 }
 
-func HandleGetList(hc *DAGListHandlerConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "index")
+func HandleGetList(hc *DAGListHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "index", tc)
 	return func(w http.ResponseWriter, r *http.Request) {
 		dir := filepath.Join(hc.DAGsDir)
 		dags, errs, err := controller.GetDAGs(dir)

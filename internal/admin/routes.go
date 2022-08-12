@@ -13,32 +13,30 @@ type route struct {
 }
 
 func defaultRoutes(cfg *Config) []*route {
+	tc := &handlers.TemplateConfig{
+		NavbarColor: cfg.NavbarColor,
+		NavbarTitle: cfg.NavbarTitle,
+	}
 	return []*route{
 		{http.MethodGet, `^/?$`, handlers.HandleGetList(
-			&handlers.DAGListHandlerConfig{
-				DAGsDir: cfg.DAGs,
-			},
+			&handlers.DAGListHandlerConfig{DAGsDir: cfg.DAGs},
+			tc,
 		)},
 		{http.MethodPost, `^/?$`, handlers.HandlePostList(
-			&handlers.DAGListHandlerConfig{
-				DAGsDir: cfg.DAGs,
-			},
+			&handlers.DAGListHandlerConfig{DAGsDir: cfg.DAGs},
 		)},
 		{http.MethodGet, `^/dags/?$`, handlers.HandleGetList(
-			&handlers.DAGListHandlerConfig{
-				DAGsDir: cfg.DAGs,
-			},
+			&handlers.DAGListHandlerConfig{DAGsDir: cfg.DAGs},
+			tc,
 		)},
 		{http.MethodPost, `^/dags/?$`, handlers.HandlePostList(
-			&handlers.DAGListHandlerConfig{
-				DAGsDir: cfg.DAGs,
-			},
+			&handlers.DAGListHandlerConfig{DAGsDir: cfg.DAGs},
 		)},
 		{http.MethodGet, `^/dags/([^/]+)$`, handlers.HandleGetDAG(
 			&handlers.DAGHandlerConfig{
 				DAGsDir:            cfg.DAGs,
 				LogEncodingCharset: cfg.LogEncodingCharset,
-			},
+			}, tc,
 		)},
 		{http.MethodPost, `^/dags/([^/]+)$`, handlers.HandlePostDAG(
 			&handlers.PostDAGHandlerConfig{

@@ -43,8 +43,7 @@ func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	cf := utils.StringWithFallback(c.String("config"), settings.MustGet(settings.SETTING__ADMIN_CONFIG))
 	cfg, err = l.LoadAdminConfig(cf)
 	if err == admin.ErrConfigNotFound {
-		cfg = admin.DefaultConfig()
-		err = nil
+		cfg, err = admin.DefaultConfig()
 	}
 	if err != nil {
 		return nil, fmt.Errorf("loading admin config failed: %w", err)

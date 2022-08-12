@@ -89,8 +89,8 @@ type DAGHandlerConfig struct {
 	LogEncodingCharset string
 }
 
-func HandleGetDAG(hc *DAGHandlerConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "dag")
+func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "dag", tc)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		dn, err := getPathParameter(r)
