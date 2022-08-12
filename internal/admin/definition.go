@@ -13,4 +13,6 @@ type configDefinition struct {
 	BasicAuthUsername  string
 	BasicAuthPassword  string
 	LogEncodingCharset string
+	NavbarColor        string
+	NavbarTitle        string
 }

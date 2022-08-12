@@ -13,13 +13,6 @@ import (
 
 type Loader struct{}
 
-func DefaultConfig() *Config {
-	c := &Config{}
-	c.Init()
-	c.setup()
-	return c
-}
-
 func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 	if !utils.FileExists(file) {
 		return nil, ErrConfigNotFound
@@ -56,13 +49,16 @@ func (cl *Loader) LoadAdminConfig(file string) (*Config, error) {
 			cfg, err = buildFromDefinition(def)
 			return err
 		},
+		func() (err error) {
+			err = cfg.setup()
+			return err
+		},
 	} {
 		if err := fn(); err != nil {
 			return nil, err
 		}
 	}
 
-	cfg.setup()
 	return cfg, nil
 }
 

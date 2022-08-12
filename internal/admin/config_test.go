@@ -20,6 +20,8 @@ basicAuthPassword: password
 logEncodingCharset: utf-8
 logDir: /var/log/dagu
 baseConfig: /dagu/config.yaml
+navbarColor: red
+navbarTitle: Dagu test
 `
 
 func TestLoadConfig(t *testing.T) {
@@ -42,6 +44,8 @@ func TestLoadConfig(t *testing.T) {
 				Env:                []string{},
 				LogDir:             "/var/log/dagu",
 				BaseConfig:         "/dagu/config.yaml",
+				NavbarColor:        "red",
+				NavbarTitle:        "Dagu test",
 			},
 		},
 		{
@@ -59,7 +63,9 @@ func TestLoadConfig(t *testing.T) {
 				Env:                []string{},
 				LogDir: settings.MustGet(
 					settings.SETTING__ADMIN_LOGS_DIR),
-				BaseConfig: settings.MustGet(settings.SETTING__BASE_CONFIG),
+				BaseConfig:  settings.MustGet(settings.SETTING__BASE_CONFIG),
+				NavbarColor: "",
+				NavbarTitle: "Dagu",
 			},
 		},
 	} {
