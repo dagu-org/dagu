@@ -1,6 +1,5 @@
 import React from 'react';
-import { GetDAGResponse } from '../api/DAG';
-import { DetailTabId } from '../models';
+import { GetDAGResponse } from '../models/api';
 
 export const DAGContext = React.createContext({
   refresh: () => {
@@ -8,5 +7,4 @@ export const DAGContext = React.createContext({
   },
   data: null as GetDAGResponse | null,
   name: '',
-  tab: DetailTabId.Status,
 });

@@ -5,11 +5,11 @@ import CreateDAGButton from '../../components/molecules/CreateDAGButton';
 import WithLoading from '../../components/atoms/WithLoading';
 import DAGTable from '../../components/molecules/DAGTable';
 import Title from '../../components/atoms/Title';
-import { useDAGGetAPI } from '../../hooks/useDAGGetAPI';
 import { DAGItem, DAGDataType } from '../../models';
 import { useLocation } from 'react-router-dom';
-import { GetDAGsResponse } from '../../api/DAGs';
+import { GetDAGsResponse } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
+import useSWR, { useSWRConfig } from 'swr';
 
 function DAGs() {
   const useQuery = () => new URLSearchParams(useLocation().search);
@@ -17,13 +17,16 @@ function DAGs() {
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
 
-  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>('/', {});
+  const { mutate } = useSWRConfig();
+  const { data } = useSWR<GetDAGsResponse>('/', null, {
+    refreshInterval: 10000,
+  });
 
-  React.useEffect(() => {
-    doGet();
-    const timer = setInterval(doGet, 10000);
-    return () => clearInterval(timer);
-  }, []);
+  const refreshFn = React.useCallback(() => {
+    mutate('/');
+    return;
+  }, [mutate]);
+
   React.useEffect(() => {
     appBarContext.setTitle('DAGs');
   }, [appBarContext]);
@@ -77,7 +80,7 @@ function DAGs() {
               <DAGTable
                 DAGs={merged}
                 group={group}
-                refreshFn={doGet}
+                refreshFn={refreshFn}
               ></DAGTable>
             </React.Fragment>
           )}

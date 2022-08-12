@@ -32,7 +32,7 @@ func defaultRoutes(cfg *Config) []*route {
 		{http.MethodPost, `^/dags/?$`, handlers.HandlePostList(
 			&handlers.DAGListHandlerConfig{DAGsDir: cfg.DAGs},
 		)},
-		{http.MethodGet, `^/dags/([^/]+)$`, handlers.HandleGetDAG(
+		{http.MethodGet, `^/dags/([^/]+)/?.*`, handlers.HandleGetDAG(
 			&handlers.DAGHandlerConfig{
 				DAGsDir:            cfg.DAGs,
 				LogEncodingCharset: cfg.LogEncodingCharset,

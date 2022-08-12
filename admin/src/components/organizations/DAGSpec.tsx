@@ -1,6 +1,6 @@
 import { Box, Button, Stack } from '@mui/material';
 import React from 'react';
-import { GetDAGResponse } from '../../api/DAG';
+import { GetDAGResponse } from '../../models/api'
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAG, Step } from '../../models';
 import DAGEditor from '../atoms/DAGEditor';

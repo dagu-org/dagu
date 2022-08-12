@@ -5,6 +5,8 @@ import Dashboard from './pages';
 import DAGDetails from './pages/dags/dag';
 import DAGs from './pages/dags';
 import { AppBarContext } from './contexts/AppBarContext';
+import { SWRConfig } from 'swr';
+import fetchJson from './lib/fetchJson';
 
 export type Config = {
   title: string;
@@ -18,23 +20,32 @@ type Props = {
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
   return (
-    <AppBarContext.Provider
+    <SWRConfig
       value={{
-        title,
-        setTitle,
+        fetcher: fetchJson,
+        onError: (err) => {
+          console.error(err);
+        },
       }}
     >
-      <BrowserRouter>
-        <Layout {...config}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="" element={<DAGs />} />
-            <Route path="/dags/" element={<DAGs />} />
-            <Route path="/dags/:name" element={<DAGDetails />} />
-          </Routes>
-        </Layout>
-      </BrowserRouter>
-    </AppBarContext.Provider>
+      <AppBarContext.Provider
+        value={{
+          title,
+          setTitle,
+        }}
+      >
+        <BrowserRouter>
+          <Layout {...config}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="" element={<DAGs />} />
+              <Route path="/dags/" element={<DAGs />} />
+              <Route path="/dags/:name/*" element={<DAGDetails />} />
+            </Routes>
+          </Layout>
+        </BrowserRouter>
+      </AppBarContext.Provider>
+    </SWRConfig>
   );
 }
 

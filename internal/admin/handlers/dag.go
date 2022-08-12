@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/yohamta/dagu/internal/constants"
@@ -40,7 +39,7 @@ type dagResponse struct {
 	Title      string
 	Charset    string
 	DAG        *controller.DAGStatus
-	Tab        dagTabType
+	Tab        string
 	Graph      string
 	Definition string
 	LogData    *Log
@@ -56,24 +55,20 @@ type logFile struct {
 	Content string
 }
 
-type dagTabType int
-
 const (
-	DAG_TabType_Status dagTabType = iota
-	DAG_TabType_Config
-	DAG_TabType_History
-	DAG_TabType_StepLog
-	DAG_TabType_ScLog
-	DAG_TabType_None
+	dag_TabType_Status  = "status"
+	dag_TabType_Spec    = "spec"
+	dag_TabType_History = "history"
+	dag_TabType_StepLog = "log"
+	dag_TabType_ScLog   = "scheduler-log"
 )
 
 type dagParameter struct {
-	Tab  dagTabType
 	File string
 	Step string
 }
 
-func newDAGResponse(dagName string, dag *controller.DAGStatus, tab dagTabType) *dagResponse {
+func newDAGResponse(dagName string, dag *controller.DAGStatus, tab string) *dagResponse {
 	return &dagResponse{
 		Title:      dagName,
 		DAG:        dag,
@@ -93,7 +88,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "dag", tc)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		dn, err := getPathParameter(r)
+		dn, tab, err := getPathParameter(r)
 		if err != nil {
 			encodeError(w, err)
 			return
@@ -108,21 +103,21 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 			return
 		}
 		c := controller.New(d.DAG)
-		data := newDAGResponse(d.DAG.Name, d, params.Tab)
+		data := newDAGResponse(d.DAG.Name, d, tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
 		}
 
-		switch params.Tab {
-		case DAG_TabType_Status:
-		case DAG_TabType_Config:
+		switch tab {
+		case dag_TabType_Status:
+		case dag_TabType_Spec:
 			data.Definition, _ = dag.ReadConfig(file)
 
-		case DAG_TabType_History:
+		case dag_TabType_History:
 			logs := controller.New(d.DAG).GetStatusHist(30)
 			data.LogData = buildLog(logs)
 
-		case DAG_TabType_StepLog:
+		case dag_TabType_StepLog:
 			if isJsonRequest(r) {
 				data.StepLog, err = readStepLog(c, params.File, params.Step, hc.LogEncodingCharset)
 				if err != nil {
@@ -131,7 +126,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 				}
 			}
 
-		case DAG_TabType_ScLog:
+		case dag_TabType_ScLog:
 			if isJsonRequest(r) {
 				data.ScLog, err = readSchedulerLog(c, params.File)
 				if err != nil {
@@ -169,7 +164,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		reqId := r.FormValue("request-id")
 		step := r.FormValue("step")
 
-		dn, err := getPathParameter(r)
+		dn, _, err := getPathParameter(r)
 		if err != nil {
 			encodeError(w, err)
 			return
@@ -468,27 +463,23 @@ func buildLog(logs []*models.StatusFile) *Log {
 	return ret
 }
 
-func getPathParameter(r *http.Request) (string, error) {
-	re := regexp.MustCompile(`/dags/([^/\?]+)/?$`)
-	m := re.FindStringSubmatch(r.URL.Path)
-	if len(m) < 2 {
-		return "", fmt.Errorf("invalid URL")
+var (
+	re  = regexp.MustCompile(`/dags/([^/\?]+)/([^/\?]+)/?`)
+	re2 = regexp.MustCompile(`/dags/([^/\?]+)/?`)
+)
+
+func getPathParameter(r *http.Request) (string, string, error) {
+	if m := re.FindStringSubmatch(r.URL.Path); m != nil {
+		return m[1], m[2], nil
 	}
-	return m[1], nil
+	if m := re2.FindStringSubmatch(r.URL.Path); m != nil {
+		return m[1], dag_TabType_Status, nil
+	}
+	return "", "", fmt.Errorf("invalid URL")
 }
 
 func getDAGParameter(r *http.Request) *dagParameter {
-	p := &dagParameter{
-		Tab: DAG_TabType_Status,
-	}
-	if tab, ok := r.URL.Query()["t"]; ok {
-		i, err := strconv.Atoi(tab[0])
-		if err != nil || i >= int(DAG_TabType_None) {
-			p.Tab = DAG_TabType_Status
-		} else {
-			p.Tab = dagTabType(i)
-		}
-	}
+	p := &dagParameter{}
 	if file, ok := r.URL.Query()["file"]; ok {
 		p.File = file[0]
 	}

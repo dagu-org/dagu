@@ -1,6 +1,5 @@
 import React from 'react';
-import { GetDAGsResponse } from '../api/DAGs';
-import { useDAGGetAPI } from '../hooks/useDAGGetAPI';
+import { GetDAGsResponse } from '../models/api';
 import { Box, Grid } from '@mui/material';
 import { SchedulerStatus } from '../models';
 import { statusColorMapping } from '../consts';
@@ -8,6 +7,7 @@ import DashboardMetric from '../components/molecules/DashboardMetric';
 import DashboardTimechart from '../components/molecules/DashboardTimechart';
 import Title from '../components/atoms/Title';
 import { AppBarContext } from '../contexts/AppBarContext';
+import useSWR from 'swr';
 
 type metrics = Record<SchedulerStatus, number>;
 
@@ -22,8 +22,9 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
-
-  const { data, doGet } = useDAGGetAPI<GetDAGsResponse>('/', {});
+  const { data } = useSWR<GetDAGsResponse>('/', null, {
+    refreshInterval: 10000,
+  });
 
   React.useEffect(() => {
     if (!data) {
@@ -42,12 +43,6 @@ function Dashboard() {
   React.useEffect(() => {
     appBarContext.setTitle('Dashboard');
   }, [appBarContext]);
-
-  React.useEffect(() => {
-    doGet();
-    const timer = setInterval(doGet, 10000);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <Grid container spacing={3} sx={{ mx: 4, width: '100%' }}>

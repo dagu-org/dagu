@@ -1,11 +1,11 @@
 import { TableCell } from '@mui/material';
 import React, { CSSProperties } from 'react';
-import { DagStatus } from '../../api/DAG';
+import { GridData } from '../../models/api';
 import { statusColorMapping } from '../../consts';
 import StyledTableRow from '../atoms/StyledTableRow';
 
 type Props = {
-  data: DagStatus;
+  data: GridData;
   onSelect: (idx: number) => void;
   idx: number;
 };

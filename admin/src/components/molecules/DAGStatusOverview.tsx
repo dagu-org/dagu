@@ -1,9 +1,9 @@
 import React from 'react';
 import { Status } from '../../models';
-import { DetailTabId } from '../../models';
 import StatusChip from '../atoms/StatusChip';
 import { Stack } from '@mui/material';
 import LabeledItem from '../atoms/LabeledItem';
+import { Link } from 'react-router-dom';
 
 type Props = {
   status?: Status;
@@ -11,8 +11,8 @@ type Props = {
   file?: string;
 };
 
-function StatusInfoTable({ status, name, file = '' }: Props) {
-  const url = `/dags/${name}?t=${DetailTabId.ScLog}&file=${encodeURI(file)}`;
+function DAGStatusOverview({ status, name, file = '' }: Props) {
+  const url = `/dags/${name}/scheduler-log?&file=${encodeURI(file)}`;
   if (!status) {
     return null;
   }
@@ -28,9 +28,9 @@ function StatusInfoTable({ status, name, file = '' }: Props) {
       </Stack>
       <LabeledItem label="Params">{status.Params}</LabeledItem>
       <LabeledItem label="Scheduler Log">
-        <a href={url}> {status.Log} </a>
+        <Link to={url}>{status.Log}</Link>
       </LabeledItem>
     </Stack>
   );
 }
-export default StatusInfoTable;
+export default DAGStatusOverview;

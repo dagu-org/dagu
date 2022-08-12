@@ -1,4 +1,4 @@
-import { DAGStatus, Node, NodeStatus, StatusFile } from '../models';
+import { DAGStatus, Node, NodeStatus, StatusFile } from './index';
 
 export type GetDAGResponse = {
   Title: string;
@@ -14,7 +14,7 @@ export type GetDAGResponse = {
 };
 
 export type LogData = {
-  GridData: DagStatus[];
+  GridData: GridData[];
   Logs: StatusFile[];
 };
 
@@ -24,7 +24,15 @@ export type LogFile = {
   Content: string;
 };
 
-export type DagStatus = {
+export type GridData = {
   Name: string;
   Vals: NodeStatus[];
+};
+
+export type GetDAGsResponse = {
+  Title: string;
+  Charset: string;
+  DAGs: DAGStatus[];
+  Errors: string[];
+  HasError: boolean;
 };

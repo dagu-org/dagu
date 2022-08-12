@@ -1,23 +1,42 @@
 import { Box } from '@mui/material';
-import React from 'react';
-import { LogData } from '../../api/DAG';
+import React, { useEffect } from 'react';
+import { GridData, LogData } from '../../models/api';
 import { DAGContext } from '../../contexts/DAGContext';
-import { Handlers } from '../../models';
+import { Handlers, StatusFile } from '../../models';
 import NodeStatusTable from '../molecules/NodeStatusTable';
-import HistoryTable from '../molecules/HistoryTable';
-import StatusInfoTable from '../molecules/DAGStatusOverview';
+import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import SubTitle from '../atoms/SubTitle';
+import LoadingIndicator from '../atoms/LoadingIndicator';
+import HistoryTable from '../molecules/HistoryTable';
 
 type Props = {
   logData: LogData;
+  isLoading: boolean;
 };
 
-function DAGHistory({ logData }: Props) {
-  const [idx, setIdx] = React.useState(logData.Logs.length - 1);
-  const [logs, gridData] = React.useMemo(() => {
-    return [logData.Logs.reverse(), logData.GridData];
-  }, [logData]);
-  const handlers = Handlers(logs[idx].Status);
+function DAGHistory({ logData, isLoading }: Props) {
+  if (!logData || logData.Logs?.length == 0 || logData.GridData?.length == 0) {
+    if (isLoading) {
+      return <LoadingIndicator />;
+    }
+    return <Box>Execution history was not found.</Box>;
+  }
+  return <DAGHistoryTable Logs={logData.Logs} GridData={logData.GridData} />;
+}
+
+type HistoryTableProps = {
+  GridData: GridData[];
+  Logs: StatusFile[];
+};
+
+function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
+  const [idx, setIdx] = React.useState(Logs.length - 1);
+  const logs = React.useMemo(() => {
+    return Logs.reverse();
+  }, [Logs]);
+
+  const handlers = logs.length > idx ? Handlers(logs[idx].Status) : null;
+
   return (
     <DAGContext.Consumer>
       {(props) => (
@@ -26,7 +45,7 @@ function DAGHistory({ logData }: Props) {
             <SubTitle>Execution History</SubTitle>
             <HistoryTable
               logs={logs}
-              gridData={gridData}
+              gridData={GridData}
               onSelect={setIdx}
               idx={idx}
             />
@@ -37,7 +56,7 @@ function DAGHistory({ logData }: Props) {
               <Box sx={{ mt: 3 }}>
                 <SubTitle>Status</SubTitle>
                 <Box sx={{ mt: 2 }}>
-                  <StatusInfoTable
+                  <DAGStatusOverview
                     status={logs[idx].Status}
                     file={logs[idx].File}
                     {...props}

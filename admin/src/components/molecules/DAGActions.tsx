@@ -2,6 +2,7 @@ import { Stack } from '@mui/material';
 import React from 'react';
 import { SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
+import { useNavigate } from 'react-router-dom';
 
 type Props = {
   status?: Status;
@@ -18,6 +19,8 @@ function DAGActions({
   redirectTo,
   label = true,
 }: Props) {
+  const nav = useNavigate();
+
   const onSubmit = React.useCallback(
     async (
       warn: string,
@@ -42,7 +45,9 @@ function DAGActions({
         body: form,
       });
       if (redirectTo) {
-        window.location.href = redirectTo;
+        nav(redirectTo);
+        refresh && refresh();
+        return;
       }
       if (!ret.ok) {
         const e = await ret.text();

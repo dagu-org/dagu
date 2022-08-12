@@ -4,7 +4,7 @@ import { DAGStatus } from '../../models';
 import { Handlers, SchedulerStatus } from '../../models';
 import Graph from '../molecules/Graph';
 import NodeStatusTable from '../molecules/NodeStatusTable';
-import StatusInfoTable from '../molecules/DAGStatusOverview';
+import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import TimelineChart from '../molecules/TimelineChart';
 import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
 import StatusUpdateModal from '../molecules/StatusUpdateModal';
@@ -122,10 +122,10 @@ function DAGStatus({ DAG, name, refresh }: Props) {
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
                 <Box sx={{ mt: 2 }}>
-                  <StatusInfoTable
+                  <DAGStatusOverview
                     status={DAG.Status}
                     {...props}
-                  ></StatusInfoTable>
+                  ></DAGStatusOverview>
                 </Box>
               </Box>
 
