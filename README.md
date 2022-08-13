@@ -1,72 +1,91 @@
-# Dagu
-<img align="right" src="./assets/images/dagu.png" width="200" alt="logo">
+<p align="center">
+  <img src="./assets/images/dagu-logo-dark.png#gh-dark-mode-only" width="300" alt="dagu-logo">
+  <img src="./assets/images/dagu-logo-light.png#gh-light-mode-only" width="300" alt="dagu-logo">
+</p>
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/yohamta/dagu)](https://goreportcard.com/report/github.com/yohamta/dagu)
-[![codecov](https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2)](https://codecov.io/gh/yohamta/dagu)
-[![GitHub release](https://img.shields.io/github/release/yohamta/dagu.svg)](https://github.com/yohamta/dagu/releases)
-[![GoDoc](https://godoc.org/github.com/yohamta/dagu?status.svg)](https://godoc.org/github.com/yohamta/dagu)
-![Test](https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg)
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/yohamta/dagu">
+    <img src="https://goreportcard.com/badge/github.com/yohamta/dagu" />
+  </a>
+  <a href="https://codecov.io/gh/yohamta/dagu">
+    <img src="https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
+  </a>
+  <a href="https://github.com/yohamta/dagu/releases">
+    <img src="https://img.shields.io/github/release/yohamta/dagu.svg" />
+  </a>
+  <a href="https://godoc.org/github.com/yohamta/dagu">
+    <img src="https://godoc.org/github.com/yohamta/dagu?status.svg" />
+  </a>
+  <img src="https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg" />
+</p>
 
-**A just another Cron alternative with a Web UI, but with much more capabilities**
+<p align="center">
+<b>A just another Cron alternative with a Web UI, but with much more capabilities</b><br />
+It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Directed acyclic graph)</a> defined in a simple YAML format.
+</p>
 
-It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format.
-
-## Contents
-
-- [Dagu](#dagu)
-  - [Contents](#contents)
-  - [Highlights](#highlights)
-  - [Motivation](#motivation)
-  - [Why not existing workflow schedulers, such as Airflow?](#why-not-existing-workflow-schedulers-such-as-airflow)
-  - [How does it work?](#how-does-it-work)
-  - [Install `dagu`](#install-dagu)
-    - [via Homebrew](#via-homebrew)
-    - [via Bash script](#via-bash-script)
-    - [via GitHub Release Page](#via-github-release-page)
-  - [️Quick start](#️quick-start)
-    - [1. Launch the Web UI](#1-launch-the-web-ui)
-    - [2. Create a new DAG](#2-create-a-new-dag)
-    - [3. Edit the DAG](#3-edit-the-dag)
-    - [4. Execute the DAG](#4-execute-the-dag)
-  - [Command Line User Interface](#command-line-user-interface)
-  - [Web User Interface](#web-user-interface)
-  - [YAML format](#yaml-format)
-    - [Minimal Definition](#minimal-definition)
-    - [Code Snippet](#code-snippet)
-    - [Environment Variables](#environment-variables)
-    - [Parameters](#parameters)
-    - [Command Substitution](#command-substitution)
-    - [Conditional Logic](#conditional-logic)
-    - [Output](#output)
-    - [Redirection](#redirection)
-    - [Lifecycle Hooks](#lifecycle-hooks)
-    - [Repeating Task](#repeating-task)
-    - [Calling Sub DAGs](#calling-sub-dags)
-    - [All Available Fields](#all-available-fields)
-  - [Admin Configuration](#admin-configuration)
-    - [Environment Variables](#environment-variables-1)
-    - [Admin Configuration](#admin-configuration-1)
-    - [Base Config for all DAGs](#base-config-for-all-dags)
-  - [Scheduler](#scheduler)
-    - [Execution Schedule](#execution-schedule)
-    - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
-    - [Scheduler Configuration](#scheduler-configuration)
-  - [REST API Interface](#rest-api-interface)
-  - [FAQ](#faq)
-    - [How to contribute?](#how-to-contribute)
-    - [Where is the history data stored?](#where-is-the-history-data-stored)
-    - [Where are the log files stored?](#where-are-the-log-files-stored)
-    - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
-    - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
-    - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
-  - [License](#license)
-  - [Contributors](#contributors)
+---
 
 ## Highlights
 
 - Install by placing just a single binary file
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
+
+## Contents
+
+- [Highlights](#highlights)
+- [Contents](#contents)
+- [Getting started](#getting-started)
+- [Motivation](#motivation)
+- [Why not existing workflow schedulers, such as Airflow?](#why-not-existing-workflow-schedulers-such-as-airflow)
+- [How does it work?](#how-does-it-work)
+- [Install `dagu`](#install-dagu)
+  - [via Homebrew](#via-homebrew)
+  - [via Bash script](#via-bash-script)
+  - [via GitHub Release Page](#via-github-release-page)
+- [️Quick start](#️quick-start)
+  - [1. Launch the Web UI](#1-launch-the-web-ui)
+  - [2. Create a new DAG](#2-create-a-new-dag)
+  - [3. Edit the DAG](#3-edit-the-dag)
+  - [4. Execute the DAG](#4-execute-the-dag)
+- [Command Line User Interface](#command-line-user-interface)
+- [Web User Interface](#web-user-interface)
+- [YAML format](#yaml-format)
+  - [Minimal Definition](#minimal-definition)
+  - [Code Snippet](#code-snippet)
+  - [Environment Variables](#environment-variables)
+  - [Parameters](#parameters)
+  - [Command Substitution](#command-substitution)
+  - [Conditional Logic](#conditional-logic)
+  - [Output](#output)
+  - [Redirection](#redirection)
+  - [Lifecycle Hooks](#lifecycle-hooks)
+  - [Repeating Task](#repeating-task)
+  - [Calling Sub DAGs](#calling-sub-dags)
+  - [All Available Fields](#all-available-fields)
+- [Admin Configuration](#admin-configuration)
+  - [Environment Variables](#environment-variables-1)
+  - [Admin Configuration](#admin-configuration-1)
+  - [Base Config for all DAGs](#base-config-for-all-dags)
+- [Scheduler](#scheduler)
+  - [Execution Schedule](#execution-schedule)
+  - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
+  - [Scheduler Configuration](#scheduler-configuration)
+- [REST API Interface](#rest-api-interface)
+- [FAQ](#faq)
+  - [How to contribute?](#how-to-contribute)
+  - [Where is the history data stored?](#where-is-the-history-data-stored)
+  - [Where are the log files stored?](#where-are-the-log-files-stored)
+  - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
+  - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
+  - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
+- [License](#license)
+- [Contributors](#contributors)
+
+## Getting started
+
+See [Install `dagu`](#install-dagu) and [️Quick start](#️quick-start).
 
 ## Motivation
 
@@ -124,7 +143,7 @@ Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste this [example YAML]
 
 Press the `Start` button and the DAG will run.
 
-![example](assets/images/example.gif?raw=true)
+![example](assets/images/demo.gif?raw=true)
 
 ## Command Line User Interface
 
