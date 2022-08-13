@@ -15,7 +15,7 @@ Dagu server provides simple APIs to query and control workflows.
   - [Submit Workflow Action `POST dags/:name`](#submit-workflow-action-post-dagsname)
     - [Success Response](#success-response-2)
 
-## Show DAGs `GET dags/`
+## Show DAG List `GET dags/`
 
 **URL** : `/api/user/`
 
@@ -24,22 +24,19 @@ Dagu server provides simple APIs to query and control workflows.
 **Header** : `Accept: application/json`
 
 **Query Parameters** : 
-- group=[string] where group is the sub directory name that the workflow is in.
+- group=[string] where group is the sub directory name that the DAG is in.
 
 ### Success Response
 
 **Code** : `200 OK`
 **Content** : TBU
 
-## Show Workflow Detail `GET dags/:name`
+## Show a DAG Status `GET dags/:name`
 
-**URL** : `/dags/:workflow`
+**URL** : `/dags/:name`
 
 **URL Parameters** : 
-- name=[string] where name is the `Name` of the workflow.
-
-**Query Parameters** : 
-- group=[string] where group is the sub directory name that the workflow is in.
+- name=[string] where name is the `Name` of the DAG.
 
 **Method** : `GET`
 
@@ -50,15 +47,28 @@ Dagu server provides simple APIs to query and control workflows.
 **Code** : `200 OK`
 **Content** : TBU
 
-## Submit Workflow Action `POST dags/:name`
+## Show a DAG Spec `GET dags/:name/spec`
 
-**URL** : `/dags/:workflow`
+**URL** : `/dags/:name/spec`
 
 **URL Parameters** : 
-- name=[string] where name is the `Name` of the workflow.
+- name=[string] where name is the `Name` of the DAG.
 
-**Query Parameters** : 
-- group=[string] where group is the sub directory name that the workflow is in.
+**Method** : `GET`
+
+**Header** : `Accept: application/json`
+
+### Success Response
+
+**Code** : `200 OK`
+**Content** : TBU
+
+## Submit an Action `POST dags/:name`
+
+**URL** : `/dags/:name`
+
+**URL Parameters** : 
+- name=[string] where name is the `Name` of the DAG.
 
 **Form Parameters** :
 - action=[string] where action is `start` or `stop` or `retry`
