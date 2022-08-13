@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 type Options = {
   name: string;
@@ -11,25 +11,25 @@ export function useDAGPostAPI(opts: Options) {
   const doPost = React.useCallback(
     async (action: string, step?: string) => {
       const form = new FormData();
-      form.set("action", action);
+      form.set('action', action);
       if (opts.requestId) {
-        form.set("request-id", opts.requestId);
+        form.set('request-id', opts.requestId);
       }
       if (step) {
-        form.set("step", step);
+        form.set('step', step);
       }
       const url = `${API_URL}/dags/${opts.name}`;
       const ret = await fetch(url, {
-        method: "POST",
-        mode: "cors",
+        method: 'POST',
+        mode: 'cors',
         body: form,
       });
       if (ret.ok) {
-        opts.onSuccess && opts.onSuccess();
+        opts?.onSuccess?.();
       } else {
         const e = await ret.text();
         alert(e);
-        opts.onFailed && opts.onFailed();
+        opts?.onFailed?.();
       }
     },
     [opts]

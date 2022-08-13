@@ -160,6 +160,10 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
   ![Details](assets/images/ui-details.png?raw=true)
 
+  You can switch to the vertical graph with the button on the top right corner.
+
+  ![Details-TD](assets/images/ui-details2.png?raw=true)
+
 - **Execution History**: It shows past execution results and logs.
 
   ![History](assets/images/ui-history.png?raw=true)

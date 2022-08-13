@@ -67,6 +67,7 @@
     "monaco-react": "^1.1.0",
     "prism": "^4.1.2",
     "react": "^18.1.0",
+    "react-cookie": "^4.1.1",
     "react-dom": "^18.1.0",
     "react-monaco-editor": "^0.48.0",
     "react-router-dom": "^6.3.0",

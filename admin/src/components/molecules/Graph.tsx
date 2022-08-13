@@ -5,8 +5,11 @@ import Mermaid from '../atoms/Mermaid';
 
 type onClickNode = (name: string) => void;
 
+export type FlowchartType = 'TD' | 'LR';
+
 type Props = {
   type: 'status' | 'config';
+  flowchart?: FlowchartType;
   steps?: Step[] | Node[];
   onClickNode?: onClickNode;
 };
@@ -17,30 +20,28 @@ declare global {
   }
 }
 
-function Graph({ steps, type = 'status', onClickNode }: Props) {
+function Graph({
+  steps,
+  flowchart = 'TD',
+  type = 'status',
+  onClickNode,
+}: Props) {
   const mermaidStyle = {
     display: 'flex',
     alignItems: 'flex-center',
     justifyContent: 'flex-start',
-    width: steps ? steps.length * 240 + 'px' : '100%',
+    width: flowchart == 'LR' && steps ? steps.length * 240 + 'px' : '100%',
     minWidth: '100%',
     minHeight: '200px',
-    // backgroundColor: '#404040',
     padding: '2em',
     borderRadius: '0.5em',
-    // backgroundImage:
-    //   'linear-gradient(rgba(245, 246, 250, .5) .1em, transparent .1em), linear-gradient(90deg, rgba(245, 246, 250, .5) .1em, transparent .1em)',
-    // backgroundSize: '3em 3em',
     backgroundSize: '20px 20px',
-    // backgroundImage:
-    //   'linear-gradient(to right, green 1px, transparent 1px), linear-gradient(to bottom, green 1px, transparent 1px)',
-    // transform: 'perspective(200px) rotateX(1deg) scale(1)',
   };
   const graph = React.useMemo(() => {
     if (!steps) {
       return '';
     }
-    const dat = ['flowchart LR;'];
+    const dat = flowchart == 'TD' ? ['flowchart TD;'] : ['flowchart LR;'];
     if (onClickNode) {
       window.onClickMermaidNode = onClickNode;
     }
@@ -73,7 +74,7 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
     dat.push('classDef done fill:#00bb00,stroke-width:0px,color:#000');
     dat.push('classDef skipped fill:#dfdfdf,stroke-width:0px,color:#000');
     return dat.join('\n');
-  }, [steps, onClickNode]);
+  }, [steps, onClickNode, flowchart]);
   return <Mermaid style={mermaidStyle} def={graph} />;
 }
 

@@ -12,5 +12,5 @@ export default function Ticker({ intervalMs, children }: Props) {
     }, intervalMs);
     return () => clearInterval(interval);
   }, []);
-  return children && children();
+  return children?.();
 }
