@@ -22,11 +22,13 @@ function DAGSpec({ data }: Props) {
   const [currentValue, setCurrentValue] = React.useState(data.Definition);
   const handlers = getHandlers(data.DAG?.DAG);
   const [cookie, setCookie] = useCookies(['flowchart']);
+  const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
   const onChangeFlowchart = React.useCallback(
     (value: FlowchartType) => {
-      setCookie('flowchart', value);
+      setCookie('flowchart', value, { path: '/' });
+      setFlowchart(value);
     },
-    [setCookie]
+    [setCookie, flowchart, setFlowchart]
   );
   if (data.DAG?.DAG == null) {
     return null;
@@ -34,8 +36,7 @@ function DAGSpec({ data }: Props) {
   return (
     <DAGContext.Consumer>
       {(props) =>
-        data.DAG &&
-        data.DAG.DAG && (
+        data?.DAG?.DAG && (
           <React.Fragment>
             <Box>
               <Stack direction="row" justifyContent="space-between">
@@ -63,7 +64,7 @@ function DAGSpec({ data }: Props) {
                   <Graph
                     steps={data.DAG.DAG.Steps}
                     type="config"
-                    flowchart={cookie['flowchart']}
+                    flowchart={flowchart}
                   />
                 </Box>
               </BorderedBox>
@@ -80,7 +81,7 @@ function DAGSpec({ data }: Props) {
                 <DAGStepTable steps={data.DAG.DAG.Steps}></DAGStepTable>
               </Box>
             </Box>
-            {handlers && handlers.length ? (
+            {handlers?.length ? (
               <Box sx={{ mt: 3 }}>
                 <SubTitle>Lifecycle Hooks</SubTitle>
                 <Box sx={{ mt: 2 }}>

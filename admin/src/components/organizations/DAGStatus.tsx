@@ -60,11 +60,13 @@ function DAGStatus({ DAG, name, refresh }: Props) {
     [DAG]
   );
   const [cookie, setCookie] = useCookies(['flowchart']);
+  const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
   const onChangeFlowchart = React.useCallback(
     (value: FlowchartType) => {
-      setCookie('flowchart', value);
+      setCookie('flowchart', value, { path: '/' });
+      setFlowchart(value);
     },
-    [setCookie]
+    [setCookie, flowchart, setFlowchart]
   );
 
   if (!DAG.Status) {
@@ -77,10 +79,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
       <Box>
         <Stack direction="row" justifyContent="space-between">
           <SubTitle>Overview</SubTitle>
-          <FlowchartSwitch
-            value={cookie['flowchart']}
-            onChange={onChangeFlowchart}
-          />
+          <FlowchartSwitch value={flowchart} onChange={onChangeFlowchart} />
         </Stack>
         <BorderedBox
           sx={{
@@ -124,7 +123,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
               <Graph
                 steps={DAG.Status.Nodes}
                 type="status"
-                flowchart={cookie['flowchart']}
+                flowchart={flowchart}
                 onClickNode={onSelectStepOnGraph}
               ></Graph>
             ) : (

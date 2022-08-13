@@ -477,7 +477,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     },
     onSortingChange: setSorting,
     onExpandedChange: setExpanded,
-    debugAll: true,
+    debugAll: false,
     meta: {
       group,
       refreshFn,
