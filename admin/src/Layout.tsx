@@ -65,7 +65,7 @@ const Drawer = styled(MuiDrawer, {
 const mdTheme = createTheme({
   typography: {
     fontFamily:
-      "'Roboto','Noto Sans JP','SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
+      "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
   },
   palette: {
     primary: {

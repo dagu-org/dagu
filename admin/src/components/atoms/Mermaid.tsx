@@ -21,7 +21,6 @@ mermaidAPI.initialize({
     htmlLabels: true,
   },
   logLevel: 4, // ERROR
-  fontFamily: "'Antonio', sans-serif;",
 });
 
 function Mermaid({ def, style = {} }: Props) {

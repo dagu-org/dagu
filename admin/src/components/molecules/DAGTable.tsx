@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   createTable,
   useTableInstance,
@@ -25,7 +25,7 @@ import {
   TableRow,
   TextField,
 } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   getFirstTag,
   getStatus,
@@ -124,8 +124,7 @@ const defaultColumns = [
       } else {
         value = data.DAGStatus.DAG.Name;
       }
-      const ret = value.toLowerCase().includes(filter.toLowerCase());
-      return ret;
+      return value.toLowerCase().includes(filter.toLowerCase());
     },
     sortingFn: (a, b) => {
       const dataA = a.original!.Name.toLowerCase();
@@ -147,7 +146,9 @@ const defaultColumns = [
                 key={tag}
                 size="small"
                 label={tag}
-                onClick={() => props.column.setFilterValue(tag)}
+                onClick={() => {
+                  props.column.setFilterValue(tag);
+                }}
               />
             ))}
           </Stack>
@@ -324,7 +325,7 @@ const defaultColumns = [
     },
   }),
   table.createDataColumn('Type', {
-    id: 'On/Off',
+    id: 'Live',
     header: 'Live',
     cell: (props) => {
       const data = props.row.original!;
@@ -373,6 +374,34 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       desc: false,
     },
   ]);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const searchText = searchParams.get('search');
+    if (searchText) {
+      instance.getColumn('Name').setFilterValue(searchText);
+    }
+    const t = searchParams.get('tag');
+    if (t) {
+      instance.getColumn('Tags').setFilterValue(t);
+    }
+  }, []);
+
+  const addSearchParam = React.useCallback(
+    (key: string, value: string) => {
+      const ret: { [key: string]: string } = {};
+      searchParams.forEach((v, k) => {
+        if (v && k !== key) {
+          ret[k] = v;
+        }
+      });
+      if (value) {
+        ret[key] = value;
+      }
+      setSearchParams(ret);
+    },
+    [searchParams, setSearchParams]
+  );
 
   const selectedTag = React.useMemo(() => {
     return (
@@ -476,7 +505,9 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
           InputProps={{
             value: instance.getColumn('Name').getFilterValue(),
             onChange: (e) => {
-              instance.getColumn('Name').setFilterValue(e.target.value || '');
+              const value = e.target.value || '';
+              addSearchParam('search', value);
+              instance.getColumn('Name').setFilterValue(value);
             },
             type: 'search',
           }}
@@ -487,7 +518,9 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
           value={selectedTag}
           options={tagOptions}
           onChange={(_, value) => {
-            instance.getColumn('Tags').setFilterValue(value || '');
+            const v = value || '';
+            addSearchParam('tag', v);
+            instance.getColumn('Tags').setFilterValue(v);
           }}
           renderInput={(params) => (
             <TextField {...params} variant="filled" label="Search Tag" />

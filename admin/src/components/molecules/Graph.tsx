@@ -25,12 +25,16 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
     width: steps ? steps.length * 240 + 'px' : '100%',
     minWidth: '100%',
     minHeight: '200px',
-    backgroundColor: '#000',
+    // backgroundColor: '#404040',
     padding: '2em',
     borderRadius: '0.5em',
-    backgroundImage:
-      'linear-gradient(rgba(245, 246, 250, .5) .1em, transparent .1em), linear-gradient(90deg, rgba(245, 246, 250, .5) .1em, transparent .1em)',
-    backgroundSize: '3em 3em',
+    // backgroundImage:
+    //   'linear-gradient(rgba(245, 246, 250, .5) .1em, transparent .1em), linear-gradient(90deg, rgba(245, 246, 250, .5) .1em, transparent .1em)',
+    // backgroundSize: '3em 3em',
+    backgroundSize: '20px 20px',
+    // backgroundImage:
+    //   'linear-gradient(to right, green 1px, transparent 1px), linear-gradient(to bottom, green 1px, transparent 1px)',
+    // transform: 'perspective(200px) rotateX(1deg) scale(1)',
   };
   const graph = React.useMemo(() => {
     if (!steps) {
@@ -47,7 +51,7 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
       if (step.Depends) {
         step.Depends.forEach((d) => {
           const depId = d.replace(/\s/g, '_');
-          dat.push(`${depId} --- ${id};`);
+          dat.push(`${depId} -.-> ${id};`);
         });
       }
       if (onClickNode) {
@@ -60,7 +64,7 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
       (steps as Step[]).forEach((s) => addNodeFn(s, NodeStatus.None));
     }
     dat.push(
-      'linkStyle default stroke:#ddeeff,stroke-width:4px,fill:none,color:#ddeeff'
+      'linkStyle default stroke:#ddeeff,stroke-width:2px,fill:none,color:#404040'
     );
     dat.push('classDef none fill:#bbbbff,stroke-width:0px,color:#000');
     dat.push('classDef running fill:#33ff33,stroke-width:0px,color:#000');
