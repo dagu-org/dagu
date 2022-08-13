@@ -86,9 +86,8 @@ func (cl *Loader) unmarshalData(data []byte) (map[string]interface{}, error) {
 func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
 	c := &configDefinition{}
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: true,
-		Result:      c,
-		TagName:     "",
+		Result:  c,
+		TagName: "",
 	})
 	err := md.Decode(cm)
 	return c, err

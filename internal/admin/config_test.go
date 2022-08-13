@@ -20,6 +20,7 @@ basicAuthPassword: password
 logEncodingCharset: utf-8
 logDir: /var/log/dagu
 baseConfig: /dagu/config.yaml
+someInvalidKey: value
 navbarColor: red
 navbarTitle: Dagu test
 `
