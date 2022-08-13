@@ -65,8 +65,8 @@ It runs [DAGs (Directed acyclic graph)](https://en.wikipedia.org/wiki/Directed_a
 ## Highlights
 
 - Install by placing just a single binary file
-- Schedule DAG executions with Cron expressions
-- Visualize dependencies between related tasks within a DAG
+- Schedule executions of DAGs with Cron expressions
+- Define dependencies between related jobs and represent them as a single DAG (unit of execution)
 
 ## Motivation
 
@@ -503,7 +503,7 @@ exit
 Set the `dags` field to specify the directory of the DAGs.
 
 ```yaml
-dags: <the location of DAG configuration files>    # required
+dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
 ```
 
 ## REST API Interface
