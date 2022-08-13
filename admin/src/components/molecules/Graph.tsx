@@ -25,12 +25,8 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
     width: steps ? steps.length * 240 + 'px' : '100%',
     minWidth: '100%',
     minHeight: '200px',
-    backgroundColor: '#000',
     padding: '2em',
     borderRadius: '0.5em',
-    backgroundImage:
-      'linear-gradient(rgba(245, 246, 250, .5) .1em, transparent .1em), linear-gradient(90deg, rgba(245, 246, 250, .5) .1em, transparent .1em)',
-    backgroundSize: '3em 3em',
   };
   const graph = React.useMemo(() => {
     if (!steps) {
@@ -47,7 +43,7 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
       if (step.Depends) {
         step.Depends.forEach((d) => {
           const depId = d.replace(/\s/g, '_');
-          dat.push(`${depId} --- ${id};`);
+          dat.push(`${depId} -.-> ${id};`);
         });
       }
       if (onClickNode) {
@@ -60,14 +56,14 @@ function Graph({ steps, type = 'status', onClickNode }: Props) {
       (steps as Step[]).forEach((s) => addNodeFn(s, NodeStatus.None));
     }
     dat.push(
-      'linkStyle default stroke:#ddeeff,stroke-width:4px,fill:none,color:#ddeeff'
+      'linkStyle default stroke:#404040,stroke-width:2px,fill:none'
     );
-    dat.push('classDef none fill:#bbbbff,stroke-width:0px,color:#000');
-    dat.push('classDef running fill:#33ff33,stroke-width:0px,color:#000');
-    dat.push('classDef error fill:#ee0000,stroke-width:0px,color:#000');
-    dat.push('classDef cancel fill:#ffbbaa,stroke-width:0px,color:#000');
-    dat.push('classDef done fill:#00bb00,stroke-width:0px,color:#000');
-    dat.push('classDef skipped fill:#dfdfdf,stroke-width:0px,color:#000');
+    dat.push('classDef none stroke:#bbbbff,stroke-width:3px,color:#000');
+    dat.push('classDef running stroke:#33ff33,stroke-width:3px,color:#000');
+    dat.push('classDef error stroke:#ee0000,stroke-width:3px,color:#000');
+    dat.push('classDef cancel stroke:#ffbbaa,stroke-width:3px,color:#000');
+    dat.push('classDef done stroke:#00bb00,stroke-width:3px,color:#000');
+    dat.push('classDef skipped stroke:#dfdfdf,stroke-width:3px,color:#000');
     return dat.join('\n');
   }, [steps, onClickNode]);
   return <Mermaid style={mermaidStyle} def={graph} />;
