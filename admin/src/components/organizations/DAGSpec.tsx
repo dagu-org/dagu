@@ -1,15 +1,17 @@
 import { Box, Button, Stack } from '@mui/material';
 import React from 'react';
-import { GetDAGResponse } from '../../models/api'
+import { GetDAGResponse } from '../../models/api';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAG, Step } from '../../models';
 import DAGEditor from '../atoms/DAGEditor';
 import DAGAttributes from '../molecules/DAGAttributes';
 import DAGDefinition from '../molecules/DAGDefinition';
-import Graph from '../molecules/Graph';
+import Graph, { FlowchartType } from '../molecules/Graph';
 import DAGStepTable from '../molecules/DAGStepTable';
 import BorderedBox from '../atoms/BorderedBox';
 import SubTitle from '../atoms/SubTitle';
+import FlowchartSwitch from '../molecules/FlowchartSwitch';
+import { useCookies } from 'react-cookie';
 
 type Props = {
   data: GetDAGResponse;
@@ -19,6 +21,13 @@ function DAGSpec({ data }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState(data.Definition);
   const handlers = getHandlers(data.DAG?.DAG);
+  const [cookie, setCookie] = useCookies(['flowchart']);
+  const onChangeFlowchart = React.useCallback(
+    (value: FlowchartType) => {
+      setCookie('flowchart', value);
+    },
+    [setCookie]
+  );
   if (data.DAG?.DAG == null) {
     return null;
   }
@@ -29,7 +38,13 @@ function DAGSpec({ data }: Props) {
         data.DAG.DAG && (
           <React.Fragment>
             <Box>
-              <SubTitle>Overview</SubTitle>
+              <Stack direction="row" justifyContent="space-between">
+                <SubTitle>Overview</SubTitle>
+                <FlowchartSwitch
+                  value={cookie['flowchart']}
+                  onChange={onChangeFlowchart}
+                />
+              </Stack>
               <BorderedBox
                 sx={{
                   mt: 2,
@@ -45,7 +60,11 @@ function DAGSpec({ data }: Props) {
                     overflowX: 'auto',
                   }}
                 >
-                  <Graph steps={data.DAG.DAG.Steps} type="config"></Graph>
+                  <Graph
+                    steps={data.DAG.DAG.Steps}
+                    type="config"
+                    flowchart={cookie['flowchart']}
+                  />
                 </Box>
               </BorderedBox>
             </Box>
@@ -58,9 +77,7 @@ function DAGSpec({ data }: Props) {
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
                 <SubTitle>Steps</SubTitle>
-                <DAGStepTable
-                  steps={data.DAG.DAG.Steps}
-                ></DAGStepTable>
+                <DAGStepTable steps={data.DAG.DAG.Steps}></DAGStepTable>
               </Box>
             </Box>
             {handlers && handlers.length ? (

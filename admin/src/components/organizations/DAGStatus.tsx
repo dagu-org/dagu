@@ -2,16 +2,18 @@ import React from 'react';
 import { DAGContext } from '../../contexts/DAGContext';
 import { DAGStatus } from '../../models';
 import { Handlers, SchedulerStatus } from '../../models';
-import Graph from '../molecules/Graph';
+import Graph, { FlowchartType } from '../molecules/Graph';
 import NodeStatusTable from '../molecules/NodeStatusTable';
 import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import TimelineChart from '../molecules/TimelineChart';
 import { useDAGPostAPI } from '../../hooks/useDAGPostAPI';
 import StatusUpdateModal from '../molecules/StatusUpdateModal';
 import { Step } from '../../models';
-import { Box, Tab, Tabs } from '@mui/material';
+import { Box, Stack, Tab, Tabs } from '@mui/material';
 import SubTitle from '../atoms/SubTitle';
 import BorderedBox from '../atoms/BorderedBox';
+import { useCookies } from 'react-cookie';
+import FlowchartSwitch from '../molecules/FlowchartSwitch';
 
 type Props = {
   DAG: DAGStatus;
@@ -57,14 +59,29 @@ function DAGStatus({ DAG, name, refresh }: Props) {
     },
     [DAG]
   );
+  const [cookie, setCookie] = useCookies(['flowchart']);
+  const onChangeFlowchart = React.useCallback(
+    (value: FlowchartType) => {
+      setCookie('flowchart', value);
+    },
+    [setCookie]
+  );
+
   if (!DAG.Status) {
     return null;
   }
   const handlers = Handlers(DAG.Status);
+
   return (
     <React.Fragment>
       <Box>
-        <SubTitle>Overview</SubTitle>
+        <Stack direction="row" justifyContent="space-between">
+          <SubTitle>Overview</SubTitle>
+          <FlowchartSwitch
+            value={cookie['flowchart']}
+            onChange={onChangeFlowchart}
+          />
+        </Stack>
         <BorderedBox
           sx={{
             mt: 2,
@@ -107,6 +124,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
               <Graph
                 steps={DAG.Status.Nodes}
                 type="status"
+                flowchart={cookie['flowchart']}
                 onClickNode={onSelectStepOnGraph}
               ></Graph>
             ) : (
@@ -140,7 +158,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
                 </Box>
               </Box>
 
-              {handlers && handlers.length ? (
+              {handlers?.length ? (
                 <Box sx={{ mt: 3 }}>
                   <SubTitle>Lifecycle Hooks</SubTitle>
                   <Box sx={{ mt: 2 }}>
