@@ -167,10 +167,6 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
 ## Web User Interface
 
-- **Dashboard**: It shows the overall status and executions timeline of the day.
-
-  ![DAGs](assets/images/ui-dashboard.png?raw=true)
-
 - **DAGs**: It shows all DAGs and the real-time status.
 
   ![DAGs](assets/images/ui-dags.png?raw=true)
