@@ -1,4 +1,4 @@
-# Dagu Admin UI
+# dagu Admin UI
 
 ## How to develop?
 
