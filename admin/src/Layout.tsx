@@ -65,11 +65,11 @@ const Drawer = styled(MuiDrawer, {
 const mdTheme = createTheme({
   typography: {
     fontFamily:
-      "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
+    "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
   },
   palette: {
     primary: {
-      main: '#6149d8',
+      main: '#485fc7',
     }
   },
 });
@@ -87,7 +87,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
   };
   const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const gradientColor = navbarColor || '#6149d8';
+  const gradientColor = navbarColor || '#485fc7';
 
   return (
     <ThemeProvider theme={mdTheme}>

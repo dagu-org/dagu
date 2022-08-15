@@ -6,12 +6,12 @@ type statusColorMapping = {
   [key: number]: CSSProperties;
 };
 export const statusColorMapping: statusColorMapping = {
-  [SchedulerStatus.None]: { backgroundColor: '#bbbbff' },
-  [SchedulerStatus.Running]: { backgroundColor: '#33ff33' },
-  [SchedulerStatus.Error]: { backgroundColor: '#ee0000'},
-  [SchedulerStatus.Cancel]: { backgroundColor: '#ffbbaa' },
-  [SchedulerStatus.Success]: { backgroundColor: '#00bb00'},
-  [SchedulerStatus.Skipped_Unused]: { backgroundColor: '#dfdfdf'},
+  [SchedulerStatus.None]: { backgroundColor: 'lightblue' },
+  [SchedulerStatus.Running]: { backgroundColor: 'lime' },
+  [SchedulerStatus.Error]: { backgroundColor: 'red', color: 'white' },
+  [SchedulerStatus.Cancel]: { backgroundColor: 'pink' },
+  [SchedulerStatus.Success]: { backgroundColor: 'green', color: 'white' },
+  [SchedulerStatus.Skipped_Unused]: { backgroundColor: 'gray', color: 'white' },
 };
 
 export const nodeStatusColorMapping = {

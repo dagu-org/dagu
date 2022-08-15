@@ -530,7 +530,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       </Stack>
       <Box
         sx={{
-          border: '1px solid #6149d8',
+          border: '1px solid #485fc7',
           borderRadius: '6px',
           mt: 2,
         }}

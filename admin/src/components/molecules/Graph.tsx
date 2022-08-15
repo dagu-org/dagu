@@ -67,12 +67,12 @@ function Graph({
     dat.push(
       'linkStyle default stroke:#ddeeff,stroke-width:2px,fill:none,color:#404040'
     );
-    dat.push('classDef none fill:#bbbbff,stroke-width:0px,color:#000');
-    dat.push('classDef running fill:#33ff33,stroke-width:0px,color:#000');
-    dat.push('classDef error fill:#ee0000,stroke-width:0px,color:#000');
-    dat.push('classDef cancel fill:#ffbbaa,stroke-width:0px,color:#000');
-    dat.push('classDef done fill:#00bb00,stroke-width:0px,color:#000');
-    dat.push('classDef skipped fill:#dfdfdf,stroke-width:0px,color:#000');
+    dat.push('classDef none fill:white,stroke:lightblue,stroke-width:2px');
+    dat.push('classDef running fill:white,stroke:lime,stroke-width:2px');
+    dat.push('classDef error fill:white,stroke:red,stroke-width:2px');
+    dat.push('classDef cancel fill:white,stroke:pink,stroke-width:2px');
+    dat.push('classDef done fill:white,stroke:green,stroke-width:2px');
+    dat.push('classDef skipped fill:white,stroke:gray,stroke-width:2px');
     return dat.join('\n');
   }, [steps, onClickNode, flowchart]);
   return <Mermaid style={mermaidStyle} def={graph} />;
