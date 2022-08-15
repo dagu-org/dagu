@@ -187,6 +187,58 @@ func TestOutputJson(t *testing.T) {
 	}
 }
 
+func TestOutputSpecialchar(t *testing.T) {
+	for i, test := range []struct {
+		CmdWithArgs string
+		Want        string
+		WantArgs    int
+	}{
+		{
+			CmdWithArgs: `echo "hello\tworld"`,
+			Want:        `hello\tworld`,
+			WantArgs:    1,
+		},
+		{
+			CmdWithArgs: `echo hello"\t"world`,
+			Want:        `hello\tworld`,
+			WantArgs:    1,
+		},
+		{
+			CmdWithArgs: `echo hello\tworld`,
+			Want:        `hello\tworld`,
+			WantArgs:    1,
+		},
+		{
+			CmdWithArgs: `echo hello\nworld`,
+			Want:        `hello\nworld`,
+			WantArgs:    1,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			n := &Node{
+				Step: &dag.Step{
+					CmdWithArgs:     test.CmdWithArgs,
+					Output:          "OUTPUT_SPECIALCHAR_TEST",
+					OutputVariables: &sync.Map{},
+				},
+			}
+			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
+			require.NoError(t, err)
+			defer func() {
+				_ = n.teardown()
+			}()
+
+			runTestNode(t, n)
+
+			require.Equal(t, test.WantArgs, len(n.Args))
+
+			v, _ := n.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
+			require.Equal(t, fmt.Sprintf("OUTPUT_SPECIALCHAR_TEST=%s", test.Want), v)
+			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_SPECIALCHAR_TEST"))
+		})
+	}
+}
+
 func TestRunScript(t *testing.T) {
 	n := &Node{
 		Step: &dag.Step{
