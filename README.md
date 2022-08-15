@@ -67,7 +67,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Admin Configuration](#admin-configuration)
   - [Environment Variables](#environment-variables-1)
   - [Admin Configuration](#admin-configuration-1)
-  - [Base Config for all DAGs](#base-config-for-all-dags)
+  - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
 - [Scheduler](#scheduler)
   - [Execution Schedule](#execution-schedule)
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
@@ -96,12 +96,12 @@ In the projects I worked on, our ETL pipeline had **many problems**. There were 
 There are existing tools such as Airflow, Prefect, Temporal, etc, but in most cases they require writing code in a programming language such as Python to define DAGs. In systems that have been in operation for a long time, there are already complex jobs written in hundreds of thousands of lines of code in other languages such as Perl or Shell Scripts, and there is concern that adding another layer of Python code will further decrease maintainability. So we developed Dagu, which requires no coding, and is easy-to-use and self-contained, making it ideal for smaller projects with fewer people.
 
 ## How does it work?
-Dagu is a single command and has zero dependency. No DBMS or cloud is required.
-It runs DAGs defined in a simple YAML text. Any existing programs are available as it is.
+Dagu is a single command and it uses the local file system to store data. Therefore, no DBMS or cloud service is required.
+Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
 ## Install `dagu`
 
-Quickly install `dagu` command and try it out.
+You can quickly install `dagu` command and try it out.
 
 ### via Homebrew
 ```sh
@@ -127,11 +127,11 @@ Download the latest binary from the [Releases page](https://github.com/yohamta/d
 
 ### 1. Launch the Web UI
 
-Run `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
+Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
 ### 2. Create a new DAG
 
-Press the `New DAG` button in the web UI. Input `example` in the input dialog.
+Create a DAG by clicking the `New DAG` button on the top page of the web UI. Input `example` in the dialog.
 
 *Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Admin Configuration](#admin-configuration) for more details.*
 
@@ -141,7 +141,7 @@ Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste this [example YAML]
 
 ### 4. Execute the DAG
 
-Press the `Start` button and the DAG will run.
+You can execute the example by pressing the `Start` button
 
 ![example](assets/images/demo.gif?raw=true)
 
@@ -191,7 +191,7 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
 ### Minimal Definition
 
-Specify steps with only `name` and `commands`.
+The minimal DAG definition is as simple as follows:
 
 ```yaml
 steps:
@@ -224,7 +224,7 @@ steps:
 
 ### Environment Variables
 
-Define environment variables and refer to using `env` field.
+You can define environment variables and refer to using `env` field.
 
 ```yaml
 env:
@@ -238,7 +238,7 @@ steps:
 
 ### Parameters
 
-Define parameters using `params` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by `--params=` parameter of `start` command.
+You can define parameters using `params` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by `--params=` parameter of `start` command.
 
 ```yaml
 params: param1 param2
@@ -247,7 +247,7 @@ steps:
     command: python main.py $1 $2
 ```
 
-Named parameters are avialble as below:
+Named parameters are also available as follows:
 
 ```yaml
 params: ONE=1 TWO=`echo 2`
@@ -258,7 +258,7 @@ steps:
 
 ### Command Substitution
 
-A string enclosed in backquotes (`` ` ``) is evaluated as a command and replaced with the result of standard output.
+You can use command substitution in field values. I.e., a string enclosed in backquotes (`` ` ``) is evaluated as a command and replaced with the result of standard output.
 
 ```yaml
 env:
@@ -283,7 +283,7 @@ steps:
         expected: "01"
 ```
 
-If you want a DAG to continue to the next step regardless of the step's conditional check result, you can use the `continueOn` field:
+If you want the DAG to continue to the next step regardless of the step's conditional check result, you can use the `continueOn` field:
 
 ```yaml
 steps:
@@ -335,7 +335,7 @@ steps:
 
 ### Repeating Task
 
-`repeatPolicy` field is available to repeat a task. `dagu stop <DAG>` command will gracefully stop the task.
+If you want a task to repeat execution at regular intervals, you can use the `repeatPolicy` field. If you want to stop the repeating task, you can use the `stop` command to gracefully stop the task.
 
 ```yaml
 steps:
@@ -348,7 +348,7 @@ steps:
 
 ### Calling Sub DAGs
 
-`dagu start` command can call other DAG (you can omit `.yaml` in the DAG name).
+You can call other DAGs in the same directory by using `dagu start` command (you can omit `.yaml`).
 
 ```yaml
 steps:
@@ -356,7 +356,7 @@ steps:
     command: dagu start other_dag
 ```
 
-You need to specify absolute path when you want to call the DAGs in other directory.
+If you want to call DAGs in other directory you can specify the DAG by absolute path.
 
 ```yaml
 steps:
@@ -430,11 +430,11 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 ### Environment Variables
 
-Define `DAGU_HOME` environment variables to configure the base path of the Dagu's internal work directory. Default is `~/.dagu/`.
+You can customize the Dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
 
 ### Admin Configuration
 
-Create the admin config file (default: `~/.dagu/admin.yaml`) to configure Dagu. All fields are optional.
+Please create the config file (default path: `~/.dagu/admin.yaml`) to configure the Dagu. All fields are optional.
 
 ```yaml
 baseConfig: <base DAG config path> .                         # default: ${DAG_HOME}/config.yaml
@@ -453,9 +453,9 @@ basicAuthUsername: <username for basic auth of web UI>       # basic auth user
 basicAuthPassword: <password for basic auth of web UI>       # basic auth password
 ```
 
-### Base Config for all DAGs
+### Base Configuration for all DAGs
 
-Create the base config file (default: `~/.dagu/config.yaml`) to define the common settings. All DAGs will share the same config once you create the config file. Each DAGs can overrite the setting if it defines the same field inside the DAG.
+Creating a base configuration (default path: `~/.dagu/config.yaml`) is a convenient way to organize shared settings among all DAGs. The path to the base config can be configured via `baseConfig` field in `admin.config`. See [Admin Configuration](#admin-configuration) for more details.
 
 ```yaml
 logDir: <path-to-write-log>         # log directory to write standard output
@@ -475,10 +475,11 @@ infoMail:
 
 ## Scheduler
 
-Run `dagu scheduler` process on your system to schedule DAGs automatically.
+To run DAGs automatically, you need to run `dagu scheduler` process on your system.
 
 ### Execution Schedule
-Specify `schedule` field in the config file to schedule the DAG. Use Cron expression:
+
+You can specify the schedule with cron expression in the `schedule` field in the config file as follows:
 
 ```yaml
 schedule: "5 4 * * *" # Run at 04:05.
@@ -487,7 +488,7 @@ steps:
     command: job.sh
 ```
 
-You can specify multiple schedules for a DAG:
+Or you can set multiple schedules:
 
 ```yaml
 schedule:
@@ -500,7 +501,7 @@ steps:
 
 ### Run Scheduler as a daemon
 
-The easiest way is to keep scheduler running is create the below script and call it every minute using Cron:
+The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
 
 ```bash
 #!/bin/bash
@@ -527,7 +528,7 @@ dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
 
 ## REST API Interface
 
-Refer to [REST API Docs](./docs/restapi.md)
+Please refer to [REST API Docs](./docs/restapi.md)
 
 ## FAQ
 
