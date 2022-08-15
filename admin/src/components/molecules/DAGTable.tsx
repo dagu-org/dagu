@@ -603,6 +603,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                         cell.column.id == 'Expand' || cell.column.id == 'Name'
                           ? '6px 4px'
                           : '6px 16px',
+                      backgroundColor:
+                        row.original!.Type == DAGDataType.Group
+                          ? '#d4daed'
+                          : undefined,
                     }}
                     width={cell.column.id == 'Expand' ? '44px' : undefined}
                   >
