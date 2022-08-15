@@ -127,9 +127,17 @@ const defaultColumns = [
       return value.toLowerCase().includes(filter.toLowerCase());
     },
     sortingFn: (a, b) => {
-      const dataA = a.original!.Name.toLowerCase();
-      const dataB = b.original!.Name.toLowerCase();
-      return dataA.localeCompare(dataB);
+      const ta = a.original!.Type;
+      const tb = b.original!.Type;
+      if (ta == tb) {
+        const dataA = a.original!.Name.toLowerCase();
+        const dataB = b.original!.Name.toLowerCase();
+        return dataA.localeCompare(dataB);
+      }
+      if (ta == DAGDataType.Group) {
+        return 1;
+      }
+      return -1;
     },
   }),
   table.createDataColumn('Type', {
