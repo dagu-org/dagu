@@ -72,16 +72,40 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		program = vals[0]
 		parser := shellwords.NewParser()
 		parser.ParseBacktick = parse
-		args, err := parser.Parse(vals[1])
+		parser.ParseEnv = false
+		a := escapeSpecialchars(vals[1])
+		args, err := parser.Parse(a)
 		if err != nil {
 			log.Printf("failed to parse arguments: %s", err)
 			//if parse shell world error use all substing as args
 			return program, []string{vals[1]}
 		}
-		return program, args
+		ret := []string{}
+		for _, v := range args {
+			ret = append(ret, unescapeSpecialchars(v))
+		}
+		return program, ret
 
 	}
 	return vals[0], []string{}
+}
+
+func unescapeSpecialchars(str string) string {
+	repl := strings.NewReplacer(
+		`\\t`, `\t`,
+		`\\r`, `\r`,
+		`\\n`, `\n`,
+	)
+	return repl.Replace(str)
+}
+
+func escapeSpecialchars(str string) string {
+	repl := strings.NewReplacer(
+		`\t`, `\\t`,
+		`\r`, `\\r`,
+		`\n`, `\\n`,
+	)
+	return repl.Replace(str)
 }
 
 // FileExists returns true if file exists.

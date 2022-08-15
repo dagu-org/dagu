@@ -3,7 +3,7 @@
 }
 
 a {
-  color: #6149d8;
+  color: #485fc7;
   cursor: pointer;
   text-decoration: none;
 }
@@ -24,7 +24,7 @@ a {
 }
 
 .MuiTableRow-root th {
-  background-color: #6149d8;
+  background-color: #485fc7;
   color: #fff;
   font-weight: 600;
 }
