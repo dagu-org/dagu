@@ -15,18 +15,7 @@ function StatusChip({ status, children }: Props) {
     }
     return statusColorMapping[status] || {};
   }, [status]);
-  return (
-    <Chip
-      sx={[
-        style,
-        {
-          fontWeight: 'bolder',
-        },
-      ]}
-      size="small"
-      label={children}
-    />
-  );
+  return <Chip sx={style} size="small" label={children} />;
 }
 
 export default StatusChip;

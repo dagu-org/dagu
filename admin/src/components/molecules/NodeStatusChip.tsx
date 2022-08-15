@@ -12,17 +12,7 @@ function NodeStatusChip({ status, children }: Props) {
   const style = React.useMemo(() => {
     return nodeStatusColorMapping[status] || {};
   }, [status]);
-  return (
-    <Chip
-      sx={[
-        style,
-        {
-          fontWeight: 'bolder',
-        },
-      ]}
-      label={children}
-    />
-  );
+  return <Chip sx={style} label={children} />;
 }
 
 export default NodeStatusChip;
