@@ -1,5 +1,5 @@
 import { Box } from '@mui/material';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { GridData, LogData } from '../../models/api';
 import { DAGContext } from '../../contexts/DAGContext';
 import { Handlers, StatusFile } from '../../models';
@@ -32,7 +32,7 @@ type HistoryTableProps = {
 function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
   const [idx, setIdx] = React.useState(Logs.length - 1);
   const logs = React.useMemo(() => {
-    return Logs.reverse();
+    return Logs;
   }, [Logs]);
 
   const handlers = logs.length > idx ? Handlers(logs[idx].Status) : null;

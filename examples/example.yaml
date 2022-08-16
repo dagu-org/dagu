@@ -58,6 +58,10 @@ steps:
     command: "sleep 2"
     depends:
       - Reconcile
+  - name: "ttt"
+    command: "sleep 2"
+    depends:
+      - Cleaning
 handlerOn:
   exit:
     command: echo finished
