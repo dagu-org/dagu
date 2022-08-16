@@ -19,14 +19,15 @@ func TestReadEntries(t *testing.T) {
 	r := NewEntryReader(&admin.Config{
 		DAGs: path.Join(testsDir, "runner/invalid"),
 	})
-	_, err := r.Read(now)
-	require.Error(t, err)
+	entries, err := r.Read(now)
+	require.NoError(t, err)
+	require.Len(t, entries, 0)
 
 	r = NewEntryReader(&admin.Config{
 		DAGs: path.Join(testsDir, "runner"),
 	})
 
-	entries, err := r.Read(now)
+	entries, err = r.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
 
