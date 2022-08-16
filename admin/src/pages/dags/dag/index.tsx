@@ -5,7 +5,7 @@ import DAGSpecErrors from '../../../components/molecules/DAGSpecErrors';
 import DAGStatus from '../../../components/organizations/DAGStatus';
 import { DAGContext } from '../../../contexts/DAGContext';
 import DAGSpec from '../../../components/organizations/DAGSpec';
-import DAGHistory from '../../../components/organizations/ExecutionHistory';
+import ExecutionHistory from '../../../components/organizations/ExecutionHistory';
 import ExecutionLog from '../../../components/organizations/ExecutionLog';
 import { Box, Stack, Tab, Tabs } from '@mui/material';
 import Title from '../../../components/atoms/Title';
@@ -124,7 +124,7 @@ function DAGDetails() {
             <Route
               path={'/history'}
               element={
-                <DAGHistory logData={data.LogData} isLoading={isValidating} />
+                <ExecutionHistory logData={data.LogData} isLoading={isValidating} />
               }
             />
             <Route

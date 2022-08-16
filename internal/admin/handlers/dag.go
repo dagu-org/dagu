@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
@@ -417,10 +418,6 @@ func readFile(f string, decorder *encoding.Decoder) ([]byte, error) {
 }
 
 func buildLog(logs []*models.StatusFile) *Log {
-	ret := &Log{
-		GridData: []*dagStatus{},
-		Logs:     logs,
-	}
 	tmp := map[string][]scheduler.NodeStatus{}
 	add := func(step *models.Node, i int) {
 		n := step.Name
@@ -434,11 +431,12 @@ func buildLog(logs []*models.StatusFile) *Log {
 			add(s, i)
 		}
 	}
+	grid := []*dagStatus{}
 	for k, v := range tmp {
-		ret.GridData = append(ret.GridData, &dagStatus{Name: k, Vals: v})
+		grid = append(grid, &dagStatus{Name: k, Vals: v})
 	}
-	sort.Slice(ret.GridData, func(i, c int) bool {
-		return strings.Compare(ret.GridData[i].Name, ret.GridData[c].Name) <= 0
+	sort.Slice(grid, func(i, c int) bool {
+		return strings.Compare(grid[i].Name, grid[c].Name) <= 0
 	})
 	tmp = map[string][]scheduler.NodeStatus{}
 	for i, l := range logs {
@@ -457,9 +455,15 @@ func buildLog(logs []*models.StatusFile) *Log {
 	}
 	for _, h := range []string{constants.OnSuccess, constants.OnFailure, constants.OnCancel, constants.OnExit} {
 		if v, ok := tmp[h]; ok {
-			ret.GridData = append(ret.GridData, &dagStatus{Name: h, Vals: v})
+			grid = append(grid, &dagStatus{Name: h, Vals: v})
 		}
 	}
+
+	ret := &Log{
+		Logs:     lo.Reverse(logs),
+		GridData: grid,
+	}
+
 	return ret
 }
 
