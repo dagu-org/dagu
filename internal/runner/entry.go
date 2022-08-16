@@ -120,10 +120,10 @@ func (er *entryReader) watchDags() {
 				dag, err := cl.LoadHeadOnly(filepath.Join(er.Admin.DAGs, filepath.Base(event.Name)))
 				if err != nil {
 					log.Printf("failed to read dag config: %s", err)
-					continue
+				} else {
+					er.dags[filepath.Base(event.Name)] = dag
+					log.Printf("reload dag entry %s", event.Name)
 				}
-				er.dags[filepath.Base(event.Name)] = dag
-				log.Printf("reload dag entry %s", event.Name)
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
