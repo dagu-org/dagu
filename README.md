@@ -65,9 +65,8 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Calling Sub DAGs](#calling-sub-dags)
   - [All Available Fields](#all-available-fields)
 - [Admin Configuration](#admin-configuration)
-  - [Environment Variables](#environment-variables-1)
-  - [Admin Configuration](#admin-configuration-1)
-  - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
+- [Environment Variable](#environment-variable)
+- [Base Configuration for all DAGs](#base-configuration-for-all-dags)
 - [Scheduler](#scheduler)
   - [Execution Schedule](#execution-schedule)
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
@@ -78,6 +77,8 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Where is the history data stored?](#where-is-the-history-data-stored)
   - [Where are the log files stored?](#where-are-the-log-files-stored)
   - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
+  - [How to use specific `host` and `port` for `dagu server`?](#how-to-use-specific-host-and-port-for-dagu-server)
+  - [How to specify the DAGs directory for `dagu server` and `dagu scheduler`?](#how-to-specify-the-dags-directory-for-dagu-server-and-dagu-scheduler)
   - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
   - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
 - [License](#license)
@@ -428,34 +429,40 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 ## Admin Configuration
 
-### Environment Variables
-
-You can customize the Dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
-
-### Admin Configuration
-
-Please create the config file (default path: `~/.dagu/admin.yaml`) to configure the Dagu. All fields are optional.
+To configure Dagu, please create the config file (default path: `~/.dagu/admin.yaml`). All fields are optional.
 
 ```yaml
-baseConfig: <base DAG config path> .                         # default: ${DAG_HOME}/config.yaml
-
+# Web Server Host and Port
 host: <hostname for web UI address>                          # default: 127.0.0.1
 port: <port number for web UI address>                       # default: 8000
-dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
-logDir: <internal logdirectory>                              # default: ${DAG_HOME}/logs/admin
-command: <Absolute path to the dagu binary>                  # default: dagu
 
+# path to the DAGs directory
+dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
+
+# Web UI Color & Title
 navbarColor: <admin-web header color>                        # header color for web UI (e.g. "#ff0000")
 navbarTitle: <admin-web title text>                          # header title for web UI (e.g. "PROD")
 
+# Basic Auth
 isBasicAuth: <true|false>                                    # enables basic auth
 basicAuthUsername: <username for basic auth of web UI>       # basic auth user
 basicAuthPassword: <password for basic auth of web UI>       # basic auth password
+
+# Base Config
+baseConfig: <base DAG config path> .                         # default: ${DAG_HOME}/config.yaml
+
+# Others
+logDir: <internal logdirectory>                              # default: ${DAG_HOME}/logs/admin
+command: <Absolute path to the dagu binary>                  # default: dagu
 ```
 
-### Base Configuration for all DAGs
+## Environment Variable
 
-Creating a base configuration (default path: `~/.dagu/config.yaml`) is a convenient way to organize shared settings among all DAGs. The path to the base config can be configured via `baseConfig` field in `admin.config`. See [Admin Configuration](#admin-configuration) for more details.
+You can configure the Dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
+
+## Base Configuration for all DAGs
+
+Creating a base configuration (default path: `~/.dagu/config.yaml`) is a convenient way to organize shared settings among all DAGs. The path to the base configuration file can be configured. See [Admin Configuration](#admin-configuration) for more details.
 
 ```yaml
 logDir: <path-to-write-log>         # log directory to write standard output
@@ -547,6 +554,23 @@ It will store log files in the `DAGU__LOGS` environment variable path. The defau
 ### How long will the history data be stored?
 
 The default retention period for execution history is 30 days. However, you can override the setting by the `histRetentionDays` field in a YAML file.
+
+### How to use specific `host` and `port` for `dagu server`?
+
+dagu server's host and port can be configured in the admin configuration file as below. See [Admin Configuration](#admin-configuration) for more details.
+
+```yaml
+host: <hostname for web UI address>                          # default: 127.0.0.1
+port: <port number for web UI address>                       # default: 8000
+```
+
+### How to specify the DAGs directory for `dagu server` and `dagu scheduler`?
+
+You can customize DAGs directory that will be used by `dagu server` and `dagu scheduler`. See [Admin Configuration](#admin-configuration) for more details.
+
+```yaml
+dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
+```
 
 ### How can I retry a DAG from a specific task?
 
