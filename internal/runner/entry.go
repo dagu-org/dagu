@@ -90,7 +90,7 @@ func (er *entryReader) initDags() error {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			dag, err := cl.LoadHeadOnly(filepath.Join(er.Admin.DAGs, fi.Name()))
 			if err != nil {
-				log.Printf("failed to read dag config: %s", err)
+				log.Printf("init dags failed to read dag config: %s", err)
 				continue
 			}
 			er.dags[fi.Name()] = dag
@@ -114,6 +114,9 @@ func (er *entryReader) watchDags() {
 		case event, ok := <-watcher.Events:
 			if !ok {
 				return
+			}
+			if !utils.MatchExtension(event.Name, dag.EXTENSIONS) {
+				continue
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
