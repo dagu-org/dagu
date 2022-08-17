@@ -3,6 +3,7 @@ module github.com/yohamta/dagu
 go 1.18
 
 require (
+	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.0
 	github.com/imdario/mergo v0.3.13
