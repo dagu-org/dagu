@@ -11,6 +11,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/yohamta/dagu/internal/admin"
 	"github.com/yohamta/dagu/internal/dag"
+	"github.com/yohamta/dagu/internal/runner/filenotify"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
@@ -103,7 +104,7 @@ func (er *entryReader) initDags() error {
 
 func (er *entryReader) watchDags() {
 	cl := dag.Loader{}
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,7 +112,7 @@ func (er *entryReader) watchDags() {
 	watcher.Add(er.Admin.DAGs)
 	for {
 		select {
-		case event, ok := <-watcher.Events:
+		case event, ok := <-watcher.Events():
 			if !ok {
 				return
 			}
@@ -133,7 +134,7 @@ func (er *entryReader) watchDags() {
 				log.Printf("remove dag entry %s", event.Name)
 			}
 			er.dagsLock.Unlock()
-		case err, ok := <-watcher.Errors:
+		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
