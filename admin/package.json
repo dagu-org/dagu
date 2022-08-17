@@ -58,7 +58,6 @@
     "@mui/icons-material": "^5.8.0",
     "@mui/material": "^5.8.1",
     "@tanstack/react-table": "^8.0.0-beta.3",
-    "bulma": "^0.9.4",
     "cron-parser": "^4.5.0",
     "fontsource-roboto": "^4.0.0",
     "mermaid": "^9.1.1",
