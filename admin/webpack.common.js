@@ -1,4 +1,4 @@
-const webpack = require("webpack");
+const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 const path = require("path");
 
 module.exports = {
@@ -20,12 +20,18 @@ module.exports = {
           },
         ],
       },
+			{
+				test: /\.ttf$/,
+				type: 'asset/resource'
+			}
     ],
   },
   plugins: [
-    new webpack.ContextReplacementPlugin(
-      /monaco-editor(\\|\/)esm(\\|\/)vs(\\|\/)editor(\\|\/)common(\\|\/)services/,
-      __dirname
+    new MonacoWebpackPlugin(
+      {
+        languages: ["yaml"],
+        features: ["find"]
+      }
     ),
   ],
   resolve: {
