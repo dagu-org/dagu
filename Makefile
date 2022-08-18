@@ -14,8 +14,6 @@ build-admin:
 	cd admin; \
 		yarn && yarn build
 	cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
-	cp admin/dist/*.woff2 ./internal/admin/handlers/web/assets/fonts/
-	cp admin/dist/*.ttf ./internal/admin/handlers/web/assets/fonts/
 
 .PHONY: server
 server: build-dir

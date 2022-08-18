@@ -12,6 +12,12 @@ import BorderedBox from '../atoms/BorderedBox';
 import SubTitle from '../atoms/SubTitle';
 import FlowchartSwitch from '../molecules/FlowchartSwitch';
 import { useCookies } from 'react-cookie';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faFloppyDisk,
+  faXmark,
+  faPenToSquare,
+} from '@fortawesome/free-solid-svg-icons';
 
 type Props = {
   data: GetDAGResponse;
@@ -121,7 +127,7 @@ function DAGSpec({ data }: Props) {
                         variant="contained"
                         startIcon={
                           <span className="icon">
-                            <i className="fa-solid fa-floppy-disk"></i>
+                            <FontAwesomeIcon icon={faFloppyDisk} />
                           </span>
                         }
                         onClick={async () => {
@@ -154,7 +160,7 @@ function DAGSpec({ data }: Props) {
                         sx={{ ml: 2 }}
                         startIcon={
                           <span className="icon">
-                            <i className="fa-solid fa-xmark"></i>
+                            <FontAwesomeIcon icon={faXmark} />
                           </span>
                         }
                       >
@@ -170,7 +176,7 @@ function DAGSpec({ data }: Props) {
                         onClick={() => setEditing(true)}
                         startIcon={
                           <span className="icon">
-                            <i className="fa-solid fa-pen-to-square"></i>
+                            <FontAwesomeIcon icon={faPenToSquare} />
                           </span>
                         }
                       >

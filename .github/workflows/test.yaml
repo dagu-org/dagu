@@ -32,8 +32,6 @@ jobs:
       - name: Copy web assets
         run: |
           cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
-          cp admin/dist/*.woff2 ./internal/admin/handlers/web/assets/fonts/
-          cp admin/dist/*.ttf ./internal/admin/handlers/web/assets/fonts/
 
       - name: Cache Go modules
         uses: actions/cache@v1
