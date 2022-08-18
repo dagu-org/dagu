@@ -13,8 +13,8 @@ function DAGSpecErrors({ errors }: Props) {
       <div>Please check the below errors!</div>
       <div className="content">
         <ul>
-          {errors.map((e) => (
-            <li>{e}</li>
+          {errors.map((e, i) => (
+            <li key={`${i}`}>{e}</li>
           ))}
         </ul>
       </div>
