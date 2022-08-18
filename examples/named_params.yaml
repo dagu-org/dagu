@@ -1,0 +1,4 @@
+params: "FOO=foo BAR=bar"
+steps:
+  - name: step1
+    command: echo $FOO-$BAR

@@ -23,8 +23,7 @@ function DAGs() {
   });
 
   const refreshFn = React.useCallback(() => {
-    mutate('/');
-    return;
+    mutate('*');
   }, [mutate]);
 
   React.useEffect(() => {
