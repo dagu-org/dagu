@@ -3,6 +3,8 @@ import React from 'react';
 import { SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
 
 type Props = {
   status?: Status;
@@ -72,7 +74,7 @@ function DAGActions({
         label={label}
         icon={
           <span className="icon">
-            <i className="fa-solid fa-play"></i>
+            <FontAwesomeIcon icon={faPlay} />
           </span>
         }
         disabled={!buttonState['start']}
@@ -89,7 +91,7 @@ function DAGActions({
         label={label}
         icon={
           <span className="icon">
-            <i className="fa-solid fa-stop"></i>
+            <FontAwesomeIcon icon={faStop} />
           </span>
         }
         disabled={!buttonState['stop']}
@@ -106,7 +108,7 @@ function DAGActions({
         label={label}
         icon={
           <span className="icon">
-            <i className="fa-solid fa-reply"></i>
+            <FontAwesomeIcon icon={faReply} />
           </span>
         }
         disabled={!buttonState['retry']}

@@ -14,6 +14,8 @@ import SubTitle from '../atoms/SubTitle';
 import BorderedBox from '../atoms/BorderedBox';
 import { useCookies } from 'react-cookie';
 import FlowchartSwitch from '../molecules/FlowchartSwitch';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChartGantt, faShareNodes } from '@fortawesome/free-solid-svg-icons';
 
 type Props = {
   DAG: DAGStatus;
@@ -102,13 +104,13 @@ function DAGStatus({ DAG, name, refresh }: Props) {
           >
             <Tab
               value="0"
-              icon={<i className="fa-solid fa-share-nodes" />}
+              icon={<FontAwesomeIcon icon={faShareNodes} />}
               label="Graph"
               sx={{ minHeight: '40px', fontSize: '0.8rem' }}
             />
             <Tab
               value="1"
-              icon={<i className="fa-solid fa-chart-gantt" />}
+              icon={<FontAwesomeIcon icon={faChartGantt} />}
               label="Timeline"
               sx={{ minHeight: '40px', fontSize: '0.8rem' }}
             />
