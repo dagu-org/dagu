@@ -37,7 +37,7 @@ function DAGDetails() {
   const { mutate } = useSWRConfig();
 
   const refreshFn = React.useCallback(() => {
-    mutate(baseUrl);
+    mutate(`${baseUrl}/*`);
     return;
   }, [mutate, baseUrl]);
 
@@ -124,7 +124,10 @@ function DAGDetails() {
             <Route
               path={'/history'}
               element={
-                <ExecutionHistory logData={data.LogData} isLoading={isValidating} />
+                <ExecutionHistory
+                  logData={data.LogData}
+                  isLoading={isValidating}
+                />
               }
             />
             <Route
