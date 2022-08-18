@@ -72,7 +72,7 @@ func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	client := resty.New()
 	if reqCfg.Timeout > 0 {
-		client.SetTimeout(time.Duration(reqCfg.Timeout))
+		client.SetTimeout(time.Second * time.Duration(reqCfg.Timeout))
 	}
 	req := client.R().SetContext(ctx)
 	if len(reqCfg.Headers) > 0 {
