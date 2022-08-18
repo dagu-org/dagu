@@ -35,7 +35,7 @@ function DAGAttributes({ dag: config }: Props) {
       </LabeledItem>
       <LabeledItem label="Description">{config.Description}</LabeledItem>
       <LabeledItem label="Max Active Runs">{config.MaxActiveRuns}</LabeledItem>
-      <LabeledItem label="Params">{config.Params}</LabeledItem>
+      <LabeledItem label="Params">{config.Params?.join(" ")}</LabeledItem>
       <Stack direction={'column'}>
         <React.Fragment>
           <LabeledItem label="Preconditions">{null}</LabeledItem>
