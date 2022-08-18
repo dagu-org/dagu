@@ -10,7 +10,8 @@
     "lint": "eslint --fix --ext .ts,.tsx .",
     "prettier": "prettier --write src/**/*.ts[x]",
     "typecheck": "tsc",
-    "typecheck:watch": "tsc -w"
+    "typecheck:watch": "tsc -w",
+    "profile": "webpack --profile --config webpack.prod.js --json=compilation-stats.json && webpack-bundle-analyzer ./compilation-stats.json"
   },
   "repository": {
     "type": "git",
