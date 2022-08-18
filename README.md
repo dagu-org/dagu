@@ -378,7 +378,7 @@ tags: example                        # Free tags (separated by comma)
 env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
-logDir: ${LOG_DIR}                   # Log directory to write standard output
+logDir: ${LOG_DIR}                   # Log directory to write standard output, default: ${DAG_HOME}/logs/dags
 histRetentionDays: 3                 # Execution history retention days (not for log files)
 delaySec: 1                          # Interval seconds between steps
 maxActiveRuns: 1                     # Max parallel number of running step
