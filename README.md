@@ -153,8 +153,8 @@ You can execute the example by pressing the `Start` button
 - `dagu retry --req=<request-id> <file>` - Re-runs the specified DAG run
 - `dagu stop <file>` - Stops the DAG execution by sending TERM signals
 - `dagu dry [--params=<params>] <file>` - Dry-runs the DAG
-- `dagu server` - Starts the web server for web UI
-- `dagu scheduler [--dags=<DAGs directory>]` - Starts the scheduler process
+- `dagu server [--host=<host>] [--port=<port>] [--dags=<path/to/the DAGs directory>]` - Starts the web server for web UI
+- `dagu scheduler [--dags=<path/to/the DAGs directory>]` - Starts the scheduler process
 - `dagu version` - Shows the current binary version
 
 The `--config=<config>` option is available to all commands. It allows to specify different Dagu configuration for the commands. Which enables you to manage multiple Dagu process in a single instance. See [Admin Configuration](#admin-configuration) for more details.
