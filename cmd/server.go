@@ -12,7 +12,26 @@ func newServerCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "server",
 		Usage: "dagu server",
-		Flags: globalFlags,
+		Flags: append(globalFlags,
+			&cli.StringFlag{
+				Name:     "dags",
+				Usage:    "DAGs directory",
+				Value:    "",
+				Required: false,
+			},
+			&cli.StringFlag{
+				Name:     "port",
+				Usage:    "server port",
+				Value:    "",
+				Required: false,
+			},
+			&cli.StringFlag{
+				Name:     "host",
+				Usage:    "server host",
+				Value:    "",
+				Required: false,
+			},
+		),
 		Action: func(c *cli.Context) error {
 			cfg, err := loadGlobalConfig(c)
 			if err != nil {
