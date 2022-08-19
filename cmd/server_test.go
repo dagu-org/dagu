@@ -14,38 +14,68 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+type serverTestExpect struct {
+	host string
+	port string
+}
+
 func Test_serverCommand(t *testing.T) {
+
 	app := makeApp()
 	dir := utils.MustTempDir("dagu_test_server")
 	os.Setenv("HOME", dir)
 	settings.ChangeHomeDir(dir)
+	defCfg, err := admin.DefaultConfig()
 
 	port := findPort(t)
 	settings.Set(settings.SETTING__ADMIN_PORT, port)
 
-	done := make(chan struct{})
-	go func() {
-		runAppTestOutput(app, appTest{
-			args: []string{"", "server"}, errored: false,
-			output: []string{"admin server is running "},
-		}, t)
-		close(done)
-	}()
+	for _, tc := range []struct {
+		args   []string
+		expect serverTestExpect
+	}{
+		{
+			args: []string{"", "server"},
+			expect: serverTestExpect{
+				port: port,
+				host: defCfg.Host,
+			},
+		},
+		{
+			args: []string{"", "server",
+				fmt.Sprintf("--port=%s", port),
+				fmt.Sprintf("--host=%s", "localhost"),
+			},
+			expect: serverTestExpect{
+				port: port,
+				host: "localhost",
+			},
+		},
+	} {
+		done := make(chan struct{})
+		go func() {
+			runAppTestOutput(app, appTest{
+				args: tc.args, errored: false,
+				output: []string{"admin server is running "},
+			}, t)
+			close(done)
+		}()
 
-	time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 100)
+		require.NoError(t, err)
 
-	cfg, err := admin.DefaultConfig()
-	require.NoError(t, err)
+		res, err := http.Post(
+			fmt.Sprintf("http://%s:%s/shutdown", tc.expect.host, tc.expect.port),
+			"application/json",
+			nil,
+		)
 
-	res, err := http.Post(
-		fmt.Sprintf("http://%s:%s/shutdown", cfg.Host, cfg.Port),
-		"application/json",
-		nil,
-	)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, res.StatusCode)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
-	<-done
+		<-done
+	}
+
 }
 
 func findPort(t *testing.T) string {

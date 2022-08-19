@@ -26,10 +26,6 @@ func newSchedulerCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
-			dagsDir := c.String("dags")
-			if dagsDir != "" {
-				cfg.DAGs = dagsDir
-			}
 			return startScheduler(cfg)
 		},
 	}

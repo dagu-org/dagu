@@ -48,6 +48,15 @@ func loadGlobalConfig(c *cli.Context) (cfg *admin.Config, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading admin config failed: %w", err)
 	}
+	if dagsDir := c.String("dags"); dagsDir != "" {
+		cfg.DAGs = dagsDir
+	}
+	if port := c.String("port"); port != "" {
+		cfg.Port = port
+	}
+	if host := c.String("host"); host != "" {
+		cfg.Host = host
+	}
 	return cfg, err
 }
 
