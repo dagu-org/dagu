@@ -11,7 +11,7 @@ import (
 func newServerCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "server",
-		Usage: "dagu server",
+		Usage: "dagu server [--host=<host>] [--port=<port>]",
 		Flags: append(globalFlags,
 			&cli.StringFlag{
 				Name:     "dags",
