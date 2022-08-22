@@ -121,16 +121,6 @@ func (a *Agent) Kill() {
 	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
 }
 
-// Cancel sends signal -1 to all child processes.
-func (a *Agent) Cancel() {
-	log.Printf("Sending -1 signal to running child processes.")
-	a.scheduler.Cancel(a.graph)
-	for a.scheduler.Status(a.graph) == scheduler.SchedulerStatus_Running {
-		time.Sleep(time.Second * 5)
-		a.scheduler.Cancel(a.graph)
-	}
-}
-
 func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	log.Printf("Sending %s signal to running child processes.", sig)
 	done := make(chan bool)

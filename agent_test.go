@@ -94,7 +94,6 @@ func TestDryRun(t *testing.T) {
 func TestCancelDAG(t *testing.T) {
 	for _, abort := range []func(*Agent){
 		func(a *Agent) { a.Signal(syscall.SIGTERM) },
-		func(a *Agent) { a.Cancel() },
 	} {
 		a, d := testDAGAsync(t, "agent_sleep.yaml")
 		time.Sleep(time.Millisecond * 100)
