@@ -65,22 +65,28 @@ const Drawer = styled(MuiDrawer, {
 const mdTheme = createTheme({
   typography: {
     fontFamily:
-    "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
+      "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
   },
   palette: {
     primary: {
       main: '#485fc7',
-    }
+    },
   },
 });
 
 type DashboardContentProps = {
   title: string;
   navbarColor: string;
+  version: string;
   children?: React.ReactElement | React.ReactElement[];
 };
 
-function Content({ title, navbarColor, children }: DashboardContentProps) {
+function Content({
+  title,
+  navbarColor,
+  version,
+  children,
+}: DashboardContentProps) {
   const [open, setOpen] = React.useState(false);
   const toggleDrawer = () => {
     setOpen(!open);
@@ -118,6 +124,17 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
                 />
               </IconButton>
             </Toolbar>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                color: '#fff',
+                overflowWrap: 'break-word',
+              }}
+            >
+              {version}
+            </Box>
             <List
               component="nav"
               sx={{
