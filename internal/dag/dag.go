@@ -14,6 +14,7 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
+	"golang.org/x/sys/unix"
 )
 
 // DAG represents a DAG configuration.
@@ -475,6 +476,14 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	if def.RepeatPolicy != nil {
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+	}
+	if def.SignalOnStep != nil {
+		sigDef := *def.SignalOnStep
+		sig := unix.SignalNum(sigDef)
+		if sig == 0 {
+			return nil, fmt.Errorf("invalid signal: %s", sigDef)
+		}
+		step.SignalOnStep = sigDef
 	}
 	step.MailOnError = def.MailOnError
 	step.Preconditions = loadPreCondition(def.Preconditions)

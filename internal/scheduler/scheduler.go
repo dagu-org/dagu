@@ -211,7 +211,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 // Signal sends a signal to the scheduler.
 // for a node with repeat policy, it does not stop the node and
 // wait to finish current run.
-func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool) {
+func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool) {
 	if !sc.IsCanceled() {
 		sc.setCanceled()
 	}
@@ -220,7 +220,7 @@ func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool) {
 			// for a repetitive task, we'll wait for the job to finish
 			// until time reaches max wait time
 		} else {
-			node.signal(sig)
+			node.signal(sig, allowOverride)
 		}
 	}
 	if done != nil {
