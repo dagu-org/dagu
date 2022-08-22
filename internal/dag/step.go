@@ -27,7 +27,7 @@ type Step struct {
 	RepeatPolicy    RepeatPolicy
 	MailOnError     bool
 	Preconditions   []*Condition
-	SignalOnStep    string
+	SignalOnStop    string
 }
 
 type RetryPolicy struct {

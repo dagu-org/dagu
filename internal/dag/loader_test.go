@@ -1,6 +1,7 @@
 package dag
 
 import (
+	"fmt"
 	"path"
 	"testing"
 	"time"
@@ -79,6 +80,41 @@ steps:
 	dat = `name: test DAG`
 	_, err = l.LoadData([]byte(dat))
 	require.Error(t, err)
+}
+
+func TestLoadSignalOnStop(t *testing.T) {
+	for _, tc := range []struct {
+		sig  string
+		want string
+		err  bool
+	}{
+		{
+			sig:  "SIGINT",
+			want: "SIGINT",
+			err:  false,
+		},
+		{
+			sig: "2000",
+			err: true,
+		},
+	} {
+		dat := fmt.Sprintf(`name: test DAG
+steps:
+  - name: "1"
+    command: "true"
+    signalOnStop: "%s"
+`, tc.sig)
+		l := &Loader{}
+		ret, err := l.LoadData([]byte(dat))
+		if tc.err {
+			require.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+
+		step := ret.Steps[0]
+		require.Equal(t, step.SignalOnStop, tc.want)
+	}
 }
 
 func TestLoadErrorFileNotExist(t *testing.T) {

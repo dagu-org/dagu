@@ -477,13 +477,13 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
 	}
-	if def.SignalOnStep != nil {
-		sigDef := *def.SignalOnStep
+	if def.SignalOnStop != nil {
+		sigDef := *def.SignalOnStop
 		sig := unix.SignalNum(sigDef)
 		if sig == 0 {
 			return nil, fmt.Errorf("invalid signal: %s", sigDef)
 		}
-		step.SignalOnStep = sigDef
+		step.SignalOnStop = sigDef
 	}
 	step.MailOnError = def.MailOnError
 	step.Preconditions = loadPreCondition(def.Preconditions)

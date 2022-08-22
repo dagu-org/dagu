@@ -184,8 +184,8 @@ func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	status := n.Status
 	if status == NodeStatus_Running && n.cmd != nil {
 		sigsig := sig
-		if allowOverride && n.Step.SignalOnStep != "" {
-			sigsig = unix.SignalNum(n.Step.SignalOnStep)
+		if allowOverride && n.Step.SignalOnStop != "" {
+			sigsig = unix.SignalNum(n.Step.SignalOnStop)
 		}
 		log.Printf("Sending %s signal to %s", sigsig, n.Name)
 		utils.LogErr("sending signal", n.cmd.Kill(sigsig))

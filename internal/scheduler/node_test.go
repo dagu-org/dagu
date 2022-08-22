@@ -61,7 +61,7 @@ func TestSignalSpecified(t *testing.T) {
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &sync.Map{},
-			SignalOnStep:    "SIGINT",
+			SignalOnStop:    "SIGINT",
 		}}
 
 	go func() {
