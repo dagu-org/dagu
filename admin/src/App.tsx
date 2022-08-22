@@ -11,6 +11,7 @@ import fetchJson from './lib/fetchJson';
 export type Config = {
   title: string;
   navbarColor: string;
+  version: string;
 };
 
 type Props = {
