@@ -42,11 +42,11 @@ function ExecutionLog({ log }: Props) {
           px: 2,
           height: '60vh',
           overflow: 'auto',
+          backgroundColor: 'black',
         }}
       >
         <pre
           style={{
-            backgroundColor: 'black',
             color: 'white',
             height: '100%',
             fontFamily: 'Courier New, Courier, monospace',
