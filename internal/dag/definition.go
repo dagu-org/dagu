@@ -49,6 +49,7 @@ type stepDef struct {
 	RepeatPolicy  *repeatPolicyDef
 	MailOnError   bool
 	Preconditions []*conditionDef
+	SignalOnStop  *string
 }
 
 type continueOnDef struct {

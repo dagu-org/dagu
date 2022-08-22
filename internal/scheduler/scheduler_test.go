@@ -360,7 +360,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 
 	go func() {
 		<-time.After(time.Millisecond * 50)
-		sc.Signal(g, syscall.SIGTERM, nil)
+		sc.Signal(g, syscall.SIGTERM, nil, false)
 	}()
 
 	err := sc.Schedule(g, nil)
@@ -386,7 +386,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 	done := make(chan bool)
 	go func() {
 		<-time.After(time.Millisecond * 500)
-		sc.Signal(g, syscall.SIGTERM, done)
+		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
 	err := sc.Schedule(g, nil)
@@ -511,7 +511,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	done := make(chan bool)
 	go func() {
 		<-time.After(time.Millisecond * 100)
-		sc.Signal(g, syscall.SIGTERM, done)
+		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
 	err := sc.Schedule(g, nil)

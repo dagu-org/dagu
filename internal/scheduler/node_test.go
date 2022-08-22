@@ -45,7 +45,28 @@ func TestSignal(t *testing.T) {
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		n.signal(syscall.SIGTERM)
+		n.signal(syscall.SIGTERM, false)
+	}()
+
+	n.updateStatus(NodeStatus_Running)
+	err := n.Execute()
+
+	require.Error(t, err)
+	require.Equal(t, n.Status, NodeStatus_Cancel)
+}
+
+func TestSignalSpecified(t *testing.T) {
+	n := &Node{
+		Step: &dag.Step{
+			Command:         "sleep",
+			Args:            []string{"100"},
+			OutputVariables: &sync.Map{},
+			SignalOnStop:    "SIGINT",
+		}}
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		n.signal(syscall.SIGTERM, true)
 	}()
 
 	n.updateStatus(NodeStatus_Running)

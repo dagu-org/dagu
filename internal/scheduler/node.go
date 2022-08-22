@@ -16,6 +16,7 @@ import (
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/executor"
 	"github.com/yohamta/dagu/internal/utils"
+	"golang.org/x/sys/unix"
 )
 
 type NodeStatus int
@@ -177,13 +178,17 @@ func (n *Node) updateStatus(status NodeStatus) {
 	n.Status = status
 }
 
-func (n *Node) signal(sig os.Signal) {
+func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.Status
 	if status == NodeStatus_Running && n.cmd != nil {
-		log.Printf("Sending %s signal to %s", sig, n.Name)
-		utils.LogErr("sending signal", n.cmd.Kill(sig))
+		sigsig := sig
+		if allowOverride && n.Step.SignalOnStop != "" {
+			sigsig = unix.SignalNum(n.Step.SignalOnStop)
+		}
+		log.Printf("Sending %s signal to %s", sigsig, n.Name)
+		utils.LogErr("sending signal", n.cmd.Kill(sigsig))
 	}
 	if status == NodeStatus_Running {
 		n.Status = NodeStatus_Cancel

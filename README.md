@@ -408,6 +408,7 @@ steps:
     ouptut: RESULT_VARIABLE
     script: |
       echo "any script"
+    signalOnStop: "SIGINT"           # Specify signal name (e.g. SIGINT) to be sent when process is stopped
     mailOn:
       failure: true                  # Send a mail when the step failed
       success: true                  # Send a mail when the step finished
