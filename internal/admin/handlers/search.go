@@ -6,13 +6,13 @@ import (
 	"github.com/yohamta/dagu/internal/controller"
 )
 
-type grepResponse struct {
+type searchResponse struct {
 	Result []*controller.GrepResult
 	Errors []string
 }
 
-func HandleGetGrep(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "grep", tc)
+func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "search", tc)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		query, ok := r.URL.Query()["q"]
@@ -27,7 +27,7 @@ func HandleGetGrep(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
 			return
 		}
 
-		resp := &grepResponse{
+		resp := &searchResponse{
 			Result: ret,
 			Errors: errs,
 		}
