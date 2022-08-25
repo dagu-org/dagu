@@ -71,9 +71,6 @@ type GrepResult struct {
 func GrepDAGs(dir string, pattern string) (ret []*GrepResult, errs []string, err error) {
 	ret = []*GrepResult{}
 	errs = []string{}
-	if pattern == "" {
-		return
-	}
 	if !utils.FileExists(dir) {
 		if err = os.MkdirAll(dir, 0755); err != nil {
 			errs = append(errs, err.Error())

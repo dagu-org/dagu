@@ -16,7 +16,7 @@ func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		query, ok := r.URL.Query()["q"]
-		if !ok || len(query) == 0 {
+		if !ok || len(query) == 0 || query[0] == "" {
 			encodeError(w, errInvalidArgs)
 			return
 		}
