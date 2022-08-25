@@ -5,20 +5,34 @@ type Props = {
   value: string;
   lineNumbers?: boolean;
   startLine?: number;
+  keyword?: string;
+  noHighlight?: boolean;
 };
 
 const language = 'yaml';
 
-function DAGDefinition({ value, lineNumbers, startLine }: Props) {
+function DAGDefinition({
+  value,
+  lineNumbers,
+  startLine,
+  keyword,
+  noHighlight,
+}: Props) {
   React.useEffect(() => {
-    Prism.highlightAll();
+    if (!noHighlight) {
+      Prism.highlightAll();
+    }
   }, [value]);
   const className = React.useMemo(() => {
+    const classes = [`language-${language}`];
     if (lineNumbers) {
-      return `language-${language} line-numbers`;
+      classes.push('line-numbers');
     }
-    return `language-${language}`;
-  }, [lineNumbers]);
+    if (keyword) {
+      classes.push(`keyword-${keyword}`);
+    }
+    return classes.join(' ');
+  }, [lineNumbers, keyword]);
   return (
     <pre
       style={{

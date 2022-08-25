@@ -1,21 +1,33 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Button, Grid, Stack, TextField } from '@mui/material';
-import { AppBarContext } from '../../contexts/AppBarContext';
 import useSWR from 'swr';
+import { useSearchParams } from 'react-router-dom';
 import Title from '../../components/atoms/Title';
+import { GetSearchResponse } from '../../models/api';
+import SearchResult from '../../components/molecules/SearchResult';
+import LoadingIndicator from '../../components/atoms/LoadingIndicator';
 
 function Search() {
-  const appBarContext = React.useContext(AppBarContext);
-  const [searchVal, setSearchVal] = React.useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
 
+  const { data, error } = useSWR<GetSearchResponse>(
+    `/search?q=${searchParams.get('q')}`
+  );
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     ref.current?.focus();
   }, [ref.current]);
 
+  const onSubmit = React.useCallback((value: string) => {
+    setSearchParams({
+      q: value,
+    });
+  }, []);
+
   return (
-    <Grid container spacing={3} sx={{ mx: 4, width: '100%' }}>
+    <Grid container sx={{ mx: 4, width: '100%' }}>
       <Grid item xs={12}>
         <Title>Search</Title>
         <Stack spacing={2} direction="row">
@@ -35,21 +47,36 @@ function Search() {
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                console.log('submit');
+                if (searchVal) {
+                  onSubmit(searchVal);
+                }
               }
             }}
           />
           <Button
+            disabled={!searchVal}
             variant="contained"
             sx={{
               width: '100px',
               border: 0,
             }}
-            onClick={async () => {}}
+            onClick={async () => {
+              onSubmit(searchVal);
+            }}
           >
             Search
           </Button>
         </Stack>
+
+        <Box mt={2}>
+          {!data && !error ? <LoadingIndicator /> : null}
+          {data && data.Results.length == 0 ? (
+            <Box>No results found</Box>
+          ) : null}
+          {data && data.Results.length > 0 ? (
+            <SearchResult results={data?.Results} />
+          ) : null}
+        </Box>
       </Grid>
     </Grid>
   );

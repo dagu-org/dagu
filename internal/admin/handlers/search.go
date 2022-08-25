@@ -7,8 +7,8 @@ import (
 )
 
 type searchResponse struct {
-	Result []*controller.GrepResult
-	Errors []string
+	Results []*controller.GrepResult
+	Errors  []string
 }
 
 func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
@@ -28,8 +28,8 @@ func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
 		}
 
 		resp := &searchResponse{
-			Result: ret,
-			Errors: errs,
+			Results: ret,
+			Errors:  errs,
 		}
 
 		if isJsonRequest(r) {

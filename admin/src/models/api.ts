@@ -1,4 +1,4 @@
-import { DAGStatus, Node, NodeStatus, StatusFile } from './index';
+import { DAG, DAGStatus, Node, NodeStatus, StatusFile } from './index';
 
 export type GetDAGResponse = {
   Title: string;
@@ -11,6 +11,21 @@ export type GetDAGResponse = {
   StepLog?: LogFile;
   ScLog?: LogFile;
   Errors: string[];
+};
+
+export type GetSearchResponse = {
+  Errors: string[];
+  Results: SearchResult[];
+};
+
+export type SearchResult = {
+  Name: string;
+  DAG?: DAG;
+  Matched: Matched;
+};
+
+export type Matched = {
+  [key: string]: string;
 };
 
 export type LogData = {
