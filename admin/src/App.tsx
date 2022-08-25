@@ -7,6 +7,7 @@ import DAGs from './pages/dags';
 import { AppBarContext } from './contexts/AppBarContext';
 import { SWRConfig } from 'swr';
 import fetchJson from './lib/fetchJson';
+import Search from './pages/search';
 
 export type Config = {
   title: string;
@@ -42,6 +43,7 @@ function App({ config }: Props) {
               <Route path="" element={<DAGs />} />
               <Route path="/dags/" element={<DAGs />} />
               <Route path="/dags/:name/*" element={<DAGDetails />} />
+              <Route path="/search/" element={<Search />} />
             </Routes>
           </Layout>
         </BrowserRouter>

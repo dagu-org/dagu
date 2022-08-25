@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -80,8 +81,6 @@ func GrepDAGs(dir string, pattern string) (ret []*GrepResult, errs []string, err
 	dl := &dag.Loader{}
 	opts := &grep.Options{
 		IsRegexp: true,
-		Before:   2,
-		After:    2,
 	}
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
@@ -101,7 +100,7 @@ func GrepDAGs(dir string, pattern string) (ret []*GrepResult, errs []string, err
 				continue
 			}
 			ret = append(ret, &GrepResult{
-				Name:    fi.Name(),
+				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
 				DAG:     dag,
 				Matched: m,
 			})

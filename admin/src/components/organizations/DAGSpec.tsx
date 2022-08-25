@@ -195,7 +195,7 @@ function DAGSpec({ data }: Props) {
                     ></DAGEditor>
                   </Box>
                 ) : (
-                  <DAGDefinition value={data.Definition} />
+                  <DAGDefinition value={data.Definition} lineNumbers />
                 )}
               </BorderedBox>
             </Box>

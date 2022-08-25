@@ -45,7 +45,7 @@ function Dashboard() {
   }, [appBarContext]);
 
   return (
-    <Grid container spacing={3} sx={{ mx: 4, width: '100%' }}>
+    <Grid container spacing={3} sx={{ mx: 2, width: '100%' }}>
       {(
         [
           [SchedulerStatus.Success, 'Successful'],

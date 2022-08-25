@@ -3,7 +3,11 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import { Link } from 'react-router-dom';
-import { TimelineOutlined, TocOutlined } from '@mui/icons-material';
+import {
+  TimelineOutlined,
+  TocOutlined,
+  SearchOutlined,
+} from '@mui/icons-material';
 import { Typography } from '@mui/material';
 
 export const mainListItems = (
@@ -13,6 +17,9 @@ export const mainListItems = (
     </Link>
     <Link to="/dags">
       <ListItem text="DAGs" icon={<TocOutlined />} />
+    </Link>
+    <Link to="/search">
+      <ListItem text="Search" icon={<SearchOutlined />} />
     </Link>
   </React.Fragment>
 );
