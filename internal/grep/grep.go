@@ -66,6 +66,9 @@ func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
 		}
 		i++
 	}
+	if len(matched) == 0 {
+		return nil, ErrNoMatch
+	}
 	for _, m := range matched {
 		l := lo.Max([]int{0, m - opts.Before})
 		h := lo.Min([]int{len(lines), m + opts.After + 1})

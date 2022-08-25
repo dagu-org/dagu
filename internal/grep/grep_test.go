@@ -73,6 +73,12 @@ func TestGrep(t *testing.T) {
 			Want: map[int]string{5: "dd\nee"},
 		},
 		{
+			Name:    "no match",
+			File:    path.Join(dir, "no match text"),
+			Pattern: "",
+			IsErr:   true,
+		},
+		{
 			Name:    "no file",
 			File:    path.Join(dir, "dummy.txt"),
 			Pattern: "aa",
