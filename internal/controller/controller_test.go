@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	testsDir = path.Join(utils.MustGetwd(), "../../tests/testdata")
+	testsDir = path.Join(utils.MustGetwd(), "./testdata")
 )
 
 func TestMain(m *testing.M) {
@@ -38,7 +38,7 @@ func testDAG(name string) string {
 }
 
 func TestGetStatus(t *testing.T) {
-	file := testDAG("controller_success.yaml")
+	file := testDAG("success.yaml")
 	dr := controller.NewDAGReader()
 	d, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestGetStatus(t *testing.T) {
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
-	file := testDAG("controller_status.yaml")
+	file := testDAG("status.yaml")
 
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
@@ -83,11 +83,11 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 }
 
 func TestGetDAG(t *testing.T) {
-	file := testDAG("controller_get_dag.yaml")
+	file := testDAG("get_dag.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
-	assert.Equal(t, "controller_get_dag", dag.DAG.Name)
+	assert.Equal(t, "get_dag", dag.DAG.Name)
 }
 
 func TestGetDAGList(t *testing.T) {
@@ -100,7 +100,7 @@ func TestGetDAGList(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
-	file := testDAG("controller_update_status.yaml")
+	file := testDAG("update_status.yaml")
 
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
@@ -140,7 +140,7 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestUpdateStatusFailure(t *testing.T) {
-	file := testDAG("controller_update_status_failed.yaml")
+	file := testDAG("update_status_failed.yaml")
 
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
@@ -174,7 +174,7 @@ func TestUpdateStatusFailure(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	file := testDAG("controller_start_err.yaml")
+	file := testDAG("start_err.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
@@ -189,7 +189,7 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartStop(t *testing.T) {
-	file := testDAG("controller_start_stop.yaml")
+	file := testDAG("start_stop.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func TestStartStop(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	file := testDAG("controller_retry.yaml")
+	file := testDAG("retry.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
