@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -22,7 +23,7 @@ import (
 )
 
 var (
-	testsDir = path.Join(utils.MustGetwd(), "./testdata")
+	testdataDir = path.Join(utils.MustGetwd(), "./testdata")
 )
 
 func TestMain(m *testing.M) {
@@ -34,7 +35,7 @@ func TestMain(m *testing.M) {
 }
 
 func testDAG(name string) string {
-	return path.Join(testsDir, name)
+	return path.Join(testdataDir, name)
 }
 
 func TestGetStatus(t *testing.T) {
@@ -90,12 +91,23 @@ func TestGetDAG(t *testing.T) {
 	assert.Equal(t, "get_dag", dag.DAG.Name)
 }
 
+func TestGrepDAGs(t *testing.T) {
+	ret, _, err := controller.GrepDAGs(testdataDir, "aabbcc")
+	println(fmt.Sprintf("%v", ret))
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ret))
+
+	ret, _, err = controller.GrepDAGs(testdataDir, "steps")
+	require.NoError(t, err)
+	require.Greater(t, len(ret), 1)
+}
+
 func TestGetDAGList(t *testing.T) {
-	dags, errs, err := controller.GetDAGs(testsDir)
+	dags, errs, err := controller.GetDAGs(testdataDir)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(errs))
 
-	matches, _ := filepath.Glob(path.Join(testsDir, "*.yaml"))
+	matches, _ := filepath.Glob(path.Join(testdataDir, "*.yaml"))
 	assert.Equal(t, len(matches), len(dags))
 }
 
