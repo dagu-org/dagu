@@ -45,6 +45,7 @@ func defaultRoutes(cfg *Config) []*route {
 				WkDir:   cfg.WorkDir,
 			},
 		)},
+		{http.MethodGet, `^/grep/?.*$`, handlers.HandleGetGrep(cfg.DAGs, tc)},
 		{http.MethodGet, `^/assets/js/.*$`, handlers.HandleGetAssets("/web")},
 		{http.MethodGet, `^/assets/css/.*$`, handlers.HandleGetAssets("/web")},
 	}
