@@ -12,16 +12,24 @@ import (
 )
 
 var (
-	ErrNoMatch      = errors.New("no matched")
+	// ErrNoMatch is returned when no match is found.
+	ErrNoMatch = errors.New("no matched")
+	// ErrEmptyPattern is returned when pattern is empty.
 	ErrEmptyPattern = errors.New("empty pattern")
 )
 
+// Options represents grep options.
+// If IsRegexp is true, the pattern is treated as a regular expression.
+// Before and After are the number of lines before and after the matched line.
 type Options struct {
-	Regexp bool
-	Before int
-	After  int
+	IsRegexp bool
+	Before   int
+	After    int
 }
 
+// Grep read file and return matched lines.
+// If opts is nil, default options will be used.
+// The result is a map, key is line number, value is line content.
 func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
 	b, err := os.ReadFile(file)
 	if err != nil {
@@ -34,7 +42,7 @@ func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
 		return nil, ErrEmptyPattern
 	}
 	var reg *regexp.Regexp = nil
-	if opts.Regexp {
+	if opts.IsRegexp {
 		if reg, err = regexp.Compile(pattern); err != nil {
 			return nil, err
 		}
@@ -48,7 +56,7 @@ func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
 		t := scanner.Text()
 		lines = append(lines, t)
 		flag := false
-		if opts.Regexp && reg.MatchString(t) {
+		if opts.IsRegexp && reg.MatchString(t) {
 			flag = true
 		} else if strings.Contains(t, pattern) {
 			flag = true

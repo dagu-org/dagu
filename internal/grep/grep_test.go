@@ -29,7 +29,7 @@ func TestGrep(t *testing.T) {
 			File:    path.Join(dir, "test.txt"),
 			Pattern: "^b.",
 			Opts: &Options{
-				Regexp: true,
+				IsRegexp: true,
 			},
 			Want: map[int]string{2: "bb"},
 		},
