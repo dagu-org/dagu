@@ -12,6 +12,7 @@ import (
 
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/grep"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/sock"
@@ -57,6 +58,56 @@ func GetDAGs(dir string) (dags []*DAGStatus, errs []string, err error) {
 		}
 	}
 	return dags, errs, nil
+}
+
+type GrepResult struct {
+	Name    string
+	DAG     *dag.DAG
+	Matched map[int]string
+}
+
+// GrepDAGs returns all DAGs that contain the given string.
+func GrepDAGs(dir string, pattern string) (ret []*GrepResult, errs []string, err error) {
+	ret = []*GrepResult{}
+	errs = []string{}
+	if !utils.FileExists(dir) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			errs = append(errs, err.Error())
+			return
+		}
+	}
+	fis, err := os.ReadDir(dir)
+	dl := &dag.Loader{}
+	opts := &grep.Options{
+		IsRegexp: true,
+		Before:   2,
+		After:    2,
+	}
+	utils.LogErr("read DAGs directory", err)
+	for _, fi := range fis {
+		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+			fn := filepath.Join(dir, fi.Name())
+			utils.LogErr("read DAG file", err)
+			m, err := grep.Grep(fn, fmt.Sprintf("(?i)%s", pattern), opts)
+			if err != nil {
+				continue
+			} else if err != nil {
+				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
+				continue
+			}
+			dag, err := dl.LoadHeadOnly(fn)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
+				continue
+			}
+			ret = append(ret, &GrepResult{
+				Name:    fi.Name(),
+				DAG:     dag,
+				Matched: m,
+			})
+		}
+	}
+	return ret, errs, nil
 }
 
 // NewConfig returns a new config.Config.
