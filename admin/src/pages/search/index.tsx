@@ -20,6 +20,7 @@ function Search() {
         <Title>Search</Title>
         <Stack spacing={2} direction="row">
           <TextField
+            label="Search Text"
             variant="outlined"
             style={{
               flex: 0.5,
