@@ -12,7 +12,7 @@ function Search() {
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
 
   const { data, error } = useSWR<GetSearchResponse>(
-    `/search?q=${searchParams.get('q')}`
+    `/search?q=${searchParams.get('q') || ""}`
   );
   const ref = useRef<HTMLInputElement>(null);
 
