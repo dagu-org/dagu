@@ -13,21 +13,18 @@ function SearchResult({ results }: Props) {
   const elements = React.useMemo(
     () =>
       results.map((result) => {
-        const keys = Object.keys(result.Matched);
         const ret = [] as ReactElement[];
-        keys.forEach((k, i) => {
-          const m = result.Matched[k];
+        result.Matches.forEach((m) => {
           ret.push(
-            <ListItem key={`${result.Name}-${k}-${i}`}>
+            <ListItem key={`${result.Name}-${m.LineNumber}`}>
               <Stack direction="column" spacing={1} style={{ width: '100%' }}>
                 <Link to={`/dags/${encodeURI(result.Name)}/spec`}>
                   <Typography variant="h6">{result.Name}</Typography>
                 </Link>
                 <DAGDefinition
-                  value={m}
+                  value={m.Line}
                   lineNumbers
-                  startLine={+k}
-                  keyword={'step'}
+                  startLine={m.StartLine}
                   noHighlight
                 />
               </Stack>

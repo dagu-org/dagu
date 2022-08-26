@@ -64,7 +64,7 @@ func GetDAGs(dir string) (dags []*DAGStatus, errs []string, err error) {
 type GrepResult struct {
 	Name    string
 	DAG     *dag.DAG
-	Matched map[int]string
+	Matches []*grep.Match
 }
 
 // GrepDAGs returns all DAGs that contain the given string.
@@ -102,7 +102,7 @@ func GrepDAGs(dir string, pattern string) (ret []*GrepResult, errs []string, err
 			ret = append(ret, &GrepResult{
 				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
 				DAG:     dag,
-				Matched: m,
+				Matches: m,
 			})
 		}
 	}

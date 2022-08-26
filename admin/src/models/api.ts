@@ -21,11 +21,13 @@ export type GetSearchResponse = {
 export type SearchResult = {
   Name: string;
   DAG?: DAG;
-  Matched: Matched;
+  Matches: Match[];
 };
 
-export type Matched = {
-  [key: string]: string;
+export type Match = {
+  Line: string;
+  LineNumber: number;
+  StartLine: number;
 };
 
 export type LogData = {
