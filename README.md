@@ -180,6 +180,10 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
   ![Details-TD](assets/images/ui-details2.png?raw=true)
 
+- **Search DAGs**: It greps given text across all DAGs definitions.
+
+  ![History](assets/images/ui-search.png?raw=true)
+
 - **Execution History**: It shows past execution results and logs.
 
   ![History](assets/images/ui-history.png?raw=true)
