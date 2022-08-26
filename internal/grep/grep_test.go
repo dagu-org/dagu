@@ -15,14 +15,19 @@ func TestGrep(t *testing.T) {
 		File    string
 		Pattern string
 		Opts    *Options
-		Want    map[int]string
+		Want    []*Match
 		IsErr   bool
 	}{
 		{
 			Name:    "simple",
 			File:    path.Join(dir, "test.txt"),
 			Pattern: "b",
-			Want:    map[int]string{2: "bb"},
+			Want: []*Match{
+				{
+					LineNumber: 2,
+					StartLine:  2,
+					Line:       "bb",
+				}},
 		},
 		{
 			Name:    "regexp",
@@ -31,7 +36,12 @@ func TestGrep(t *testing.T) {
 			Opts: &Options{
 				IsRegexp: true,
 			},
-			Want: map[int]string{2: "bb"},
+			Want: []*Match{
+				{
+					LineNumber: 2,
+					StartLine:  2,
+					Line:       "bb",
+				}},
 		},
 		{
 			Name:    "before",
@@ -40,7 +50,12 @@ func TestGrep(t *testing.T) {
 			Opts: &Options{
 				Before: 1,
 			},
-			Want: map[int]string{2: "aa\nbb"},
+			Want: []*Match{
+				{
+					LineNumber: 2,
+					StartLine:  1,
+					Line:       "aa\nbb",
+				}},
 		},
 		{
 			Name:    "before+after",
@@ -50,7 +65,12 @@ func TestGrep(t *testing.T) {
 				Before: 2,
 				After:  2,
 			},
-			Want: map[int]string{3: "aa\nbb\ncc\ndd\nee"},
+			Want: []*Match{
+				{
+					LineNumber: 3,
+					StartLine:  1,
+					Line:       "aa\nbb\ncc\ndd\nee",
+				}},
 		},
 		{
 			Name:    "before+after,firstline",
@@ -60,7 +80,12 @@ func TestGrep(t *testing.T) {
 				Before: 1,
 				After:  1,
 			},
-			Want: map[int]string{1: "aa\nbb"},
+			Want: []*Match{
+				{
+					LineNumber: 1,
+					StartLine:  1,
+					Line:       "aa\nbb",
+				}},
 		},
 		{
 			Name:    "before+after,lastline",
@@ -70,7 +95,12 @@ func TestGrep(t *testing.T) {
 				Before: 1,
 				After:  1,
 			},
-			Want: map[int]string{5: "dd\nee"},
+			Want: []*Match{
+				{
+					LineNumber: 5,
+					StartLine:  4,
+					Line:       "dd\nee",
+				}},
 		},
 		{
 			Name:    "no match",

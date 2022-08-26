@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Box, Button, Grid, Stack, TextField } from '@mui/material';
+import { Box, Button, Grid, Stack, TextField, Typography } from '@mui/material';
 import useSWR from 'swr';
 import { useSearchParams } from 'react-router-dom';
 import Title from '../../components/atoms/Title';
@@ -12,7 +12,7 @@ function Search() {
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
 
   const { data, error } = useSWR<GetSearchResponse>(
-    `/search?q=${searchParams.get('q')}`
+    `/search?q=${searchParams.get('q') || ''}`
   );
   const ref = useRef<HTMLInputElement>(null);
 
@@ -74,7 +74,12 @@ function Search() {
             <Box>No results found</Box>
           ) : null}
           {data && data.Results.length > 0 ? (
-            <SearchResult results={data?.Results} />
+            <Box>
+              <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
+                {data.Results.length} results found
+              </Typography>
+              <SearchResult results={data?.Results} />
+            </Box>
           ) : null}
         </Box>
       </Grid>

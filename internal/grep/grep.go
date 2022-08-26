@@ -27,10 +27,17 @@ type Options struct {
 	After    int
 }
 
+// Match contains matched line number and line content.
+type Match struct {
+	Line       string
+	LineNumber int
+	StartLine  int
+}
+
 // Grep read file and return matched lines.
 // If opts is nil, default options will be used.
 // The result is a map, key is line number, value is line content.
-func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
+func Grep(file string, pattern string, opts *Options) ([]*Match, error) {
 	b, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -48,7 +55,7 @@ func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
 		}
 	}
 	scanner := bufio.NewScanner(bytes.NewReader(b))
-	ret := map[int]string{}
+	ret := []*Match{}
 	lines := []string{}
 	matched := []int{}
 	i := 0
@@ -73,7 +80,11 @@ func Grep(file string, pattern string, opts *Options) (map[int]string, error) {
 		l := lo.Max([]int{0, m - opts.Before})
 		h := lo.Min([]int{len(lines), m + opts.After + 1})
 		s := strings.Join(lines[l:h], "\n")
-		ret[m+1] = s
+		ret = append(ret, &Match{
+			StartLine:  l + 1,
+			LineNumber: m + 1,
+			Line:       s,
+		})
 	}
 	return ret, nil
 }
