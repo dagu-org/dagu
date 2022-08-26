@@ -12,25 +12,31 @@ type Props = {
 function SearchResult({ results }: Props) {
   const elements = React.useMemo(
     () =>
-      results.map((result) => {
+      results.map((result, i) => {
         const ret = [] as ReactElement[];
-        result.Matches.forEach((m) => {
+        result.Matches.forEach((m, j) => {
           ret.push(
             <ListItem key={`${result.Name}-${m.LineNumber}`}>
               <Stack direction="column" spacing={1} style={{ width: '100%' }}>
-                <Link to={`/dags/${encodeURI(result.Name)}/spec`}>
-                  <Typography variant="h6">{result.Name}</Typography>
-                </Link>
+                {j == 0 ? (
+                  <Link to={`/dags/${encodeURI(result.Name)}/spec`}>
+                    <Typography variant="h6">{result.Name}</Typography>
+                  </Link>
+                ) : null}
                 <DAGDefinition
                   value={m.Line}
                   lineNumbers
                   startLine={m.StartLine}
+                  highlightLine={m.LineNumber - m.StartLine}
                   noHighlight
                 />
               </Stack>
             </ListItem>
           );
         });
+        if (i < results.length - 1) {
+          ret.push(<Divider key={`${result.Name}-divider`} />);
+        }
         return ret;
       }),
     [results]

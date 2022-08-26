@@ -81,6 +81,8 @@ func GrepDAGs(dir string, pattern string) (ret []*GrepResult, errs []string, err
 	dl := &dag.Loader{}
 	opts := &grep.Options{
 		IsRegexp: true,
+		Before:   2,
+		After:    2,
 	}
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {

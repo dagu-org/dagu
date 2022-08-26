@@ -4,6 +4,7 @@ import Prism from '../../assets/js/prism';
 type Props = {
   value: string;
   lineNumbers?: boolean;
+  highlightLine?: number;
   startLine?: number;
   keyword?: string;
   noHighlight?: boolean;
@@ -14,6 +15,7 @@ const language = 'yaml';
 function DAGDefinition({
   value,
   lineNumbers,
+  highlightLine,
   startLine,
   keyword,
   noHighlight,
@@ -34,12 +36,7 @@ function DAGDefinition({
     return classes.join(' ');
   }, [lineNumbers, keyword]);
   return (
-    <pre
-      style={{
-        fontSize: '0.9rem',
-      }}
-      data-start={startLine || 1}
-    >
+    <pre data-start={startLine || 1} data-line={highlightLine}>
       <code className={className}>{value}</code>
     </pre>
   );
