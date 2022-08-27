@@ -23,7 +23,7 @@ func TestAgent(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
 	a := NewAgent(
 		&admin.Config{
-			DAGs:    path.Join(testsDir, "runner"),
+			DAGs:    testdataDir,
 			Command: testBin,
 			LogDir:  path.Join(tmpDir, "log"),
 		})
@@ -34,7 +34,7 @@ func TestAgent(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	f := path.Join(testsDir, "runner/scheduled_job.yaml")
+	f := path.Join(testdataDir, "scheduled_job.yaml")
 	cl := &dag.Loader{}
 	dag, err := cl.LoadHeadOnly(f)
 	require.NoError(t, err)

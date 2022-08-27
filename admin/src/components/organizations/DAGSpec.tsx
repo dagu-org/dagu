@@ -117,7 +117,7 @@ function DAGSpec({ data }: Props) {
                       color: 'grey.600',
                     }}
                   >
-                    {data.DAG.DAG.Path}
+                    {data.DAG.DAG.Location}
                   </Box>
                   {editing ? (
                     <Stack direction="row">

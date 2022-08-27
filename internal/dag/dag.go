@@ -19,7 +19,7 @@ import (
 
 // DAG represents a DAG configuration.
 type DAG struct {
-	Path              string
+	Location          string
 	Group             string
 	Name              string
 	Schedule          []cron.Schedule
@@ -87,7 +87,7 @@ func (c *DAG) HasTag(tag string) bool {
 }
 
 func (c *DAG) SockAddr() string {
-	s := strings.ReplaceAll(c.Path, " ", "_")
+	s := strings.ReplaceAll(c.Location, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
 	h := md5.New()
 	h.Write([]byte(s))
@@ -123,7 +123,7 @@ func (c *DAG) setup() {
 	if c.MaxCleanUpTime == 0 {
 		c.MaxCleanUpTime = time.Second * 60
 	}
-	dir := path.Dir(c.Path)
+	dir := path.Dir(c.Location)
 	for _, step := range c.Steps {
 		c.setupStep(step, dir)
 	}
@@ -143,7 +143,7 @@ func (c *DAG) setup() {
 
 func (c *DAG) setupStep(step *Step, defaultDir string) {
 	if step.Dir == "" {
-		step.Dir = path.Dir(c.Path)
+		step.Dir = path.Dir(c.Location)
 	}
 }
 

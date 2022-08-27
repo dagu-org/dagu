@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	testsDir    = path.Join(utils.MustGetwd(), "../../tests")
+	testdataDir = path.Join(utils.MustGetwd(), "testdata")
 	testBin     = path.Join(utils.MustGetwd(), "../../bin/dagu")
 	testConfig  = &admin.Config{Command: testBin}
 	testHomeDir string

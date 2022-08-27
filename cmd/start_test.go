@@ -33,7 +33,7 @@ func Test_startCommand(t *testing.T) {
 	}
 
 	// For testing --config parameter we need to set the environment variable for now.
-	os.Setenv("TEST_CONFIG_BASE", testsDir)
+	os.Setenv("TEST_CONFIG_BASE", testdataDir)
 
 	for _, v := range tests {
 		app := makeApp()

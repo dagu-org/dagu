@@ -158,7 +158,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	dst.Path = file
+	dst.Location = file
 
 	if !opts.noSetenv {
 		dst.setup()

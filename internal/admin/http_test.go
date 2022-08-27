@@ -21,7 +21,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 	server := NewServer(&Config{
 		Host: host,
 		Port: port,
-		DAGs: testDAGsDir,
+		DAGs: testHomeDir,
 	})
 
 	go func() {
@@ -88,7 +88,7 @@ func TestHttpServerBasicAuth(t *testing.T) {
 		IsBasicAuth:       true,
 		BasicAuthUsername: "user",
 		BasicAuthPassword: "password",
-		DAGs:              testDAGsDir,
+		DAGs:              testHomeDir,
 	})
 
 	go func() {
