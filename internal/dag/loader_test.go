@@ -12,11 +12,11 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	l := &Loader{}
-	_, err := l.Load(path.Join(testdataDir, "config_load.yaml"), "")
+	_, err := l.Load(path.Join(testdataDir, "load.yaml"), "")
 	require.NoError(t, err)
 
 	// without .yaml
-	s := path.Join(testdataDir, "config_load")
+	s := path.Join(testdataDir, "load")
 	_, err = l.Load(s, "")
 	require.NoError(t, err)
 }
@@ -33,8 +33,8 @@ func TestLoadBaseConfig(t *testing.T) {
 
 func TestLoadBaseConfigError(t *testing.T) {
 	for _, f := range []string{
-		path.Join(testdataDir, "config_err_decode.yaml"),
-		path.Join(testdataDir, "config_err_parse.yaml"),
+		path.Join(testdataDir, "err_decode.yaml"),
+		path.Join(testdataDir, "err_parse.yaml"),
 	} {
 		l := &Loader{}
 		_, err := l.loadBaseConfig(f, &BuildDAGOptions{})
@@ -44,7 +44,7 @@ func TestLoadBaseConfigError(t *testing.T) {
 
 func TestLoadDeafult(t *testing.T) {
 	l := &Loader{}
-	d, err := l.Load(path.Join(testdataDir, "config_default.yaml"), "")
+	d, err := l.Load(path.Join(testdataDir, "default.yaml"), "")
 	require.NoError(t, err)
 
 	require.Equal(t, time.Second*60, d.MaxCleanUpTime)
@@ -126,14 +126,14 @@ func TestLoadErrorFileNotExist(t *testing.T) {
 func TestGlobalConfigNotExist(t *testing.T) {
 	l := &Loader{}
 
-	file := path.Join(testdataDir, "config_default.yaml")
+	file := path.Join(testdataDir, "default.yaml")
 	_, err := l.Load(file, "")
 	require.NoError(t, err)
 }
 
 func TestDecodeError(t *testing.T) {
 	l := &Loader{}
-	file := path.Join(testdataDir, "config_err_decode.yaml")
+	file := path.Join(testdataDir, "err_decode.yaml")
 	_, err := l.Load(file, "")
 	require.Error(t, err)
 }
