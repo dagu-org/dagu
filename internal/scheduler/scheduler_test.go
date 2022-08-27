@@ -17,15 +17,14 @@ import (
 var (
 	testCommand     = "true"
 	testCommandFail = "false"
-	testBinDir      = path.Join(utils.MustGetwd(), "../../tests/bin")
-	testDir         string
+	testTempDir     string
 )
 
 func TestMain(m *testing.M) {
-	testDir = utils.MustTempDir("scheduler-test")
-	settings.ChangeHomeDir(testDir)
+	testTempDir = utils.MustTempDir("scheduler-test")
+	settings.ChangeHomeDir(testTempDir)
 	code := m.Run()
-	os.RemoveAll(testDir)
+	os.RemoveAll(testTempDir)
 	os.Exit(code)
 }
 
@@ -166,7 +165,7 @@ func TestSchedulerCancel(t *testing.T) {
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
-	cmd := path.Join(testBinDir, "testfile.sh")
+	cmd := path.Join(utils.MustGetwd(), "testdata/testfile.sh")
 	g, sc, err := testSchedule(t,
 		&dag.Step{
 			Name:        "1",
@@ -203,7 +202,7 @@ func TestSchedulerRetryFail(t *testing.T) {
 }
 
 func TestSchedulerRetrySuccess(t *testing.T) {
-	cmd := path.Join(testBinDir, "testfile.sh")
+	cmd := path.Join(utils.MustGetwd(), "testdata/testfile.sh")
 	tmpDir, err := os.MkdirTemp("", "scheduler_test")
 	tmpFile := path.Join(tmpDir, "flag")
 
