@@ -15,7 +15,7 @@ import (
 
 func Test_retryCommand(t *testing.T) {
 	app := makeApp()
-	configPath := testConfig("cmd_retry.yaml")
+	configPath := testConfig("retry.yaml")
 	runAppTestOutput(app, appTest{
 		args: []string{"", "start", "--params=x", configPath}, errored: true,
 		output: []string{},
@@ -44,7 +44,7 @@ func Test_retryCommand(t *testing.T) {
 	app = makeApp()
 	runAppTestOutput(app, appTest{
 		args: []string{"", "retry", fmt.Sprintf("--req=%s",
-			dag.Status.RequestId), testConfig("cmd_retry.yaml")}, errored: false,
+			dag.Status.RequestId), testConfig("retry.yaml")}, errored: false,
 		output: []string{"parameter is x"},
 	}, t)
 
@@ -67,7 +67,7 @@ func Test_retryFail(t *testing.T) {
 	app := makeApp()
 	runAppTestOutput(app, appTest{
 		args: []string{"", "retry", fmt.Sprintf("--req=%s",
-			"invalid-request-id"), testConfig("cmd_retry.yaml")}, errored: true,
+			"invalid-request-id"), testConfig("retry.yaml")}, errored: true,
 		errMessage: []string{"request id not found"},
 	}, t)
 }

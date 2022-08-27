@@ -7,7 +7,7 @@ import (
 func Test_dryCommand(t *testing.T) {
 	tests := []appTest{
 		{
-			args: []string{"", "dry", testConfig("cmd_dry.yaml")}, errored: false,
+			args: []string{"", "dry", testConfig("dry.yaml")}, errored: false,
 			output: []string{"Starting DRY-RUN"},
 		},
 	}
