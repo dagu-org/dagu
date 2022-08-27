@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestRunDAG(t *testing.T) {
-	d := testLoadDAG(t, "agent_run.yaml")
+	d := testLoadDAG(t, "run.yaml")
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
 	status, _ := controller.New(d).GetLastStatus()
@@ -58,7 +58,7 @@ func TestRunDAG(t *testing.T) {
 }
 
 func TestCheckRunning(t *testing.T) {
-	d := testLoadDAG(t, "agent_is_running.yaml")
+	d := testLoadDAG(t, "is_running.yaml")
 
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
@@ -79,7 +79,7 @@ func TestCheckRunning(t *testing.T) {
 
 func TestDryRun(t *testing.T) {
 	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: testLoadDAG(t, "agent_dry.yaml"),
+		DAG: testLoadDAG(t, "dry.yaml"),
 		Dry: true,
 	}}
 	err := a.Run()
@@ -95,7 +95,7 @@ func TestCancelDAG(t *testing.T) {
 	for _, abort := range []func(*Agent){
 		func(a *Agent) { a.Signal(syscall.SIGTERM) },
 	} {
-		a, d := testDAGAsync(t, "agent_sleep.yaml")
+		a, d := testDAGAsync(t, "sleep.yaml")
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
@@ -106,7 +106,7 @@ func TestCancelDAG(t *testing.T) {
 }
 
 func TestPreConditionInvalid(t *testing.T) {
-	d := testLoadDAG(t, "agent_multiple_steps.yaml")
+	d := testLoadDAG(t, "multiple_steps.yaml")
 	d.Preconditions = []*dag.Condition{
 		{
 			Condition: "`echo 1`",
@@ -123,7 +123,7 @@ func TestPreConditionInvalid(t *testing.T) {
 }
 
 func TestPreConditionValid(t *testing.T) {
-	d := testLoadDAG(t, "agent_with_params.yaml")
+	d := testLoadDAG(t, "with_params.yaml")
 
 	d.Preconditions = []*dag.Condition{
 		{
@@ -141,7 +141,7 @@ func TestPreConditionValid(t *testing.T) {
 }
 
 func TestStartError(t *testing.T) {
-	d := testLoadDAG(t, "agent_error.yaml")
+	d := testLoadDAG(t, "error.yaml")
 	status, err := testDAG(t, d)
 	require.Error(t, err)
 
@@ -149,7 +149,7 @@ func TestStartError(t *testing.T) {
 }
 
 func TestOnExit(t *testing.T) {
-	d := testLoadDAG(t, "agent_on_exit.yaml")
+	d := testLoadDAG(t, "on_exit.yaml")
 	status, err := testDAG(t, d)
 	require.NoError(t, err)
 
@@ -161,7 +161,7 @@ func TestOnExit(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	d := testLoadDAG(t, "agent_retry.yaml")
+	d := testLoadDAG(t, "retry.yaml")
 
 	status, err := testDAG(t, d)
 	require.Error(t, err)
@@ -192,7 +192,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestHandleHTTP(t *testing.T) {
-	d := testLoadDAG(t, "agent_handle_http.yaml")
+	d := testLoadDAG(t, "handle_http.yaml")
 
 	a := &Agent{AgentConfig: &AgentConfig{
 		DAG: d,
