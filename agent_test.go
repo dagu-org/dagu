@@ -21,10 +21,10 @@ import (
 var testdataDir = path.Join(utils.MustGetwd(), "testdata")
 
 func TestMain(m *testing.M) {
-	testTempDir := utils.MustTempDir("agent_test")
-	settings.ChangeHomeDir(testTempDir)
+	testHomeDir := utils.MustTempDir("agent_test")
+	settings.ChangeHomeDir(testHomeDir)
 	code := m.Run()
-	os.RemoveAll(testTempDir)
+	os.RemoveAll(testHomeDir)
 	os.Exit(code)
 }
 

@@ -17,14 +17,14 @@ import (
 var (
 	testCommand     = "true"
 	testCommandFail = "false"
-	testTempDir     string
+	testHomeDir     string
 )
 
 func TestMain(m *testing.M) {
-	testTempDir = utils.MustTempDir("scheduler-test")
-	settings.ChangeHomeDir(testTempDir)
+	testHomeDir = utils.MustTempDir("scheduler-test")
+	settings.ChangeHomeDir(testHomeDir)
 	code := m.Run()
-	os.RemoveAll(testTempDir)
+	os.RemoveAll(testHomeDir)
 	os.Exit(code)
 }
 

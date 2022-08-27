@@ -10,13 +10,13 @@ import (
 )
 
 var testdataDir = path.Join(utils.MustGetwd(), "testdata")
-var testTempDir string
+var testHomeDir string
 
 func TestMain(m *testing.M) {
-	testTempDir = utils.MustTempDir("dagu-admin-test")
+	testHomeDir = utils.MustTempDir("dagu-admin-test")
 	os.Setenv("HOST", "localhost")
 	settings.ChangeHomeDir(testdataDir)
 	code := m.Run()
-	_ = os.RemoveAll(testTempDir)
+	_ = os.RemoveAll(testHomeDir)
 	os.Exit(code)
 }
