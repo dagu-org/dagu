@@ -12,7 +12,7 @@ import (
 )
 
 func TestJobRun(t *testing.T) {
-	file := path.Join(testsDir, "testdata/runner_job_run.yaml")
+	file := path.Join(testdataDir, "job_run.yaml")
 	dr := controller.NewDAGReader()
 	dag, err := dr.ReadDAG(file, false)
 	require.NoError(t, err)
