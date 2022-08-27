@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	testDir     = path.Join(utils.MustGetwd(), "../../tests/testdata")
-	testHomeDir = path.Join(utils.MustGetwd(), "../../tests/config")
-	testConfig  = path.Join(testDir, "config_load.yaml")
+	testdataDir = path.Join(utils.MustGetwd(), "testdata")
+	testHomeDir = path.Join(utils.MustGetwd(), "testdata/home")
 	testEnv     = []string{}
 )
 
@@ -31,24 +30,24 @@ func TestMain(m *testing.M) {
 func TestAssertDefinition(t *testing.T) {
 	l := &Loader{}
 
-	_, err := l.Load(path.Join(testDir, "config_err_no_steps.yaml"), "")
+	_, err := l.Load(path.Join(testdataDir, "config_err_no_steps.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("at least one step must be specified"))
 }
 
 func TestAssertStepDefinition(t *testing.T) {
 	l := &Loader{}
 
-	_, err := l.Load(path.Join(testDir, "config_err_step_no_name.yaml"), "")
+	_, err := l.Load(path.Join(testdataDir, "config_err_step_no_name.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("step name must be specified"))
 
-	_, err = l.Load(path.Join(testDir, "config_err_step_no_command.yaml"), "")
+	_, err = l.Load(path.Join(testdataDir, "config_err_step_no_command.yaml"), "")
 	require.Equal(t, err, fmt.Errorf("step command must be specified"))
 }
 
 func TestConfigReadClone(t *testing.T) {
 	l := &Loader{}
 
-	d, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
+	d, err := l.Load(path.Join(testdataDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
 	dd := d.Clone()
@@ -58,7 +57,7 @@ func TestConfigReadClone(t *testing.T) {
 func TestToString(t *testing.T) {
 	l := &Loader{}
 
-	d, err := l.Load(path.Join(testDir, "config_default.yaml"), "")
+	d, err := l.Load(path.Join(testdataDir, "config_default.yaml"), "")
 	require.NoError(t, err)
 
 	ret := d.String()
@@ -87,7 +86,7 @@ func TestReadConfig(t *testing.T) {
 func TestConfigLoadHeadOnly(t *testing.T) {
 	l := &Loader{}
 
-	d, err := l.LoadHeadOnly(path.Join(testDir, "config_default.yaml"))
+	d, err := l.LoadHeadOnly(path.Join(testdataDir, "config_default.yaml"))
 	require.NoError(t, err)
 
 	require.Equal(t, d.Name, "config_default")
@@ -313,13 +312,13 @@ func TestSockAddr(t *testing.T) {
 func TestOverwriteGlobalConfig(t *testing.T) {
 	l := &Loader{BaseConfig: settings.MustGet(settings.SETTING__BASE_CONFIG)}
 
-	d, err := l.Load(path.Join(testDir, "config_overwrite.yaml"), "")
+	d, err := l.Load(path.Join(testdataDir, "config_overwrite.yaml"), "")
 	require.NoError(t, err)
 
 	require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
 	require.Equal(t, d.HistRetentionDays, 7)
 
-	d, err = l.Load(path.Join(testDir, "config_no_overwrite.yaml"), "")
+	d, err = l.Load(path.Join(testdataDir, "config_no_overwrite.yaml"), "")
 	require.NoError(t, err)
 
 	require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
