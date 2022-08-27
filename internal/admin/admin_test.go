@@ -9,14 +9,14 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var testsDir = path.Join(utils.MustGetwd(), "../../tests/admin/")
-var testDAGsDir string
+var testdataDir = path.Join(utils.MustGetwd(), "testdata")
+var testTempDir string
 
 func TestMain(m *testing.M) {
-	testDAGsDir = utils.MustTempDir("dagu-admin-test")
+	testTempDir = utils.MustTempDir("dagu-admin-test")
 	os.Setenv("HOST", "localhost")
-	settings.ChangeHomeDir(testsDir)
+	settings.ChangeHomeDir(testdataDir)
 	code := m.Run()
-	_ = os.RemoveAll(testDAGsDir)
+	_ = os.RemoveAll(testTempDir)
 	os.Exit(code)
 }

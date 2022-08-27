@@ -18,13 +18,13 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var testsDir = path.Join(utils.MustGetwd(), "./tests/testdata")
+var testdataDir = path.Join(utils.MustGetwd(), "testdata")
 
 func TestMain(m *testing.M) {
-	tempDir := utils.MustTempDir("agent_test")
-	settings.ChangeHomeDir(tempDir)
+	testTempDir := utils.MustTempDir("agent_test")
+	settings.ChangeHomeDir(testTempDir)
 	code := m.Run()
-	os.RemoveAll(tempDir)
+	os.RemoveAll(testTempDir)
 	os.Exit(code)
 }
 
@@ -283,7 +283,7 @@ func testDAG(t *testing.T, d *dag.DAG) (*models.Status, error) {
 }
 
 func testLoadDAG(t *testing.T, name string) *dag.DAG {
-	file := path.Join(testsDir, name)
+	file := path.Join(testdataDir, name)
 	cl := &dag.Loader{}
 	d, err := cl.Load(file, "")
 	require.NoError(t, err)

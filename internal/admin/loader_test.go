@@ -8,7 +8,7 @@ import (
 	"github.com/yohamta/dagu/internal/settings"
 )
 
-var testsConfig = path.Join(testsDir, "admin.yaml")
+var testsConfig = path.Join(testdataDir, "admin.yaml")
 
 func TestDefaultConfig(t *testing.T) {
 	cfg, err := DefaultConfig()
@@ -33,9 +33,9 @@ func TestHomeAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8081",
-		DAGs:    path.Join(testsDir, "/dagu/dags"),
-		Command: path.Join(testsDir, "/dagu/bin/dagu"),
-		WorkDir: path.Join(testsDir, "/dagu/dags"),
+		DAGs:    path.Join(testdataDir, "/dagu/dags"),
+		Command: path.Join(testdataDir, "/dagu/bin/dagu"),
+		WorkDir: path.Join(testdataDir, "/dagu/dags"),
 	})
 }
 
@@ -53,9 +53,9 @@ func TestLoadAdminConfig(t *testing.T) {
 	testConfig(t, cfg, &testWant{
 		Host:    "localhost",
 		Port:    "8082",
-		DAGs:    path.Join(testsDir, "/dagu/dags"),
-		Command: path.Join(testsDir, "/dagu/bin/dagu"),
-		WorkDir: path.Join(testsDir, "/dagu/dags"),
+		DAGs:    path.Join(testdataDir, "/dagu/dags"),
+		Command: path.Join(testdataDir, "/dagu/bin/dagu"),
+		WorkDir: path.Join(testdataDir, "/dagu/dags"),
 	})
 }
 
