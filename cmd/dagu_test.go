@@ -25,7 +25,7 @@ type appTest struct {
 }
 
 var (
-	testsDir    = path.Join(utils.MustGetwd(), "../tests/testdata")
+	testdataDir = path.Join(utils.MustGetwd(), "testdata")
 	testHomeDir = ""
 )
 
@@ -44,7 +44,7 @@ func TestSetVersion(t *testing.T) {
 }
 
 func testConfig(name string) string {
-	return path.Join(testsDir, name)
+	return path.Join(testdataDir, name)
 }
 
 func runAppTestOutput(app *cli.App, test appTest, t *testing.T) {
