@@ -50,7 +50,7 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAGStatus, error) {
 		if d != nil {
 			return dr.newDAG(d, defaultStatus(d), err), err
 		}
-		d := &dag.DAG{Path: file}
+		d := &dag.DAG{Location: file}
 		d.Init()
 		return dr.newDAG(d, defaultStatus(d), err), err
 	}
@@ -68,8 +68,8 @@ func (dr *DAGReader) ReadDAG(file string, headOnly bool) (*DAGStatus, error) {
 
 func (dr *DAGReader) newDAG(d *dag.DAG, s *models.Status, err error) *DAGStatus {
 	ret := &DAGStatus{
-		File:      filepath.Base(d.Path),
-		Dir:       filepath.Dir(d.Path),
+		File:      filepath.Base(d.Location),
+		Dir:       filepath.Dir(d.Location),
 		DAG:       d,
 		Status:    s,
 		Suspended: dr.suspendChecker.IsSuspended(d),

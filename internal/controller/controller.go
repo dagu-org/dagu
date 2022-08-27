@@ -167,7 +167,7 @@ func (c *controller) Start(bin string, workDir string, params string) error {
 	if params != "" {
 		args = append(args, fmt.Sprintf("--params=\"%s\"", params))
 	}
-	args = append(args, c.Path)
+	args = append(args, c.Location)
 	cmd := exec.Command(bin, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
@@ -183,7 +183,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
-		args = append(args, c.Path)
+		args = append(args, c.Location)
 		cmd := exec.Command(bin, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
@@ -216,7 +216,7 @@ func (c *controller) GetLastStatus() (*models.Status, error) {
 		return models.StatusFromJson(ret)
 	}
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		status, err := defaultDb().ReadStatusToday(c.Path)
+		status, err := defaultDb().ReadStatusToday(c.Location)
 		if err != nil {
 			var readErr error = nil
 			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
@@ -236,7 +236,7 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
-	ret, err := db.FindByRequestId(c.Path, requestId)
+	ret, err := db.FindByRequestId(c.Location, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 }
 
 func (c *controller) GetStatusHist(n int) []*models.StatusFile {
-	ret := defaultDb().ReadStatusHist(c.Path, n)
+	ret := defaultDb().ReadStatusHist(c.Location, n)
 	return ret
 }
 
@@ -267,7 +267,7 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	toUpdate, err := defaultDb().FindByRequestId(c.Path, status.RequestId)
+	toUpdate, err := defaultDb().FindByRequestId(c.Location, status.RequestId)
 	if err != nil {
 		return err
 	}
@@ -286,10 +286,10 @@ func (c *controller) Save(value string) error {
 	if err != nil {
 		return err
 	}
-	if !utils.FileExists(c.Path) {
-		return fmt.Errorf("the config file %s does not exist", c.Path)
+	if !utils.FileExists(c.Location) {
+		return fmt.Errorf("the config file %s does not exist", c.Location)
 	}
-	err = os.WriteFile(c.Path, []byte(value), 0755)
+	err = os.WriteFile(c.Location, []byte(value), 0755)
 	return err
 }
 

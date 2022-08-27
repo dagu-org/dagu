@@ -49,7 +49,7 @@ export type Condition = {
 };
 
 export type DAG = {
-  Path: string;
+  Location: string;
   Name: string;
   ScheduleExp: string[];
   Group: string;
