@@ -142,7 +142,7 @@ export function getStatusField(
 
 export function getNextSchedule(data: DAGStatus): number {
   const schedules = data.DAG.ScheduleExp;
-  if (!schedules || schedules.length == 0) {
+  if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
   const datesToRun = schedules.map((s) => cronParser.parseExpression(s).next());
