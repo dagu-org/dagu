@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import {
-  createTable,
-  useTableInstance,
+  flexRender,
+  useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   SortingState,
@@ -9,6 +9,8 @@ import {
   ColumnFiltersState,
   ExpandedState,
   getExpandedRowModel,
+  createColumnHelper,
+  RowData,
 } from '@tanstack/react-table';
 import DAGActions from './DAGActions';
 import StatusChip from '../atoms/StatusChip';
@@ -57,26 +59,27 @@ type DAGRow = DAGItem & { subRows?: DAGItem[] };
 const durFormatSec = 's[s]m[m]h[h]d[d]';
 const durFormatMin = 'm[m]h[h]d[d]';
 
-const table = createTable()
-  .setRowType<DAGRow>()
-  .setFilterMetaType<DAGRow>()
-  .setTableMetaType<{
+declare module '@tanstack/react-table' {
+  interface TableMeta<TData extends RowData> {
     group: string;
     refreshFn: () => void;
-  }>();
+  }
+}
+
+const columnHelper = createColumnHelper<DAGRow>();
 
 const defaultColumns = [
-  table.createDataColumn('Name', {
+  columnHelper.accessor('Name', {
     id: 'Expand',
-    header: ({ instance }) => {
+    header: ({ table }) => {
       return (
         <IconButton
-          onClick={instance.getToggleAllRowsExpandedHandler()}
+          onClick={table.getToggleAllRowsExpandedHandler()}
           sx={{
             color: 'white',
           }}
         >
-          {instance.getIsAllRowsExpanded() ? (
+          {table.getIsAllRowsExpanded() ? (
             <KeyboardArrowUp />
           ) : (
             <KeyboardArrowDown />
@@ -96,7 +99,7 @@ const defaultColumns = [
     },
     enableSorting: false,
   }),
-  table.createDataColumn('Name', {
+  columnHelper.accessor('Name', {
     id: 'Name',
     cell: ({ row, getValue }) => {
       const data = row.original!;
@@ -140,7 +143,7 @@ const defaultColumns = [
       return -1;
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Tags',
     header: 'Tags',
     cell: (props) => {
@@ -179,7 +182,7 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Status',
     header: 'Status',
     cell: (props) => {
@@ -199,7 +202,7 @@ const defaultColumns = [
       return valA < valB ? -1 : 1;
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Started At',
     header: 'Started At',
     cell: (props) => {
@@ -217,7 +220,7 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Finished At',
     header: 'Finished At',
     cell: (props) => {
@@ -235,7 +238,7 @@ const defaultColumns = [
       return valA.localeCompare(valB);
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Schedule',
     header: 'Schedule',
     enableSorting: true,
@@ -274,7 +277,7 @@ const defaultColumns = [
       );
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'NextRun',
     header: 'Next Run',
     enableSorting: true,
@@ -320,7 +323,7 @@ const defaultColumns = [
       );
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Config',
     header: 'Description',
     enableSorting: false,
@@ -332,7 +335,7 @@ const defaultColumns = [
       return null;
     },
   }),
-  table.createDataColumn('Type', {
+  columnHelper.accessor('Type', {
     id: 'Live',
     header: 'Live',
     cell: (props) => {
@@ -343,12 +346,12 @@ const defaultColumns = [
       return (
         <LiveSwitch
           DAG={data.DAGStatus}
-          refresh={props.instance.options.meta?.refreshFn}
+          refresh={props.table.options.meta?.refreshFn}
         />
       );
     },
   }),
-  table.createDisplayColumn({
+  columnHelper.display({
     id: 'Actions',
     header: 'Actions',
     cell: (props) => {
@@ -361,7 +364,7 @@ const defaultColumns = [
           status={data.DAGStatus.Status}
           name={data.DAGStatus.DAG.Name}
           label={false}
-          refresh={props.instance.options.meta?.refreshFn}
+          refresh={props.table.options.meta?.refreshFn}
         />
       );
     },
@@ -468,7 +471,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     return ret;
   }, []);
 
-  const instance = useTableInstance(table, {
+  const instance = useReactTable({
     data,
     columns,
     getSubRows: (row) => row.subRows,
@@ -569,7 +572,12 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                         }}
                       >
                         <Stack direction="row" alignItems="center">
-                          {header.isPlaceholder ? null : header.renderHeader()}
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
                           {{
                             asc: (
                               <ArrowUpward
@@ -593,7 +601,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                         </Stack>
                       </Box>
                     ) : (
-                      header.renderHeader()
+                      flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )
                     )}
                   </TableCell>
                 ))}
@@ -618,7 +629,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                     }}
                     width={cell.column.id == 'Expand' ? '44px' : undefined}
                   >
-                    {cell.renderCell()}
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </StyledTableRow>
