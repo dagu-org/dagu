@@ -121,13 +121,13 @@ const defaultColumns = [
     },
     filterFn: (props, _, filter) => {
       const data = props.original!;
-      let value = '';
       if (data.Type == DAGDataType.Group) {
-        value = data.Name;
-      } else {
-        value = data.DAGStatus.DAG.Name;
+        return true;
+      } else if (data.Type == DAGDataType.DAG) {
+        const value = data.DAGStatus.DAG.Name;
+        return value.toLowerCase().includes(filter.toLowerCase());
       }
-      return value.toLowerCase().includes(filter.toLowerCase());
+      return false;
     },
     sortingFn: (a, b) => {
       const ta = a.original!.Type;
