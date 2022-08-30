@@ -376,8 +376,6 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     ...defaultColumns,
   ]);
 
-  console.log({DAGs})
-
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
