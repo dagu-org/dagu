@@ -3,6 +3,7 @@ env:
   LOG_DIR: ${HOME}/logs
 logDir: ${LOG_DIR}
 params: foo bar
+tags: daily
 steps:
   - name: "check precondition"
     command: echo start
