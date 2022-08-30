@@ -245,19 +245,19 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAGStatus.DAG.ScheduleExp;
+        const schedules = data.DAGStatus.DAG.Schedule;
         if (schedules) {
           return (
             <React.Fragment>
               {schedules.map((s) => (
                 <Chip
-                  key={s}
+                  key={s.Expression}
                   sx={{
                     fontWeight: 'semibold',
                     marginRight: 1,
                   }}
                   size="small"
-                  label={s}
+                  label={s.Expression}
                 />
               ))}
             </React.Fragment>
@@ -284,7 +284,7 @@ const defaultColumns = [
     cell: (props) => {
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
-        const schedules = data.DAGStatus.DAG.ScheduleExp;
+        const schedules = data.DAGStatus.DAG.Schedule;
         if (schedules && !data.DAGStatus.Suspended) {
           return (
             <React.Fragment>
@@ -375,6 +375,8 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
+
+  console.log({DAGs})
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []

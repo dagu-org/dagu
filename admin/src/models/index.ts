@@ -51,7 +51,7 @@ export type Condition = {
 export type DAG = {
   Location: string;
   Name: string;
-  ScheduleExp: string[];
+  Schedule: Schedule[];
   Group: string;
   Tags: string[];
   Description: string;
@@ -66,6 +66,10 @@ export type DAG = {
   DefaultParams: string;
   Delay: number;
   MaxCleanUpTime: number;
+};
+
+export type Schedule = {
+  Expression: string;
 };
 
 export type HandlerOn = {
@@ -141,11 +145,13 @@ export function getStatusField(
 }
 
 export function getNextSchedule(data: DAGStatus): number {
-  const schedules = data.DAG.ScheduleExp;
+  const schedules = data.DAG.Schedule;
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
-  const datesToRun = schedules.map((s) => cronParser.parseExpression(s).next());
+  const datesToRun = schedules.map((s) =>
+    cronParser.parseExpression(s.Expression).next()
+  );
   const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
   return sorted[0].getTime() / 1000;
 }

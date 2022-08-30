@@ -20,22 +20,22 @@ function DAGAttributes({ dag: config }: Props) {
       <LabeledItem label="Name">{config.Name}</LabeledItem>
       <LabeledItem label="Schedule">
         <Stack direction={'row'}>
-          {config.ScheduleExp?.map((s) => (
+          {config.Schedule?.map((s) => (
             <Chip
-              key={s}
+              key={s.Expression}
               sx={{
                 fontWeight: 'semibold',
                 marginRight: 1,
               }}
               size="small"
-              label={s}
+              label={s.Expression}
             />
           ))}
         </Stack>
       </LabeledItem>
       <LabeledItem label="Description">{config.Description}</LabeledItem>
       <LabeledItem label="Max Active Runs">{config.MaxActiveRuns}</LabeledItem>
-      <LabeledItem label="Params">{config.Params?.join(" ")}</LabeledItem>
+      <LabeledItem label="Params">{config.Params?.join(' ')}</LabeledItem>
       <Stack direction={'column'}>
         <React.Fragment>
           <LabeledItem label="Preconditions">{null}</LabeledItem>

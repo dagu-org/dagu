@@ -64,9 +64,9 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 			continue
 		}
 		for _, sc := range dag.Schedule {
-			next := sc.Next(now)
+			next := sc.Parsed.Next(now)
 			entries = append(entries, &Entry{
-				Next: sc.Next(now),
+				Next: sc.Parsed.Next(now),
 				Job: &job{
 					DAG:       dag,
 					Config:    er.Admin,
