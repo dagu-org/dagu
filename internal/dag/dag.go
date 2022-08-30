@@ -22,8 +22,7 @@ type DAG struct {
 	Location          string
 	Group             string
 	Name              string
-	Schedule          []cron.Schedule
-	ScheduleExp       []string
+	Schedule          []*Schedule
 	Description       string
 	Env               []string
 	LogDir            string
@@ -41,6 +40,11 @@ type DAG struct {
 	DefaultParams     string
 	MaxCleanUpTime    time.Duration
 	Tags              []string
+}
+
+type Schedule struct {
+	Expression string
+	Parsed     cron.Schedule
 }
 
 type HandlerOn struct {
@@ -232,24 +236,23 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 }
 
 func (b *builder) buildSchedule(def *configDefinition, d *DAG) (err error) {
+	values := []string{}
 	switch (def.Schedule).(type) {
 	case string:
-		d.ScheduleExp = []string{def.Schedule.(string)}
+		values = append(values, def.Schedule.(string))
 	case []interface{}:
-		items := []string{}
 		for _, s := range def.Schedule.([]interface{}) {
-			if a, ok := s.(string); ok {
-				items = append(items, a)
+			if ss, ok := s.(string); ok {
+				values = append(values, ss)
 			} else {
 				return fmt.Errorf("schedule must be a string or an array of strings")
 			}
 		}
-		d.ScheduleExp = items
 	case nil:
 	default:
 		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
 	}
-	d.Schedule, err = parseSchedule(d.ScheduleExp)
+	d.Schedule, err = parseSchedule(values)
 	return
 }
 
@@ -554,14 +557,17 @@ func parseTags(value string) []string {
 	return ret
 }
 
-func parseSchedule(values []string) ([]cron.Schedule, error) {
-	ret := []cron.Schedule{}
+func parseSchedule(values []string) ([]*Schedule, error) {
+	ret := []*Schedule{}
 	for _, v := range values {
-		sc, err := cronParser.Parse(v)
+		paresed, err := cronParser.Parse(v)
 		if err != nil {
 			return nil, fmt.Errorf("invalid schedule: %s", err)
 		}
-		ret = append(ret, sc)
+		ret = append(ret, &Schedule{
+			Expression: v,
+			Parsed:     paresed,
+		})
 	}
 	return ret, nil
 }
