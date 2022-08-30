@@ -170,7 +170,7 @@ const defaultColumns = [
     filterFn: (props, _, filter) => {
       const data = props.original!;
       if (data.Type != DAGDataType.DAG) {
-        return false;
+        return true;
       }
       const tags = data.DAGStatus.DAG.Tags;
       const ret = tags?.some((tag) => tag == filter) || false;
