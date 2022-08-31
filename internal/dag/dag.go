@@ -23,6 +23,7 @@ type DAG struct {
 	Group             string
 	Name              string
 	Schedule          []*Schedule
+	StopSchedule      []*Schedule
 	Description       string
 	Env               []string
 	LogDir            string
@@ -235,25 +236,53 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	return d, nil
 }
 
-func (b *builder) buildSchedule(def *configDefinition, d *DAG) (err error) {
-	values := []string{}
+func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
+	starts := []string{}
+	stops := []string{}
+
 	switch (def.Schedule).(type) {
 	case string:
-		values = append(values, def.Schedule.(string))
+		starts = append(starts, def.Schedule.(string))
 	case []interface{}:
 		for _, s := range def.Schedule.([]interface{}) {
 			if ss, ok := s.(string); ok {
-				values = append(values, ss)
+				starts = append(starts, ss)
 			} else {
 				return fmt.Errorf("schedule must be a string or an array of strings")
+			}
+		}
+	case map[interface{}]interface{}:
+		for k, v := range def.Schedule.(map[interface{}]interface{}) {
+			if _, ok := k.(string); !ok {
+				return fmt.Errorf("schedule key must be a string")
+			}
+			key := k.(string)
+			switch key {
+			case "start", "stop":
+				if _, ok := v.(string); !ok {
+					return fmt.Errorf("schedule value must be a string")
+				}
+				switch key {
+				case "start":
+					starts = append(starts, v.(string))
+				case "stop":
+					stops = append(stops, v.(string))
+				}
+			default:
+				return fmt.Errorf("schedule key must be start or stop")
 			}
 		}
 	case nil:
 	default:
 		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
 	}
-	d.Schedule, err = parseSchedule(values)
-	return
+	var err error
+	d.Schedule, err = parseSchedule(starts)
+	if err != nil {
+		return err
+	}
+	d.StopSchedule, err = parseSchedule(stops)
+	return err
 }
 
 func (b *builder) buildEnvVariables(def *configDefinition, d *DAG) (err error) {
