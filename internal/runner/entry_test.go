@@ -16,14 +16,14 @@ import (
 func TestReadEntries(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	r := NewEntryReader(&admin.Config{
+	r := newEntryReader(&admin.Config{
 		DAGs: path.Join(testdataDir, "invalid_directory"),
 	})
 	entries, err := r.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	r = NewEntryReader(&admin.Config{
+	r = newEntryReader(&admin.Config{
 		DAGs: testdataDir,
 	})
 

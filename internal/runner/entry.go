@@ -27,7 +27,7 @@ type EntryReader interface {
 	Read(now time.Time) ([]*Entry, error)
 }
 
-func NewEntryReader(cfg *admin.Config) *entryReader {
+func newEntryReader(cfg *admin.Config) *entryReader {
 	er := &entryReader{
 		Admin: cfg,
 		suspendChecker: suspend.NewSuspendChecker(
