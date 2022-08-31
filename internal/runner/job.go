@@ -12,24 +12,26 @@ import (
 )
 
 type Job interface {
-	Run() error
+	Start() error
+	Stop() error
 	String() string
 }
 
 type job struct {
-	DAG       *dag.DAG
-	Config    *admin.Config
-	StartTime time.Time
+	DAG    *dag.DAG
+	Config *admin.Config
+	Next   time.Time
 }
 
 var _ Job = (*job)(nil)
 
 var (
-	ErrJobRunning  = errors.New("job already running")
-	ErrJobFinished = errors.New("job already finished")
+	ErrJobRunning      = errors.New("job already running")
+	ErrJobIsNotRunning = errors.New("job is not running")
+	ErrJobFinished     = errors.New("job already finished")
 )
 
-func (j *job) Run() error {
+func (j *job) Start() error {
 	c := controller.New(j.DAG)
 	s, err := c.GetLastStatus()
 	if err != nil {
@@ -45,13 +47,25 @@ func (j *job) Run() error {
 		t, err := utils.ParseTime(s.StartedAt)
 		if err == nil {
 			t = t.Truncate(time.Second * 60)
-			if t.After(j.StartTime) || j.StartTime.Equal(t) {
+			if t.After(j.Next) || j.Next.Equal(t) {
 				return ErrJobFinished
 			}
 		}
 		// should not be here
 	}
 	return c.Start(j.Config.Command, j.Config.WorkDir, "")
+}
+
+func (j *job) Stop() error {
+	c := controller.New(j.DAG)
+	s, err := c.GetLastStatus()
+	if err != nil {
+		return err
+	}
+	if s.Status != scheduler.SchedulerStatus_Running {
+		return ErrJobIsNotRunning
+	}
+	return c.Stop()
 }
 
 func (j *job) String() string {

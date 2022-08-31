@@ -29,22 +29,28 @@ func TestReadEntries(t *testing.T) {
 
 	entries, err = r.Read(now)
 	require.NoError(t, err)
-	require.Len(t, entries, 1)
-
-	j := entries[0].Job.(*job)
-	require.Equal(t, "scheduled_job", j.DAG.Name)
+	require.GreaterOrEqual(t, len(entries), 1)
 
 	next := entries[0].Next
 	require.Equal(t, now.Add(time.Second), next)
 
 	// suspend
+	var j *job
+	for _, e := range entries {
+		jj := e.Job.(*job)
+		if jj.DAG.Name == "scheduled_job" {
+			j = jj
+			break
+		}
+	}
 	sc := suspend.NewSuspendChecker(
 		storage.NewStorage(settings.MustGet(
 			settings.SETTING__SUSPEND_FLAGS_DIR,
 		)))
 	sc.ToggleSuspend(j.DAG, true)
 
-	entries, err = r.Read(now)
+	// check if the job is suspended
+	lives, err := r.Read(now)
 	require.NoError(t, err)
-	require.Len(t, entries, 0)
+	require.Equal(t, len(entries)-1, len(lives))
 }

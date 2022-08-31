@@ -18,9 +18,32 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+type EntryType int
+
+const (
+	EntryTypeStart EntryType = iota
+	EntryTypeStop
+)
+
 type Entry struct {
-	Next time.Time
-	Job  Job
+	Next      time.Time
+	Job       Job
+	EntryType EntryType
+}
+
+func (e *Entry) Invoke() error {
+	if e.Job == nil {
+		return nil
+	}
+	switch e.EntryType {
+	case EntryTypeStart:
+		log.Printf("[%s] start %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		return e.Job.Start()
+	case EntryTypeStop:
+		log.Printf("[%s] stop %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		return e.Job.Stop()
+	}
+	return nil
 }
 
 type EntryReader interface {
@@ -59,22 +82,29 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
+	f := func(d *dag.DAG, s []*dag.Schedule, e EntryType) {
+		for _, ss := range s {
+			next := ss.Parsed.Next(now)
+			entries = append(entries, &Entry{
+				Next: ss.Parsed.Next(now),
+				Job: &job{
+					DAG:    d,
+					Config: er.Admin,
+					Next:   next,
+				},
+				EntryType: e,
+			})
+		}
+	}
+
 	for _, dag := range er.dags {
 		if er.suspendChecker.IsSuspended(dag) {
 			continue
 		}
-		for _, sc := range dag.Schedule {
-			next := sc.Parsed.Next(now)
-			entries = append(entries, &Entry{
-				Next: sc.Parsed.Next(now),
-				Job: &job{
-					DAG:       dag,
-					Config:    er.Admin,
-					StartTime: next,
-				},
-			})
-		}
+		f(dag, dag.Schedule, EntryTypeStart)
+		f(dag, dag.StopSchedule, EntryTypeStop)
 	}
+
 	return entries, nil
 }
 

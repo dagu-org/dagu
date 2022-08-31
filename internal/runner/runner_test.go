@@ -78,9 +78,10 @@ func (er *mockEntryReader) Read(now time.Time) ([]*Entry, error) {
 }
 
 type mockJob struct {
-	Name     string
-	RunCount int
-	Panic    error
+	Name      string
+	RunCount  int
+	StopCount int
+	Panic     error
 }
 
 var _ Job = (*mockJob)(nil)
@@ -89,10 +90,15 @@ func (j *mockJob) String() string {
 	return j.Name
 }
 
-func (j *mockJob) Run() error {
+func (j *mockJob) Start() error {
 	j.RunCount++
 	if j.Panic != nil {
 		panic(j.Panic)
 	}
+	return nil
+}
+
+func (j *mockJob) Stop() error {
+	j.StopCount++
 	return nil
 }
