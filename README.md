@@ -69,6 +69,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
 - [Scheduler](#scheduler)
   - [Execution Schedule](#execution-schedule)
+  - [Stop Schedule](#stop-schedule)
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
 - [REST API Interface](#rest-api-interface)
@@ -506,6 +507,19 @@ Or you can set multiple schedules:
 schedule:
   - "30 7 * * *" # Run at 7:30
   - "0 20 * * *" # Also run at 20:00
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+### Stop Schedule
+
+If you want to start and stop a long-running process on a fixed schedule, you can define `start` and `stop` times as follows. At the stop time, each step's process receives a stop signal.
+
+```yaml
+schedule:
+  start: "0 8 * * *" # starts at 8:00
+  stop: "0 13 * * *" # stops at 13:00
 steps:
   - name: scheduled job
     command: job.sh
