@@ -263,22 +263,26 @@ tags: %s
 }
 
 func TestSchedule(t *testing.T) {
-	for _, test := range []struct {
+	for _, tc := range []struct {
+		Name string
 		Def  string
 		Err  bool
 		Want int
 	}{
 		{
+			Name: "basic schedule",
 			Def:  "schedule: \"*/5 * * * *\"",
 			Want: 1,
 		},
 		{
+			Name: "multiple schedule",
 			Def: `schedule:
   - "*/5 * * * *"
   - "* * * * *"`,
 			Want: 2,
 		},
 		{
+			Name: "parsing error",
 			Def: `schedule:
   - true 
   - "* * * * *"`,
@@ -286,7 +290,7 @@ func TestSchedule(t *testing.T) {
 		},
 	} {
 		l := &Loader{}
-		m, err := l.unmarshalData([]byte(test.Def))
+		m, err := l.unmarshalData([]byte(tc.Def))
 		require.NoError(t, err)
 
 		def, err := l.decode(m)
@@ -295,12 +299,82 @@ func TestSchedule(t *testing.T) {
 		b := &builder{}
 		d, err := b.buildFromDefinition(def, nil)
 
-		if test.Err {
+		if tc.Err {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, test.Want, len(d.Schedule))
+			require.Equal(t, tc.Want, len(d.Schedule))
 		}
+	}
+}
+
+func TestScheduleStop(t *testing.T) {
+	for _, tc := range []struct {
+		Name      string
+		Def       string
+		Err       bool
+		WantStart int
+		WantStop  int
+	}{
+		{
+			Name: "start and stop are parsed",
+			Def: `schedule:
+  start: "0 1 * * *"
+  stop: "0 2 * * *"
+`,
+			WantStart: 1,
+			WantStop:  1,
+		},
+		{
+			Name: "start only",
+			Def: `schedule:
+  start: "0 1 * * *"
+`,
+			WantStart: 1,
+			WantStop:  0,
+		},
+		{
+			Name: "stop only",
+			Def: `schedule:
+  stop: "0 1 * * *"
+`,
+			WantStart: 0,
+			WantStop:  1,
+		},
+		{
+			Name: "invalid expression",
+			Def: `schedule:
+  stop: "* * * * * * *"
+`,
+			Err: true,
+		},
+		{
+			Name: "invalid key",
+			Def: `schedule:
+  invalid: "* * * * * * *"
+`,
+			Err: true,
+		},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			l := &Loader{}
+			m, err := l.unmarshalData([]byte(tc.Def))
+			require.NoError(t, err)
+
+			def, err := l.decode(m)
+			require.NoError(t, err)
+
+			b := &builder{}
+			d, err := b.buildFromDefinition(def, nil)
+
+			if tc.Err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.WantStart, len(d.Schedule))
+			require.Equal(t, tc.WantStop, len(d.StopSchedule))
+		})
 	}
 }
 

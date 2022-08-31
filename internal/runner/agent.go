@@ -51,7 +51,7 @@ func (a *Agent) start() error {
 
 	log.Printf("starting dagu scheduler")
 	a.stop = make(chan struct{})
-	runner := New(NewEntryReader(a.Config))
+	runner := New(newEntryReader(a.Config))
 	a.registerRunnerShutdown(runner)
 
 	go runner.Start()
