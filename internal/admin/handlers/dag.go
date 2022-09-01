@@ -302,6 +302,36 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 	}
 }
 
+type DeleteDAGHandlerConfig struct {
+	DAGsDir string
+}
+
+func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		dn, _, err := getPathParameter(r)
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		dr := controller.NewDAGReader()
+		dag, err := dr.ReadDAG(file, false)
+		c := controller.New(dag.DAG)
+
+		err = c.Delete()
+
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}
+}
+
 func updateStatus(c *controller.Controller, reqId, step string, to scheduler.NodeStatus) error {
 	status, err := c.GetStatusByRequestId(reqId)
 	if err != nil {
