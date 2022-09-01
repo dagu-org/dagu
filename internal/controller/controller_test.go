@@ -281,13 +281,47 @@ steps:
 	defer f.Close()
 
 	err = c.Save(dat)
-	require.NoError(t, err) // no config file
+	require.NoError(t, err)
 
 	// check file
 	saved, _ := os.Open(d.Location)
 	defer saved.Close()
 	b, _ := io.ReadAll(saved)
 	require.Equal(t, dat, string(b))
+}
+
+func TestRemove(t *testing.T) {
+	tmpDir := utils.MustTempDir("controller-test-remove")
+	defer os.RemoveAll(tmpDir)
+	d := &dag.DAG{
+		Name:     "test",
+		Location: path.Join(tmpDir, "test.yaml"),
+	}
+
+	c := controller.New(d)
+
+	dat := `name: test DAG
+steps:
+  - name: "1"
+    command: "true"
+`
+	// create file
+	f, _ := utils.CreateFile(d.Location)
+	defer f.Close()
+
+	err := c.Save(dat)
+	require.NoError(t, err)
+
+	// check file
+	saved, _ := os.Open(d.Location)
+	defer saved.Close()
+	b, _ := io.ReadAll(saved)
+	require.Equal(t, dat, string(b))
+
+	// remove file
+	err = c.Delete()
+	require.NoError(t, err)
+	require.NoFileExists(t, d.Location)
 }
 
 func TestNewConfig(t *testing.T) {

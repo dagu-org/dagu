@@ -32,6 +32,7 @@ type Controller interface {
 	GetStatusHist(n int) []*models.StatusFile
 	UpdateStatus(*models.Status) error
 	Save(value string) error
+	Delete() error
 }
 
 // GetDAGs returns all DAGs in the config file.
@@ -291,6 +292,17 @@ func (c *controller) Save(value string) error {
 	}
 	err = os.WriteFile(c.Location, []byte(value), 0755)
 	return err
+}
+
+func (c *controller) Delete() error {
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
+	err := db.RemoveAll(c.Location)
+	if err != nil {
+		return err
+	}
+	return os.Remove(c.Location)
 }
 
 func assertPath(configPath string) error {
