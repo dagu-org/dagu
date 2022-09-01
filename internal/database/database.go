@@ -139,8 +139,8 @@ func (db *Database) FindByRequestId(configPath string, requestId string) (*model
 }
 
 // RemoveAll removes all files in a directory.
-func (db *Database) RemoveAll(configPath string) {
-	db.RemoveOld(configPath, 0)
+func (db *Database) RemoveAll(configPath string) error {
+	return db.RemoveOld(configPath, 0)
 }
 
 // RemoveOld removes old files.

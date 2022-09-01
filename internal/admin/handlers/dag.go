@@ -302,7 +302,37 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 	}
 }
 
-func updateStatus(c controller.Controller, reqId, step string, to scheduler.NodeStatus) error {
+type DeleteDAGHandlerConfig struct {
+	DAGsDir string
+}
+
+func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		dn, _, err := getPathParameter(r)
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		dr := controller.NewDAGReader()
+		dag, err := dr.ReadDAG(file, false)
+		c := controller.New(dag.DAG)
+
+		err = c.Delete()
+
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}
+}
+
+func updateStatus(c *controller.Controller, reqId, step string, to scheduler.NodeStatus) error {
 	status, err := c.GetStatusByRequestId(reqId)
 	if err != nil {
 		return err
@@ -322,7 +352,7 @@ func updateStatus(c controller.Controller, reqId, step string, to scheduler.Node
 	return c.UpdateStatus(status)
 }
 
-func readSchedulerLog(c controller.Controller, file string) (*logFile, error) {
+func readSchedulerLog(c *controller.Controller, file string) (*logFile, error) {
 	f := ""
 	if file == "" {
 		s, err := c.GetLastStatus()
@@ -347,7 +377,7 @@ func readSchedulerLog(c controller.Controller, file string) (*logFile, error) {
 	}, nil
 }
 
-func readStepLog(c controller.Controller, file, stepName, enc string) (*logFile, error) {
+func readStepLog(c *controller.Controller, file, stepName, enc string) (*logFile, error) {
 	var steps []*models.Node = nil
 	var stepm = map[string]*models.Node{
 		constants.OnSuccess: nil,

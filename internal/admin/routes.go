@@ -45,6 +45,11 @@ func defaultRoutes(cfg *Config) []*route {
 				WkDir:   cfg.WorkDir,
 			},
 		)},
+		{http.MethodDelete, `^/dags/([^/]+)$`, handlers.HandleDeleteDAG(
+			&handlers.DeleteDAGHandlerConfig{
+				DAGsDir: cfg.DAGs,
+			},
+		)},
 		{http.MethodGet, `^/search/?.*$`, handlers.HandleGetSearch(cfg.DAGs, tc)},
 		{http.MethodGet, `^/assets/js/.*$`, handlers.HandleGetAssets("/web")},
 		{http.MethodGet, `^/assets/css/.*$`, handlers.HandleGetAssets("/web")},

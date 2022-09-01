@@ -20,20 +20,6 @@ import (
 	"github.com/yohamta/grep"
 )
 
-// Controller is the interface for working with DAGs.
-type Controller interface {
-	Stop() error
-	Start(bin string, workDir string, params string) error
-	StartAsync(bin string, workDir string, params string)
-	Retry(bin string, workDir string, reqId string) error
-	GetStatus() (*models.Status, error)
-	GetLastStatus() (*models.Status, error)
-	GetStatusByRequestId(requestId string) (*models.Status, error)
-	GetStatusHist(n int) []*models.StatusFile
-	UpdateStatus(*models.Status) error
-	Save(value string) error
-}
-
 // GetDAGs returns all DAGs in the config file.
 func GetDAGs(dir string) (dags []*DAGStatus, errs []string, err error) {
 	dags = []*DAGStatus{}
@@ -137,32 +123,30 @@ func RenameConfig(oldPath, newPath string) error {
 	return defaultDb().MoveData(oldPath, newPath)
 }
 
-var _ Controller = (*controller)(nil)
-
-type controller struct {
+type Controller struct {
 	*dag.DAG
 }
 
-func New(d *dag.DAG) Controller {
-	return &controller{
+func New(d *dag.DAG) *Controller {
+	return &Controller{
 		DAG: d,
 	}
 }
 
-func (c *controller) Stop() error {
+func (c *Controller) Stop() error {
 	client := sock.Client{Addr: c.SockAddr()}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (c *controller) StartAsync(bin string, workDir string, params string) {
+func (c *Controller) StartAsync(bin string, workDir string, params string) {
 	go func() {
 		err := c.Start(bin, workDir, params)
 		utils.LogErr("starting a DAG", err)
 	}()
 }
 
-func (c *controller) Start(bin string, workDir string, params string) error {
+func (c *Controller) Start(bin string, workDir string, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, fmt.Sprintf("--params=\"%s\"", params))
@@ -179,7 +163,7 @@ func (c *controller) Start(bin string, workDir string, params string) error {
 	return cmd.Wait()
 }
 
-func (c *controller) Retry(bin string, workDir string, reqId string) (err error) {
+func (c *Controller) Retry(bin string, workDir string, reqId string) (err error) {
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
@@ -196,7 +180,7 @@ func (c *controller) Retry(bin string, workDir string, reqId string) (err error)
 	return
 }
 
-func (c *controller) GetStatus() (*models.Status, error) {
+func (c *Controller) GetStatus() (*models.Status, error) {
 	client := sock.Client{Addr: c.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -209,7 +193,7 @@ func (c *controller) GetStatus() (*models.Status, error) {
 	return models.StatusFromJson(ret)
 }
 
-func (c *controller) GetLastStatus() (*models.Status, error) {
+func (c *Controller) GetLastStatus() (*models.Status, error) {
 	client := sock.Client{Addr: c.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err == nil {
@@ -232,7 +216,7 @@ func (c *controller) GetLastStatus() (*models.Status, error) {
 	return nil, err
 }
 
-func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
+func (c *Controller) GetStatusByRequestId(requestId string) (*models.Status, error) {
 	db := &database.Database{
 		Config: database.DefaultConfig(),
 	}
@@ -248,12 +232,12 @@ func (c *controller) GetStatusByRequestId(requestId string) (*models.Status, err
 	return ret.Status, err
 }
 
-func (c *controller) GetStatusHist(n int) []*models.StatusFile {
+func (c *Controller) GetStatusHist(n int) []*models.StatusFile {
 	ret := defaultDb().ReadStatusHist(c.Location, n)
 	return ret
 }
 
-func (c *controller) UpdateStatus(status *models.Status) error {
+func (c *Controller) UpdateStatus(status *models.Status) error {
 	client := sock.Client{Addr: c.SockAddr()}
 	res, err := client.Request("GET", "/status")
 	if err != nil {
@@ -279,7 +263,7 @@ func (c *controller) UpdateStatus(status *models.Status) error {
 	return w.Write(status)
 }
 
-func (c *controller) Save(value string) error {
+func (c *Controller) Save(value string) error {
 	// validate
 	cl := dag.Loader{}
 	_, err := cl.LoadData([]byte(value))
@@ -291,6 +275,17 @@ func (c *controller) Save(value string) error {
 	}
 	err = os.WriteFile(c.Location, []byte(value), 0755)
 	return err
+}
+
+func (c *Controller) Delete() error {
+	db := &database.Database{
+		Config: database.DefaultConfig(),
+	}
+	err := db.RemoveAll(c.Location)
+	if err != nil {
+		return err
+	}
+	return os.Remove(c.Location)
 }
 
 func assertPath(configPath string) error {
