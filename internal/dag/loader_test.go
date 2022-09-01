@@ -12,13 +12,15 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	l := &Loader{}
-	_, err := l.Load(path.Join(testdataDir, "load.yaml"), "")
+	f := path.Join(testdataDir, "load.yaml")
+	d, err := l.Load(f, "")
 	require.NoError(t, err)
+	require.Equal(t, f, d.Location)
 
 	// without .yaml
-	s := path.Join(testdataDir, "load")
-	_, err = l.Load(s, "")
+	d, err = l.Load(path.Join(testdataDir, "load"), "")
 	require.NoError(t, err)
+	require.Equal(t, f, d.Location)
 }
 
 func TestLoadBaseConfig(t *testing.T) {
