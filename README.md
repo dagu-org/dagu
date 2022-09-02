@@ -59,7 +59,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Command Substitution](#command-substitution)
   - [Conditional Logic](#conditional-logic)
   - [Output](#output)
-  - [Redirection](#redirection)
+  - [Stdout and Stderr Redirection](#stdout-and-stderr-redirection)
   - [Lifecycle Hooks](#lifecycle-hooks)
   - [Repeating Task](#repeating-task)
   - [Calling Sub DAGs](#calling-sub-dags)
@@ -313,7 +313,7 @@ steps:
     output: FOO # will contain "foo"
 ```
 
-### Redirection
+### Stdout and Stderr Redirection
 
 `stdout` field can be used to write standard output to a file.
 
@@ -322,6 +322,15 @@ steps:
   - name: create a file
     command: "echo hello"
     stdout: "/tmp/hello" # the content will be "hello\n"
+```
+
+`stderr` field allows to redirect stderr to other file without writing to the normal log file.
+
+```yaml
+steps:
+  - name: output error file
+    command: "echo error message >&2"
+    stderr: "/tmp/error.txt"
 ```
 
 ### Lifecycle Hooks
