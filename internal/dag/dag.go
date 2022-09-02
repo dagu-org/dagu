@@ -256,17 +256,32 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 			if _, ok := k.(string); !ok {
 				return fmt.Errorf("schedule key must be a string")
 			}
-			key := k.(string)
-			switch key {
+			kk := k.(string)
+			switch kk {
 			case "start", "stop":
-				if _, ok := v.(string); !ok {
-					return fmt.Errorf("schedule value must be a string")
-				}
-				switch key {
-				case "start":
-					starts = append(starts, v.(string))
-				case "stop":
-					stops = append(stops, v.(string))
+				switch (v).(type) {
+				case string:
+					switch kk {
+					case "start":
+						starts = append(starts, v.(string))
+					case "stop":
+						stops = append(stops, v.(string))
+					}
+				case []interface{}:
+					for _, vv := range v.([]interface{}) {
+						if vvv, ok := vv.(string); ok {
+							switch kk {
+							case "start":
+								starts = append(starts, vvv)
+							case "stop":
+								stops = append(stops, vvv)
+							}
+						} else {
+							return fmt.Errorf("schedule must be a string or an array of strings")
+						}
+					}
+				default:
+					return fmt.Errorf("schedule must be a string or an array of strings")
 				}
 			default:
 				return fmt.Errorf("schedule key must be start or stop")
