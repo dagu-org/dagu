@@ -525,6 +525,21 @@ steps:
     command: job.sh
 ```
 
+You can also set multiple start/stop schedules. In the following example, the process will run at 0:00-12:00 and 5:00-17:00.
+
+```yaml
+schedule:
+  start:
+    - "0 0 * * *"
+    - "12 0 * * *"
+  stop:
+    - "5 0 * * *"
+    - "17 0 * * *"
+steps:
+  - name: some long-process
+    command: main.sh
+```
+
 ### Run Scheduler as a daemon
 
 The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
