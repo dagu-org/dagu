@@ -62,6 +62,8 @@ type Node struct {
 	logWriter    *bufio.Writer
 	stdoutFile   *os.File
 	stdoutWriter *bufio.Writer
+	stderrFile   *os.File
+	stderrWriter *bufio.Writer
 	outputWriter *os.File
 	outputReader *os.File
 	scriptFile   *os.File
@@ -121,6 +123,11 @@ func (n *Node) Execute() error {
 	}
 
 	cmd.SetStdout(stdout)
+	if n.stderrWriter != nil {
+		cmd.SetStderr(n.stderrWriter)
+	} else {
+		cmd.SetStderr(stdout)
+	}
 
 	n.Error = cmd.Run()
 
@@ -218,6 +225,7 @@ func (n *Node) setup(logDir string, requestId string) error {
 	setup := []func() error{
 		n.setupLog,
 		n.setupStdout,
+		n.setupStderr,
 		n.setupScript,
 	}
 	for _, fn := range setup {
@@ -257,6 +265,23 @@ func (n *Node) setupStdout() error {
 			return err
 		}
 		n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
+	}
+	return nil
+}
+
+func (n *Node) setupStderr() error {
+	if n.Stderr != "" {
+		f := n.Stderr
+		if !filepath.IsAbs(f) {
+			f = filepath.Join(n.Dir, f)
+		}
+		var err error
+		n.stderrFile, err = utils.OpenOrCreateFile(f)
+		if err != nil {
+			n.Error = err
+			return err
+		}
+		n.stderrWriter = bufio.NewWriter(n.stderrFile)
 	}
 	return nil
 }

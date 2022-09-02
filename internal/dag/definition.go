@@ -42,6 +42,7 @@ type stepDef struct {
 	Command       string
 	Script        string
 	Stdout        string
+	Stderr        string
 	Output        string
 	Depends       []string
 	ContinueOn    *continueOnDef
