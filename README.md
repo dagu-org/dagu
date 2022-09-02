@@ -525,7 +525,7 @@ steps:
     command: job.sh
 ```
 
-You can also set multiple start/stop schedules. In the following example, the process will run at 0:00-12:00 and 5:00-17:00.
+You can also set multiple start/stop schedules. In the following example, the process will run at 0:00-5:00 and 12:00-17:00.
 
 ```yaml
 schedule:
