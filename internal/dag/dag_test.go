@@ -289,22 +289,24 @@ func TestSchedule(t *testing.T) {
 			Err: true,
 		},
 	} {
-		l := &Loader{}
-		m, err := l.unmarshalData([]byte(tc.Def))
-		require.NoError(t, err)
-
-		def, err := l.decode(m)
-		require.NoError(t, err)
-
-		b := &builder{}
-		d, err := b.buildFromDefinition(def, nil)
-
-		if tc.Err {
-			require.Error(t, err)
-		} else {
+		t.Run(tc.Name, func(t *testing.T) {
+			l := &Loader{}
+			m, err := l.unmarshalData([]byte(tc.Def))
 			require.NoError(t, err)
-			require.Equal(t, tc.Want, len(d.Schedule))
-		}
+
+			def, err := l.decode(m)
+			require.NoError(t, err)
+
+			b := &builder{}
+			d, err := b.buildFromDefinition(def, nil)
+
+			if tc.Err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.Want, len(d.Schedule))
+			}
+		})
 	}
 }
 
@@ -340,6 +342,19 @@ func TestScheduleStop(t *testing.T) {
 `,
 			WantStart: 0,
 			WantStop:  1,
+		},
+		{
+			Name: "multiple schedule",
+			Def: `schedule:
+  start: 
+    - "0 1 * * *"
+    - "0 18 * * *"
+  stop:
+    - "0 2 * * *"
+    - "0 20 * * *"
+`,
+			WantStart: 2,
+			WantStop:  2,
 		},
 		{
 			Name: "invalid expression",
