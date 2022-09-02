@@ -76,7 +76,23 @@ func TestSignalSpecified(t *testing.T) {
 	require.Equal(t, n.Status, NodeStatus_Cancel)
 }
 
-func TestLogAndStdout(t *testing.T) {
+func TestLog(t *testing.T) {
+	n := &Node{
+		Step: &dag.Step{
+			Command:         "echo",
+			Args:            []string{"done"},
+			Dir:             os.Getenv("HOME"),
+			OutputVariables: &sync.Map{},
+		},
+	}
+
+	runTestNode(t, n)
+
+	dat, _ := os.ReadFile(n.logFile.Name())
+	require.Equal(t, "done\n", string(dat))
+}
+
+func TestStdout(t *testing.T) {
 	n := &Node{
 		Step: &dag.Step{
 			Command:         "echo",
@@ -92,9 +108,32 @@ func TestLogAndStdout(t *testing.T) {
 	f := path.Join(os.Getenv("HOME"), n.Step.Stdout)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "done\n", string(dat))
+}
 
-	dat, _ = os.ReadFile(n.logFile.Name())
-	require.Equal(t, "done\n", string(dat))
+func TestStderr(t *testing.T) {
+	n := &Node{
+		Step: &dag.Step{
+			Command: "sh",
+			Script: `
+echo Stdout message >&1
+echo Stderr message >&2
+			`,
+			Dir:             os.Getenv("HOME"),
+			Stdout:          "stdout.log",
+			Stderr:          "stderr.log",
+			OutputVariables: &sync.Map{},
+		},
+	}
+
+	runTestNode(t, n)
+
+	f := path.Join(os.Getenv("HOME"), n.Step.Stderr)
+	dat, _ := os.ReadFile(f)
+	require.Equal(t, "Stderr message\n", string(dat))
+
+	f = path.Join(os.Getenv("HOME"), n.Step.Stdout)
+	dat, _ = os.ReadFile(f)
+	require.Equal(t, "Stdout message\n", string(dat))
 }
 
 func TestNode(t *testing.T) {
