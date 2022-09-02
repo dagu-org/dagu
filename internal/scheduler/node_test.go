@@ -119,8 +119,8 @@ echo Stdout message >&1
 echo Stderr message >&2
 			`,
 			Dir:             os.Getenv("HOME"),
-			Stdout:          "stdout.log",
-			Stderr:          "stderr.log",
+			Stdout:          "test-stderr-stdout.log",
+			Stderr:          "test-stderr-stderr.log",
 			OutputVariables: &sync.Map{},
 		},
 	}
