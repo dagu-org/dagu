@@ -19,6 +19,7 @@ type Step struct {
 	Command         string
 	Script          string
 	Stdout          string
+	Stderr          string
 	Output          string
 	Args            []string
 	Depends         []string
