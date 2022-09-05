@@ -164,6 +164,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		value := r.FormValue("value")
 		reqId := r.FormValue("request-id")
 		step := r.FormValue("step")
+		params := r.FormValue("params")
 
 		dn, _, err := getPathParameter(r)
 		if err != nil {
@@ -187,7 +188,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				w.Write([]byte("DAG is already running."))
 				return
 			}
-			c.StartAsync(hc.Bin, hc.WkDir, "")
+			c.StartAsync(hc.Bin, hc.WkDir, params)
 
 		case "suspend":
 			sc := suspend.NewSuspendChecker(

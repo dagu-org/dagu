@@ -32,10 +32,18 @@ function DAGActions({
         requestId?: string;
       }
     ) => {
-      if (!confirm(warn)) {
-        return;
-      }
       const form = new FormData();
+      if (params.action == "start") {
+        let parameters = window.prompt('Please input execute parameters', '');
+        if (parameters === null) {//hint cancel
+          return
+        }
+        form.set("params", parameters)
+      } else {
+        if (!confirm(warn)) {
+          return;
+        }
+      }
       form.set('action', params.action);
       if (params.requestId) {
         form.set('request-id', params.requestId);
