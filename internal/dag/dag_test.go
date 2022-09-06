@@ -312,11 +312,12 @@ func TestSchedule(t *testing.T) {
 
 func TestScheduleStop(t *testing.T) {
 	for _, tc := range []struct {
-		Name      string
-		Def       string
-		Err       bool
-		WantStart int
-		WantStop  int
+		Name        string
+		Def         string
+		Err         bool
+		WantStart   int
+		WantStop    int
+		WantRestart int
 	}{
 		{
 			Name: "start and stop are parsed",
@@ -357,6 +358,17 @@ func TestScheduleStop(t *testing.T) {
 			WantStop:  2,
 		},
 		{
+			Name: "restart",
+			Def: `schedule:
+  start: "0 8 * * *"
+  restart: "0 12 * * *"
+  stop: "0 20 * * *"
+`,
+			WantStart:   1,
+			WantStop:    1,
+			WantRestart: 1,
+		},
+		{
 			Name: "invalid expression",
 			Def: `schedule:
   stop: "* * * * * * *"
@@ -389,6 +401,7 @@ func TestScheduleStop(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.WantStart, len(d.Schedule))
 			require.Equal(t, tc.WantStop, len(d.StopSchedule))
+			require.Equal(t, tc.WantRestart, len(d.RestartSchedule))
 		})
 	}
 }

@@ -14,6 +14,7 @@ type configDefinition struct {
 	ErrorMail         mailConfigDef
 	InfoMail          mailConfigDef
 	DelaySec          int
+	RestartWaitSec    int
 	HistRetentionDays *int
 	Preconditions     []*conditionDef
 	MaxActiveRuns     int

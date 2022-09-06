@@ -1,0 +1,9 @@
+params: "default_param"
+steps:
+  - name: "1"
+    command: "echo $1"
+  - name: "2"
+    command: "sleep 10000"
+    depends:
+      - "1"
+restartWaitSec: 1

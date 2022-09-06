@@ -59,6 +59,30 @@ func TestRun(t *testing.T) {
 	require.Equal(t, 0, er.Entries[1].Job.(*mockJob).RunCount)
 }
 
+func TestRestart(t *testing.T) {
+	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	utils.FixedTime = now
+
+	er := &mockEntryReader{
+		Entries: []*Entry{
+			{
+				EntryType: EntryTypeRestart,
+				Job:       &mockJob{},
+				Next:      now,
+			},
+		},
+	}
+
+	r := New(er)
+
+	go func() {
+		r.Start()
+	}()
+
+	time.Sleep(time.Second + time.Millisecond*100)
+	require.Equal(t, 1, er.Entries[0].Job.(*mockJob).RestartCount)
+}
+
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
@@ -78,10 +102,11 @@ func (er *mockEntryReader) Read(now time.Time) ([]*Entry, error) {
 }
 
 type mockJob struct {
-	Name      string
-	RunCount  int
-	StopCount int
-	Panic     error
+	Name         string
+	RunCount     int
+	StopCount    int
+	RestartCount int
+	Panic        error
 }
 
 var _ Job = (*mockJob)(nil)
@@ -100,5 +125,10 @@ func (j *mockJob) Start() error {
 
 func (j *mockJob) Stop() error {
 	j.StopCount++
+	return nil
+}
+
+func (j *mockJob) Restart() error {
+	j.RestartCount++
 	return nil
 }

@@ -27,6 +27,9 @@ func (e *CommandExecutor) SetStderr(out io.Writer) {
 }
 
 func (e *CommandExecutor) Kill(sig os.Signal) error {
+	if e.cmd == nil || e.cmd.Process == nil {
+		return nil
+	}
 	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 

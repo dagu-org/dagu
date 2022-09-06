@@ -222,6 +222,21 @@ func TestStartStop(t *testing.T) {
 	}, time.Millisecond*1500, time.Millisecond*100)
 }
 
+func TestRestart(t *testing.T) {
+	file := testDAG("restart.yaml")
+	dr := controller.NewDAGReader()
+	dag, err := dr.ReadDAG(file, false)
+	require.NoError(t, err)
+
+	c := controller.New(dag.DAG)
+	err = c.Restart(path.Join(utils.MustGetwd(), "../../bin/dagu"), "")
+	require.NoError(t, err)
+
+	st, err := c.GetLastStatus()
+	require.NoError(t, err)
+	require.Equal(t, scheduler.SchedulerStatus_Success, st.Status)
+}
+
 func TestRetry(t *testing.T) {
 	file := testDAG("retry.yaml")
 	dr := controller.NewDAGReader()

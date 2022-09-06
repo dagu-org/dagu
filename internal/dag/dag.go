@@ -24,6 +24,7 @@ type DAG struct {
 	Name              string
 	Schedule          []*Schedule
 	StopSchedule      []*Schedule
+	RestartSchedule   []*Schedule
 	Description       string
 	Env               []string
 	LogDir            string
@@ -34,6 +35,7 @@ type DAG struct {
 	InfoMail          *MailConfig
 	Smtp              *SmtpConfig
 	Delay             time.Duration
+	RestartWait       time.Duration
 	HistRetentionDays int
 	Preconditions     []*Condition
 	MaxActiveRuns     int
@@ -191,6 +193,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		}
 	}
 	d.Delay = time.Second * time.Duration(def.DelaySec)
+	d.RestartWait = time.Second * time.Duration(def.RestartWaitSec)
 	d.Tags = parseTags(def.Tags)
 
 	for _, bs := range []buildStep{
@@ -236,9 +239,16 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	return d, nil
 }
 
+const (
+	scheduleStart   = "start"
+	scheduleStop    = "stop"
+	scheduleRestart = "restart"
+)
+
 func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 	starts := []string{}
 	stops := []string{}
+	restarts := []string{}
 
 	switch (def.Schedule).(type) {
 	case string:
@@ -258,23 +268,27 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 			}
 			kk := k.(string)
 			switch kk {
-			case "start", "stop":
+			case scheduleStart, scheduleStop, scheduleRestart:
 				switch (v).(type) {
 				case string:
 					switch kk {
-					case "start":
+					case scheduleStart:
 						starts = append(starts, v.(string))
-					case "stop":
+					case scheduleStop:
 						stops = append(stops, v.(string))
+					case scheduleRestart:
+						restarts = append(restarts, v.(string))
 					}
 				case []interface{}:
 					for _, vv := range v.([]interface{}) {
 						if vvv, ok := vv.(string); ok {
 							switch kk {
-							case "start":
+							case scheduleStart:
 								starts = append(starts, vvv)
-							case "stop":
+							case scheduleStop:
 								stops = append(stops, vvv)
+							case scheduleRestart:
+								restarts = append(restarts, vvv)
 							}
 						} else {
 							return fmt.Errorf("schedule must be a string or an array of strings")
@@ -297,6 +311,10 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 		return err
 	}
 	d.StopSchedule, err = parseSchedule(stops)
+	if err != nil {
+		return err
+	}
+	d.RestartSchedule, err = parseSchedule(restarts)
 	return err
 }
 

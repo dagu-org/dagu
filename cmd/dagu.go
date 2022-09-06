@@ -100,6 +100,7 @@ func makeApp() *cli.App {
 			newStartCommand(),
 			newStatusCommand(),
 			newStopCommand(),
+			newRestartCommand(),
 			newRetryCommand(),
 			newDryCommand(),
 			newServerCommand(),

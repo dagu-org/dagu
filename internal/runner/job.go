@@ -14,6 +14,7 @@ import (
 type Job interface {
 	Start() error
 	Stop() error
+	Restart() error
 	String() string
 }
 
@@ -66,6 +67,11 @@ func (j *job) Stop() error {
 		return ErrJobIsNotRunning
 	}
 	return c.Stop()
+}
+
+func (j *job) Restart() error {
+	c := controller.New(j.DAG)
+	return c.Restart(j.Config.Command, j.Config.WorkDir)
 }
 
 func (j *job) String() string {
