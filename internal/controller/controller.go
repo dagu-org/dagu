@@ -180,6 +180,19 @@ func (c *Controller) Retry(bin string, workDir string, reqId string) (err error)
 	return
 }
 
+func (c *Controller) Restart(bin string, workDir string) error {
+	args := []string{"restart", c.Location}
+	cmd := exec.Command(bin, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = workDir
+	cmd.Env = os.Environ()
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
+}
+
 func (c *Controller) GetStatus() (*models.Status, error) {
 	client := sock.Client{Addr: c.SockAddr()}
 	ret, err := client.Request("GET", "/status")
