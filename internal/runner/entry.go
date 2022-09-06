@@ -23,6 +23,7 @@ type EntryType int
 const (
 	EntryTypeStart EntryType = iota
 	EntryTypeStop
+	EntryTypeRestart
 )
 
 type Entry struct {
@@ -42,6 +43,9 @@ func (e *Entry) Invoke() error {
 	case EntryTypeStop:
 		log.Printf("[%s] stop %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
 		return e.Job.Stop()
+	case EntryTypeRestart:
+		log.Printf("[%s] restart %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		return e.Job.Restart()
 	}
 	return nil
 }
@@ -103,6 +107,7 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 		}
 		f(dag, dag.Schedule, EntryTypeStart)
 		f(dag, dag.StopSchedule, EntryTypeStop)
+		f(dag, dag.RestartSchedule, EntryTypeRestart)
 	}
 
 	return entries, nil
