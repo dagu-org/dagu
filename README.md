@@ -70,6 +70,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Scheduler](#scheduler)
   - [Execution Schedule](#execution-schedule)
   - [Stop Schedule](#stop-schedule)
+  - [Restart Schedule](#restart-schedule)
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
 - [REST API Interface](#rest-api-interface)
@@ -153,6 +154,7 @@ You can execute the example by pressing the `Start` button
 - `dagu status <file>` - Displays the current status of the DAG
 - `dagu retry --req=<request-id> <file>` - Re-runs the specified DAG run
 - `dagu stop <file>` - Stops the DAG execution by sending TERM signals
+- `dagu restart <file>` - Restart the current running DAG
 - `dagu dry [--params=<params>] <file>` - Dry-runs the DAG
 - `dagu server [--host=<host>] [--port=<port>] [--dags=<path/to/the DAGs directory>]` - Starts the web server for web UI
 - `dagu scheduler [--dags=<path/to/the DAGs directory>]` - Starts the scheduler process
@@ -547,6 +549,30 @@ schedule:
 steps:
   - name: some long-process
     command: main.sh
+```
+
+### Restart Schedule
+
+If you want to restart a DAG process on a fixed schedule, the `restart` field is also available. At the restart time, the DAG execution will be stopped and restarted again.
+
+```yaml
+schedule:
+  start: "0 8 * * *" # starts at 8:00
+  restart: "0 12 * * *" # restarts at 12:00
+  stop: "0 13 * * *" # stops at 13:00
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+The wait time after the job is stopped before restart can be configured in the DAG definition as follows. The default value is `0` (zero).
+
+```yaml
+RestartWaitSec: 60 # Wait 60s after the process is stopped, then restart the DAG.
+
+steps:
+  - name: step1
+    command: python some_app.py
 ```
 
 ### Run Scheduler as a daemon
