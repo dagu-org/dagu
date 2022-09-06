@@ -34,7 +34,7 @@ function DAGActions({
     ) => {
       const form = new FormData();
       if (params.action == "start") {
-        let parameters = window.prompt('Please input execute parameters', '');
+        let parameters = window.prompt('Enter parameters (for default parameters, leave blank and click OK).', '');
         if (parameters === null) {//hint cancel
           return
         }
