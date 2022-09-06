@@ -144,7 +144,9 @@ Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste this [example YAML]
 
 ### 4. Execute the DAG
 
-You can execute the example by pressing the `Start` button
+You can execute the example by pressing the `Start` button.
+
+*Note: Leave the parameter field in the dialog blank and press OK.*
 
 ![example](assets/images/demo.gif?raw=true)
 
