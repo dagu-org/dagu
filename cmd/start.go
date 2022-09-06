@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/yohamta/dagu"
@@ -22,7 +23,7 @@ func newStartCommand() *cli.Command {
 			},
 		),
 		Action: func(c *cli.Context) error {
-			d, err := loadDAG(c, c.Args().Get(0), c.String("params"))
+			d, err := loadDAG(c, c.Args().Get(0), strings.Trim(c.String("params"), "\""))
 			if err != nil {
 				return err
 			}
