@@ -34,6 +34,7 @@ type DAG struct {
 	InfoMail          *MailConfig
 	Smtp              *SmtpConfig
 	Delay             time.Duration
+	RestartWait       time.Duration
 	HistRetentionDays int
 	Preconditions     []*Condition
 	MaxActiveRuns     int
@@ -191,6 +192,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		}
 	}
 	d.Delay = time.Second * time.Duration(def.DelaySec)
+	d.RestartWait = time.Second * time.Duration(def.RestartWaitSec)
 	d.Tags = parseTags(def.Tags)
 
 	for _, bs := range []buildStep{
