@@ -37,8 +37,6 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Highlights](#highlights)
 - [Contents](#contents)
 - [Getting started](#getting-started)
-- [Motivation](#motivation)
-- [Why not existing workflow schedulers, such as Airflow?](#why-not-existing-workflow-schedulers-such-as-airflow)
 - [How does it work?](#how-does-it-work)
 - [Install `dagu`](#install-dagu)
   - [via Homebrew](#via-homebrew)
@@ -89,14 +87,6 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 ## Getting started
 
 See [Install `dagu`](#install-dagu) and [️Quick start](#️quick-start).
-
-## Motivation
-
-In the projects I worked on, our ETL pipeline had **many problems**. There were hundreds of cron jobs on the server's crontab, and it is impossible to keep track of those dependencies between them. If one job failed, we were not sure which to rerun. We also have to SSH into the server to see the logs and run each shell script one by one. So we needed a tool that could explicitly visualize and manage the dependencies of the pipeline. ***How nice it would be to be able to visually see the job dependencies, execution status, and logs of each job in a Web UI and to be able to rerun or stop a series of jobs with just a mouse click!***
-
-## Why not existing workflow schedulers, such as Airflow?
-
-There are existing tools such as Airflow, Prefect, Temporal, etc, but in most cases they require writing code in a programming language such as Python to define DAGs. In systems that have been in operation for a long time, there are already complex jobs written in hundreds of thousands of lines of code in other languages such as Perl or Shell Scripts, and there is concern that adding another layer of Python code will further decrease maintainability. So we developed Dagu, which requires no coding, and is easy-to-use and self-contained, making it ideal for smaller projects with fewer people.
 
 ## How does it work?
 Dagu is a single command and it uses the local file system to store data. Therefore, no DBMS or cloud service is required.
