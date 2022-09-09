@@ -27,7 +27,6 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 ---
 
 ## Highlights
-
 - Install by placing just a single binary file
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
@@ -37,6 +36,8 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Highlights](#highlights)
 - [Contents](#contents)
 - [Getting started](#getting-started)
+- [Motivation](#motivation)
+- [Why not an existing workflow scheduler like Airflow?](#why-not-an-existing-workflow-scheduler-like-airflow)
 - [How does it work?](#how-does-it-work)
 - [Install `dagu`](#install-dagu)
   - [via Homebrew](#via-homebrew)
@@ -60,7 +61,6 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Stdout and Stderr Redirection](#stdout-and-stderr-redirection)
   - [Lifecycle Hooks](#lifecycle-hooks)
   - [Repeating Task](#repeating-task)
-  - [Calling Sub DAGs](#calling-sub-dags)
   - [All Available Fields](#all-available-fields)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
@@ -88,9 +88,17 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 
 See [Install `dagu`](#install-dagu) and [️Quick start](#️quick-start).
 
+## Motivation
+
+In legacy complex systems there are implicit dependencies of jobs on each other. When there are hundreds of cron jobs in a server's crontab, it is impossible to keep track of the dependencies between them. If one job fails, it is impossible to know which one to rerun. You also have to SSH into the server to see the logs. And to rerun them, you have to manually run the shell scripts one by one. This is a huge hassle and makes operation impossible. We need a tool that can explicitly visualize and manage pipeline dependencies as a DAG. ***How nice it would be if we could visually check the dependencies, execution status, and logs of each job in a Web UI, and rerun or stop a series of jobs with just a mouse click!***
+
+## Why not an existing workflow scheduler like Airflow?
+
+There are existing tools such as Airflow, Prefect, Temporal, etc., but many libraries require you to write code in a programming language such as Python to define the DAG. In systems that have been in operation for a long time, there are already complex jobs with hundreds of thousands of lines of code written in other languages such as Perl or Shell Scripts. Adding another layer of Python on top of these codes would further reduce maintainability. So we developed dagu, which requires no coding, is easy to use, self-contained, and ideal for small projects.
+
 ## How does it work?
-Dagu is a single command and it uses the local file system to store data. Therefore, no DBMS or cloud service is required.
-Dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
+dagu is a single command and it uses the local file system to store data. Therefore, no DBMS or cloud service is required.
+dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
 ## Install `dagu`
 
@@ -152,7 +160,7 @@ You can execute the example by pressing the `Start` button.
 - `dagu scheduler [--dags=<path/to/the DAGs directory>]` - Starts the scheduler process
 - `dagu version` - Shows the current binary version
 
-The `--config=<config>` option is available to all commands. It allows to specify different Dagu configuration for the commands. Which enables you to manage multiple Dagu process in a single instance. See [Admin Configuration](#admin-configuration) for more details.
+The `--config=<config>` option is available to all commands. It allows to specify different dagu configuration for the commands. Which enables you to manage multiple dagu process in a single instance. See [Admin Configuration](#admin-configuration) for more details.
 
 For example:
 
@@ -355,24 +363,6 @@ steps:
       intervalSec: 60
 ```
 
-### Calling Sub DAGs
-
-You can call other DAGs in the same directory by using `dagu start` command (you can omit `.yaml`).
-
-```yaml
-steps:
-  - name: Sub DAG
-    command: dagu start other_dag
-```
-
-If you want to call DAGs in other directory you can specify the DAG by absolute path.
-
-```yaml
-steps:
-  - name: Sub DAG
-    command: dagu start /path/to/dag.yaml
-```
-
 ### All Available Fields
 
 Combining these settings gives you granular control over how the DAG runs.
@@ -387,6 +377,7 @@ env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
 logDir: ${LOG_DIR}                   # Log directory to write standard output, default: ${DAG_HOME}/logs/dags
+restartWaitSec: 60                   # Wait 60s after the process is stopped, then restart the DAG.
 histRetentionDays: 3                 # Execution history retention days (not for log files)
 delaySec: 1                          # Interval seconds between steps
 maxActiveRuns: 1                     # Max parallel number of running step
@@ -438,7 +429,7 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 ## Admin Configuration
 
-To configure Dagu, please create the config file (default path: `~/.dagu/admin.yaml`). All fields are optional.
+To configure dagu, please create the config file (default path: `~/.dagu/admin.yaml`). All fields are optional.
 
 ```yaml
 # Web Server Host and Port
@@ -467,7 +458,7 @@ command: <Absolute path to the dagu binary>                  # default: dagu
 
 ## Environment Variable
 
-You can configure the Dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
+You can configure the dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
 
 ## Base Configuration for all DAGs
 
@@ -549,9 +540,9 @@ If you want to restart a DAG process on a fixed schedule, the `restart` field is
 
 ```yaml
 schedule:
-  start: "0 8 * * *" # starts at 8:00
+  start: "0 8 * * *"    # starts at 8:00
   restart: "0 12 * * *" # restarts at 12:00
-  stop: "0 13 * * *" # stops at 13:00
+  stop: "0 13 * * *"    # stops at 13:00
 steps:
   - name: scheduled job
     command: job.sh
@@ -560,7 +551,7 @@ steps:
 The wait time after the job is stopped before restart can be configured in the DAG definition as follows. The default value is `0` (zero).
 
 ```yaml
-RestartWaitSec: 60 # Wait 60s after the process is stopped, then restart the DAG.
+restartWaitSec: 60 # Wait 60s after the process is stopped, then restart the DAG.
 
 steps:
   - name: step1
@@ -639,7 +630,7 @@ You can change the status of any task to a `failed` state. Then, when you retry 
 
 ### How does it track running processes without DBMS?
 
-Dagu uses Unix sockets to communicate with running processes.
+dagu uses Unix sockets to communicate with running processes.
 
 ## License
 
