@@ -13,15 +13,13 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.8.0
 	github.com/urfave/cli/v2 v2.4.5
+	github.com/yohamta/grep v1.0.0
 	golang.org/x/text v0.3.7
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require (
-	github.com/yohamta/grep v1.0.0 // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
-)
+require golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
@@ -32,6 +30,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/samber/lo v1.27.0
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
+	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
