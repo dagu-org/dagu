@@ -125,7 +125,7 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	log.Printf("Sending %s signal to running child processes.", sig)
 	done := make(chan bool)
 	go func() {
-		a.scheduler.Signal(a.graph, sig, done, false)
+		a.scheduler.Signal(a.graph, sig, done, allowOverride)
 	}()
 	timeout := time.After(a.DAG.MaxCleanUpTime)
 	tick := time.After(time.Second * 5)
@@ -381,6 +381,7 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 		go func() {
+			log.Printf("stop request received. shutting down...")
 			a.signal(syscall.SIGTERM, true)
 		}()
 	default:
