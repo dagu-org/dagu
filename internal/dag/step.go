@@ -15,6 +15,7 @@ type Step struct {
 	OutputVariables *sync.Map
 	Dir             string
 	Executor        string
+	ExecutorConfig  map[string]interface{}
 	CmdWithArgs     string
 	Command         string
 	Script          string

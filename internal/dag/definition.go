@@ -36,22 +36,23 @@ type handerOnDef struct {
 }
 
 type stepDef struct {
-	Name          string
-	Description   string
-	Dir           string
-	Executor      string
-	Command       string
-	Script        string
-	Stdout        string
-	Stderr        string
-	Output        string
-	Depends       []string
-	ContinueOn    *continueOnDef
-	RetryPolicy   *retryPolicyDef
-	RepeatPolicy  *repeatPolicyDef
-	MailOnError   bool
-	Preconditions []*conditionDef
-	SignalOnStop  *string
+	Name           string
+	Description    string
+	Dir            string
+	Executor       string
+	ExecutorConfig map[string]interface{}
+	Command        string
+	Script         string
+	Stdout         string
+	Stderr         string
+	Output         string
+	Depends        []string
+	ContinueOn     *continueOnDef
+	RetryPolicy    *retryPolicyDef
+	RepeatPolicy   *repeatPolicyDef
+	MailOnError    bool
+	Preconditions  []*conditionDef
+	SignalOnStop   *string
 }
 
 type continueOnDef struct {
