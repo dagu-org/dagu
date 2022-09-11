@@ -3,6 +3,7 @@ module github.com/yohamta/dagu
 go 1.18
 
 require (
+	github.com/docker/docker v20.10.18+incompatible
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.0
@@ -20,7 +21,6 @@ require (
 )
 
 require (
-	github.com/docker/docker v20.10.18+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
