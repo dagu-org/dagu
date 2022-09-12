@@ -61,7 +61,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Stdout and Stderr Redirection](#stdout-and-stderr-redirection)
   - [Lifecycle Hooks](#lifecycle-hooks)
   - [Repeating Task](#repeating-task)
-  - [All Available Fields](#all-available-fields)
+  - [Other Available Fields](#other-available-fields)
+- [Executor](#executor)
+  - [HTTP Executor](#http-executor)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
 - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
@@ -363,7 +365,7 @@ steps:
       intervalSec: 60
 ```
 
-### All Available Fields
+### Other Available Fields
 
 Combining these settings gives you granular control over how the DAG runs.
 
@@ -426,6 +428,32 @@ steps:
 ```
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
+
+## Executor
+
+Executor is a different way of executing a Step; Executor can be set in the `executor` field.
+
+### HTTP Executor
+
+The HTTP Executor allows you to send arbitrary HTTP requests.
+
+```yaml
+steps:
+  - name: send POST request
+    executor: http
+    command: POST https://foo.bar.com
+    script: |
+      {
+        "timeout": 10,
+        "headers": {
+          "Authorization": "Bearer $TOKEN"
+        },
+        "query": {
+          "key": "value"
+        },
+        "body": "post body"
+      }      
+```
 
 ## Admin Configuration
 
