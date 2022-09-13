@@ -1,4 +1,5 @@
 import React from 'react';
+import { Canvas, NodeData, EdgeData } from 'reaflow';
 import { Node, NodeStatus } from '../../models';
 import { Step } from '../../models';
 import Mermaid from '../atoms/Mermaid';
@@ -37,45 +38,51 @@ function Graph({
     borderRadius: '0.5em',
     backgroundSize: '20px 20px',
   };
-  const graph = React.useMemo(() => {
+  const [nodes, edges] = React.useMemo(() => {
+    const nodes: NodeData[] = [];
+    const edges: EdgeData[] = [];
     if (!steps) {
-      return '';
-    }
-    const dat = flowchart == 'TD' ? ['flowchart TD;'] : ['flowchart LR;'];
-    if (onClickNode) {
-      window.onClickMermaidNode = onClickNode;
+      return [nodes, edges];
     }
     const addNodeFn = (step: Step, status: NodeStatus) => {
-      const id = step.Name.replace(/\s/g, '_');
-      const c = graphStatusMap[status] || '';
-      dat.push(`${id}(${step.Name})${c};`);
-      if (step.Depends) {
-        step.Depends.forEach((d) => {
-          const depId = d.replace(/\s/g, '_');
-          dat.push(`${depId} -.-> ${id};`);
+      nodes.push({
+        id: step.Name,
+        text: step.Name,
+        data: {
+          label: step.Name,
+          status,
+        },
+      });
+      step.Depends?.forEach((dep) => {
+        edges.push({
+          id: `${step.Name}-${dep}`,
+          from: step.Name,
+          to: dep,
         });
-      }
-      if (onClickNode) {
-        dat.push(`click ${id} onClickMermaidNode`);
-      }
+      });
     };
     if (type == 'status') {
       (steps as Node[]).forEach((s) => addNodeFn(s.Step, s.Status));
     } else {
       (steps as Step[]).forEach((s) => addNodeFn(s, NodeStatus.None));
     }
-    dat.push(
-      'linkStyle default stroke:#ddeeff,stroke-width:2px,fill:none,color:#404040'
-    );
-    dat.push('classDef none fill:white,stroke:lightblue,stroke-width:2px');
-    dat.push('classDef running fill:white,stroke:lime,stroke-width:2px');
-    dat.push('classDef error fill:white,stroke:red,stroke-width:2px');
-    dat.push('classDef cancel fill:white,stroke:pink,stroke-width:2px');
-    dat.push('classDef done fill:white,stroke:green,stroke-width:2px');
-    dat.push('classDef skipped fill:white,stroke:gray,stroke-width:2px');
-    return dat.join('\n');
+    const dat = flowchart == 'TD' ? ['flowchart TD;'] : ['flowchart LR;'];
+    if (onClickNode) {
+      window.onClickMermaidNode = onClickNode;
+    }
+    // dat.push(
+    //   'linkStyle default stroke:#ddeeff,stroke-width:2px,fill:none,color:#404040'
+    // );
+    // dat.push('classDef none fill:white,stroke:lightblue,stroke-width:2px');
+    // dat.push('classDef running fill:white,stroke:lime,stroke-width:2px');
+    // dat.push('classDef error fill:white,stroke:red,stroke-width:2px');
+    // dat.push('classDef cancel fill:white,stroke:pink,stroke-width:2px');
+    // dat.push('classDef done fill:white,stroke:green,stroke-width:2px');
+    // dat.push('classDef skipped fill:white,stroke:gray,stroke-width:2px');
+    return [nodes, edges];
   }, [steps, onClickNode, flowchart]);
-  return <Mermaid style={mermaidStyle} def={graph} />;
+  return <Canvas nodes={nodes} edges={edges} />;
+  // return <Mermaid style={mermaidStyle} def={graph} />;
 }
 
 export default Graph;
