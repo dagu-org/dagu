@@ -47,6 +47,7 @@ import LiveSwitch from './LiveSwitch';
 import moment from 'moment';
 import 'moment-duration-format';
 import Ticker from '../atoms/Ticker';
+import VisuallyHidden from '../atoms/VisuallyHidden';
 
 type Props = {
   DAGs: DAGItem[];
@@ -80,9 +81,15 @@ const defaultColumns = [
           }}
         >
           {table.getIsAllRowsExpanded() ? (
-            <KeyboardArrowUp />
+            <>
+              <VisuallyHidden>Compress rows</VisuallyHidden>
+              <KeyboardArrowUp />
+            </>
           ) : (
-            <KeyboardArrowDown />
+            <>
+              <VisuallyHidden>Expand rows</VisuallyHidden>
+              <KeyboardArrowDown />
+            </>
           )}
         </IconButton>
       );
@@ -347,6 +354,9 @@ const defaultColumns = [
         <LiveSwitch
           DAG={data.DAGStatus}
           refresh={props.table.options.meta?.refreshFn}
+          inputProps={{
+            'aria-label': `Toggle ${data.Name}`,
+          }}
         />
       );
     },
