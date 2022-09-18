@@ -5,6 +5,12 @@ import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
+import VisuallyHidden from '../atoms/VisuallyHidden';
+
+type LabelProps = {
+  show: boolean;
+  children: React.ReactNode;
+};
 
 type Props = {
   status?: Status;
@@ -13,6 +19,11 @@ type Props = {
   redirectTo?: string;
   refresh?: () => void;
 };
+
+function Label({ show, children }: LabelProps): JSX.Element {
+  if (show) return <>{children}</>;
+  return <VisuallyHidden>{children}</VisuallyHidden>;
+}
 
 function DAGActions({
   status,
@@ -33,12 +44,16 @@ function DAGActions({
       }
     ) => {
       const form = new FormData();
-      if (params.action == "start") {
-        let parameters = window.prompt('Enter parameters (for default parameters, leave blank and click OK).', '');
-        if (parameters === null) {//hint cancel
-          return
+      if (params.action == 'start') {
+        const parameters = window.prompt(
+          'Enter parameters (for default parameters, leave blank and click OK).',
+          ''
+        );
+        if (parameters === null) {
+          //hint cancel
+          return;
         }
-        form.set("params", parameters)
+        form.set('params', parameters);
       } else {
         if (!confirm(warn)) {
           return;
@@ -81,9 +96,12 @@ function DAGActions({
       <ActionButton
         label={label}
         icon={
-          <span className="icon">
-            <FontAwesomeIcon icon={faPlay} />
-          </span>
+          <>
+            <Label show={label}>Start</Label>
+            <span className="icon">
+              <FontAwesomeIcon icon={faPlay} />
+            </span>
+          </>
         }
         disabled={!buttonState['start']}
         onClick={() =>
@@ -93,14 +111,17 @@ function DAGActions({
           })
         }
       >
-        {label ? 'Start' : ''}
+        {label && 'Start'}
       </ActionButton>
       <ActionButton
         label={label}
         icon={
-          <span className="icon">
-            <FontAwesomeIcon icon={faStop} />
-          </span>
+          <>
+            <Label show={label}>Stop</Label>
+            <span className="icon">
+              <FontAwesomeIcon icon={faStop} />
+            </span>
+          </>
         }
         disabled={!buttonState['stop']}
         onClick={() =>
@@ -110,14 +131,17 @@ function DAGActions({
           })
         }
       >
-        {label ? 'Stop' : ''}
+        {label && 'Stop'}
       </ActionButton>
       <ActionButton
         label={label}
         icon={
-          <span className="icon">
-            <FontAwesomeIcon icon={faReply} />
-          </span>
+          <>
+            <Label show={label}>Retry</Label>
+            <span className="icon">
+              <FontAwesomeIcon icon={faReply} />
+            </span>
+          </>
         }
         disabled={!buttonState['retry']}
         onClick={() =>
@@ -131,7 +155,7 @@ function DAGActions({
           )
         }
       >
-        {label ? 'Retry' : ''}
+        {label && 'Retry'}
       </ActionButton>
     </Stack>
   );

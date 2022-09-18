@@ -3,13 +3,13 @@ import React from 'react';
 import { DAGStatus } from '../../models';
 
 type Props = {
+  inputProps?: React.HTMLProps<HTMLInputElement>;
   DAG: DAGStatus;
   refresh?: () => void;
 };
 
-function LiveSwitch({ DAG, refresh }: Props) {
+function LiveSwitch({ DAG, refresh, inputProps }: Props) {
   const [checked, setChecked] = React.useState(!DAG.Suspended);
-
   const onSubmit = React.useCallback(
     async (params: { name: string; action: string; value: string }) => {
       const form = new FormData();
@@ -42,6 +42,8 @@ function LiveSwitch({ DAG, refresh }: Props) {
       value: enabled ? 'false' : 'true',
     });
   }, [DAG, checked]);
-  return <Switch checked={checked} onChange={onChange} />;
+  return (
+    <Switch checked={checked} onChange={onChange} inputProps={inputProps} />
+  );
 }
 export default LiveSwitch;

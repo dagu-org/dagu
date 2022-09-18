@@ -2,7 +2,7 @@ import { Button, IconButton } from '@mui/material';
 import React, { ReactElement } from 'react';
 
 interface ActionButtonProps {
-  children: string;
+  children: React.ReactNode;
   label: boolean;
   icon: ReactElement;
   disabled: boolean;
