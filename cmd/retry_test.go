@@ -21,8 +21,8 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{},
 	}, t)
 
-	dr := controller.NewDAGReader()
-	dag, err := dr.ReadDAG(configPath, false)
+	dr := controller.NewDAGStatusReader()
+	dag, err := dr.ReadStatus(configPath, false)
 	require.NoError(t, err)
 	require.Equal(t, dag.Status.Status, scheduler.SchedulerStatus_Success)
 
@@ -48,7 +48,7 @@ func Test_retryCommand(t *testing.T) {
 		output: []string{"parameter is x"},
 	}, t)
 
-	c := controller.New(dag.DAG)
+	c := controller.NewDAGController(dag.DAG)
 
 	var retryStatus *models.Status
 	require.Eventually(t, func() bool {

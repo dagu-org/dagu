@@ -97,13 +97,13 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 
 		params := getDAGParameter(r)
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
-		dr := controller.NewDAGReader()
-		d, err := dr.ReadDAG(file, false)
+		dr := controller.NewDAGStatusReader()
+		d, err := dr.ReadStatus(file, false)
 		if d == nil {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(d.DAG)
+		c := controller.NewDAGController(d.DAG)
 		data := newDAGResponse(d.DAG.Name, d, tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
@@ -115,7 +115,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 			data.Definition, _ = dag.ReadConfig(file)
 
 		case dag_TabType_History:
-			logs := controller.New(d.DAG).GetStatusHist(30)
+			logs := controller.NewDAGController(d.DAG).GetRecentStatuses(30)
 			data.LogData = buildLog(logs)
 
 		case dag_TabType_StepLog:
@@ -173,13 +173,13 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		}
 
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
-		dr := controller.NewDAGReader()
-		dag, err := dr.ReadDAG(file, false)
+		dr := controller.NewDAGStatusReader()
+		dag, err := dr.ReadStatus(file, false)
 		if err != nil && action != "save" {
 			encodeError(w, err)
 			return
 		}
-		c := controller.New(dag.DAG)
+		c := controller.NewDAGController(dag.DAG)
 
 		switch action {
 		case "start":
@@ -275,7 +275,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			}
 
 		case "save":
-			err := c.Save(value)
+			err := c.UpdateDAGSpec(value)
 			if err != nil {
 				encodeError(w, err)
 				return
@@ -286,7 +286,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 		case "rename":
 			newfile := nameWithExt(path.Join(hc.DAGsDir, value))
-			err := controller.RenameConfig(file, newfile)
+			err := controller.MoveDAG(file, newfile)
 			if err != nil {
 				encodeError(w, err)
 				return
@@ -317,11 +317,11 @@ func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
 		}
 
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
-		dr := controller.NewDAGReader()
-		dag, err := dr.ReadDAG(file, false)
-		c := controller.New(dag.DAG)
+		dr := controller.NewDAGStatusReader()
+		dag, err := dr.ReadStatus(file, false)
+		c := controller.NewDAGController(dag.DAG)
 
-		err = c.Delete()
+		err = c.DeleteDAG()
 
 		if err != nil {
 			encodeError(w, err)
@@ -333,7 +333,7 @@ func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
 	}
 }
 
-func updateStatus(c *controller.Controller, reqId, step string, to scheduler.NodeStatus) error {
+func updateStatus(c *controller.DAGController, reqId, step string, to scheduler.NodeStatus) error {
 	status, err := c.GetStatusByRequestId(reqId)
 	if err != nil {
 		return err
@@ -353,7 +353,7 @@ func updateStatus(c *controller.Controller, reqId, step string, to scheduler.Nod
 	return c.UpdateStatus(status)
 }
 
-func readSchedulerLog(c *controller.Controller, file string) (*logFile, error) {
+func readSchedulerLog(c *controller.DAGController, file string) (*logFile, error) {
 	f := ""
 	if file == "" {
 		s, err := c.GetLastStatus()
@@ -378,7 +378,7 @@ func readSchedulerLog(c *controller.Controller, file string) (*logFile, error) {
 	}, nil
 }
 
-func readStepLog(c *controller.Controller, file, stepName, enc string) (*logFile, error) {
+func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logFile, error) {
 	var steps []*models.Node = nil
 	var stepm = map[string]*models.Node{
 		constants.OnSuccess: nil,

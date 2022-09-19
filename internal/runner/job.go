@@ -33,7 +33,7 @@ var (
 )
 
 func (j *job) Start() error {
-	c := controller.New(j.DAG)
+	c := controller.NewDAGController(j.DAG)
 	s, err := c.GetLastStatus()
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (j *job) Start() error {
 }
 
 func (j *job) Stop() error {
-	c := controller.New(j.DAG)
+	c := controller.NewDAGController(j.DAG)
 	s, err := c.GetLastStatus()
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func (j *job) Stop() error {
 }
 
 func (j *job) Restart() error {
-	c := controller.New(j.DAG)
+	c := controller.NewDAGController(j.DAG)
 	return c.Restart(j.Config.Command, j.Config.WorkDir)
 }
 

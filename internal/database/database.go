@@ -43,6 +43,13 @@ func DefaultConfig() *Config {
 	}
 }
 
+// New creates a new Database with default configuration.
+func New() *Database {
+	return &Database{
+		Config: DefaultConfig(),
+	}
+}
+
 // ParseFile parses a status file.
 func ParseFile(file string) (*models.Status, error) {
 	f, err := os.Open(file)

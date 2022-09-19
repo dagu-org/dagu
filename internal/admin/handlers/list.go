@@ -26,7 +26,8 @@ func HandleGetList(hc *DAGListHandlerConfig, tc *TemplateConfig) http.HandlerFun
 	renderFunc := useTemplate("index.gohtml", "index", tc)
 	return func(w http.ResponseWriter, r *http.Request) {
 		dir := filepath.Join(hc.DAGsDir)
-		dags, errs, err := controller.GetDAGs(dir)
+		dr := controller.NewDAGStatusReader()
+		dags, errs, err := dr.ReadAllStatus(dir)
 		if err != nil {
 			encodeError(w, err)
 			return
@@ -66,7 +67,7 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 		switch action {
 		case "new":
 			filename := nameWithExt(path.Join(hc.DAGsDir, value))
-			err := controller.NewConfig(filename)
+			err := controller.CreateDAG(filename)
 			if err != nil {
 				encodeError(w, err)
 				return

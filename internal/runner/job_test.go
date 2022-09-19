@@ -13,9 +13,9 @@ import (
 
 func TestJobStart(t *testing.T) {
 	file := path.Join(testdataDir, "start.yaml")
-	dr := controller.NewDAGReader()
-	dag, _ := dr.ReadDAG(file, false)
-	c := controller.New(dag.DAG)
+	dr := controller.NewDAGStatusReader()
+	dag, _ := dr.ReadStatus(file, false)
+	c := controller.NewDAGController(dag.DAG)
 
 	j := &job{
 		DAG:    dag.DAG,
@@ -44,8 +44,8 @@ func TestJobStart(t *testing.T) {
 
 func TestJobSop(t *testing.T) {
 	file := path.Join(testdataDir, "stop.yaml")
-	dr := controller.NewDAGReader()
-	dag, _ := dr.ReadDAG(file, false)
+	dr := controller.NewDAGStatusReader()
+	dag, _ := dr.ReadStatus(file, false)
 
 	j := &job{
 		DAG:    dag.DAG,
@@ -64,7 +64,7 @@ func TestJobSop(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	c := controller.New(dag.DAG)
+	c := controller.NewDAGController(dag.DAG)
 	s, _ := c.GetLastStatus()
 	require.Equal(t, scheduler.SchedulerStatus_Cancel, s.Status)
 }
