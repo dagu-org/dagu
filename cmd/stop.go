@@ -24,7 +24,7 @@ func newStopCommand() *cli.Command {
 }
 
 func stop(d *dag.DAG) error {
-	c := controller.New(d)
+	c := controller.NewDAGController(d)
 	log.Printf("Stopping...")
 	return c.Stop()
 }

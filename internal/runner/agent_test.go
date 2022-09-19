@@ -38,7 +38,7 @@ func TestAgent(t *testing.T) {
 	cl := &dag.Loader{}
 	dag, err := cl.LoadHeadOnly(f)
 	require.NoError(t, err)
-	c := controller.New(dag)
+	c := controller.NewDAGController(dag)
 
 	require.Eventually(t, func() bool {
 		s, err := c.GetLastStatus()
@@ -65,9 +65,9 @@ func TestAgentForStop(t *testing.T) {
 
 	// read the test DAG
 	file := path.Join(testdataDir, "start_stop.yaml")
-	dr := controller.NewDAGReader()
-	dag, _ := dr.ReadDAG(file, false)
-	c := controller.New(dag.DAG)
+	dr := controller.NewDAGStatusReader()
+	dag, _ := dr.ReadStatus(file, false)
+	c := controller.NewDAGController(dag.DAG)
 
 	j := &job{
 		DAG:    dag.DAG,

@@ -32,7 +32,7 @@ func TestRunDAG(t *testing.T) {
 	d := testLoadDAG(t, "run.yaml")
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
-	status, _ := controller.New(d).GetLastStatus()
+	status, _ := controller.NewDAGController(d).GetLastStatus()
 	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
 
 	go func() {
@@ -43,7 +43,7 @@ func TestRunDAG(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	require.Eventually(t, func() bool {
-		status, err := controller.New(d).GetLastStatus()
+		status, err := controller.NewDAGController(d).GetLastStatus()
 		require.NoError(t, err)
 		return status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*2, time.Millisecond*100)
@@ -53,7 +53,7 @@ func TestRunDAG(t *testing.T) {
 	a = &Agent{AgentConfig: &AgentConfig{DAG: d}}
 	err := a.Run()
 	require.NoError(t, err)
-	statusList := controller.New(d).GetStatusHist(100)
+	statusList := controller.NewDAGController(d).GetRecentStatuses(100)
 	require.Equal(t, 1, len(statusList))
 }
 
@@ -99,7 +99,7 @@ func TestCancelDAG(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
-		status, err := controller.New(d).GetLastStatus()
+		status, err := controller.NewDAGController(d).GetLastStatus()
 		require.NoError(t, err)
 		require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
 	}

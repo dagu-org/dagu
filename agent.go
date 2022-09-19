@@ -341,7 +341,7 @@ func (a *Agent) dryRun() error {
 }
 
 func (a *Agent) checkIsRunning() error {
-	status, err := controller.New(a.DAG).GetStatus()
+	status, err := controller.NewDAGController(a.DAG).GetStatus()
 	if err != nil {
 		return err
 	}

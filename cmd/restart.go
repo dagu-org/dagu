@@ -29,7 +29,7 @@ func newRestartCommand() *cli.Command {
 const resetartTimeout = time.Second * 180
 
 func restart(d *dag.DAG, ctx *cli.Context) error {
-	c := controller.New(d)
+	c := controller.NewDAGController(d)
 
 	// stop the DAG
 	wait := time.Millisecond * 500

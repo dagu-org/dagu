@@ -26,7 +26,7 @@ func newStatusCommand() *cli.Command {
 }
 
 func queryStatus(d *dag.DAG) error {
-	status, err := controller.New(d).GetStatus()
+	status, err := controller.NewDAGController(d).GetStatus()
 	if err != nil {
 		return err
 	}

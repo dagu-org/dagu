@@ -21,7 +21,7 @@ func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
 			return
 		}
 
-		ret, errs, err := controller.GrepDAGs(DAGsDir, query[0])
+		ret, errs, err := controller.GrepDAG(DAGsDir, query[0])
 		if err != nil {
 			encodeError(w, err)
 			return

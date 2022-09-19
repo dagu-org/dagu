@@ -15,7 +15,7 @@ func Test_restartCommand(t *testing.T) {
 	cfg := testConfig("restart.yaml")
 	cl := &dag.Loader{}
 	d, _ := cl.Load(cfg, "")
-	c := controller.New(d)
+	c := controller.NewDAGController(d)
 
 	// start the DAG
 	println("start the DAG")
