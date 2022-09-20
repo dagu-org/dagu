@@ -71,8 +71,10 @@ type retryPolicyDef struct {
 }
 
 type smtpConfigDef struct {
-	Host string
-	Port string
+	Host     string
+	Port     string
+	Username string
+	Password string
 }
 
 type mailConfigDef struct {
