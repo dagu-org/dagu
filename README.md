@@ -30,6 +30,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - Install by placing just a single binary file
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
+- Send email notifications upon DAG execution error/success with simple configuration
 
 ## Contents
 
@@ -66,6 +67,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [HTTP Executor](#http-executor)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
+- [Sending email notifications](#sending-email-notifications)
 - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
 - [Scheduler](#scheduler)
   - [Execution Schedule](#execution-schedule)
@@ -488,24 +490,73 @@ command: <Absolute path to the dagu binary>                  # default: dagu
 
 You can configure the dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
 
+## Sending email notifications
+
+Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `stmp` field and related fields in the DAG specs. You can use any email delivery services (e.g., Sendgrid, Mailgun, etc).
+
+```yaml
+# Eamil notification settings
+mailOn:
+  failure: true
+  success: true
+
+# SMTP server settings
+smtp:
+  host: "smtp.foo.bar"
+  port: "587"
+  username: "<username>"
+  password: "<password>"
+
+# Error mail configuration
+errorMail:
+  from: "foo@bar.com"
+  to: "foo@bar.com"
+  prefix: "[Error]"
+
+# Info mail configuration
+infoMail:
+  from: "foo@bar.com"
+  to: "foo@bar.com"
+  prefix: "[Info]"
+```
+
+If you want to use the same settings for all DAGs, set them to the [base configuration](#base-configuration-for-all-dags).
+
+
 ## Base Configuration for all DAGs
 
 Creating a base configuration (default path: `~/.dagu/config.yaml`) is a convenient way to organize shared settings among all DAGs. The path to the base configuration file can be configured. See [Admin Configuration](#admin-configuration) for more details.
 
 ```yaml
-logDir: <path-to-write-log>         # log directory to write standard output
-histRetentionDays: 3                # history retention days
-smtp:                               # [optional] mail server configuration to send notifications
-  host: <smtp server host>
-  port: <stmp server port>
-errorMail:                          # [optional] mail configuration for error-level
-  from: <from address>
-  to: <to address>
-  prefix: <prefix of mail subject>
+# directory path to save logs from standard output
+logDir: /path/to/stdout-logs/
+
+# history retention days (default: 30)
+histRetentionDays: 3
+
+# Eamil notification settings
+mailOn:
+  failure: true
+  success: true
+
+# SMTP server settings
+smtp:
+  host: "smtp.foo.bar"
+  port: "587"
+  username: "<username>"
+  password: "<password>"
+
+# Error mail configuration
+errorMail:
+  from: "foo@bar.com"
+  to: "foo@bar.com"
+  prefix: "[Error]"
+
+# Info mail configuration
 infoMail:
-  from: <from address>              # [optional] mail configuration for info-level
-  to: <to address>
-  prefix: <prefix of mail subject>
+  from: "foo@bar.com"
+  to: "foo@bar.com"
+  prefix: "[Info]"
 ```
 
 ## Scheduler
