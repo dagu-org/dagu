@@ -4,6 +4,6 @@ steps:
   - name: step 1
     command: echo $1
   - name: step 2
-    command: sleep 50
+    command: sleep 1
     depends:
       - step 1
