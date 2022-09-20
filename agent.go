@@ -167,8 +167,10 @@ func (a *Agent) init() {
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{
 				Config: &mailer.Config{
-					Host: a.DAG.Smtp.Host,
-					Port: a.DAG.Smtp.Port,
+					Host:     a.DAG.Smtp.Host,
+					Port:     a.DAG.Smtp.Port,
+					Username: a.DAG.Smtp.Username,
+					Password: a.DAG.Smtp.Password,
 				},
 			},
 		}}

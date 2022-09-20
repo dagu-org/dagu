@@ -568,6 +568,8 @@ func buildSmtpConfigFromDefinition(def *configDefinition, d *DAG) (err error) {
 	smtp := &SmtpConfig{}
 	smtp.Host = def.Smtp.Host
 	smtp.Port = def.Smtp.Port
+	smtp.Username = def.Smtp.Username
+	smtp.Password = def.Smtp.Password
 	d.Smtp = smtp
 	return nil
 }
