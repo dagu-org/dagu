@@ -30,7 +30,6 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - Install by placing just a single binary file
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
-- Send email notifications upon DAG execution error/success with simple configuration
 
 ## Contents
 
