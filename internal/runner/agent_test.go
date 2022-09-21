@@ -21,7 +21,7 @@ func TestAgent(t *testing.T) {
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
-	a := NewAgent(
+	agent := NewAgent(
 		&admin.Config{
 			DAGs:    testdataDir,
 			Command: testBin,
@@ -30,22 +30,22 @@ func TestAgent(t *testing.T) {
 	utils.FixedTime = now
 
 	go func() {
-		err := a.Start()
+		err := agent.Start()
 		require.NoError(t, err)
 	}()
 
-	f := path.Join(testdataDir, "scheduled_job.yaml")
-	cl := &dag.Loader{}
-	dag, err := cl.LoadHeadOnly(f)
+	pathToDAG := path.Join(testdataDir, "scheduled_job.yaml")
+	loader := &dag.Loader{}
+	dag, err := loader.LoadHeadOnly(pathToDAG)
 	require.NoError(t, err)
 	c := controller.NewDAGController(dag)
 
 	require.Eventually(t, func() bool {
-		s, err := c.GetLastStatus()
-		return err == nil && s.Status == scheduler.SchedulerStatus_Success
+		status, err := c.GetLastStatus()
+		return err == nil && status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*1, time.Millisecond*100)
 
-	a.Stop()
+	agent.Stop()
 }
 
 func TestAgentForStop(t *testing.T) {
@@ -55,7 +55,7 @@ func TestAgentForStop(t *testing.T) {
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC)
-	a := NewAgent(
+	agent := NewAgent(
 		&admin.Config{
 			DAGs:    testdataDir,
 			Command: testBin,
@@ -83,12 +83,13 @@ func TestAgentForStop(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// confirm the job is running
-	s, _ := c.GetLastStatus()
-	require.Equal(t, scheduler.SchedulerStatus_Running, s.Status)
+	status, err := c.GetLastStatus()
+	require.NoError(t, err)
+	require.Equal(t, scheduler.SchedulerStatus_Running, status.Status)
 
 	// start the agent
 	go func() {
-		err := a.Start()
+		err := agent.Start()
 		require.NoError(t, err)
 	}()
 
@@ -101,5 +102,5 @@ func TestAgentForStop(t *testing.T) {
 	}, time.Second*1, time.Millisecond*100)
 
 	// stop the agent
-	a.Stop()
+	agent.Stop()
 }
