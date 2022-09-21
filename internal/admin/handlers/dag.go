@@ -112,7 +112,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 		switch tab {
 		case dag_TabType_Status:
 		case dag_TabType_Spec:
-			data.Definition, _ = dag.ReadConfig(file)
+			data.Definition, _ = dag.ReadFile(file)
 
 		case dag_TabType_History:
 			logs := controller.NewDAGController(d.DAG).GetRecentStatuses(30)

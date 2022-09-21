@@ -64,7 +64,7 @@ type MailOn struct {
 
 var EXTENSIONS = []string{".yaml", ".yml"}
 
-func ReadConfig(file string) (string, error) {
+func ReadFile(file string) (string, error) {
 	b, err := os.ReadFile(file)
 	return string(b), err
 }
