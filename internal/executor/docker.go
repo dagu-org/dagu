@@ -34,7 +34,6 @@ func (e *DockerExecutor) Run() error {
 }
 
 func CreateDockerExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
-	step.Executor = "docker"
 	cfg := &container.Config{}
 	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result: cfg,
@@ -44,11 +43,9 @@ func CreateDockerExecutor(ctx context.Context, step *dag.Step) (Executor, error)
 		return nil, err
 	}
 
-	if err := md.Decode(step.ExecutorConfig); err != nil {
+	if err := md.Decode(step.ExecutorConfig.Config); err != nil {
 		return nil, err
 	}
-
-	// TODO: validate config if necessary
 
 	return &DockerExecutor{
 		stdout: os.Stdout,

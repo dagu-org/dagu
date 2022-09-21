@@ -526,8 +526,24 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	step.Stderr = b.expandEnv(def.Stderr)
 	step.Output = def.Output
 	step.Dir = b.expandEnv(def.Dir)
-	step.Executor = def.Executor
-	step.ExecutorConfig = def.ExecutorConfig
+	step.ExecutorConfig.Config = map[string]interface{}{}
+	if def.Executor != nil {
+		switch val := (def.Executor).(type) {
+		case string:
+			step.ExecutorConfig.Type = val
+		case map[interface{}]interface{}:
+			for k, v := range val {
+				if k == "type" {
+					step.ExecutorConfig.Type = v.(string)
+				} else {
+					step.ExecutorConfig.Config[k.(string)] = v
+				}
+			}
+		default:
+			return nil, fmt.Errorf("invalid executor config")
+		}
+	}
+	// TODO: validate executor name
 	step.Variables = variables
 	step.Depends = def.Depends
 	if def.ContinueOn != nil {

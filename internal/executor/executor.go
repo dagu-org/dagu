@@ -25,9 +25,14 @@ func Register(name string, register Creator) {
 }
 
 func CreateExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
-	f, ok := executors[step.Executor]
+	f, ok := executors[step.ExecutorConfig.Type]
 	if ok {
 		return f(ctx, step)
 	}
-	return nil, fmt.Errorf("invalid executor: %s", step.Executor)
+	return nil, fmt.Errorf("invalid executor: %s", step.ExecutorConfig)
+}
+
+func ExecutorIsValid(name string) bool {
+	_, ok := executors[name]
+	return ok
 }

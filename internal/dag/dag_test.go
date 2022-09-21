@@ -426,3 +426,53 @@ func TestOverwriteGlobalConfig(t *testing.T) {
 	require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
 	require.Equal(t, d.HistRetentionDays, 30)
 }
+
+func TestExecutor(t *testing.T) {
+	tests := []struct {
+		def, exepectedType, expectedConfig string
+	}{
+		{
+			`
+steps:
+  - name: S1
+    command: echo 1
+    executor: http
+`,
+			"http",
+			"",
+		},
+		{
+			`
+steps:
+  - name: S1
+    command: echo 1
+    executor:
+      type: http
+      config: some option 
+`,
+			"http",
+			"some option",
+		},
+	}
+
+	for _, tt := range tests {
+		l := &Loader{}
+		d, err := l.unmarshalData([]byte(tt.def))
+		require.NoError(t, err)
+
+		def, err := l.decode(d)
+		require.NoError(t, err)
+
+		b := &builder{}
+		dag, err := b.buildFromDefinition(def, nil)
+		require.NoError(t, err)
+
+		if len(dag.Steps) <= 0 {
+			t.Fatal("no steps")
+		}
+		require.Equal(t, tt.exepectedType, dag.Steps[0].ExecutorConfig.Type)
+		if tt.expectedConfig != "" {
+			require.Equal(t, tt.expectedConfig, dag.Steps[0].ExecutorConfig.Config["config"])
+		}
+	}
+}
