@@ -64,7 +64,7 @@ type MailOn struct {
 
 var EXTENSIONS = []string{".yaml", ".yml"}
 
-func ReadConfig(file string) (string, error) {
+func ReadFile(file string) (string, error) {
 	b, err := os.ReadFile(file)
 	return string(b), err
 }
@@ -526,8 +526,24 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	step.Stderr = b.expandEnv(def.Stderr)
 	step.Output = def.Output
 	step.Dir = b.expandEnv(def.Dir)
-	step.Executor = def.Executor
-	step.ExecutorConfig = def.ExecutorConfig
+	step.ExecutorConfig.Config = map[string]interface{}{}
+	if def.Executor != nil {
+		switch val := (def.Executor).(type) {
+		case string:
+			step.ExecutorConfig.Type = val
+		case map[interface{}]interface{}:
+			for k, v := range val {
+				if k == "type" {
+					step.ExecutorConfig.Type = v.(string)
+				} else {
+					step.ExecutorConfig.Config[k.(string)] = v
+				}
+			}
+		default:
+			return nil, fmt.Errorf("invalid executor config")
+		}
+	}
+	// TODO: validate executor config
 	step.Variables = variables
 	step.Depends = def.Depends
 	if def.ContinueOn != nil {

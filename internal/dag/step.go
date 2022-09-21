@@ -14,8 +14,7 @@ type Step struct {
 	Variables       []string
 	OutputVariables *sync.Map
 	Dir             string
-	Executor        string
-	ExecutorConfig  map[string]interface{}
+	ExecutorConfig  ExecutorConfig
 	CmdWithArgs     string
 	Command         string
 	Script          string
@@ -30,6 +29,11 @@ type Step struct {
 	MailOnError     bool
 	Preconditions   []*Condition
 	SignalOnStop    string
+}
+
+type ExecutorConfig struct {
+	Type   string
+	Config map[string]interface{}
 }
 
 type RetryPolicy struct {

@@ -71,16 +71,16 @@ func TestReadConfig(t *testing.T) {
 	}()
 
 	tmpFile := path.Join(tmpDir, "config.yaml")
-	testConfig := `steps:
+	input := `steps:
   - name: step 1
     command: echo test
 `
-	err := os.WriteFile(tmpFile, []byte(testConfig), 0644)
+	err := os.WriteFile(tmpFile, []byte(input), 0644)
 	require.NoError(t, err)
 
-	ret, err := ReadConfig(tmpFile)
+	ret, err := ReadFile(tmpFile)
 	require.NoError(t, err)
-	require.Equal(t, testConfig, ret)
+	require.Equal(t, input, ret)
 }
 
 func TestConfigLoadHeadOnly(t *testing.T) {
@@ -93,17 +93,21 @@ func TestConfigLoadHeadOnly(t *testing.T) {
 	require.True(t, len(d.Steps) == 0)
 }
 
-func TestLoadInvalidConfigError(t *testing.T) {
-	for _, c := range []string{
-		`env: 
+func TestLoadInvalidDAG(t *testing.T) {
+	tests := []struct {
+		input string
+	}{
+		{`env: 
   VAR: "` + "`ech 1`" + `"
-`,
-		`logDir: "` + "`ech foo`" + `"`,
-		`params: "` + "`ech foo`" + `"`,
-		`schedule: "` + "1" + `"`,
-	} {
+`},
+		{`logDir: "` + "`ech foo`" + `"`},
+		{`params: "` + "`ech foo`" + `"`},
+		{`schedule: "` + "1" + `"`},
+	}
+
+	for _, tt := range tests {
 		l := &Loader{}
-		d, err := l.unmarshalData([]byte(c))
+		d, err := l.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
 		def, err := l.decode(d)
@@ -116,8 +120,8 @@ func TestLoadInvalidConfigError(t *testing.T) {
 }
 
 func TestLoadEnv(t *testing.T) {
-	for _, c := range []struct {
-		val, key, want string
+	tests := []struct {
+		input, envKey, expectedValue string
 	}{
 		{
 			`env: 
@@ -140,9 +144,11 @@ func TestLoadEnv(t *testing.T) {
 `,
 			"FOO", "BAR:BAZ:BAR:FOO",
 		},
-	} {
+	}
+
+	for _, tt := range tests {
 		l := &Loader{}
-		d, err := l.unmarshalData([]byte(c.val))
+		d, err := l.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
 		def, err := l.decode(d)
@@ -152,48 +158,48 @@ func TestLoadEnv(t *testing.T) {
 		_, err = b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
-		require.Equal(t, c.want, os.Getenv(c.key))
+		require.Equal(t, tt.expectedValue, os.Getenv(tt.envKey))
 	}
 }
 
 func TestParseParameter(t *testing.T) {
-	for _, test := range []struct {
-		Params string
-		Env    string
-		Want   map[string]string
+	tests := []struct {
+		params         string
+		environ        string
+		expectedParams map[string]string
 	}{
 		{
-			Params: "x",
-			Want: map[string]string{
+			params: "x",
+			expectedParams: map[string]string{
 				"1": "x",
 			},
 		},
 		{
-			Params: "x y",
-			Want: map[string]string{
+			params: "x y",
+			expectedParams: map[string]string{
 				"1": "x",
 				"2": "y",
 			},
 		},
 		{
-			Params: "x yy zzz",
-			Want: map[string]string{
+			params: "x yy zzz",
+			expectedParams: map[string]string{
 				"1": "x",
 				"2": "yy",
 				"3": "zzz",
 			},
 		},
 		{
-			Params: "x $1",
-			Want: map[string]string{
+			params: "x $1",
+			expectedParams: map[string]string{
 				"1": "x",
 				"2": "x",
 			},
 		},
 		{
-			Params: "first P1=foo P2=${FOO} P3=`/bin/echo ${P2}` X=bar Y=${P1} Z=\"A B C\"",
-			Env:    "FOO: BAR",
-			Want: map[string]string{
+			params:  "first P1=foo P2=${FOO} P3=`/bin/echo ${P2}` X=bar Y=${P1} Z=\"A B C\"",
+			environ: "FOO: BAR",
+			expectedParams: map[string]string{
 				"P1": "foo",
 				"P2": "BAR",
 				"P3": "BAR",
@@ -209,13 +215,15 @@ func TestParseParameter(t *testing.T) {
 				"7":  "Z=A B C",
 			},
 		},
-	} {
+	}
+
+	for _, tt := range tests {
 		l := &Loader{}
 		d, err := l.unmarshalData([]byte(fmt.Sprintf(`
 env:
   - %s
 params: %s
-  	`, test.Env, test.Params)))
+  	`, tt.environ, tt.params)))
 		require.NoError(t, err)
 
 		def, err := l.decode(d)
@@ -225,7 +233,7 @@ params: %s
 		_, err = b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
-		for k, v := range test.Want {
+		for k, v := range tt.expectedParams {
 			require.Equal(t, v, os.Getenv(k))
 		}
 	}
@@ -241,12 +249,12 @@ func TestExpandEnv(t *testing.T) {
 }
 
 func TestTags(t *testing.T) {
-	tags := "Daily, Monthly"
-	wants := []string{"daily", "monthly"}
+	input := `
+tags: Daily, Monthly
+`
+	expectedTags := []string{"daily", "monthly"}
 	l := &Loader{}
-	m, err := l.unmarshalData([]byte(fmt.Sprintf(`
-tags: %s
-  	`, tags)))
+	m, err := l.unmarshalData([]byte(input))
 	require.NoError(t, err)
 
 	def, err := l.decode(m)
@@ -256,42 +264,40 @@ tags: %s
 	d, err := b.buildFromDefinition(def, nil)
 	require.NoError(t, err)
 
-	require.Equal(t, wants, d.Tags)
+	require.Equal(t, expectedTags, d.Tags)
 
 	require.True(t, d.HasTag("daily"))
 	require.False(t, d.HasTag("weekly"))
 }
 
 func TestSchedule(t *testing.T) {
-	for _, tc := range []struct {
-		Name string
-		Def  string
-		Err  bool
-		Want int
+	tests := []struct {
+		input       string
+		err         bool
+		expectedLen int
 	}{
 		{
-			Name: "basic schedule",
-			Def:  "schedule: \"*/5 * * * *\"",
-			Want: 1,
+			input:       "schedule: \"*/5 * * * *\"",
+			expectedLen: 1,
 		},
 		{
-			Name: "multiple schedule",
-			Def: `schedule:
+			input: `schedule:
   - "*/5 * * * *"
   - "* * * * *"`,
-			Want: 2,
+			expectedLen: 2,
 		},
 		{
-			Name: "parsing error",
-			Def: `schedule:
+			input: `schedule:
   - true 
   - "* * * * *"`,
-			Err: true,
+			err: true,
 		},
-	} {
-		t.Run(tc.Name, func(t *testing.T) {
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
 			l := &Loader{}
-			m, err := l.unmarshalData([]byte(tc.Def))
+			m, err := l.unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
 			def, err := l.decode(m)
@@ -300,53 +306,48 @@ func TestSchedule(t *testing.T) {
 			b := &builder{}
 			d, err := b.buildFromDefinition(def, nil)
 
-			if tc.Err {
+			if tt.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.Want, len(d.Schedule))
+				require.Equal(t, tt.expectedLen, len(d.Schedule))
 			}
 		})
 	}
 }
 
 func TestScheduleStop(t *testing.T) {
-	for _, tc := range []struct {
-		Name        string
-		Def         string
-		Err         bool
-		WantStart   int
-		WantStop    int
-		WantRestart int
+	tests := []struct {
+		input              string
+		err                bool
+		expectedStartLen   int
+		expectedStopLen    int
+		expectedRestartLen int
 	}{
 		{
-			Name: "start and stop are parsed",
-			Def: `schedule:
+			input: `schedule:
   start: "0 1 * * *"
   stop: "0 2 * * *"
 `,
-			WantStart: 1,
-			WantStop:  1,
+			expectedStartLen: 1,
+			expectedStopLen:  1,
 		},
 		{
-			Name: "start only",
-			Def: `schedule:
+			input: `schedule:
   start: "0 1 * * *"
 `,
-			WantStart: 1,
-			WantStop:  0,
+			expectedStartLen: 1,
+			expectedStopLen:  0,
 		},
 		{
-			Name: "stop only",
-			Def: `schedule:
+			input: `schedule:
   stop: "0 1 * * *"
 `,
-			WantStart: 0,
-			WantStop:  1,
+			expectedStartLen: 0,
+			expectedStopLen:  1,
 		},
 		{
-			Name: "multiple schedule",
-			Def: `schedule:
+			input: `schedule:
   start: 
     - "0 1 * * *"
     - "0 18 * * *"
@@ -354,38 +355,37 @@ func TestScheduleStop(t *testing.T) {
     - "0 2 * * *"
     - "0 20 * * *"
 `,
-			WantStart: 2,
-			WantStop:  2,
+			expectedStartLen: 2,
+			expectedStopLen:  2,
 		},
 		{
-			Name: "restart",
-			Def: `schedule:
+			input: `schedule:
   start: "0 8 * * *"
   restart: "0 12 * * *"
   stop: "0 20 * * *"
 `,
-			WantStart:   1,
-			WantStop:    1,
-			WantRestart: 1,
+			expectedStartLen:   1,
+			expectedStopLen:    1,
+			expectedRestartLen: 1,
 		},
 		{
-			Name: "invalid expression",
-			Def: `schedule:
+			input: `schedule:
   stop: "* * * * * * *"
 `,
-			Err: true,
+			err: true,
 		},
 		{
-			Name: "invalid key",
-			Def: `schedule:
+			input: `schedule:
   invalid: "* * * * * * *"
 `,
-			Err: true,
+			err: true,
 		},
-	} {
-		t.Run(tc.Name, func(t *testing.T) {
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
 			l := &Loader{}
-			m, err := l.unmarshalData([]byte(tc.Def))
+			m, err := l.unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
 			def, err := l.decode(m)
@@ -394,14 +394,14 @@ func TestScheduleStop(t *testing.T) {
 			b := &builder{}
 			d, err := b.buildFromDefinition(def, nil)
 
-			if tc.Err {
+			if tt.err {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tc.WantStart, len(d.Schedule))
-			require.Equal(t, tc.WantStop, len(d.StopSchedule))
-			require.Equal(t, tc.WantRestart, len(d.RestartSchedule))
+			require.Equal(t, tt.expectedStartLen, len(d.Schedule))
+			require.Equal(t, tt.expectedStopLen, len(d.StopSchedule))
+			require.Equal(t, tt.expectedRestartLen, len(d.RestartSchedule))
 		})
 	}
 }
@@ -425,4 +425,54 @@ func TestOverwriteGlobalConfig(t *testing.T) {
 
 	require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
 	require.Equal(t, d.HistRetentionDays, 30)
+}
+
+func TestExecutor(t *testing.T) {
+	tests := []struct {
+		input, exepectedType, expectedConfig string
+	}{
+		{
+			`
+steps:
+  - name: S1
+    command: echo 1
+    executor: http
+`,
+			"http",
+			"",
+		},
+		{
+			`
+steps:
+  - name: S1
+    command: echo 1
+    executor:
+      type: http
+      config: some option 
+`,
+			"http",
+			"some option",
+		},
+	}
+
+	for _, tt := range tests {
+		l := &Loader{}
+		d, err := l.unmarshalData([]byte(tt.input))
+		require.NoError(t, err)
+
+		def, err := l.decode(d)
+		require.NoError(t, err)
+
+		b := &builder{}
+		dag, err := b.buildFromDefinition(def, nil)
+		require.NoError(t, err)
+
+		if len(dag.Steps) <= 0 {
+			t.Fatal("no steps")
+		}
+		require.Equal(t, tt.exepectedType, dag.Steps[0].ExecutorConfig.Type)
+		if tt.expectedConfig != "" {
+			require.Equal(t, tt.expectedConfig, dag.Steps[0].ExecutorConfig.Config["config"])
+		}
+	}
 }
