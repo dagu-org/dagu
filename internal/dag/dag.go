@@ -543,7 +543,7 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 			return nil, fmt.Errorf("invalid executor config")
 		}
 	}
-	// TODO: validate executor name
+	// TODO: validate executor config
 	step.Variables = variables
 	step.Depends = def.Depends
 	if def.ContinueOn != nil {
