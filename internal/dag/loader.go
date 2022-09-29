@@ -67,9 +67,6 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := assertDef(def); err != nil {
-		return nil, err
-	}
 	b := &builder{
 		BuildDAGOptions: BuildDAGOptions{
 			headOnly: false,
@@ -139,10 +136,6 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 
 	def, err := cl.decode(raw)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := assertDef(def); err != nil {
 		return nil, err
 	}
 

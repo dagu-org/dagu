@@ -1,8 +1,8 @@
 package dag
 
 import (
-	"fmt"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,20 +10,71 @@ import (
 	"github.com/yohamta/dagu/internal/settings"
 )
 
-func TestLoadConfig(t *testing.T) {
+func TestLoadingFile(t *testing.T) {
 	l := &Loader{}
-	f := path.Join(testdataDir, "load.yaml")
+	f := path.Join(testdataDir, "loader_test.yaml")
 	d, err := l.Load(f, "")
 	require.NoError(t, err)
 	require.Equal(t, f, d.Location)
 
 	// without .yaml
-	d, err = l.Load(path.Join(testdataDir, "load"), "")
+	d, err = l.Load(path.Join(testdataDir, "loader_test"), "")
 	require.NoError(t, err)
 	require.Equal(t, f, d.Location)
 }
 
-func TestLoadBaseConfig(t *testing.T) {
+func TestLoaingErrors(t *testing.T) {
+
+	tests := []struct {
+		file          string
+		expectedError string
+	}{
+		{
+			file:          path.Join(testdataDir, "not_existing_file.yaml"),
+			expectedError: "no such file or directory",
+		},
+		{
+			file:          path.Join(testdataDir, "err_decode.yaml"),
+			expectedError: "has invalid keys: invalidkey",
+		},
+		{
+			file:          path.Join(testdataDir, "err_parse.yaml"),
+			expectedError: "cannot unmarshal",
+		},
+	}
+
+	for i, tt := range tests {
+		l := &Loader{}
+		_, err := l.Load(tt.file, "")
+		require.Error(t, err)
+
+		if !strings.Contains(err.Error(), tt.expectedError) {
+			t.Errorf("test %d: expected error %q, got %q", i, tt.expectedError, err.Error())
+		}
+	}
+}
+
+func TestLoadingHeadlineOnly(t *testing.T) {
+	l := &Loader{}
+
+	d, err := l.LoadHeadOnly(path.Join(testdataDir, "default.yaml"))
+	require.NoError(t, err)
+
+	require.Equal(t, d.Name, "default")
+	require.True(t, len(d.Steps) == 0)
+}
+
+func TestCloning(t *testing.T) {
+	l := &Loader{}
+
+	d, err := l.Load(path.Join(testdataDir, "default.yaml"), "")
+	require.NoError(t, err)
+
+	cloned := d.Clone()
+	require.Equal(t, d, cloned)
+}
+
+func TestLoadingBaseConfig(t *testing.T) {
 	l := &Loader{}
 	d, err := l.loadBaseConfig(
 		settings.MustGet(settings.SETTING__BASE_CONFIG),
@@ -33,18 +84,7 @@ func TestLoadBaseConfig(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestLoadBaseConfigError(t *testing.T) {
-	for _, f := range []string{
-		path.Join(testdataDir, "err_decode.yaml"),
-		path.Join(testdataDir, "err_parse.yaml"),
-	} {
-		l := &Loader{}
-		_, err := l.loadBaseConfig(f, &BuildDAGOptions{})
-		require.Error(t, err)
-	}
-}
-
-func TestLoadDeafult(t *testing.T) {
+func TestLoadingDeafultValues(t *testing.T) {
 	l := &Loader{}
 	d, err := l.Load(path.Join(testdataDir, "default.yaml"), "")
 	require.NoError(t, err)
@@ -53,8 +93,9 @@ func TestLoadDeafult(t *testing.T) {
 	require.Equal(t, 30, d.HistRetentionDays)
 }
 
-func TestLoadData(t *testing.T) {
-	dat := `name: test DAG
+func TestLoadingFromMemory(t *testing.T) {
+	dat := `
+name: test DAG
 steps:
   - name: "1"
     command: "true"
@@ -76,66 +117,5 @@ steps:
 	// error
 	dat = `invalidkey: test DAG`
 	_, err = l.LoadData([]byte(dat))
-	require.Error(t, err)
-
-	// error
-	dat = `name: test DAG`
-	_, err = l.LoadData([]byte(dat))
-	require.Error(t, err)
-}
-
-func TestLoadSignalOnStop(t *testing.T) {
-	for _, tc := range []struct {
-		sig  string
-		want string
-		err  bool
-	}{
-		{
-			sig:  "SIGINT",
-			want: "SIGINT",
-			err:  false,
-		},
-		{
-			sig: "2000",
-			err: true,
-		},
-	} {
-		dat := fmt.Sprintf(`name: test DAG
-steps:
-  - name: "1"
-    command: "true"
-    signalOnStop: "%s"
-`, tc.sig)
-		l := &Loader{}
-		ret, err := l.LoadData([]byte(dat))
-		if tc.err {
-			require.Error(t, err)
-			continue
-		}
-		require.NoError(t, err)
-
-		step := ret.Steps[0]
-		require.Equal(t, step.SignalOnStop, tc.want)
-	}
-}
-
-func TestLoadErrorFileNotExist(t *testing.T) {
-	l := &Loader{}
-	_, err := l.Load(path.Join(testdataDir, "not_existing_file.yaml"), "")
-	require.Error(t, err)
-}
-
-func TestGlobalConfigNotExist(t *testing.T) {
-	l := &Loader{}
-
-	file := path.Join(testdataDir, "default.yaml")
-	_, err := l.Load(file, "")
-	require.NoError(t, err)
-}
-
-func TestDecodeError(t *testing.T) {
-	l := &Loader{}
-	file := path.Join(testdataDir, "err_decode.yaml")
-	_, err := l.Load(file, "")
 	require.Error(t, err)
 }
