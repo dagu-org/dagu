@@ -69,35 +69,35 @@ func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (dags []*DAGStatus, err
 // ReadStatus loads DAG from config file.
 func (dr *DAGStatusReader) ReadStatus(dagLocation string, headerOnly bool) (*DAGStatus, error) {
 	var (
-		cl     = dag.Loader{}
-		dagObj *dag.DAG
-		err    error
+		cl  = dag.Loader{}
+		d   *dag.DAG
+		err error
 	)
 
 	if headerOnly {
-		dagObj, err = cl.LoadHeadOnly(dagLocation)
+		d, err = cl.LoadHeadOnly(dagLocation)
 	} else {
-		dagObj, err = cl.LoadWithoutEval(dagLocation)
+		d, err = cl.LoadWithoutEval(dagLocation)
 	}
 
 	if err != nil {
-		if dagObj != nil {
-			return dr.newDAGStatus(dagObj, defaultStatus(dagObj), err), err
+		if d != nil {
+			return dr.newDAGStatus(d, defaultStatus(d), err), err
 		}
-		dagObj := &dag.DAG{Location: dagLocation}
-		dagObj.Init()
-		return dr.newDAGStatus(dagObj, defaultStatus(dagObj), err), err
+		d := &dag.DAG{Location: dagLocation}
+		d.Init()
+		return dr.newDAGStatus(d, defaultStatus(d), err), err
 	}
 
 	if !headerOnly {
-		if _, err := scheduler.NewExecutionGraph(dagObj.Steps...); err != nil {
-			return dr.newDAGStatus(dagObj, nil, err), err
+		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
+			return dr.newDAGStatus(d, nil, err), err
 		}
 	}
 
-	dc := NewDAGController(dagObj)
+	dc := NewDAGController(d)
 	status, err := dc.GetLastStatus()
-	return dr.newDAGStatus(dagObj, status, err), err
+	return dr.newDAGStatus(d, status, err), err
 }
 
 func (dr *DAGStatusReader) newDAGStatus(d *dag.DAG, s *models.Status, err error) *DAGStatus {

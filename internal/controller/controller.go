@@ -106,9 +106,9 @@ type DAGController struct {
 	*dag.DAG
 }
 
-func NewDAGController(dagObj *dag.DAG) *DAGController {
+func NewDAGController(d *dag.DAG) *DAGController {
 	return &DAGController{
-		DAG: dagObj,
+		DAG: d,
 	}
 }
 
