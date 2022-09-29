@@ -251,11 +251,11 @@ func TestUpdate(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	loc := path.Join(tmpDir, "test.yaml")
-	dagObj := &dag.DAG{
+	d := &dag.DAG{
 		Name:     "test",
 		Location: loc,
 	}
-	dc := controller.NewDAGController(dagObj)
+	dc := controller.NewDAGController(d)
 
 	// invalid DAG
 	invalidDAG := `name: test DAG`
@@ -293,12 +293,12 @@ func TestRemove(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	loc := path.Join(tmpDir, "test.yaml")
-	dagObj := &dag.DAG{
+	d := &dag.DAG{
 		Name:     "test",
 		Location: loc,
 	}
 
-	dc := controller.NewDAGController(dagObj)
+	dc := controller.NewDAGController(d)
 	dagSpec := `name: test DAG
 steps:
   - name: "1"
@@ -341,11 +341,11 @@ func TestCreateNewDAG(t *testing.T) {
 	// check file is created
 	cl := &dag.Loader{}
 
-	dagObj, err := cl.Load(filename, "")
+	d, err := cl.Load(filename, "")
 	require.NoError(t, err)
-	require.Equal(t, "test", dagObj.Name)
+	require.Equal(t, "test", d.Name)
 
-	steps := dagObj.Steps[0]
+	steps := d.Steps[0]
 	require.Equal(t, "step1", steps.Name)
 	require.Equal(t, "echo", steps.Command)
 	require.Equal(t, []string{"hello"}, steps.Args)

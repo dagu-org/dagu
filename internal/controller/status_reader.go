@@ -41,8 +41,8 @@ func NewDAGStatusReader() *DAGStatusReader {
 }
 
 // ReadAllStatus reads all DAGStatus
-func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (dags []*DAGStatus, errs []string, err error) {
-	dags = []*DAGStatus{}
+func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs []string, err error) {
+	statuses = []*DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(DAGsDir) {
 		if err = os.MkdirAll(DAGsDir, 0755); err != nil {
@@ -54,50 +54,50 @@ func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (dags []*DAGStatus, err
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dag, err := dr.ReadStatus(filepath.Join(DAGsDir, fi.Name()), true)
+			d, err := dr.ReadStatus(filepath.Join(DAGsDir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
-			if dag != nil {
-				dags = append(dags, dag)
+			if d != nil {
+				statuses = append(statuses, d)
 			} else {
 				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
 			}
 		}
 	}
-	return dags, errs, nil
+	return statuses, errs, nil
 }
 
 // ReadStatus loads DAG from config file.
 func (dr *DAGStatusReader) ReadStatus(dagLocation string, headerOnly bool) (*DAGStatus, error) {
 	var (
-		cl     = dag.Loader{}
-		dagObj *dag.DAG
-		err    error
+		cl  = dag.Loader{}
+		d   *dag.DAG
+		err error
 	)
 
 	if headerOnly {
-		dagObj, err = cl.LoadHeadOnly(dagLocation)
+		d, err = cl.LoadHeadOnly(dagLocation)
 	} else {
-		dagObj, err = cl.LoadWithoutEval(dagLocation)
+		d, err = cl.LoadWithoutEval(dagLocation)
 	}
 
 	if err != nil {
-		if dagObj != nil {
-			return dr.newDAGStatus(dagObj, defaultStatus(dagObj), err), err
+		if d != nil {
+			return dr.newDAGStatus(d, defaultStatus(d), err), err
 		}
-		dagObj := &dag.DAG{Location: dagLocation}
-		dagObj.Init()
-		return dr.newDAGStatus(dagObj, defaultStatus(dagObj), err), err
+		d := &dag.DAG{Location: dagLocation}
+		d.Init()
+		return dr.newDAGStatus(d, defaultStatus(d), err), err
 	}
 
 	if !headerOnly {
-		if _, err := scheduler.NewExecutionGraph(dagObj.Steps...); err != nil {
-			return dr.newDAGStatus(dagObj, nil, err), err
+		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
+			return dr.newDAGStatus(d, nil, err), err
 		}
 	}
 
-	dc := NewDAGController(dagObj)
+	dc := NewDAGController(d)
 	status, err := dc.GetLastStatus()
-	return dr.newDAGStatus(dagObj, status, err), err
+	return dr.newDAGStatus(d, status, err), err
 }
 
 func (dr *DAGStatusReader) newDAGStatus(d *dag.DAG, s *models.Status, err error) *DAGStatus {
