@@ -509,6 +509,7 @@ func (b *builder) buildStepsFromDefinition(def *configDefinition, d *DAG) error 
 		ret = append(ret, step)
 	}
 	d.Steps = ret
+
 	return nil
 }
 
@@ -652,13 +653,6 @@ func parseSchedule(values []string) ([]*Schedule, error) {
 		})
 	}
 	return ret, nil
-}
-
-func assertDef(def *configDefinition) error {
-	if len(def.Steps) == 0 {
-		return fmt.Errorf("at least one step must be specified")
-	}
-	return nil
 }
 
 func assertStepDef(def *stepDef) error {

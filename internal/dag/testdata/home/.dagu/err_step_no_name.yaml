@@ -1,3 +1,0 @@
-name: test
-steps:
-  - command: "printf 1"

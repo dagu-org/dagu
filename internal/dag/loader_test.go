@@ -77,11 +77,6 @@ steps:
 	dat = `invalidkey: test DAG`
 	_, err = l.LoadData([]byte(dat))
 	require.Error(t, err)
-
-	// error
-	dat = `name: test DAG`
-	_, err = l.LoadData([]byte(dat))
-	require.Error(t, err)
 }
 
 func TestLoadSignalOnStop(t *testing.T) {

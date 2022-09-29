@@ -27,21 +27,38 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestAssertDefinition(t *testing.T) {
-	l := &Loader{}
+func TestBuildErrors(t *testing.T) {
+	tests := []struct {
+		input         string
+		expectedError string
+	}{
+		{
+			input: `
+steps:
+  - command: echo 1`,
+			expectedError: "step name must be specified",
+		},
+		{
+			input: `
+steps:
+  - name: step 1`,
+			expectedError: "step command must be specified",
+		},
+	}
 
-	_, err := l.Load(path.Join(testdataDir, "err_no_steps.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("at least one step must be specified"))
-}
+	for _, tt := range tests {
+		l := &Loader{}
+		d, err := l.unmarshalData([]byte(tt.input))
+		require.NoError(t, err)
 
-func TestAssertStepDefinition(t *testing.T) {
-	l := &Loader{}
+		def, err := l.decode(d)
+		require.NoError(t, err)
 
-	_, err := l.Load(path.Join(testdataDir, "err_step_no_name.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("step name must be specified"))
-
-	_, err = l.Load(path.Join(testdataDir, "err_step_no_command.yaml"), "")
-	require.Equal(t, err, fmt.Errorf("step command must be specified"))
+		b := &builder{}
+		_, err = b.buildFromDefinition(def, nil)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), tt.expectedError)
+	}
 }
 
 func TestConfigReadClone(t *testing.T) {
