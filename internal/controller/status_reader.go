@@ -41,8 +41,8 @@ func NewDAGStatusReader() *DAGStatusReader {
 }
 
 // ReadAllStatus reads all DAGStatus
-func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (dags []*DAGStatus, errs []string, err error) {
-	dags = []*DAGStatus{}
+func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs []string, err error) {
+	statuses = []*DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(DAGsDir) {
 		if err = os.MkdirAll(DAGsDir, 0755); err != nil {
@@ -54,16 +54,16 @@ func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (dags []*DAGStatus, err
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dag, err := dr.ReadStatus(filepath.Join(DAGsDir, fi.Name()), true)
+			d, err := dr.ReadStatus(filepath.Join(DAGsDir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
-			if dag != nil {
-				dags = append(dags, dag)
+			if d != nil {
+				statuses = append(statuses, d)
 			} else {
 				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
 			}
 		}
 	}
-	return dags, errs, nil
+	return statuses, errs, nil
 }
 
 // ReadStatus loads DAG from config file.

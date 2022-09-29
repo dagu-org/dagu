@@ -101,13 +101,13 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 		}
 	}
 
-	for _, dag := range er.dags {
-		if er.suspendChecker.IsSuspended(dag) {
+	for _, d := range er.dags {
+		if er.suspendChecker.IsSuspended(d) {
 			continue
 		}
-		f(dag, dag.Schedule, EntryTypeStart)
-		f(dag, dag.StopSchedule, EntryTypeStop)
-		f(dag, dag.RestartSchedule, EntryTypeRestart)
+		f(d, d.Schedule, EntryTypeStart)
+		f(d, d.StopSchedule, EntryTypeStop)
+		f(d, d.RestartSchedule, EntryTypeRestart)
 	}
 
 	return entries, nil
