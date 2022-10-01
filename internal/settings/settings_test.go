@@ -41,7 +41,7 @@ func TestReadSetting(t *testing.T) {
 		require.Equal(t, val, test.Want)
 	}
 
-	// read from enviroment variables
+	// read from environment variables
 	_ = os.Setenv(SETTING__HOME, "/tmp/dagu/")
 	for _, test := range []struct {
 		Name string
