@@ -296,7 +296,7 @@ steps:
 
 ### Conditional Logic
 
-Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `precondition` field to add conditional branches to your DAG.
+Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `preconditions` field to add conditional branches to your DAG.
 
 For example, the below task only runs on the first date of each month.
 
@@ -506,7 +506,7 @@ You can configure the dagu's internal work directory by defining `DAGU_HOME` env
 
 ## Sending email notifications
 
-Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `stmp` field and related fields in the DAG specs. You can use any email delivery services (e.g., Sendgrid, Mailgun, etc).
+Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `smtp` field and related fields in the DAG specs. You can use any email delivery services (e.g., Sendgrid, Mailgun, etc).
 
 ```yaml
 # Eamil notification settings
