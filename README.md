@@ -76,7 +76,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
 - [REST API Interface](#rest-api-interface)
-- [Development Guide](#development-guide)
+- [Build from Source](#build-from-source)
 - [FAQ](#faq)
   - [How to contribute?](#how-to-contribute)
   - [Where is the history data stored?](#where-is-the-history-data-stored)
@@ -136,8 +136,6 @@ docker run \
 -v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
 yohamta/dagu:latest
 ```
-
-Then browse to http://localhost:8080
 
 ### via GitHub Release Page 
 
@@ -683,7 +681,7 @@ dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
 
 Please refer to [REST API Docs](./docs/restapi.md)
 
-## Development Guide
+## Build from Source
 
 How to build:
 
@@ -699,18 +697,6 @@ npm i -g yarn
 4. Build 
 ```sh
 make build
-```
-
-How to run tests:
-
-```sh
-make test
-```
-
-Run with `go run`:
-
-```
-go run ./cmd
 ```
 
 ## FAQ
