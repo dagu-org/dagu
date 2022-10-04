@@ -76,6 +76,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
 - [REST API Interface](#rest-api-interface)
+- [Development Guide](#development-guide)
 - [FAQ](#faq)
   - [How to contribute?](#how-to-contribute)
   - [Where is the history data stored?](#where-is-the-history-data-stored)
@@ -681,6 +682,36 @@ dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
 ## REST API Interface
 
 Please refer to [REST API Docs](./docs/restapi.md)
+
+## Development Guide
+
+How to build:
+
+1. Check out the repository
+
+2. Install the latest version of [Node.js](https://nodejs.org/en/download/)
+
+3. Install Yarn 
+```sh
+npm i -g yarn
+```
+
+4. Build 
+```sh
+make build
+```
+
+How to run tests:
+
+```sh
+make test
+```
+
+Run with `go run`:
+
+```
+go run ./cmd
+```
 
 ## FAQ
 
