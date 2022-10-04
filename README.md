@@ -42,6 +42,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Install `dagu`](#install-dagu)
   - [via Homebrew](#via-homebrew)
   - [via Bash script](#via-bash-script)
+  - [via Docker Image](#via-docker-image)
   - [via GitHub Release Page](#via-github-release-page)
 - [️Quick start](#️quick-start)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
@@ -122,6 +123,20 @@ brew upgrade yohamta/tap/dagu
 ```sh
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
+
+### via Docker Image
+
+```sh
+docker run \
+--rm \
+-p 8080:8080 \
+-v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
+-v $HOME/.dagu/data:/home/dagu/.dagu/data \
+-v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
+yohamta/dagu:latest
+```
+
+Then browse to http://localhost:8080
 
 ### via GitHub Release Page 
 
@@ -463,7 +478,7 @@ To configure dagu, please create the config file (default path: `~/.dagu/admin.y
 ```yaml
 # Web Server Host and Port
 host: <hostname for web UI address>                          # default: 127.0.0.1
-port: <port number for web UI address>                       # default: 8000
+port: <port number for web UI address>                       # default: 8080
 
 # path to the DAGs directory
 dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
