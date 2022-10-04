@@ -42,6 +42,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Install `dagu`](#install-dagu)
   - [via Homebrew](#via-homebrew)
   - [via Bash script](#via-bash-script)
+  - [via Docker Image](#via-docker-image)
   - [via GitHub Release Page](#via-github-release-page)
 - [️Quick start](#️quick-start)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
@@ -122,6 +123,20 @@ brew upgrade yohamta/tap/dagu
 ```sh
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
+
+### via Docker Image
+
+```sh
+docker run \
+--rm \
+-p 8080:8080 \
+-v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
+-v $HOME/.dagu/data:/home/dagu/.dagu/data \
+-v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
+yohamta/dagu:latest
+```
+
+Then browse to http://localhost:8080
 
 ### via GitHub Release Page 
 
@@ -281,7 +296,7 @@ steps:
 
 ### Conditional Logic
 
-Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `precondition` field to add conditional branches to your DAG.
+Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `preconditions` field to add conditional branches to your DAG.
 
 For example, the below task only runs on the first date of each month.
 
@@ -463,7 +478,7 @@ To configure dagu, please create the config file (default path: `~/.dagu/admin.y
 ```yaml
 # Web Server Host and Port
 host: <hostname for web UI address>                          # default: 127.0.0.1
-port: <port number for web UI address>                       # default: 8000
+port: <port number for web UI address>                       # default: 8080
 
 # path to the DAGs directory
 dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
@@ -491,7 +506,7 @@ You can configure the dagu's internal work directory by defining `DAGU_HOME` env
 
 ## Sending email notifications
 
-Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `stmp` field and related fields in the DAG specs. You can use any email delivery services (e.g., Sendgrid, Mailgun, etc).
+Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `smtp` field and related fields in the DAG specs. You can use any email delivery services (e.g., Sendgrid, Mailgun, etc).
 
 ```yaml
 # Eamil notification settings
