@@ -1,7 +1,7 @@
 steps:
   - name: step1
-    executor: docker
-    executorConfig:
+    executor: 
+    - type: docker
       hostname: localhost
       image: node:latest
     command: npm init -y
