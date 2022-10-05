@@ -97,7 +97,7 @@ function DAGActions({
         label={label}
         icon={
           <>
-            <Label show={label}>Start</Label>
+            <Label show={false}>Start</Label>
             <span className="icon">
               <FontAwesomeIcon icon={faPlay} />
             </span>
@@ -117,7 +117,7 @@ function DAGActions({
         label={label}
         icon={
           <>
-            <Label show={label}>Stop</Label>
+            <Label show={false}>Stop</Label>
             <span className="icon">
               <FontAwesomeIcon icon={faStop} />
             </span>
@@ -137,7 +137,7 @@ function DAGActions({
         label={label}
         icon={
           <>
-            <Label show={label}>Retry</Label>
+            <Label show={false}>Retry</Label>
             <span className="icon">
               <FontAwesomeIcon icon={faReply} />
             </span>
