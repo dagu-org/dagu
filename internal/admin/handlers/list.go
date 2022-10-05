@@ -73,7 +73,7 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
+			_, _ = w.Write([]byte("OK"))
 			return
 		}
 		encodeError(w, errInvalidArgs)

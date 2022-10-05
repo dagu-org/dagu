@@ -21,8 +21,8 @@ func testWriteStatusToFile(t *testing.T, db *Database) {
 	require.NoError(t, err)
 	require.NoError(t, dw.Open())
 	defer func() {
-		dw.Close()
-		db.RemoveOld(d.Location, 0)
+		_ = dw.Close()
+		_ = db.RemoveOld(d.Location, 0)
 	}()
 
 	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)

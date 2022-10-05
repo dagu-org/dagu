@@ -143,8 +143,10 @@ func (er *entryReader) watchDags() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer watcher.Close()
-	watcher.Add(er.Admin.DAGs)
+	defer func() {
+		_ = watcher.Close()
+	}()
+	_ = watcher.Add(er.Admin.DAGs)
 	for {
 		select {
 		case event, ok := <-watcher.Events():

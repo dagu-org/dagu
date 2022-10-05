@@ -76,7 +76,7 @@ func NewStatus(d *dag.DAG, nodes []*scheduler.Node, status scheduler.SchedulerSt
 	} else {
 		models = FromSteps(d.Steps)
 	}
-	var onExit, onSuccess, onFailure, onCancel *Node = nil, nil, nil, nil
+	var onExit, onSuccess, onFailure, onCancel *Node
 	onExit = fromStepWithDefValues(d.HandlerOn.Exit)
 	onSuccess = fromStepWithDefValues(d.HandlerOn.Success)
 	onFailure = fromStepWithDefValues(d.HandlerOn.Failure)

@@ -31,7 +31,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 			Addr: tmpFile.Name(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("OK"))
+				_, _ = w.Write([]byte("OK"))
 			},
 		})
 	require.NoError(t, err)
@@ -53,7 +53,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 	ret, err := client.Request(http.MethodPost, "/")
 	require.Equal(t, "OK", ret)
 
-	unixServer.Shutdown()
+	_ = unixServer.Shutdown()
 
 	time.Sleep(time.Millisecond * 50)
 	_, err = client.Request(http.MethodPost, "/")
@@ -83,7 +83,7 @@ func TestNoResponse(t *testing.T) {
 
 	go func() {
 		err = unixServer.Serve(listen)
-		defer unixServer.Shutdown()
+		_ = unixServer.Shutdown()
 	}()
 
 	time.Sleep(time.Millisecond * 50)
@@ -95,7 +95,9 @@ func TestNoResponse(t *testing.T) {
 func TestErrorResponse(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_error_response")
 	require.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
 
 	unixServer, err := NewServer(
 		&Config{
@@ -113,7 +115,7 @@ func TestErrorResponse(t *testing.T) {
 
 	go func() {
 		err = unixServer.Serve(listen)
-		defer unixServer.Shutdown()
+		_ = unixServer.Shutdown()
 	}()
 
 	time.Sleep(time.Millisecond * 50)

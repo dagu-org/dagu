@@ -70,7 +70,7 @@ func (rp *Reporter) SendMail(d *dag.DAG, status *models.Status, err error) error
 		}
 	} else if status.Status == scheduler.SchedulerStatus_Success {
 		if d.MailOn != nil && d.MailOn.Success {
-			rp.Mailer.SendMail(
+			_ = rp.Mailer.SendMail(
 				d.InfoMail.From,
 				[]string{d.InfoMail.To},
 				fmt.Sprintf("%s %s (%s)", d.InfoMail.Prefix, d.Name, status.Status),

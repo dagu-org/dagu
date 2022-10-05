@@ -121,7 +121,9 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 						sc.lastError = err
 						node.updateStatus(NodeStatus_Error)
 					}
-					defer node.teardown()
+					defer func() {
+						_ = node.teardown()
+					}()
 				}
 
 				for setup && !sc.IsCanceled() {
@@ -194,7 +196,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 	handlers = append(handlers, constants.OnExit)
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
-			log.Println(fmt.Sprintf("%s started", n.Name))
+			log.Printf("%s started", n.Name)
 			n.OutputVariables = g.outputVariables
 			err := sc.runHandlerNode(n)
 			if err != nil {
@@ -313,9 +315,15 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 	node.updateStatus(NodeStatus_Running)
 
 	if !sc.Dry {
-		node.setup(sc.LogDir, sc.RequestId)
-		defer node.teardown()
-		err := node.Execute()
+		err := node.setup(sc.LogDir, sc.RequestId)
+		if err != nil {
+			node.updateStatus(NodeStatus_Error)
+			return nil
+		}
+		defer func() {
+			_ = node.teardown()
+		}()
+		err = node.Execute()
 		if err != nil {
 			node.updateStatus(NodeStatus_Error)
 		} else {

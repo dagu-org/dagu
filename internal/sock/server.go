@@ -56,8 +56,8 @@ func (svr *Server) Serve(listen chan error) error {
 	}
 	log.Printf("server is running at \"%v\"\n", svr.Addr)
 	defer func() {
-		svr.Shutdown()
-		os.Remove(svr.Addr)
+		_ = svr.Shutdown()
+		_ = os.Remove(svr.Addr)
 	}()
 	for {
 		conn, err := svr.listener.Accept()
@@ -114,7 +114,7 @@ func (w *httpResponseWriter) Write(data []byte) (int, error) {
 		Body:       io.NopCloser(strings.NewReader(string(data))),
 		Header:     w.header,
 	}
-	response.Write(*w.conn)
+	_ = response.Write(*w.conn)
 	return 0, nil
 }
 

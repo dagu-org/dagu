@@ -221,7 +221,7 @@ func (db *Database) MoveData(oldPath, newPath string) error {
 	for _, m := range matches {
 		base := path.Base(m)
 		f := strings.Replace(base, oldPattern, newPattern, 1)
-		os.Rename(m, path.Join(newDir, f))
+		_ = os.Rename(m, path.Join(newDir, f))
 	}
 	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
 		os.Remove(oldDir)
@@ -251,7 +251,7 @@ func (db *Database) pattern(configPath string) string {
 }
 
 func (db *Database) latestToday(configPath string, day time.Time) (string, error) {
-	var ret = []string{}
+	var ret []string
 	pattern := fmt.Sprintf("%s.%s*.*.dat", db.pattern(configPath), day.Format("20060102"))
 	matches, err := filepath.Glob(pattern)
 	if err == nil || len(matches) > 0 {

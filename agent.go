@@ -378,10 +378,10 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write(b)
+		_, _ = w.Write(b)
 	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 		go func() {
 			log.Printf("stop request received. shutting down...")
 			a.signal(syscall.SIGTERM, true)

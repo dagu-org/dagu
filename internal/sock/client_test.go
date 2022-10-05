@@ -37,13 +37,13 @@ func TestDialTimeout(t *testing.T) {
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				time.Sleep(time.Second * 3100)
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("OK"))
+				_, _ = w.Write([]byte("OK"))
 			},
 		})
 	require.NoError(t, err)
 
 	go func() {
-		s.Serve(nil)
+		_ = s.Serve(nil)
 	}()
 
 	time.Sleep(time.Millisecond * 500)

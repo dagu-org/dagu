@@ -18,12 +18,12 @@ func formatError(err error) string {
 }
 
 func encodeError(w http.ResponseWriter, err error) {
-	switch err {
-	case dag.ErrDAGNotFound:
+	switch {
+	case errors.Is(err, dag.ErrDAGNotFound):
 		http.Error(w, formatError(err), http.StatusNotFound)
-	case errInvalidArgs:
+	case errors.Is(err, errInvalidArgs):
 		http.Error(w, formatError(err), http.StatusBadRequest)
-	case errNotFound:
+	case errors.Is(err, errNotFound):
 		http.Error(w, formatError(err), http.StatusNotFound)
 	default:
 		http.Error(w, formatError(err), http.StatusInternalServerError)

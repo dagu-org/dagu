@@ -47,7 +47,8 @@ func TestReadEntries(t *testing.T) {
 		storage.NewStorage(settings.MustGet(
 			settings.SETTING__SUSPEND_FLAGS_DIR,
 		)))
-	sc.ToggleSuspend(j.DAG, true)
+	err = sc.ToggleSuspend(j.DAG, true)
+	require.NoError(t, err)
 
 	// check if the job is suspended
 	lives, err := r.Read(now)

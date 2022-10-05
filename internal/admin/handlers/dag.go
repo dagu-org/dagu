@@ -184,8 +184,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		switch action {
 		case "start":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("DAG is already running."))
+				encodeError(w, fmt.Errorf("%w already running", errInvalidArgs))
 				return
 			}
 			c.StartAsync(hc.Bin, hc.WkDir, params)
@@ -198,79 +197,67 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 					),
 				),
 			)
-			sc.ToggleSuspend(dag.DAG, value == "true")
+			_ = sc.ToggleSuspend(dag.DAG, value == "true")
 
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("DAG is not running."))
+				encodeError(w, fmt.Errorf("%w: DAG is not running", errInvalidArgs))
 				return
 			}
 			err = c.Stop()
 			if err != nil {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(err.Error()))
+				encodeError(w, fmt.Errorf("failed to stop DAG: %s", err))
 				return
 			}
 
 		case "retry":
 			if reqId == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("request-id is required."))
+				encodeError(w, fmt.Errorf("%w: request-id is required", errInvalidArgs))
 				return
 			}
 			err = c.Retry(hc.Bin, hc.WkDir, reqId)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
+				encodeError(w, err)
 				return
 			}
 
 		case "mark-success":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("DAG is running."))
+				encodeError(w, fmt.Errorf("%w: DAG is running.", errInvalidArgs))
 				return
 			}
 			if reqId == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("request-id is required."))
+				encodeError(w, fmt.Errorf("%w: request-id is required.", errInvalidArgs))
 				return
 			}
 			if step == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("step is required."))
+				encodeError(w, fmt.Errorf("%w: step is required.", errInvalidArgs))
 				return
 			}
 
 			err = updateStatus(c, reqId, step, scheduler.NodeStatus_Success)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
+				encodeError(w, err)
 				return
 			}
 
 		case "mark-failed":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("DAG is running."))
+				encodeError(w, fmt.Errorf("%w: DAG is running.", errInvalidArgs))
 				return
 			}
 			if reqId == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("request-id is required."))
+				encodeError(w, fmt.Errorf("%w: request-id is required.", errInvalidArgs))
 				return
 			}
 			if step == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("step is required."))
+				encodeError(w, fmt.Errorf("%w: step is required.", errInvalidArgs))
 				return
 			}
 
 			err = updateStatus(c, reqId, step, scheduler.NodeStatus_Error)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
+				encodeError(w, err)
 				return
 			}
 
@@ -281,7 +268,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
+			_, _ = w.Write([]byte("OK"))
 			return
 
 		case "rename":
@@ -292,7 +279,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
+			_, _ = w.Write([]byte("OK"))
 
 		default:
 			encodeError(w, errInvalidArgs)
@@ -319,6 +306,10 @@ func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
 		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		dag, err := dr.ReadStatus(file, false)
+		if err != nil {
+			encodeError(w, err)
+		}
+
 		c := controller.NewDAGController(dag.DAG)
 
 		err = c.DeleteDAG()
@@ -329,7 +320,7 @@ func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}
 }
 
@@ -379,7 +370,7 @@ func readSchedulerLog(c *controller.DAGController, file string) (*logFile, error
 }
 
 func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logFile, error) {
-	var steps []*models.Node = nil
+	var steps []*models.Node
 	var stepm = map[string]*models.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
@@ -420,8 +411,8 @@ func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logF
 	if step == nil {
 		return nil, fmt.Errorf("step was not found %s", stepName)
 	}
-	var b []byte = nil
-	var err error = nil
+	var b []byte
+	var err error
 	if strings.ToLower(enc) == "euc-jp" {
 		b, err = readFile(step.Log, japanese.EUCJP.NewDecoder())
 	} else {

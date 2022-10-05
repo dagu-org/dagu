@@ -32,7 +32,9 @@ func TestJobStart(t *testing.T) {
 	err := j.Start()
 	require.Equal(t, ErrJobRunning, err)
 
-	c.Stop()
+	err = c.Stop()
+	require.NoError(t, err)
+
 	time.Sleep(time.Millisecond * 200)
 
 	s, _ := c.GetLastStatus()
@@ -57,14 +59,18 @@ func TestJobSop(t *testing.T) {
 		_ = j.Start()
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	c := controller.NewDAGController(dag.DAG)
+
+	require.Eventually(t, func() bool {
+		s, _ := c.GetLastStatus()
+		return scheduler.SchedulerStatus_Running == s.Status
+	}, time.Millisecond*1500, time.Millisecond*100)
 
 	err := j.Stop()
 	require.NoError(t, err)
 
-	time.Sleep(time.Millisecond * 100)
-
-	c := controller.NewDAGController(dag.DAG)
-	s, _ := c.GetLastStatus()
-	require.Equal(t, scheduler.SchedulerStatus_Cancel, s.Status)
+	require.Eventually(t, func() bool {
+		s, _ := c.GetLastStatus()
+		return scheduler.SchedulerStatus_Cancel == s.Status
+	}, time.Millisecond*1500, time.Millisecond*100)
 }

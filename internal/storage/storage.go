@@ -12,7 +12,8 @@ type Storage struct {
 
 // NewStorage creates a new storage.
 func NewStorage(dir string) *Storage {
-	os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0755)
+
 	return &Storage{
 		Dir: dir,
 	}

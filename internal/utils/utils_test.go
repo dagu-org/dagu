@@ -84,9 +84,9 @@ func TestOpenFile(t *testing.T) {
 		os.Remove(name)
 	}()
 
-	f.WriteString("test")
-	f.Sync()
-	f.Close()
+	_, _ = f.WriteString("test")
+	_ = f.Sync()
+	_ = f.Close()
 
 	_, err = utils.OpenFile(name)
 	require.NoError(t, err)
