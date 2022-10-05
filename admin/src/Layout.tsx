@@ -133,7 +133,7 @@ function Content({
                 overflowWrap: 'break-word',
               }}
             >
-              {version}
+              {version ? `v${version}` : "dev"}
             </Box>
             <List
               component="nav"
