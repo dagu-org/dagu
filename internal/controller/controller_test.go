@@ -49,22 +49,21 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 					scheduler.SchedulerStatus_Running, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJson()
-				w.Write(b)
+				_, _ = w.Write(b)
 			},
 		})
 
 	go func() {
-		socketServer.Serve(nil)
+		_ = socketServer.Serve(nil)
+		_ = socketServer.Shutdown()
 	}()
-
-	defer socketServer.Shutdown()
 
 	time.Sleep(time.Millisecond * 100)
 	st, err := dc.GetStatus()
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
 
-	socketServer.Shutdown()
+	_ = socketServer.Shutdown()
 
 	st, err = dc.GetStatus()
 	require.NoError(t, err)
@@ -184,7 +183,7 @@ func TestStop(t *testing.T) {
 		return st.Status == scheduler.SchedulerStatus_Running
 	}, time.Millisecond*1500, time.Millisecond*100)
 
-	dc.Stop()
+	_ = dc.Stop()
 
 	require.Eventually(t, func() bool {
 		st, _ := dc.GetLastStatus()

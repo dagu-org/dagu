@@ -29,11 +29,6 @@ type builder struct {
 	baseConfig *DAG
 }
 
-type buildStep struct {
-	BuildFn  func(def *configDefinition, d *DAG) error
-	Headline bool
-}
-
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
 func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
@@ -58,43 +53,27 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	d.RestartWait = time.Second * time.Duration(def.RestartWaitSec)
 	d.Tags = parseTags(def.Tags)
 
-	for _, bs := range []buildStep{
-		{
-			BuildFn:  b.buildSchedule,
-			Headline: true,
-		},
-		{
-			BuildFn: b.buildEnvVariables,
-		},
-		{
-			BuildFn: b.buildLogdir,
-		},
-		{
-			BuildFn: b.buildParameters,
-		},
-		{
-			BuildFn: b.buildStepsFromDefinition,
-		},
-		{
-			BuildFn: b.buildHandlers,
-		},
-		{
-			BuildFn: b.buildConfig,
-		},
-		{
-			BuildFn: buildSmtpConfigFromDefinition,
-		},
-		{
-			BuildFn: buildErrorMailConfig,
-		},
-		{
-			BuildFn: buildInfoMailConfig,
-		},
+	if err = b.buildSchedule(def, d); err != nil {
+		return
+	}
+
+	if b.headOnly {
+		return
+	}
+
+	for _, fn := range []func(def *configDefinition, d *DAG) error{
+		b.buildEnvs,
+		b.buildLogDir,
+		b.buildParams,
+		b.buildSteps,
+		b.buildHandlers,
+		b.buildConfig,
+		buldSMTPConfig,
+		buildErrMailConfig,
+		buildInfoMailConfig,
 	} {
-		if (b.headOnly && bs.Headline) || !b.headOnly {
-			if err = bs.BuildFn(def, d); err != nil {
-				return
-			}
+		if err = fn(def, d); err != nil {
+			return
 		}
 	}
 
@@ -117,8 +96,8 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 		starts = append(starts, def.Schedule.(string))
 	case []interface{}:
 		for _, s := range def.Schedule.([]interface{}) {
-			if ss, ok := s.(string); ok {
-				starts = append(starts, ss)
+			if s, ok := s.(string); ok {
+				starts = append(starts, s)
 			} else {
 				return fmt.Errorf("schedule must be a string or an array of strings")
 			}
@@ -128,29 +107,28 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 			if _, ok := k.(string); !ok {
 				return fmt.Errorf("schedule key must be a string")
 			}
-			kk := k.(string)
-			switch kk {
+			switch k.(string) {
 			case scheduleStart, scheduleStop, scheduleRestart:
-				switch (v).(type) {
+				switch v := (v).(type) {
 				case string:
-					switch kk {
+					switch k {
 					case scheduleStart:
-						starts = append(starts, v.(string))
+						starts = append(starts, v)
 					case scheduleStop:
-						stops = append(stops, v.(string))
+						stops = append(stops, v)
 					case scheduleRestart:
-						restarts = append(restarts, v.(string))
+						restarts = append(restarts, v)
 					}
 				case []interface{}:
-					for _, vv := range v.([]interface{}) {
-						if vvv, ok := vv.(string); ok {
-							switch kk {
+					for _, item := range v {
+						if item, ok := item.(string); ok {
+							switch k {
 							case scheduleStart:
-								starts = append(starts, vvv)
+								starts = append(starts, item)
 							case scheduleStop:
-								stops = append(stops, vvv)
+								stops = append(stops, item)
 							case scheduleRestart:
-								restarts = append(restarts, vvv)
+								restarts = append(restarts, item)
 							}
 						} else {
 							return fmt.Errorf("schedule must be a string or an array of strings")
@@ -180,7 +158,7 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 	return err
 }
 
-func (b *builder) buildEnvVariables(def *configDefinition, d *DAG) (err error) {
+func (b *builder) buildEnvs(def *configDefinition, d *DAG) (err error) {
 	var env map[string]string
 	env, err = b.loadVariables(def.Env, b.defaultEnv)
 	if err == nil {
@@ -197,12 +175,12 @@ func (b *builder) buildEnvVariables(def *configDefinition, d *DAG) (err error) {
 	return
 }
 
-func (b *builder) buildLogdir(def *configDefinition, d *DAG) (err error) {
+func (b *builder) buildLogDir(def *configDefinition, d *DAG) (err error) {
 	d.LogDir, err = utils.ParseVariable(def.LogDir)
 	return err
 }
 
-func (b *builder) buildParameters(def *configDefinition, d *DAG) (err error) {
+func (b *builder) buildParams(def *configDefinition, d *DAG) (err error) {
 	d.DefaultParams = def.Params
 	p := d.DefaultParams
 	if b.parameters != "" {
@@ -314,11 +292,11 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 
 	loadFn := func(a []*envVariable, m map[interface{}]interface{}) ([]*envVariable, error) {
 		for k, v := range m {
-			if ks, ok := k.(string); ok {
-				if vs, ok := v.(string); ok {
-					a = append(a, &envVariable{ks, vs})
+			if k, ok := k.(string); ok {
+				if vv, ok := v.(string); ok {
+					a = append(a, &envVariable{k, vv})
 				} else {
-					return a, fmt.Errorf("invalid value for env %s", ks)
+					return a, fmt.Errorf("invalid value for env %s", v)
 				}
 			}
 		}
@@ -361,7 +339,7 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 	return vars, nil
 }
 
-func (b *builder) buildStepsFromDefinition(def *configDefinition, d *DAG) error {
+func (b *builder) buildSteps(def *configDefinition, d *DAG) error {
 	ret := []*Step{}
 	for _, stepDef := range def.Steps {
 		step, err := b.buildStep(d.Env, stepDef)
@@ -396,10 +374,18 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 			step.ExecutorConfig.Type = val
 		case map[interface{}]interface{}:
 			for k, v := range val {
-				if k == "type" {
-					step.ExecutorConfig.Type = v.(string)
+				if k, ok := k.(string); ok {
+					if v, ok := v.(string); ok {
+						if k == "type" {
+							step.ExecutorConfig.Type = v
+						} else {
+							step.ExecutorConfig.Config[k] = v
+						}
+					} else {
+						return nil, fmt.Errorf("invalid value for executor %s", v)
+					}
 				} else {
-					step.ExecutorConfig.Config[k.(string)] = v
+					return nil, fmt.Errorf("invalid executor config key %s", k)
 				}
 			}
 		default:
@@ -443,7 +429,7 @@ func (b *builder) expandEnv(val string) string {
 	return os.ExpandEnv(val)
 }
 
-func buildSmtpConfigFromDefinition(def *configDefinition, d *DAG) (err error) {
+func buldSMTPConfig(def *configDefinition, d *DAG) (err error) {
 	smtp := &SmtpConfig{}
 	smtp.Host = def.Smtp.Host
 	smtp.Port = def.Smtp.Port
@@ -453,7 +439,7 @@ func buildSmtpConfigFromDefinition(def *configDefinition, d *DAG) (err error) {
 	return nil
 }
 
-func buildErrorMailConfig(def *configDefinition, d *DAG) (err error) {
+func buildErrMailConfig(def *configDefinition, d *DAG) (err error) {
 	d.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
 	return
 }

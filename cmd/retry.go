@@ -34,6 +34,9 @@ func newRetryCommand() *cli.Command {
 				return err
 			}
 			d, err := loadDAG(c, c.Args().Get(0), status.Status.Params)
+			if err != nil {
+				return err
+			}
 			return retry(d, status)
 		},
 	}

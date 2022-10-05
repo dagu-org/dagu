@@ -57,7 +57,7 @@ func useTemplate(layout string, name string, tc *TemplateConfig) func(http.Respo
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		io.Copy(w, &buf)
+		_, _ = io.Copy(w, &buf)
 	}
 }
 

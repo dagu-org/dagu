@@ -63,7 +63,7 @@ func TestCheckRunning(t *testing.T) {
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
 	go func() {
-		a.Run()
+		_ = a.Run()
 	}()
 
 	time.Sleep(time.Millisecond * 30)
@@ -299,7 +299,7 @@ func testDAGAsync(t *testing.T, file string) (*Agent, *dag.DAG) {
 	}}
 
 	go func() {
-		a.Run()
+		_ = a.Run()
 	}()
 
 	return a, d

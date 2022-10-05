@@ -83,7 +83,7 @@ func testErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node)
 	d.MailOn.Failure = true
 	d.MailOn.Success = false
 
-	rp.SendMail(d, &models.Status{
+	_ = rp.SendMail(d, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -98,10 +98,11 @@ func testNoErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Nod
 	d.MailOn.Failure = false
 	d.MailOn.Success = true
 
-	rp.SendMail(d, &models.Status{
+	err := rp.SendMail(d, &models.Status{
 		Status: scheduler.SchedulerStatus_Error,
 		Nodes:  nodes,
 	}, nil)
+	require.NoError(t, err)
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Equal(t, 0, mock.count)
@@ -111,10 +112,11 @@ func testSuccessMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Nod
 	d.MailOn.Failure = true
 	d.MailOn.Success = true
 
-	rp.SendMail(d, &models.Status{
+	err := rp.SendMail(d, &models.Status{
 		Status: scheduler.SchedulerStatus_Success,
 		Nodes:  nodes,
 	}, nil)
+	require.NoError(t, err)
 
 	mock := rp.Mailer.(*mockMailer)
 	require.Contains(t, mock.subject, "Success")
@@ -163,7 +165,7 @@ func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node
 	}()
 
 	d.Steps[0].MailOnError = true
-	rp.ReportStep(
+	err = rp.ReportStep(
 		d,
 		&models.Status{
 			Status: scheduler.SchedulerStatus_Running,
@@ -176,6 +178,7 @@ func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*models.Node
 			},
 		},
 	)
+	require.NoError(t, err)
 
 	w.Close()
 	os.Stdout = origStdout

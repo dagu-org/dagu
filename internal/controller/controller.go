@@ -51,8 +51,6 @@ func GrepDAG(dir string, pattern string) (ret []*GrepResult, errs []string, err 
 			utils.LogErr("read DAG file", err)
 			m, err := grep.Grep(fn, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
-				continue
-			} else if err != nil {
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
@@ -151,7 +149,9 @@ func (dc *DAGController) Retry(binPath string, workDir string, reqId string) (er
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
 		cmd.Env = os.Environ()
-		defer cmd.Wait()
+		defer func() {
+			_ = cmd.Wait()
+		}()
 		err = cmd.Start()
 		utils.LogErr("retry a DAG", err)
 	}()

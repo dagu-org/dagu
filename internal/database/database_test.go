@@ -69,7 +69,9 @@ func testWriteAndFindFiles(t *testing.T, db *Database) {
 		Name:     "test_read_status_n",
 		Location: "test_data_files_n.yaml",
 	}
-	defer db.RemoveAll(d.Location)
+	defer func() {
+		_ = db.RemoveAll(d.Location)
+	}()
 
 	for _, data := range []struct {
 		Status    *models.Status
@@ -106,7 +108,9 @@ func testWriteAndFindByRequestId(t *testing.T, db *Database) {
 		Name:     "test_find_by_request_id",
 		Location: "test_find_by_request_id.yaml",
 	}
-	defer db.RemoveAll(d.Location)
+	defer func() {
+		_ = db.RemoveAll(d.Location)
+	}()
 
 	for _, data := range []struct {
 		Status    *models.Status
@@ -177,7 +181,7 @@ func testRemoveOldFiles(t *testing.T, db *Database) {
 	files := db.latest(db.pattern(d.Location)+"*.dat", 3)
 	require.Equal(t, 3, len(files))
 
-	db.RemoveOld(d.Location, 0)
+	_ = db.RemoveOld(d.Location, 0)
 
 	files = db.latest(db.pattern(d.Location)+"*.dat", 3)
 	require.Equal(t, 0, len(files))
@@ -191,18 +195,22 @@ func testReadLatestStatus(t *testing.T, db *Database) {
 		Location: "test_config_status_reader.yaml",
 	}
 	requestId := "request-id-1"
+
 	dw, _, err := db.NewWriter(d.Location, time.Now(), requestId)
 	require.NoError(t, err)
 	err = dw.Open()
 	require.NoError(t, err)
-	defer dw.Close()
+	defer func() {
+		_ = dw.Close()
+	}()
 
 	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil)
-	dw.Write(status)
+	err = dw.Write(status)
+	require.NoError(t, err)
 
 	status.Status = scheduler.SchedulerStatus_Success
 	status.Pid = 20000
-	dw.Write(status)
+	_ = dw.Write(status)
 
 	ret, err := db.ReadStatusToday(d.Location)
 
@@ -386,7 +394,7 @@ func TestReadLine(t *testing.T) {
 
 	// write data
 	dat := []byte("line1\nline2")
-	f.Write(dat)
+	_, _ = f.Write(dat)
 
 	err = f.Sync()
 	require.NoError(t, err)
@@ -397,7 +405,7 @@ func TestReadLine(t *testing.T) {
 	f, err = os.Open(tmpFile)
 	require.NoError(t, err)
 
-	f.Seek(0, 0)
+	_, _ = f.Seek(0, 0)
 	var offset int64 = 0
 	for _, tt := range []struct {
 		Want []byte

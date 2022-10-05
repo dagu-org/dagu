@@ -80,7 +80,8 @@ func TestLoadConfig(t *testing.T) {
 		c, err := buildFromDefinition(def)
 		require.NoError(t, err)
 
-		c.setup()
+		err = c.setup()
+		require.NoError(t, err)
 		c.Env = []string{}
 
 		require.Equal(t, test.Want, c)
