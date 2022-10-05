@@ -76,9 +76,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
 - [REST API Interface](#rest-api-interface)
-- [Build from Source](#build-from-source)
 - [FAQ](#faq)
   - [How to contribute?](#how-to-contribute)
+- [How to build `dagu` locally?](#how-to-build-dagu-locally)
   - [Where is the history data stored?](#where-is-the-history-data-stored)
   - [Where are the log files stored?](#where-are-the-log-files-stored)
   - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
@@ -393,7 +393,7 @@ tags: example                        # Free tags (separated by comma)
 env:                                 # Environment variables
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
-logDir: ${LOG_DIR}                   # Log directory to write standard output, default: ${DAG_HOME}/logs/dags
+logDir: ${LOG_DIR}                   # Log directory to write standard output, default: ${DAGU_HOME}/logs/dags
 restartWaitSec: 60                   # Wait 60s after the process is stopped, then restart the DAG.
 histRetentionDays: 3                 # Execution history retention days (not for log files)
 delaySec: 1                          # Interval seconds between steps
@@ -480,7 +480,7 @@ host: <hostname for web UI address>                          # default: 127.0.0.
 port: <port number for web UI address>                       # default: 8080
 
 # path to the DAGs directory
-dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
+dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
 
 # Web UI Color & Title
 navbarColor: <admin-web header color>                        # header color for web UI (e.g. "#ff0000")
@@ -492,10 +492,10 @@ basicAuthUsername: <username for basic auth of web UI>       # basic auth user
 basicAuthPassword: <password for basic auth of web UI>       # basic auth password
 
 # Base Config
-baseConfig: <base DAG config path> .                         # default: ${DAG_HOME}/config.yaml
+baseConfig: <base DAG config path> .                         # default: ${DAGU_HOME}/config.yaml
 
 # Others
-logDir: <internal logdirectory>                              # default: ${DAG_HOME}/logs/admin
+logDir: <internal logdirectory>                              # default: ${DAGU_HOME}/logs/admin
 command: <Absolute path to the dagu binary>                  # default: dagu
 ```
 
@@ -681,29 +681,27 @@ dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
 
 Please refer to [REST API Docs](./docs/restapi.md)
 
-## Build from Source
-
-How to build:
-
-1. Check out the repository
-
-2. Install the latest version of [Node.js](https://nodejs.org/en/download/)
-
-3. Install Yarn 
-```sh
-npm i -g yarn
-```
-
-4. Build 
-```sh
-make build
-```
-
 ## FAQ
 
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thanks!
+
+## How to build `dagu` locally?
+
+1. Install the latest version of [Node.js](https://nodejs.org/en/download/) and Go (>= 1.18)
+
+2. Install Yarn 
+```sh
+npm i -g yarn
+```
+
+3. Check out the repository
+
+4. Build 
+```sh
+make build
+```
 
 ### Where is the history data stored?
 
@@ -731,7 +729,7 @@ port: <port number for web UI address>                       # default: 8000
 You can customize DAGs directory that will be used by `dagu server` and `dagu scheduler`. See [Admin Configuration](#admin-configuration) for more details.
 
 ```yaml
-dags: <the location of DAG configuration files>              # default: ${DAG_HOME}/dags
+dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
 ```
 
 ### How can I retry a DAG from a specific task?
