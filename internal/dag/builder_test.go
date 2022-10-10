@@ -388,11 +388,12 @@ steps:
     command: echo 1
     executor:
       type: http
-      config: some option 
+      config:
+        key: value
 `,
 			expectedExec: "http",
 			expectedConfig: map[string]interface{}{
-				"config": "some option",
+				"key": "value",
 			},
 		},
 	}

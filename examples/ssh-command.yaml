@@ -1,0 +1,10 @@
+steps:
+  - name: step1
+    executor: 
+      type: ssh
+      config:
+        user: ec2-user
+        ip: "35.78.67.103"
+        key: /Users/hamadayouta/.ssh/prod-ec2instance-keypair.pem
+        StrictHostKeyChecking: false
+    command: /usr/sbin/ifconfig
