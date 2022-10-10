@@ -375,21 +375,32 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 		case map[interface{}]interface{}:
 			for k, v := range val {
 				if k, ok := k.(string); ok {
-					if v, ok := v.(string); ok {
-						if k == "type" {
+					switch k {
+					case "type":
+						if v, ok := v.(string); ok {
 							step.ExecutorConfig.Type = v
 						} else {
-							step.ExecutorConfig.Config[k] = v
+							return nil, fmt.Errorf("invalid value for type: %s", v)
 						}
-					} else {
-						return nil, fmt.Errorf("invalid value for executor %s", v)
+					case "config":
+						if v, ok := v.(map[interface{}]interface{}); ok {
+							for k, v := range v {
+								if k, ok := k.(string); ok {
+									step.ExecutorConfig.Config[k] = v
+								} else {
+									return nil, fmt.Errorf("invalid key for config: %s", k)
+								}
+							}
+						} else {
+							return nil, fmt.Errorf("invalid value for config: %s", v)
+						}
 					}
 				} else {
 					return nil, fmt.Errorf("invalid executor config key %s", k)
 				}
 			}
 		default:
-			return nil, fmt.Errorf("invalid executor config")
+			return nil, fmt.Errorf("invalid executor config type: %t values: %v", val, val)
 		}
 	}
 	// TODO: validate executor config
