@@ -31,9 +31,17 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
 
+## Features
+- Web UI to edit DAGs, view past execution logs and history
+- Ability to run/stop/retry DAGs from the Web UI or command
+- Support for command execution on remote hosts via SSH
+- Ability to send mail notifications on error or success of a DAG
+- Various options to define DAG specification (e.g. environment variables, parameters, conditional logic, etc)
+
 ## Contents
 
 - [Highlights](#highlights)
+- [Features](#features)
 - [Contents](#contents)
 - [Getting started](#getting-started)
 - [Motivation](#motivation)
@@ -42,7 +50,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Install `dagu`](#install-dagu)
   - [via Homebrew](#via-homebrew)
   - [via Bash script](#via-bash-script)
-  - [via Docker Image](#via-docker-image)
+  - [via Docker](#via-docker)
   - [via GitHub Release Page](#via-github-release-page)
 - [️Quick start](#️quick-start)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
@@ -126,7 +134,7 @@ brew upgrade yohamta/tap/dagu
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
 
-### via Docker Image
+### via Docker
 
 ```sh
 docker run \
@@ -524,7 +532,7 @@ You can configure the dagu's internal work directory by defining `DAGU_HOME` env
 
 ## Sending email notifications
 
-Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `smtp` field and related fields in the DAG specs. You can use any email delivery services (e.g., Sendgrid, Mailgun, etc).
+Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `smtp` field and related fields in the DAG specs. You can use any email delivery services (e.g. Sendgrid, Mailgun, etc).
 
 ```yaml
 # Eamil notification settings
