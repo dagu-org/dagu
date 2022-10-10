@@ -65,6 +65,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Other Available Fields](#other-available-fields)
 - [Executor](#executor)
   - [HTTP Executor](#http-executor)
+  - [SSH Executor](#ssh-executor)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
 - [Sending email notifications](#sending-email-notifications)
@@ -450,7 +451,7 @@ Executor is a different way of executing a Step; Executor can be set in the `exe
 
 ### HTTP Executor
 
-The HTTP Executor allows you to send arbitrary HTTP requests.
+The HTTP Executor allows us to send arbitrary HTTP requests.
 
 ```yaml
 steps:
@@ -468,6 +469,24 @@ steps:
         },
         "body": "post body"
       }      
+```
+
+### SSH Executor
+
+The SSH Executor allows us to execute arbitrary command on a remote host.
+
+```yaml
+steps:
+  - name: step1
+    executor: 
+      type: ssh
+      config:
+        user: dagu
+        ip: XXX.XXX.XXX.XXX
+        port: 22
+        key: /Users/dagu/.ssh/private.pem
+        StrictHostKeyChecking: false
+    command: /usr/sbin/ifconfig
 ```
 
 ## Admin Configuration
