@@ -485,7 +485,6 @@ steps:
         ip: XXX.XXX.XXX.XXX
         port: 22
         key: /Users/dagu/.ssh/private.pem
-        StrictHostKeyChecking: false
     command: /usr/sbin/ifconfig
 ```
 
