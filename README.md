@@ -31,17 +31,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
 
-## Features
-- Web UI to edit DAGs, view past execution logs and history
-- Ability to run/stop/retry DAGs from the Web UI or command
-- Support for command execution on remote hosts via SSH
-- Ability to send mail notifications on error or success of a DAG
-- Various options to define DAG specification (e.g. environment variables, parameters, conditional logic, etc)
-
 ## Contents
 
 - [Highlights](#highlights)
-- [Features](#features)
 - [Contents](#contents)
 - [Getting started](#getting-started)
 - [Motivation](#motivation)
