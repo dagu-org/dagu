@@ -76,6 +76,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Restart Schedule](#restart-schedule)
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
+- [Building Docker Image](#building-docker-image)
 - [REST API Interface](#rest-api-interface)
 - [FAQ](#faq)
   - [How to contribute?](#how-to-contribute)
@@ -693,6 +694,19 @@ Set the `dags` field to specify the directory of the DAGs.
 
 ```yaml
 dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
+```
+
+## Building Docker Image
+
+Download the [Dockerfile](https://github.com/yohamta/dagu/blob/main/Dockerfile) to your local PC and you can build an image.
+
+Example:
+
+```sh
+DAGU_VERSION=1.9.0
+docker build -t dagu:${DAGU_VERSION} \
+--build-arg VERSION=${DAGU_VERSION} \
+--no-cache .
 ```
 
 ## REST API Interface
