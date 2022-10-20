@@ -14,7 +14,7 @@ EXPOSE 8080
 RUN <<EOF
     #User and permissions setup
     apk update
-    apk add sudo
+    apk add --no-cache sudo tzdata
     addgroup -g ${USER_GID} ${USER}
     adduser ${USER} -h /home/${USER} -u ${USER_UID} -G ${USER} -D -s /bin/ash
     echo ${USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USER}
