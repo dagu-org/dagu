@@ -442,10 +442,10 @@ func (b *builder) expandEnv(val string) string {
 
 func buldSMTPConfig(def *configDefinition, d *DAG) (err error) {
 	smtp := &SmtpConfig{}
-	smtp.Host = def.Smtp.Host
-	smtp.Port = def.Smtp.Port
-	smtp.Username = def.Smtp.Username
-	smtp.Password = def.Smtp.Password
+	smtp.Host = os.ExpandEnv(def.Smtp.Host)
+	smtp.Port = os.ExpandEnv(def.Smtp.Port)
+	smtp.Username = os.ExpandEnv(def.Smtp.Username)
+	smtp.Password = os.ExpandEnv(def.Smtp.Password)
 	d.Smtp = smtp
 	return nil
 }
