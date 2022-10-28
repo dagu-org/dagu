@@ -4,6 +4,11 @@ Dagu server provides simple APIs to query and control workflows.
 
 **Endpoint** : `localhost:8080` (default)
 
+**Required HTTP header** :
+```
+Accept: application/json
+```
+
 ## Contents
 
 - [REST API Docs](#rest-api-docs)
