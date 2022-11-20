@@ -58,14 +58,14 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Parameters](#parameters)
   - [Command Substitution](#command-substitution)
   - [Conditional Logic](#conditional-logic)
+  - [Run Docker Images](#run-docker-images)
+  - [HTTP Requests](#http-requests)
+  - [Execute Command via SSH](#execute-command-via-ssh)
   - [Output](#output)
   - [Stdout and Stderr Redirection](#stdout-and-stderr-redirection)
   - [Lifecycle Hooks](#lifecycle-hooks)
   - [Repeating Task](#repeating-task)
   - [Other Available Fields](#other-available-fields)
-- [Executor](#executor)
-  - [HTTP Executor](#http-executor)
-  - [SSH Executor](#ssh-executor)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
 - [Sending email notifications](#sending-email-notifications)
@@ -325,6 +325,90 @@ steps:
       skipped: true
 ```
 
+### Run Docker Images
+
+If you want to execute an already-built Docker image instead of just a command, that functionality is provided as well.
+
+In the below example, it pulls and runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
+
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+Example Log output:
+
+![docker](./examples/images/docker.png)
+
+You can control the Docker container by passing more detailed options.
+
+For example:
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        container:
+          volumes:
+            /app:/app:
+          env:
+            - FOO=BAR
+        host:
+          autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+See the Docker's API documentation for all available options.
+- For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
+- For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
+
+### HTTP Requests
+
+If you simply want to perform an HTTP request at a certain step, you can easily send an HTTP request as follows:
+
+```yaml
+steps:
+  - name: send POST request
+    executor: http
+    command: POST https://foo.bar.com
+    script: |
+      {
+        "timeout": 10,
+        "headers": {
+          "Authorization": "Bearer $TOKEN"
+        },
+        "query": {
+          "key": "value"
+        },
+        "body": "post body"
+      }      
+```
+
+### Execute Command via SSH
+
+If you want to execute a command via SSH on a remote host, you can do so as follows:
+
+```yaml
+steps:
+  - name: step1
+    executor: 
+      type: ssh
+      config:
+        user: dagu
+        ip: XXX.XXX.XXX.XXX
+        port: 22
+        key: /Users/dagu/.ssh/private.pem
+    command: /usr/sbin/ifconfig
+```
+
 ### Output
 
 `output` field can be used to set a environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
@@ -447,49 +531,6 @@ steps:
 ```
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
-
-## Executor
-
-Executor is a different way of executing a Step; Executor can be set in the `executor` field.
-
-### HTTP Executor
-
-The HTTP Executor allows us to send arbitrary HTTP requests.
-
-```yaml
-steps:
-  - name: send POST request
-    executor: http
-    command: POST https://foo.bar.com
-    script: |
-      {
-        "timeout": 10,
-        "headers": {
-          "Authorization": "Bearer $TOKEN"
-        },
-        "query": {
-          "key": "value"
-        },
-        "body": "post body"
-      }      
-```
-
-### SSH Executor
-
-The SSH Executor allows us to execute arbitrary command on a remote host.
-
-```yaml
-steps:
-  - name: step1
-    executor: 
-      type: ssh
-      config:
-        user: dagu
-        ip: XXX.XXX.XXX.XXX
-        port: 22
-        key: /Users/dagu/.ssh/private.pem
-    command: /usr/sbin/ifconfig
-```
 
 ## Admin Configuration
 

@@ -1,0 +1,16 @@
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        container:
+          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
+          volumes:
+            /app:/app:
+          env:
+            - FOO=BAR
+        host:
+          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
+          autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts

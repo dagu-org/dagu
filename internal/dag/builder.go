@@ -403,6 +403,14 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 			return nil, fmt.Errorf("invalid executor config type: %t values: %v", val, val)
 		}
 	}
+
+	// Convert map[interface{}]interface{} to map[string]interface{}
+	if step.ExecutorConfig.Config != nil {
+		if err := convertMap(step.ExecutorConfig.Config); err != nil {
+			return nil, err
+		}
+	}
+
 	// TODO: validate executor config
 	step.Variables = variables
 	step.Depends = def.Depends
@@ -438,6 +446,44 @@ func (b *builder) expandEnv(val string) string {
 		return val
 	}
 	return os.ExpandEnv(val)
+}
+
+func convertMap(m map[string]interface{}) error {
+	convertKey := func(v interface{}) (interface{}, error) {
+		switch v.(type) {
+		case string:
+			return v, nil
+		default:
+			return nil, fmt.Errorf("invalid key type: %t", v)
+		}
+	}
+
+	queue := []map[string]interface{}{m}
+
+	for len(queue) > 0 {
+		curr := queue[0]
+		for k, v := range curr {
+			switch v := v.(type) {
+			case map[interface{}]interface{}:
+				ret := map[string]interface{}{}
+				for kk, vv := range v {
+					if kk, err := convertKey(kk); err != nil {
+						return fmt.Errorf("executor config key must be string: %s", err)
+					} else {
+						ret[kk.(string)] = vv
+					}
+				}
+				delete(curr, k)
+				curr[k] = ret
+				queue = append(queue, ret)
+			default:
+				curr[k] = v
+			}
+		}
+		queue = queue[1:]
+	}
+
+	return nil
 }
 
 func buldSMTPConfig(def *configDefinition, d *DAG) (err error) {

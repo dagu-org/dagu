@@ -5,10 +5,12 @@
   - [Conditional step](#conditional-step)
   - [Writing to a file](#writing-to-a-file)
   - [Passing output to the next step](#passing-output-to-the-next-step)
+  - [Runing Docker image](#runing-docker-image)
   - [Runing command via SSH](#runing-command-via-ssh)
   - [Sending HTTP request](#sending-http-request)
   - [Sending Email Notification](#sending-email-notification)
   - [Customizing Signal on Stop](#customizing-signal-on-stop)
+- [How to contribute?](#how-to-contribute)
 
 ## Printing Hello World
 
@@ -74,6 +76,31 @@ steps:
       echo $OUT1 world
     depends:
       - pass 'hello'
+```
+
+## Runing Docker image
+
+Example Log output
+
+![docker](./images/docker.png)
+
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        container:
+          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
+          volumes:
+            /app:/app:
+          env:
+            - FOO=BAR
+        host:
+          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
+          autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
 ```
 
 ## Runing command via SSH
@@ -151,3 +178,7 @@ steps:
       sleep 60
     signalOnStop: "SIGINT"
 ```
+
+# How to contribute?
+
+Feel free to contribute interesting examples in this page. Thanks!
