@@ -457,6 +457,7 @@ Executor is a different way of executing a Step; Executor can be set in the `exe
 
 The Docker Executor allows us to run arbitrary docker image. The below example runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
 
+
 ```yaml
 steps:
   - name: deno_hello_world
@@ -464,12 +465,36 @@ steps:
       type: docker
       config:
         image: "denoland/deno:1.10.3"
+        autoRemove: true
     command: run https://examples.deno.land/hello-world.ts
 ```
 
-Example Log output
+Example Log output:
 
 ![docker](./examples/images/docker.png)
+
+You can pass additionl options for Docker `container` and `host`:
+
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        container:
+          volumes:
+            /app:/app:
+          env:
+            - FOO=BAR
+        host:
+          autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+See Docker's API document for all available options.
+- For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
+- For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
 
 ### Executing HTTP Request
 

@@ -1,5 +1,7 @@
 package executor
 
+// See https://docs.docker.com/engine/api/sdk/
+
 import (
 	"context"
 	"fmt"
@@ -15,12 +17,14 @@ import (
 )
 
 type DockerExecutor struct {
-	image   string
-	step    *dag.Step
-	config  *container.Config
-	stdout  io.Writer
-	context context.Context
-	cancel  func()
+	image           string
+	autoRemove      bool
+	step            *dag.Step
+	containerConfig *container.Config
+	hostConfig      *container.HostConfig
+	stdout          io.Writer
+	context         context.Context
+	cancel          func()
 }
 
 func (e *DockerExecutor) SetStdout(out io.Writer) {
@@ -55,10 +59,12 @@ func (e *DockerExecutor) Run() error {
 	}
 	io.Copy(e.stdout, reader)
 
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: e.image,
-		Cmd:   append([]string{e.step.Command}, e.step.Args...),
-	}, nil, nil, nil, "")
+	if e.image != "" {
+		e.containerConfig.Image = e.image
+	}
+	e.containerConfig.Cmd = append([]string{e.step.Command}, e.step.Args...)
+
+	resp, err := cli.ContainerCreate(ctx, e.containerConfig, e.hostConfig, nil, nil, "")
 
 	if err != nil {
 		return err
@@ -84,31 +90,66 @@ func (e *DockerExecutor) Run() error {
 
 	stdcopy.StdCopy(e.stdout, e.stdout, out)
 
+	if e.autoRemove {
+		cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
+	}
+
 	return nil
 }
 
 func CreateDockerExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
-	cfg := &container.Config{}
+	containerConfig := &container.Config{}
+	hostConfig := &container.HostConfig{}
 	execCfg := step.ExecutorConfig
 
 	if cfg, ok := execCfg.Config["container"]; ok {
+		// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			Result: cfg,
+			Result: containerConfig,
 		})
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create decoder: %w", err)
 		}
 
 		if err := md.Decode(cfg); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to decode config: %w", err)
+		}
+	}
+
+	if cfg, ok := execCfg.Config["host"]; ok {
+		// See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
+		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			Result: hostConfig,
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to create decoder: %w", err)
+		}
+
+		if err := md.Decode(cfg); err != nil {
+			return nil, fmt.Errorf("failed to decode config: %w", err)
+		}
+	}
+
+	autoRemove := false
+	if hostConfig.AutoRemove {
+		hostConfig.AutoRemove = false
+		autoRemove = true
+	}
+
+	if a, ok := execCfg.Config["autoRemove"]; ok {
+		if a, ok := a.(bool); ok {
+			autoRemove = a
 		}
 	}
 
 	exec := &DockerExecutor{
-		step:   step,
-		stdout: os.Stdout,
-		config: cfg,
+		step:            step,
+		stdout:          os.Stdout,
+		containerConfig: containerConfig,
+		hostConfig:      hostConfig,
+		autoRemove:      autoRemove,
 	}
 
 	if img, ok := execCfg.Config["image"]; ok {
