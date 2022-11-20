@@ -1,5 +1,0 @@
-steps:
-  - name: step1
-    command: echo s="\t" test
-  - name: step2
-    command: echo s=\t test

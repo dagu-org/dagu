@@ -1,5 +1,0 @@
-description: |
-  てすと
-steps:
-  - name: step1
-    command: dagu start calling_subdag_sub

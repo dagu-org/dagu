@@ -1,0 +1,18 @@
+params: foo
+steps:
+  - name: "step1"
+    command: echo start
+  - name: "foo"
+    command: echo foo
+    depends:
+      - "step1"
+    preconditions:
+      - condition: "$1"
+        expected: foo
+  - name: "bar"
+    command: echo bar
+    depends:
+      - "step1"
+    preconditions:
+      - condition: "$1"
+        expected: bar
