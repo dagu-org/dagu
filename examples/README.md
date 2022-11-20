@@ -134,7 +134,7 @@ See the Docker's API documentation for all available options.
 
 ### How to run docker image inside a `dagu` container
 
-If you are running `dagu` using a container, you need the below setup.
+If you are running `dagu` using a container, you need the setup below.
 
 1. Run a `socat` conainer:
 
