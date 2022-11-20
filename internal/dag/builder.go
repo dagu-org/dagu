@@ -403,6 +403,48 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 			return nil, fmt.Errorf("invalid executor config type: %t values: %v", val, val)
 		}
 	}
+
+	// Convert map[interface{}]interface{} to map[string]interface{}
+	// Because encode/json doesn't support map[interface{}]interface{}
+	if step.ExecutorConfig.Config != nil {
+		ret := map[string]interface{}{}
+
+		convertKey := func(v interface{}) (interface{}, error) {
+			switch v.(type) {
+			case string:
+				return v, nil
+			default:
+				return nil, fmt.Errorf("invalid key type: %t", v)
+			}
+		}
+
+		queue := []map[string]interface{}{step.ExecutorConfig.Config}
+
+		for len(queue) > 0 {
+			curr := queue[len(queue)-1]
+			for k, v := range curr {
+				switch v := v.(type) {
+				case map[interface{}]interface{}:
+					ret := map[string]interface{}{}
+					for kk, vv := range v {
+						if kk, err := convertKey(kk); err != nil {
+							return nil, fmt.Errorf("executor config key must be string: %s", err)
+						} else {
+							ret[kk.(string)] = vv
+						}
+					}
+					curr[k] = ret
+					queue = append(queue, ret)
+				default:
+					ret[k] = v
+				}
+			}
+			queue = queue[1:]
+		}
+
+		step.ExecutorConfig.Config = ret
+	}
+
 	// TODO: validate executor config
 	step.Variables = variables
 	step.Depends = def.Depends
