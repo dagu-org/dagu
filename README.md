@@ -341,6 +341,7 @@ steps:
       config:
         image: "denoland/deno:1.10.3"
         autoRemove: true
+        host: "host.docker.internal"
     command: run https://examples.deno.land/hello-world.ts
 ```
 
@@ -348,29 +349,8 @@ Example Log output:
 
 ![docker](./examples/images/docker.png)
 
-You can control the Docker container by passing more detailed options.
+To see more configurations, visit [this](https://github.com/yohamta/dagu/tree/main/examples#runing-docker-image) page.
 
-For example:
-```yaml
-steps:
-  - name: deno_hello_world
-    executor: 
-      type: docker
-      config:
-        image: "denoland/deno:1.10.3"
-        container:
-          volumes:
-            /app:/app:
-          env:
-            - FOO=BAR
-        host:
-          autoRemove: true
-    command: run https://examples.deno.land/hello-world.ts
-```
-
-See the Docker's API documentation for all available options.
-- For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
-- For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
 
 ### HTTP Requests
 
@@ -814,7 +794,6 @@ dags: <the location of DAG configuration files>              # default: ${DAGU_H
 You can change the status of any task to a `failed` state. Then, when you retry the DAG, it will execute the failed one and any subsequent.
 
 ### How does it track running processes without DBMS?
-
 dagu uses Unix sockets to communicate with running processes.
 
 ## License

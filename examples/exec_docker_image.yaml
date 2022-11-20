@@ -1,3 +1,5 @@
+env:
+  - DOCKER_HOST : "tcp://host.docker.internal:2376"
 steps:
   - name: deno_hello_world
     executor: 

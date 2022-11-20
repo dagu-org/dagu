@@ -6,6 +6,8 @@
   - [Writing to a file](#writing-to-a-file)
   - [Passing output to the next step](#passing-output-to-the-next-step)
   - [Runing Docker image](#runing-docker-image)
+    - [Container configurations](#container-configurations)
+    - [How to run docker image inside a `dagu` container](#how-to-run-docker-image-inside-a-dagu-container)
   - [Runing command via SSH](#runing-command-via-ssh)
   - [Sending HTTP request](#sending-http-request)
   - [Sending Email Notification](#sending-email-notification)
@@ -102,6 +104,60 @@ steps:
           autoRemove: true
     command: run https://examples.deno.land/hello-world.ts
 ```
+
+### Container configurations
+
+You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
+
+For example:
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        container:
+          volumes:
+            /app:/app:
+          env:
+            - FOO=BAR
+        host:
+          autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+See the Docker's API documentation for all available options.
+
+- For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
+- For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
+
+### How to run docker image inside a `dagu` container
+
+If you are running `dagu` using a container, you need the below setup.
+
+1. Run a `socat` conainer:
+
+```sh
+docker run -v /var/run/docker.sock:/var/run/docker.sock -p 2376:2375 bobrik/socat TCP4-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
+```
+
+2. Then you can set the `DOCKER_HOST` environment as follows:
+
+```yaml
+env:
+  - DOCKER_HOST : "tcp://host.docker.internal:2376"
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+For more details, see [this page](https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2).
 
 ## Runing command via SSH
 
