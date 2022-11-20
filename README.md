@@ -341,7 +341,6 @@ steps:
       config:
         image: "denoland/deno:1.10.3"
         autoRemove: true
-        host: "host.docker.internal"
     command: run https://examples.deno.land/hello-world.ts
 ```
 
