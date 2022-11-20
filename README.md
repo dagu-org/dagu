@@ -20,14 +20,14 @@
 </p>
 
 <p align="center">
-<b>A just another Cron alternative with a Web UI, but with much more capabilities</b><br />
+<b>Just another Cron alternative with a Web UI, but with much more capabilities</b><br />
 It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Directed acyclic graph)</a> defined in a simple YAML format.
 </p>
 
 ---
 
 ## Highlights
-- Install by placing just a single binary file
+- Install by placing a single binary file
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
 
@@ -216,7 +216,7 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
 ## Examples
 
-To check all examples, visit [this](https://github.com/yohamta/dagu/tree/main/examples) page.
+To view all examples, visit [this](https://github.com/yohamta/dagu/tree/main/examples) page.
 
 ### Minimal Definition
 
@@ -253,7 +253,7 @@ steps:
 
 ### Environment Variables
 
-You can define environment variables and refer to using `env` field.
+You can define environment variables and refer to them using the `env` field.
 
 ```yaml
 env:
@@ -267,7 +267,7 @@ steps:
 
 ### Parameters
 
-You can define parameters using `params` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by `--params=` parameter of `start` command.
+You can define parameters using the `params` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by the `--params=` parameter of the `start` command.
 
 ```yaml
 params: param1 param2
@@ -393,7 +393,7 @@ steps:
 
 ### Output
 
-`output` field can be used to set an environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
+The `output` field can be used to set an environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
 
 ```yaml
 steps:
@@ -404,7 +404,7 @@ steps:
 
 ### Stdout and Stderr Redirection
 
-`stdout` field can be used to write standard output to a file.
+The `stdout` field can be used to write standard output to a file.
 
 ```yaml
 steps:
@@ -413,7 +413,7 @@ steps:
     stdout: "/tmp/hello" # the content will be "hello\n"
 ```
 
-`stderr` field allows to redirect stderr to other file without writing to the normal log file.
+The `stderr` field allows to redirect stderr to other file without writing to the normal log file.
 
 ```yaml
 steps:
@@ -545,7 +545,7 @@ command: <Absolute path to the dagu binary>                  # default: dagu
 
 ## Environment Variable
 
-You can configure the dagu's internal work directory by defining `DAGU_HOME` environment variables. Default path is `~/.dagu/`.
+You can configure the dagu's internal work directory by defining `DAGU_HOME` environment variables. The default path is `~/.dagu/`.
 
 ## Sending email notifications
 
@@ -618,7 +618,7 @@ infoMail:
 
 ## Scheduler
 
-To run DAGs automatically, you need to run `dagu scheduler` process on your system.
+To run DAGs automatically, you need to run the `dagu scheduler` process on your system.
 
 ### Execution Schedule
 
@@ -655,7 +655,7 @@ steps:
     command: job.sh
 ```
 
-You can also set multiple start/stop schedules. In the following example, the process will run at 0:00-5:00 and 12:00-17:00.
+You can also set multiple start/stop schedules. In the following example, the process will run from 0:00-5:00 and 12:00-17:00.
 
 ```yaml
 schedule:
@@ -741,7 +741,7 @@ Please refer to [REST API Docs](./docs/restapi.md)
 ## Local Development Setup
 
 1. Install the latest version of [Node.js](https://nodejs.org/en/download/).
-2. Install [yarn](https://yarnpkg.com/) by running the below command.
+2. Install [yarn](https://yarnpkg.com/) by running the command below.
 ```sh
 npm i -g yarn
 ```
