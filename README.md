@@ -64,8 +64,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Repeating Task](#repeating-task)
   - [Other Available Fields](#other-available-fields)
 - [Executor](#executor)
-  - [HTTP Executor](#http-executor)
-  - [SSH Executor](#ssh-executor)
+  - [Running Docker Image](#running-docker-image)
+  - [Executing HTTP Request](#executing-http-request)
+  - [Executing Remote Command via SSH](#executing-remote-command-via-ssh)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
 - [Sending email notifications](#sending-email-notifications)
@@ -452,7 +453,25 @@ The global configuration file `~/.dagu/config.yaml` is useful to gather common s
 
 Executor is a different way of executing a Step; Executor can be set in the `executor` field.
 
-### HTTP Executor
+### Running Docker Image
+
+The Docker Executor allows us to run arbitrary docker image. The below example runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
+
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+Example Log output
+
+![docker](./examples/images/docker.png)
+
+### Executing HTTP Request
 
 The HTTP Executor allows us to send arbitrary HTTP requests.
 
@@ -474,7 +493,7 @@ steps:
       }      
 ```
 
-### SSH Executor
+### Executing Remote Command via SSH
 
 The SSH Executor allows us to execute arbitrary command on a remote host.
 
