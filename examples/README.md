@@ -10,6 +10,7 @@
   - [Sending HTTP request](#sending-http-request)
   - [Sending Email Notification](#sending-email-notification)
   - [Customizing Signal on Stop](#customizing-signal-on-stop)
+- [How to contribute?](#how-to-contribute)
 
 ## Printing Hello World
 
@@ -90,6 +91,15 @@ steps:
       type: docker
       config:
         image: "denoland/deno:1.10.3"
+        container:
+          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
+          volumes:
+            /app:/app:
+          env:
+            - FOO=BAR
+        host:
+          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
+          autoRemove: true
     command: run https://examples.deno.land/hello-world.ts
 ```
 
@@ -168,3 +178,7 @@ steps:
       sleep 60
     signalOnStop: "SIGINT"
 ```
+
+# How to contribute?
+
+Feel free to contribute interesting examples in this page. Thanks!
