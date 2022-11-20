@@ -78,9 +78,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [Scheduler Configuration](#scheduler-configuration)
 - [Building Docker Image](#building-docker-image)
 - [REST API Interface](#rest-api-interface)
+- [Local Development Setup](#local-development-setup)
 - [FAQ](#faq)
   - [How to contribute?](#how-to-contribute)
-- [How to build `dagu` locally?](#how-to-build-dagu-locally)
   - [Where is the history data stored?](#where-is-the-history-data-stored)
   - [Where are the log files stored?](#where-are-the-log-files-stored)
   - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
@@ -327,6 +327,8 @@ steps:
 
 ### Run Docker Images
 
+Note: Docker must be running on the host.
+
 If you want to execute an already-built Docker image instead of just a command, that functionality is provided as well.
 
 In the below example, it pulls and runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
@@ -411,7 +413,7 @@ steps:
 
 ### Output
 
-`output` field can be used to set a environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
+`output` field can be used to set an environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
 
 ```yaml
 steps:
@@ -756,27 +758,27 @@ docker build -t dagu:${DAGU_VERSION} \
 
 Please refer to [REST API Docs](./docs/restapi.md)
 
+## Local Development Setup
+
+1. Install the latest version of [Node.js](https://nodejs.org/en/download/).
+2. Install [yarn](https://yarnpkg.com/) by running the below command.
+```sh
+npm i -g yarn
+```
+3. Build frontend project
+```sh
+make build-admin
+```
+4. Build `dagu` binary to `bin/dagu`
+```sh
+make build
+```
+
 ## FAQ
 
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thanks!
-
-## How to build `dagu` locally?
-
-1. Install the latest version of [Node.js](https://nodejs.org/en/download/) and Go (>= 1.18)
-
-2. Install Yarn 
-```sh
-npm i -g yarn
-```
-
-3. Check out the repository
-
-4. Build 
-```sh
-make build
-```
 
 ### Where is the history data stored?
 
