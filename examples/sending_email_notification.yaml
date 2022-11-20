@@ -1,6 +1,6 @@
 steps:
-  - name: S1
-    command: echo "hello"
+  - name: Sending Email on Finish or Error
+    command: echo "hello world"
 
 mailOn:
   failure: true

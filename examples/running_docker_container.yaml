@@ -1,0 +1,7 @@
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+    command: run https://examples.deno.land/hello-world.ts

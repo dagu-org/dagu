@@ -51,7 +51,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [4. Execute the DAG](#4-execute-the-dag)
 - [Command Line User Interface](#command-line-user-interface)
 - [Web User Interface](#web-user-interface)
-- [YAML format](#yaml-format)
+- [Examples](#examples)
   - [Minimal Definition](#minimal-definition)
   - [Code Snippet](#code-snippet)
   - [Environment Variables](#environment-variables)
@@ -214,7 +214,9 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
   ![DAG Log](assets/images/ui-logoutput.png?raw=true)
 
-## YAML format
+## Examples
+
+To check all examples, visit [this](https://github.com/yohamta/dagu/tree/main/examples) page.
 
 ### Minimal Definition
 

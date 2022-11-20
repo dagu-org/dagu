@@ -1,0 +1,7 @@
+steps:
+  - name: "say hello"
+    command: echo hello world
+  - name: "done"
+    command: echo done!
+    depends:
+      - "say hello"
