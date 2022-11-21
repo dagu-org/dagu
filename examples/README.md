@@ -82,10 +82,6 @@ steps:
 
 ## Runing Docker image
 
-Example Log output
-
-![docker](./images/docker.png)
-
 ```yaml
 steps:
   - name: deno_hello_world
@@ -93,17 +89,14 @@ steps:
       type: docker
       config:
         image: "denoland/deno:1.10.3"
-        container:
-          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
-          volumes:
-            /app:/app:
-          env:
-            - FOO=BAR
         host:
-          # See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
           autoRemove: true
     command: run https://examples.deno.land/hello-world.ts
 ```
+
+Example Log output
+
+![docker](./images/docker.png)
 
 ### Container configurations
 
