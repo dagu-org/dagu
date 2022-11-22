@@ -30,6 +30,7 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - Install by placing a single binary file
 - Schedule executions of DAGs with Cron expressions
 - Define dependencies between related jobs and represent them as a single DAG (unit of execution)
+- Native support for running Docker images, executing HTTP requests, and executing commands on remote hosts via SSH
 
 ## Contents
 
@@ -101,7 +102,7 @@ In legacy complex systems there are implicit dependencies of jobs on each other.
 
 ## Why not an existing workflow scheduler like Airflow?
 
-There are existing tools such as Airflow, Prefect, Temporal, etc., but many libraries require you to write code in a programming language such as Python to define the DAG. In systems that have been in operation for a long time, there are already complex jobs with hundreds of thousands of lines of code written in other languages such as Perl or Shell Scripts. Adding another layer of Python on top of these codes would further reduce maintainability. So we developed dagu, which requires no coding, is easy to use, self-contained, and ideal for small projects.
+There are existing tools such as Airflow, Prefect, Temporal, etc., but many libraries require you to write code in a programming language such as Python to define the DAG. In systems that have been in operation for a long time, there are already complex jobs with hundreds of thousands of lines of code written in other languages such as Perl or Shell Scripts. Adding another layer of complexity on top of these codes would further reduce maintainability. So we developed dagu, which requires no coding, is easy to use, self-contained, and ideal for small projects.
 
 ## How does it work?
 dagu is a single command and it uses the local file system to store data. Therefore, no DBMS or cloud service is required.
