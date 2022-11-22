@@ -1,20 +1,20 @@
 # Examples
 
 - [Examples](#examples)
-  - [Printing Hello World](#printing-hello-world)
-  - [Conditional step](#conditional-step)
-  - [Writing to a file](#writing-to-a-file)
+  - [Hello World](#hello-world)
+  - [Conditional Steps](#conditional-steps)
+  - [Writing to Files](#writing-to-files)
   - [Passing output to the next step](#passing-output-to-the-next-step)
-  - [Runing Docker image](#runing-docker-image)
-    - [Container configurations](#container-configurations)
-    - [How to run docker image inside a `dagu` container](#how-to-run-docker-image-inside-a-dagu-container)
-  - [Runing command via SSH](#runing-command-via-ssh)
-  - [Sending HTTP request](#sending-http-request)
+  - [Running Docker Containers](#running-docker-containers)
+    - [Container Configurations](#container-configurations)
+    - [How to run docker containers inside a `dagu` container](#how-to-run-docker-containers-inside-a-dagu-container)
+  - [Command Execution over SSH](#command-execution-over-ssh)
+  - [Making HTTP Requests](#making-http-requests)
   - [Sending Email Notification](#sending-email-notification)
   - [Customizing Signal on Stop](#customizing-signal-on-stop)
 - [How to contribute?](#how-to-contribute)
 
-## Printing Hello World
+## Hello World
 
 ![hello world](./images/helloworld.png)
 
@@ -29,7 +29,7 @@ steps:
       - "1"
 ```
 
-## Conditional step
+## Conditional Steps
 
 ![conditional](./images/conditional.png)
 
@@ -54,7 +54,7 @@ steps:
         expected: bar
 ```
 
-## Writing to a file
+## Writing to Files
 
 ```yaml
 steps:
@@ -80,7 +80,7 @@ steps:
       - pass 'hello'
 ```
 
-## Runing Docker image
+## Running Docker Containers
 
 ```yaml
 steps:
@@ -98,7 +98,23 @@ Example Log output
 
 ![docker](./images/docker.png)
 
-### Container configurations
+You can configure the Docker host with the environment variable `DOCKER_HOST`.
+
+For example:
+```yaml
+env:
+  - DOCKER_HOST : "tcp://XXX.XXX.XXX.XXX:2375"
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+### Container Configurations
 
 You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
 
@@ -125,17 +141,17 @@ See the Docker's API documentation for all available options.
 - For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
 - For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
 
-### How to run docker image inside a `dagu` container
+### How to run docker containers inside a `dagu` container
 
 If you are running `dagu` using a container, you need the setup below.
 
-1. Run a `socat` conainer:
+1. Run a `socat` conainer with the command below.
 
 ```sh
 docker run -v /var/run/docker.sock:/var/run/docker.sock -p 2376:2375 bobrik/socat TCP4-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
 ```
 
-2. Then you can set the `DOCKER_HOST` environment as follows:
+2. Then you can set the `DOCKER_HOST` environment as follows.
 
 ```yaml
 env:
@@ -152,7 +168,7 @@ steps:
 
 For more details, see [this page](https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2).
 
-## Runing command via SSH
+## Command Execution over SSH
 
 ```yaml
 steps:
@@ -168,7 +184,7 @@ steps:
 
 ```
 
-## Sending HTTP request
+## Making HTTP Requests
 
 ```yaml
 steps:

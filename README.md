@@ -28,9 +28,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 
 ## Highlights
 - Install by placing a single binary file
+- Define dependencies between commands and represent them as a single DAG
 - Schedule executions of DAGs with Cron expressions
-- Define dependencies between related jobs and represent them as a single DAG (unit of execution)
-- Native support for running Docker images, executing HTTP requests, and executing commands on remote hosts via SSH
+- Native support for running Docker containers, making HTTP requests, and executing commands over SSH
 
 ## Contents
 
@@ -52,21 +52,22 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [4. Execute the DAG](#4-execute-the-dag)
 - [Command Line User Interface](#command-line-user-interface)
 - [Web User Interface](#web-user-interface)
-- [Examples](#examples)
+- [YAML Format](#yaml-format)
   - [Minimal Definition](#minimal-definition)
   - [Code Snippet](#code-snippet)
   - [Environment Variables](#environment-variables)
   - [Parameters](#parameters)
   - [Command Substitution](#command-substitution)
   - [Conditional Logic](#conditional-logic)
-  - [Run Docker Images](#run-docker-images)
-  - [HTTP Requests](#http-requests)
-  - [Execute Command via SSH](#execute-command-via-ssh)
   - [Output](#output)
   - [Stdout and Stderr Redirection](#stdout-and-stderr-redirection)
   - [Lifecycle Hooks](#lifecycle-hooks)
   - [Repeating Task](#repeating-task)
   - [Other Available Fields](#other-available-fields)
+- [Executors](#executors)
+  - [Running Docker Containers](#running-docker-containers)
+  - [Making HTTP Requests](#making-http-requests)
+  - [Command Execution over SSH](#command-execution-over-ssh)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
 - [Sending email notifications](#sending-email-notifications)
@@ -215,13 +216,13 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
   ![DAG Log](assets/images/ui-logoutput.png?raw=true)
 
-## Examples
+## YAML Format
 
 To view all examples, visit [this](https://github.com/yohamta/dagu/tree/main/examples) page.
 
 ### Minimal Definition
 
-The minimal DAG definition is as simple as follows:
+The minimal DAG definition is as simple as follows.
 
 ```yaml
 steps:
@@ -277,7 +278,7 @@ steps:
     command: python main.py $1 $2
 ```
 
-Named parameters are also available as follows:
+Named parameters are also available as follows.
 
 ```yaml
 params: ONE=1 TWO=`echo 2`
@@ -302,7 +303,7 @@ steps:
 
 Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `preconditions` field to add conditional branches to your DAG.
 
-For example, the below task only runs on the first date of each month.
+For example, the task below only runs on the first date of each month.
 
 ```yaml
 steps:
@@ -324,71 +325,6 @@ steps:
         expected: "01"
     continueOn:
       skipped: true
-```
-
-### Run Docker Images
-
-Note: Docker must be running on the host.
-
-If you want to execute an already-built Docker image instead of just a command, that functionality is provided as well.
-
-In the below example, it pulls and runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
-
-```yaml
-steps:
-  - name: deno_hello_world
-    executor: 
-      type: docker
-      config:
-        image: "denoland/deno:1.10.3"
-        autoRemove: true
-    command: run https://examples.deno.land/hello-world.ts
-```
-
-Example Log output:
-
-![docker](./examples/images/docker.png)
-
-To see more configurations, visit [this](https://github.com/yohamta/dagu/tree/main/examples#runing-docker-image) page.
-
-
-### HTTP Requests
-
-If you simply want to perform an HTTP request at a certain step, you can easily send an HTTP request as follows:
-
-```yaml
-steps:
-  - name: send POST request
-    executor: http
-    command: POST https://foo.bar.com
-    script: |
-      {
-        "timeout": 10,
-        "headers": {
-          "Authorization": "Bearer $TOKEN"
-        },
-        "query": {
-          "key": "value"
-        },
-        "body": "post body"
-      }      
-```
-
-### Execute Command via SSH
-
-If you want to execute a command via SSH on a remote host, you can do so as follows:
-
-```yaml
-steps:
-  - name: step1
-    executor: 
-      type: ssh
-      config:
-        user: dagu
-        ip: XXX.XXX.XXX.XXX
-        port: 22
-        key: /Users/dagu/.ssh/private.pem
-    command: /usr/sbin/ifconfig
 ```
 
 ### Output
@@ -514,6 +450,74 @@ steps:
 
 The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
 
+## Executors
+
+The `executor` field provides different execution methods for each step.
+
+### Running Docker Containers
+
+*Note: It requires Docker daemon running on the host.*
+
+The `docker` executor allows us to run Docker containers instead of bare commands.
+
+In the example below, it pulls and runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
+
+```yaml
+steps:
+  - name: deno_hello_world
+    executor: 
+      type: docker
+      config:
+        image: "denoland/deno:1.10.3"
+        autoRemove: true
+    command: run https://examples.deno.land/hello-world.ts
+```
+
+Example Log output:
+
+![docker](./examples/images/docker.png)
+
+To see more configurations, visit [this](https://github.com/yohamta/dagu/tree/main/examples#running-docker-containers) page.
+
+### Making HTTP Requests
+
+The `http` executor allows us to make an arbitrary HTTP request.
+
+```yaml
+steps:
+  - name: send POST request
+    executor: http
+    command: POST https://foo.bar.com
+    script: |
+      {
+        "timeout": 10,
+        "headers": {
+          "Authorization": "Bearer $TOKEN"
+        },
+        "query": {
+          "key": "value"
+        },
+        "body": "post body"
+      }      
+```
+
+### Command Execution over SSH
+
+The `ssh` executor allows us to execute commands on remote hosts over SSH.
+
+```yaml
+steps:
+  - name: step1
+    executor: 
+      type: ssh
+      config:
+        user: dagu
+        ip: XXX.XXX.XXX.XXX
+        port: 22
+        key: /Users/dagu/.ssh/private.pem
+    command: /usr/sbin/ifconfig
+```
+
 ## Admin Configuration
 
 To configure dagu, please create the config file (default path: `~/.dagu/admin.yaml`). All fields are optional.
@@ -622,7 +626,7 @@ To run DAGs automatically, you need to run the `dagu scheduler` process on your 
 
 ### Execution Schedule
 
-You can specify the schedule with cron expression in the `schedule` field in the config file as follows:
+You can specify the schedule with cron expression in the `schedule` field in the config file as follows.
 
 ```yaml
 schedule: "5 4 * * *" # Run at 04:05.
@@ -631,7 +635,7 @@ steps:
     command: job.sh
 ```
 
-Or you can set multiple schedules:
+Or you can set multiple schedules.
 
 ```yaml
 schedule:
@@ -696,7 +700,7 @@ steps:
 
 ### Run Scheduler as a daemon
 
-The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
+The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way).
 
 ```bash
 #!/bin/bash
@@ -725,7 +729,7 @@ dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
 
 Download the [Dockerfile](https://github.com/yohamta/dagu/blob/main/Dockerfile) to your local PC and you can build an image.
 
-Example:
+For example:
 
 ```sh
 DAGU_VERSION=1.9.0
