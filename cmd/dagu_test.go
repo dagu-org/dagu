@@ -41,6 +41,10 @@ func TestSetVersion(t *testing.T) {
 	version = "0.0.1"
 	setVersion()
 	require.Equal(t, version, constants.Version)
+
+	version = "0.0.2"
+	main()
+	require.Equal(t, version, constants.Version)
 }
 
 func testConfig(name string) string {
