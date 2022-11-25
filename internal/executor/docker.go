@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/mitchellh/mapstructure"
 	"github.com/yohamta/dagu/internal/dag"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type DockerExecutor struct {
@@ -57,7 +58,10 @@ func (e *DockerExecutor) Run() error {
 	if err != nil {
 		return err
 	}
-	io.Copy(e.stdout, reader)
+	_, err = io.Copy(e.stdout, reader)
+	if err != nil {
+		return err
+	}
 
 	if e.image != "" {
 		e.containerConfig.Image = e.image
@@ -88,10 +92,12 @@ func (e *DockerExecutor) Run() error {
 		return err
 	}
 
-	stdcopy.StdCopy(e.stdout, e.stdout, out)
+	_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
+	utils.LogErr("docker executor: stdcopy", err)
 
 	if e.autoRemove {
-		cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
+		err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
+		utils.LogErr("docker executor: remove container", err)
 	}
 
 	return nil
