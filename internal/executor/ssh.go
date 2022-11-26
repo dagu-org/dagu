@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"strings"
 
@@ -26,7 +25,6 @@ type SSHExecutor struct {
 	config    *SSHConfig
 	sshConfig *ssh.ClientConfig
 	stdout    io.Writer
-	addr      net.Addr
 	session   *ssh.Session
 }
 

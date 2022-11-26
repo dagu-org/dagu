@@ -380,7 +380,7 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 						if v, ok := v.(string); ok {
 							step.ExecutorConfig.Type = v
 						} else {
-							return nil, fmt.Errorf("invalid value for type: %s", v)
+							return nil, fmt.Errorf("executor.type value must be string")
 						}
 					case "config":
 						if v, ok := v.(map[interface{}]interface{}); ok {
@@ -388,19 +388,21 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 								if k, ok := k.(string); ok {
 									step.ExecutorConfig.Config[k] = v
 								} else {
-									return nil, fmt.Errorf("invalid key for config: %s", k)
+									return nil, fmt.Errorf("executor.config key must be string")
 								}
 							}
 						} else {
-							return nil, fmt.Errorf("invalid value for config: %s", v)
+							return nil, fmt.Errorf("executor.config value must be a map")
 						}
+					default:
+						return nil, fmt.Errorf("executor has invalid key '%s'", k)
 					}
 				} else {
-					return nil, fmt.Errorf("invalid executor config key %s", k)
+					return nil, fmt.Errorf("executor config map key must be string")
 				}
 			}
 		default:
-			return nil, fmt.Errorf("invalid executor config type: %t values: %v", val, val)
+			return nil, fmt.Errorf("executor config must be string or map")
 		}
 	}
 
@@ -476,8 +478,6 @@ func convertMap(m map[string]interface{}) error {
 				delete(curr, k)
 				curr[k] = ret
 				queue = append(queue, ret)
-			default:
-				curr[k] = v
 			}
 		}
 		queue = queue[1:]
