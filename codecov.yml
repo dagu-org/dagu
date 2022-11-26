@@ -6,9 +6,6 @@ coverage:
       default:
         if_ci_failed: success
         threshold: 5%
-    patch:
-      default:
-        if_ci_failed: success
-        threshold: 20%
+    patch: off
 github_checks:
     annotations: false
