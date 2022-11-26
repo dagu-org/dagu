@@ -478,8 +478,6 @@ func convertMap(m map[string]interface{}) error {
 				delete(curr, k)
 				curr[k] = ret
 				queue = append(queue, ret)
-			default:
-				curr[k] = v
 			}
 		}
 		queue = queue[1:]

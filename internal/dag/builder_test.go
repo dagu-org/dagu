@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -454,4 +455,51 @@ steps:
 		step := ret.Steps[0]
 		require.Equal(t, step.SignalOnStop, tc.want)
 	}
+}
+
+func TestConvertMap(t *testing.T) {
+	data := map[string]interface{}{
+		"key1": "value1",
+		"map": map[interface{}]interface{}{
+			"key2": "value2",
+			"map": map[interface{}]interface{}{
+				"key3": "value3",
+			},
+		},
+	}
+
+	err := convertMap(data)
+	require.NoError(t, err)
+
+	m1 := data["map"]
+	k1 := reflect.TypeOf(m1).Key().Kind()
+	require.True(t, k1 == reflect.String)
+
+	m2 := data["map"].(map[string]interface{})["map"]
+	k2 := reflect.TypeOf(m2).Key().Kind()
+	require.True(t, k2 == reflect.String)
+
+	expected := map[string]interface{}{
+		"key1": "value1",
+		"map": map[string]interface{}{
+			"key2": "value2",
+			"map": map[string]interface{}{
+				"key3": "value3",
+			},
+		},
+	}
+
+	require.Equal(t, expected, data)
+}
+
+func TestConvertMapError(t *testing.T) {
+	data := map[string]interface{}{
+		"key1": "value1",
+		"map": map[interface{}]interface{}{
+			1: "value2",
+		},
+	}
+
+	err := convertMap(data)
+	require.Error(t, err)
 }
