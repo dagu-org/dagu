@@ -52,6 +52,7 @@ type stepDef struct {
 	MailOnError   bool
 	Preconditions []*conditionDef
 	SignalOnStop  *string
+	Env 		  string
 }
 
 type continueOnDef struct {
