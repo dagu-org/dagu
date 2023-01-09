@@ -24,13 +24,16 @@
 It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Directed acyclic graph)</a> defined in a simple YAML format.
 </p>
 
----
+Dagu is a tool for scheduling and running tasks based on a directed acyclic graph (DAG). It allows you to define dependencies between commands and represent them as a single DAG, schedule the execution of DAGs with Cron expressions, and natively support running Docker containers, making HTTP requests, and executing commands over SSH.
 
 ## Highlights
-- Install by placing a single binary file
-- Define dependencies between commands and represent them as a single DAG
-- Schedule executions of DAGs with Cron expressions
-- Native support for running Docker containers, making HTTP requests, and executing commands over SSH
+- Single binary file installation
+- Declarative YAML format for defining DAGs
+- Web UI for visualizing, managing, and rerunning pipelines
+- No programming required, making it easy to use and ideal for small projects
+- Self-contained, with no need for a DBMS or cloud service
+
+---
 
 ## Contents
 
@@ -38,9 +41,9 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
 - [Contents](#contents)
 - [Getting started](#getting-started)
 - [Motivation](#motivation)
-- [Why not an existing workflow scheduler like Airflow?](#why-not-an-existing-workflow-scheduler-like-airflow)
+- [Why not use an existing workflow scheduler like Airflow?](#why-not-use-an-existing-workflow-scheduler-like-airflow)
 - [How does it work?](#how-does-it-work)
-- [Install `dagu`](#install-dagu)
+- [Installation](#installation)
   - [via Homebrew](#via-homebrew)
   - [via Bash script](#via-bash-script)
   - [via Docker](#via-docker)
@@ -90,28 +93,28 @@ It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Dir
   - [How to specify the DAGs directory for `dagu server` and `dagu scheduler`?](#how-to-specify-the-dags-directory-for-dagu-server-and-dagu-scheduler)
   - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
   - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
+- [Contributions](#contributions)
 - [License](#license)
-- [Contributors](#contributors)
 
 ## Getting started
 
-See [Install `dagu`](#install-dagu) and [️Quick start](#️quick-start).
+To get started with Dagu, see the [installation instructions](#install-dagu) below and then check out the [️Quick start](#️quick-start) guide.
 
 ## Motivation
 
-In legacy complex systems there are implicit dependencies of jobs on each other. When there are hundreds of cron jobs in a server's crontab, it is impossible to keep track of the dependencies between them. If one job fails, it is impossible to know which one to rerun. You also have to SSH into the server to see the logs. And to rerun them, you have to manually run the shell scripts one by one. This is a huge hassle and makes operation impossible. We need a tool that can explicitly visualize and manage pipeline dependencies as a DAG. ***How nice it would be if we could visually check the dependencies, execution status, and logs of each job in a Web UI, and rerun or stop a series of jobs with just a mouse click!***
+Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
 
-## Why not an existing workflow scheduler like Airflow?
+## Why not use an existing workflow scheduler like Airflow?
 
-There are existing tools such as Airflow, Prefect, Temporal, etc., but many libraries require you to write code in a programming language such as Python to define the DAG. In systems that have been in operation for a long time, there are already complex jobs with hundreds of thousands of lines of code written in other languages such as Perl or Shell Scripts. Adding another layer of complexity on top of these codes would further reduce maintainability. So we developed dagu, which requires no coding, is easy to use, self-contained, and ideal for small projects.
+There are many existing tools such as Airflow, Prefect, and Temporal, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
 ## How does it work?
-dagu is a single command and it uses the local file system to store data. Therefore, no DBMS or cloud service is required.
-dagu executes DAGs defined in declarative YAML format. Existing programs can be used without any modification.
 
-## Install `dagu`
+Dagu is a single command line tool that uses the local file system to store data, so no database management system or cloud service is required. DAGs are defined in a declarative YAML format, and existing programs can be used without modification.
 
-You can quickly install `dagu` command and try it out.
+## Installation
+
+You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
 
 ### via Homebrew
 ```sh
@@ -175,9 +178,9 @@ You can execute the example by pressing the `Start` button.
 - `dagu status <file>` - Displays the current status of the DAG
 - `dagu retry --req=<request-id> <file>` - Re-runs the specified DAG run
 - `dagu stop <file>` - Stops the DAG execution by sending TERM signals
-- `dagu restart <file>` - Restart the current running DAG
+- `dagu restart <file>` - Restarts the current running DAG
 - `dagu dry [--params=<params>] <file>` - Dry-runs the DAG
-- `dagu server [--host=<host>] [--port=<port>] [--dags=<path/to/the DAGs directory>]` - Starts the web server for web UI
+- `dagu server [--host=<host>] [--port=<port>] [--dags=<path/to/the DAGs directory>]` - Launches the Dagu web UI server
 - `dagu scheduler [--dags=<path/to/the DAGs directory>]` - Starts the scheduler process
 - `dagu version` - Shows the current binary version
 
@@ -800,14 +803,16 @@ You can change the status of any task to a `failed` state. Then, when you retry 
 ### How does it track running processes without DBMS?
 dagu uses Unix sockets to communicate with running processes.
 
+## Contributions
+
+We welcome contributions to Dagu! If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository. If you would like to contribute code, please follow these steps:
+
+1. Fork the repository
+2. Create a new branch for your changes
+3. Make your changes and commit them to your branch
+4. Push your branch to your fork and open a pull request
+
+
 ## License
 
 This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
-
-## Contributors
-
-<a href="https://github.com/yohamta/dagu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
-</a>
-
-Made with [contrib.rocks](https://contrib.rocks).
