@@ -392,6 +392,8 @@ func (sc *Scheduler) isRunning(g *ExecutionGraph) bool {
 		switch node.ReadStatus() {
 		case NodeStatus_Running:
 			return true
+		case NodeStatus_None:
+			return true
 		}
 	}
 	return false
