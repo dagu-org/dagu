@@ -64,8 +64,8 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 				}
 				return true
 			})
-			node.OutputVariables = graph.outputVariables
 		}
+		node.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
