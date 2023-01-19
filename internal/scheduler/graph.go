@@ -3,17 +3,18 @@ package scheduler
 import (
 	"fmt"
 	"log"
-	"sync"
+	"os"
 	"time"
 
 	"github.com/yohamta/dagu/internal/dag"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
 	StartedAt       time.Time
 	FinishedAt      time.Time
-	outputVariables *sync.Map
+	outputVariables *utils.SyncMap
 	dict            map[int]*Node
 	nodes           []*Node
 	from            map[int][]int
@@ -23,7 +24,7 @@ type ExecutionGraph struct {
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...*dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		outputVariables: &sync.Map{},
+		outputVariables: &utils.SyncMap{},
 		dict:            make(map[int]*Node),
 		from:            make(map[int][]int),
 		to:              make(map[int][]int),
@@ -45,13 +46,25 @@ func NewExecutionGraph(steps ...*dag.Step) (*ExecutionGraph, error) {
 // NewExecutionGraphForRetry creates a new execution graph for retry with given nodes.
 func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		outputVariables: &sync.Map{},
+		outputVariables: &utils.SyncMap{},
 		dict:            make(map[int]*Node),
 		from:            make(map[int][]int),
 		to:              make(map[int][]int),
 		nodes:           []*Node{},
 	}
 	for _, node := range nodes {
+		if node.OutputVariables != nil {
+			node.OutputVariables.Range(func(key, value interface{}) bool {
+				k := key.(string)
+				v := value.(string)
+				graph.outputVariables.Store(key, value)
+				err := os.Setenv(k, v[len(key.(string))+1:])
+				if err != nil {
+					log.Printf("set env error : %s", err.Error())
+				}
+				return true
+			})
+		}
 		node.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node

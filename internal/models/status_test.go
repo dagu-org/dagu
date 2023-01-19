@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func TestPid(t *testing.T) {
@@ -69,4 +71,16 @@ func TestCorrectRunningStatus(t *testing.T) {
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+}
+
+func TestJsonMarshal(t *testing.T) {
+	step := dag.Step{
+		OutputVariables: &utils.SyncMap{},
+	}
+	step.OutputVariables.Store("A", "B")
+	js, err := json.Marshal(step)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Logf(string(js))
 }
