@@ -5,20 +5,20 @@ import (
 	"math/rand"
 	"os"
 	"path"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/dag"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func TestExecute(t *testing.T) {
 	n := &Node{
 		Step: &dag.Step{
 			Command:         "true",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		}}
 	require.NoError(t, n.Execute())
 	require.Nil(t, n.Error)
@@ -28,7 +28,7 @@ func TestError(t *testing.T) {
 	n := &Node{
 		Step: &dag.Step{
 			Command:         "false",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		}}
 	err := n.Execute()
 	require.True(t, err != nil)
@@ -40,7 +40,7 @@ func TestSignal(t *testing.T) {
 		Step: &dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		}}
 
 	go func() {
@@ -60,7 +60,7 @@ func TestSignalSpecified(t *testing.T) {
 		Step: &dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 			SignalOnStop:    "SIGINT",
 		}}
 
@@ -82,7 +82,7 @@ func TestLog(t *testing.T) {
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 
@@ -99,7 +99,7 @@ func TestStdout(t *testing.T) {
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
 			Stdout:          "stdout.log",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 
@@ -121,7 +121,7 @@ echo Stderr message >&2
 			Dir:             os.Getenv("HOME"),
 			Stdout:          "test-stderr-stdout.log",
 			Stderr:          "test-stderr-stderr.log",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 
@@ -141,7 +141,7 @@ func TestNode(t *testing.T) {
 		Step: &dag.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 	n.incDoneCount()
@@ -164,7 +164,7 @@ func TestOutput(t *testing.T) {
 		Step: &dag.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
@@ -184,7 +184,7 @@ func TestOutput(t *testing.T) {
 		Step: &dag.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 
@@ -197,7 +197,7 @@ func TestOutput(t *testing.T) {
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 
@@ -227,7 +227,7 @@ func TestOutputJson(t *testing.T) {
 				Step: &dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
-					OutputVariables: &sync.Map{},
+					OutputVariables: &utils.SyncMap{},
 				},
 			}
 			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-json-%d", i))
@@ -279,7 +279,7 @@ func TestOutputSpecialchar(t *testing.T) {
 				Step: &dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_SPECIALCHAR_TEST",
-					OutputVariables: &sync.Map{},
+					OutputVariables: &utils.SyncMap{},
 				},
 			}
 			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
@@ -308,7 +308,7 @@ func TestRunScript(t *testing.T) {
 			  echo hello
 			`,
 			Output:          "SCRIPT_TEST",
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 
@@ -335,7 +335,7 @@ func TestTeardown(t *testing.T) {
 		Step: &dag.Step{
 			Command:         testCommand,
 			Args:            []string{},
-			OutputVariables: &sync.Map{},
+			OutputVariables: &utils.SyncMap{},
 		},
 	}
 

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 func TestPid(t *testing.T) {
@@ -69,4 +71,40 @@ func TestCorrectRunningStatus(t *testing.T) {
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+}
+
+func TestJsonMarshal(t *testing.T) {
+	step := dag.Step{
+		OutputVariables: &utils.SyncMap{},
+	}
+	step.OutputVariables.Store("A", "B")
+	js, err := json.Marshal(step)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Fatalf(string(js))
+}
+
+func TestMarshalJSON(t *testing.T) {
+	m := &utils.SyncMap{}
+	m.Store("A", "B")
+	js, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	t.Fatalf(string(js))
+}
+
+func TestUnMarshalJSON(t *testing.T) {
+	a := `{"RequestId":"86c07302-ff8e-401f-872d-4d7ac6eb52a4","Name":"test_output","Status":4,"StatusText":"finished","Pid":41030,"Nodes":[{"Step":{"Name":"step 1","Description":"","Variables":[],"OutputVariables":{"FOO":"FOO=hello"},"Dir":"/tmp/dagu/.dagu/dags","ExecutorConfig":{"Type":"","Config":{}},"CmdWithArgs":"echo hello","Command":"echo","Script":"","Stdout":"","Stderr":"","Output":"FOO","Args":["hello"],"Depends":null,"ContinueOn":{"Failure":false,"Skipped":false},"RetryPolicy":null,"RepeatPolicy":{"Repeat":false,"Interval":0},"MailOnError":false,"Preconditions":[],"SignalOnStop":""},"Log":"/tmp/dagu/.dagu/logs/dags/test_output/step_1.20230119.16:28:47.553.86c07302.log","StartedAt":"2023-01-19 16:28:47","FinishedAt":"2023-01-19 16:28:47","Status":4,"RetryCount":0,"DoneCount":1,"Error":"","StatusText":"finished"},{"Step":{"Name":"step 2","Description":"","Variables":[],"OutputVariables":{"FOO":"FOO=hello"},"Dir":"/tmp/dagu/.dagu/dags","ExecutorConfig":{"Type":"","Config":{}},"CmdWithArgs":"echo $FOO","Command":"echo","Script":"","Stdout":"","Stderr":"","Output":"","Args":["hello"],"Depends":["step 1"],"ContinueOn":{"Failure":false,"Skipped":false},"RetryPolicy":null,"RepeatPolicy":{"Repeat":false,"Interval":0},"MailOnError":false,"Preconditions":[],"SignalOnStop":""},"Log":"/tmp/dagu/.dagu/logs/dags/test_output/step_2.20230119.16:28:47.658.86c07302.log","StartedAt":"2023-01-19 16:28:47","FinishedAt":"2023-01-19 16:28:47","Status":4,"RetryCount":0,"DoneCount":1,"Error":"","StatusText":"finished"}],"OnExit":null,"OnSuccess":null,"OnFailure":null,"OnCancel":null,"StartedAt":"2023-01-19 16:28:47","FinishedAt":"2023-01-19 16:28:47","Log":"/tmp/dagu/.dagu/logs/dags/test_output/agent_test_output.20230119.16:28:47.548.86c07302.log","Params":""}`
+	m := &utils.SyncMap{}
+	err := json.Unmarshal([]byte(a), m)
+	if err != nil {
+		t.Fatalf("HEHE" + err.Error())
+	}
+	js, err := json.Marshal(m)
+	if err != nil {
+		t.Fatalf("HAHA" + err.Error())
+	}
+	t.Fatalf("=============" + string(js))
 }

@@ -3,8 +3,9 @@ package dag
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
+
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 // Step represents a step in a DAG.
@@ -12,7 +13,7 @@ type Step struct {
 	Name            string
 	Description     string
 	Variables       []string
-	OutputVariables *sync.Map
+	OutputVariables *utils.SyncMap
 	Dir             string
 	ExecutorConfig  ExecutorConfig
 	CmdWithArgs     string
