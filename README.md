@@ -81,6 +81,7 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
   - [Restart Schedule](#restart-schedule)
   - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
+- [Running with Docker Compose](#running-with-docker-compose)
 - [Building Docker Image](#building-docker-image)
 - [REST API Interface](#rest-api-interface)
 - [Local Development Setup](#local-development-setup)
@@ -726,6 +727,55 @@ Set the `dags` field to specify the directory of the DAGs.
 
 ```yaml
 dags: <the location of DAG configuration files> # default: (~/.dagu/dags)
+```
+
+## Running with Docker Compose
+
+To automate workflows based on cron expressions, it is necessary to run both the admin server and scheduler process. Here is an example `docker-compose.yml` setup for running Dagu using Docker Compose.
+
+```yaml
+version: "3.9"
+services:
+
+  # init container updates permission
+  init:
+    image: "yohamta/dagu:latest"
+    user: root
+    volumes:
+      - data:/home/dagu/.dagu/data
+      - logs:/home/dagu/.dagu/logs
+    command: chown -R dagu /home/dagu/.dagu/
+
+  # admin web server process
+  server:
+    image: "yohamta/dagu:latest"
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/home/dagu/.dagu/data
+      - logs:/home/dagu/.dagu/logs
+      - <path to config files>:/home/dagu/.dagu
+      - <path to dag files>:/home/dagu/.dagu/dags
+    depends_on:
+      - init
+
+  # scheduler process
+  scheduler:
+    image: "yohamta/dagu:latest"
+    restart: unless-stopped
+    volumes:
+      - data:/home/dagu/.dagu/data
+      - logs:/home/dagu/.dagu/logs
+      - <path to config files>:/home/dagu/.dagu
+      - <path to dag files>:/home/dagu/.dagu/dags
+    command: dagu scheduler
+    depends_on:
+      - init
+
+volumes:
+  data: {}
+  logs: {}
 ```
 
 ## Building Docker Image
