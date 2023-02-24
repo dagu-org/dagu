@@ -1,0 +1,42 @@
+version: "3.9"
+services:
+
+  # init container updates permission
+  init:
+    image: "yohamta/dagu:latest"
+    user: root
+    volumes:
+      - data:/home/dagu/.dagu/data
+      - logs:/home/dagu/.dagu/logs
+    command: chown -R dagu /home/dagu/.dagu/
+
+  # admin web server process
+  server:
+    image: "yohamta/dagu:latest"
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/home/dagu/.dagu/data
+      - logs:/home/dagu/.dagu/logs
+      - ./local:/home/dagu/.dagu
+      - ./examples:/home/dagu/.dagu/dags
+    depends_on:
+      - init
+
+  # scheduler process
+  scheduler:
+    image: "yohamta/dagu:latest"
+    restart: unless-stopped
+    volumes:
+      - data:/home/dagu/.dagu/data
+      - logs:/home/dagu/.dagu/logs
+      - ./local:/home/dagu/.dagu
+      - ./examples:/home/dagu/.dagu/dags
+    command: dagu scheduler
+    depends_on:
+      - init
+
+volumes:
+  data: {}
+  logs: {}
