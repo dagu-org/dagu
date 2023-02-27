@@ -22,7 +22,7 @@ Accept: application/json
 
 ## Show DAG List `GET dags/`
 
-**URL** : `/api/user/`
+**URL** : `/dags/`
 
 **Method** : `GET`
 
