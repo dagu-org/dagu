@@ -6,8 +6,7 @@ services:
     image: "yohamta/dagu:latest"
     user: root
     volumes:
-      - data:/home/dagu/.dagu/data
-      - logs:/home/dagu/.dagu/logs
+      - dagu:/home/dagu/.dagu
     command: chown -R dagu /home/dagu/.dagu/
 
   # admin web server process
@@ -17,10 +16,8 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - data:/home/dagu/.dagu/data
-      - logs:/home/dagu/.dagu/logs
-      - ./:/home/dagu/.dagu
-      - ../:/home/dagu/.dagu/dags
+      - dagu:/home/dagu/.dagu
+      - ./dags/:/home/dagu/.dagu/dags
     depends_on:
       - init
 
@@ -29,14 +26,11 @@ services:
     image: "yohamta/dagu:latest"
     restart: unless-stopped
     volumes:
-      - data:/home/dagu/.dagu/data
-      - logs:/home/dagu/.dagu/logs
-      - .:/home/dagu/.dagu
-      - ../:/home/dagu/.dagu/dags
+      - dagu:/home/dagu/.dagu
+      - ./dags/:/home/dagu/.dagu/dags
     command: dagu scheduler
     depends_on:
       - init
 
 volumes:
-  data: {}
-  logs: {}
+  dagu: {}
