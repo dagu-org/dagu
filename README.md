@@ -70,6 +70,7 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Executors](#executors)
   - [Running Docker Containers](#running-docker-containers)
   - [Making HTTP Requests](#making-http-requests)
+  - [Executing jq Command](#executing-jq-command)
   - [Command Execution over SSH](#command-execution-over-ssh)
 - [Admin Configuration](#admin-configuration)
 - [Environment Variable](#environment-variable)
@@ -504,6 +505,50 @@ steps:
         "body": "post body"
       }      
 ```
+
+### Executing jq Command
+
+The `jq` executor can be used to transform, query, and format JSON.
+
+Query Example:
+
+```yaml
+steps:
+  - name: run query
+    executor: jq
+    command: '{(.id): .["10"].b}'
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+```
+
+output:
+```json
+{
+    "sample": 42
+}
+```
+
+Formatting JSON:
+
+```yaml
+steps:
+  - name: format json
+    executor: jq
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+```
+
+output:
+```json
+{
+    "10": {
+        "b": 42
+    },
+    "id": "sample"
+}
+```
+
+The `jq` result can be used in following steps via [Output](#output) or [Stdout Redirection](#stdout-and-stderr-redirection).
 
 ### Command Execution over SSH
 
