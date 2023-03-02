@@ -64,7 +64,8 @@ func (e *HTTPExecutor) Run() error {
 func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 	var reqCfg HTTPConfig
 	if len(step.Script) > 0 {
-		if err := json.Unmarshal([]byte(step.Script), &reqCfg); err != nil {
+		script := os.ExpandEnv(step.Script)
+		if err := json.Unmarshal([]byte(script), &reqCfg); err != nil {
 			return nil, err
 		}
 	}
