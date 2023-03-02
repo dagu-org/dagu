@@ -4,6 +4,9 @@ dist/
 internal/admin/handlers/web/assets/fonts/*
 internal/admin/handlers/web/assets/js/*
 
+# NVM
+.nvmrc
+
 # tmp files
 tmp/*
 
