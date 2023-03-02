@@ -10,6 +10,8 @@
     - [How to run docker containers inside a `dagu` container](#how-to-run-docker-containers-inside-a-dagu-container)
   - [Command Execution over SSH](#command-execution-over-ssh)
   - [Making HTTP Requests](#making-http-requests)
+  - [Querying JSON with jq](#querying-json-with-jq)
+  - [Format JSON with jq](#format-json-with-jq)
   - [Sending Email Notification](#sending-email-notification)
   - [Customizing Signal on Stop](#customizing-signal-on-stop)
 - [How to contribute?](#how-to-contribute)
@@ -200,6 +202,42 @@ steps:
         },
         "body": ""
       }      
+```
+
+## Querying JSON with jq
+```yaml
+steps:
+  - name: run query
+    executor: jq
+    command: '{(.id): .["10"].b}'
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+```
+
+log output:
+```json
+{
+    "sample": 42
+}
+```
+
+## Format JSON with jq
+```yaml
+steps:
+  - name: format json
+    executor: jq
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+```
+
+log output:
+```json
+{
+    "10": {
+        "b": 42
+    },
+    "id": "sample"
+}
 ```
 
 ## Sending Email Notification

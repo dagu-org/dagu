@@ -564,7 +564,7 @@ func assertStepDef(def *stepDef) error {
 	if def.Name == "" {
 		return fmt.Errorf("step name must be specified")
 	}
-	if def.Command == "" {
+	if def.Command == "" && def.Executor != "jq" {
 		return fmt.Errorf("step command must be specified")
 	}
 	return nil

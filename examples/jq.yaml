@@ -1,0 +1,10 @@
+steps:
+  - name: run query
+    executor: jq
+    command: '{(.id): .["10"].b}'
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+  - name: format json
+    executor: jq
+    script: |
+      {"id": "sample", "10": {"b": 42}}
