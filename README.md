@@ -895,6 +895,10 @@ You can change the status of any task to a `failed` state. Then, when you retry 
 dagu uses Unix sockets to communicate with running processes.
 
 ## Contributions
+ 
+<a href="https://github.com/yohamta/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
+</a>
 
 We welcome contributions to Dagu! If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository. If you would like to contribute code, please follow these steps:
 
