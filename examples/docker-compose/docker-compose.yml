@@ -19,8 +19,8 @@ services:
     volumes:
       - data:/home/dagu/.dagu/data
       - logs:/home/dagu/.dagu/logs
-      - ./local:/home/dagu/.dagu
-      - ./examples:/home/dagu/.dagu/dags
+      - ./:/home/dagu/.dagu
+      - ../:/home/dagu/.dagu/dags
     depends_on:
       - init
 
@@ -31,8 +31,8 @@ services:
     volumes:
       - data:/home/dagu/.dagu/data
       - logs:/home/dagu/.dagu/logs
-      - ./local:/home/dagu/.dagu
-      - ./examples:/home/dagu/.dagu/dags
+      - .:/home/dagu/.dagu
+      - ../:/home/dagu/.dagu/dags
     command: dagu scheduler
     depends_on:
       - init
