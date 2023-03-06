@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu"
+	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/dag"
 )
 
@@ -33,7 +33,7 @@ func newStartCommand() *cli.Command {
 }
 
 func start(d *dag.DAG) error {
-	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
+	a := &agent.Agent{AgentConfig: &agent.AgentConfig{
 		DAG: d,
 		Dry: false,
 	}}

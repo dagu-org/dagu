@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yohamta/dagu"
+	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
@@ -43,12 +43,12 @@ func newRetryCommand() *cli.Command {
 }
 
 func retry(d *dag.DAG, status *models.StatusFile) error {
-	a := &dagu.Agent{
-		AgentConfig: &dagu.AgentConfig{
+	a := &agent.Agent{
+		AgentConfig: &agent.AgentConfig{
 			DAG: d,
 			Dry: false,
 		},
-		RetryConfig: &dagu.RetryConfig{
+		RetryConfig: &agent.RetryConfig{
 			Status: status.Status,
 		},
 	}
