@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/settings"
@@ -98,6 +99,20 @@ func testLastStatus(t *testing.T, dagFile string, expected scheduler.SchedulerSt
 	status := db.ReadStatusHist(dagFile, 1)
 	require.GreaterOrEqual(t, 1, len(status))
 	require.Equal(t, expected.String(), status[0].Status.Status.String())
+}
+
+func testStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
+	t.Helper()
+
+	d, err := loadDAG(dagFile, "")
+	require.NoError(t, err)
+	ctrl := controller.NewDAGController(d)
+
+	require.Eventually(t, func() bool {
+		status, err := ctrl.GetStatus()
+		require.NoError(t, err)
+		return expected == status.Status
+	}, time.Millisecond*5000, time.Millisecond*50)
 }
 
 func testLastStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {

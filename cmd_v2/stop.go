@@ -9,20 +9,18 @@ import (
 )
 
 var stopCommand = &cobra.Command{
-	Use:   "stop <YAML file>",
+	Use:   "stop <DAG file>",
 	Short: "Stop specified DAG",
-	Long:  `dagu stop <YAML file>`,
+	Long:  `dagu stop <DAG file>`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		file := args[0]
-		d, err := loadDAG(file, "")
+		d, err := loadDAG(args[0], "")
 		cobra.CheckErr(err)
 		cobra.CheckErr(stop(d))
 	},
 }
 
 func stop(d *dag.DAG) error {
-	c := controller.NewDAGController(d)
 	log.Printf("Stopping...")
-	return c.Stop()
+	return controller.NewDAGController(d).Stop()
 }

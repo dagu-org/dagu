@@ -10,15 +10,14 @@ import (
 )
 
 var startCommand = &cobra.Command{
-	Use:   "start [flags] <YAML file>",
+	Use:   "start [flags] <DAG file>",
 	Short: "Runs specified DAG",
-	Long:  `dagu start [--params="param1 param2"] <YAML file>`,
+	Long:  `dagu start [--params="param1 param2"] <DAG file>`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		file := args[0]
 		params, err := cmd.Flags().GetString("params")
 		cobra.CheckErr(err)
-		d, err := loadDAG(file, strings.Trim(params, `"`))
+		d, err := loadDAG(args[0], strings.Trim(params, `"`))
 		cobra.CheckErr(err)
 		cobra.CheckErr(start(d))
 	},
