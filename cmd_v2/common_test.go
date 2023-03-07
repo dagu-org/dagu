@@ -7,11 +7,29 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
+
+var (
+	testHomeDir = ""
+)
+
+func TestMain(m *testing.M) {
+	testHomeDir = utils.MustTempDir("dagu_test")
+	settings.ChangeHomeDir(testHomeDir)
+
+	code := m.Run()
+
+	os.RemoveAll(testHomeDir)
+	os.Exit(code)
+}
 
 type cmdTest struct {
 	args        []string
@@ -69,7 +87,27 @@ func withSpool(t *testing.T, f func()) string {
 	return buf.String()
 }
 
-func testConfig(name string) string {
+func testDAGFile(name string) string {
 	d := path.Join(utils.MustGetwd(), "testdata")
 	return path.Join(d, name)
+}
+
+func testLastStatus(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
+	t.Helper()
+	db := &database.Database{Config: database.DefaultConfig()}
+	status := db.ReadStatusHist(dagFile, 1)
+	require.GreaterOrEqual(t, 1, len(status))
+	require.Equal(t, expected.String(), status[0].Status.Status.String())
+}
+
+func testLastStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		db := &database.Database{Config: database.DefaultConfig()}
+		status := db.ReadStatusHist(dagFile, 1)
+		if len(status) < 1 {
+			return false
+		}
+		return expected == status[0].Status.Status
+	}, time.Millisecond*5000, time.Millisecond*50)
 }

@@ -5,7 +5,6 @@ package cmd_v2
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -36,7 +35,6 @@ var (
 	}
 
 	version = "0.0.0"
-	stdin   io.ReadCloser
 	sigs    chan os.Signal
 )
 
@@ -63,6 +61,7 @@ func init() {
 	startCommand.Flags().StringP("params", "p", "", "parameters")
 
 	rootCmd.AddCommand(startCommand)
+	rootCmd.AddCommand(stopCommand)
 }
 
 func initConfig() {

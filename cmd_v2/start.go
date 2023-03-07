@@ -17,16 +17,10 @@ var startCommand = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		file := args[0]
 		params, err := cmd.Flags().GetString("params")
-		if err != nil {
-			panic(err)
-		}
+		cobra.CheckErr(err)
 		d, err := loadDAG(file, strings.Trim(params, `"`))
-		if err != nil {
-			panic(err)
-		}
-		if err := start(d); err != nil {
-			panic(err)
-		}
+		cobra.CheckErr(err)
+		cobra.CheckErr(start(d))
 	},
 }
 
