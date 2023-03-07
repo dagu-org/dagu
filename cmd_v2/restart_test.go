@@ -40,6 +40,8 @@ func TestRestartCommand(t *testing.T) {
 	// Stop the restarted DAG.
 	testRunCommand(t, stopCommand, cmdTest{args: []string{"stop", dagFile}})
 
+	time.Sleep(time.Millisecond * 50)
+
 	// Check parameter was the same as the first execution
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
