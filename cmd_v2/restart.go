@@ -76,6 +76,6 @@ func stopRunningDAG(ctrl *controller.DAGController) error {
 		if err := ctrl.Stop(); err != nil {
 			return fmt.Errorf("error stopping the DAG: %w", err)
 		}
-		time.Sleep(time.Millisecond * 500)
+		time.Sleep(time.Millisecond * 100)
 	}
 }
