@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
 )
 
 func stopCommand() *cobra.Command {
@@ -17,12 +16,9 @@ func stopCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			d, err := loadDAG(args[0], "")
 			cobra.CheckErr(err)
-			cobra.CheckErr(stop(d))
+
+			log.Printf("Stopping...")
+			cobra.CheckErr(controller.NewDAGController(d).Stop())
 		},
 	}
-}
-
-func stop(d *dag.DAG) error {
-	log.Printf("Stopping...")
-	return controller.NewDAGController(d).Stop()
 }
