@@ -37,15 +37,17 @@ func restart(dagFile string) error {
 
 	// Stop the DAG if it is running.
 	if st.Status == scheduler.SchedulerStatus_Running {
-		log.Printf("Stopping!!! %s for restart...", d.Name)
+		log.Printf("Stopping %s for restart...", d.Name)
 		if err := stopRunningDAG(ctrl); err != nil {
 			return err
 		}
 	}
 
 	// Wait for the specified amount of time before restarting.
-	log.Printf("Waiting for %s...", d.RestartWait)
-	time.Sleep(d.RestartWait)
+	if d.RestartWait > 0 {
+		log.Printf("Waiting for %s...", d.RestartWait)
+		time.Sleep(d.RestartWait)
+	}
 
 	// Retrieve the parameter of the previous execution.
 	log.Printf("Restarting %s...", d.Name)
@@ -74,7 +76,6 @@ func stopRunningDAG(ctrl *controller.DAGController) error {
 		if err := ctrl.Stop(); err != nil {
 			return fmt.Errorf("error stopping the DAG: %w", err)
 		}
-		fmt.Errorf("!!waiting ")
 		time.Sleep(time.Millisecond * 500)
 	}
 }
