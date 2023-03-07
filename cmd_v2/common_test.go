@@ -35,7 +35,6 @@ func TestMain(m *testing.M) {
 type cmdTest struct {
 	args        []string
 	expectedOut []string
-	expectedErr []string
 }
 
 func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {

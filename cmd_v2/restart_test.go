@@ -24,9 +24,11 @@ func TestRestartCommand(t *testing.T) {
 	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Restart the DAG.
-	go func(dagFile string) {
+	done := make(chan struct{})
+	go func() {
 		testRunCommand(t, restartCommand(), cmdTest{args: []string{"restart", dagFile}})
-	}(dagFile)
+		close(done)
+	}()
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -49,4 +51,6 @@ func TestRestartCommand(t *testing.T) {
 	println(fmt.Sprintf("%#v", sts))
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
+
+	<-done
 }

@@ -11,8 +11,10 @@ func TestStopCommand(t *testing.T) {
 	dagFile := testDAGFile("stop.yaml")
 
 	// Start the DAG.
+	done := make(chan struct{})
 	go func() {
 		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
+		close(done)
 	}()
 
 	time.Sleep(time.Millisecond * 50)
@@ -27,4 +29,5 @@ func TestStopCommand(t *testing.T) {
 
 	// Check the last execution is cancelled.
 	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Cancel)
+	<-done
 }
