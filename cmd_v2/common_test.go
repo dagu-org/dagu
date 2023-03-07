@@ -93,14 +93,6 @@ func testDAGFile(name string) string {
 	return path.Join(d, name)
 }
 
-func testLastStatus(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
-	t.Helper()
-	db := &database.Database{Config: database.DefaultConfig()}
-	status := db.ReadStatusHist(dagFile, 1)
-	require.GreaterOrEqual(t, 1, len(status))
-	require.Equal(t, expected.String(), status[0].Status.Status.String())
-}
-
 func testStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
 	t.Helper()
 

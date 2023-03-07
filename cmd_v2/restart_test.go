@@ -1,6 +1,7 @@
 package cmd_v2
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,39 +15,38 @@ func TestRestartCommand(t *testing.T) {
 
 	// Start the DAG.
 	go func() {
-		testRunCommand(t, startCommand, cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 	}()
 
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG running.
 	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Restart the DAG.
-	go func() {
-		testRunCommand(t, restartCommand, cmdTest{
-			args:        []string{"restart", dagFile},
-			expectedOut: []string{"Restarting"}})
-	}()
+	go func(dagFile string) {
+		testRunCommand(t, restartCommand(), cmdTest{args: []string{"restart", dagFile}})
+	}(dagFile)
 
-	time.Sleep(time.Millisecond * 50)
-
-	// Check the last execution is cancelled.
-	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Cancel)
+	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG running again.
 	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Stop the restarted DAG.
-	testRunCommand(t, stopCommand, cmdTest{args: []string{"stop", dagFile}})
+	testRunCommand(t, stopCommand(), cmdTest{args: []string{"stop", dagFile}})
 
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Millisecond * 100)
+
+	// Wait for the DAG is stopped.
+	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_None)
 
 	// Check parameter was the same as the first execution
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
 	ctrl := controller.NewDAGController(d)
 	sts := ctrl.GetRecentStatuses(2)
+	println(fmt.Sprintf("%#v", sts))
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
 }

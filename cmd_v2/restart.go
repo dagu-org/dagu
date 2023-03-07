@@ -10,14 +10,16 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-var restartCommand = &cobra.Command{
-	Use:   "restart <DAG file>",
-	Short: "Restart specified DAG",
-	Long:  `dagu restart <DAG file>`,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		cobra.CheckErr(restart(args[0]))
-	},
+func restartCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "restart <DAG file>",
+		Short: "Restart specified DAG",
+		Long:  `dagu restart <DAG file>`,
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(restart(args[0]))
+		},
+	}
 }
 
 func restart(dagFile string) error {
@@ -30,12 +32,12 @@ func restart(dagFile string) error {
 	// Check the current status.
 	st, err := ctrl.GetStatus()
 	if err != nil {
-		return fmt.Errorf("restart failed because failed to get status: %v", err)
+		return fmt.Errorf("error reading current status: %v", err)
 	}
 
 	// Stop the DAG if it is running.
 	if st.Status == scheduler.SchedulerStatus_Running {
-		log.Printf("Stopping %s for restart...", d.Name)
+		log.Printf("Stopping!!! %s for restart...", d.Name)
 		if err := stopRunningDAG(ctrl); err != nil {
 			return err
 		}
@@ -57,7 +59,7 @@ func restart(dagFile string) error {
 	if err != nil {
 		return err
 	}
-	return start(d)
+	return start(d, false)
 }
 
 func stopRunningDAG(ctrl *controller.DAGController) error {
@@ -72,6 +74,7 @@ func stopRunningDAG(ctrl *controller.DAGController) error {
 		if err := ctrl.Stop(); err != nil {
 			return fmt.Errorf("error stopping the DAG: %w", err)
 		}
+		fmt.Errorf("!!waiting ")
 		time.Sleep(time.Millisecond * 500)
 	}
 }

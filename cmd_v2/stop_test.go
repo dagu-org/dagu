@@ -12,7 +12,7 @@ func TestStopCommand(t *testing.T) {
 
 	// Start the DAG.
 	go func() {
-		testRunCommand(t, startCommand, cmdTest{args: []string{"start", dagFile}})
+		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
 	}()
 
 	time.Sleep(time.Millisecond * 50)
@@ -21,7 +21,7 @@ func TestStopCommand(t *testing.T) {
 	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Stop the DAG.
-	testRunCommand(t, stopCommand, cmdTest{
+	testRunCommand(t, stopCommand(), cmdTest{
 		args:        []string{"stop", dagFile},
 		expectedOut: []string{"Stopping..."}})
 

@@ -58,11 +58,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&port, "port", "", "admin server port (default is 8080)")
 	rootCmd.PersistentFlags().StringVar(&host, "host", "", "admin server host (default is localhost)")
 
-	startCommand.Flags().StringP("params", "p", "", "parameters")
-
-	rootCmd.AddCommand(startCommand)
-	rootCmd.AddCommand(stopCommand)
-	rootCmd.AddCommand(restartCommand)
+	rootCmd.AddCommand(startCommand())
+	rootCmd.AddCommand(stopCommand())
+	rootCmd.AddCommand(restartCommand())
+	rootCmd.AddCommand(dryCommand())
 }
 
 func initConfig() {
