@@ -64,6 +64,7 @@ func init() {
 	rootCmd.AddCommand(dryCommand())
 	rootCmd.AddCommand(statusCommand())
 	rootCmd.AddCommand(versionCommand())
+	rootCmd.AddCommand(serverCommand())
 }
 
 func initConfig() {
@@ -131,4 +132,11 @@ func listenSignals(abortFunc func(sig os.Signal)) {
 			abortFunc(sig)
 		}
 	}()
+}
+
+func getFlagString(cmd *cobra.Command, name, fallback string) string {
+	if s, _ := cmd.Flags().GetString(name); s != "" {
+		return s
+	}
+	return fallback
 }
