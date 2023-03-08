@@ -10,7 +10,7 @@ import (
 func stopCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop <DAG file>",
-		Short: "Stop specified DAG",
+		Short: "Stop the running DAG",
 		Long:  `dagu stop <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

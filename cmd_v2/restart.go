@@ -12,7 +12,7 @@ import (
 func restartCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart <DAG file>",
-		Short: "Restart specified DAG",
+		Short: "Restart the DAG",
 		Long:  `dagu restart <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

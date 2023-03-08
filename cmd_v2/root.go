@@ -62,6 +62,7 @@ func init() {
 	rootCmd.AddCommand(stopCommand())
 	rootCmd.AddCommand(restartCommand())
 	rootCmd.AddCommand(dryCommand())
+	rootCmd.AddCommand(statusCommand())
 }
 
 func initConfig() {
