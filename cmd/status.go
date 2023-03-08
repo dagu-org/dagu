@@ -1,38 +1,28 @@
-package main
+package cmd
 
 import (
 	"log"
 
+	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
-
-	"github.com/urfave/cli/v2"
 )
 
-func newStatusCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "status",
-		Usage: "dagu status <DAG file>",
-		Flags: globalFlags,
-		Action: func(c *cli.Context) error {
-			d, err := loadDAG(c, c.Args().Get(0), "")
-			if err != nil {
-				return err
-			}
-			return queryStatus(d)
+func statusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status <DAG file>",
+		Short: "Display current status of the DAG",
+		Long:  `dagu status <DAG file>`,
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			d, err := loadDAG(args[0], "")
+			cobra.CheckErr(err)
+
+			status, err := controller.NewDAGController(d).GetStatus()
+			cobra.CheckErr(err)
+
+			res := &models.StatusResponse{Status: status}
+			log.Printf("Pid=%d Status=%s", res.Status.Pid, res.Status.Status)
 		},
 	}
-}
-
-func queryStatus(d *dag.DAG) error {
-	status, err := controller.NewDAGController(d).GetStatus()
-	if err != nil {
-		return err
-	}
-	res := &models.StatusResponse{
-		Status: status,
-	}
-	log.Printf("Pid=%d Status=%s", res.Status.Pid, res.Status.Status)
-	return nil
 }

@@ -1,42 +1,24 @@
-package main
+package cmd
 
-import (
-	"fmt"
-	"os"
-	"testing"
-)
+import "testing"
 
-func Test_startCommand(t *testing.T) {
-	tests := []appTest{
+func TestStartCommand(t *testing.T) {
+	tests := []cmdTest{
 		{
-			args: []string{"", "start", testConfig("start_multiple_steps.yaml")}, errored: false,
-			output: []string{"1 finished", "2 finished"},
+			args:        []string{"start", testDAGFile("start.yaml")},
+			expectedOut: []string{"1 finished"},
 		},
 		{
-			args: []string{"", "start", testConfig("start_with_params.yaml")}, errored: false,
-			output: []string{"params is param-value"},
+			args:        []string{"start", testDAGFile("start_with_params.yaml")},
+			expectedOut: []string{"params is p1 and p2"},
 		},
 		{
-			args: []string{"", "start", "--params=x y", testConfig("start_with_params_2.yaml")}, errored: false,
-			output: []string{"params are x and y"},
-		},
-		{
-			args: []string{"", "start", testConfig("start_success")}, errored: false,
-			output: []string{"1 finished"},
-		},
-		{
-			args: []string{"", "start",
-				fmt.Sprintf("--config=%s", testConfig("start_global_config.yaml")),
-				testConfig("start_global_config_check.yaml")}, errored: false,
-			output: []string{"GLOBAL_ENV_VAR"},
+			args:        []string{"start", `--params="p3 p4"`, testDAGFile("start_with_params.yaml")},
+			expectedOut: []string{"params is p3 and p4"},
 		},
 	}
 
-	// For testing --config parameter we need to set the environment variable for now.
-	os.Setenv("TEST_CONFIG_BASE", testdataDir)
-
-	for _, v := range tests {
-		app := makeApp()
-		runAppTestOutput(app, v, t)
+	for _, tc := range tests {
+		testRunCommand(t, startCommand(), tc)
 	}
 }

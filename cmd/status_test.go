@@ -1,32 +1,34 @@
-package main
+package cmd
 
 import (
 	"testing"
 	"time"
+
+	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-func Test_statusCommand(t *testing.T) {
-	tests := []appTest{
-		{
-			args: []string{"", "start", testConfig("status.yaml")}, errored: false,
-		},
-	}
+func TestStatusCommand(t *testing.T) {
+	dagFile := testDAGFile("status.yaml")
 
-	for _, v := range tests {
-		app := makeApp()
-		app2 := makeApp()
+	// Start the DAG.
+	done := make(chan struct{})
+	go func() {
+		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
+		close(done)
+	}()
 
-		done := make(chan bool)
-		go func() {
-			time.Sleep(time.Millisecond * 50)
-			runAppTestOutput(app2, appTest{
-				args: []string{"", "status", v.args[2]}, errored: false,
-				output: []string{"Status=running"},
-			}, t)
-			done <- true
-		}()
+	time.Sleep(time.Millisecond * 50)
 
-		runAppTest(app, v, t)
-		<-done
-	}
+	// Wait for the DAG running.
+	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
+
+	// Check the current status.
+	testRunCommand(t, statusCommand(), cmdTest{
+		args:        []string{"status", dagFile},
+		expectedOut: []string{"Status=running"},
+	})
+
+	// Stop the DAG.
+	testRunCommand(t, stopCommand(), cmdTest{args: []string{"stop", dagFile}})
+	<-done
 }

@@ -1,19 +1,16 @@
-package main
+package cmd
 
-import (
-	"testing"
-)
+import "testing"
 
-func Test_dryCommand(t *testing.T) {
-	tests := []appTest{
+func TestDryCommand(t *testing.T) {
+	tests := []cmdTest{
 		{
-			args: []string{"", "dry", testConfig("dry.yaml")}, errored: false,
-			output: []string{"Starting DRY-RUN"},
+			args:        []string{"dry", testDAGFile("dry.yaml")},
+			expectedOut: []string{"Starting DRY-RUN"},
 		},
 	}
 
-	for _, v := range tests {
-		app := makeApp()
-		runAppTestOutput(app, v, t)
+	for _, tc := range tests {
+		testRunCommand(t, dryCommand(), tc)
 	}
 }

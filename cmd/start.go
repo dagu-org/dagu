@@ -1,42 +1,34 @@
-package main
+package cmd
 
 import (
 	"os"
 	"strings"
 
-	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu"
+	"github.com/spf13/cobra"
+	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/dag"
 )
 
-func newStartCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "start",
-		Usage: "dagu start [--params=\"<params>\"] <DAG file>",
-		Flags: append(
-			globalFlags,
-			&cli.StringFlag{
-				Name:     "params",
-				Usage:    "parameters",
-				Value:    "",
-				Required: false,
-			},
-		),
-		Action: func(c *cli.Context) error {
-			d, err := loadDAG(c, c.Args().Get(0), strings.Trim(c.String("params"), "\""))
-			if err != nil {
-				return err
-			}
-			return start(d)
+func startCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "start [flags] <DAG file>",
+		Short: "Runs the DAG",
+		Long:  `dagu start [--params="param1 param2"] <DAG file>`,
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			params, err := cmd.Flags().GetString("params")
+			cobra.CheckErr(err)
+			d, err := loadDAG(args[0], strings.Trim(params, `"`))
+			cobra.CheckErr(err)
+			cobra.CheckErr(start(d, false))
 		},
 	}
+	cmd.Flags().StringP("params", "p", "", "parameters")
+	return cmd
 }
 
-func start(d *dag.DAG) error {
-	a := &dagu.Agent{AgentConfig: &dagu.AgentConfig{
-		DAG: d,
-		Dry: false,
-	}}
+func start(d *dag.DAG, dry bool) error {
+	a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: d, Dry: dry}}
 
 	listenSignals(func(sig os.Signal) {
 		a.Signal(sig)

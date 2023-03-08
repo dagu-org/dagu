@@ -1,22 +1,19 @@
-package main
+package cmd
 
 import (
 	"fmt"
 
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/constants"
 )
 
-func newVersionCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "version",
-		Usage: "dagu version",
-		Action: func(c *cli.Context) error {
-			if constants.Version != "" {
-				fmt.Println(constants.Version)
-				return nil
-			}
-			return fmt.Errorf("failed to get version")
+func versionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Display the binary version",
+		Long:  `dagu version`,
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(constants.Version)
 		},
 	}
 }

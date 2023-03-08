@@ -1,28 +1,25 @@
-package main
+package cmd
 
 import (
-	"fmt"
 	"syscall"
 	"testing"
 	"time"
 )
 
-func Test_schedulerCommand(t *testing.T) {
-	app := makeApp()
-	dir := testHomeDir
-
+func TestSchedulerCommand(t *testing.T) {
+	// Start the scheduler.
 	done := make(chan struct{})
 	go func() {
-		runAppTestOutput(app, appTest{
-			args: []string{"", "scheduler",
-				fmt.Sprintf("--dags=%s", dir)}, errored: false,
-			output: []string{"starting dagu scheduler"},
-		}, t)
+		testRunCommand(t, schedulerCommand(), cmdTest{
+			args:        []string{"scheduler"},
+			expectedOut: []string{"starting dagu scheduler"},
+		})
 		close(done)
 	}()
 
 	time.Sleep(time.Millisecond * 300)
 
+	// Stop the scheduler.
 	sigs <- syscall.SIGTERM
 	<-done
 }

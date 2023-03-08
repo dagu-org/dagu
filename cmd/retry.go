@@ -1,61 +1,35 @@
-package main
+package cmd
 
 import (
 	"os"
 	"path/filepath"
 
-	"github.com/yohamta/dagu"
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/spf13/cobra"
+	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/database"
-	"github.com/yohamta/dagu/internal/models"
-
-	"github.com/urfave/cli/v2"
 )
 
-func newRetryCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "retry",
-		Usage: "dagu retry --req=<request-id> <DAG file>",
-		Flags: append(
-			globalFlags,
-			&cli.StringFlag{
-				Name:     "req",
-				Usage:    "request-id",
-				Value:    "",
-				Required: true,
-			},
-		),
-		Action: func(c *cli.Context) error {
-			f, _ := filepath.Abs(c.Args().Get(0))
-			db := database.Database{Config: database.DefaultConfig()}
-			requestId := c.String("req")
-			status, err := db.FindByRequestId(f, requestId)
-			if err != nil {
-				return err
-			}
-			d, err := loadDAG(c, c.Args().Get(0), status.Status.Params)
-			if err != nil {
-				return err
-			}
-			return retry(d, status)
+func retryCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "retry --req=<request-id> <DAG file>",
+		Short: "Retry the DAG execution",
+		Long:  `dagu retry --req=<request-id> <DAG file>`,
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			f, _ := filepath.Abs(args[0])
+			reqID, err := cmd.Flags().GetString("req")
+			cobra.CheckErr(err)
+			status, err := database.New().FindByRequestId(f, reqID)
+			cobra.CheckErr(err)
+			d, err := loadDAG(args[0], status.Status.Params)
+			cobra.CheckErr(err)
+			a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: d},
+				RetryConfig: &agent.RetryConfig{Status: status.Status}}
+			listenSignals(func(sig os.Signal) { a.Signal(sig) })
+			cobra.CheckErr(a.Run())
 		},
 	}
-}
-
-func retry(d *dag.DAG, status *models.StatusFile) error {
-	a := &dagu.Agent{
-		AgentConfig: &dagu.AgentConfig{
-			DAG: d,
-			Dry: false,
-		},
-		RetryConfig: &dagu.RetryConfig{
-			Status: status.Status,
-		},
-	}
-
-	listenSignals(func(sig os.Signal) {
-		a.Signal(sig)
-	})
-
-	return a.Run()
+	cmd.Flags().StringP("req", "r", "", "request-id")
+	cmd.MarkFlagRequired("req")
+	return cmd
 }

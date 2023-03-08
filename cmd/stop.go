@@ -1,30 +1,24 @@
-package main
+package cmd
 
 import (
 	"log"
 
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
 )
 
-func newStopCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "stop",
-		Usage: "dagu stop <DAG file>",
-		Flags: globalFlags,
-		Action: func(c *cli.Context) error {
-			d, err := loadDAG(c, c.Args().Get(0), "")
-			if err != nil {
-				return err
-			}
-			return stop(d)
+func stopCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "stop <DAG file>",
+		Short: "Stop the running DAG",
+		Long:  `dagu stop <DAG file>`,
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			d, err := loadDAG(args[0], "")
+			cobra.CheckErr(err)
+
+			log.Printf("Stopping...")
+			cobra.CheckErr(controller.NewDAGController(d).Stop())
 		},
 	}
-}
-
-func stop(d *dag.DAG) error {
-	c := controller.NewDAGController(d)
-	log.Printf("Stopping...")
-	return c.Stop()
 }
