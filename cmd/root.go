@@ -97,17 +97,6 @@ func loadConfig(cmd *cobra.Command) (*admin.Config, error) {
 		return nil, fmt.Errorf("unable to load config: %w", err)
 	}
 
-	// TODO: Use environment variables instead of flags.
-	if s, err := cmd.Flags().GetString("dags"); s != "" && err != nil {
-		cfg.DAGs = s
-	}
-	if s, err := cmd.Flags().GetString("port"); s != "" && err != nil {
-		cfg.Port = s
-	}
-	if s, err := cmd.Flags().GetString("host"); s != "" && err != nil {
-		cfg.Host = s
-	}
-
 	return cfg, nil
 }
 
