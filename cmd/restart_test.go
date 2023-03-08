@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -48,7 +47,6 @@ func TestRestartCommand(t *testing.T) {
 	require.NoError(t, err)
 	ctrl := controller.NewDAGController(d)
 	sts := ctrl.GetRecentStatuses(2)
-	println(fmt.Sprintf("%#v", sts))
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
 
