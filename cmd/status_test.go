@@ -8,7 +8,7 @@ import (
 )
 
 func TestStatusCommand(t *testing.T) {
-	dagFile := testDAGFile("stop.yaml")
+	dagFile := testDAGFile("status.yaml")
 
 	// Start the DAG.
 	done := make(chan struct{})
