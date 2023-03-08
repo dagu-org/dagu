@@ -21,8 +21,8 @@ func serverCommand() *cobra.Command {
 			cobra.CheckErr(server.Serve())
 		},
 	}
-	cmd.Flags().StringP("dags", "d", "", "DAGs dir")
-	cmd.Flags().StringP("host", "s", "", "host")
-	cmd.Flags().StringP("port", "p", "", "port")
+	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
+	cmd.Flags().StringP("host", "s", "", "server port (default is 8080)")
+	cmd.Flags().StringP("port", "p", "", "server host (default is localhost)")
 	return cmd
 }

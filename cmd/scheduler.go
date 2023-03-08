@@ -19,6 +19,6 @@ func schedulerCommand() *cobra.Command {
 			cobra.CheckErr(agent.Start())
 		},
 	}
-	cmd.Flags().StringP("dags", "d", "", "DAGs dir")
+	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
 	return cmd
 }

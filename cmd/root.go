@@ -21,11 +21,6 @@ var (
 	cfgFile string
 	cfg     *admin.Config
 
-	// TODO: Refactor to read environment variables with other admin.Config fields.
-	dagsDir string
-	port    string
-	host    string
-
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
 		Use:   "dagu",
@@ -53,9 +48,6 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
-	rootCmd.PersistentFlags().StringVar(&dagsDir, "dags", "", "dags location (default is $HOME/.dagu/dags)")
-	rootCmd.PersistentFlags().StringVar(&port, "port", "", "admin server port (default is 8080)")
-	rootCmd.PersistentFlags().StringVar(&host, "host", "", "admin server host (default is localhost)")
 
 	rootCmd.AddCommand(startCommand())
 	rootCmd.AddCommand(stopCommand())
