@@ -23,7 +23,7 @@ func TestServerCommand(t *testing.T) {
 		close(done)
 	}()
 
-	time.Sleep(time.Millisecond * 500)
+	time.Sleep(time.Millisecond * 300)
 
 	// Stop the server.
 	res, err := http.Post(

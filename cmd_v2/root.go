@@ -5,7 +5,6 @@ package cmd_v2
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path"
@@ -65,6 +64,7 @@ func init() {
 	rootCmd.AddCommand(statusCommand())
 	rootCmd.AddCommand(versionCommand())
 	rootCmd.AddCommand(serverCommand())
+	rootCmd.AddCommand(schedulerCommand())
 }
 
 func initConfig() {
@@ -124,11 +124,10 @@ func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
 }
 
 func listenSignals(abortFunc func(sig os.Signal)) {
-	sigs = make(chan os.Signal, 1)
+	sigs = make(chan os.Signal, 100)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		for sig := range sigs {
-			log.Printf("\nGot signal: %v", sig)
 			abortFunc(sig)
 		}
 	}()
