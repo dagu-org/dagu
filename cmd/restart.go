@@ -1,82 +1,65 @@
-package main
+package cmd
 
 import (
-	"fmt"
 	"log"
 	"time"
 
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-func newRestartCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "restart",
-		Usage: "dagu restart <DAG file>",
-		Flags: globalFlags,
-		Action: func(c *cli.Context) error {
-			d, err := loadDAG(c, c.Args().Get(0), "")
-			if err != nil {
-				return err
+func restartCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "restart <DAG file>",
+		Short: "Restart the DAG",
+		Long:  `dagu restart <DAG file>`,
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			dagFile := args[0]
+			d, err := loadDAG(dagFile, "")
+			cobra.CheckErr(err)
+
+			ctrl := controller.NewDAGController(d)
+
+			// Check the current status.
+			st, err := ctrl.GetStatus()
+			cobra.CheckErr(err)
+
+			// Stop the DAG if it is running.
+			if st.Status == scheduler.SchedulerStatus_Running {
+				log.Printf("Stopping %s for restart...", d.Name)
+				cobra.CheckErr(stopRunningDAG(ctrl))
 			}
-			return restart(d, c)
+
+			// Wait for the specified amount of time before restarting.
+			if d.RestartWait > 0 {
+				log.Printf("Waiting for %s...", d.RestartWait)
+				time.Sleep(d.RestartWait)
+			}
+
+			// Retrieve the parameter of the previous execution.
+			log.Printf("Restarting %s...", d.Name)
+			st, err = ctrl.GetLastStatus()
+			cobra.CheckErr(err)
+
+			// Start the DAG with the same parmaeter.
+			d, err = loadDAG(dagFile, st.Params)
+			cobra.CheckErr(err)
+			cobra.CheckErr(start(d, false))
 		},
 	}
 }
 
-const resetartTimeout = time.Second * 180
+func stopRunningDAG(ctrl *controller.DAGController) error {
+	for {
+		st, err := ctrl.GetStatus()
+		cobra.CheckErr(err)
 
-func restart(d *dag.DAG, ctx *cli.Context) error {
-	c := controller.NewDAGController(d)
-
-	// stop the DAG
-	wait := time.Millisecond * 500
-	timer := time.Duration(0)
-	timeout := resetartTimeout + d.MaxCleanUpTime
-
-	st, err := c.GetStatus()
-	if err != nil {
-		return fmt.Errorf("restart failed because failed to get status: %v", err)
-	}
-	switch st.Status {
-	case scheduler.SchedulerStatus_Running:
-		log.Printf("Stopping %s for restart...", d.Name)
-		for {
-			st, err := c.GetStatus()
-			if err != nil {
-				log.Printf("Failed to get status: %v", err)
-				continue
-			}
-			if st.Status == scheduler.SchedulerStatus_None {
-				break
-			}
-			if err := c.Stop(); err != nil {
-				return err
-			}
-			time.Sleep(wait)
-			timer += wait
-			if timer > timeout {
-				return fmt.Errorf("restart failed because timeout")
-			}
+		if st.Status != scheduler.SchedulerStatus_Running {
+			return nil
 		}
-
-		// wait for restartWaitTime
-		log.Printf("wait for restart %s", d.RestartWait)
-		time.Sleep(d.RestartWait)
+		cobra.CheckErr(ctrl.Stop())
+		time.Sleep(time.Millisecond * 100)
 	}
-
-	// retrieve the parameter and start the DAG
-	log.Printf("Restarting %s...", d.Name)
-	st, err = c.GetLastStatus()
-	if err != nil {
-		return fmt.Errorf("failed to get the last status: %w", err)
-	}
-	params := st.Params
-	d, err = loadDAG(ctx, ctx.Args().Get(0), params)
-	if err != nil {
-		return err
-	}
-	return start(d)
 }

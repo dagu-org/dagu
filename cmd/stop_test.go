@@ -1,42 +1,33 @@
-package main
+package cmd
 
 import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-func Test_stopCommand(t *testing.T) {
-	c := testConfig("stop_sleep.yaml")
-	test := appTest{
-		args: []string{"", "start", c}, errored: false,
-	}
+func TestStopCommand(t *testing.T) {
+	dagFile := testDAGFile("stop.yaml")
 
-	app := makeApp()
-	stopper := makeApp()
-
+	// Start the DAG.
+	done := make(chan struct{})
 	go func() {
-		time.Sleep(time.Millisecond * 50)
-		runAppTestOutput(stopper, appTest{
-			args: []string{"", "stop", test.args[2]}, errored: false,
-			output: []string{"Stopping..."},
-		}, t)
+		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
+		close(done)
 	}()
 
-	runAppTest(app, test, t)
+	time.Sleep(time.Millisecond * 50)
 
-	db := &database.Database{
-		Config: database.DefaultConfig(),
-	}
-	d := &dag.DAG{
-		Location: c,
-	}
+	// Wait for the DAG running.
+	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
-	s := db.ReadStatusHist(d.Location, 1)
-	require.Equal(t, 1, len(s))
-	require.Equal(t, scheduler.SchedulerStatus_Cancel, s[0].Status.Status)
+	// Stop the DAG.
+	testRunCommand(t, stopCommand(), cmdTest{
+		args:        []string{"stop", dagFile},
+		expectedOut: []string{"Stopping..."}})
+
+	// Check the last execution is cancelled.
+	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Cancel)
+	<-done
 }

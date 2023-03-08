@@ -1,55 +1,28 @@
-package main
+package cmd
 
 import (
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
-func newServerCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "server",
-		Usage: "dagu server [--host=<host>] [--port=<port>]",
-		Flags: append(globalFlags,
-			&cli.StringFlag{
-				Name:     "dags",
-				Usage:    "DAGs directory",
-				Value:    "",
-				Required: false,
-			},
-			&cli.StringFlag{
-				Name:     "port",
-				Usage:    "server port",
-				Value:    "",
-				Required: false,
-			},
-			&cli.StringFlag{
-				Name:     "host",
-				Usage:    "server host",
-				Value:    "",
-				Required: false,
-			},
-		),
-		Action: func(c *cli.Context) error {
-			cfg, err := loadGlobalConfig(c)
-			if err != nil {
-				return err
-			}
-			return startServer(cfg)
+func serverCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "server",
+		Short: "Start the server",
+		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg.DAGs = getFlagString(cmd, "dags", cfg.DAGs)
+			cfg.Host = getFlagString(cmd, "host", cfg.Host)
+			cfg.Port = getFlagString(cmd, "port", cfg.Port)
+			server := admin.NewServer(cfg)
+			listenSignals(func(sig os.Signal) { server.Shutdown() })
+			cobra.CheckErr(server.Serve())
 		},
 	}
-}
-
-func startServer(cfg *admin.Config) error {
-	server := admin.NewServer(cfg)
-
-	listenSignals(func(sig os.Signal) {
-		server.Shutdown()
-	})
-
-	err := server.Serve()
-	utils.LogErr("running server", err)
-	return err
+	cmd.Flags().StringP("dags", "d", "", "DAGs dir")
+	cmd.Flags().StringP("host", "s", "", "host")
+	cmd.Flags().StringP("port", "p", "", "port")
+	return cmd
 }

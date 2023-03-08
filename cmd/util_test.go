@@ -1,4 +1,4 @@
-package cmd_v2
+package cmd
 
 import (
 	"bytes"

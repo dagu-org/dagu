@@ -1,42 +1,24 @@
-package main
+package cmd
 
 import (
 	"os"
 
-	"github.com/urfave/cli/v2"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/runner"
 )
 
-func newSchedulerCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "scheduler",
-		Usage: "dagu scheduler",
-		Flags: append(
-			globalFlags,
-			&cli.StringFlag{
-				Name:     "dags",
-				Usage:    "DAGs directory",
-				Value:    "",
-				Required: false,
-			},
-		),
-		Action: func(c *cli.Context) error {
-			cfg, err := loadGlobalConfig(c)
-			if err != nil {
-				return err
-			}
-			return startScheduler(cfg)
+func schedulerCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "scheduler",
+		Short: "Start the scheduler",
+		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cfg.DAGs = getFlagString(cmd, "dags", cfg.DAGs)
+			agent := runner.NewAgent(cfg)
+			listenSignals(func(sig os.Signal) { agent.Stop() })
+			cobra.CheckErr(agent.Start())
 		},
 	}
-}
-
-func startScheduler(cfg *admin.Config) error {
-	agent := runner.NewAgent(cfg)
-
-	listenSignals(func(sig os.Signal) {
-		agent.Stop()
-	})
-
-	return agent.Start()
+	cmd.Flags().StringP("dags", "d", "", "DAGs dir")
+	return cmd
 }

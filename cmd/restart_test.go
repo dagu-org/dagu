@@ -1,78 +1,56 @@
-package main
+package cmd
 
 import (
+	"fmt"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-func Test_restartCommand(t *testing.T) {
-	// TODO: Fix failing test.
-	// cfg := testConfig("restart.yaml")
-	// cl := &dag.Loader{}
-	// d, _ := cl.Load(cfg, "")
-	// c := controller.NewDAGController(d)
+func TestRestartCommand(t *testing.T) {
+	dagFile := testDAGFile("restart.yaml")
 
-	// // start the DAG
-	// println("start the DAG")
-	// go func() {
-	// 	app := makeApp()
-	// 	test := appTest{
-	// 		args: []string{"", "start", "--params=restart_test", cfg}, errored: false,
-	// 	}
-	// 	runAppTest(app, test, t)
-	// }()
+	// Start the DAG.
+	go func() {
+		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+	}()
 
-	// require.Eventually(t, func() bool {
-	// 	s, _ := c.GetStatus()
-	// 	return s.Status == scheduler.SchedulerStatus_Running
-	// }, time.Second*5, time.Millisecond*50)
+	time.Sleep(time.Millisecond * 100)
 
-	// time.Sleep(time.Millisecond * 50)
+	// Wait for the DAG running.
+	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
-	// // restart the DAG
-	// go func() {
-	// 	app2 := makeApp()
-	// 	runAppTestOutput(app2, appTest{
-	// 		args: []string{"", "restart", cfg}, errored: false,
-	// 		output: []string{"wait for restart 1s", "Restarting"},
-	// 	}, t)
-	// }()
+	// Restart the DAG.
+	done := make(chan struct{})
+	go func() {
+		testRunCommand(t, restartCommand(), cmdTest{args: []string{"restart", dagFile}})
+		close(done)
+	}()
 
-	// // check canceled
-	// require.Eventually(t, func() bool {
-	// 	s, _ := c.GetLastStatus()
-	// 	return s != nil && s.Status == scheduler.SchedulerStatus_Cancel
-	// }, time.Second*5, time.Millisecond*50)
+	time.Sleep(time.Millisecond * 100)
 
-	// // check restarted
-	// require.Eventually(t, func() bool {
-	// 	s, _ := c.GetLastStatus()
-	// 	return s != nil && s.Status == scheduler.SchedulerStatus_Running
-	// }, time.Second*5, time.Millisecond*50)
+	// Wait for the DAG running again.
+	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
-	// // cancel the DAG
-	// go func() {
-	// 	app3 := makeApp()
-	// 	runAppTestOutput(app3, appTest{
-	// 		args: []string{"", "stop", cfg}, errored: false,
-	// 		output: []string{"Stopping..."},
-	// 	}, t)
-	// }()
+	// Stop the restarted DAG.
+	testRunCommand(t, stopCommand(), cmdTest{args: []string{"stop", dagFile}})
 
-	// // check canceled
-	// require.Eventually(t, func() bool {
-	// 	s, _ := c.GetLastStatus()
-	// 	return s != nil && s.Status == scheduler.SchedulerStatus_Cancel
-	// }, time.Second*5, time.Millisecond*50)
+	time.Sleep(time.Millisecond * 100)
 
-	// // check history
-	// db := &database.Database{Config: database.DefaultConfig()}
-	// require.Eventually(t, func() bool {
-	// 	s := db.ReadStatusHist(cfg, 100)
-	// 	return len(s) == 2 && s[1].Status.Status == scheduler.SchedulerStatus_Cancel
-	// }, time.Second*5, time.Millisecond*50)
+	// Wait for the DAG is stopped.
+	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_None)
 
-	// // check result
-	// s := db.ReadStatusHist(cfg, 2)
-	// require.Equal(t, "restart_test", s[0].Status.Params)
-	// require.Equal(t, "restart_test", s[1].Status.Params)
+	// Check parameter was the same as the first execution
+	d, err := loadDAG(dagFile, "")
+	require.NoError(t, err)
+	ctrl := controller.NewDAGController(d)
+	sts := ctrl.GetRecentStatuses(2)
+	println(fmt.Sprintf("%#v", sts))
+	require.Len(t, sts, 2)
+	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
+
+	<-done
 }

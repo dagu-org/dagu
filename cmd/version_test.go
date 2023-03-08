@@ -1,19 +1,14 @@
-package main
+package cmd
 
 import (
 	"testing"
+
+	"github.com/yohamta/dagu/internal/constants"
 )
 
-func Test_versionCommand(t *testing.T) {
-	tests := []appTest{
-		{
-			args: []string{"", "version"}, errored: false,
-			exactOutput: "0.0.1\n",
-		},
-	}
-
-	for _, v := range tests {
-		app := makeApp()
-		runAppTestOutput(app, v, t)
-	}
+func TestVersionCommand(t *testing.T) {
+	constants.Version = "1.2.3"
+	testRunCommand(t, versionCommand(), cmdTest{
+		args:        []string{"version"},
+		expectedOut: []string{"1.2.3"}})
 }
