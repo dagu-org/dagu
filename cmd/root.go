@@ -57,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(versionCommand())
 	rootCmd.AddCommand(serverCommand())
 	rootCmd.AddCommand(schedulerCommand())
+	rootCmd.AddCommand(retryCommand())
 }
 
 func initConfig() {
