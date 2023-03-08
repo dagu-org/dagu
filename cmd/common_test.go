@@ -18,17 +18,11 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-var (
-	testHomeDir = ""
-)
-
 func TestMain(m *testing.M) {
-	testHomeDir = utils.MustTempDir("dagu_test")
-	settings.ChangeHomeDir(testHomeDir)
-
+	tmpDir := utils.MustTempDir("dagu_test")
+	settings.ChangeHomeDir(tmpDir)
 	code := m.Run()
-
-	os.RemoveAll(testHomeDir)
+	os.RemoveAll(tmpDir)
 	os.Exit(code)
 }
 
