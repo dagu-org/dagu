@@ -11,25 +11,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
-
-func TestMain(m *testing.M) {
-	tmpDir := utils.MustTempDir("dagu_test")
-	changeHomeDir(tmpDir)
-	code := m.Run()
-	os.RemoveAll(tmpDir)
-	os.Exit(code)
-}
-
-func changeHomeDir(homeDir string) {
-	os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig(homeDir)
-}
 
 type cmdTest struct {
 	args        []string
