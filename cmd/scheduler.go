@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/runner"
 )
@@ -21,5 +22,7 @@ func schedulerCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
+	viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
+
 	return cmd
 }

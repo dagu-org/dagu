@@ -47,22 +47,14 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
 
-	serverCmd := serverCommand()
-	viper.BindPFlag("port", serverCmd.Flags().Lookup("port"))
-	viper.BindPFlag("host", serverCmd.Flags().Lookup("host"))
-	viper.BindPFlag("dags", serverCmd.Flags().Lookup("dags"))
-
-	schedulerCmd := schedulerCommand()
-	viper.BindPFlag("dags", serverCmd.Flags().Lookup("dags"))
-
 	rootCmd.AddCommand(startCommand())
 	rootCmd.AddCommand(stopCommand())
 	rootCmd.AddCommand(restartCommand())
 	rootCmd.AddCommand(dryCommand())
 	rootCmd.AddCommand(statusCommand())
 	rootCmd.AddCommand(versionCommand())
-	rootCmd.AddCommand(serverCmd)
-	rootCmd.AddCommand(schedulerCmd)
+	rootCmd.AddCommand(serverCommand())
+	rootCmd.AddCommand(schedulerCommand())
 	rootCmd.AddCommand(retryCommand())
 }
 
