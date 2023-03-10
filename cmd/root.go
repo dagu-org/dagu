@@ -47,15 +47,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
 
-	rootCmd.AddCommand(startCommand())
-	rootCmd.AddCommand(stopCommand())
-	rootCmd.AddCommand(restartCommand())
-	rootCmd.AddCommand(dryCommand())
-	rootCmd.AddCommand(statusCommand())
-	rootCmd.AddCommand(versionCommand())
-	rootCmd.AddCommand(serverCommand())
-	rootCmd.AddCommand(schedulerCommand())
-	rootCmd.AddCommand(retryCommand())
+	regisgterCommands(rootCmd)
 }
 
 func initConfig() {
