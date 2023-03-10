@@ -3,14 +3,16 @@ package admin
 import (
 	"net/http"
 	"regexp"
+
+	"github.com/yohamta/dagu/internal/config"
 )
 
 type adminHandler struct {
-	config *Config
+	config *config.Config
 	routes map[string]map[*regexp.Regexp]http.HandlerFunc
 }
 
-func newAdminHandler(cfg *Config, routes []*route) *adminHandler {
+func newAdminHandler(cfg *config.Config, routes []*route) *adminHandler {
 	hdl := &adminHandler{
 		config: cfg,
 		routes: map[string]map[*regexp.Regexp]http.HandlerFunc{},

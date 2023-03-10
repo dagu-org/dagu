@@ -5,7 +5,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -15,8 +15,13 @@ var testHomeDir string
 func TestMain(m *testing.M) {
 	testHomeDir = utils.MustTempDir("dagu-admin-test")
 	os.Setenv("HOST", "localhost")
-	settings.ChangeHomeDir(testdataDir)
+	changeHomeDir(testdataDir)
 	code := m.Run()
 	_ = os.RemoveAll(testHomeDir)
 	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
 }

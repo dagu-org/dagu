@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/settings"
 )
 
 type SchedulerStatus int
@@ -339,10 +339,7 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 func (sc *Scheduler) setup() (err error) {
 	sc.pause = time.Millisecond * 100
 	if sc.LogDir == "" {
-		sc.LogDir, err = settings.Get(settings.SETTING__LOGS_DIR)
-		if err != nil {
-			return
-		}
+		sc.LogDir = config.Get().LogDir
 	}
 	if !sc.Dry {
 		if err = os.MkdirAll(sc.LogDir, 0755); err != nil {

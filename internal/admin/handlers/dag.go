@@ -12,13 +12,13 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
 	"golang.org/x/text/encoding"
@@ -190,13 +190,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			c.StartAsync(hc.Bin, hc.WkDir, params)
 
 		case "suspend":
-			sc := suspend.NewSuspendChecker(
-				storage.NewStorage(
-					settings.MustGet(
-						settings.SETTING__SUSPEND_FLAGS_DIR,
-					),
-				),
-			)
+			sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
 			_ = sc.ToggleSuspend(dag.DAG, value == "true")
 
 		case "stop":

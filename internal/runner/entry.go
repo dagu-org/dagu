@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/runner/filenotify"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
 	"github.com/yohamta/dagu/internal/utils"
@@ -54,13 +53,11 @@ type EntryReader interface {
 	Read(now time.Time) ([]*Entry, error)
 }
 
-func newEntryReader(cfg *admin.Config) *entryReader {
+func newEntryReader(cfg *config.Config) *entryReader {
 	er := &entryReader{
 		Admin: cfg,
 		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(
-				settings.MustGet(settings.SETTING__SUSPEND_FLAGS_DIR),
-			),
+			storage.NewStorage(config.Get().SuspendFlagsDir),
 		),
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},
@@ -73,7 +70,7 @@ func newEntryReader(cfg *admin.Config) *entryReader {
 }
 
 type entryReader struct {
-	Admin          *admin.Config
+	Admin          *config.Config
 	suspendChecker *suspend.SuspendChecker
 	dagsLock       sync.Mutex
 	dags           map[string]*dag.DAG

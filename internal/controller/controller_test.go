@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/sock"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -25,10 +25,15 @@ var (
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("controller_test")
-	settings.ChangeHomeDir(tempDir)
+	changeHomeDir(tempDir)
 	code := m.Run()
 	os.RemoveAll(tempDir)
 	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {

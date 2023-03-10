@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -22,10 +22,15 @@ var testdataDir = path.Join(utils.MustGetwd(), "testdata")
 
 func TestMain(m *testing.M) {
 	testHomeDir := utils.MustTempDir("agent_test")
-	settings.ChangeHomeDir(testHomeDir)
+	changeHomeDir(testHomeDir)
 	code := m.Run()
 	os.RemoveAll(testHomeDir)
 	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
 }
 
 func TestRunDAG(t *testing.T) {

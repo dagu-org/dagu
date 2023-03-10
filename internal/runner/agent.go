@@ -7,18 +7,18 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/logger"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type Agent struct {
-	*admin.Config
+	*config.Config
 	logger *logger.TeeLogger
 	stop   chan struct{}
 }
 
-func NewAgent(cfg *admin.Config) *Agent {
+func NewAgent(cfg *config.Config) *Agent {
 	return &Agent{
 		Config: cfg,
 	}

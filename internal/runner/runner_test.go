@@ -8,25 +8,29 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
 var (
 	testdataDir = path.Join(utils.MustGetwd(), "testdata")
 	testBin     = path.Join(utils.MustGetwd(), "../../bin/dagu")
-	testConfig  = &admin.Config{Command: testBin}
+	testConfig  = &config.Config{Command: testBin}
 	testHomeDir string
 )
 
 func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("runner_test")
-	settings.ChangeHomeDir(tempDir)
+	changeHomeDir(tempDir)
 	testHomeDir = tempDir
 	code := m.Run()
 	os.RemoveAll(tempDir)
 	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
 }
 
 func TestRun(t *testing.T) {
