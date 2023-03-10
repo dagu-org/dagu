@@ -15,8 +15,8 @@ func schedulerCommand() *cobra.Command {
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			config.C.DAGs = getFlagString(cmd, "dags", config.C.DAGs)
-			agent := runner.NewAgent(config.C)
+			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
+			agent := runner.NewAgent(config.Get())
 			listenSignals(func(sig os.Signal) { agent.Stop() })
 			cobra.CheckErr(agent.Start())
 		},

@@ -76,7 +76,7 @@ func initConfig() {
 }
 
 func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
-	dagLoader := &dag.Loader{BaseConfig: config.C.BaseConfig}
+	dagLoader := &dag.Loader{BaseConfig: config.Get().BaseConfig}
 	return dagLoader.Load(dagFile, params)
 }
 

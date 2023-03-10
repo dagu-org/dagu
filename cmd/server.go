@@ -15,7 +15,7 @@ func serverCommand() *cobra.Command {
 		Short: "Start the server",
 		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			server := admin.NewServer(config.C)
+			server := admin.NewServer(config.Get())
 			listenSignals(func(sig os.Signal) { server.Shutdown() })
 			cobra.CheckErr(server.Serve())
 		},
