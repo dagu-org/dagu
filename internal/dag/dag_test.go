@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 	changeHomeDir(testHomeDir)
 	testEnv = []string{
 		fmt.Sprintf("LOG_DIR=%s", path.Join(testHomeDir, "/logs")),
-		fmt.Sprintf("PATH=%s", os.ExpandEnv("${PATH}")),
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 	}
 	code := m.Run()
 	os.Exit(code)
