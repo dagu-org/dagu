@@ -18,8 +18,8 @@ import (
 // DefaultEnv returns default value of environment variable.
 func DefaultEnv() map[string]string {
 	return map[string]string{
-		"PATH": "${PATH}",
-		"HOME": "${HOME}",
+		"PATH": os.ExpandEnv("PATH"),
+		"HOME": os.ExpandEnv("HOME"),
 	}
 }
 

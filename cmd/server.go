@@ -13,10 +13,7 @@ func serverCommand() *cobra.Command {
 		Short: "Start the server",
 		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg.DAGs = getFlagString(cmd, "dags", cfg.DAGs)
-			cfg.Host = getFlagString(cmd, "host", cfg.Host)
-			cfg.Port = getFlagString(cmd, "port", cfg.Port)
-			server := admin.NewServer(cfg)
+			server := admin.NewServer(admin.C)
 			listenSignals(func(sig os.Signal) { server.Shutdown() })
 			cobra.CheckErr(server.Serve())
 		},

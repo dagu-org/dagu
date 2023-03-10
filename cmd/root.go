@@ -4,7 +4,6 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"path"
@@ -19,7 +18,6 @@ import (
 
 var (
 	cfgFile string
-	cfg     *admin.Config
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
@@ -49,59 +47,44 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
 
+	serverCmd := serverCommand()
+	viper.BindPFlag("port", serverCmd.Flags().Lookup("port"))
+	viper.BindPFlag("host", serverCmd.Flags().Lookup("host"))
+	viper.BindPFlag("dags", serverCmd.Flags().Lookup("dags"))
+
+	schedulerCmd := schedulerCommand()
+	viper.BindPFlag("dags", serverCmd.Flags().Lookup("dags"))
+
 	rootCmd.AddCommand(startCommand())
 	rootCmd.AddCommand(stopCommand())
 	rootCmd.AddCommand(restartCommand())
 	rootCmd.AddCommand(dryCommand())
 	rootCmd.AddCommand(statusCommand())
 	rootCmd.AddCommand(versionCommand())
-	rootCmd.AddCommand(serverCommand())
-	rootCmd.AddCommand(schedulerCommand())
+	rootCmd.AddCommand(serverCmd)
+	rootCmd.AddCommand(schedulerCmd)
 	rootCmd.AddCommand(retryCommand())
 }
 
 func initConfig() {
+	// Find home directory.
+	home, err := os.UserHomeDir()
+	cobra.CheckErr(err)
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
 		// Search config in home directory with name ".cobra" (without extension).
 		viper.AddConfigPath(path.Join(home, legacyPath))
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("admin")
 	}
 
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
-
-	var err error
-	cfg, err = loadConfig(rootCmd)
-	cobra.CheckErr(err)
-}
-
-func loadConfig(cmd *cobra.Command) (*admin.Config, error) {
-	ldr := &admin.Loader{}
-	cfgFileUsed := viper.ConfigFileUsed()
-
-	cfg, err := ldr.LoadAdminConfig(cfgFileUsed)
-	if err == admin.ErrConfigNotFound {
-		return admin.DefaultConfig()
-	} else if err != nil {
-		return nil, fmt.Errorf("unable to load config: %w", err)
-	}
-
-	return cfg, nil
+	cobra.CheckErr(admin.LoadConfig(home))
 }
 
 func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
-	dagLoader := &dag.Loader{BaseConfig: cfg.BaseConfig}
+	dagLoader := &dag.Loader{BaseConfig: admin.C.BaseConfig}
 	return dagLoader.Load(dagFile, params)
 }
 
