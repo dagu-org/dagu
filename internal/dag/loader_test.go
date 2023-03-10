@@ -76,7 +76,7 @@ func TestCloning(t *testing.T) {
 
 func TestLoadingBaseConfig(t *testing.T) {
 	l := &Loader{}
-	d, err := l.loadBaseConfig(config.C.BaseConfig, &BuildDAGOptions{})
+	d, err := l.loadBaseConfig(config.Get().BaseConfig, &BuildDAGOptions{})
 	require.NotNil(t, d)
 	require.NoError(t, err)
 }

@@ -40,7 +40,7 @@ func TestReadEntries(t *testing.T) {
 			break
 		}
 	}
-	sc := suspend.NewSuspendChecker(storage.NewStorage(config.C.SuspendFlagsDir))
+	sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
 	err = sc.ToggleSuspend(j.DAG, true)
 	require.NoError(t, err)
 

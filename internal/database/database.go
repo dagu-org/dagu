@@ -38,7 +38,7 @@ type Config struct {
 
 // DefaultConfig is the default configuration for Database.
 func DefaultConfig() *Config {
-	return &Config{Dir: config.C.DataDir}
+	return &Config{Dir: config.Get().DataDir}
 }
 
 // New creates a new Database with default configuration.

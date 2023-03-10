@@ -57,7 +57,7 @@ func newEntryReader(cfg *config.Config) *entryReader {
 	er := &entryReader{
 		Admin: cfg,
 		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(config.C.SuspendFlagsDir),
+			storage.NewStorage(config.Get().SuspendFlagsDir),
 		),
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},

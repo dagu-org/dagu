@@ -365,7 +365,7 @@ func testWriteStatus(t *testing.T, db *Database, d *dag.DAG, status *models.Stat
 
 func TestDefaultConfig(t *testing.T) {
 	d := DefaultConfig()
-	require.Equal(t, d.Dir, config.C.DataDir)
+	require.Equal(t, d.Dir, config.Get().DataDir)
 }
 
 func TestTimestamp(t *testing.T) {

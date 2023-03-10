@@ -339,7 +339,7 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 func (sc *Scheduler) setup() (err error) {
 	sc.pause = time.Millisecond * 100
 	if sc.LogDir == "" {
-		sc.LogDir = config.C.LogDir
+		sc.LogDir = config.Get().LogDir
 	}
 	if !sc.Dry {
 		if err = os.MkdirAll(sc.LogDir, 0755); err != nil {

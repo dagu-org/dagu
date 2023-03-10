@@ -33,7 +33,7 @@ type DAGStatusReader struct {
 func NewDAGStatusReader() *DAGStatusReader {
 	return &DAGStatusReader{
 		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(config.C.SuspendFlagsDir),
+			storage.NewStorage(config.Get().SuspendFlagsDir),
 		),
 	}
 }

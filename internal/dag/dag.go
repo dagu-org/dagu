@@ -115,7 +115,7 @@ func (c *DAG) String() string {
 
 func (c *DAG) setup() {
 	if c.LogDir == "" {
-		c.LogDir = config.C.LogDir
+		c.LogDir = config.Get().LogDir
 	}
 	if c.HistRetentionDays == 0 {
 		c.HistRetentionDays = 30

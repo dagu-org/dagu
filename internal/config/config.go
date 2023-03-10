@@ -29,7 +29,17 @@ type Config struct {
 	Env                []string
 }
 
-var C *Config = nil
+var instance *Config = nil
+
+func Get() *Config {
+	if instance == nil {
+		home, _ := os.UserHomeDir()
+		if err := LoadConfig(home); err != nil {
+			panic(err)
+		}
+	}
+	return instance
+}
 
 func LoadConfig(homeDir string) error {
 	appHome := path.Join(homeDir, appHomeDir())
@@ -65,7 +75,7 @@ func LoadConfig(homeDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal Config file: %w", err)
 	}
-	C = cfg
+	instance = cfg
 	loadLegacyEnvs()
 
 	return nil
@@ -73,15 +83,15 @@ func LoadConfig(homeDir string) error {
 
 func loadLegacyEnvs() {
 	// For backward compatibility.
-	C.NavbarColor = loadEnv("DAGU__ADMIN_NAVBAR_COLOR", C.NavbarColor)
-	C.NavbarTitle = loadEnv("DAGU__ADMIN_NAVBAR_TITLE", C.NavbarTitle)
-	C.Port = loadEnv("DAGU__ADMIN_PORT", C.Port)
-	C.Host = loadEnv("DAGU__ADMIN_HOST", C.Host)
-	C.DataDir = loadEnv("DAGU__DATA", C.DataDir)
-	C.LogDir = loadEnv("DAGU__DATA", C.LogDir)
-	C.SuspendFlagsDir = loadEnv("DAGU__SUSPEND_FLAGS_DIR", C.SuspendFlagsDir)
-	C.BaseConfig = loadEnv("DAGU__SUSPEND_FLAGS_DIR", C.BaseConfig)
-	C.AdminLogsDir = loadEnv("DAGU__ADMIN_LOGS_DIR", C.AdminLogsDir)
+	instance.NavbarColor = loadEnv("DAGU__ADMIN_NAVBAR_COLOR", instance.NavbarColor)
+	instance.NavbarTitle = loadEnv("DAGU__ADMIN_NAVBAR_TITLE", instance.NavbarTitle)
+	instance.Port = loadEnv("DAGU__ADMIN_PORT", instance.Port)
+	instance.Host = loadEnv("DAGU__ADMIN_HOST", instance.Host)
+	instance.DataDir = loadEnv("DAGU__DATA", instance.DataDir)
+	instance.LogDir = loadEnv("DAGU__DATA", instance.LogDir)
+	instance.SuspendFlagsDir = loadEnv("DAGU__SUSPEND_FLAGS_DIR", instance.SuspendFlagsDir)
+	instance.BaseConfig = loadEnv("DAGU__SUSPEND_FLAGS_DIR", instance.BaseConfig)
+	instance.AdminLogsDir = loadEnv("DAGU__ADMIN_LOGS_DIR", instance.AdminLogsDir)
 }
 
 func loadEnv(env, def string) string {

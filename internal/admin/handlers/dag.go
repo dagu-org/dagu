@@ -190,7 +190,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			c.StartAsync(hc.Bin, hc.WkDir, params)
 
 		case "suspend":
-			sc := suspend.NewSuspendChecker(storage.NewStorage(config.C.SuspendFlagsDir))
+			sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
 			_ = sc.ToggleSuspend(dag.DAG, value == "true")
 
 		case "stop":

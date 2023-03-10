@@ -109,8 +109,9 @@ func CreateSSHExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 }
 
 // referenced code:
-//   https://go.googlesource.com/crypto/+/master/ssh/example_test.go
-//   https://gist.github.com/boyzhujian/73b5ecd37efd6f8dd38f56e7588f1b58
+//
+//	https://go.googlesource.com/crypto/+/master/ssh/example_test.go
+//	https://gist.github.com/boyzhujian/73b5ecd37efd6f8dd38f56e7588f1b58
 func getPublicKeySigner(path string) (ssh.Signer, error) {
 	// A public key may be used to authenticate against the remote
 	// server by using an unencrypted PEM-encoded private key file.

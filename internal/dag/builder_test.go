@@ -351,7 +351,7 @@ func TestGeneratingSockAddr(t *testing.T) {
 }
 
 func TestOverwriteGlobalConfig(t *testing.T) {
-	l := &Loader{BaseConfig: config.C.BaseConfig}
+	l := &Loader{BaseConfig: config.Get().BaseConfig}
 
 	d, err := l.Load(path.Join(testdataDir, "overwrite.yaml"), "")
 	require.NoError(t, err)
