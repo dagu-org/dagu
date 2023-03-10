@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strconv"
@@ -46,8 +45,6 @@ func Get() *Config {
 func LoadConfig(homeDir string) error {
 	appHome := path.Join(homeDir, appHomeDir())
 
-	log.Printf("Config file used: [%s]", viper.ConfigFileUsed())
-
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("dagu")
 
@@ -68,9 +65,7 @@ func LoadConfig(homeDir string) error {
 	viper.SetDefault("navbar_color", "")
 	viper.SetDefault("navbar_title", "Dagu")
 
-	if err := viper.ReadInConfig(); err == nil {
-		log.Printf("Config file used: [%s]", viper.ConfigFileUsed())
-	}
+	_ = viper.ReadInConfig()
 
 	cfg := &Config{}
 	err := viper.Unmarshal(cfg)
@@ -88,13 +83,14 @@ func loadEnvs() {
 	if instance.Env == nil {
 		instance.Env = map[string]string{}
 	}
+	for k, v := range instance.Env {
+		_ = os.Setenv(k, v)
+	}
+	// TODO: Remove this since this may not be necessary.
 	for k, v := range utils.DefaultEnv() {
 		if k, ok := instance.Env[k]; !ok {
 			instance.Env[k] = v
 		}
-	}
-	for k, v := range instance.Env {
-		_ = os.Setenv(k, v)
 	}
 }
 
