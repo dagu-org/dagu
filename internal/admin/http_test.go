@@ -32,13 +32,13 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 300)
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
 	server.Shutdown()
 
-	_, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	_, err = http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.Error(t, err)
 }
 
@@ -62,17 +62,17 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 300)
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
-	resp, err = http.Post(fmt.Sprintf("http://%s:%s/shutdown", host, port), "", nil)
+	resp, err = http.Post(fmt.Sprintf("http://%s:%d/shutdown", host, port), "", nil)
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
 	time.Sleep(time.Millisecond * 1000)
 
-	_, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	_, err = http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.Error(t, err)
 }
 
@@ -104,14 +104,14 @@ func TestHttpServerBasicAuth(t *testing.T) {
 		Timeout: time.Second * 1,
 	}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%s", host, port), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d", host, port), nil)
 	require.NoError(t, err)
 
 	res, err := client.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, "401 Unauthorized", res.Status)
 
-	req, err = http.NewRequest("GET", fmt.Sprintf("http://%s:%s", host, port), nil)
+	req, err = http.NewRequest("GET", fmt.Sprintf("http://%s:%d", host, port), nil)
 	require.NoError(t, err)
 	req.SetBasicAuth("user", "password")
 

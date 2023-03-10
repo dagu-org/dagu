@@ -85,6 +85,9 @@ func LoadConfig(homeDir string) error {
 }
 
 func loadEnvs() {
+	if instance.Env == nil {
+		instance.Env = map[string]string{}
+	}
 	for k, v := range utils.DefaultEnv() {
 		if k, ok := instance.Env[k]; !ok {
 			instance.Env[k] = v
