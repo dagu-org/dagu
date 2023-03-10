@@ -32,7 +32,7 @@ type Config struct {
 var C *Config = nil
 
 func LoadConfig(homeDir string) error {
-	appHome := path.Join(homeDir, appDir())
+	appHome := path.Join(homeDir, appHomeDir())
 
 	log.Printf("Config file used: [%s]", viper.ConfigFileUsed())
 
@@ -92,10 +92,15 @@ func loadEnv(env, def string) string {
 	return v
 }
 
-func appDir() string {
-	appDir := os.ExpandEnv("${DAGU_HOME}")
+const (
+	appHomeEnv     = "DAGU_HOME"
+	appHomeDefault = ".dagu"
+)
+
+func appHomeDir() string {
+	appDir := os.Getenv(appHomeEnv)
 	if appDir == "" {
-		return ".dagu"
+		return appHomeDefault
 	}
 	return appDir
 }
