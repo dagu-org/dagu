@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 // DAG represents a DAG configuration.
@@ -115,7 +115,7 @@ func (c *DAG) String() string {
 
 func (c *DAG) setup() {
 	if c.LogDir == "" {
-		c.LogDir = path.Join(settings.MustGet(settings.SETTING__LOGS_DIR), "dags")
+		c.LogDir = config.C.LogDir
 	}
 	if c.HistRetentionDays == 0 {
 		c.HistRetentionDays = 30

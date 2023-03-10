@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -20,7 +20,7 @@ type Job interface {
 
 type job struct {
 	DAG    *dag.DAG
-	Config *admin.Config
+	Config *config.Config
 	Next   time.Time
 }
 

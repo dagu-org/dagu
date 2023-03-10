@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/dag"
 )
@@ -80,11 +80,11 @@ func initConfig() {
 		viper.SetConfigName("admin")
 	}
 
-	cobra.CheckErr(admin.LoadConfig(home))
+	cobra.CheckErr(config.LoadConfig(home))
 }
 
 func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
-	dagLoader := &dag.Loader{BaseConfig: admin.C.BaseConfig}
+	dagLoader := &dag.Loader{BaseConfig: config.C.BaseConfig}
 	return dagLoader.Load(dagFile, params)
 }
 

@@ -5,10 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
 	"github.com/yohamta/dagu/internal/utils"
@@ -33,9 +33,7 @@ type DAGStatusReader struct {
 func NewDAGStatusReader() *DAGStatusReader {
 	return &DAGStatusReader{
 		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(
-				settings.MustGet(settings.SETTING__SUSPEND_FLAGS_DIR),
-			),
+			storage.NewStorage(config.C.SuspendFlagsDir),
 		),
 	}
 }

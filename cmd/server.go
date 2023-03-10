@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func serverCommand() *cobra.Command {
@@ -13,7 +14,7 @@ func serverCommand() *cobra.Command {
 		Short: "Start the server",
 		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			server := admin.NewServer(admin.C)
+			server := admin.NewServer(config.C)
 			listenSignals(func(sig os.Signal) { server.Shutdown() })
 			cobra.CheckErr(server.Serve())
 		},

@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/runner"
 )
 
@@ -14,8 +14,8 @@ func schedulerCommand() *cobra.Command {
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			admin.C.DAGs = getFlagString(cmd, "dags", admin.C.DAGs)
-			agent := runner.NewAgent(admin.C)
+			config.C.DAGs = getFlagString(cmd, "dags", config.C.DAGs)
+			agent := runner.NewAgent(config.C)
 			listenSignals(func(sig os.Signal) { agent.Stop() })
 			cobra.CheckErr(agent.Start())
 		},

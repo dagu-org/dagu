@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/yohamta/dagu/internal/admin/handlers"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 type route struct {
@@ -12,7 +13,7 @@ type route struct {
 	handler http.HandlerFunc
 }
 
-func defaultRoutes(cfg *Config) []*route {
+func defaultRoutes(cfg *config.Config) []*route {
 	tc := &handlers.TemplateConfig{
 		NavbarColor: cfg.NavbarColor,
 		NavbarTitle: cfg.NavbarTitle,

@@ -6,18 +6,19 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
 type server struct {
-	config          *Config
+	config          *config.Config
 	addr            string
 	server          *http.Server
 	admin           *adminHandler
 	idleConnsClosed chan struct{}
 }
 
-func NewServer(cfg *Config) *server {
+func NewServer(cfg *config.Config) *server {
 	return &server{
 		addr:            net.JoinHostPort(cfg.Host, cfg.Port),
 		config:          cfg,

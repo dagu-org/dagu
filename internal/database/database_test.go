@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -365,7 +365,7 @@ func testWriteStatus(t *testing.T, db *Database, d *dag.DAG, status *models.Stat
 
 func TestDefaultConfig(t *testing.T) {
 	d := DefaultConfig()
-	require.Equal(t, d.Dir, settings.MustGet(settings.SETTING__DATA_DIR))
+	require.Equal(t, d.Dir, config.C.DataDir)
 }
 
 func TestTimestamp(t *testing.T) {

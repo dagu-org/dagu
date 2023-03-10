@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestBuildErrors(t *testing.T) {
@@ -351,7 +351,7 @@ func TestGeneratingSockAddr(t *testing.T) {
 }
 
 func TestOverwriteGlobalConfig(t *testing.T) {
-	l := &Loader{BaseConfig: settings.MustGet(settings.SETTING__BASE_CONFIG)}
+	l := &Loader{BaseConfig: config.C.BaseConfig}
 
 	d, err := l.Load(path.Join(testdataDir, "overwrite.yaml"), "")
 	require.NoError(t, err)

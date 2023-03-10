@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestHttpServerStartShutdown(t *testing.T) {
@@ -18,7 +19,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&Config{
+	server := NewServer(&config.Config{
 		Host: host,
 		Port: port,
 		DAGs: testHomeDir,
@@ -48,7 +49,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&Config{
+	server := NewServer(&config.Config{
 		Host: host,
 		Port: port,
 		DAGs: dir,
@@ -82,7 +83,7 @@ func TestHttpServerBasicAuth(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&Config{
+	server := NewServer(&config.Config{
 		Host:              host,
 		Port:              port,
 		IsBasicAuth:       true,

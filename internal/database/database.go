@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -38,9 +38,7 @@ type Config struct {
 
 // DefaultConfig is the default configuration for Database.
 func DefaultConfig() *Config {
-	return &Config{
-		Dir: settings.MustGet(settings.SETTING__DATA_DIR),
-	}
+	return &Config{Dir: config.C.DataDir}
 }
 
 // New creates a new Database with default configuration.

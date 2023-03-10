@@ -7,8 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yohamta/dagu/internal/admin"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
 )
@@ -16,16 +15,14 @@ import (
 func TestReadEntries(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	r := newEntryReader(&admin.Config{
+	r := newEntryReader(&config.Config{
 		DAGs: path.Join(testdataDir, "invalid_directory"),
 	})
 	entries, err := r.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	r = newEntryReader(&admin.Config{
-		DAGs: testdataDir,
-	})
+	r = newEntryReader(&config.Config{DAGs: testdataDir})
 
 	entries, err = r.Read(now)
 	require.NoError(t, err)
@@ -43,10 +40,7 @@ func TestReadEntries(t *testing.T) {
 			break
 		}
 	}
-	sc := suspend.NewSuspendChecker(
-		storage.NewStorage(settings.MustGet(
-			settings.SETTING__SUSPEND_FLAGS_DIR,
-		)))
+	sc := suspend.NewSuspendChecker(storage.NewStorage(config.C.SuspendFlagsDir))
 	err = sc.ToggleSuspend(j.DAG, true)
 	require.NoError(t, err)
 
