@@ -120,7 +120,7 @@ func TestHttpServerBasicAuth(t *testing.T) {
 	require.Equal(t, "200 OK", res.Status)
 }
 
-func findPort(t *testing.T) string {
+func findPort(t *testing.T) int {
 	t.Helper()
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -130,5 +130,5 @@ func findPort(t *testing.T) string {
 	if err := ln.Close(); err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%d", port)
+	return port
 }

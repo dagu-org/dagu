@@ -5,28 +5,30 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/spf13/viper"
+	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Config struct {
-	Host               string `mapstructure:"host"`
-	Port               string `mapstructure:"port"`
-	DAGs               string `mapstructure:"dags_dir"`
-	Command            string `mapstructure:"command"`
-	WorkDir            string `mapstructure:"work_dir"`
-	IsBasicAuth        bool   `mapstructure:"is_basicauth"`
-	BasicAuthUsername  string `mapstructure:"basicauth_username"`
-	BasicAuthPassword  string `mapstructure:"basicauth_password"`
-	LogEncodingCharset string `mapstructure:"log_encoding_charset"`
-	LogDir             string `mapstructure:"log_dir"`
-	DataDir            string `mapstructure:"data_dir"`
-	SuspendFlagsDir    string `mapstructure:"suspend_flags_dir"`
-	AdminLogsDir       string `mapstructure:"admin_log_dir"`
-	BaseConfig         string `mapstructure:"base_config"`
-	NavbarColor        string `mapstructure:"navbar_color"`
-	NavbarTitle        string `mapstructure:"navbar_title"`
-	Env                []string
+	Host               string            `mapstructure:"host"`
+	Port               int               `mapstructure:"port"`
+	DAGs               string            `mapstructure:"dags_dir"`
+	Command            string            `mapstructure:"command"`
+	WorkDir            string            `mapstructure:"work_dir"`
+	IsBasicAuth        bool              `mapstructure:"is_basicauth"`
+	BasicAuthUsername  string            `mapstructure:"basicauth_username"`
+	BasicAuthPassword  string            `mapstructure:"basicauth_password"`
+	LogEncodingCharset string            `mapstructure:"log_encoding_charset"`
+	LogDir             string            `mapstructure:"log_dir"`
+	DataDir            string            `mapstructure:"data_dir"`
+	SuspendFlagsDir    string            `mapstructure:"suspend_flags_dir"`
+	AdminLogsDir       string            `mapstructure:"admin_log_dir"`
+	BaseConfig         string            `mapstructure:"base_config"`
+	NavbarColor        string            `mapstructure:"navbar_color"`
+	NavbarTitle        string            `mapstructure:"navbar_title"`
+	Env                map[string]string `mapstructure:"env"`
 }
 
 var instance *Config = nil
@@ -77,29 +79,54 @@ func LoadConfig(homeDir string) error {
 	}
 	instance = cfg
 	loadLegacyEnvs()
+	loadEnvs()
 
 	return nil
 }
 
-func loadLegacyEnvs() {
-	// For backward compatibility.
-	instance.NavbarColor = loadEnv("DAGU__ADMIN_NAVBAR_COLOR", instance.NavbarColor)
-	instance.NavbarTitle = loadEnv("DAGU__ADMIN_NAVBAR_TITLE", instance.NavbarTitle)
-	instance.Port = loadEnv("DAGU__ADMIN_PORT", instance.Port)
-	instance.Host = loadEnv("DAGU__ADMIN_HOST", instance.Host)
-	instance.DataDir = loadEnv("DAGU__DATA", instance.DataDir)
-	instance.LogDir = loadEnv("DAGU__DATA", instance.LogDir)
-	instance.SuspendFlagsDir = loadEnv("DAGU__SUSPEND_FLAGS_DIR", instance.SuspendFlagsDir)
-	instance.BaseConfig = loadEnv("DAGU__SUSPEND_FLAGS_DIR", instance.BaseConfig)
-	instance.AdminLogsDir = loadEnv("DAGU__ADMIN_LOGS_DIR", instance.AdminLogsDir)
+func loadEnvs() {
+	for k, v := range utils.DefaultEnv() {
+		if k, ok := instance.Env[k]; !ok {
+			instance.Env[k] = v
+		}
+	}
+	for k, v := range instance.Env {
+		_ = os.Setenv(k, v)
+	}
 }
 
-func loadEnv(env, def string) string {
+func loadLegacyEnvs() {
+	// For backward compatibility.
+	instance.NavbarColor = getEnv("DAGU__ADMIN_NAVBAR_COLOR", instance.NavbarColor)
+	instance.NavbarTitle = getEnv("DAGU__ADMIN_NAVBAR_TITLE", instance.NavbarTitle)
+	instance.Port = getEnvI("DAGU__ADMIN_PORT", instance.Port)
+	instance.Host = getEnv("DAGU__ADMIN_HOST", instance.Host)
+	instance.DataDir = getEnv("DAGU__DATA", instance.DataDir)
+	instance.LogDir = getEnv("DAGU__DATA", instance.LogDir)
+	instance.SuspendFlagsDir = getEnv("DAGU__SUSPEND_FLAGS_DIR", instance.SuspendFlagsDir)
+	instance.BaseConfig = getEnv("DAGU__SUSPEND_FLAGS_DIR", instance.BaseConfig)
+	instance.AdminLogsDir = getEnv("DAGU__ADMIN_LOGS_DIR", instance.AdminLogsDir)
+}
+
+func getEnv(env, def string) string {
 	v := os.Getenv("env")
 	if v == "" {
 		return def
 	}
 	return v
+}
+
+func parseInt(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
+}
+
+func getEnvI(env string, def int) int {
+	v := os.Getenv("env")
+	if v == "" {
+		return def
+	}
+	return parseInt(v)
 }
 
 const (
