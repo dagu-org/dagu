@@ -9,15 +9,12 @@ import (
 	"path"
 	"text/template"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 )
 
-type TemplateConfig struct {
-	NavbarColor string
-	NavbarTitle string
-}
-
-func defaultFuncs(tc *TemplateConfig) template.FuncMap {
+func defaultFuncs() template.FuncMap {
+	cfg := config.Get()
 	return template.FuncMap{
 		"defTitle": func(ip interface{}) string {
 			v, ok := ip.(string)
@@ -30,10 +27,10 @@ func defaultFuncs(tc *TemplateConfig) template.FuncMap {
 			return constants.Version
 		},
 		"navbarColor": func() string {
-			return tc.NavbarColor
+			return cfg.NavbarColor
 		},
 		"navbarTitle": func() string {
-			return tc.NavbarTitle
+			return cfg.NavbarTitle
 		},
 	}
 }
@@ -42,9 +39,9 @@ func defaultFuncs(tc *TemplateConfig) template.FuncMap {
 var assets embed.FS
 var templatePath = "web/templates/"
 
-func useTemplate(layout string, name string, tc *TemplateConfig) func(http.ResponseWriter, interface{}) {
+func useTemplate(layout string, name string) func(http.ResponseWriter, interface{}) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))
-	tmpl, err := template.New(name).Funcs(defaultFuncs(tc)).ParseFS(assets, files...)
+	tmpl, err := template.New(name).Funcs(defaultFuncs()).ParseFS(assets, files...)
 	if err != nil {
 		panic(err)
 	}
@@ -62,9 +59,7 @@ func useTemplate(layout string, name string, tc *TemplateConfig) func(http.Respo
 }
 
 func baseTemplates() []string {
-	var templateFiles = []string{
-		"base.gohtml",
-	}
+	var templateFiles = []string{"base.gohtml"}
 	ret := []string{}
 	for _, t := range templateFiles {
 		ret = append(ret, path.Join(templatePath, t))

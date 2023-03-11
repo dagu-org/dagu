@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/yohamta/dagu/internal/admin/handlers"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
@@ -15,7 +18,6 @@ type server struct {
 	config          *config.Config
 	addr            string
 	server          *http.Server
-	admin           *adminHandler
 	idleConnsClosed chan struct{}
 }
 
@@ -23,7 +25,6 @@ func NewServer(cfg *config.Config) *server {
 	return &server{
 		addr:            net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
 		config:          cfg,
-		admin:           newAdminHandler(cfg, defaultRoutes(cfg)),
 		idleConnsClosed: nil,
 	}
 }
@@ -71,15 +72,36 @@ func (svr *server) setupServer() {
 }
 
 func (svr *server) setupHandler() {
-	svr.admin.addRoute(http.MethodPost, `^/shutdown$`, svr.handleShutdown)
-	handler := requestLogger(svr.admin)
-	handler = cors(handler)
+	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Use(func(h http.Handler) http.Handler {
+		return http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Add("Access-Control-Allow-Origin", "*")
+				w.Header().Add("Access-Control-Allow-Methods", "*")
+				w.Header().Add("Access-Control-Allow-Headers", "*")
+				h.ServeHTTP(w, r)
+			})
+	})
+
 	if svr.config.IsBasicAuth {
-		handler = basicAuth(handler,
-			svr.config.BasicAuthUsername,
-			svr.config.BasicAuthPassword)
+		r.Use(middleware.BasicAuth(
+			"restricted",
+			map[string]string{
+				svr.config.BasicAuthUsername: svr.config.BasicAuthPassword,
+			},
+		))
 	}
-	svr.server.Handler = handler
+
+	handlers.ConfigRoutes(r)
+
+	r.Post("/shutdown", svr.handleShutdown)
+
+	svr.server.Handler = r
 }
 
 func (svr *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
