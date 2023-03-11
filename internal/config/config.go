@@ -5,29 +5,30 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Config struct {
-	Host               string            `mapstructure:"host"`
-	Port               int               `mapstructure:"port"`
-	DAGs               string            `mapstructure:"dags_dir"`
-	Command            string            `mapstructure:"command"`
-	WorkDir            string            `mapstructure:"work_dir"`
-	IsBasicAuth        bool              `mapstructure:"is_basicauth"`
-	BasicAuthUsername  string            `mapstructure:"basicauth_username"`
-	BasicAuthPassword  string            `mapstructure:"basicauth_password"`
-	LogEncodingCharset string            `mapstructure:"log_encoding_charset"`
-	LogDir             string            `mapstructure:"log_dir"`
-	DataDir            string            `mapstructure:"data_dir"`
-	SuspendFlagsDir    string            `mapstructure:"suspend_flags_dir"`
-	AdminLogsDir       string            `mapstructure:"admin_log_dir"`
-	BaseConfig         string            `mapstructure:"base_config"`
-	NavbarColor        string            `mapstructure:"navbar_color"`
-	NavbarTitle        string            `mapstructure:"navbar_title"`
-	Env                map[string]string `mapstructure:"env"`
+	Host               string
+	Port               int
+	DAGs               string
+	Command            string
+	WorkDir            string
+	IsBasicAuth        bool
+	BasicAuthUsername  string
+	BasicAuthPassword  string
+	LogEncodingCharset string
+	LogDir             string
+	DataDir            string
+	SuspendFlagsDir    string
+	AdminLogsDir       string
+	BaseConfig         string
+	NavbarColor        string
+	NavbarTitle        string
+	Env                map[string]string
 }
 
 var instance *Config = nil
@@ -45,25 +46,47 @@ func Get() *Config {
 func LoadConfig(homeDir string) error {
 	appHome := path.Join(homeDir, appHomeDir())
 
-	viper.AutomaticEnv()
 	viper.SetEnvPrefix("dagu")
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+
+	viper.BindEnv("command", "DAGU_EXECUTABLE")
+	viper.BindEnv("dags", "DAGU_DAGS_DIR")
+	viper.BindEnv("workDir", "DAGU_WORK_DIR")
+	viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
+	viper.BindEnv("basicAuthUsername", "DAGU_BASICAUTH_USERNAME")
+	viper.BindEnv("basicAuthPassword", "DAGU_BASICAUTH_PASSWORD")
+	viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
+	viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
+	viper.BindEnv("logDir", "DAGU_LOG_DIR")
+	viper.BindEnv("dataDir", "DAGU_DATA_DIR")
+	viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
+	viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
+	viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
+	viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+
+	exectable := "dagu"
+	if ex, err := os.Executable(); err == nil {
+		exectable = ex
+	}
 
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
-	viper.SetDefault("dags_dir", path.Join(appHome, "dags"))
-	viper.SetDefault("command", "dagu")
-	viper.SetDefault("work_dir", "")
-	viper.SetDefault("is_basicauth", "0")
-	viper.SetDefault("basicauth_username", "")
-	viper.SetDefault("basicauth_password", "")
-	viper.SetDefault("log_encoding_charset", "")
-	viper.SetDefault("base_config", path.Join(appHome, "config.yaml"))
-	viper.SetDefault("log_dir", path.Join(appHome, "logs"))
-	viper.SetDefault("data_dir", path.Join(appHome, "data"))
-	viper.SetDefault("suspend_flags_dir", path.Join(appHome, "suspend"))
-	viper.SetDefault("admin_log_dir", path.Join(appHome, "logs", "admin"))
-	viper.SetDefault("navbar_color", "")
-	viper.SetDefault("navbar_title", "Dagu")
+	viper.SetDefault("command", exectable)
+	viper.SetDefault("dags", path.Join(appHome, "dags"))
+	viper.SetDefault("workDir", "")
+	viper.SetDefault("isBasicAuth", "0")
+	viper.SetDefault("basicAuthUsername", "")
+	viper.SetDefault("basicAuthPassword", "")
+	viper.SetDefault("logEncodingCharset", "")
+	viper.SetDefault("baseConfig", path.Join(appHome, "config.yaml"))
+	viper.SetDefault("logDir", path.Join(appHome, "logs"))
+	viper.SetDefault("dataDir", path.Join(appHome, "data"))
+	viper.SetDefault("suspendFlagsDir", path.Join(appHome, "suspend"))
+	viper.SetDefault("adminLogsDir", path.Join(appHome, "logs", "admin"))
+	viper.SetDefault("navbarColor", "")
+	viper.SetDefault("navbarTitle", "Dagu")
+
+	viper.AutomaticEnv()
 
 	_ = viper.ReadInConfig()
 
@@ -86,9 +109,8 @@ func loadEnvs() {
 	for k, v := range instance.Env {
 		_ = os.Setenv(k, v)
 	}
-	// TODO: Remove this since this may not be necessary.
 	for k, v := range utils.DefaultEnv() {
-		if k, ok := instance.Env[k]; !ok {
+		if _, ok := instance.Env[k]; !ok {
 			instance.Env[k] = v
 		}
 	}
