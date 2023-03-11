@@ -59,9 +59,7 @@ func useTemplate(layout string, name string) func(http.ResponseWriter, interface
 }
 
 func baseTemplates() []string {
-	var templateFiles = []string{
-		"base.gohtml",
-	}
+	var templateFiles = []string{"base.gohtml"}
 	ret := []string{}
 	for _, t := range templateFiles {
 		ret = append(ret, path.Join(templatePath, t))
