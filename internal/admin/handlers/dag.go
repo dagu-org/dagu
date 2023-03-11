@@ -80,23 +80,16 @@ func newDAGResponse(dagName string, dag *controller.DAGStatus, tab string) *dagR
 	}
 }
 
-type DAGHandlerConfig struct {
-	DAGsDir            string
-	LogEncodingCharset string
-}
-
-func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "dag", tc)
+func HandleGetDAG() http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "dag")
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		dn, tab, err := getPathParameter(r)
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
+		dn := dagNameFromCtx(r.Context())
+		tab := tabNameFromCtx(r.Context())
 
 		params := getDAGParameter(r)
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		d, err := dr.ReadStatus(file, false)
 		if d == nil {
@@ -120,7 +113,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 
 		case dag_TabType_StepLog:
 			if isJsonRequest(r) {
-				data.StepLog, err = readStepLog(c, params.File, params.Step, hc.LogEncodingCharset)
+				data.StepLog, err = readStepLog(c, params.File, params.Step, cfg.LogEncodingCharset)
 				if err != nil {
 					encodeError(w, err)
 					return
@@ -151,13 +144,8 @@ func isJsonRequest(r *http.Request) bool {
 	return r.Header.Get("Accept") == "application/json"
 }
 
-type PostDAGHandlerConfig struct {
-	DAGsDir string
-	Bin     string
-	WkDir   string
-}
-
-func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
+func HandlePostDAG() http.HandlerFunc {
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
@@ -166,13 +154,9 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		step := r.FormValue("step")
 		params := r.FormValue("params")
 
-		dn, _, err := getPathParameter(r)
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
+		dn := dagNameFromCtx(r.Context())
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		dag, err := dr.ReadStatus(file, false)
 		if err != nil && action != "save" {
@@ -187,7 +171,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				encodeError(w, fmt.Errorf("%w already running", errInvalidArgs))
 				return
 			}
-			c.StartAsync(hc.Bin, hc.WkDir, params)
+			c.StartAsync(cfg.Command, cfg.WorkDir, params)
 
 		case "suspend":
 			sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
@@ -209,7 +193,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 				encodeError(w, fmt.Errorf("%w: request-id is required", errInvalidArgs))
 				return
 			}
-			err = c.Retry(hc.Bin, hc.WkDir, reqId)
+			err = c.Retry(cfg.Command, cfg.WorkDir, reqId)
 			if err != nil {
 				encodeError(w, err)
 				return
@@ -266,7 +250,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 
 		case "rename":
-			newfile := nameWithExt(path.Join(hc.DAGsDir, value))
+			newfile := nameWithExt(path.Join(cfg.DAGs, value))
 			err := controller.MoveDAG(file, newfile)
 			if err != nil {
 				encodeError(w, err)
@@ -284,20 +268,13 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 	}
 }
 
-type DeleteDAGHandlerConfig struct {
-	DAGsDir string
-}
-
-func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
+func HandleDeleteDAG() http.HandlerFunc {
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		dn, _, err := getPathParameter(r)
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
+		dn := dagNameFromCtx(r.Context())
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		dag, err := dr.ReadStatus(file, false)
 		if err != nil {
@@ -488,15 +465,15 @@ var (
 	re2 = regexp.MustCompile(`/dags/([^/\?]+)/?`)
 )
 
-func getPathParameter(r *http.Request) (string, string, error) {
-	if m := re.FindStringSubmatch(r.URL.Path); m != nil {
-		return m[1], m[2], nil
-	}
-	if m := re2.FindStringSubmatch(r.URL.Path); m != nil {
-		return m[1], dag_TabType_Status, nil
-	}
-	return "", "", fmt.Errorf("invalid URL")
-}
+// func getPathParameter(r *http.Request) (string, string, error) {
+// 	if m := re.FindStringSubmatch(r.URL.Path); m != nil {
+// 		return m[1], m[2], nil
+// 	}
+// 	if m := re2.FindStringSubmatch(r.URL.Path); m != nil {
+// 		return m[1], dag_TabType_Status, nil
+// 	}
+// 	return "", "", fmt.Errorf("invalid URL")
+// }
 
 func getDAGParameter(r *http.Request) *dagParameter {
 	p := &dagParameter{}

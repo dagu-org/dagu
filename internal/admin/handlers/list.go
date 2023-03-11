@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 )
 
@@ -18,14 +19,11 @@ type dagListResponse struct {
 	HasError bool
 }
 
-type DAGListHandlerConfig struct {
-	DAGsDir string
-}
-
-func HandleGetList(hc *DAGListHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "index", tc)
+func HandleGetList() http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "index")
+	cfg := config.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
-		dir := filepath.Join(hc.DAGsDir)
+		dir := filepath.Join(cfg.DAGs)
 		dr := controller.NewDAGStatusReader()
 		dags, errs, err := dr.ReadAllStatus(dir)
 		if err != nil {
@@ -58,7 +56,8 @@ func HandleGetList(hc *DAGListHandlerConfig, tc *TemplateConfig) http.HandlerFun
 	}
 }
 
-func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
+func HandlePostList() http.HandlerFunc {
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
@@ -66,7 +65,7 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 
 		switch action {
 		case "new":
-			filename := nameWithExt(path.Join(hc.DAGsDir, value))
+			filename := nameWithExt(path.Join(cfg.DAGs, value))
 			err := controller.CreateDAG(filename)
 			if err != nil {
 				encodeError(w, err)

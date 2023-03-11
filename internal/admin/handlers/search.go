@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 )
 
@@ -11,8 +12,9 @@ type searchResponse struct {
 	Errors  []string
 }
 
-func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "search", tc)
+func HandleGetSearch() http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "search")
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		query, ok := r.URL.Query()["q"]
@@ -21,7 +23,7 @@ func HandleGetSearch(DAGsDir string, tc *TemplateConfig) http.HandlerFunc {
 			return
 		}
 
-		ret, errs, err := controller.GrepDAG(DAGsDir, query[0])
+		ret, errs, err := controller.GrepDAG(cfg.DAGs, query[0])
 		if err != nil {
 			encodeError(w, err)
 			return
