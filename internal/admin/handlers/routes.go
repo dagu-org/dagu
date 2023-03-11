@@ -2,34 +2,55 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
 
 func ConfigRoutes(r *chi.Mux) {
-	r.Get("/", HandleGetList())
+	r.Get("/", handleGetList())
 
-	r.Post("/", HandlePostList())
+	r.Post("/", handlePostList())
 
 	r.Route("/dags", func(r chi.Router) {
-		r.Get("/", HandleGetList())
-		r.Post("/", HandlePostList())
+		r.Get("/", handleGetList())
+		r.Post("/", handlePostList())
 
 		dagRoute := func(r chi.Router) {
 			r.Use(dagContext)
 			r.Use(tabContext)
-			r.Get("/", HandleGetDAG())
-			r.Post("/", HandlePostDAG())
-			r.Delete("/", HandleDeleteDAG())
+			r.Get("/", handleGetDAG())
+			r.Post("/", handlePostDAG())
+			r.Delete("/", handleDeleteDAG())
 		}
 
 		r.Route("/{dagName}", dagRoute)
 		r.Route("/{dagName}/{tabName}", dagRoute)
 	})
 
-	r.Get("/search", HandleGetSearch())
-	r.Get("/assets/*", HandleGetAssets())
+	r.Get("/search", handleGetSearch())
+	r.Get("/assets/*", handleGetAssets())
+}
+
+func handleGetAssets() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = "/web" + r.URL.Path
+		w.Header().Set("Cache-Control", "max-age=86400")
+		http.FileServer(http.FS(assets)).ServeHTTP(w, r)
+	}
+}
+
+func renderJson(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(data)
+	if err != nil {
+		log.Printf("%v", err)
+	}
 }
 
 type ctxKeyDAG struct{}
@@ -65,4 +86,9 @@ func tabContext(next http.Handler) http.Handler {
 
 func tabNameFromCtx(ctx context.Context) string {
 	return ctx.Value(ctxKeyTab{}).(string)
+}
+
+func nameWithExt(name string) string {
+	s := strings.TrimSuffix(name, ".yaml")
+	return fmt.Sprintf("%s.yaml", s)
 }

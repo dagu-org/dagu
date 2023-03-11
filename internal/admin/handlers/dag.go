@@ -74,7 +74,7 @@ func newDAGResponse(dagName string, dag *controller.DAGStatus, tab string) *dagR
 	}
 }
 
-func HandleGetDAG() http.HandlerFunc {
+func handleGetDAG() http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "dag")
 	cfg := config.Get()
 
@@ -140,7 +140,7 @@ func isJsonRequest(r *http.Request) bool {
 	return r.Header.Get("Accept") == "application/json"
 }
 
-func HandlePostDAG() http.HandlerFunc {
+func handlePostDAG() http.HandlerFunc {
 	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +264,7 @@ func HandlePostDAG() http.HandlerFunc {
 	}
 }
 
-func HandleDeleteDAG() http.HandlerFunc {
+func handleDeleteDAG() http.HandlerFunc {
 	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {

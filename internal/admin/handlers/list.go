@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
@@ -19,7 +17,7 @@ type dagListResponse struct {
 	HasError bool
 }
 
-func HandleGetList() http.HandlerFunc {
+func handleGetList() http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "index")
 	cfg := config.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +54,7 @@ func HandleGetList() http.HandlerFunc {
 	}
 }
 
-func HandlePostList() http.HandlerFunc {
+func handlePostList() http.HandlerFunc {
 	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -77,9 +75,4 @@ func HandlePostList() http.HandlerFunc {
 		}
 		encodeError(w, errInvalidArgs)
 	}
-}
-
-func nameWithExt(name string) string {
-	s := strings.TrimSuffix(name, ".yaml")
-	return fmt.Sprintf("%s.yaml", s)
 }

@@ -12,7 +12,7 @@ type searchResponse struct {
 	Errors  []string
 }
 
-func HandleGetSearch() http.HandlerFunc {
+func handleGetSearch() http.HandlerFunc {
 	renderFunc := useTemplate("index.gohtml", "search")
 	cfg := config.Get()
 
