@@ -49,6 +49,7 @@ func LoadConfig(homeDir string) error {
 	viper.SetEnvPrefix("dagu")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
+	viper.BindEnv("command", "DAGU_EXECUTABLE")
 	viper.BindEnv("dags", "DAGU_DAGS_DIR")
 	viper.BindEnv("workDir", "DAGU_WORK_DIR")
 	viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
@@ -63,9 +64,14 @@ func LoadConfig(homeDir string) error {
 	viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
 	viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
 
+	exectable := "dagu"
+	if ex, err := os.Executable(); err == nil {
+		exectable = ex
+	}
+
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
-	viper.SetDefault("command", "dagu")
+	viper.SetDefault("command", exectable)
 	viper.SetDefault("dags", path.Join(appHome, "dags"))
 	viper.SetDefault("workDir", "")
 	viper.SetDefault("isBasicAuth", "0")
