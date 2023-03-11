@@ -103,9 +103,8 @@ func loadEnvs() {
 	for k, v := range instance.Env {
 		_ = os.Setenv(k, v)
 	}
-	// TODO: Remove this since this may not be necessary.
 	for k, v := range utils.DefaultEnv() {
-		if k, ok := instance.Env[k]; !ok {
+		if _, ok := instance.Env[k]; !ok {
 			instance.Env[k] = v
 		}
 	}
