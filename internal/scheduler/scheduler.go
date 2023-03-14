@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -64,7 +65,7 @@ type Config struct {
 }
 
 // Schedule runs the graph of steps.
-func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
+func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan *Node) error {
 	if err := sc.setup(); err != nil {
 		return err
 	}
@@ -129,7 +130,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 				for setup && !sc.IsCanceled() {
 					var err error = nil
 					if !sc.Dry {
-						err = node.Execute()
+						err = node.Execute(ctx)
 					}
 					if err != nil {
 						if sc.IsCanceled() {
@@ -198,7 +199,7 @@ func (sc *Scheduler) Schedule(g *ExecutionGraph, done chan *Node) error {
 		if n := sc.handlers[h]; n != nil {
 			log.Printf("%s started", n.Name)
 			n.OutputVariables = g.outputVariables
-			err := sc.runHandlerNode(n)
+			err := sc.runHandlerNode(ctx, n)
 			if err != nil {
 				sc.lastError = err
 			}
@@ -307,7 +308,7 @@ func isReady(g *ExecutionGraph, node *Node) (ready bool) {
 	return ready
 }
 
-func (sc *Scheduler) runHandlerNode(node *Node) error {
+func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 	defer func() {
 		node.FinishedAt = time.Now()
 	}()
@@ -323,7 +324,7 @@ func (sc *Scheduler) runHandlerNode(node *Node) error {
 		defer func() {
 			_ = node.teardown()
 		}()
-		err = node.Execute()
+		err = node.Execute(ctx)
 		if err != nil {
 			node.updateStatus(NodeStatus_Error)
 		} else {

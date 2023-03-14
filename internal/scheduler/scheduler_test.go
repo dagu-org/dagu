@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path"
 	"syscall"
@@ -50,7 +51,7 @@ func TestScheduler(t *testing.T) {
 			counter += 1
 		}
 	}()
-	require.Error(t, sc.Schedule(g, done))
+	require.Error(t, sc.Schedule(context.Background(), g, done))
 	require.Equal(t, counter, 3)
 	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
@@ -68,7 +69,7 @@ func TestSchedulerParallel(t *testing.T) {
 		step("2", testCommand),
 		step("3", testCommand),
 	)
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
 
@@ -157,7 +158,7 @@ func TestSchedulerCancel(t *testing.T) {
 		sc.Cancel(g)
 	}()
 
-	_ = sc.Schedule(g, nil)
+	_ = sc.Schedule(context.Background(), g, nil)
 
 	require.Eventually(t, func() bool {
 		return sc.Status(g) == SchedulerStatus_Cancel
@@ -255,7 +256,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 		require.Greater(t, retriedAt.Sub(startedAt), time.Millisecond*500)
 	}()
 
-	err = sc.Schedule(g, nil)
+	err = sc.Schedule(context.Background(), g, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
@@ -318,7 +319,7 @@ func TestSchedulerOnExit(t *testing.T) {
 		step("3", testCommand),
 	)
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -341,7 +342,7 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 		step("3", testCommand),
 	)
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
@@ -367,7 +368,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 		sc.Signal(g, syscall.SIGTERM, nil, false)
 	}()
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -393,7 +394,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 	<-done // Wait for canceling finished
 	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
@@ -416,7 +417,7 @@ func TestSchedulerOnSuccess(t *testing.T) {
 		step("1", testCommand),
 	)
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -437,7 +438,7 @@ func TestSchedulerOnFailure(t *testing.T) {
 		step("1", testCommandFail),
 	)
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
@@ -467,7 +468,7 @@ func TestRepeat(t *testing.T) {
 		sc.Cancel(g)
 	}()
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -489,7 +490,7 @@ func TestRepeatFail(t *testing.T) {
 		},
 	)
 	sc := &Scheduler{Config: &Config{}}
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
@@ -518,7 +519,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 	<-done
 
@@ -562,7 +563,7 @@ func TestNodeSetupFailure(t *testing.T) {
 		},
 	)
 	sc := &Scheduler{Config: &Config{}}
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
 
@@ -588,7 +589,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 		nodes[0].logFile.Close()
 	}()
 
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
 	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
@@ -605,7 +606,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	s2.Output = "TOOK_PREV_OUT"
 
 	g, sc := newTestSchedule(t, &Config{}, s1, s2)
-	err := sc.Schedule(g, nil)
+	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -631,7 +632,7 @@ func testSchedule(t *testing.T, steps ...*dag.Step) (
 	t.Helper()
 	g, sc := newTestSchedule(t,
 		&Config{MaxActiveRuns: 2}, steps...)
-	return g, sc, sc.Schedule(g, nil)
+	return g, sc, sc.Schedule(context.Background(), g, nil)
 }
 
 func newTestSchedule(t *testing.T, cfg *Config, steps ...*dag.Step) (
