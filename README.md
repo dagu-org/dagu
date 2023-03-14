@@ -70,6 +70,7 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Executors](#executors)
   - [Running Docker Containers](#running-docker-containers)
   - [Making HTTP Requests](#making-http-requests)
+  - [Sending E-mail](#sending-e-mail)
   - [Executing jq Command](#executing-jq-command)
   - [Command Execution over SSH](#command-execution-over-ssh)
 - [Configuration Options](#configuration-options)
@@ -501,6 +502,38 @@ steps:
         },
         "body": "post body"
       }      
+```
+
+### Sending E-mail
+
+The `mail` executor can be used to send e-mail.
+
+Example:
+
+```yaml
+smtp:
+  host: "smtp.foo.bar"
+  port: "587"
+  username: "<username>"
+  password: "<password>"
+
+steps:
+  - name: step1
+    executor:
+      type: mail
+      config:
+        to: <to address>
+        from: <from address>
+        subject: "Urgent Request: Help Me Find My Sanity"
+        message: |
+          I'm in a bit of a pickle.
+          I seem to have lost my sanity somewhere between my third cup of coffee
+          and my fourth Zoom meeting of the day.
+          
+          If you see it lying around, please let me know.
+          Thanks for your help!
+
+          Best,
 ```
 
 ### Executing jq Command

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -303,7 +304,9 @@ func (a *Agent) run() error {
 		utils.LogErr("write status", a.dbWriter.Write(a.Status()))
 	}()
 
-	lastErr := a.scheduler.Schedule(a.graph, done)
+	ctx := dag.NewContext(context.Background(), a.DAG)
+
+	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()
 
 	log.Println("schedule finished.")
@@ -333,7 +336,9 @@ func (a *Agent) dryRun() error {
 
 	log.Printf("***** Starting DRY-RUN *****")
 
-	lastErr := a.scheduler.Schedule(a.graph, done)
+	ctx := dag.NewContext(context.Background(), a.DAG)
+
+	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()
 	a.reporter.ReportSummary(status, lastErr)
 
