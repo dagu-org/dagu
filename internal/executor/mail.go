@@ -63,6 +63,11 @@ func CreateMailExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 		return nil, err
 	}
 
+	cfg.From = os.ExpandEnv(cfg.From)
+	cfg.To = os.ExpandEnv(cfg.To)
+	cfg.Subject = os.ExpandEnv(cfg.Subject)
+	cfg.Message = os.ExpandEnv(cfg.Message)
+
 	exec := &MailExecutor{cfg: &cfg}
 
 	d := dag.GetDAGFromContext(ctx)

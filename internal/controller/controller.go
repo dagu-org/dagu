@@ -126,13 +126,15 @@ func (dc *DAGController) StartAsync(binPath string, workDir string, params strin
 func (dc *DAGController) Start(binPath string, workDir string, params string) error {
 	args := []string{"start"}
 	if params != "" {
-		args = append(args, fmt.Sprintf("--params=\"%s\"", params))
+		args = append(args, "-p")
+		args = append(args, fmt.Sprintf(`"%s"`, params))
 	}
 	args = append(args, dc.Location)
 	cmd := exec.Command(binPath, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
+
 	err := cmd.Start()
 	if err != nil {
 		return err

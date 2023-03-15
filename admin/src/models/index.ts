@@ -214,7 +214,3 @@ export type ContinueOn = {
   Failure: boolean;
   Skipped: boolean;
 };
-
-export type Parameters = {
-  Parameters: string
-}

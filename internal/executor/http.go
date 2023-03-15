@@ -79,6 +79,10 @@ func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 		if err := decodeHTTPConfig(step.ExecutorConfig.Config, &reqCfg); err != nil {
 			return nil, err
 		}
+		reqCfg.Body = os.ExpandEnv(reqCfg.Body)
+		for k, v := range reqCfg.Headers {
+			reqCfg.Headers[k] = os.ExpandEnv(v)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

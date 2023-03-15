@@ -1,6 +1,6 @@
 import { Box, Stack } from '@mui/material';
 import React from 'react';
-import { DAG, Parameters, SchedulerStatus, Status } from '../../models';
+import { DAG, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -44,18 +44,15 @@ function DAGActions({
   const [isRetryModal, setIsRetryModal] = React.useState(false);
 
   const onSubmit = React.useCallback(
-    async (
-      warn: string,
-      params: {
-        name: string;
-        action: string;
-        requestId?: string;
-        params?: Parameters;
-      }
-    ) => {
+    async (params: {
+      name: string;
+      action: string;
+      requestId?: string;
+      params?: string;
+    }) => {
       const form = new FormData();
       if (params.action == 'start') {
-        form.set('params', params.params!.Parameters);
+        form.set('params', params.params!);
       }
       form.set('action', params.action);
       if (params.requestId) {
@@ -144,7 +141,7 @@ function DAGActions({
         dismissModal={() => setIsStopModal(false)}
         onSubmit={() => {
           setIsStopModal(false);
-          onSubmit('', { name: name, action: 'stop' });
+          onSubmit({ name: name, action: 'stop' });
         }}
       >
         <Box>Do you really want to cancel the DAG?</Box>
@@ -156,7 +153,7 @@ function DAGActions({
         dismissModal={() => setIsRetryModal(false)}
         onSubmit={() => {
           setIsRetryModal(false);
-          onSubmit('', {
+          onSubmit({
             name: name,
             action: 'retry',
             requestId: status?.RequestId,
@@ -170,11 +167,12 @@ function DAGActions({
         </Stack>
       </ConfirmModal>
       <StartDAGModal
+        defaultParams={dag.DefaultParams}
         dag={dag}
         visible={isStartModal}
         onSubmit={(params) => {
           setIsStartModal(false);
-          onSubmit('', { name: name, action: 'start', params: params });
+          onSubmit({ name: name, action: 'start', params: params });
         }}
         dismissModal={() => {
           setIsStartModal(false);

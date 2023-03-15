@@ -611,8 +611,8 @@ The following environment variables can be used to configure the Dagu. Default v
 - `DAGU_SUSPEND_FLAGS_DIR` (`$DAGU_HOME/suspend`): The directory containing DAG suspend flags.
 - `DAGU_ADMIN_LOG_DIR` (`$DAGU_HOME/logs/admin`): The directory where admin logs will be stored.
 - `DAGU_BASE_CONFIG` (`$DAGU_HOME/config.yaml`): The path to the base configuration file.
-- `DAGU_NAVBAR_COLOR` (`""`): The color to use for the navigation bar.
-- `DAGU_NAVBAR_TITLE` (`Dagu`): The title to display in the navigation bar.
+- `DAGU_NAVBAR_COLOR` (`""`): The color to use for the navigation bar. E.g., `red` or `#ff0000`.
+- `DAGU_NAVBAR_TITLE` (`Dagu`): The title to display in the navigation bar. E.g., `Dagu - PROD` or `Dagu - DEV`
 
 Note: All of the above environment variables are optional. If not set, the default values shown above will be used. If DAGU_HOME environment variable is not set, the default value is `$HOME/.dagu`.
 

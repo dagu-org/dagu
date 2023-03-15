@@ -43,13 +43,20 @@ func startCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			params, err := cmd.Flags().GetString("params")
 			cobra.CheckErr(err)
-			d, err := loadDAG(args[0], strings.Trim(params, `"`))
+			d, err := loadDAG(args[0], removeQuotes(params))
 			cobra.CheckErr(err)
 			cobra.CheckErr(start(d, false))
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	return cmd
+}
+
+func removeQuotes(s string) string {
+	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 func dryCommand() *cobra.Command {

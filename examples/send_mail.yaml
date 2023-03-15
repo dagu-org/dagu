@@ -3,8 +3,8 @@ steps:
     executor:
       type: mail
       config:
-        to: yohamta@gmail.com
-        from: yohamta@gmail.com
+        to: "$MY_EMAIL"
+        from: "$MY_EMAIL"
         subject: "Urgent Request: Help Me Find My Sanity"
         message: |
           I'm in a bit of a pickle.

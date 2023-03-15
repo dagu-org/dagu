@@ -7,14 +7,15 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
-import { DAG, Parameters } from '../../models';
+import { DAG } from '../../models';
 import LabeledItem from '../atoms/LabeledItem';
 
 type Props = {
   visible: boolean;
+  defaultParams: string;
   dag: DAG;
   dismissModal: () => void;
-  onSubmit: (params: Parameters) => void;
+  onSubmit: (params: string) => void;
 };
 
 const style = {
@@ -29,7 +30,13 @@ const style = {
   p: 4,
 };
 
-function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
+function StartDAGModal({
+  visible,
+  defaultParams,
+  dag,
+  dismissModal,
+  onSubmit,
+}: Props) {
   React.useEffect(() => {
     const callback = (event: KeyboardEvent) => {
       const e = event || window.event;
@@ -45,7 +52,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
 
   const ref = React.useRef<HTMLInputElement>(null);
 
-  const [params, setParams] = React.useState<Parameters>({ Parameters: '' });
+  const [params, setParams] = React.useState<string>(dag.DefaultParams);
 
   React.useEffect(() => {
     ref.current?.focus();
@@ -55,7 +62,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
     <Modal open={visible} onClose={dismissModal}>
       <Box sx={style}>
         <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Confirmation</Typography>
+          <Typography variant="h6">Start the DAG</Typography>
         </Stack>
         <Stack
           direction="column"
@@ -79,12 +86,9 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                 }}
                 inputRef={ref}
                 InputProps={{
-                  value: params.Parameters,
+                  value: params,
                   onChange: (e) => {
-                    setParams({
-                      ...params,
-                      Parameters: e.target.value,
-                    });
+                    setParams(e.target.value);
                   },
                 }}
               />
