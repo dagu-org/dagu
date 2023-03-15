@@ -20,7 +20,10 @@ steps:
     output: API_RESPONSE
 
   - name: get result
-    executor: jq
+    executor:
+      type: jq
+      config:
+        raw: true
     command: ".choices[0].message.content"
     script: "$API_RESPONSE"
     output: MESSAGE_CONTENT
