@@ -14,17 +14,8 @@ import (
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/utils"
 )
-
-func TestMain(m *testing.M) {
-	tmpDir := utils.MustTempDir("dagu_test")
-	settings.ChangeHomeDir(tmpDir)
-	code := m.Run()
-	os.RemoveAll(tmpDir)
-	os.Exit(code)
-}
 
 type cmdTest struct {
 	args        []string

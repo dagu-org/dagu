@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -52,7 +53,7 @@ func testRunSteps(t *testing.T, steps ...*dag.Step) *scheduler.ExecutionGraph {
 	g, err := scheduler.NewExecutionGraph(steps...)
 	require.NoError(t, err)
 	for _, n := range g.Nodes() {
-		if err := n.Execute(); err != nil {
+		if err := n.Execute(context.Background()); err != nil {
 			n.Status = scheduler.NodeStatus_Error
 		} else {
 			n.Status = scheduler.NodeStatus_Success

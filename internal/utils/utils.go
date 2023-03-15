@@ -15,12 +15,18 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 )
 
+var defaultEnv map[string]string
+
+func init() {
+	defaultEnv = map[string]string{
+		"PATH": os.Getenv("PATH"),
+		"HOME": os.Getenv("HOME"),
+	}
+}
+
 // DefaultEnv returns default value of environment variable.
 func DefaultEnv() map[string]string {
-	return map[string]string{
-		"PATH": "${PATH}",
-		"HOME": "${HOME}",
-	}
+	return defaultEnv
 }
 
 // MustGetUserHomeDir returns current working directory.

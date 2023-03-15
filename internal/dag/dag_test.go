@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
@@ -18,13 +18,18 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	settings.ChangeHomeDir(testHomeDir)
+	changeHomeDir(testHomeDir)
 	testEnv = []string{
 		fmt.Sprintf("LOG_DIR=%s", path.Join(testHomeDir, "/logs")),
-		fmt.Sprintf("PATH=%s", os.ExpandEnv("${PATH}")),
+		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 	}
 	code := m.Run()
 	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
 }
 
 func TestToString(t *testing.T) {

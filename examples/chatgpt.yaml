@@ -1,0 +1,42 @@
+params: QUESTION="what is your favorite activity?"
+
+steps:
+  - name: ask chatgpt
+    executor:
+      type: http
+      config:
+        timeout: 180
+        headers:
+          Authorization: "Bearer $OPENAI_API_KEY"
+          Content-Type: "application/json"
+        silent: true
+        body: |
+          { "model": "gpt-3.5-turbo", "messages": [
+              {"role": "system", "content": "You are a philosopher of the Roman Imperial Period"},
+              {"role": "user", "content": "$QUESTION"}
+            ] 
+          }
+    command: POST https://api.openai.com/v1/chat/completions
+    output: API_RESPONSE
+
+  - name: get result
+    executor:
+      type: jq
+      config:
+        raw: true
+    command: ".choices[0].message.content"
+    script: "$API_RESPONSE"
+    output: MESSAGE_CONTENT
+    depends:
+      - ask chatgpt
+  
+  - name: send mail
+    executor:
+      type: mail
+      config:
+        to: "$MY_EMAIL"
+        from: "$MY_EMAIL"
+        subject: "$QUESTION"
+        message: "$MESSAGE_CONTENT"
+    depends:
+      - get result

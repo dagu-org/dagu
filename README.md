@@ -70,10 +70,10 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Executors](#executors)
   - [Running Docker Containers](#running-docker-containers)
   - [Making HTTP Requests](#making-http-requests)
+  - [Sending E-mail](#sending-e-mail)
   - [Executing jq Command](#executing-jq-command)
   - [Command Execution over SSH](#command-execution-over-ssh)
-- [Admin Configuration](#admin-configuration)
-- [Environment Variable](#environment-variable)
+- [Configuration Options](#configuration-options)
 - [Sending email notifications](#sending-email-notifications)
 - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
 - [Scheduler](#scheduler)
@@ -88,8 +88,6 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Local Development Setup](#local-development-setup)
 - [FAQ](#faq)
   - [How to contribute?](#how-to-contribute)
-  - [Where is the history data stored?](#where-is-the-history-data-stored)
-  - [Where are the log files stored?](#where-are-the-log-files-stored)
   - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
   - [How to use specific `host` and `port` for `dagu server`?](#how-to-use-specific-host-and-port-for-dagu-server)
   - [How to specify the DAGs directory for `dagu server` and `dagu scheduler`?](#how-to-specify-the-dags-directory-for-dagu-server-and-dagu-scheduler)
@@ -491,19 +489,49 @@ The `http` executor allows us to make an arbitrary HTTP request.
 ```yaml
 steps:
   - name: send POST request
-    executor: http
     command: POST https://foo.bar.com
-    script: |
-      {
-        "timeout": 10,
-        "headers": {
-          "Authorization": "Bearer $TOKEN"
-        },
-        "query": {
-          "key": "value"
-        },
-        "body": "post body"
-      }      
+    executor: 
+      type: http
+      config:
+        timeout: 10,
+        headers:
+          Authorization: "Bearer $TOKEN"
+        silent: true # If silent is true, it outputs response body only.
+        query:
+          key: "value"
+        body: "post body"
+```
+
+### Sending E-mail
+
+The `mail` executor can be used to send e-mail.
+
+Example:
+
+```yaml
+smtp:
+  host: "smtp.foo.bar"
+  port: "587"
+  username: "<username>"
+  password: "<password>"
+
+steps:
+  - name: step1
+    executor:
+      type: mail
+      config:
+        to: <to address>
+        from: <from address>
+        subject: "Urgent Request: Help Me Find My Sanity"
+        message: |
+          I'm in a bit of a pickle.
+          I seem to have lost my sanity somewhere between my third cup of coffee
+          and my fourth Zoom meeting of the day.
+          
+          If you see it lying around, please let me know.
+          Thanks for your help!
+
+          Best,
 ```
 
 ### Executing jq Command
@@ -567,38 +595,26 @@ steps:
     command: /usr/sbin/ifconfig
 ```
 
-## Admin Configuration
+## Configuration Options
 
-To configure dagu, please create the config file (default path: `~/.dagu/admin.yaml`). All fields are optional.
+The following environment variables can be used to configure the Dagu. Default values are provided in the parentheses:
 
-```yaml
-# Web Server Host and Port
-host: <hostname for web UI address>                          # default: 127.0.0.1
-port: <port number for web UI address>                       # default: 8080
+- `DAGU_HOST` (`127.0.0.1`): The host to bind the server to.
+- `DAGU_PORT` (`8080`): The port to bind the server to.
+- `DAGU_DAGS` (`$DAGU_HOME/dags`): The directory containing the DAGs.
+- `DAGU_COMMAND` (`dagu`): The command used to start the application.
+- `DAGU_IS_BASIC_AUTH` (`0`): Set to 1 to enable basic authentication.
+- `DAGU_BASIC_AUTH_USERNAME` (`""`): The username to use for basic authentication.
+- `DAGU_BASIC_AUTH_PASSWORD` (`""`): The password to use for basic authentication.
+- `DAGU_LOG_DIR` (`$DAGU_HOME/logs`): The directory where logs will be stored.
+- `DAGU_DATA_DIR` (`$DAGU_HOME/data`): The directory where application data will be stored.
+- `DAGU_SUSPEND_FLAGS_DIR` (`$DAGU_HOME/suspend`): The directory containing DAG suspend flags.
+- `DAGU_ADMIN_LOG_DIR` (`$DAGU_HOME/logs/admin`): The directory where admin logs will be stored.
+- `DAGU_BASE_CONFIG` (`$DAGU_HOME/config.yaml`): The path to the base configuration file.
+- `DAGU_NAVBAR_COLOR` (`""`): The color to use for the navigation bar. E.g., `red` or `#ff0000`.
+- `DAGU_NAVBAR_TITLE` (`Dagu`): The title to display in the navigation bar. E.g., `Dagu - PROD` or `Dagu - DEV`
 
-# path to the DAGs directory
-dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
-
-# Web UI Color & Title
-navbarColor: <admin-web header color>                        # header color for web UI (e.g. "#ff0000")
-navbarTitle: <admin-web title text>                          # header title for web UI (e.g. "PROD")
-
-# Basic Auth
-isBasicAuth: <true|false>                                    # enables basic auth
-basicAuthUsername: <username for basic auth of web UI>       # basic auth user
-basicAuthPassword: <password for basic auth of web UI>       # basic auth password
-
-# Base Config
-baseConfig: <base DAG config path> .                         # default: ${DAGU_HOME}/config.yaml
-
-# Others
-logDir: <internal logdirectory>                              # default: ${DAGU_HOME}/logs/admin
-command: <Absolute path to the dagu binary>                  # default: dagu
-```
-
-## Environment Variable
-
-You can configure the dagu's internal work directory by defining `DAGU_HOME` environment variables. The default path is `~/.dagu/`.
+Note: All of the above environment variables are optional. If not set, the default values shown above will be used. If DAGU_HOME environment variable is not set, the default value is `$HOME/.dagu`.
 
 ## Sending email notifications
 
@@ -857,14 +873,6 @@ make build
 ### How to contribute?
 
 Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thanks!
-
-### Where is the history data stored?
-
-It will store execution history data in the `DAGU__DATA` environment variable path. The default location is `$HOME/.dagu/data`.
-
-### Where are the log files stored?
-
-It will store log files in the `DAGU__LOGS` environment variable path. The default location is `$HOME/.dagu/logs`. You can override the setting by the `logDir` field in a YAML file.
 
 ### How long will the history data be stored?
 

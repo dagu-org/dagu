@@ -83,8 +83,8 @@ type NodeState struct {
 }
 
 // Execute runs the command synchronously and returns error if any.
-func (n *Node) Execute() error {
-	ctx, fn := context.WithCancel(context.Background())
+func (n *Node) Execute(ctx context.Context) error {
+	ctx, fn := context.WithCancel(ctx)
 	n.cancelFunc = fn
 
 	if n.CmdWithArgs != "" {

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/itchyny/gojq"
+	"github.com/mitchellh/mapstructure"
 	"github.com/yohamta/dagu/internal/dag"
 )
 
@@ -16,6 +18,11 @@ type JqExecutor struct {
 	stderr io.Writer
 	query  string
 	input  map[string]interface{}
+	cfg    *JqConfig
+}
+
+type JqConfig struct {
+	Raw bool `mapstructure:"raw"`
 }
 
 func (e *JqExecutor) SetStdout(out io.Writer) {
@@ -50,12 +57,23 @@ func (e *JqExecutor) Run() error {
 			e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
 			continue
 		}
-		e.stdout.Write(val)
+		if e.cfg.Raw {
+			s := string(val)
+			e.stdout.Write([]byte(strings.Trim(s, `"`)))
+		} else {
+			e.stdout.Write(val)
+		}
 	}
 	return nil
 }
 
 func CreateJqExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+	var jqCfg JqConfig
+	if step.ExecutorConfig.Config != nil {
+		if err := decodeJqConfig(step.ExecutorConfig.Config, &jqCfg); err != nil {
+			return nil, err
+		}
+	}
 	s := os.ExpandEnv(step.Script)
 	input := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(s), &input); err != nil {
@@ -65,7 +83,16 @@ func CreateJqExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 		stdout: os.Stdout,
 		input:  input,
 		query:  step.CmdWithArgs,
+		cfg:    &jqCfg,
 	}, nil
+}
+
+func decodeJqConfig(dat map[string]interface{}, cfg *JqConfig) error {
+	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		ErrorUnused: false,
+		Result:      cfg,
+	})
+	return md.Decode(dat)
 }
 
 func init() {

@@ -5,6 +5,8 @@ go 1.18
 require (
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
+	github.com/go-chi/chi v1.5.4
+	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.0
 	github.com/imdario/mergo v0.3.13

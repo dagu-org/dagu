@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/admin"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/scheduler"
@@ -22,7 +22,7 @@ func TestAgent(t *testing.T) {
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
 	agent := NewAgent(
-		&admin.Config{
+		&config.Config{
 			DAGs:    testdataDir,
 			Command: testBin,
 			LogDir:  path.Join(tmpDir, "log"),
@@ -56,7 +56,7 @@ func TestAgentForStop(t *testing.T) {
 
 	now := time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC)
 	agent := NewAgent(
-		&admin.Config{
+		&config.Config{
 			DAGs:    testdataDir,
 			Command: testBin,
 			LogDir:  path.Join(tmpDir, "log"),

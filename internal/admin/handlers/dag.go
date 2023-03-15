@@ -7,18 +7,17 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/settings"
 	"github.com/yohamta/dagu/internal/storage"
 	"github.com/yohamta/dagu/internal/suspend"
 	"golang.org/x/text/encoding"
@@ -64,11 +63,6 @@ const (
 	dag_TabType_ScLog   = "scheduler-log"
 )
 
-type dagParameter struct {
-	File string
-	Step string
-}
-
 func newDAGResponse(dagName string, dag *controller.DAGStatus, tab string) *dagResponse {
 	return &dagResponse{
 		Title:      dagName,
@@ -80,23 +74,18 @@ func newDAGResponse(dagName string, dag *controller.DAGStatus, tab string) *dagR
 	}
 }
 
-type DAGHandlerConfig struct {
-	DAGsDir            string
-	LogEncodingCharset string
-}
-
-func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
-	renderFunc := useTemplate("index.gohtml", "dag", tc)
+func handleGetDAG() http.HandlerFunc {
+	renderFunc := useTemplate("index.gohtml", "dag")
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		dn, tab, err := getPathParameter(r)
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
+		dn := dagNameFromCtx(r.Context())
+		tab := tabNameFromCtx(r.Context())
 
-		params := getDAGParameter(r)
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		paramFile := getReqParam(r, "file")
+		paramStep := getReqParam(r, "step")
+
+		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		d, err := dr.ReadStatus(file, false)
 		if d == nil {
@@ -120,7 +109,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 
 		case dag_TabType_StepLog:
 			if isJsonRequest(r) {
-				data.StepLog, err = readStepLog(c, params.File, params.Step, hc.LogEncodingCharset)
+				data.StepLog, err = readStepLog(c, paramFile, paramStep, cfg.LogEncodingCharset)
 				if err != nil {
 					encodeError(w, err)
 					return
@@ -129,7 +118,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 
 		case dag_TabType_ScLog:
 			if isJsonRequest(r) {
-				data.ScLog, err = readSchedulerLog(c, params.File)
+				data.ScLog, err = readSchedulerLog(c, paramFile)
 				if err != nil {
 					encodeError(w, err)
 					return
@@ -151,13 +140,8 @@ func isJsonRequest(r *http.Request) bool {
 	return r.Header.Get("Accept") == "application/json"
 }
 
-type PostDAGHandlerConfig struct {
-	DAGsDir string
-	Bin     string
-	WkDir   string
-}
-
-func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
+func handlePostDAG() http.HandlerFunc {
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
@@ -166,13 +150,9 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		step := r.FormValue("step")
 		params := r.FormValue("params")
 
-		dn, _, err := getPathParameter(r)
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
+		dn := dagNameFromCtx(r.Context())
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		dag, err := dr.ReadStatus(file, false)
 		if err != nil && action != "save" {
@@ -184,38 +164,32 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 		switch action {
 		case "start":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
-				encodeError(w, fmt.Errorf("%w already running", errInvalidArgs))
+				encodeError(w, fmt.Errorf("already running: %w", errInvalidArgs))
 				return
 			}
-			c.StartAsync(hc.Bin, hc.WkDir, params)
+			c.StartAsync(cfg.Command, cfg.WorkDir, params)
 
 		case "suspend":
-			sc := suspend.NewSuspendChecker(
-				storage.NewStorage(
-					settings.MustGet(
-						settings.SETTING__SUSPEND_FLAGS_DIR,
-					),
-				),
-			)
+			sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
 			_ = sc.ToggleSuspend(dag.DAG, value == "true")
 
 		case "stop":
 			if dag.Status.Status != scheduler.SchedulerStatus_Running {
-				encodeError(w, fmt.Errorf("%w: DAG is not running", errInvalidArgs))
+				encodeError(w, fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 				return
 			}
 			err = c.Stop()
 			if err != nil {
-				encodeError(w, fmt.Errorf("failed to stop DAG: %s", err))
+				encodeError(w, fmt.Errorf("error trying to stop the DAG: %w", err))
 				return
 			}
 
 		case "retry":
 			if reqId == "" {
-				encodeError(w, fmt.Errorf("%w: request-id is required", errInvalidArgs))
+				encodeError(w, fmt.Errorf("request-id is required: %w", errInvalidArgs))
 				return
 			}
-			err = c.Retry(hc.Bin, hc.WkDir, reqId)
+			err = c.Retry(cfg.Command, cfg.WorkDir, reqId)
 			if err != nil {
 				encodeError(w, err)
 				return
@@ -223,15 +197,15 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 		case "mark-success":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
-				encodeError(w, fmt.Errorf("%w: DAG is running.", errInvalidArgs))
+				encodeError(w, fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 				return
 			}
 			if reqId == "" {
-				encodeError(w, fmt.Errorf("%w: request-id is required.", errInvalidArgs))
+				encodeError(w, fmt.Errorf("request-id is required: %w", errInvalidArgs))
 				return
 			}
 			if step == "" {
-				encodeError(w, fmt.Errorf("%w: step is required.", errInvalidArgs))
+				encodeError(w, fmt.Errorf("step name is required: %w", errInvalidArgs))
 				return
 			}
 
@@ -243,15 +217,15 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 
 		case "mark-failed":
 			if dag.Status.Status == scheduler.SchedulerStatus_Running {
-				encodeError(w, fmt.Errorf("%w: DAG is running.", errInvalidArgs))
+				encodeError(w, fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 				return
 			}
 			if reqId == "" {
-				encodeError(w, fmt.Errorf("%w: request-id is required.", errInvalidArgs))
+				encodeError(w, fmt.Errorf("request-id is required: %w", errInvalidArgs))
 				return
 			}
 			if step == "" {
-				encodeError(w, fmt.Errorf("%w: step is required.", errInvalidArgs))
+				encodeError(w, fmt.Errorf("step name is required: %w", errInvalidArgs))
 				return
 			}
 
@@ -272,7 +246,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 
 		case "rename":
-			newfile := nameWithExt(path.Join(hc.DAGsDir, value))
+			newfile := nameWithExt(path.Join(cfg.DAGs, value))
 			err := controller.MoveDAG(file, newfile)
 			if err != nil {
 				encodeError(w, err)
@@ -290,20 +264,13 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 	}
 }
 
-type DeleteDAGHandlerConfig struct {
-	DAGsDir string
-}
-
-func HandleDeleteDAG(hc *DeleteDAGHandlerConfig) http.HandlerFunc {
+func handleDeleteDAG() http.HandlerFunc {
+	cfg := config.Get()
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		dn, _, err := getPathParameter(r)
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
+		dn := dagNameFromCtx(r.Context())
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
 		dr := controller.NewDAGStatusReader()
 		dag, err := dr.ReadStatus(file, false)
 		if err != nil {
@@ -339,7 +306,7 @@ func updateStatus(c *controller.DAGController, reqId, step string, to scheduler.
 		}
 	}
 	if !found {
-		return fmt.Errorf("step %s not found", step)
+		return fmt.Errorf("step was not found: %s", step)
 	}
 	return c.UpdateStatus(status)
 }
@@ -349,19 +316,19 @@ func readSchedulerLog(c *controller.DAGController, file string) (*logFile, error
 	if file == "" {
 		s, err := c.GetLastStatus()
 		if err != nil {
-			return nil, fmt.Errorf("failed to read status")
+			return nil, fmt.Errorf("error reading the last status")
 		}
 		f = s.Log
 	} else {
 		s, err := database.ParseFile(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read status file %s", file)
+			return nil, fmt.Errorf("error parsing %s: %w", file, err)
 		}
 		f = s.Log
 	}
 	b, err := os.ReadFile(f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s", f)
+		return nil, fmt.Errorf("error reading %s: %w", f, err)
 	}
 	return &logFile{
 		LogFile: f,
@@ -390,7 +357,7 @@ func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logF
 	} else {
 		s, err := database.ParseFile(file)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read status file %s", file)
+			return nil, fmt.Errorf("error parsing %s: %w", file, err)
 		}
 		steps = s.Nodes
 		stepm[constants.OnSuccess] = s.OnSuccess
@@ -409,7 +376,7 @@ func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logF
 		step = v
 	}
 	if step == nil {
-		return nil, fmt.Errorf("step was not found %s", stepName)
+		return nil, fmt.Errorf("step name was not found %s", stepName)
 	}
 	var b []byte
 	var err error
@@ -419,7 +386,7 @@ func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logF
 		b, err = os.ReadFile(step.Log)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s", step.Log)
+		return nil, fmt.Errorf("error reading %s: %w", step.Log, err)
 	}
 	return &logFile{
 		LogFile: step.Log,
@@ -431,7 +398,7 @@ func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logF
 func readFile(f string, decorder *encoding.Decoder) ([]byte, error) {
 	r, err := os.Open(f)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s", f)
+		return nil, fmt.Errorf("error reading %s: %w", f, err)
 	}
 	defer r.Close()
 	tr := transform.NewReader(r, decorder)
@@ -489,28 +456,9 @@ func buildLog(logs []*models.StatusFile) *Log {
 	return ret
 }
 
-var (
-	re  = regexp.MustCompile(`/dags/([^/\?]+)/([^/\?]+)/?`)
-	re2 = regexp.MustCompile(`/dags/([^/\?]+)/?`)
-)
-
-func getPathParameter(r *http.Request) (string, string, error) {
-	if m := re.FindStringSubmatch(r.URL.Path); m != nil {
-		return m[1], m[2], nil
+func getReqParam(r *http.Request, key string) string {
+	if ss, ok := r.URL.Query()[key]; ok {
+		return ss[0]
 	}
-	if m := re2.FindStringSubmatch(r.URL.Path); m != nil {
-		return m[1], dag_TabType_Status, nil
-	}
-	return "", "", fmt.Errorf("invalid URL")
-}
-
-func getDAGParameter(r *http.Request) *dagParameter {
-	p := &dagParameter{}
-	if file, ok := r.URL.Query()["file"]; ok {
-		p.File = file[0]
-	}
-	if step, ok := r.URL.Query()["step"]; ok {
-		p.Step = step[0]
-	}
-	return p
+	return ""
 }

@@ -1,0 +1,17 @@
+steps:
+  - name: step1
+    executor:
+      type: mail
+      config:
+        to: "$MY_EMAIL"
+        from: "$MY_EMAIL"
+        subject: "Urgent Request: Help Me Find My Sanity"
+        message: |
+          I'm in a bit of a pickle.
+          I seem to have lost my sanity somewhere between my third cup of coffee
+          and my fourth Zoom meeting of the day.
+          
+          If you see it lying around, please let me know.
+          Thanks for your help!
+
+          Best,

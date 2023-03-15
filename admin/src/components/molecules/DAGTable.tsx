@@ -57,8 +57,8 @@ type Props = {
 
 type DAGRow = DAGItem & { subRows?: DAGItem[] };
 
-const durFormatSec = 's[s]m[m]h[h]d[d]';
-const durFormatMin = 'm[m]h[h]d[d]';
+const durFormatSec = 'd[d]h[h]m[m]s[s]';
+const durFormatMin = 'd[d]h[h]m[m]';
 
 declare module '@tanstack/react-table' {
   interface TableMeta<TData extends RowData> {
@@ -371,6 +371,7 @@ const defaultColumns = [
       }
       return (
         <DAGActions
+          dag={data.DAGStatus.DAG}
           status={data.DAGStatus.Status}
           name={data.DAGStatus.DAG.Name}
           label={false}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestHttpServerStartShutdown(t *testing.T) {
@@ -18,7 +19,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&Config{
+	server := NewServer(&config.Config{
 		Host: host,
 		Port: port,
 		DAGs: testHomeDir,
@@ -31,13 +32,13 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 300)
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
 	server.Shutdown()
 
-	_, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	_, err = http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.Error(t, err)
 }
 
@@ -48,7 +49,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&Config{
+	server := NewServer(&config.Config{
 		Host: host,
 		Port: port,
 		DAGs: dir,
@@ -61,65 +62,21 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 300)
 
-	resp, err := http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
-	resp, err = http.Post(fmt.Sprintf("http://%s:%s/shutdown", host, port), "", nil)
+	resp, err = http.Post(fmt.Sprintf("http://%s:%d/shutdown", host, port), "", nil)
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
 	time.Sleep(time.Millisecond * 1000)
 
-	_, err = http.Get(fmt.Sprintf("http://%s:%s", host, port))
+	_, err = http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.Error(t, err)
 }
 
-func TestHttpServerBasicAuth(t *testing.T) {
-	dir, err := os.MkdirTemp("", "test_http_server")
-	require.NoError(t, err)
-	os.RemoveAll(dir)
-
-	host := "127.0.0.1"
-	port := findPort(t)
-	server := NewServer(&Config{
-		Host:              host,
-		Port:              port,
-		IsBasicAuth:       true,
-		BasicAuthUsername: "user",
-		BasicAuthPassword: "password",
-		DAGs:              testHomeDir,
-	})
-
-	go func() {
-		err := server.Serve()
-		require.NoError(t, err)
-	}()
-	defer server.Shutdown()
-
-	time.Sleep(time.Millisecond * 300)
-
-	client := &http.Client{
-		Timeout: time.Second * 1,
-	}
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%s", host, port), nil)
-	require.NoError(t, err)
-
-	res, err := client.Do(req)
-	require.NoError(t, err)
-	require.Equal(t, "401 Unauthorized", res.Status)
-
-	req, err = http.NewRequest("GET", fmt.Sprintf("http://%s:%s", host, port), nil)
-	require.NoError(t, err)
-	req.SetBasicAuth("user", "password")
-
-	res, err = client.Do(req)
-	require.NoError(t, err)
-	require.Equal(t, "200 OK", res.Status)
-}
-
-func findPort(t *testing.T) string {
+func findPort(t *testing.T) int {
 	t.Helper()
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -129,5 +86,5 @@ func findPort(t *testing.T) string {
 	if err := ln.Close(); err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%d", port)
+	return port
 }

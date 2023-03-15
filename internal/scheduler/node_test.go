@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -20,7 +21,7 @@ func TestExecute(t *testing.T) {
 			Command:         "true",
 			OutputVariables: &utils.SyncMap{},
 		}}
-	require.NoError(t, n.Execute())
+	require.NoError(t, n.Execute(context.Background()))
 	require.Nil(t, n.Error)
 }
 
@@ -30,7 +31,7 @@ func TestError(t *testing.T) {
 			Command:         "false",
 			OutputVariables: &utils.SyncMap{},
 		}}
-	err := n.Execute()
+	err := n.Execute(context.Background())
 	require.True(t, err != nil)
 	require.Equal(t, n.Error, err)
 }
@@ -49,7 +50,7 @@ func TestSignal(t *testing.T) {
 	}()
 
 	n.updateStatus(NodeStatus_Running)
-	err := n.Execute()
+	err := n.Execute(context.Background())
 
 	require.Error(t, err)
 	require.Equal(t, n.Status, NodeStatus_Cancel)
@@ -70,7 +71,7 @@ func TestSignalSpecified(t *testing.T) {
 	}()
 
 	n.updateStatus(NodeStatus_Running)
-	err := n.Execute()
+	err := n.Execute(context.Background())
 
 	require.Error(t, err)
 	require.Equal(t, n.Status, NodeStatus_Cancel)
@@ -321,7 +322,7 @@ func TestRunScript(t *testing.T) {
 	require.Equal(t, n.Script, string(b))
 
 	require.NoError(t, err)
-	err = n.Execute()
+	err = n.Execute(context.Background())
 	require.NoError(t, err)
 	err = n.teardown()
 	require.NoError(t, err)
@@ -358,7 +359,7 @@ func runTestNode(t *testing.T, n *Node) {
 	err := n.setup(os.Getenv("HOME"),
 		fmt.Sprintf("test-request-id-%d", rand.Int()))
 	require.NoError(t, err)
-	err = n.Execute()
+	err = n.Execute(context.Background())
 	require.NoError(t, err)
 	err = n.teardown()
 	require.NoError(t, err)

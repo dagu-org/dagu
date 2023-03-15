@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/settings"
+	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestLoadingFile(t *testing.T) {
@@ -76,10 +76,7 @@ func TestCloning(t *testing.T) {
 
 func TestLoadingBaseConfig(t *testing.T) {
 	l := &Loader{}
-	d, err := l.loadBaseConfig(
-		settings.MustGet(settings.SETTING__BASE_CONFIG),
-		&BuildDAGOptions{},
-	)
+	d, err := l.loadBaseConfig(config.Get().BaseConfig, &BuildDAGOptions{})
 	require.NotNil(t, d)
 	require.NoError(t, err)
 }

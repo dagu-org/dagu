@@ -1,22 +1,23 @@
 # Examples
 
 - [Examples](#examples)
-  - [Hello World](#hello-world)
-  - [Conditional Steps](#conditional-steps)
-  - [Writing to Files](#writing-to-files)
-  - [Passing output to the next step](#passing-output-to-the-next-step)
-  - [Running Docker Containers](#running-docker-containers)
-    - [Container Configurations](#container-configurations)
-    - [How to run docker containers inside a `dagu` container](#how-to-run-docker-containers-inside-a-dagu-container)
-  - [Command Execution over SSH](#command-execution-over-ssh)
-  - [Making HTTP Requests](#making-http-requests)
-  - [Querying JSON with jq](#querying-json-with-jq)
-  - [Format JSON with jq](#format-json-with-jq)
-  - [Sending Email Notification](#sending-email-notification)
-  - [Customizing Signal on Stop](#customizing-signal-on-stop)
-- [How to contribute?](#how-to-contribute)
+  - [Print Hello World](#print-hello-world)
+  - [Execute Conditional Steps](#execute-conditional-steps)
+  - [Write to a File](#write-to-a-file)
+  - [Pass output to the next step](#pass-output-to-the-next-step)
+  - [Run a Docker Container](#run-a-docker-container)
+    - [Configure Container Volumes, Envs, etc](#configure-container-volumes-envs-etc)
+    - [Run Containers on Host's Docker Environment](#run-containers-on-hosts-docker-environment)
+  - [Execute Commands over SSH](#execute-commands-over-ssh)
+  - [Send HTTP Requests](#send-http-requests)
+  - [Execute jq Commands to Query JSON](#execute-jq-commands-to-query-json)
+  - [Execute jq Commands to Format JSON](#execute-jq-commands-to-format-json)
+  - [Execute jq Command and Output Raw Value](#execute-jq-command-and-output-raw-value)
+  - [Send E-mail Notification](#send-e-mail-notification)
+  - [Send E-mail](#send-e-mail)
+  - [Customize Signal on Stop](#customize-signal-on-stop)
 
-## Hello World
+## Print Hello World
 
 ![hello world](./images/helloworld.png)
 
@@ -31,7 +32,7 @@ steps:
       - "1"
 ```
 
-## Conditional Steps
+## Execute Conditional Steps
 
 ![conditional](./images/conditional.png)
 
@@ -56,7 +57,7 @@ steps:
         expected: bar
 ```
 
-## Writing to Files
+## Write to a File
 
 ```yaml
 steps:
@@ -65,7 +66,7 @@ steps:
     stdout: /tmp/hello.txt
 ```
 
-## Passing output to the next step
+## Pass output to the next step
 
 ![output](./images/output.png)
 
@@ -82,7 +83,7 @@ steps:
       - pass 'hello'
 ```
 
-## Running Docker Containers
+## Run a Docker Container
 
 ```yaml
 steps:
@@ -116,7 +117,7 @@ steps:
     command: run https://examples.deno.land/hello-world.ts
 ```
 
-### Container Configurations
+### Configure Container Volumes, Envs, etc
 
 You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
 
@@ -143,7 +144,7 @@ See the Docker's API documentation for all available options.
 - For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
 - For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
 
-### How to run docker containers inside a `dagu` container
+### Run Containers on Host's Docker Environment
 
 If you are running `dagu` using a container, you need the setup below.
 
@@ -170,7 +171,7 @@ steps:
 
 For more details, see [this page](https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2).
 
-## Command Execution over SSH
+## Execute Commands over SSH
 
 ```yaml
 steps:
@@ -186,7 +187,7 @@ steps:
 
 ```
 
-## Making HTTP Requests
+## Send HTTP Requests
 
 ```yaml
 steps:
@@ -204,7 +205,7 @@ steps:
       }      
 ```
 
-## Querying JSON with jq
+## Execute jq Commands to Query JSON
 ```yaml
 steps:
   - name: run query
@@ -221,7 +222,7 @@ log output:
 }
 ```
 
-## Format JSON with jq
+## Execute jq Commands to Format JSON
 ```yaml
 steps:
   - name: format json
@@ -240,9 +241,25 @@ log output:
 }
 ```
 
-## Sending Email Notification
+## Execute jq Command and Output Raw Value
+```yaml
+steps:
+  - name: output raw value
+    executor:
+      type: jq
+      config:
+        raw: true
+    command: '.id'
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+```
 
-Email example
+log output:
+```json
+sample
+```
+
+## Send E-mail Notification
 
 ![sample](./images/email.png)
 
@@ -270,7 +287,34 @@ infoMail:
   prefix: "[Info]"
 ```
 
-## Customizing Signal on Stop
+## Send E-mail
+
+```yaml
+smtp:
+  host: "smtp.foo.bar"
+  port: "587"
+  username: "<username>"
+  password: "<password>"
+
+steps:
+  - name: step1
+    executor:
+      type: mail
+      config:
+        to: <to address>
+        from: <from address>
+        subject: "Urgent Request: Help Me Find My Sanity"
+        message: |
+          I'm in a bit of a pickle.
+          I seem to have lost my sanity somewhere between my third cup of coffee and my fourth Zoom meeting of the day.
+          
+          If you see it lying around, please let me know.
+          Thanks for your help!
+
+          Best,
+```
+
+## Customize Signal on Stop
 
 ```yaml
 steps:
@@ -281,7 +325,3 @@ steps:
       sleep 60
     signalOnStop: "SIGINT"
 ```
-
-# How to contribute?
-
-Feel free to contribute interesting examples in this page. Thanks!
