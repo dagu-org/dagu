@@ -45,7 +45,9 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
 
   const ref = React.useRef<HTMLInputElement>(null);
 
-  const [params, setParams] = React.useState<Parameters>({ Parameters: '' });
+  const [params, setParams] = React.useState<Parameters>({
+    Parameters: dag.DefaultParams,
+  });
 
   React.useEffect(() => {
     ref.current?.focus();
