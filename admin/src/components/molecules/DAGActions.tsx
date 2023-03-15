@@ -1,11 +1,14 @@
-import { Stack } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import React from 'react';
-import { SchedulerStatus, Status } from '../../models';
+import { DAG, Parameters, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
 import VisuallyHidden from '../atoms/VisuallyHidden';
+import StartDAGModal from './StartDAGModal';
+import ConfirmModal from './ConfirmModal';
+import LabeledItem from '../atoms/LabeledItem';
 
 type LabelProps = {
   show: boolean;
@@ -15,6 +18,7 @@ type LabelProps = {
 type Props = {
   status?: Status;
   name: string;
+  dag: DAG;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -28,11 +32,16 @@ function Label({ show, children }: LabelProps): JSX.Element {
 function DAGActions({
   status,
   name,
+  dag,
   refresh,
   redirectTo,
   label = true,
 }: Props) {
   const nav = useNavigate();
+
+  const [isStartModal, setIsStartModal] = React.useState(false);
+  const [isStopModal, setIsStopModal] = React.useState(false);
+  const [isRetryModal, setIsRetryModal] = React.useState(false);
 
   const onSubmit = React.useCallback(
     async (
@@ -41,23 +50,12 @@ function DAGActions({
         name: string;
         action: string;
         requestId?: string;
+        params?: Parameters;
       }
     ) => {
       const form = new FormData();
       if (params.action == 'start') {
-        const parameters = window.prompt(
-          'Enter parameters (for default parameters, leave blank and click OK).',
-          ''
-        );
-        if (parameters === null) {
-          //hint cancel
-          return;
-        }
-        form.set('params', parameters);
-      } else {
-        if (!confirm(warn)) {
-          return;
-        }
+        form.set('params', params.params!.Parameters);
       }
       form.set('action', params.action);
       if (params.requestId) {
@@ -82,6 +80,7 @@ function DAGActions({
     },
     [refresh]
   );
+
   const buttonState = React.useMemo(
     () => ({
       start: status?.Status != SchedulerStatus.Running,
@@ -104,12 +103,7 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['start']}
-        onClick={() =>
-          onSubmit('Do you really want to start the DAG?', {
-            name: name,
-            action: 'start',
-          })
-        }
+        onClick={() => setIsStartModal(true)}
       >
         {label && 'Start'}
       </ActionButton>
@@ -124,12 +118,7 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['stop']}
-        onClick={() =>
-          onSubmit('Do you really want to cancel the DAG?', {
-            name: name,
-            action: 'stop',
-          })
-        }
+        onClick={() => setIsStopModal(true)}
       >
         {label && 'Stop'}
       </ActionButton>
@@ -144,19 +133,53 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['retry']}
-        onClick={() =>
-          onSubmit(
-            `Do you really want to rerun the last execution (${status?.RequestId}) ?`,
-            {
-              name: name,
-              requestId: status?.RequestId,
-              action: 'retry',
-            }
-          )
-        }
+        onClick={() => setIsRetryModal(true)}
       >
         {label && 'Retry'}
       </ActionButton>
+      <ConfirmModal
+        title="Confirmation"
+        buttonText="Stop"
+        visible={isStopModal}
+        dismissModal={() => setIsStopModal(false)}
+        onSubmit={() => {
+          setIsStopModal(false);
+          onSubmit('', { name: name, action: 'stop' });
+        }}
+      >
+        <Box>Do you really want to cancel the DAG?</Box>
+      </ConfirmModal>
+      <ConfirmModal
+        title="Confirmation"
+        buttonText="Rerun"
+        visible={isRetryModal}
+        dismissModal={() => setIsRetryModal(false)}
+        onSubmit={() => {
+          setIsRetryModal(false);
+          onSubmit('', {
+            name: name,
+            action: 'retry',
+            requestId: status?.RequestId,
+          });
+        }}
+      >
+        <Stack direction="column">
+          <Box>Do you really want to rerun the last execution?</Box>
+          <LabeledItem label="Request-ID">{null}</LabeledItem>
+          <Box>{status?.RequestId}</Box>
+        </Stack>
+      </ConfirmModal>
+      <StartDAGModal
+        dag={dag}
+        visible={isStartModal}
+        onSubmit={(params) => {
+          setIsStartModal(false);
+          onSubmit('', { name: name, action: 'start', params: params });
+        }}
+        dismissModal={() => {
+          setIsStartModal(false);
+        }}
+      />
     </Stack>
   );
 }

@@ -1,12 +1,13 @@
 import { Box, Button, Modal, Stack, Typography } from '@mui/material';
 import React from 'react';
-import { Step } from '../../models';
 
 type Props = {
+  title: string;
+  buttonText: string;
+  children: React.ReactNode;
   visible: boolean;
   dismissModal: () => void;
-  step?: Step;
-  onSubmit: (step: Step, action: string) => void;
+  onSubmit: () => void;
 };
 
 const style = {
@@ -21,7 +22,14 @@ const style = {
   p: 4,
 };
 
-function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
+function ConfirmModal({
+  children,
+  title,
+  buttonText,
+  visible,
+  dismissModal,
+  onSubmit,
+}: Props) {
   React.useEffect(() => {
     const callback = (event: KeyboardEvent) => {
       const e = event || window.event;
@@ -34,14 +42,12 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
       document.removeEventListener('keydown', callback);
     };
   }, [dismissModal]);
-  if (!step) {
-    return null;
-  }
+
   return (
     <Modal open={visible} onClose={dismissModal}>
       <Box sx={style}>
         <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Update status of "{step.Name}"</Typography>
+          <Typography variant="h6">{title}</Typography>
         </Stack>
         <Stack
           direction="column"
@@ -50,34 +56,17 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
           spacing={2}
           mt={2}
         >
-          <Stack
-            direction="row"
-            alignContent="center"
-            justifyContent="center"
-            spacing={2}
-          >
-            <Button
-              variant="contained"
-              onClick={() => onSubmit(step, 'mark-success')}
-            >
-              Mark Success
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => onSubmit(step, 'mark-failed')}
-            >
-              Mark Failed
-            </Button>
-          </Stack>
-          <Stack direction="row" alignContent="center" justifyContent="center">
-            <Button variant="contained" color="error" onClick={dismissModal}>
-              Cancel
-            </Button>
-          </Stack>
+          <Box>{children}</Box>
+          <Button variant="contained" onClick={() => onSubmit()}>
+            {buttonText}
+          </Button>
+          <Button variant="contained" color="error" onClick={dismissModal}>
+            Cancel
+          </Button>
         </Stack>
       </Box>
     </Modal>
   );
 }
 
-export default StatusUpdateModal;
+export default ConfirmModal;
