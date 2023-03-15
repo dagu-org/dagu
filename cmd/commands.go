@@ -43,13 +43,23 @@ func startCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			params, err := cmd.Flags().GetString("params")
 			cobra.CheckErr(err)
-			d, err := loadDAG(args[0], strings.Trim(params, `"`))
+			d, err := loadDAG(args[0], sanitizeParams(params))
 			cobra.CheckErr(err)
 			cobra.CheckErr(start(d, false))
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	return cmd
+}
+
+const dq = `"`
+
+func sanitizeParams(s string) string {
+	if strings.HasPrefix(s, dq) && strings.HasSuffix(s, dq) {
+		s = strings.TrimPrefix(s, dq)
+		s = strings.TrimSuffix(s, dq)
+	}
+	return s
 }
 
 func dryCommand() *cobra.Command {
