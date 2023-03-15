@@ -1,11 +1,12 @@
 import { Stack } from '@mui/material';
 import React from 'react';
-import { SchedulerStatus, Status } from '../../models';
+import { DAG, Parameters, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
 import VisuallyHidden from '../atoms/VisuallyHidden';
+import StartDAGModal from './StartDAGModal';
 
 type LabelProps = {
   show: boolean;
@@ -15,6 +16,7 @@ type LabelProps = {
 type Props = {
   status?: Status;
   name: string;
+  dag: DAG;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -28,11 +30,14 @@ function Label({ show, children }: LabelProps): JSX.Element {
 function DAGActions({
   status,
   name,
+  dag,
   refresh,
   redirectTo,
   label = true,
 }: Props) {
   const nav = useNavigate();
+
+  const [isRunModalVisible, setIsRunModalVisible] = React.useState(false);
 
   const onSubmit = React.useCallback(
     async (
@@ -41,23 +46,15 @@ function DAGActions({
         name: string;
         action: string;
         requestId?: string;
+        params?: Parameters;
       }
     ) => {
       const form = new FormData();
       if (params.action == 'start') {
-        const parameters = window.prompt(
-          'Enter parameters (for default parameters, leave blank and click OK).',
-          ''
-        );
-        if (parameters === null) {
-          //hint cancel
-          return;
-        }
-        form.set('params', parameters);
-      } else {
-        if (!confirm(warn)) {
-          return;
-        }
+        form.set('params', params.params!.Parameters);
+      }
+      if (warn != '' && !confirm(warn)) {
+        return;
       }
       form.set('action', params.action);
       if (params.requestId) {
@@ -82,6 +79,14 @@ function DAGActions({
     },
     [refresh]
   );
+
+  const onRunTheDAG = React.useCallback(
+    async (params: Parameters) => {
+      onSubmit('', { name: name, action: 'start', params: params });
+    },
+    [onSubmit]
+  );
+
   const buttonState = React.useMemo(
     () => ({
       start: status?.Status != SchedulerStatus.Running,
@@ -104,12 +109,7 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['start']}
-        onClick={() =>
-          onSubmit('Do you really want to start the DAG?', {
-            name: name,
-            action: 'start',
-          })
-        }
+        onClick={() => setIsRunModalVisible(true)}
       >
         {label && 'Start'}
       </ActionButton>
@@ -157,6 +157,17 @@ function DAGActions({
       >
         {label && 'Retry'}
       </ActionButton>
+      <StartDAGModal
+        dag={dag}
+        visible={isRunModalVisible}
+        onSubmit={(params) => {
+          setIsRunModalVisible(false);
+          onRunTheDAG(params);
+        }}
+        dismissModal={() => {
+          setIsRunModalVisible(false);
+        }}
+      />
     </Stack>
   );
 }

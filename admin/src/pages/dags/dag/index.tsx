@@ -77,6 +77,7 @@ function DAGDetails() {
           <Title>{data.Title}</Title>
           <DAGActions
             status={data.DAG.Status}
+            dag={data.DAG.DAG}
             name={params.name!}
             refresh={refreshFn}
             redirectTo={`${baseUrl}`}

@@ -371,6 +371,7 @@ const defaultColumns = [
       }
       return (
         <DAGActions
+          dag={data.DAGStatus.DAG}
           status={data.DAGStatus.Status}
           name={data.DAGStatus.DAG.Name}
           label={false}
