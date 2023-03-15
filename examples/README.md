@@ -10,8 +10,9 @@
     - [Run Containers on Host's Docker Environment](#run-containers-on-hosts-docker-environment)
   - [Execute Commands over SSH](#execute-commands-over-ssh)
   - [Send HTTP Requests](#send-http-requests)
-  - [Execute jq Commands to query JSON](#execute-jq-commands-to-query-json)
-  - [Execute jq to Format JSON](#execute-jq-to-format-json)
+  - [Execute jq Commands to Query JSON](#execute-jq-commands-to-query-json)
+  - [Execute jq Commands to Format JSON](#execute-jq-commands-to-format-json)
+  - [Execute jq Command and Output Raw Value](#execute-jq-command-and-output-raw-value)
   - [Send E-mail Notification](#send-e-mail-notification)
   - [Send E-mail](#send-e-mail)
   - [Customize Signal on Stop](#customize-signal-on-stop)
@@ -204,7 +205,7 @@ steps:
       }      
 ```
 
-## Execute jq Commands to query JSON
+## Execute jq Commands to Query JSON
 ```yaml
 steps:
   - name: run query
@@ -221,7 +222,7 @@ log output:
 }
 ```
 
-## Execute jq to Format JSON
+## Execute jq Commands to Format JSON
 ```yaml
 steps:
   - name: format json
@@ -238,6 +239,24 @@ log output:
     },
     "id": "sample"
 }
+```
+
+## Execute jq Command and Output Raw Value
+```yaml
+steps:
+  - name: output raw value
+    executor:
+      type: jq
+      config:
+        raw: true
+    command: '.id'
+    script: |
+      {"id": "sample", "10": {"b": 42}}
+```
+
+log output:
+```json
+sample
 ```
 
 ## Send E-mail Notification
