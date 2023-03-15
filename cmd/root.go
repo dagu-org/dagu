@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/dag"
 )
 
@@ -26,8 +25,7 @@ var (
 		Long:  `YAML-based DAG scheduling tool.`,
 	}
 
-	version = "0.0.0"
-	sigs    chan os.Signal
+	sigs chan os.Signal
 )
 
 const legacyPath = ".dagu"
@@ -42,7 +40,6 @@ func Execute() {
 }
 
 func init() {
-	constants.Version = version
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
