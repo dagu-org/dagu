@@ -45,7 +45,6 @@ function DAGActions({
 
   const onSubmit = React.useCallback(
     async (
-      warn: string,
       params: {
         name: string;
         action: string;
@@ -55,6 +54,7 @@ function DAGActions({
     ) => {
       const form = new FormData();
       if (params.action == 'start') {
+      console.log("params", params)
         form.set('params', params.params!.Parameters);
       }
       form.set('action', params.action);
@@ -144,7 +144,7 @@ function DAGActions({
         dismissModal={() => setIsStopModal(false)}
         onSubmit={() => {
           setIsStopModal(false);
-          onSubmit('', { name: name, action: 'stop' });
+          onSubmit({ name: name, action: 'stop' });
         }}
       >
         <Box>Do you really want to cancel the DAG?</Box>
@@ -156,7 +156,7 @@ function DAGActions({
         dismissModal={() => setIsRetryModal(false)}
         onSubmit={() => {
           setIsRetryModal(false);
-          onSubmit('', {
+          onSubmit({
             name: name,
             action: 'retry',
             requestId: status?.RequestId,
@@ -174,7 +174,7 @@ function DAGActions({
         visible={isStartModal}
         onSubmit={(params) => {
           setIsStartModal(false);
-          onSubmit('', { name: name, action: 'start', params: params });
+          onSubmit({ name: name, action: 'start', params: params });
         }}
         dismissModal={() => {
           setIsStartModal(false);
