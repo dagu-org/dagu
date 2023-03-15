@@ -614,7 +614,7 @@ The following environment variables can be used to configure the Dagu. Default v
 - `DAGU_NAVBAR_COLOR` (`""`): The color to use for the navigation bar.
 - `DAGU_NAVBAR_TITLE` (`Dagu`): The title to display in the navigation bar.
 
-Note: All of the above environment variables are optional. If not set, the default values shown above will be used. If DAGU_HOME environment variable is not set, the default value is $HOME/.dagu.
+Note: All of the above environment variables are optional. If not set, the default values shown above will be used. If DAGU_HOME environment variable is not set, the default value is `$HOME/.dagu`.
 
 ## Sending email notifications
 
