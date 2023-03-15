@@ -1,4 +1,4 @@
-import { Stack } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 import React from 'react';
 import { DAG, Parameters, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
@@ -7,6 +7,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
 import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
+import ConfirmModal from './ConfirmModal';
+import LabeledItem from '../atoms/LabeledItem';
 
 type LabelProps = {
   show: boolean;
@@ -37,7 +39,9 @@ function DAGActions({
 }: Props) {
   const nav = useNavigate();
 
-  const [isRunModalVisible, setIsRunModalVisible] = React.useState(false);
+  const [isStartModal, setIsStartModal] = React.useState(false);
+  const [isStopModal, setIsStopModal] = React.useState(false);
+  const [isRetryModal, setIsRetryModal] = React.useState(false);
 
   const onSubmit = React.useCallback(
     async (
@@ -52,9 +56,6 @@ function DAGActions({
       const form = new FormData();
       if (params.action == 'start') {
         form.set('params', params.params!.Parameters);
-      }
-      if (warn != '' && !confirm(warn)) {
-        return;
       }
       form.set('action', params.action);
       if (params.requestId) {
@@ -80,13 +81,6 @@ function DAGActions({
     [refresh]
   );
 
-  const onRunTheDAG = React.useCallback(
-    async (params: Parameters) => {
-      onSubmit('', { name: name, action: 'start', params: params });
-    },
-    [onSubmit]
-  );
-
   const buttonState = React.useMemo(
     () => ({
       start: status?.Status != SchedulerStatus.Running,
@@ -109,7 +103,7 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['start']}
-        onClick={() => setIsRunModalVisible(true)}
+        onClick={() => setIsStartModal(true)}
       >
         {label && 'Start'}
       </ActionButton>
@@ -124,12 +118,7 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['stop']}
-        onClick={() =>
-          onSubmit('Do you really want to cancel the DAG?', {
-            name: name,
-            action: 'stop',
-          })
-        }
+        onClick={() => setIsStopModal(true)}
       >
         {label && 'Stop'}
       </ActionButton>
@@ -144,28 +133,51 @@ function DAGActions({
           </>
         }
         disabled={!buttonState['retry']}
-        onClick={() =>
-          onSubmit(
-            `Do you really want to rerun the last execution (${status?.RequestId}) ?`,
-            {
-              name: name,
-              requestId: status?.RequestId,
-              action: 'retry',
-            }
-          )
-        }
+        onClick={() => setIsRetryModal(true)}
       >
         {label && 'Retry'}
       </ActionButton>
+      <ConfirmModal
+        title="Confirmation"
+        buttonText="Stop"
+        visible={isStopModal}
+        dismissModal={() => setIsStopModal(false)}
+        onSubmit={() => {
+          setIsStopModal(false);
+          onSubmit('', { name: name, action: 'stop' });
+        }}
+      >
+        <Box>Do you really want to cancel the DAG?</Box>
+      </ConfirmModal>
+      <ConfirmModal
+        title="Confirmation"
+        buttonText="Rerun"
+        visible={isRetryModal}
+        dismissModal={() => setIsRetryModal(false)}
+        onSubmit={() => {
+          setIsRetryModal(false);
+          onSubmit('', {
+            name: name,
+            action: 'retry',
+            requestId: status?.RequestId,
+          });
+        }}
+      >
+        <Stack direction="column">
+          <Box>Do you really want to rerun the last execution?</Box>
+          <LabeledItem label="Request-ID">{null}</LabeledItem>
+          <Box>{status?.RequestId}</Box>
+        </Stack>
+      </ConfirmModal>
       <StartDAGModal
         dag={dag}
-        visible={isRunModalVisible}
+        visible={isStartModal}
         onSubmit={(params) => {
-          setIsRunModalVisible(false);
-          onRunTheDAG(params);
+          setIsStartModal(false);
+          onSubmit('', { name: name, action: 'start', params: params });
         }}
         dismissModal={() => {
-          setIsRunModalVisible(false);
+          setIsStartModal(false);
         }}
       />
     </Stack>

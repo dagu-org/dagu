@@ -55,7 +55,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
     <Modal open={visible} onClose={dismissModal}>
       <Box sx={style}>
         <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Run the DAG</Typography>
+          <Typography variant="h6">Confirmation</Typography>
         </Stack>
         <Stack
           direction="column"
@@ -90,22 +90,12 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
               />
             </>
           ) : null}
-
-          <Stack
-            direction="row"
-            alignContent="center"
-            justifyContent="center"
-            spacing={2}
-          >
-            <Button variant="contained" onClick={() => onSubmit(params)}>
-              Run the DAG
-            </Button>
-          </Stack>
-          <Stack direction="row" alignContent="center" justifyContent="center">
-            <Button variant="contained" color="error" onClick={dismissModal}>
-              Cancel
-            </Button>
-          </Stack>
+          <Button variant="contained" onClick={() => onSubmit(params)}>
+            Start
+          </Button>
+          <Button variant="contained" color="error" onClick={dismissModal}>
+            Cancel
+          </Button>
         </Stack>
       </Box>
     </Modal>
