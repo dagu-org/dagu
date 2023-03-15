@@ -489,19 +489,17 @@ The `http` executor allows us to make an arbitrary HTTP request.
 ```yaml
 steps:
   - name: send POST request
-    executor: http
     command: POST https://foo.bar.com
-    script: |
-      {
-        "timeout": 10,
-        "headers": {
-          "Authorization": "Bearer $TOKEN"
-        },
-        "query": {
-          "key": "value"
-        },
-        "body": "post body"
-      }      
+    executor: 
+      type: http
+      config:
+        timeout: 10,
+        headers:
+          Authorization: "Bearer $TOKEN"
+        silent: true # If silent is true, it outputs response body only.
+        query:
+          key: "value"
+        body: "post body"
 ```
 
 ### Sending E-mail
