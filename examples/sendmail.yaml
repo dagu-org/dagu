@@ -3,8 +3,8 @@ steps:
     executor:
       type: mail
       config:
-        to: xxxxxxxxx@xxx.com
-        from: xxxxxxxxx@xxx.com
+        to: yohamta@gmail.com
+        from: yohamta@gmail.com
         subject: "Urgent Request: Help Me Find My Sanity"
         message: |
           I'm in a bit of a pickle.
@@ -15,4 +15,3 @@ steps:
           Thanks for your help!
 
           Best,
-

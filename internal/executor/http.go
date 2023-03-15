@@ -3,13 +3,14 @@ package executor
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/mitchellh/mapstructure"
 	"github.com/yohamta/dagu/internal/dag"
 )
 
@@ -19,6 +20,7 @@ type HTTPExecutor struct {
 	reqCancel context.CancelFunc
 	url       string
 	method    string
+	cfg       *HTTPConfig
 }
 
 type HTTPConfig struct {
@@ -26,6 +28,7 @@ type HTTPConfig struct {
 	Headers     map[string]string `json:"headers"`
 	QueryParams map[string]string `json:"query"`
 	Body        string            `json:"body"`
+	Silent      bool              `json:"silent"`
 }
 
 func (e *HTTPExecutor) SetStdout(out io.Writer) {
@@ -46,17 +49,22 @@ func (e *HTTPExecutor) Run() error {
 	if err != nil {
 		return err
 	}
-	if _, err := e.stdout.Write([]byte(rsp.Status() + "\n")); err != nil {
-		return err
-	}
-	if err := rsp.Header().Write(e.stdout); err != nil {
-		return err
+
+	resCode := rsp.StatusCode()
+	isErr := resCode < 200 || resCode > 299
+	if isErr || !e.cfg.Silent {
+		if _, err := e.stdout.Write([]byte(rsp.Status() + "\n")); err != nil {
+			return err
+		}
+		if err := rsp.Header().Write(e.stdout); err != nil {
+			return err
+		}
 	}
 	if _, err := e.stdout.Write(rsp.Body()); err != nil {
 		return err
 	}
-	if rsp.StatusCode() != 200 {
-		return errors.New("http status code not 200")
+	if isErr {
+		return fmt.Errorf("http status code not 2xx: %d", resCode)
 	}
 	return nil
 }
@@ -64,8 +72,11 @@ func (e *HTTPExecutor) Run() error {
 func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 	var reqCfg HTTPConfig
 	if len(step.Script) > 0 {
-		script := os.ExpandEnv(step.Script)
-		if err := json.Unmarshal([]byte(script), &reqCfg); err != nil {
+		if err := decodeHTTPConfigFromString(step.Script, &reqCfg); err != nil {
+			return nil, err
+		}
+	} else if step.ExecutorConfig.Config != nil {
+		if err := decodeHTTPConfig(step.ExecutorConfig.Config, &reqCfg); err != nil {
 			return nil, err
 		}
 	}
@@ -90,7 +101,26 @@ func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 		reqCancel: cancel,
 		method:    step.Command,
 		url:       step.Args[0],
+		cfg:       &reqCfg,
 	}, nil
+}
+
+func decodeHTTPConfig(dat map[string]interface{}, cfg *HTTPConfig) error {
+	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		ErrorUnused: false,
+		Result:      cfg,
+	})
+	return md.Decode(dat)
+}
+
+func decodeHTTPConfigFromString(s string, cfg *HTTPConfig) error {
+	if len(s) > 0 {
+		ss := os.ExpandEnv(s)
+		if err := json.Unmarshal([]byte(ss), &cfg); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func init() {

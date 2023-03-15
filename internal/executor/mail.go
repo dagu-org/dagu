@@ -6,18 +6,23 @@ import (
 	"io"
 	"os"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/yohamta/dagu/internal/dag"
 	"github.com/yohamta/dagu/internal/mailer"
 )
 
 type MailExecutor struct {
-	stdout  io.Writer
-	stderr  io.Writer
-	from    string
-	to      string
-	subject string
-	message string
-	mailer  *mailer.Mailer
+	stdout io.Writer
+	stderr io.Writer
+	mailer *mailer.Mailer
+	cfg    *MailConfig
+}
+
+type MailConfig struct {
+	From    string `mapstructure:"from"`
+	To      string `mapstructure:"to"`
+	Subject string `mapstructure:"subject"`
+	Message string `mapstructure:"message"`
 }
 
 func (e *MailExecutor) SetStdout(out io.Writer) {
@@ -32,33 +37,33 @@ func (e *MailExecutor) Kill(sig os.Signal) error {
 	return nil
 }
 
+const mailLogTemplate = `sending email
+-----
+from: %s
+to: %s
+subject: %s
+message: %s
+-----
+`
+
 func (e *MailExecutor) Run() error {
-	return e.mailer.SendMail(e.from, []string{e.to}, e.subject, e.message)
+	e.stdout.Write([]byte(fmt.Sprintf(mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)))
+	err := e.mailer.SendMail(e.cfg.From, []string{e.cfg.To}, e.cfg.Subject, e.cfg.Message)
+	if err != nil {
+		e.stdout.Write([]byte("error occurred."))
+	} else {
+		e.stdout.Write([]byte("sending email succeed."))
+	}
+	return err
 }
 
 func CreateMailExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
-	exec := &MailExecutor{}
-
-	for _, key := range []string{"from", "to", "subject", "message"} {
-		if _, ok := step.ExecutorConfig.Config[key]; !ok {
-			return nil, fmt.Errorf(`"%s" is required`, key)
-		}
-		switch v := step.ExecutorConfig.Config[key].(type) {
-		case string:
-			switch key {
-			case "from":
-				exec.from = os.ExpandEnv(v)
-			case "to":
-				exec.to = os.ExpandEnv(v)
-			case "subject":
-				exec.subject = os.ExpandEnv(v)
-			case "message":
-				exec.message = os.ExpandEnv(v)
-			}
-		default:
-			return nil, fmt.Errorf(`"%s" is must be string`, key)
-		}
+	var cfg MailConfig
+	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
+		return nil, err
 	}
+
+	exec := &MailExecutor{cfg: &cfg}
 
 	d := dag.GetDAGFromContext(ctx)
 	m := &mailer.Mailer{
@@ -71,6 +76,14 @@ func CreateMailExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 	exec.mailer = m
 
 	return exec, nil
+}
+
+func decodeMailConfig(dat map[string]interface{}, cfg *MailConfig) error {
+	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		ErrorUnused: false,
+		Result:      cfg,
+	})
+	return md.Decode(dat)
 }
 
 func init() {

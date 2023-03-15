@@ -1,13 +1,12 @@
 steps:
   - name: get fake json data
-    executor: http
+    executor:
+      type: http
+      config: 
+        timeout: 10
+        headers:
+        silent: true
+        query:
+          postId: "1"
+        body: ""
     command: GET https://jsonplaceholder.typicode.com/comments
-    script: |
-      {
-        "timeout": 10,
-        "headers": {},
-        "query": {
-          "postId": "1"
-        },
-        "body": ""
-      }      
