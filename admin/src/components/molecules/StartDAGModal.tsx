@@ -62,7 +62,7 @@ function StartDAGModal({
     <Modal open={visible} onClose={dismissModal}>
       <Box sx={style}>
         <Stack direction="row" alignContent="center" justifyContent="center">
-          <Typography variant="h6">Confirmation</Typography>
+          <Typography variant="h6">Start the DAG</Typography>
         </Stack>
         <Stack
           direction="column"
