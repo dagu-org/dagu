@@ -85,10 +85,15 @@ func (a *Agent) Run() error {
 
 // Status returns the current status of the workflow.
 func (a *Agent) Status() *models.Status {
+	scStatus := a.scheduler.Status(a.graph)
+	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {
+		scStatus = scheduler.SchedulerStatus_Running
+	}
+
 	status := models.NewStatus(
 		a.DAG,
 		a.graph.Nodes(),
-		a.scheduler.Status(a.graph),
+		scStatus,
 		os.Getpid(),
 		&a.graph.StartedAt,
 		&a.graph.FinishedAt,
