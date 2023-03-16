@@ -164,7 +164,7 @@ Create a DAG by clicking the `New DAG` button on the top page of the web UI. Inp
 
 ### 3. Edit the DAG
 
-Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example.yaml) and click the `Save` button.
+Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste this [example YAML](https://github.com/yohamta/dagu/blob/main/examples/example_workflow.yaml) and click the `Save` button.
 
 ### 4. Execute the DAG
 
