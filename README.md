@@ -41,58 +41,60 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Contents](#contents)
 - [Getting started](#getting-started)
 - [Motivation](#motivation)
-- [Why not use an existing workflow scheduler like Airflow?](#why-not-use-an-existing-workflow-scheduler-like-airflow)
-- [How does it work?](#how-does-it-work)
+- [Why Not Use an Existing Workflow Scheduler Like Airflow?](#why-not-use-an-existing-workflow-scheduler-like-airflow)
+- [How it Works](#how-it-works)
 - [Installation](#installation)
-  - [via Homebrew](#via-homebrew)
-  - [via Bash script](#via-bash-script)
-  - [via Docker](#via-docker)
-  - [via GitHub Release Page](#via-github-release-page)
-- [️Quick start](#️quick-start)
+  - [Via Homebrew](#via-homebrew)
+  - [Via Bash script](#via-bash-script)
+  - [Via Docker](#via-docker)
+  - [Via GitHub Release Page](#via-github-release-page)
+- [️Quick Start Guide](#️quick-start-guide)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
-  - [2. Create a new DAG](#2-create-a-new-dag)
+  - [2. Create a New DAG](#2-create-a-new-dag)
   - [3. Edit the DAG](#3-edit-the-dag)
   - [4. Execute the DAG](#4-execute-the-dag)
-- [Command Line User Interface](#command-line-user-interface)
-- [Web User Interface](#web-user-interface)
+- [Command Line Interface](#command-line-interface)
+- [Web Interface](#web-interface)
 - [YAML Format](#yaml-format)
-  - [Minimal Definition](#minimal-definition)
-  - [Code Snippet](#code-snippet)
-  - [Environment Variables](#environment-variables)
-  - [Parameters](#parameters)
-  - [Command Substitution](#command-substitution)
-  - [Conditional Logic](#conditional-logic)
-  - [Output](#output)
-  - [Stdout and Stderr Redirection](#stdout-and-stderr-redirection)
-  - [Lifecycle Hooks](#lifecycle-hooks)
-  - [Repeating Task](#repeating-task)
+  - [Minimal DAG Definition](#minimal-dag-definition)
+  - [Running Arbitrary Code Snippets](#running-arbitrary-code-snippets)
+  - [Defining Environment Variables](#defining-environment-variables)
+  - [Defining and Using Parameters](#defining-and-using-parameters)
+  - [Using Command Substitution](#using-command-substitution)
+  - [Adding Conditional Logic](#adding-conditional-logic)
+  - [Setting Environment Variables with Standard Output](#setting-environment-variables-with-standard-output)
+  - [Redirecting Stdout and Stderr](#redirecting-stdout-and-stderr)
+  - [Adding Lifecycle Hooks](#adding-lifecycle-hooks)
+  - [Repeating a Task at Regular Intervals](#repeating-a-task-at-regular-intervals)
   - [Other Available Fields](#other-available-fields)
 - [Executors](#executors)
   - [Running Docker Containers](#running-docker-containers)
   - [Making HTTP Requests](#making-http-requests)
-  - [Sending E-mail](#sending-e-mail)
+  - [Sending Email](#sending-email)
   - [Executing jq Command](#executing-jq-command)
   - [Command Execution over SSH](#command-execution-over-ssh)
 - [Configuration Options](#configuration-options)
-- [Sending email notifications](#sending-email-notifications)
+- [Sending Email Notifications](#sending-email-notifications)
 - [Base Configuration for all DAGs](#base-configuration-for-all-dags)
 - [Scheduler](#scheduler)
   - [Execution Schedule](#execution-schedule)
   - [Stop Schedule](#stop-schedule)
   - [Restart Schedule](#restart-schedule)
-  - [Run Scheduler as a daemon](#run-scheduler-as-a-daemon)
+  - [Run Scheduler as a Daemon](#run-scheduler-as-a-daemon)
   - [Scheduler Configuration](#scheduler-configuration)
 - [Running with Docker Compose](#running-with-docker-compose)
 - [Building Docker Image](#building-docker-image)
 - [REST API Interface](#rest-api-interface)
-- [Local Development Setup](#local-development-setup)
+- [Building Binary From Source Code](#building-binary-from-source-code)
+  - [Prerequisite](#prerequisite)
+  - [Build Binary](#build-binary)
 - [FAQ](#faq)
-  - [How to contribute?](#how-to-contribute)
-  - [How long will the history data be stored?](#how-long-will-the-history-data-be-stored)
-  - [How to use specific `host` and `port` for `dagu server`?](#how-to-use-specific-host-and-port-for-dagu-server)
-  - [How to specify the DAGs directory for `dagu server` and `dagu scheduler`?](#how-to-specify-the-dags-directory-for-dagu-server-and-dagu-scheduler)
-  - [How can I retry a DAG from a specific task?](#how-can-i-retry-a-dag-from-a-specific-task)
-  - [How does it track running processes without DBMS?](#how-does-it-track-running-processes-without-dbms)
+  - [How to Contribute?](#how-to-contribute)
+  - [How Long Will the History Data be Stored?](#how-long-will-the-history-data-be-stored)
+  - [How to Use Specific Host and Port for `dagu server`?](#how-to-use-specific-host-and-port-for-dagu-server)
+  - [How to Specify the DAGs Directory for `dagu server` and `dagu scheduler`?](#how-to-specify-the-dags-directory-for-dagu-server-and-dagu-scheduler)
+  - [How Can I Retry a DAG from a Specific Task?](#how-can-i-retry-a-dag-from-a-specific-task)
+  - [How Does It Track Running Processes Without DBMS?](#how-does-it-track-running-processes-without-dbms)
 - [Contributions](#contributions)
 - [License](#license)
 
@@ -104,11 +106,11 @@ To get started with Dagu, see the [installation instructions](#install-dagu) bel
 
 Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
 
-## Why not use an existing workflow scheduler like Airflow?
+## Why Not Use an Existing Workflow Scheduler Like Airflow?
 
 There are many existing tools such as Airflow, Prefect, and Temporal, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
-## How does it work?
+## How it Works
 
 Dagu is a single command line tool that uses the local file system to store data, so no database management system or cloud service is required. DAGs are defined in a declarative YAML format, and existing programs can be used without modification.
 
@@ -116,7 +118,7 @@ Dagu is a single command line tool that uses the local file system to store data
 
 You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
 
-### via Homebrew
+### Via Homebrew
 ```sh
 brew install yohamta/tap/dagu
 ```
@@ -126,13 +128,13 @@ Upgrade to the latest version:
 brew upgrade yohamta/tap/dagu
 ```
 
-### via Bash script
+### Via Bash script
 
 ```sh
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
 
-### via Docker
+### Via Docker
 
 ```sh
 docker run \
@@ -144,17 +146,17 @@ docker run \
 yohamta/dagu:latest
 ```
 
-### via GitHub Release Page 
+### Via GitHub Release Page 
 
 Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 
-## ️Quick start
+## ️Quick Start Guide
 
 ### 1. Launch the Web UI
 
 Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-### 2. Create a new DAG
+### 2. Create a New DAG
 
 Create a DAG by clicking the `New DAG` button on the top page of the web UI. Input `example` in the dialog.
 
@@ -172,7 +174,7 @@ You can execute the example by pressing the `Start` button.
 
 ![example](assets/images/demo.gif?raw=true)
 
-## Command Line User Interface
+## Command Line Interface
 
 - `dagu start [--params=<params>] <file>` - Runs the DAG
 - `dagu status <file>` - Displays the current status of the DAG
@@ -193,7 +195,7 @@ dagu server --config=~/.dagu/dev.yaml
 dagu scheduler --config=~/.dagu/dev.yaml
 ```
 
-## Web User Interface
+## Web Interface
 
 - **DAGs**: It shows all DAGs and the real-time status.
 
@@ -223,7 +225,7 @@ dagu scheduler --config=~/.dagu/dev.yaml
 
 To view all examples, visit [this](https://github.com/yohamta/dagu/tree/main/examples) page.
 
-### Minimal Definition
+### Minimal DAG Definition
 
 The minimal DAG definition is as simple as follows.
 
@@ -237,7 +239,7 @@ steps:
       - step 1
 ```
 
-### Code Snippet
+### Running Arbitrary Code Snippets
 
 `script` field provides a way to run arbitrary snippets of code in any language.
 
@@ -256,7 +258,7 @@ steps:
       - step 1
 ```
 
-### Environment Variables
+### Defining Environment Variables
 
 You can define environment variables and refer to them using the `env` field.
 
@@ -270,7 +272,7 @@ steps:
     command: python main.py ${SOME_FILE}
 ```
 
-### Parameters
+### Defining and Using Parameters
 
 You can define parameters using the `params` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by the `--params=` parameter of the `start` command.
 
@@ -290,7 +292,7 @@ steps:
     command: python main.py $ONE $TWO
 ```
 
-### Command Substitution
+### Using Command Substitution
 
 You can use command substitution in field values. I.e., a string enclosed in backquotes (`` ` ``) is evaluated as a command and replaced with the result of standard output.
 
@@ -302,7 +304,7 @@ steps:
     command: "echo hello, today is ${TODAY}"
 ```
 
-### Conditional Logic
+### Adding Conditional Logic
 
 Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the `preconditions` field to add conditional branches to your DAG.
 
@@ -330,7 +332,7 @@ steps:
       skipped: true
 ```
 
-### Output
+### Setting Environment Variables with Standard Output
 
 The `output` field can be used to set an environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
 
@@ -341,7 +343,7 @@ steps:
     output: FOO # will contain "foo"
 ```
 
-### Stdout and Stderr Redirection
+### Redirecting Stdout and Stderr
 
 The `stdout` field can be used to write standard output to a file.
 
@@ -361,7 +363,7 @@ steps:
     stderr: "/tmp/error.txt"
 ```
 
-### Lifecycle Hooks
+### Adding Lifecycle Hooks
 
 It is often desirable to take action when a specific event happens, for example, when a DAG fails. To achieve this, you can use `handlerOn` fields.
 
@@ -376,7 +378,7 @@ steps:
     command: main.sh
 ```
 
-### Repeating Task
+### Repeating a Task at Regular Intervals
 
 If you want a task to repeat execution at regular intervals, you can use the `repeatPolicy` field. If you want to stop the repeating task, you can use the `stop` command to gracefully stop the task.
 
@@ -391,77 +393,117 @@ steps:
 
 ### Other Available Fields
 
-Combining these settings gives you granular control over how the DAG runs.
+This section provides a comprehensive list of available fields that can be used to configure DAGs and their steps in detail. Each field serves a specific purpose, enabling granular control over how the DAG runs. The fields include:
+
+- `name`: The name of the DAG, which is optional. The default name is the name of the file.
+- `description`: A brief description of the DAG.
+- `schedule`: The execution schedule of the DAG in Cron expression format.
+- `group`: The group name to organize DAGs, which is optional.
+- `tags`: Free tags that can be used to categorize DAGs, separated by commas.
+- `env`: Environment variables that can be accessed by the DAG and its steps.
+- `logDir`: The directory where the standard output is written. The default value is `${DAGU_HOME}/logs/dags`.
+- `restartWaitSec`: The number of seconds to wait after the DAG process stops before restarting it.
+- `histRetentionDays`: The number of days to retain execution history (not for log files).
+- `delaySec`: The interval time in seconds between steps.
+- `maxActiveRuns`: The maximum number of parallel running steps.
+- `params`: The default parameters that can be referred to by `$1`, `$2`, and so on.
+- `preconditions`: The conditions that must be met before a DAG or step can run.
+- `mailOn`: Whether to send an email notification when a DAG or step fails or succeeds.
+- `MaxCleanUpTimeSec`: The maximum time to wait after sending a TERM signal to running steps before killing them.
+- `handlerOn`: The command to execute when a DAG or step succeeds, fails, cancels, or exits.
+- `steps`: A list of steps to execute in the DAG.
+
+Each step can have its own set of configurations, including:
+
+- `name`: The name of the step.
+- `description`: A brief description of the step.
+- `dir`: The working directory for the step.
+- `command`: The command and parameters to execute.
+- `stdout`: The file to which the standard output is written.
+- `output`: The variable to which the result is written.
+- `script`: The script to execute.
+- `signalOnStop`: The signal name (e.g., `SIGINT`) to be sent when the process is stopped.
+- `mailOn`: Whether to send an email notification when the step fails or succeeds.
+- `continueOn`: Whether to continue to the next step, regardless of whether the step failed or not or the preconditions are met or not.
+- `retryPolicy`: The retry policy for the step.
+- `repeatPolicy`: The repeat policy for the step.
+- `preconditions`: The conditions that must be met before a step can run.
+
+In addition, a global configuration file, `$DAGU_HOME/config.yaml`, can be used to gather common settings, such as logDir or env.
+
+Note: If `DAGU_HOME` environment variable is not set, the default path is `$HOME/.dagu/config.yaml`.
+
+Example:
 
 ```yaml
-name: all configuration              # Name (optional, default is filename)
-description: run a DAG               # Description
-schedule: "0 * * * *"                # Execution schedule (cron expression)
-group: DailyJobs                     # Group name to organize DAGs (optional)
-tags: example                        # Free tags (separated by comma)
-env:                                 # Environment variables
+name: DAG name
+description: run a DAG               
+schedule: "0 * * * *"                
+group: DailyJobs                     
+tags: example                        
+env:                                 
   - LOG_DIR: ${HOME}/logs
   - PATH: /usr/local/bin:${PATH}
-logDir: ${LOG_DIR}                   # Log directory to write standard output, default: ${DAGU_HOME}/logs/dags
-restartWaitSec: 60                   # Wait 60s after the process is stopped, then restart the DAG.
-histRetentionDays: 3                 # Execution history retention days (not for log files)
-delaySec: 1                          # Interval seconds between steps
-maxActiveRuns: 1                     # Max parallel number of running step
-params: param1 param2                # Default parameters that can be referred to by $1, $2, ...
-preconditions:                       # Precondisions for whether the it is allowed to run
-  - condition: "`echo $2`"           # Command or variables to evaluate
-    expected: "param2"               # Expected value for the condition
+logDir: ${LOG_DIR}                   
+restartWaitSec: 60                   
+histRetentionDays: 3                 
+delaySec: 1                          
+maxActiveRuns: 1                     
+params: param1 param2                
+preconditions:                       
+  - condition: "`echo $2`"           
+    expected: "param2"               
 mailOn:
-  failure: true                      # Send a mail when the it failed
-  success: true                      # Send a mail when the it finished
-MaxCleanUpTimeSec: 300               # The maximum amount of time to wait after sending a TERM signal to running steps before killing them
-handlerOn:                           # Handlers on Success, Failure, Cancel, and Exit
+  failure: true                      
+  success: true                      
+MaxCleanUpTimeSec: 300               
+handlerOn:                           
   success:
-    command: "echo succeed"          # Command to execute when the execution succeed
+    command: "echo succeed"          
   failure:
-    command: "echo failed"           # Command to execute when the execution failed
+    command: "echo failed"           
   cancel:
-    command: "echo canceled"         # Command to execute when the execution canceled
+    command: "echo canceled"         
   exit:
-    command: "echo finished"         # Command to execute when the execution finished
+    command: "echo finished"         
 steps:
-  - name: some task                  # Step name
-    description: some task           # Step description
-    dir: ${HOME}/logs                # Working directory (default: the same directory of the DAG file)
-    command: bash                    # Command and parameters
+  - name: some task                  
+    description: some task           
+    dir: ${HOME}/logs                
+    command: bash                    
     stdout: /tmp/outfile
     ouptut: RESULT_VARIABLE
     script: |
       echo "any script"
-    signalOnStop: "SIGINT"           # Specify signal name (e.g. SIGINT) to be sent when process is stopped
+    signalOnStop: "SIGINT"           
     mailOn:
-      failure: true                  # Send a mail when the step failed
-      success: true                  # Send a mail when the step finished
+      failure: true                  
+      success: true                  
     continueOn:
-      failure: true                   # Continue to the next regardless of the step failed or not
-      skipped: true                  # Continue to the next regardless the preconditions are met or not
-    retryPolicy:                     # Retry policy for the step
-      limit: 2                       # Retry up to 2 times when the step failed
-      intervalSec: 5                 # Interval time before retry
-    repeatPolicy:                    # Repeat policy for the step
-      repeat: true                   # Boolean whether to repeat this step
-      intervalSec: 60                # Interval time to repeat the step in seconds
-    preconditions:                   # Precondisions for whether the step is allowed to run
-      - condition: "`echo $1`"       # Command or variables to evaluate
-        expected: "param1"           # Expected Value for the condition
+      failure: true                  
+      skipped: true                  
+    retryPolicy:                     
+      limit: 2                       
+      intervalSec: 5                 
+    repeatPolicy:                    
+      repeat: true                   
+      intervalSec: 60                
+    preconditions:                   
+      - condition: "`echo $1`"       
+        expected: "param1"           
 ```
-
-The global configuration file `~/.dagu/config.yaml` is useful to gather common settings, such as `logDir` or `env`.
 
 ## Executors
 
-The `executor` field provides different execution methods for each step.
+The `executor` field provides different execution methods for each step. These executors are responsible for executing the commands or scripts specified in the command or script field of the step. Below are the available executors and their use cases.
+
+In the [examples](./examples/) directory, you can find a collection of sample DAGs that demonstrate how to use executors. 
 
 ### Running Docker Containers
 
 *Note: It requires Docker daemon running on the host.*
 
-The `docker` executor allows us to run Docker containers instead of bare commands.
+The `docker` executor allows us to run Docker containers instead of bare commands. This can be useful for running commands in isolated environments or for reproducibility purposes.
 
 In the example below, it pulls and runs [Deno's docker image](https://hub.docker.com/r/denoland/deno) and prints 'Hello World'.
 
@@ -484,7 +526,7 @@ To see more configurations, visit [this](https://github.com/yohamta/dagu/tree/ma
 
 ### Making HTTP Requests
 
-The `http` executor allows us to make an arbitrary HTTP request.
+The `http` executor allows us to make an arbitrary HTTP request. This can be useful for interacting with web services or APIs.
 
 ```yaml
 steps:
@@ -502,9 +544,9 @@ steps:
         body: "post body"
 ```
 
-### Sending E-mail
+### Sending Email
 
-The `mail` executor can be used to send e-mail.
+The `mail` executor can be used to send email. This can be useful for sending notifications or alerts.
 
 Example:
 
@@ -536,7 +578,7 @@ steps:
 
 ### Executing jq Command
 
-The `jq` executor can be used to transform, query, and format JSON.
+The `jq` executor can be used to transform, query, and format JSON. This can be useful for working with JSON data in pipelines or for data processing.
 
 Query Example:
 
@@ -614,9 +656,9 @@ The following environment variables can be used to configure the Dagu. Default v
 - `DAGU_NAVBAR_COLOR` (`""`): The color to use for the navigation bar. E.g., `red` or `#ff0000`.
 - `DAGU_NAVBAR_TITLE` (`Dagu`): The title to display in the navigation bar. E.g., `Dagu - PROD` or `Dagu - DEV`
 
-Note: All of the above environment variables are optional. If not set, the default values shown above will be used. If DAGU_HOME environment variable is not set, the default value is `$HOME/.dagu`.
+Note: All of the above environment variables are optional. If not set, the default values shown above will be used. If `DAGU_HOME` environment variable is not set, the default value is `$HOME/.dagu`.
 
-## Sending email notifications
+## Sending Email Notifications
 
 Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the `smtp` field and related fields in the DAG specs. You can use any email delivery services (e.g. Sendgrid, Mailgun, etc).
 
@@ -763,7 +805,7 @@ steps:
     command: python some_app.py
 ```
 
-### Run Scheduler as a daemon
+### Run Scheduler as a Daemon
 
 The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way).
 
@@ -852,55 +894,56 @@ docker build -t dagu:${DAGU_VERSION} \
 
 Please refer to [REST API Docs](./docs/restapi.md)
 
-## Local Development Setup
+## Building Binary From Source Code
 
-1. Install the latest version of [Node.js](https://nodejs.org/en/download/).
-2. Install [yarn](https://yarnpkg.com/) by running the command below.
-```sh
-npm i -g yarn
-```
-3. Build frontend project
-```sh
-make build-admin
-```
-4. Build `dagu` binary to `bin/dagu`
-```sh
-make build
-```
+### Prerequisite
+
+Before building the binary from the source code, make sure that you have the following software installed on your system:
+
+1. [Go version 1.18 or later.](https://go.dev/doc/install)
+2. Latest version of [Node.js](https://nodejs.org/en/download/).
+3. [yarn](https://yarnpkg.com/) package manager.
+
+### Build Binary
+
+To build the binary from the source code, follow these steps:
+
+1. Clone the repository to your local machine.
+2. Navigate to the root directory of the cloned repository and build the frontend project by running the following command:
+  ```sh
+  make build-admin
+  ```
+4. Build the `dagu` binary by running the following command:
+  ```sh
+  make build
+  ```
+
+You can now use the `dagu` binary that is created in the `./bin` directory.
 
 ## FAQ
 
-### How to contribute?
+### How to Contribute?
 
 Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests. Thanks!
 
-### How long will the history data be stored?
+### How Long Will the History Data be Stored?
 
-The default retention period for execution history is 30 days. However, you can override the setting by the `histRetentionDays` field in a YAML file.
+By default, the execution history data is retained for 30 days. However, you can customize this setting by modifying the `histRetentionDays` field in a YAML file.
 
-### How to use specific `host` and `port` for `dagu server`?
+### How to Use Specific Host and Port for `dagu server`?
 
-dagu server's host and port can be configured in the admin configuration file as below. See [Admin Configuration](#admin-configuration) for more details.
+To configure the host and port for `dagu server`, you can set the environment variables `DAGU_HOST` and `DAGU_PORT`. Refer to the [Configuration Options](#configuration-options) for more details.
 
-```yaml
-host: <hostname for web UI address>                          # default: 127.0.0.1
-port: <port number for web UI address>                       # default: 8000
-```
+### How to Specify the DAGs Directory for `dagu server` and `dagu scheduler`?
 
-### How to specify the DAGs directory for `dagu server` and `dagu scheduler`?
+You can customize the directory used to store DAG files by setting the environment variable `DAGU_DAGS`. See [Configuration Options](#configuration-options) for more information.
 
-You can customize DAGs directory that will be used by `dagu server` and `dagu scheduler`. See [Admin Configuration](#admin-configuration) for more details.
+### How Can I Retry a DAG from a Specific Task?
 
-```yaml
-dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
-```
+If you want to retry a DAG from a specific task, you can set the status of that task to `failed` by clicking the step in the Web UI. When you rerun the DAG, it will execute the failed task and any subsequent tasks.
 
-### How can I retry a DAG from a specific task?
-
-You can change the status of any task to a `failed` state. Then, when you retry the DAG, it will execute the failed one and any subsequent.
-
-### How does it track running processes without DBMS?
-dagu uses Unix sockets to communicate with running processes.
+### How Does It Track Running Processes Without DBMS?
+`dagu` uses Unix sockets to communicate with running processes.
 
 ## Contributions
  
@@ -915,7 +958,6 @@ We welcome contributions to Dagu! If you have an idea for a new feature or have 
 3. Make your changes and commit them to your branch
 4. Push your branch to your fork and open a pull request
 
-
 ## License
 
-This project is licensed under the GNU GPLv3 - see the [LICENSE.md](LICENSE.md) file for details
+This project is licensed under the GNU GPLv3. Refer to the [LICENSE.md](LICENSE.md) file for more details.

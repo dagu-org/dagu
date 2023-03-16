@@ -1,25 +1,25 @@
 # Examples
 
 - [Examples](#examples)
-  - [Print Hello World](#print-hello-world)
-  - [Execute Conditional Steps](#execute-conditional-steps)
-  - [Write to a File](#write-to-a-file)
-  - [Pass output to the next step](#pass-output-to-the-next-step)
-  - [Run a Docker Container](#run-a-docker-container)
-    - [Configure Container Volumes, Envs, etc](#configure-container-volumes-envs-etc)
-    - [Run Containers on Host's Docker Environment](#run-containers-on-hosts-docker-environment)
-  - [Execute Commands over SSH](#execute-commands-over-ssh)
-  - [Send HTTP Requests](#send-http-requests)
-  - [Execute jq Commands to Query JSON](#execute-jq-commands-to-query-json)
-  - [Execute jq Commands to Format JSON](#execute-jq-commands-to-format-json)
-  - [Execute jq Command and Output Raw Value](#execute-jq-command-and-output-raw-value)
-  - [Send E-mail Notification](#send-e-mail-notification)
-  - [Send E-mail](#send-e-mail)
-  - [Customize Signal on Stop](#customize-signal-on-stop)
+  - [Printing "Hello World"](#printing-hello-world)
+  - [Executing Conditional Steps](#executing-conditional-steps)
+  - [Writing to a File](#writing-to-a-file)
+  - [Passing Output to Next Step](#passing-output-to-next-step)
+  - [Running a Docker Container](#running-a-docker-container)
+    - [Configuring Container Volumes, Environment Variables, and More](#configuring-container-volumes-environment-variables-and-more)
+    - [Running Containers on the Host's Docker Environment](#running-containers-on-the-hosts-docker-environment)
+  - [Executing Commands over SSH](#executing-commands-over-ssh)
+  - [Sending HTTP Requests](#sending-http-requests)
+  - [Querying JSON Data with jq](#querying-json-data-with-jq)
+  - [Formatting JSON Data with jq](#formatting-json-data-with-jq)
+  - [Outputting Raw Values with jq](#outputting-raw-values-with-jq)
+  - [Sending Email Notifications](#sending-email-notifications)
+  - [Sending Email](#sending-email)
+  - [Customizing Signal Handling on Stop](#customizing-signal-handling-on-stop)
 
-## Print Hello World
+## Printing "Hello World"
 
-![hello world](./images/helloworld.png)
+This example demonstrates how to print "hello world" to the log.
 
 ```yaml
 name: hello world
@@ -32,9 +32,9 @@ steps:
       - "1"
 ```
 
-## Execute Conditional Steps
+## Executing Conditional Steps
 
-![conditional](./images/conditional.png)
+This example demonstrates how to execute conditional steps.
 
 ```yaml
 params: foo
@@ -57,7 +57,11 @@ steps:
         expected: bar
 ```
 
-## Write to a File
+![conditional](./images/conditional.png)
+
+## Writing to a File
+
+This example demonstrates how to write text to a file.
 
 ```yaml
 steps:
@@ -66,9 +70,9 @@ steps:
     stdout: /tmp/hello.txt
 ```
 
-## Pass output to the next step
+## Passing Output to Next Step
 
-![output](./images/output.png)
+This example demonstrates how to pass output from one step to the next. It will print "hello world" to the log.
 
 ```yaml
 steps:
@@ -83,7 +87,9 @@ steps:
       - pass 'hello'
 ```
 
-## Run a Docker Container
+## Running a Docker Container
+
+This example demonstrates how to run a Docker container.
 
 ```yaml
 steps:
@@ -97,7 +103,7 @@ steps:
     command: run https://examples.deno.land/hello-world.ts
 ```
 
-Example Log output
+Example log output:
 
 ![docker](./images/docker.png)
 
@@ -117,7 +123,7 @@ steps:
     command: run https://examples.deno.land/hello-world.ts
 ```
 
-### Configure Container Volumes, Envs, etc
+### Configuring Container Volumes, Environment Variables, and More
 
 You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
 
@@ -144,7 +150,7 @@ See the Docker's API documentation for all available options.
 - For `container`, see [ContainerConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#Config).
 - For `host`, see [HostConfig](https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig).
 
-### Run Containers on Host's Docker Environment
+### Running Containers on the Host's Docker Environment
 
 If you are running `dagu` using a container, you need the setup below.
 
@@ -171,7 +177,7 @@ steps:
 
 For more details, see [this page](https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2).
 
-## Execute Commands over SSH
+## Executing Commands over SSH
 
 ```yaml
 steps:
@@ -187,7 +193,7 @@ steps:
 
 ```
 
-## Send HTTP Requests
+## Sending HTTP Requests
 
 ```yaml
 steps:
@@ -205,7 +211,7 @@ steps:
       }      
 ```
 
-## Execute jq Commands to Query JSON
+## Querying JSON Data with jq
 ```yaml
 steps:
   - name: run query
@@ -222,7 +228,7 @@ log output:
 }
 ```
 
-## Execute jq Commands to Format JSON
+## Formatting JSON Data with jq
 ```yaml
 steps:
   - name: format json
@@ -241,7 +247,7 @@ log output:
 }
 ```
 
-## Execute jq Command and Output Raw Value
+## Outputting Raw Values with jq
 ```yaml
 steps:
   - name: output raw value
@@ -259,7 +265,7 @@ log output:
 sample
 ```
 
-## Send E-mail Notification
+## Sending Email Notifications
 
 ![sample](./images/email.png)
 
@@ -287,7 +293,7 @@ infoMail:
   prefix: "[Info]"
 ```
 
-## Send E-mail
+## Sending Email
 
 ```yaml
 smtp:
@@ -314,7 +320,7 @@ steps:
           Best,
 ```
 
-## Customize Signal on Stop
+## Customizing Signal Handling on Stop
 
 ```yaml
 steps:
@@ -325,3 +331,5 @@ steps:
       sleep 60
     signalOnStop: "SIGINT"
 ```
+
+In the above example, the script waits indefinitely for a `SIGINT` signal, but a custom handler is defined to print a message and exit with code 130 when the signal is received. The signals section is used to configure dagu to send `SIGINT` signals when the user stops the pipeline.
