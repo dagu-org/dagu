@@ -82,7 +82,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		parser := shellwords.NewParser()
 		parser.ParseBacktick = parse
 		parser.ParseEnv = false
-		a := EscapeSpecialchars(vals[1])
+		a := EscapeArg(vals[1], true)
 		args, err := parser.Parse(a)
 		if err != nil {
 			log.Printf("failed to parse arguments: %s", err)
@@ -91,7 +91,8 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		}
 		ret := []string{}
 		for _, v := range args {
-			ret = append(ret, UnescapeSpecialchars(v))
+			s, _ := UnescapeArg(v)
+			ret = append(ret, s)
 		}
 		return program, ret
 
@@ -333,7 +334,7 @@ func StringifyParam(param Parameter) string {
 	return quotedValue
 }
 
-func EscapeArg(input string) string {
+func EscapeArg(input string, doubleQuotes bool) string {
 	escaped := strings.Builder{}
 
 	for _, char := range input {
@@ -341,8 +342,8 @@ func EscapeArg(input string) string {
 			escaped.WriteString("\\r")
 		} else if char == '\n' {
 			escaped.WriteString("\\n")
-			// } else if char == '"' {
-			// 	escaped.WriteString("\\\"")
+		} else if char == '"' && doubleQuotes {
+			escaped.WriteString("\\\"")
 		} else {
 			escaped.WriteRune(char)
 		}
@@ -370,8 +371,8 @@ func UnescapeArg(input string) (string, error) {
 				escaped.WriteRune('\n')
 			case 'r':
 				escaped.WriteRune('\r')
-			// case '"':
-			// 	escaped.WriteRune('"')
+			case '"':
+				escaped.WriteRune('"')
 			default:
 				return "", fmt.Errorf("unknown escape sequence '\\%c'", input[i])
 			}

@@ -62,6 +62,13 @@ func TestSplitCommand(t *testing.T) {
 	require.Equal(t, "test/", args[1])
 }
 
+func TestSplitCommandJSON(t *testing.T) {
+	command := "echo {\"key\":\"value\"}"
+	program, args := utils.SplitCommand(command, false)
+	require.Equal(t, "echo", program)
+	require.Equal(t, "{\"key\":\"value\"}", args[0])
+}
+
 func TestFileExits(t *testing.T) {
 	require.True(t, utils.FileExists("/"))
 }
