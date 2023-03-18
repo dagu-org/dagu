@@ -91,7 +91,7 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [FAQ](#faq)
   - [How to Contribute?](#how-to-contribute)
   - [How Long Will the History Data be Stored?](#how-long-will-the-history-data-be-stored)
-  - [How to Use Specific Host and Port for `dagu server`?](#how-to-use-specific-host-and-port-for-dagu-server)
+  - [How to Use Specific Host and Port eor `dagu server`?](#how-to-use-specific-host-and-port-eor-dagu-server)
   - [How to Specify the DAGs Directory for `dagu server` and `dagu scheduler`?](#how-to-specify-the-dags-directory-for-dagu-server-and-dagu-scheduler)
   - [How Can I Retry a DAG from a Specific Task?](#how-can-i-retry-a-dag-from-a-specific-task)
   - [How Does It Track Running Processes Without DBMS?](#how-does-it-track-running-processes-without-dbms)
@@ -160,7 +160,7 @@ Start the server with `dagu server` and browse to `http://127.0.0.1:8080` to exp
 
 Create a DAG by clicking the `New DAG` button on the top page of the web UI. Input `example` in the dialog.
 
-*Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Admin Configuration](#admin-configuration) for more details.*
+*Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Configuration Options](#configuration-options) for more details.*
 
 ### 3. Edit the DAG
 
@@ -186,7 +186,7 @@ You can execute the example by pressing the `Start` button.
 - `dagu scheduler [--dags=<path/to/the DAGs directory>]` - Starts the scheduler process
 - `dagu version` - Shows the current binary version
 
-The `--config=<config>` option is available to all commands. It allows to specify different dagu configuration for the commands. Which enables you to manage multiple dagu process in a single instance. See [Admin Configuration](#admin-configuration) for more details.
+The `--config=<config>` option is available to all commands. It allows to specify different dagu configuration for the commands. Which enables you to manage multiple dagu process in a single instance. See [Configuration Options](#configuration-options) for more details.
 
 For example:
 
@@ -693,7 +693,7 @@ If you want to use the same settings for all DAGs, set them to the [base configu
 
 ## Base Configuration for all DAGs
 
-Creating a base configuration (default path: `~/.dagu/config.yaml`) is a convenient way to organize shared settings among all DAGs. The path to the base configuration file can be configured. See [Admin Configuration](#admin-configuration) for more details.
+Creating a base configuration (default path: `~/.dagu/config.yaml`) is a convenient way to organize shared settings among all DAGs. The path to the base configuration file can be configured. See [Configuration Options](#configuration-options) for more details.
 
 ```yaml
 # directory path to save logs from standard output
@@ -930,7 +930,7 @@ Feel free to contribute in any way you want. Share ideas, questions, submit issu
 
 By default, the execution history data is retained for 30 days. However, you can customize this setting by modifying the `histRetentionDays` field in a YAML file.
 
-### How to Use Specific Host and Port for `dagu server`?
+### How to Use Specific Host and Port eor `dagu server`?
 
 To configure the host and port for `dagu server`, you can set the environment variables `DAGU_HOST` and `DAGU_PORT`. Refer to the [Configuration Options](#configuration-options) for more details.
 
