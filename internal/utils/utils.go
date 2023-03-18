@@ -277,8 +277,7 @@ type Parameter struct {
 }
 
 func ParseParams(input string, executeCommandSubstitution bool) ([]Parameter, error) {
-	println(fmt.Sprintf("parsing: %+v", input))
-	paramRegex := regexp.MustCompile(`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|[^"\s]+)`)
+	paramRegex := regexp.MustCompile(`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`)
 	matches := paramRegex.FindAllStringSubmatch(input, -1)
 
 	params := []Parameter{}
@@ -287,21 +286,29 @@ func ParseParams(input string, executeCommandSubstitution bool) ([]Parameter, er
 		name := match[1]
 		value := match[2]
 
-		if strings.HasPrefix(value, `"`) {
-			value = strings.Trim(value, `"`)
-			value = strings.ReplaceAll(value, `\"`, `"`)
+		if strings.HasPrefix(value, `"`) || strings.HasPrefix(value, "`") {
+			if strings.HasPrefix(value, `"`) {
+				value = strings.Trim(value, `"`)
+				value = strings.ReplaceAll(value, `\"`, `"`)
+			}
 
 			if executeCommandSubstitution {
 				// Perform backtick command substitution
 				backtickRegex := regexp.MustCompile("`[^`]*`")
+				var cmdErr error
 				value = backtickRegex.ReplaceAllStringFunc(value, func(match string) string {
 					cmdStr := strings.Trim(match, "`")
+					cmdStr = os.ExpandEnv(cmdStr)
 					cmdOut, err := exec.Command("sh", "-c", cmdStr).Output()
 					if err != nil {
+						cmdErr = err
 						return fmt.Sprintf("`%s`", cmdStr) // Leave the original command if it fails
 					}
 					return strings.TrimSpace(string(cmdOut))
 				})
+				if cmdErr != nil {
+					return nil, cmdErr
+				}
 			}
 		}
 
@@ -313,7 +320,6 @@ func ParseParams(input string, executeCommandSubstitution bool) ([]Parameter, er
 		params = append(params, param)
 	}
 
-	println(fmt.Sprintf("parsing result: %+v", params))
 	return params, nil
 }
 

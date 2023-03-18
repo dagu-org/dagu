@@ -56,12 +56,14 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		return
 	}
 
-	for _, fn := range []func(def *configDefinition, d *DAG) error{
-		b.buildParams,
-	} {
-		if err = fn(def, d); err != nil {
+	if !b.noEval {
+		if err = b.buildEnvs(def, d); err != nil {
 			return
 		}
+	}
+
+	if err = b.buildParams(def, d); err != nil {
+		return
 	}
 
 	if b.headOnly {
@@ -69,7 +71,6 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	}
 
 	for _, fn := range []func(def *configDefinition, d *DAG) error{
-		b.buildEnvs,
 		b.buildLogDir,
 		b.buildSteps,
 		b.buildHandlers,
@@ -256,17 +257,26 @@ func (b *builder) parseParameters(value string, eval bool) (
 	}
 
 	ret := []string{}
-	if !b.noSetenv {
-		for i, p := range parsedParams {
-			strParam := utils.StringifyParam(p)
-			ret = append(ret, strParam)
+	for i, p := range parsedParams {
+		if eval {
+			p.Value = os.ExpandEnv(p.Value)
+		}
+		strParam := utils.StringifyParam(p)
+		ret = append(ret, strParam)
+
+		if p.Name == "" {
+			strParam = p.Value
+		}
+		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
+			return
+		}
+		if !b.noSetenv {
 			if p.Name != "" {
-				os.Setenv(p.Name, p.Value)
 				envs = append(envs, strParam)
-			}
-			err = os.Setenv(strconv.Itoa(i+1), p.Value)
-			if err != nil {
-				return nil, nil, err
+				err = os.Setenv(p.Name, p.Value)
+				if err != nil {
+					return
+				}
 			}
 		}
 	}
