@@ -307,7 +307,7 @@ func ParseParams(input string, executeCommandSubstitution bool) ([]Parameter, er
 					return strings.TrimSpace(string(cmdOut))
 				})
 				if cmdErr != nil {
-					return nil, cmdErr
+					return nil, fmt.Errorf("error evaluating '%s': %w", value, cmdErr)
 				}
 			}
 		}
