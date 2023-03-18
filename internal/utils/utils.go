@@ -100,24 +100,6 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 	return vals[0], []string{}
 }
 
-func UnescapeSpecialchars(str string) string {
-	repl := strings.NewReplacer(
-		`\\t`, `\t`,
-		`\\r`, `\r`,
-		`\\n`, `\n`,
-	)
-	return repl.Replace(str)
-}
-
-func EscapeSpecialchars(str string) string {
-	repl := strings.NewReplacer(
-		`\t`, `\\t`,
-		`\r`, `\\r`,
-		`\n`, `\\n`,
-	)
-	return repl.Replace(str)
-}
-
 // FileExists returns true if file exists.
 func FileExists(file string) bool {
 	_, err := os.Stat(file)
