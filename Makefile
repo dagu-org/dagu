@@ -29,7 +29,7 @@ scheduler: build-dir
 	./bin/dagu scheduler
 
 .PHONY: test
-test: build
+test:
 	go test -v ./...
 
 .PHONY: test-clean
