@@ -73,9 +73,6 @@ func FormatDuration(t time.Duration, defaultVal string) string {
 // SplitCommand splits command string to program and arguments.
 func SplitCommand(cmd string, parse bool) (program string, args []string) {
 	s := cmd
-	if parse {
-		s = os.ExpandEnv(cmd)
-	}
 	vals := strings.SplitN(s, " ", 2)
 	if len(vals) > 1 {
 		program = vals[0]
@@ -91,7 +88,11 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		}
 		ret := []string{}
 		for _, v := range args {
-			ret = append(ret, UnescapeSpecialchars(v))
+			val := UnescapeSpecialchars(v)
+			if parse {
+				val = os.ExpandEnv(val)
+			}
+			ret = append(ret, val)
 		}
 		return program, ret
 
