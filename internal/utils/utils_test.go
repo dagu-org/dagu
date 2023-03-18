@@ -63,8 +63,8 @@ func TestSplitCommand(t *testing.T) {
 }
 
 func TestSplitCommandJSON(t *testing.T) {
-	command := "echo {\"key\":\"value\"}"
-	program, args := utils.SplitCommand(command, false)
+	command := `echo {\"key\":\"value\"}`
+	program, args := utils.SplitCommand(command, true)
 	require.Equal(t, "echo", program)
 	require.Equal(t, "{\"key\":\"value\"}", args[0])
 }
