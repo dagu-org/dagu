@@ -167,7 +167,6 @@ function DAGActions({
         </Stack>
       </ConfirmModal>
       <StartDAGModal
-        defaultParams={dag.DefaultParams}
         dag={dag}
         visible={isStartModal}
         onSubmit={(params) => {

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-shellwords"
 	"github.com/robfig/cron/v3"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/utils"
@@ -57,14 +56,22 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		return
 	}
 
+	if !b.noEval {
+		if err = b.buildEnvs(def, d); err != nil {
+			return
+		}
+	}
+
+	if err = b.buildParams(def, d); err != nil {
+		return
+	}
+
 	if b.headOnly {
 		return
 	}
 
 	for _, fn := range []func(def *configDefinition, d *DAG) error{
-		b.buildEnvs,
 		b.buildLogDir,
-		b.buildParams,
 		b.buildSteps,
 		b.buildHandlers,
 		b.buildConfig,
@@ -243,36 +250,35 @@ func (b *builder) parseParameters(value string, eval bool) (
 	envs []string,
 	err error,
 ) {
-	parser := shellwords.NewParser()
-	parser.ParseBacktick = false
-	parser.ParseEnv = false
-
-	var parsed []string
-	parsed, err = parser.Parse(value)
+	var parsedParams []utils.Parameter
+	parsedParams, err = utils.ParseParams(value, eval)
 	if err != nil {
 		return
 	}
 
 	ret := []string{}
-	for i, v := range parsed {
+	for i, p := range parsedParams {
 		if eval {
-			v, err = utils.ParseCommand(os.ExpandEnv(v))
-			if err != nil {
-				return nil, nil, err
-			}
+			p.Value = os.ExpandEnv(p.Value)
+		}
+		strParam := utils.StringifyParam(p)
+		ret = append(ret, strParam)
+
+		if p.Name == "" {
+			strParam = p.Value
+		}
+		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
+			return
 		}
 		if !b.noSetenv {
-			if strings.Contains(v, "=") {
-				parts := strings.SplitN(v, "=", 2)
-				os.Setenv(parts[0], parts[1])
-				envs = append(envs, v)
-			}
-			err = os.Setenv(strconv.Itoa(i+1), v)
-			if err != nil {
-				return nil, nil, err
+			if p.Name != "" {
+				envs = append(envs, strParam)
+				err = os.Setenv(p.Name, p.Value)
+				if err != nil {
+					return
+				}
 			}
 		}
-		ret = append(ret, v)
 	}
 	return ret, envs, nil
 }
