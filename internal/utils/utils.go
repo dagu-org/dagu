@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -81,7 +82,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		parser := shellwords.NewParser()
 		parser.ParseBacktick = parse
 		parser.ParseEnv = false
-		a := escapeSpecialchars(vals[1])
+		a := EscapeSpecialchars(vals[1])
 		args, err := parser.Parse(a)
 		if err != nil {
 			log.Printf("failed to parse arguments: %s", err)
@@ -90,7 +91,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		}
 		ret := []string{}
 		for _, v := range args {
-			ret = append(ret, unescapeSpecialchars(v))
+			ret = append(ret, UnescapeSpecialchars(v))
 		}
 		return program, ret
 
@@ -98,7 +99,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 	return vals[0], []string{}
 }
 
-func unescapeSpecialchars(str string) string {
+func UnescapeSpecialchars(str string) string {
 	repl := strings.NewReplacer(
 		`\\t`, `\t`,
 		`\\r`, `\r`,
@@ -107,7 +108,7 @@ func unescapeSpecialchars(str string) string {
 	return repl.Replace(str)
 }
 
-func escapeSpecialchars(str string) string {
+func EscapeSpecialchars(str string) string {
 	repl := strings.NewReplacer(
 		`\t`, `\\t`,
 		`\r`, `\\r`,
@@ -268,4 +269,111 @@ func (m *SyncMap) UnmarshalJSON(data []byte) error {
 		m.Store(key, value)
 	}
 	return nil
+}
+
+type Parameter struct {
+	Name  string
+	Value string
+}
+
+func ParseParams(input string, executeCommandSubstitution bool) ([]Parameter, error) {
+	println(fmt.Sprintf("parsing: %+v", input))
+	paramRegex := regexp.MustCompile(`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|[^"\s]+)`)
+	matches := paramRegex.FindAllStringSubmatch(input, -1)
+
+	params := []Parameter{}
+
+	for _, match := range matches {
+		name := match[1]
+		value := match[2]
+
+		if strings.HasPrefix(value, `"`) {
+			value = strings.Trim(value, `"`)
+			value = strings.ReplaceAll(value, `\"`, `"`)
+
+			if executeCommandSubstitution {
+				// Perform backtick command substitution
+				backtickRegex := regexp.MustCompile("`[^`]*`")
+				value = backtickRegex.ReplaceAllStringFunc(value, func(match string) string {
+					cmdStr := strings.Trim(match, "`")
+					cmdOut, err := exec.Command("sh", "-c", cmdStr).Output()
+					if err != nil {
+						return fmt.Sprintf("`%s`", cmdStr) // Leave the original command if it fails
+					}
+					return strings.TrimSpace(string(cmdOut))
+				})
+			}
+		}
+
+		param := Parameter{
+			Name:  name,
+			Value: value,
+		}
+
+		params = append(params, param)
+	}
+
+	println(fmt.Sprintf("parsing result: %+v", params))
+	return params, nil
+}
+
+func StringifyParam(param Parameter) string {
+	escapedValue := strings.ReplaceAll(param.Value, `"`, `\"`)
+	quotedValue := fmt.Sprintf(`"%s"`, escapedValue)
+
+	if param.Name != "" {
+		return fmt.Sprintf("%s=%s", param.Name, quotedValue)
+	}
+	return quotedValue
+}
+
+func EscapeArg(input string) string {
+	escaped := strings.Builder{}
+
+	for _, char := range input {
+		if char == '\r' {
+			escaped.WriteString("\\r")
+		} else if char == '\n' {
+			escaped.WriteString("\\n")
+			// } else if char == '"' {
+			// 	escaped.WriteString("\\\"")
+		} else {
+			escaped.WriteRune(char)
+		}
+	}
+
+	return escaped.String()
+}
+
+func UnescapeArg(input string) (string, error) {
+	escaped := strings.Builder{}
+	length := len(input)
+	i := 0
+
+	for i < length {
+		char := input[i]
+
+		if char == '\\' {
+			i++
+			if i >= length {
+				return "", fmt.Errorf("unexpected end of input after escape character")
+			}
+
+			switch input[i] {
+			case 'n':
+				escaped.WriteRune('\n')
+			case 'r':
+				escaped.WriteRune('\r')
+			// case '"':
+			// 	escaped.WriteRune('"')
+			default:
+				return "", fmt.Errorf("unknown escape sequence '\\%c'", input[i])
+			}
+		} else {
+			escaped.WriteByte(char)
+		}
+		i++
+	}
+
+	return escaped.String(), nil
 }

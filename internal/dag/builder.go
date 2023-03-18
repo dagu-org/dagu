@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-shellwords"
 	"github.com/robfig/cron/v3"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/utils"
@@ -250,36 +249,26 @@ func (b *builder) parseParameters(value string, eval bool) (
 	envs []string,
 	err error,
 ) {
-	parser := shellwords.NewParser()
-	parser.ParseBacktick = false
-	parser.ParseEnv = false
-
-	var parsed []string
-	parsed, err = parser.Parse(value)
+	var parsedParams []utils.Parameter
+	parsedParams, err = utils.ParseParams(value, eval)
 	if err != nil {
 		return
 	}
 
 	ret := []string{}
-	for i, v := range parsed {
-		if eval {
-			v, err = utils.ParseCommand(os.ExpandEnv(v))
+	if !b.noSetenv {
+		for i, p := range parsedParams {
+			strParam := utils.StringifyParam(p)
+			ret = append(ret, strParam)
+			if p.Name != "" {
+				os.Setenv(p.Name, p.Value)
+				envs = append(envs, strParam)
+			}
+			err = os.Setenv(strconv.Itoa(i+1), p.Value)
 			if err != nil {
 				return nil, nil, err
 			}
 		}
-		if !b.noSetenv {
-			if strings.Contains(v, "=") {
-				parts := strings.SplitN(v, "=", 2)
-				os.Setenv(parts[0], parts[1])
-				envs = append(envs, v)
-			}
-			err = os.Setenv(strconv.Itoa(i+1), v)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		ret = append(ret, v)
 	}
 	return ret, envs, nil
 }
