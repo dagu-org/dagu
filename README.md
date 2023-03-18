@@ -618,7 +618,7 @@ output:
 }
 ```
 
-The `jq` result can be used in following steps via [Output](#output) or [Stdout Redirection](#stdout-and-stderr-redirection).
+The `jq` result can be used in following steps via [Output](#setting-environment-variables-with-standard-output) or [Stdout Redirection](#redirecting-stdout-and-stderr).
 
 ### Command Execution over SSH
 
