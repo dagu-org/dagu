@@ -82,7 +82,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		parser := shellwords.NewParser()
 		parser.ParseBacktick = parse
 		parser.ParseEnv = false
-		a := EscapeArg(vals[1], true)
+		a := EscapeSpecialchars(vals[1])
 		args, err := parser.Parse(a)
 		if err != nil {
 			log.Printf("failed to parse arguments: %s", err)
@@ -91,13 +91,31 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		}
 		ret := []string{}
 		for _, v := range args {
-			s, _ := UnescapeArg(v)
-			ret = append(ret, s)
+			ret = append(ret, UnescapeSpecialchars(v))
 		}
 		return program, ret
 
 	}
 	return vals[0], []string{}
+}
+
+func UnescapeSpecialchars(str string) string {
+	repl := strings.NewReplacer(
+		`\\t`, `\t`,
+		`\\r`, `\r`,
+		`\\n`, `\n`,
+	)
+	return repl.Replace(str)
+}
+
+func EscapeSpecialchars(str string) string {
+	repl := strings.NewReplacer(
+		`"`, `\"`,
+		`\t`, `\\t`,
+		`\r`, `\\r`,
+		`\n`, `\\n`,
+	)
+	return repl.Replace(str)
 }
 
 // FileExists returns true if file exists.
