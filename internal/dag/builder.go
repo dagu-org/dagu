@@ -57,6 +57,14 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		return
 	}
 
+	for _, fn := range []func(def *configDefinition, d *DAG) error{
+		b.buildParams,
+	} {
+		if err = fn(def, d); err != nil {
+			return
+		}
+	}
+
 	if b.headOnly {
 		return
 	}
@@ -64,7 +72,6 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	for _, fn := range []func(def *configDefinition, d *DAG) error{
 		b.buildEnvs,
 		b.buildLogDir,
-		b.buildParams,
 		b.buildSteps,
 		b.buildHandlers,
 		b.buildConfig,
