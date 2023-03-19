@@ -110,43 +110,8 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 			}
 		}
 	case map[interface{}]interface{}:
-		for k, v := range def.Schedule.(map[interface{}]interface{}) {
-			if _, ok := k.(string); !ok {
-				return fmt.Errorf("schedule key must be a string")
-			}
-			switch k.(string) {
-			case scheduleStart, scheduleStop, scheduleRestart:
-				switch v := (v).(type) {
-				case string:
-					switch k {
-					case scheduleStart:
-						starts = append(starts, v)
-					case scheduleStop:
-						stops = append(stops, v)
-					case scheduleRestart:
-						restarts = append(restarts, v)
-					}
-				case []interface{}:
-					for _, item := range v {
-						if item, ok := item.(string); ok {
-							switch k {
-							case scheduleStart:
-								starts = append(starts, item)
-							case scheduleStop:
-								stops = append(stops, item)
-							case scheduleRestart:
-								restarts = append(restarts, item)
-							}
-						} else {
-							return fmt.Errorf("schedule must be a string or an array of strings")
-						}
-					}
-				default:
-					return fmt.Errorf("schedule must be a string or an array of strings")
-				}
-			default:
-				return fmt.Errorf("schedule key must be start or stop")
-			}
+		if err := parseScheduleMap(def.Schedule.(map[interface{}]interface{}), &starts, &stops, &restarts); err != nil {
+			return err
 		}
 	case nil:
 	default:
@@ -573,6 +538,48 @@ func assertStepDef(def *stepDef) error {
 	// TODO: Refactor the validation check for each executor.
 	if def.Executor == nil && def.Command == "" {
 		return fmt.Errorf("step command must be specified")
+	}
+	return nil
+}
+
+func parseScheduleMap(scheduleMap map[interface{}]interface{}, starts, stops, restarts *[]string) error {
+	for k, v := range scheduleMap {
+		if _, ok := k.(string); !ok {
+			return fmt.Errorf("schedule key must be a string")
+		}
+		switch k.(string) {
+		case scheduleStart, scheduleStop, scheduleRestart:
+			switch v := (v).(type) {
+			case string:
+				switch k {
+				case scheduleStart:
+					*starts = append(*starts, v)
+				case scheduleStop:
+					*stops = append(*stops, v)
+				case scheduleRestart:
+					*restarts = append(*restarts, v)
+				}
+			case []interface{}:
+				for _, item := range v {
+					if item, ok := item.(string); ok {
+						switch k {
+						case scheduleStart:
+							*starts = append(*starts, item)
+						case scheduleStop:
+							*stops = append(*stops, item)
+						case scheduleRestart:
+							*restarts = append(*restarts, item)
+						}
+					} else {
+						return fmt.Errorf("schedule must be a string or an array of strings")
+					}
+				}
+			default:
+				return fmt.Errorf("schedule must be a string or an array of strings")
+			}
+		default:
+			return fmt.Errorf("schedule key must be start or stop")
+		}
 	}
 	return nil
 }
