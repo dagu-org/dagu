@@ -54,7 +54,7 @@ func GrepDAG(dir string, pattern string) (ret []*GrepResult, errs []string, err 
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
-			dag, err := dl.LoadHeadOnly(fn)
+			dag, err := dl.LoadMetadataOnly(fn)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue

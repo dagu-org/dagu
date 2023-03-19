@@ -16,11 +16,11 @@ import (
 var EXTENSIONS = []string{".yaml", ".yml"}
 
 type BuildDAGOptions struct {
-	headOnly   bool
-	parameters string
-	noEval     bool
-	noSetenv   bool
-	defaultEnv map[string]string
+	loadMetadataOnly bool
+	parameters       string
+	skipEnvEval      bool
+	skipEnvSetup     bool
+	defaultEnvs      map[string]string
 }
 type DAGBuilder struct {
 	options    BuildDAGOptions
@@ -40,7 +40,7 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 		return
 	}
 
-	if !b.options.noEval {
+	if !b.options.skipEnvEval {
 		if err = buildEnvs(def, d, b.baseConfig, b.options); err != nil {
 			return
 		}
@@ -50,7 +50,7 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 		return
 	}
 
-	if b.options.headOnly {
+	if b.options.loadMetadataOnly {
 		return
 	}
 
@@ -174,7 +174,7 @@ func buildParams(def *configDefinition, d *DAG, options BuildDAGOptions) (err er
 		p = options.parameters
 	}
 	var envs []string
-	d.Params, envs, err = parseParameters(p, !options.noEval, options)
+	d.Params, envs, err = parseParameters(p, !options.skipEnvEval, options)
 	if err == nil {
 		d.Env = append(d.Env, envs...)
 	}
@@ -250,7 +250,7 @@ func parseParameters(value string, eval bool, options BuildDAGOptions) (
 		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
 			return
 		}
-		if !options.noSetenv {
+		if !options.skipEnvSetup {
 			if p.Name != "" {
 				envs = append(envs, strParam)
 				err = os.Setenv(p.Name, p.Value)
@@ -272,7 +272,7 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 	map[string]string, error,
 ) {
 	var vals []*envVariable = []*envVariable{}
-	for k, v := range options.defaultEnv {
+	for k, v := range options.defaultEnvs {
 		vals = append(vals, &envVariable{k, v})
 	}
 
@@ -315,7 +315,7 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 			return nil, err
 		}
 		vars[v.key] = parsed
-		if !options.noSetenv {
+		if !options.skipEnvSetup {
 			err = os.Setenv(v.key, parsed)
 			if err != nil {
 				return nil, err
@@ -430,7 +430,7 @@ func buildStep(variables []string, def *stepDef, options BuildDAGOptions) (*Step
 }
 
 func expandEnv(val string, options BuildDAGOptions) string {
-	if options.noEval {
+	if options.skipEnvEval {
 		return val
 	}
 	return os.ExpandEnv(val)

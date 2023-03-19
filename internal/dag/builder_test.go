@@ -185,7 +185,7 @@ params: %s
 func TestExpandingEnvs(t *testing.T) {
 	os.Setenv("FOO", "BAR")
 	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{}), "BAR")
-	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{noEval: true}), "${FOO}")
+	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{skipEnvEval: true}), "${FOO}")
 }
 
 func TestBuildingTags(t *testing.T) {

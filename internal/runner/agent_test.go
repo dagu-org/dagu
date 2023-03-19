@@ -36,7 +36,7 @@ func TestAgent(t *testing.T) {
 
 	pathToDAG := path.Join(testdataDir, "scheduled_job.yaml")
 	loader := &dag.Loader{}
-	dag, err := loader.LoadHeadOnly(pathToDAG)
+	dag, err := loader.LoadMetadataOnly(pathToDAG)
 	require.NoError(t, err)
 	c := controller.NewDAGController(dag)
 

@@ -65,15 +65,15 @@ func (dr *DAGStatusReader) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus,
 }
 
 // ReadStatus loads DAG from config file.
-func (dr *DAGStatusReader) ReadStatus(dagLocation string, headerOnly bool) (*DAGStatus, error) {
+func (dr *DAGStatusReader) ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAGStatus, error) {
 	var (
 		cl  = dag.Loader{}
 		d   *dag.DAG
 		err error
 	)
 
-	if headerOnly {
-		d, err = cl.LoadHeadOnly(dagLocation)
+	if loadMetadataOnly {
+		d, err = cl.LoadMetadataOnly(dagLocation)
 	} else {
 		d, err = cl.LoadWithoutEval(dagLocation)
 	}
@@ -86,7 +86,7 @@ func (dr *DAGStatusReader) ReadStatus(dagLocation string, headerOnly bool) (*DAG
 		return dr.newDAGStatus(d, defaultStatus(d), err), err
 	}
 
-	if !headerOnly {
+	if !loadMetadataOnly {
 		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
 			return dr.newDAGStatus(d, nil, err), err
 		}

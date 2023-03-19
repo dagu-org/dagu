@@ -33,19 +33,19 @@ func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
 	return cl.loadDAGWithOptions(f, "", false, true, true)
 }
 
-// LoadHeadOnly loads config from file and returns only the headline data.
-func (cl *Loader) LoadHeadOnly(f string) (*DAG, error) {
+// LoadMetadataOnly loads config from file and returns only the headline data.
+func (cl *Loader) LoadMetadataOnly(f string) (*DAG, error) {
 	return cl.loadDAGWithOptions(f, "", true, true, true)
 }
 
 // loadDAGWithOptions loads the config file with the provided options.
-func (cl *Loader) loadDAGWithOptions(f, params string, headOnly, noEval, noSetenv bool) (*DAG, error) {
+func (cl *Loader) loadDAGWithOptions(f, params string, loadMetadataOnly, skipEnvEval, skipEnvSetup bool) (*DAG, error) {
 	return cl.loadDAG(f,
 		&BuildDAGOptions{
-			parameters: params,
-			headOnly:   headOnly,
-			noEval:     noEval,
-			noSetenv:   noSetenv,
+			parameters:       params,
+			loadMetadataOnly: loadMetadataOnly,
+			skipEnvEval:      skipEnvEval,
+			skipEnvSetup:     skipEnvSetup,
 		},
 	)
 }
@@ -63,7 +63,7 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 		return nil, err
 	}
 	b := &DAGBuilder{
-		options: BuildDAGOptions{headOnly: false, noEval: true, noSetenv: true},
+		options: BuildDAGOptions{loadMetadataOnly: false, skipEnvEval: true, skipEnvSetup: true},
 	}
 	return b.buildFromDefinition(def, nil)
 }
@@ -85,8 +85,8 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 	}
 
 	buildOpts := *opts
-	buildOpts.headOnly = false
-	buildOpts.defaultEnv = utils.DefaultEnv()
+	buildOpts.loadMetadataOnly = false
+	buildOpts.defaultEnvs = utils.DefaultEnv()
 	b := &DAGBuilder{
 		options: buildOpts,
 	}
@@ -130,7 +130,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 
 	dst.Location = file
 
-	if !opts.noSetenv {
+	if !opts.skipEnvSetup {
 		dst.setup()
 	}
 
@@ -150,7 +150,7 @@ func (cl *Loader) prepareFilepath(f string) (string, error) {
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
 func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (*DAG, error) {
-	if !opts.headOnly && cl.BaseConfig != "" {
+	if !opts.loadMetadataOnly && cl.BaseConfig != "" {
 		dag, err := cl.loadBaseConfig(cl.BaseConfig, opts)
 		if err != nil {
 			return nil, err
