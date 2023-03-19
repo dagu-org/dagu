@@ -10,7 +10,6 @@ import { useLocation } from 'react-router-dom';
 import { GetDAGsResponse } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import useSWR, { useSWRConfig } from 'swr';
-import { parseParams } from '../../lib/parseParams';
 
 function DAGs() {
   const useQuery = () => new URLSearchParams(useLocation().search);

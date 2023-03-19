@@ -37,8 +37,7 @@ function DAGDetails() {
   const { mutate } = useSWRConfig();
 
   const refreshFn = React.useCallback(() => {
-    mutate(`${baseUrl}/*`);
-    return;
+    mutate(`${baseUrl}/`);
   }, [mutate, baseUrl]);
 
   React.useEffect(() => {
