@@ -36,21 +36,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	d = &DAG{}
 	d.Init()
 
-	d.Name = def.Name
-	if def.Name != "" {
-		d.Name = def.Name
-	}
-	d.Group = def.Group
-	d.Description = def.Description
-	if def.MailOn != nil {
-		d.MailOn = &MailOn{
-			Failure: def.MailOn.Failure,
-			Success: def.MailOn.Success,
-		}
-	}
-	d.Delay = time.Second * time.Duration(def.DelaySec)
-	d.RestartWait = time.Second * time.Duration(def.RestartWaitSec)
-	d.Tags = parseTags(def.Tags)
+	b.setDAGProperties(def, d)
 
 	if err = b.buildSchedule(def, d); err != nil {
 		return
@@ -70,7 +56,15 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		return
 	}
 
-	for _, fn := range []func(def *configDefinition, d *DAG) error{
+	err = b.buildAll(def, d)
+	if err != nil {
+		return
+	}
+	return d, nil
+}
+
+func (b *builder) buildAll(def *configDefinition, d *DAG) error {
+	buildFunctions := []func(def *configDefinition, d *DAG) error{
 		b.buildLogDir,
 		b.buildSteps,
 		b.buildHandlers,
@@ -78,13 +72,15 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		buldSMTPConfig,
 		buildErrMailConfig,
 		buildInfoMailConfig,
-	} {
-		if err = fn(def, d); err != nil {
-			return
+	}
+
+	for _, fn := range buildFunctions {
+		if err := fn(def, d); err != nil {
+			return err
 		}
 	}
 
-	return d, nil
+	return nil
 }
 
 const (
@@ -92,6 +88,24 @@ const (
 	scheduleStop    = "stop"
 	scheduleRestart = "restart"
 )
+
+func (b *builder) setDAGProperties(def *configDefinition, d *DAG) {
+	d.Name = def.Name
+	if def.Name != "" {
+		d.Name = def.Name
+	}
+	d.Group = def.Group
+	d.Description = def.Description
+	if def.MailOn != nil {
+		d.MailOn = &MailOn{
+			Failure: def.MailOn.Failure,
+			Success: def.MailOn.Success,
+		}
+	}
+	d.Delay = time.Second * time.Duration(def.DelaySec)
+	d.RestartWait = time.Second * time.Duration(def.RestartWaitSec)
+	d.Tags = parseTags(def.Tags)
+}
 
 func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 	starts := []string{}
