@@ -34,26 +34,31 @@ type Agent struct {
 
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
-	logFilename  string
-	logFile      *os.File
+	logManager   *logManager
 	reporter     *reporter.Reporter
 	database     *database.Database
-	dbFile       string
-	dbWriter     *database.Writer
+	dbManager    *dbManager
 	socketServer *sock.Server
 	requestId    string
 }
 
+// AgentConfig contains the configuration for an Agent.
 type AgentConfig struct {
 	DAG *dag.DAG
 	Dry bool
 }
 
+// RetryConfig contains the configuration for retrying a workflow.
 type RetryConfig struct {
 	Status *models.Status
 }
 
-// Run starts the workflow.
+type dbManager struct {
+	dbFile   string
+	dbWriter *database.Writer
+}
+
+// Run starts the workflow execution.
 func (a *Agent) Run(ctx context.Context) error {
 	if err := a.setupRequestId(); err != nil {
 		return err
@@ -72,7 +77,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.checkIsRunning,
 		a.setupDatabase,
 		a.setupSocketServer,
-		a.setupLogFile,
+		a.logManager.setupLogFile,
 	}
 	for _, fn := range setup {
 		err := fn()
@@ -80,7 +85,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			return err
 		}
 	}
-	return a.run()
+	return a.run(ctx)
 }
 
 // Status returns the current status of the workflow.
@@ -99,7 +104,7 @@ func (a *Agent) Status() *models.Status {
 		&a.graph.FinishedAt,
 	)
 	status.RequestId = a.requestId
-	status.Log = a.logFilename
+	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
 		status.OnExit = models.FromNode(node)
 	}
@@ -180,13 +185,13 @@ func (a *Agent) init() {
 				},
 			},
 		}}
-	a.logFilename = filepath.Join(
-		logDir,
-		fmt.Sprintf("agent_%s.%s.%s.log",
+	logFilename := filepath.Join(
+		logDir, fmt.Sprintf("agent_%s.%s.%s.log",
 			utils.ValidFilename(a.DAG.Name, "_"),
 			time.Now().Format("20060102.15:04:05.000"),
 			utils.TruncString(a.requestId, 8),
 		))
+	a.logManager = &logManager{logFilename: logFilename}
 }
 
 func (a *Agent) setupGraph() (err error) {
@@ -195,15 +200,6 @@ func (a *Agent) setupGraph() (err error) {
 		return a.setupRetry()
 	}
 	a.graph, err = scheduler.NewExecutionGraph(a.DAG.Steps...)
-	return
-}
-
-func (a *Agent) setupLogFile() (err error) {
-	dir := path.Dir(a.logFilename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	a.logFile, err = utils.OpenOrCreateFile(a.logFilename)
 	return
 }
 
@@ -225,14 +221,16 @@ func (a *Agent) setupRequestId() error {
 	return nil
 }
 
-func (a *Agent) setupDatabase() (err error) {
-	a.database = &database.Database{
-		Config: database.DefaultConfig(),
+func (a *Agent) setupDatabase() error {
+	a.database = database.New()
+	utils.LogErr("clean old history data", a.database.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays))
+
+	dbWriter, dbFile, err := a.database.NewWriter(a.DAG.Location, time.Now(), a.requestId)
+	if err != nil {
+		return err
 	}
-	a.dbWriter, a.dbFile, err = a.database.NewWriter(a.DAG.Location, time.Now(), a.requestId)
-	utils.LogErr("clean old history data",
-		a.database.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays))
-	return
+	a.dbManager = &dbManager{dbFile, dbWriter}
+	return nil
 }
 
 func (a *Agent) setupSocketServer() (err error) {
@@ -255,8 +253,8 @@ func (a *Agent) checkPreconditions() error {
 	return nil
 }
 
-func (a *Agent) run() error {
-	tl := &logger.TeeLogger{Writer: a.logFile}
+func (a *Agent) run(ctx context.Context) error {
+	tl := &logger.TeeLogger{Writer: a.logManager.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}
@@ -265,17 +263,17 @@ func (a *Agent) run() error {
 		tl.Close()
 	}()
 
-	if err := a.dbWriter.Open(); err != nil {
+	if err := a.dbManager.dbWriter.Open(); err != nil {
 		return err
 	}
 
 	defer func() {
-		if err := a.dbWriter.Close(); err != nil {
+		if err := a.dbManager.dbWriter.Close(); err != nil {
 			log.Printf("failed to close db writer: %v", err)
 		}
 	}()
 
-	utils.LogErr("write status", a.dbWriter.Write(a.Status()))
+	utils.LogErr("write status", a.dbManager.dbWriter.Write(a.Status()))
 
 	listen := make(chan error)
 	go func() {
@@ -299,29 +297,29 @@ func (a *Agent) run() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			utils.LogErr("write status", a.dbWriter.Write(status))
+			utils.LogErr("write status", a.dbManager.dbWriter.Write(status))
 			utils.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
 		}
 	}()
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
-		utils.LogErr("write status", a.dbWriter.Write(a.Status()))
+		utils.LogErr("write status", a.dbManager.dbWriter.Write(a.Status()))
 	}()
 
-	ctx := dag.NewContext(context.Background(), a.DAG)
+	ctx = dag.NewContext(ctx, a.DAG)
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	utils.LogErr("write status", a.dbWriter.Write(a.Status()))
+	utils.LogErr("write status", a.dbManager.dbWriter.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
-	utils.LogErr("close data file", a.dbWriter.Close())
-	utils.LogErr("data compaction", a.database.Compact(a.DAG.Location, a.dbFile))
+	utils.LogErr("close data file", a.dbManager.dbWriter.Close())
+	utils.LogErr("data compaction", a.database.Compact(a.DAG.Location, a.dbManager.dbFile))
 
 	return lastErr
 }
@@ -365,8 +363,8 @@ func (a *Agent) checkIsRunning() error {
 }
 
 func (a *Agent) closeLogFile() error {
-	if a.logFile != nil {
-		return a.logFile.Close()
+	if a.logManager.logFile != nil {
+		return a.logManager.logFile.Close()
 	}
 	return nil
 }
@@ -397,17 +395,38 @@ func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
 			a.signal(syscall.SIGTERM, true)
 		}()
 	default:
-		encodeError(w, errNotFound)
+		encodeError(w, &HTTPError{Code: http.StatusNotFound, Message: "Not found"})
 	}
 }
 
-var errNotFound = errors.New("not found")
+type logManager struct {
+	logFilename string
+	logFile     *os.File
+}
+
+func (l *logManager) setupLogFile() (err error) {
+	dir := path.Dir(l.logFilename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	l.logFile, err = utils.OpenOrCreateFile(l.logFilename)
+	return
+}
+
+type HTTPError struct {
+	Code    int
+	Message string
+}
+
+func (e *HTTPError) Error() string {
+	return e.Message
+}
 
 func encodeError(w http.ResponseWriter, err error) {
-	switch err {
-	case errNotFound:
-		http.Error(w, err.Error(), http.StatusNotFound)
-	default:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
+		http.Error(w, httpErr.Error(), httpErr.Code)
+	} else {
+		http.Error(w, httpErr.Error(), http.StatusInternalServerError)
 	}
 }
