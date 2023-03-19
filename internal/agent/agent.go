@@ -54,7 +54,7 @@ type RetryConfig struct {
 }
 
 // Run starts the workflow.
-func (a *Agent) Run() error {
+func (a *Agent) Run(ctx context.Context) error {
 	if err := a.setupRequestId(); err != nil {
 		return err
 	}

@@ -5,9 +5,7 @@ package cmd
 
 import (
 	"os"
-	"os/signal"
 	"path"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -24,8 +22,6 @@ var (
 		Short: "YAML-based DAG scheduling tool.",
 		Long:  `YAML-based DAG scheduling tool.`,
 	}
-
-	sigs chan os.Signal
 )
 
 const legacyPath = ".dagu"
@@ -44,39 +40,33 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
 
-	regisgterCommands(rootCmd)
+	registerCommands(rootCmd)
 }
 
 func initConfig() {
-	// Find home directory.
 	home, err := os.UserHomeDir()
 	cobra.CheckErr(err)
+	setConfigFile(home)
+	cobra.CheckErr(config.LoadConfig(home))
+}
+
+func setConfigFile(home string) {
 	if cfgFile != "" {
-		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Search config in home directory with name ".cobra" (without extension).
-		viper.AddConfigPath(path.Join(home, legacyPath))
+		setDefaultConfigPath(home)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("admin")
 	}
+}
 
-	cobra.CheckErr(config.LoadConfig(home))
+func setDefaultConfigPath(home string) {
+	viper.AddConfigPath(path.Join(home, legacyPath))
 }
 
 func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
 	dagLoader := &dag.Loader{BaseConfig: config.Get().BaseConfig}
 	return dagLoader.Load(dagFile, params)
-}
-
-func listenSignals(abortFunc func(sig os.Signal)) {
-	sigs = make(chan os.Signal, 100)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		for sig := range sigs {
-			abortFunc(sig)
-		}
-	}()
 }
 
 func getFlagString(cmd *cobra.Command, name, fallback string) string {

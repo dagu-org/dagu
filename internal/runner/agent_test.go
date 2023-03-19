@@ -45,7 +45,7 @@ func TestAgent(t *testing.T) {
 		return err == nil && status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*1, time.Millisecond*100)
 
-	agent.Stop()
+	agent.Signal(os.Interrupt)
 }
 
 func TestAgentForStop(t *testing.T) {
@@ -102,5 +102,5 @@ func TestAgentForStop(t *testing.T) {
 	}, time.Second*1, time.Millisecond*100)
 
 	// stop the agent
-	agent.Stop()
+	agent.Signal(os.Interrupt)
 }
