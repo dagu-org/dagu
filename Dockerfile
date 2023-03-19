@@ -37,12 +37,7 @@ RUN <<EOF
     mkdir .dagu
 EOF
 
-RUN <<EOF
-#Creation of a minimal admin config file for the web ui
-cat <<EOF2 > ~/.dagu/admin.yaml
-host: 0.0.0.0
-port: 8080
-EOF2
-EOF
+ENV DAGU_HOST=0.0.0.0
+ENV DAGU_PORT=8080
 
 CMD dagu server

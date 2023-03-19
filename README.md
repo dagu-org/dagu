@@ -853,6 +853,9 @@ services:
   # admin web server process
   server:
     image: "yohamta/dagu:latest"
+    environment:
+      - DAGU_PORT=8080
+      - DAGU_DAGS=/home/dagu/.dagu/dags
     restart: unless-stopped
     ports:
       - "8080:8080"
@@ -865,6 +868,8 @@ services:
   # scheduler process
   scheduler:
     image: "yohamta/dagu:latest"
+    environment:
+      - DAGU_DAGS=/home/dagu/.dagu/dags
     restart: unless-stopped
     volumes:
       - dagu:/home/dagu/.dagu
