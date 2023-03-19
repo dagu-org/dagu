@@ -52,7 +52,8 @@ func (cl *Loader) loadDAGWithOptions(f, params string, headOnly, noEval, noSeten
 
 // LoadData loads config from given data.
 func (cl *Loader) LoadData(data []byte) (*DAG, error) {
-	raw, err := cl.unmarshalData(data)
+	fl := &fileLoader{}
+	raw, err := fl.unmarshalData(data)
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +62,7 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 		return nil, err
 	}
 	b := &DAGBuilder{
-		options: BuildDAGOptions{
-			headOnly: false,
-			noEval:   true,
-			noSetenv: true,
-		},
+		options: BuildDAGOptions{headOnly: false, noEval: true, noSetenv: true},
 	}
 	return b.buildFromDefinition(def, nil)
 }
@@ -182,17 +179,8 @@ func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
 }
 
 func (cl *Loader) readFile(file string) (config map[string]interface{}, err error) {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", file, err)
-	}
-	return cl.unmarshalData(data)
-}
-
-func (cl *Loader) unmarshalData(data []byte) (map[string]interface{}, error) {
-	var cm map[string]interface{}
-	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
-	return cm, err
+	fl := &fileLoader{}
+	return fl.readFile(file)
 }
 
 func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
@@ -204,4 +192,23 @@ func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
 	})
 	err := md.Decode(cm)
 	return c, err
+}
+
+// fileLoader is a helper struct to load and process configuration files.
+type fileLoader struct{}
+
+// readFile reads the contents of the file into a map.
+func (fl *fileLoader) readFile(file string) (config map[string]interface{}, err error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", file, err)
+	}
+	return fl.unmarshalData(data)
+}
+
+// unmarshalData unmarshals the data from a byte slice into a map.
+func (fl *fileLoader) unmarshalData(data []byte) (map[string]interface{}, error) {
+	var cm map[string]interface{}
+	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
+	return cm, err
 }

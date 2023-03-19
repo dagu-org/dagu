@@ -114,6 +114,18 @@ func (d *DAG) setDefaults() {
 	if d.MaxCleanUpTime == 0 {
 		d.MaxCleanUpTime = time.Second * 60
 	}
+	if d.Env == nil {
+		d.Env = []string{}
+	}
+	if d.Steps == nil {
+		d.Steps = []*Step{}
+	}
+	if d.Params == nil {
+		d.Params = []string{}
+	}
+	if d.Preconditions == nil {
+		d.Preconditions = []*Condition{}
+	}
 }
 
 func (d *DAG) setupHandlers() {

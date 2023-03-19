@@ -39,10 +39,11 @@ env:
 	}
 
 	for _, tt := range tests {
-		l := &Loader{}
-		d, err := l.unmarshalData([]byte(tt.input))
+		fl := &fileLoader{}
+		d, err := fl.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
+		l := &Loader{}
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
@@ -85,10 +86,11 @@ env:
 	}
 
 	for _, tt := range tests {
-		l := &Loader{}
-		d, err := l.unmarshalData([]byte(tt.input))
+		fl := &fileLoader{}
+		d, err := fl.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
+		l := &Loader{}
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
@@ -158,14 +160,15 @@ func TestBuildingParameters(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		l := &Loader{}
-		d, err := l.unmarshalData([]byte(fmt.Sprintf(`
+		fl := &fileLoader{}
+		d, err := fl.unmarshalData([]byte(fmt.Sprintf(`
 env:
   - %s
 params: %s
   	`, tt.env, tt.params)))
 		require.NoError(t, err)
 
+		l := &Loader{}
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
@@ -189,10 +192,11 @@ func TestBuildingTags(t *testing.T) {
 	input := `tags: Daily, Monthly`
 	expected := []string{"daily", "monthly"}
 
-	l := &Loader{}
-	m, err := l.unmarshalData([]byte(input))
+	fl := &fileLoader{}
+	m, err := fl.unmarshalData([]byte(input))
 	require.NoError(t, err)
 
+	l := &Loader{}
 	def, err := l.decode(m)
 	require.NoError(t, err)
 
@@ -287,10 +291,11 @@ schedule:
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			l := &Loader{}
-			m, err := l.unmarshalData([]byte(tt.input))
+			fl := &fileLoader{}
+			m, err := fl.unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
+			l := &Loader{}
 			def, err := l.decode(m)
 			require.NoError(t, err)
 
@@ -383,10 +388,11 @@ steps:
 	}
 
 	for _, tt := range tests {
-		l := &Loader{}
-		d, err := l.unmarshalData([]byte(tt.input))
+		fl := &fileLoader{}
+		d, err := fl.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
+		l := &Loader{}
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
