@@ -146,7 +146,7 @@ func buildSchedule(def *configDefinition, d *DAG) error {
 	return err
 }
 
-func buildEnvs(def *configDefinition, base, d *DAG, options BuildDAGOptions) (err error) {
+func buildEnvs(def *configDefinition, d, base *DAG, options BuildDAGOptions) (err error) {
 	var env map[string]string
 	env, err = loadVariables(def.Env, options)
 	if err == nil {
