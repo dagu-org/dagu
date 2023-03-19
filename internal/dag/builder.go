@@ -33,7 +33,6 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 	b.baseConfig = baseConfig
 
 	d = &DAG{}
-	d.Init()
 
 	setDAGProperties(def, d)
 

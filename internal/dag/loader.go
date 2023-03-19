@@ -124,7 +124,6 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 
 	if dst == nil {
 		dst = &DAG{}
-		dst.Init()
 	}
 
 	dst.Name = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))

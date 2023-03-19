@@ -83,7 +83,6 @@ func (dr *DAGStatusReader) ReadStatus(dagLocation string, headerOnly bool) (*DAG
 			return dr.newDAGStatus(d, defaultStatus(d), err), err
 		}
 		d := &dag.DAG{Location: dagLocation}
-		d.Init()
 		return dr.newDAGStatus(d, defaultStatus(d), err), err
 	}
 

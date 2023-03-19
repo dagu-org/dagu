@@ -62,21 +62,6 @@ func ReadFile(file string) (string, error) {
 	return string(b), err
 }
 
-func (d *DAG) Init() {
-	if d.Env == nil {
-		d.Env = []string{}
-	}
-	if d.Steps == nil {
-		d.Steps = []*Step{}
-	}
-	if d.Params == nil {
-		d.Params = []string{}
-	}
-	if d.Preconditions == nil {
-		d.Preconditions = []*Condition{}
-	}
-}
-
 func (d *DAG) HasTag(tag string) bool {
 	for _, t := range d.Tags {
 		if t == tag {
