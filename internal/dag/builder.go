@@ -37,27 +37,25 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 
 	setDAGProperties(def, d)
 
-	if err = buildSchedule(def, d); err != nil {
-		return
-	}
+	errList := &errors.ErrorList{}
 
+	errList.Add(buildSchedule(def, d))
 	if !b.options.skipEnvEval {
-		if err = buildEnvs(def, d, b.baseConfig, b.options); err != nil {
-			return
-		}
+		errList.Add(buildEnvs(def, d, b.baseConfig, b.options))
 	}
+	errList.Add(buildParams(def, d, b.options))
 
-	if err = buildParams(def, d, b.options); err != nil {
-		return
+	if errList.HasErrors() {
+		return nil, errList
 	}
 
 	if b.options.loadMetadataOnly {
 		return
 	}
 
-	err = buildAll(def, d, b.options)
-	if err != nil {
-		return
+	errList.Add(buildAll(def, d, b.options))
+	if errList.HasErrors() {
+		return nil, errList
 	}
 	return d, nil
 }
@@ -128,6 +126,7 @@ func buildSchedule(def *configDefinition, d *DAG) error {
 	default:
 		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
 	}
+
 	var err error
 	d.Schedule, err = parseSchedule(starts)
 	if err != nil {
