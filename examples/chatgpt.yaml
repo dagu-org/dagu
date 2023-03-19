@@ -36,7 +36,13 @@ steps:
       config:
         to: "$MY_EMAIL"
         from: "$MY_EMAIL"
-        subject: "$QUESTION"
-        message: "$MESSAGE_CONTENT"
+        subject: "philosopher's reply"
+        message: |
+          <html>
+            <body>
+              <div>$QUESTION</div>
+              <div>$MESSAGE_CONTENT<div>
+            </body>
+          </html>
     depends:
       - get result
