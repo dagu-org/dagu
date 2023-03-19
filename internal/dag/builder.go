@@ -35,19 +35,19 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 	d = &DAG{}
 	d.Init()
 
-	b.setDAGProperties(def, d)
+	setDAGProperties(def, d)
 
-	if err = b.buildSchedule(def, d); err != nil {
+	if err = buildSchedule(def, d); err != nil {
 		return
 	}
 
 	if !b.options.noEval {
-		if err = b.buildEnvs(def, d); err != nil {
+		if err = buildEnvs(def, d, b.baseConfig, b.options); err != nil {
 			return
 		}
 	}
 
-	if err = b.buildParams(def, d); err != nil {
+	if err = buildParams(def, d, b.options); err != nil {
 		return
 	}
 
@@ -55,31 +55,34 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 		return
 	}
 
-	err = b.buildAll(def, d)
+	err = buildAll(def, d, b.options)
 	if err != nil {
 		return
 	}
 	return d, nil
 }
 
-func (b *DAGBuilder) buildAll(def *configDefinition, d *DAG) error {
-	buildFunctions := []func(def *configDefinition, d *DAG) error{
-		b.buildLogDir,
-		b.buildSteps,
-		b.buildHandlers,
-		b.buildConfig,
-		buldSMTPConfig,
-		buildErrMailConfig,
-		buildInfoMailConfig,
-	}
+func buildAll(def *configDefinition, d *DAG, options BuildDAGOptions) error {
+	errs := []error{}
+	checkErr(buildLogDir(def, d), &errs)
+	checkErr(buildSteps(def, d, options), &errs)
+	checkErr(buildHandlers(def, d, options), &errs)
+	checkErr(buildConfig(def, d), &errs)
+	checkErr(buildSMTPConfig(def, d), &errs)
+	checkErr(buildErrMailConfig(def, d), &errs)
+	checkErr(buildInfoMailConfig(def, d), &errs)
 
-	for _, fn := range buildFunctions {
-		if err := fn(def, d); err != nil {
-			return err
-		}
+	if len(errs) != 0 {
+		return errs[0]
 	}
 
 	return nil
+}
+
+func checkErr(err error, errs *[]error) {
+	if err != nil {
+		*errs = append(*errs, err)
+	}
 }
 
 const (
@@ -88,7 +91,7 @@ const (
 	scheduleRestart = "restart"
 )
 
-func (b *DAGBuilder) setDAGProperties(def *configDefinition, d *DAG) {
+func setDAGProperties(def *configDefinition, d *DAG) {
 	d.Name = def.Name
 	if def.Name != "" {
 		d.Name = def.Name
@@ -106,7 +109,7 @@ func (b *DAGBuilder) setDAGProperties(def *configDefinition, d *DAG) {
 	d.Tags = parseTags(def.Tags)
 }
 
-func (b *DAGBuilder) buildSchedule(def *configDefinition, d *DAG) error {
+func buildSchedule(def *configDefinition, d *DAG) error {
 	starts := []string{}
 	stops := []string{}
 	restarts := []string{}
@@ -143,13 +146,13 @@ func (b *DAGBuilder) buildSchedule(def *configDefinition, d *DAG) error {
 	return err
 }
 
-func (b *DAGBuilder) buildEnvs(def *configDefinition, d *DAG) (err error) {
+func buildEnvs(def *configDefinition, base, d *DAG, options BuildDAGOptions) (err error) {
 	var env map[string]string
-	env, err = b.loadVariables(def.Env, b.options.defaultEnv)
+	env, err = loadVariables(def.Env, options)
 	if err == nil {
 		d.Env = buildConfigEnv(env)
-		if b.baseConfig != nil {
-			for _, e := range b.baseConfig.Env {
+		if base != nil {
+			for _, e := range base.Env {
 				key := strings.SplitN(e, "=", 2)[0]
 				if _, ok := env[key]; !ok {
 					d.Env = append(d.Env, e)
@@ -160,57 +163,57 @@ func (b *DAGBuilder) buildEnvs(def *configDefinition, d *DAG) (err error) {
 	return
 }
 
-func (b *DAGBuilder) buildLogDir(def *configDefinition, d *DAG) (err error) {
+func buildLogDir(def *configDefinition, d *DAG) (err error) {
 	d.LogDir, err = utils.ParseVariable(def.LogDir)
 	return err
 }
 
-func (b *DAGBuilder) buildParams(def *configDefinition, d *DAG) (err error) {
+func buildParams(def *configDefinition, d *DAG, options BuildDAGOptions) (err error) {
 	d.DefaultParams = def.Params
 	p := d.DefaultParams
-	if b.options.parameters != "" {
-		p = b.options.parameters
+	if options.parameters != "" {
+		p = options.parameters
 	}
 	var envs []string
-	d.Params, envs, err = b.parseParameters(p, !b.options.noEval)
+	d.Params, envs, err = parseParameters(p, !options.noEval, options)
 	if err == nil {
 		d.Env = append(d.Env, envs...)
 	}
 	return
 }
 
-func (b *DAGBuilder) buildHandlers(def *configDefinition, d *DAG) (err error) {
+func buildHandlers(def *configDefinition, d *DAG, options BuildDAGOptions) (err error) {
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
-		if d.HandlerOn.Exit, err = b.buildStep(d.Env, def.HandlerOn.Exit); err != nil {
+		if d.HandlerOn.Exit, err = buildStep(d.Env, def.HandlerOn.Exit, options); err != nil {
 			return err
 		}
 	}
 
 	if def.HandlerOn.Success != nil {
 		def.HandlerOn.Success.Name = constants.OnSuccess
-		if d.HandlerOn.Success, err = b.buildStep(d.Env, def.HandlerOn.Success); err != nil {
+		if d.HandlerOn.Success, err = buildStep(d.Env, def.HandlerOn.Success, options); err != nil {
 			return
 		}
 	}
 
 	if def.HandlerOn.Failure != nil {
 		def.HandlerOn.Failure.Name = constants.OnFailure
-		if d.HandlerOn.Failure, err = b.buildStep(d.Env, def.HandlerOn.Failure); err != nil {
+		if d.HandlerOn.Failure, err = buildStep(d.Env, def.HandlerOn.Failure, options); err != nil {
 			return
 		}
 	}
 
 	if def.HandlerOn.Cancel != nil {
 		def.HandlerOn.Cancel.Name = constants.OnCancel
-		if d.HandlerOn.Cancel, err = b.buildStep(d.Env, def.HandlerOn.Cancel); err != nil {
+		if d.HandlerOn.Cancel, err = buildStep(d.Env, def.HandlerOn.Cancel, options); err != nil {
 			return
 		}
 	}
 	return nil
 }
 
-func (b *DAGBuilder) buildConfig(def *configDefinition, d *DAG) (err error) {
+func buildConfig(def *configDefinition, d *DAG) (err error) {
 	if def.HistRetentionDays != nil {
 		d.HistRetentionDays = *def.HistRetentionDays
 	}
@@ -223,7 +226,7 @@ func (b *DAGBuilder) buildConfig(def *configDefinition, d *DAG) (err error) {
 	return nil
 }
 
-func (b *DAGBuilder) parseParameters(value string, eval bool) (
+func parseParameters(value string, eval bool, options BuildDAGOptions) (
 	params []string,
 	envs []string,
 	err error,
@@ -248,7 +251,7 @@ func (b *DAGBuilder) parseParameters(value string, eval bool) (
 		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
 			return
 		}
-		if !b.options.noSetenv {
+		if !options.noSetenv {
 			if p.Name != "" {
 				envs = append(envs, strParam)
 				err = os.Setenv(p.Name, p.Value)
@@ -266,11 +269,11 @@ type envVariable struct {
 	val string
 }
 
-func (b *DAGBuilder) loadVariables(strVariables interface{}, defaults map[string]string) (
+func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 	map[string]string, error,
 ) {
 	var vals []*envVariable = []*envVariable{}
-	for k, v := range defaults {
+	for k, v := range options.defaultEnv {
 		vals = append(vals, &envVariable{k, v})
 	}
 
@@ -313,7 +316,7 @@ func (b *DAGBuilder) loadVariables(strVariables interface{}, defaults map[string
 			return nil, err
 		}
 		vars[v.key] = parsed
-		if !b.options.noSetenv {
+		if !options.noSetenv {
 			err = os.Setenv(v.key, parsed)
 			if err != nil {
 				return nil, err
@@ -323,10 +326,10 @@ func (b *DAGBuilder) loadVariables(strVariables interface{}, defaults map[string
 	return vars, nil
 }
 
-func (b *DAGBuilder) buildSteps(def *configDefinition, d *DAG) error {
+func buildSteps(def *configDefinition, d *DAG, options BuildDAGOptions) error {
 	ret := []*Step{}
 	for _, stepDef := range def.Steps {
-		step, err := b.buildStep(d.Env, stepDef)
+		step, err := buildStep(d.Env, stepDef, options)
 		if err != nil {
 			return err
 		}
@@ -337,7 +340,7 @@ func (b *DAGBuilder) buildSteps(def *configDefinition, d *DAG) error {
 	return nil
 }
 
-func (b *DAGBuilder) buildStep(variables []string, def *stepDef) (*Step, error) {
+func buildStep(variables []string, def *stepDef, options BuildDAGOptions) (*Step, error) {
 	if err := assertStepDef(def); err != nil {
 		return nil, err
 	}
@@ -347,10 +350,10 @@ func (b *DAGBuilder) buildStep(variables []string, def *stepDef) (*Step, error) 
 	step.CmdWithArgs = def.Command
 	step.Command, step.Args = utils.SplitCommand(step.CmdWithArgs, false)
 	step.Script = def.Script
-	step.Stdout = b.expandEnv(def.Stdout)
-	step.Stderr = b.expandEnv(def.Stderr)
+	step.Stdout = expandEnv(def.Stdout, options)
+	step.Stderr = expandEnv(def.Stderr, options)
 	step.Output = def.Output
-	step.Dir = b.expandEnv(def.Dir)
+	step.Dir = expandEnv(def.Dir, options)
 	step.ExecutorConfig.Config = map[string]interface{}{}
 	if def.Executor != nil {
 		switch val := (def.Executor).(type) {
@@ -427,8 +430,8 @@ func (b *DAGBuilder) buildStep(variables []string, def *stepDef) (*Step, error) 
 	return step, nil
 }
 
-func (b *DAGBuilder) expandEnv(val string) string {
-	if b.options.noEval {
+func expandEnv(val string, options BuildDAGOptions) string {
+	if options.noEval {
 		return val
 	}
 	return os.ExpandEnv(val)
@@ -470,7 +473,7 @@ func convertMap(m map[string]interface{}) error {
 	return nil
 }
 
-func buldSMTPConfig(def *configDefinition, d *DAG) (err error) {
+func buildSMTPConfig(def *configDefinition, d *DAG) (err error) {
 	smtp := &SmtpConfig{}
 	smtp.Host = os.ExpandEnv(def.Smtp.Host)
 	smtp.Port = os.ExpandEnv(def.Smtp.Port)
