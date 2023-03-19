@@ -43,7 +43,7 @@ func createStartCommand() *cobra.Command {
 		Long:  `dagu start [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			executeDAGCommand(context.Background(), cmd, args, false)
+			executeDAGCommand(cmd.Context(), cmd, args, false)
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
@@ -57,7 +57,7 @@ func createDryCommand() *cobra.Command {
 		Long:  `dagu dry [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			executeDAGCommand(context.Background(), cmd, args, true)
+			executeDAGCommand(cmd.Context(), cmd, args, true)
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
@@ -90,7 +90,7 @@ func createRestartCommand() *cobra.Command {
 			// Start the DAG with the same parameter.
 			loadedDAG, err = loadDAG(dagFile, params)
 			checkError(err)
-			cobra.CheckErr(start(context.Background(), loadedDAG, false))
+			cobra.CheckErr(start(cmd.Context(), loadedDAG, false))
 		},
 	}
 }
@@ -139,7 +139,7 @@ func createRetryCommand() *cobra.Command {
 
 			a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: loadedDAG},
 				RetryConfig: &agent.RetryConfig{Status: status.Status}}
-			ctx := context.Background()
+			ctx := cmd.Context()
 			go listenSignals(ctx, a)
 			checkError(a.Run(ctx))
 		},
@@ -157,7 +157,7 @@ func createSchedulerCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 			agent := runner.NewAgent(config.Get())
-			go listenSignals(context.Background(), agent)
+			go listenSignals(cmd.Context(), agent)
 			checkError(agent.Start())
 		},
 	}
@@ -174,7 +174,7 @@ func createServerCommand() *cobra.Command {
 		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		Run: func(cmd *cobra.Command, args []string) {
 			server := admin.NewServer(config.Get())
-			go listenSignals(context.Background(), server)
+			go listenSignals(cmd.Context(), server)
 			checkError(server.Serve())
 		},
 	}
