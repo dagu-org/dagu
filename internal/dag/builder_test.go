@@ -46,7 +46,7 @@ env:
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
-		b := &builder{}
+		b := &DAGBuilder{}
 
 		_, err = b.buildFromDefinition(def, nil)
 		require.Error(t, err)
@@ -92,7 +92,7 @@ env:
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
-		b := &builder{}
+		b := &DAGBuilder{}
 		_, err = b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
@@ -169,7 +169,7 @@ params: %s
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
-		b := &builder{}
+		b := &DAGBuilder{}
 		_, err = b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
@@ -180,12 +180,12 @@ params: %s
 }
 
 func TestExpandingEnvs(t *testing.T) {
-	b := &builder{}
+	b := &DAGBuilder{}
 	os.Setenv("FOO", "BAR")
 	require.Equal(t, b.expandEnv("${FOO}"), "BAR")
 
-	b = &builder{
-		BuildDAGOptions: BuildDAGOptions{
+	b = &DAGBuilder{
+		options: BuildDAGOptions{
 			noEval: true,
 		},
 	}
@@ -203,7 +203,7 @@ func TestBuildingTags(t *testing.T) {
 	def, err := l.decode(m)
 	require.NoError(t, err)
 
-	b := &builder{}
+	b := &DAGBuilder{}
 	d, err := b.buildFromDefinition(def, nil)
 	require.NoError(t, err)
 
@@ -301,7 +301,7 @@ schedule:
 			def, err := l.decode(m)
 			require.NoError(t, err)
 
-			b := &builder{}
+			b := &DAGBuilder{}
 			d, err := b.buildFromDefinition(def, nil)
 
 			if tt.isErr {
@@ -397,7 +397,7 @@ steps:
 		def, err := l.decode(d)
 		require.NoError(t, err)
 
-		b := &builder{}
+		b := &DAGBuilder{}
 		dag, err := b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 

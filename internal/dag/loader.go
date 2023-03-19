@@ -67,8 +67,8 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &builder{
-		BuildDAGOptions: BuildDAGOptions{
+	b := &DAGBuilder{
+		options: BuildDAGOptions{
 			headOnly: false,
 			noEval:   true,
 			noSetenv: true,
@@ -95,8 +95,8 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 	buildOpts := *opts
 	buildOpts.headOnly = false
 	buildOpts.defaultEnv = utils.DefaultEnv()
-	b := &builder{
-		BuildDAGOptions: buildOpts,
+	b := &DAGBuilder{
+		options: buildOpts,
 	}
 	return b.buildFromDefinition(def, nil)
 }
@@ -139,7 +139,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	b := builder{BuildDAGOptions: *opts}
+	b := DAGBuilder{options: *opts}
 	c, err := b.buildFromDefinition(def, dst)
 
 	if err != nil {

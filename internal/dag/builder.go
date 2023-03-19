@@ -22,15 +22,14 @@ type BuildDAGOptions struct {
 	noSetenv   bool
 	defaultEnv map[string]string
 }
-
-type builder struct {
-	BuildDAGOptions
+type DAGBuilder struct {
+	options    BuildDAGOptions
 	baseConfig *DAG
 }
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
+func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
 	b.baseConfig = baseConfig
 
 	d = &DAG{}
@@ -42,7 +41,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		return
 	}
 
-	if !b.noEval {
+	if !b.options.noEval {
 		if err = b.buildEnvs(def, d); err != nil {
 			return
 		}
@@ -52,7 +51,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 		return
 	}
 
-	if b.headOnly {
+	if b.options.headOnly {
 		return
 	}
 
@@ -63,7 +62,7 @@ func (b *builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d
 	return d, nil
 }
 
-func (b *builder) buildAll(def *configDefinition, d *DAG) error {
+func (b *DAGBuilder) buildAll(def *configDefinition, d *DAG) error {
 	buildFunctions := []func(def *configDefinition, d *DAG) error{
 		b.buildLogDir,
 		b.buildSteps,
@@ -89,7 +88,7 @@ const (
 	scheduleRestart = "restart"
 )
 
-func (b *builder) setDAGProperties(def *configDefinition, d *DAG) {
+func (b *DAGBuilder) setDAGProperties(def *configDefinition, d *DAG) {
 	d.Name = def.Name
 	if def.Name != "" {
 		d.Name = def.Name
@@ -107,7 +106,7 @@ func (b *builder) setDAGProperties(def *configDefinition, d *DAG) {
 	d.Tags = parseTags(def.Tags)
 }
 
-func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
+func (b *DAGBuilder) buildSchedule(def *configDefinition, d *DAG) error {
 	starts := []string{}
 	stops := []string{}
 	restarts := []string{}
@@ -144,9 +143,9 @@ func (b *builder) buildSchedule(def *configDefinition, d *DAG) error {
 	return err
 }
 
-func (b *builder) buildEnvs(def *configDefinition, d *DAG) (err error) {
+func (b *DAGBuilder) buildEnvs(def *configDefinition, d *DAG) (err error) {
 	var env map[string]string
-	env, err = b.loadVariables(def.Env, b.defaultEnv)
+	env, err = b.loadVariables(def.Env, b.options.defaultEnv)
 	if err == nil {
 		d.Env = buildConfigEnv(env)
 		if b.baseConfig != nil {
@@ -161,26 +160,26 @@ func (b *builder) buildEnvs(def *configDefinition, d *DAG) (err error) {
 	return
 }
 
-func (b *builder) buildLogDir(def *configDefinition, d *DAG) (err error) {
+func (b *DAGBuilder) buildLogDir(def *configDefinition, d *DAG) (err error) {
 	d.LogDir, err = utils.ParseVariable(def.LogDir)
 	return err
 }
 
-func (b *builder) buildParams(def *configDefinition, d *DAG) (err error) {
+func (b *DAGBuilder) buildParams(def *configDefinition, d *DAG) (err error) {
 	d.DefaultParams = def.Params
 	p := d.DefaultParams
-	if b.parameters != "" {
-		p = b.parameters
+	if b.options.parameters != "" {
+		p = b.options.parameters
 	}
 	var envs []string
-	d.Params, envs, err = b.parseParameters(p, !b.noEval)
+	d.Params, envs, err = b.parseParameters(p, !b.options.noEval)
 	if err == nil {
 		d.Env = append(d.Env, envs...)
 	}
 	return
 }
 
-func (b *builder) buildHandlers(def *configDefinition, d *DAG) (err error) {
+func (b *DAGBuilder) buildHandlers(def *configDefinition, d *DAG) (err error) {
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
 		if d.HandlerOn.Exit, err = b.buildStep(d.Env, def.HandlerOn.Exit); err != nil {
@@ -211,7 +210,7 @@ func (b *builder) buildHandlers(def *configDefinition, d *DAG) (err error) {
 	return nil
 }
 
-func (b *builder) buildConfig(def *configDefinition, d *DAG) (err error) {
+func (b *DAGBuilder) buildConfig(def *configDefinition, d *DAG) (err error) {
 	if def.HistRetentionDays != nil {
 		d.HistRetentionDays = *def.HistRetentionDays
 	}
@@ -224,7 +223,7 @@ func (b *builder) buildConfig(def *configDefinition, d *DAG) (err error) {
 	return nil
 }
 
-func (b *builder) parseParameters(value string, eval bool) (
+func (b *DAGBuilder) parseParameters(value string, eval bool) (
 	params []string,
 	envs []string,
 	err error,
@@ -249,7 +248,7 @@ func (b *builder) parseParameters(value string, eval bool) (
 		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
 			return
 		}
-		if !b.noSetenv {
+		if !b.options.noSetenv {
 			if p.Name != "" {
 				envs = append(envs, strParam)
 				err = os.Setenv(p.Name, p.Value)
@@ -267,7 +266,7 @@ type envVariable struct {
 	val string
 }
 
-func (b *builder) loadVariables(strVariables interface{}, defaults map[string]string) (
+func (b *DAGBuilder) loadVariables(strVariables interface{}, defaults map[string]string) (
 	map[string]string, error,
 ) {
 	var vals []*envVariable = []*envVariable{}
@@ -314,7 +313,7 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 			return nil, err
 		}
 		vars[v.key] = parsed
-		if !b.noSetenv {
+		if !b.options.noSetenv {
 			err = os.Setenv(v.key, parsed)
 			if err != nil {
 				return nil, err
@@ -324,7 +323,7 @@ func (b *builder) loadVariables(strVariables interface{}, defaults map[string]st
 	return vars, nil
 }
 
-func (b *builder) buildSteps(def *configDefinition, d *DAG) error {
+func (b *DAGBuilder) buildSteps(def *configDefinition, d *DAG) error {
 	ret := []*Step{}
 	for _, stepDef := range def.Steps {
 		step, err := b.buildStep(d.Env, stepDef)
@@ -338,7 +337,7 @@ func (b *builder) buildSteps(def *configDefinition, d *DAG) error {
 	return nil
 }
 
-func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
+func (b *DAGBuilder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	if err := assertStepDef(def); err != nil {
 		return nil, err
 	}
@@ -428,8 +427,8 @@ func (b *builder) buildStep(variables []string, def *stepDef) (*Step, error) {
 	return step, nil
 }
 
-func (b *builder) expandEnv(val string) string {
-	if b.noEval {
+func (b *DAGBuilder) expandEnv(val string) string {
+	if b.options.noEval {
 		return val
 	}
 	return os.ExpandEnv(val)
