@@ -62,23 +62,23 @@ func ReadFile(file string) (string, error) {
 	return string(b), err
 }
 
-func (c *DAG) Init() {
-	if c.Env == nil {
-		c.Env = []string{}
+func (d *DAG) Init() {
+	if d.Env == nil {
+		d.Env = []string{}
 	}
-	if c.Steps == nil {
-		c.Steps = []*Step{}
+	if d.Steps == nil {
+		d.Steps = []*Step{}
 	}
-	if c.Params == nil {
-		c.Params = []string{}
+	if d.Params == nil {
+		d.Params = []string{}
 	}
-	if c.Preconditions == nil {
-		c.Preconditions = []*Condition{}
+	if d.Preconditions == nil {
+		d.Preconditions = []*Condition{}
 	}
 }
 
-func (c *DAG) HasTag(tag string) bool {
-	for _, t := range c.Tags {
+func (d *DAG) HasTag(tag string) bool {
+	for _, t := range d.Tags {
 		if t == tag {
 			return true
 		}
@@ -86,8 +86,8 @@ func (c *DAG) HasTag(tag string) bool {
 	return false
 }
 
-func (c *DAG) SockAddr() string {
-	s := strings.ReplaceAll(c.Location, " ", "_")
+func (d *DAG) SockAddr() string {
+	s := strings.ReplaceAll(d.Location, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
 	h := md5.New()
 	h.Write([]byte(s))
@@ -95,54 +95,59 @@ func (c *DAG) SockAddr() string {
 	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
 }
 
-func (c *DAG) Clone() *DAG {
-	ret := *c
+func (d *DAG) Clone() *DAG {
+	ret := *d
 	return &ret
 }
 
-func (c *DAG) String() string {
+func (d *DAG) String() string {
 	ret := "{\n"
-	ret = fmt.Sprintf("%s\tName: %s\n", ret, c.Name)
-	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(c.Description))
-	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(c.Env, ", "))
-	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, c.LogDir)
-	for i, s := range c.Steps {
+	ret = fmt.Sprintf("%s\tName: %s\n", ret, d.Name)
+	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(d.Description))
+	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(d.Env, ", "))
+	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, d.LogDir)
+	for i, s := range d.Steps {
 		ret = fmt.Sprintf("%s\tStep%d: %v\n", ret, i, s)
 	}
 	ret = fmt.Sprintf("%s}\n", ret)
 	return ret
 }
 
-func (c *DAG) setup() {
-	if c.LogDir == "" {
-		c.LogDir = config.Get().LogDir
+func (d *DAG) setup() {
+	d.setDefaults()
+	d.setupSteps()
+	d.setupHandlers()
+}
+
+func (d *DAG) setDefaults() {
+	if d.LogDir == "" {
+		d.LogDir = config.Get().LogDir
 	}
-	if c.HistRetentionDays == 0 {
-		c.HistRetentionDays = 30
+	if d.HistRetentionDays == 0 {
+		d.HistRetentionDays = 30
 	}
-	if c.MaxCleanUpTime == 0 {
-		c.MaxCleanUpTime = time.Second * 60
-	}
-	dir := path.Dir(c.Location)
-	for _, step := range c.Steps {
-		c.setupStep(step, dir)
-	}
-	if c.HandlerOn.Exit != nil {
-		c.setupStep(c.HandlerOn.Exit, dir)
-	}
-	if c.HandlerOn.Success != nil {
-		c.setupStep(c.HandlerOn.Success, dir)
-	}
-	if c.HandlerOn.Failure != nil {
-		c.setupStep(c.HandlerOn.Failure, dir)
-	}
-	if c.HandlerOn.Cancel != nil {
-		c.setupStep(c.HandlerOn.Cancel, dir)
+	if d.MaxCleanUpTime == 0 {
+		d.MaxCleanUpTime = time.Second * 60
 	}
 }
 
-func (c *DAG) setupStep(step *Step, defaultDir string) {
-	if step.Dir == "" {
-		step.Dir = path.Dir(c.Location)
+func (d *DAG) setupHandlers() {
+	dir := path.Dir(d.Location)
+	for _, handlerStep := range []*Step{
+		d.HandlerOn.Exit,
+		d.HandlerOn.Success,
+		d.HandlerOn.Failure,
+		d.HandlerOn.Cancel,
+	} {
+		if handlerStep != nil {
+			handlerStep.setup(dir)
+		}
+	}
+}
+
+func (d *DAG) setupSteps() {
+	dir := path.Dir(d.Location)
+	for _, step := range d.Steps {
+		step.setup(dir)
 	}
 }

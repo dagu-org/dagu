@@ -2,6 +2,7 @@ package dag
 
 import (
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -60,4 +61,10 @@ func (s *Step) String() string {
 	vals = append(vals, fmt.Sprintf("Args: %s", s.Args))
 	vals = append(vals, fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")))
 	return strings.Join(vals, "\t")
+}
+
+func (s *Step) setup(defaultLocation string) {
+	if s.Dir == "" {
+		s.Dir = path.Dir(defaultLocation)
+	}
 }
