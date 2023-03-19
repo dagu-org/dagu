@@ -43,8 +43,8 @@ env:
 		d, err := fl.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
-		l := &Loader{}
-		def, err := l.decode(d)
+		cdl := &configDefinitionLoader{}
+		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
 		b := &DAGBuilder{}
@@ -90,8 +90,8 @@ env:
 		d, err := fl.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
-		l := &Loader{}
-		def, err := l.decode(d)
+		cdl := &configDefinitionLoader{}
+		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
 		b := &DAGBuilder{}
@@ -168,8 +168,8 @@ params: %s
   	`, tt.env, tt.params)))
 		require.NoError(t, err)
 
-		l := &Loader{}
-		def, err := l.decode(d)
+		cdl := &configDefinitionLoader{}
+		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
 		b := &DAGBuilder{}
@@ -196,8 +196,8 @@ func TestBuildingTags(t *testing.T) {
 	m, err := fl.unmarshalData([]byte(input))
 	require.NoError(t, err)
 
-	l := &Loader{}
-	def, err := l.decode(m)
+	cdl := &configDefinitionLoader{}
+	def, err := cdl.decode(m)
 	require.NoError(t, err)
 
 	b := &DAGBuilder{}
@@ -295,8 +295,8 @@ schedule:
 			m, err := fl.unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			l := &Loader{}
-			def, err := l.decode(m)
+			cdl := &configDefinitionLoader{}
+			def, err := cdl.decode(m)
 			require.NoError(t, err)
 
 			b := &DAGBuilder{}
@@ -392,8 +392,8 @@ steps:
 		d, err := fl.unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
-		l := &Loader{}
-		def, err := l.decode(d)
+		cdl := &configDefinitionLoader{}
+		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
 		b := &DAGBuilder{}

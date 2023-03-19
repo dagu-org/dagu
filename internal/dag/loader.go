@@ -57,7 +57,8 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	def, err := cl.decode(raw)
+	cdl := &configDefinitionLoader{}
+	def, err := cdl.decode(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +78,8 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 		return nil, err
 	}
 
-	def, err := cl.decode(raw)
+	cdl := &configDefinitionLoader{}
+	def, err := cdl.decode(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +109,9 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	def, err := cl.decode(raw)
+	cdl := &configDefinitionLoader{}
+
+	def, err := cdl.decode(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +123,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	err = cl.merge(dst, c)
+	err = cdl.merge(dst, c)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +151,13 @@ func (cl *Loader) prepareFilepath(f string) (string, error) {
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
 func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (*DAG, error) {
 	if !opts.headOnly && cl.BaseConfig != "" {
-		return cl.loadBaseConfig(cl.BaseConfig, opts)
+		dag, err := cl.loadBaseConfig(cl.BaseConfig, opts)
+		if err != nil {
+			return nil, err
+		}
+		if dag != nil {
+			return dag, nil
+		}
 	}
 	return &DAG{Name: strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))}, nil
 }
@@ -168,12 +178,6 @@ func (mt *mergeTranformer) Transformer(typ reflect.Type) func(dst, src reflect.V
 	return nil
 }
 
-func (cl *Loader) merge(dst, src *DAG) error {
-	err := mergo.Merge(dst, src, mergo.WithOverride,
-		mergo.WithTransformers(&mergeTranformer{}))
-	return err
-}
-
 func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
 	return cl.readFile(file)
 }
@@ -181,17 +185,6 @@ func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
 func (cl *Loader) readFile(file string) (config map[string]interface{}, err error) {
 	fl := &fileLoader{}
 	return fl.readFile(file)
-}
-
-func (cl *Loader) decode(cm map[string]interface{}) (*configDefinition, error) {
-	c := &configDefinition{}
-	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: true,
-		Result:      c,
-		TagName:     "",
-	})
-	err := md.Decode(cm)
-	return c, err
 }
 
 // fileLoader is a helper struct to load and process configuration files.
@@ -211,4 +204,26 @@ func (fl *fileLoader) unmarshalData(data []byte) (map[string]interface{}, error)
 	var cm map[string]interface{}
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
 	return cm, err
+}
+
+// configDefinitionLoader is a helper struct to decode and merge configuration definitions.
+type configDefinitionLoader struct{}
+
+// decode decodes the configuration map into a configDefinition.
+func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDefinition, error) {
+	c := &configDefinition{}
+	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		ErrorUnused: true,
+		Result:      c,
+		TagName:     "",
+	})
+	err := md.Decode(cm)
+	return c, err
+}
+
+// merge merges the source DAG into the destination DAG.
+func (cdl *configDefinitionLoader) merge(dst, src *DAG) error {
+	err := mergo.Merge(dst, src, mergo.WithOverride,
+		mergo.WithTransformers(&mergeTranformer{}))
+	return err
 }
