@@ -36,7 +36,7 @@ func TestAgent(t *testing.T) {
 
 	pathToDAG := path.Join(testdataDir, "scheduled_job.yaml")
 	loader := &dag.Loader{}
-	dag, err := loader.LoadHeadOnly(pathToDAG)
+	dag, err := loader.LoadMetadataOnly(pathToDAG)
 	require.NoError(t, err)
 	c := controller.NewDAGController(dag)
 
@@ -45,7 +45,7 @@ func TestAgent(t *testing.T) {
 		return err == nil && status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*1, time.Millisecond*100)
 
-	agent.Stop()
+	agent.Signal(os.Interrupt)
 }
 
 func TestAgentForStop(t *testing.T) {
@@ -102,5 +102,5 @@ func TestAgentForStop(t *testing.T) {
 	}, time.Second*1, time.Millisecond*100)
 
 	// stop the agent
-	agent.Stop()
+	agent.Signal(os.Interrupt)
 }

@@ -37,7 +37,7 @@ func (a *Agent) Start() error {
 	return a.start()
 }
 
-func (a *Agent) Stop() {
+func (a *Agent) Signal(_ os.Signal) {
 	a.stop <- struct{}{}
 }
 
@@ -68,7 +68,7 @@ func (a *Agent) registerRunnerShutdown(runner *Runner) {
 	go func() {
 		s := <-c
 		log.Printf("got signal: %v", s)
-		a.Stop()
+		a.Signal(os.Interrupt)
 
 		log.Printf("terminated")
 		os.Exit(1)

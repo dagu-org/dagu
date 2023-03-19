@@ -43,9 +43,7 @@ func DefaultConfig() *Config {
 
 // New creates a new Database with default configuration.
 func New() *Database {
-	return &Database{
-		Config: DefaultConfig(),
-	}
+	return &Database{Config: DefaultConfig()}
 }
 
 // ParseFile parses a status file.

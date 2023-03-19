@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"os"
@@ -41,7 +42,7 @@ func TestRunDAG(t *testing.T) {
 	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
 
 	go func() {
-		err := a.Run()
+		err := a.Run(context.Background())
 		require.NoError(t, err)
 	}()
 
@@ -56,19 +57,18 @@ func TestRunDAG(t *testing.T) {
 	// check deletion of expired history files
 	d.HistRetentionDays = 0
 	a = &Agent{AgentConfig: &AgentConfig{DAG: d}}
-	err := a.Run()
+	err := a.Run(context.Background())
 	require.NoError(t, err)
 	statusList := controller.NewDAGController(d).GetRecentStatuses(100)
 	require.Equal(t, 1, len(statusList))
 }
 
 func TestCheckRunning(t *testing.T) {
-	d := testLoadDAG(t, "is_running.yaml")
+	loadedDAG := testLoadDAG(t, "is_running.yaml")
 
-	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
-
+	a := &Agent{AgentConfig: &AgentConfig{DAG: loadedDAG}}
 	go func() {
-		_ = a.Run()
+		_ = a.Run(context.Background())
 	}()
 
 	time.Sleep(time.Millisecond * 30)
@@ -77,17 +77,14 @@ func TestCheckRunning(t *testing.T) {
 	require.NotNil(t, status)
 	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
 
-	_, err := testDAG(t, d)
+	_, err := testDAG(t, loadedDAG)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "is already running")
 }
 
 func TestDryRun(t *testing.T) {
-	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: testLoadDAG(t, "dry.yaml"),
-		Dry: true,
-	}}
-	err := a.Run()
+	a := &Agent{AgentConfig: &AgentConfig{testLoadDAG(t, "dry.yaml"), true}}
+	err := a.Run(context.Background())
 	require.NoError(t, err)
 
 	status := a.Status()
@@ -166,9 +163,9 @@ func TestOnExit(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	d := testLoadDAG(t, "retry.yaml")
+	loadedDAG := testLoadDAG(t, "retry.yaml")
 
-	status, err := testDAG(t, d)
+	status, err := testDAG(t, loadedDAG)
 	require.Error(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 
@@ -176,14 +173,10 @@ func TestRetry(t *testing.T) {
 		n.CmdWithArgs = "true"
 	}
 	a := &Agent{
-		AgentConfig: &AgentConfig{
-			DAG: d,
-		},
-		RetryConfig: &RetryConfig{
-			Status: status,
-		},
+		AgentConfig: &AgentConfig{DAG: loadedDAG},
+		RetryConfig: &RetryConfig{Status: status},
 	}
-	err = a.Run()
+	err = a.Run(context.Background())
 	status = a.Status()
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
@@ -197,14 +190,12 @@ func TestRetry(t *testing.T) {
 }
 
 func TestHandleHTTP(t *testing.T) {
-	d := testLoadDAG(t, "handle_http.yaml")
+	loadedDAG := testLoadDAG(t, "handle_http.yaml")
 
-	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: d,
-	}}
+	a := &Agent{AgentConfig: &AgentConfig{DAG: loadedDAG}}
 
 	go func() {
-		err := a.Run()
+		err := a.Run(context.Background())
 		require.NoError(t, err)
 	}()
 
@@ -213,14 +204,14 @@ func TestHandleHTTP(t *testing.T) {
 	var mockResponseWriter = mockResponseWriter{}
 
 	// status
-	r := &http.Request{
+	req := &http.Request{
 		Method: "GET",
 		URL: &url.URL{
 			Path: "/status",
 		},
 	}
 
-	a.handleHTTP(&mockResponseWriter, r)
+	a.handleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 	status, err := models.StatusFromJson(mockResponseWriter.body)
@@ -228,23 +219,23 @@ func TestHandleHTTP(t *testing.T) {
 	require.Equal(t, scheduler.SchedulerStatus_Running, status.Status)
 
 	// invalid path
-	r = &http.Request{
+	req = &http.Request{
 		Method: "GET",
 		URL: &url.URL{
 			Path: "/invalid-path",
 		},
 	}
-	a.handleHTTP(&mockResponseWriter, r)
+	a.handleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
 
 	// cancel
-	r = &http.Request{
+	req = &http.Request{
 		Method: "POST",
 		URL: &url.URL{
 			Path: "/stop",
 		},
 	}
-	a.handleHTTP(&mockResponseWriter, r)
+	a.handleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 	require.Equal(t, "OK", mockResponseWriter.body)
 
@@ -280,10 +271,8 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 
 func testDAG(t *testing.T, d *dag.DAG) (*models.Status, error) {
 	t.Helper()
-	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: d,
-	}}
-	err := a.Run()
+	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
+	err := a.Run(context.Background())
 	return a.Status(), err
 }
 
@@ -298,14 +287,12 @@ func testLoadDAG(t *testing.T, name string) *dag.DAG {
 func testDAGAsync(t *testing.T, file string) (*Agent, *dag.DAG) {
 	t.Helper()
 
-	d := testLoadDAG(t, file)
-	a := &Agent{AgentConfig: &AgentConfig{
-		DAG: d,
-	}}
+	loadedDAG := testLoadDAG(t, file)
+	a := &Agent{AgentConfig: &AgentConfig{DAG: loadedDAG}}
 
 	go func() {
-		_ = a.Run()
+		_ = a.Run(context.Background())
 	}()
 
-	return a, d
+	return a, loadedDAG
 }

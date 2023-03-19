@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
-	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -22,62 +24,47 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 )
 
-func regisgterCommands(root *cobra.Command) {
-	rootCmd.AddCommand(startCommand())
-	rootCmd.AddCommand(stopCommand())
-	rootCmd.AddCommand(restartCommand())
-	rootCmd.AddCommand(dryCommand())
-	rootCmd.AddCommand(statusCommand())
-	rootCmd.AddCommand(versionCommand())
-	rootCmd.AddCommand(serverCommand())
-	rootCmd.AddCommand(schedulerCommand())
-	rootCmd.AddCommand(retryCommand())
+func registerCommands(root *cobra.Command) {
+	rootCmd.AddCommand(createStartCommand())
+	rootCmd.AddCommand(createStopCommand())
+	rootCmd.AddCommand(createRestartCommand())
+	rootCmd.AddCommand(createDryCommand())
+	rootCmd.AddCommand(createStatusCommand())
+	rootCmd.AddCommand(createVersionCommand())
+	rootCmd.AddCommand(createServerCommand())
+	rootCmd.AddCommand(createSchedulerCommand())
+	rootCmd.AddCommand(createRetryCommand())
 }
 
-func startCommand() *cobra.Command {
+func createStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [flags] <DAG file>",
 		Short: "Runs the DAG",
 		Long:  `dagu start [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			params, err := cmd.Flags().GetString("params")
-			cobra.CheckErr(err)
-			d, err := loadDAG(args[0], removeQuotes(params))
-			cobra.CheckErr(err)
-			cobra.CheckErr(start(d, false))
+			executeDAGCommand(cmd.Context(), cmd, args, false)
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	return cmd
 }
 
-func removeQuotes(s string) string {
-	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
-		return s[1 : len(s)-1]
-	}
-	return s
-}
-
-func dryCommand() *cobra.Command {
+func createDryCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dry [flags] <DAG file>",
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			params, err := cmd.Flags().GetString("params")
-			cobra.CheckErr(err)
-			d, err := loadDAG(args[0], strings.Trim(params, `"`))
-			cobra.CheckErr(err)
-			cobra.CheckErr(start(d, true))
+			executeDAGCommand(cmd.Context(), cmd, args, true)
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	return cmd
 }
 
-func restartCommand() *cobra.Command {
+func createRestartCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart <DAG file>",
 		Short: "Restart the DAG",
@@ -85,41 +72,55 @@ func restartCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			dagFile := args[0]
-			d, err := loadDAG(dagFile, "")
-			cobra.CheckErr(err)
+			loadedDAG, err := loadDAG(dagFile, "")
+			checkError(err)
 
-			ctrl := controller.NewDAGController(d)
+			ctrl := controller.NewDAGController(loadedDAG)
 
-			// Check the current status.
-			st, err := ctrl.GetStatus()
-			cobra.CheckErr(err)
-
-			// Stop the DAG if it is running.
-			if st.Status == scheduler.SchedulerStatus_Running {
-				log.Printf("Stopping %s for restart...", d.Name)
-				cobra.CheckErr(stopRunningDAG(ctrl))
-			}
+			// Check the current status and stop the DAG if it is running.
+			stopDAGIfRunning(ctrl)
 
 			// Wait for the specified amount of time before restarting.
-			if d.RestartWait > 0 {
-				log.Printf("Waiting for %s...", d.RestartWait)
-				time.Sleep(d.RestartWait)
-			}
+			waitForRestart(loadedDAG.RestartWait)
 
 			// Retrieve the parameter of the previous execution.
-			log.Printf("Restarting %s...", d.Name)
-			st, err = ctrl.GetLastStatus()
-			cobra.CheckErr(err)
+			log.Printf("Restarting %s...", loadedDAG.Name)
+			params := getPreviousExecutionParams(ctrl)
 
-			// Start the DAG with the same parmaeter.
-			d, err = loadDAG(dagFile, st.Params)
-			cobra.CheckErr(err)
-			cobra.CheckErr(start(d, false))
+			// Start the DAG with the same parameter.
+			loadedDAG, err = loadDAG(dagFile, params)
+			checkError(err)
+			cobra.CheckErr(start(cmd.Context(), loadedDAG, false))
 		},
 	}
 }
 
-func retryCommand() *cobra.Command {
+func stopDAGIfRunning(ctrl *controller.DAGController) {
+	st, err := ctrl.GetStatus()
+	checkError(err)
+
+	// Stop the DAG if it is running.
+	if st.Status == scheduler.SchedulerStatus_Running {
+		log.Printf("Stopping %s for restart...", ctrl.DAG.Name)
+		cobra.CheckErr(stopRunningDAG(ctrl))
+	}
+}
+
+func waitForRestart(restartWait time.Duration) {
+	if restartWait > 0 {
+		log.Printf("Waiting for %s...", restartWait)
+		time.Sleep(restartWait)
+	}
+}
+
+func getPreviousExecutionParams(ctrl *controller.DAGController) string {
+	st, err := ctrl.GetLastStatus()
+	checkError(err)
+
+	return st.Params
+}
+
+func createRetryCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retry --req=<request-id> <DAG file>",
 		Short: "Retry the DAG execution",
@@ -128,15 +129,19 @@ func retryCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			f, _ := filepath.Abs(args[0])
 			reqID, err := cmd.Flags().GetString("req")
-			cobra.CheckErr(err)
+			checkError(err)
+
 			status, err := database.New().FindByRequestId(f, reqID)
-			cobra.CheckErr(err)
-			d, err := loadDAG(args[0], status.Status.Params)
-			cobra.CheckErr(err)
-			a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: d},
+			checkError(err)
+
+			loadedDAG, err := loadDAG(args[0], status.Status.Params)
+			checkError(err)
+
+			a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: loadedDAG},
 				RetryConfig: &agent.RetryConfig{Status: status.Status}}
-			listenSignals(func(sig os.Signal) { a.Signal(sig) })
-			cobra.CheckErr(a.Run())
+			ctx := cmd.Context()
+			go listenSignals(ctx, a)
+			checkError(a.Run(ctx))
 		},
 	}
 	cmd.Flags().StringP("req", "r", "", "request-id")
@@ -144,7 +149,7 @@ func retryCommand() *cobra.Command {
 	return cmd
 }
 
-func schedulerCommand() *cobra.Command {
+func createSchedulerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
 		Short: "Start the scheduler",
@@ -152,8 +157,8 @@ func schedulerCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 			agent := runner.NewAgent(config.Get())
-			listenSignals(func(sig os.Signal) { agent.Stop() })
-			cobra.CheckErr(agent.Start())
+			go listenSignals(cmd.Context(), agent)
+			checkError(agent.Start())
 		},
 	}
 	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
@@ -162,17 +167,22 @@ func schedulerCommand() *cobra.Command {
 	return cmd
 }
 
-func serverCommand() *cobra.Command {
+func createServerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Start the server",
 		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		Run: func(cmd *cobra.Command, args []string) {
 			server := admin.NewServer(config.Get())
-			listenSignals(func(sig os.Signal) { server.Shutdown() })
-			cobra.CheckErr(server.Serve())
+			go listenSignals(cmd.Context(), server)
+			checkError(server.Serve())
 		},
 	}
+	bindServerCommandFlags(cmd)
+	return cmd
+}
+
+func bindServerCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
 	cmd.Flags().StringP("host", "s", "", "server port (default is 8080)")
 	cmd.Flags().StringP("port", "p", "", "server host (default is localhost)")
@@ -180,21 +190,20 @@ func serverCommand() *cobra.Command {
 	viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 	viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 	viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
-	return cmd
 }
 
-func statusCommand() *cobra.Command {
+func createStatusCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status <DAG file>",
 		Short: "Display current status of the DAG",
 		Long:  `dagu status <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			d, err := loadDAG(args[0], "")
-			cobra.CheckErr(err)
+			loadedDAG, err := loadDAG(args[0], "")
+			checkError(err)
 
-			status, err := controller.NewDAGController(d).GetStatus()
-			cobra.CheckErr(err)
+			status, err := controller.NewDAGController(loadedDAG).GetStatus()
+			checkError(err)
 
 			res := &models.StatusResponse{Status: status}
 			log.Printf("Pid=%d Status=%s", res.Status.Pid, res.Status.Status)
@@ -202,23 +211,23 @@ func statusCommand() *cobra.Command {
 	}
 }
 
-func stopCommand() *cobra.Command {
+func createStopCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop <DAG file>",
 		Short: "Stop the running DAG",
 		Long:  `dagu stop <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			d, err := loadDAG(args[0], "")
-			cobra.CheckErr(err)
+			loadedDAG, err := loadDAG(args[0], "")
+			checkError(err)
 
 			log.Printf("Stopping...")
-			cobra.CheckErr(controller.NewDAGController(d).Stop())
+			checkError(controller.NewDAGController(loadedDAG).Stop())
 		},
 	}
 }
 
-func versionCommand() *cobra.Command {
+func createVersionCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Display the binary version",
@@ -232,22 +241,66 @@ func versionCommand() *cobra.Command {
 func stopRunningDAG(ctrl *controller.DAGController) error {
 	for {
 		st, err := ctrl.GetStatus()
-		cobra.CheckErr(err)
+		checkError(err)
 
 		if st.Status != scheduler.SchedulerStatus_Running {
 			return nil
 		}
-		cobra.CheckErr(ctrl.Stop())
+		checkError(ctrl.Stop())
 		time.Sleep(time.Millisecond * 100)
 	}
 }
 
-func start(d *dag.DAG, dry bool) error {
+func executeDAGCommand(ctx context.Context, cmd *cobra.Command, args []string, dry bool) {
+	params, err := cmd.Flags().GetString("params")
+	checkError(err)
+
+	loadedDAG, err := loadDAG(args[0], removeQuotes(params))
+	checkError(err)
+
+	err = start(ctx, loadedDAG, dry)
+	if err != nil {
+		log.Fatalf("Failed to start DAG: %v", err)
+	}
+}
+
+func start(ctx context.Context, d *dag.DAG, dry bool) error {
 	a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: d, Dry: dry}}
+	go listenSignals(ctx, a)
+	return a.Run(ctx)
+}
 
-	listenSignals(func(sig os.Signal) {
+type signalListener interface {
+	Signal(os.Signal)
+}
+
+var (
+	signalChan chan os.Signal
+)
+
+func listenSignals(ctx context.Context, a signalListener) error {
+	signalChan = make(chan os.Signal, 100)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case <-ctx.Done():
+		a.Signal(os.Interrupt)
+		return ctx.Err()
+	case sig := <-signalChan:
 		a.Signal(sig)
-	})
+		return fmt.Errorf("received signal: %v", sig)
+	}
+}
 
-	return a.Run()
+func checkError(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func removeQuotes(s string) string {
+	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }

@@ -17,14 +17,14 @@ function DAGs() {
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
 
-  const { mutate } = useSWRConfig();
+  const { cache, mutate } = useSWRConfig();
   const { data } = useSWR<GetDAGsResponse>('/', null, {
     refreshInterval: 10000,
   });
 
   const refreshFn = React.useCallback(() => {
-    mutate('*');
-  }, [mutate]);
+    setTimeout(() => mutate('/'), 500);
+  }, [mutate, cache]);
 
   React.useEffect(() => {
     appBarContext.setTitle('DAGs');

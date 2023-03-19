@@ -2,14 +2,15 @@ package dag
 
 import "context"
 
-// NewContext set the current DAG to the context
+// NewContext sets the current DAG to the context.
 func NewContext(ctx context.Context, dag *DAG) context.Context {
-	return context.WithValue(ctx, dagContextKey{}, dag)
+	return context.WithValue(ctx, DAGContextKey{}, dag)
 }
 
-type dagContextKey struct{}
+// DAGContextKey is used as the key for storing the DAG in the context.
+type DAGContextKey struct{}
 
-// GetDAGFromContext returns DAG from current context
+// GetDAGFromContext returns the DAG from the current context.
 func GetDAGFromContext(ctx context.Context) *DAG {
-	return ctx.Value(dagContextKey{}).(*DAG)
+	return ctx.Value(DAGContextKey{}).(*DAG)
 }

@@ -12,43 +12,29 @@ type Condition struct {
 	Expected  string
 }
 
-// ConditionResult represents an evaluated result of a condition.
-type ConditionResult struct {
-	Condition string
-	Expected  string
-	Actual    string
+// Evaluate returns the actual value of the condition.
+func (c *Condition) Evaluate() (string, error) {
+	return utils.ParseVariable(c.Condition)
 }
 
-// Eval evaluates the condition.
-func (c *Condition) Eval() (*ConditionResult, error) {
-	ret, err := utils.ParseVariable(c.Condition)
-	if err != nil {
-		return nil, err
+// CheckResult checks if the actual value of the condition matches the expected value.
+func (c *Condition) CheckResult(actualValue string) error {
+	if c.Expected != actualValue {
+		return fmt.Errorf("condition was not met. Condition=%s Expected=%s Actual=%s", c.Condition, c.Expected, actualValue)
 	}
-	return &ConditionResult{
-		Condition: c.Condition,
-		Expected:  c.Expected,
-		Actual:    ret,
-	}, nil
+	return nil
 }
 
-// EvalCondition evaluates a single condition.
+// EvalCondition evaluates a single condition and checks the result.
 func EvalCondition(c *Condition) error {
-	r, err := c.Eval()
+	actual, err := c.Evaluate()
 	if err != nil {
-		return fmt.Errorf(
-			"failed to evaluate condition. Condition=%s Error=%v",
-			c.Condition, err)
+		return fmt.Errorf("failed to evaluate condition. Condition=%s Error=%v", c.Condition, err)
 	}
-	if r.Expected != r.Actual {
-		return fmt.Errorf(
-			"condition was not met. Condition=%s Expected=%s Actual=%s",
-			r.Condition, r.Expected, r.Actual)
-	}
-	return err
+	return c.CheckResult(actual)
 }
 
-// EvalConditions evaluates a list of conditions.
+// EvalConditions evaluates a list of conditions and checks the results.
 func EvalConditions(cond []*Condition) error {
 	for _, c := range cond {
 		err := EvalCondition(c)

@@ -7,12 +7,12 @@ import {
   Typography,
 } from '@mui/material';
 import React from 'react';
+import { Parameter, parseParams, stringifyParams } from '../../lib/parseParams';
 import { DAG } from '../../models';
 import LabeledItem from '../atoms/LabeledItem';
 
 type Props = {
   visible: boolean;
-  defaultParams: string;
   dag: DAG;
   dismissModal: () => void;
   onSubmit: (params: string) => void;
@@ -30,13 +30,7 @@ const style = {
   p: 4,
 };
 
-function StartDAGModal({
-  visible,
-  defaultParams,
-  dag,
-  dismissModal,
-  onSubmit,
-}: Props) {
+function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   React.useEffect(() => {
     const callback = (event: KeyboardEvent) => {
       const e = event || window.event;
@@ -52,11 +46,18 @@ function StartDAGModal({
 
   const ref = React.useRef<HTMLInputElement>(null);
 
-  const [params, setParams] = React.useState<string>(dag.DefaultParams);
+  const parsedParams = React.useMemo(() => {
+    if (dag.DefaultParams.trim() == '') {
+      return [];
+    }
+    return parseParams(dag.DefaultParams);
+  }, [dag.DefaultParams]);
+
+  const [params, setParams] = React.useState<Parameter[]>([]);
 
   React.useEffect(() => {
-    ref.current?.focus();
-  }, [ref.current]);
+    setParams(parsedParams);
+  }, [parsedParams]);
 
   return (
     <Modal open={visible} onClose={dismissModal}>
@@ -71,30 +72,81 @@ function StartDAGModal({
           spacing={2}
           mt={2}
         >
-          {dag.DefaultParams != '' ? (
-            <>
-              <Stack direction={'column'}>
-                <LabeledItem label="Default parameters">{null}</LabeledItem>
-                <Box sx={{ backgroundColor: '#eee' }}>{dag.DefaultParams}</Box>
-              </Stack>
-              <TextField
-                label="parameters"
-                multiline
-                variant="outlined"
-                style={{
-                  flex: 0.5,
-                }}
-                inputRef={ref}
-                InputProps={{
-                  value: params,
-                  onChange: (e) => {
-                    setParams(e.target.value);
-                  },
-                }}
-              />
-            </>
-          ) : null}
-          <Button variant="contained" onClick={() => onSubmit(params)}>
+          {parsedParams.map((p, i) => {
+            if (p.Name != undefined) {
+              return (
+                <React.Fragment key={i}>
+                  <TextField
+                    label={p.Name}
+                    multiline
+                    placeholder={p.Value}
+                    variant="outlined"
+                    style={{
+                      flex: 0.5,
+                    }}
+                    inputRef={ref}
+                    InputProps={{
+                      value: params.find((pp) => pp.Name == p.Name)?.Value,
+                      onChange: (e) => {
+                        if (p.Name) {
+                          setParams(
+                            params.map((pp) => {
+                              if (pp.Name == p.Name) {
+                                return {
+                                  ...pp,
+                                  Value: e.target.value,
+                                };
+                              } else {
+                                return pp;
+                              }
+                            })
+                          );
+                        }
+                      },
+                    }}
+                  />
+                </React.Fragment>
+              );
+            } else {
+              return (
+                <React.Fragment key={i}>
+                  <TextField
+                    label={`Parameter ${i + 1}`}
+                    multiline
+                    placeholder={p.Value}
+                    variant="outlined"
+                    style={{
+                      flex: 0.5,
+                    }}
+                    inputRef={ref}
+                    InputProps={{
+                      value: params.find((_, j) => i == j)?.Value,
+                      onChange: (e) => {
+                        setParams(
+                          params.map((pp, j) => {
+                            if (j == i) {
+                              return {
+                                ...pp,
+                                Value: e.target.value,
+                              };
+                            } else {
+                              return pp;
+                            }
+                          })
+                        );
+                      },
+                    }}
+                  />
+                </React.Fragment>
+              );
+            }
+          })}
+          <Button
+            variant="contained"
+            onClick={() => {
+              onSubmit(stringifyParams(params));
+            }}
+          >
             Start
           </Button>
           <Button variant="contained" color="error" onClick={dismissModal}>

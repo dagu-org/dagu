@@ -62,6 +62,13 @@ func TestSplitCommand(t *testing.T) {
 	require.Equal(t, "test/", args[1])
 }
 
+func TestSplitCommandJSON(t *testing.T) {
+	command := `echo {\"key\":\"value\"}`
+	program, args := utils.SplitCommand(command, true)
+	require.Equal(t, "echo", program)
+	require.Equal(t, "{\"key\":\"value\"}", args[0])
+}
+
 func TestFileExits(t *testing.T) {
 	require.True(t, utils.FileExists("/"))
 }
@@ -203,4 +210,13 @@ func TestFixedTIme(t *testing.T) {
 	require.Equal(t, tm, utils.Now())
 	utils.FixedTime = time.Time{}
 	require.NotEqual(t, tm, utils.Now())
+}
+
+func TestParseParams(t *testing.T) {
+	val := "QUESTION=\"what is your favorite activity?\""
+	ret, err := utils.ParseParams(val, true)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ret))
+	require.Equal(t, ret[0].Name, "QUESTION")
+	require.Equal(t, ret[0].Value, "what is your favorite activity?")
 }

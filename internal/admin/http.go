@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/go-chi/chi/middleware"
@@ -38,6 +39,10 @@ func (svr *server) Shutdown() {
 		close(svr.idleConnsClosed)
 		svr.idleConnsClosed = nil
 	}
+}
+
+func (svr *server) Signal(_ os.Signal) {
+	svr.Shutdown()
 }
 
 func (svr *server) Serve() (err error) {

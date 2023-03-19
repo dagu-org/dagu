@@ -9,27 +9,15 @@ import (
 
 func TestCondition(t *testing.T) {
 	{
-		c := &Condition{
-			Condition: "`echo 1`",
-			Expected:  "1",
-		}
-		ret, err := c.Eval()
+		c := &Condition{Condition: "`echo 1`", Expected: "1"}
+		err := EvalCondition(c)
 		require.NoError(t, err)
-		require.Equal(t, ret.Condition, c.Condition)
-		require.Equal(t, ret.Expected, c.Expected)
-		require.Equal(t, ret.Actual, c.Expected)
 	}
 	{
 		os.Setenv("TEST_CONDITION", "100")
-		c := &Condition{
-			Condition: "${TEST_CONDITION}",
-			Expected:  "100",
-		}
-		ret, err := c.Eval()
+		c := &Condition{Condition: "${TEST_CONDITION}", Expected: "100"}
+		err := EvalCondition(c)
 		require.NoError(t, err)
-		require.Equal(t, ret.Condition, c.Condition)
-		require.Equal(t, ret.Expected, c.Expected)
-		require.Equal(t, ret.Actual, c.Expected)
 	}
 }
 

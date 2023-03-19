@@ -54,6 +54,7 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string) 
 	if err != nil {
 		return err
 	}
+	body = newlineToBrTag(body)
 	msg := "To: " + strings.Join(to, ",") + "\r\n" +
 		"From: " + from + "\r\n" +
 		"Subject: " + subject + "\r\n" +
@@ -72,10 +73,15 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string) 
 
 func (m *Mailer) sendWithAuth(from string, to []string, subject, body string) error {
 	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
+	body = newlineToBrTag(body)
 	return smtp.SendMail(m.Host+":"+m.Port, auth, from, to, []byte("To: "+strings.Join(to, ",")+"\r\n"+
 		"From: "+from+"\r\n"+
 		"Subject: "+subject+"\r\n"+
 		"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
 		"Content-Transfer-Encoding: base64\r\n"+
 		"\r\n"+base64.StdEncoding.EncodeToString([]byte(body))))
+}
+
+func newlineToBrTag(body string) string {
+	return strings.NewReplacer(`\r\n`, "<br />", `\r`, "<br />", `\n`, "<br />").Replace(body)
 }

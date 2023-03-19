@@ -274,6 +274,16 @@ func TestOutputSpecialchar(t *testing.T) {
 			Want:        `hello\nworld`,
 			WantArgs:    1,
 		},
+		{
+			CmdWithArgs: `echo {\"key\":\"value\"}`,
+			Want:        `{"key":"value"}`,
+			WantArgs:    1,
+		},
+		{
+			CmdWithArgs: `echo "{\"key\":\"value\"}"`,
+			Want:        `{"key":"value"}`,
+			WantArgs:    1,
+		},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			n := &Node{

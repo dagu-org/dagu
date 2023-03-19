@@ -47,7 +47,7 @@ func TestStartCommand(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		testRunCommand(t, startCommand(), tc)
+		testRunCommand(t, createStartCommand(), tc)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestDryCommand(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		testRunCommand(t, dryCommand(), tc)
+		testRunCommand(t, createDryCommand(), tc)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestRestartCommand(t *testing.T) {
 
 	// Start the DAG.
 	go func() {
-		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+		testRunCommand(t, createStartCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 	}()
 
 	time.Sleep(time.Millisecond * 100)
@@ -80,7 +80,7 @@ func TestRestartCommand(t *testing.T) {
 	// Restart the DAG.
 	done := make(chan struct{})
 	go func() {
-		testRunCommand(t, restartCommand(), cmdTest{args: []string{"restart", dagFile}})
+		testRunCommand(t, createRestartCommand(), cmdTest{args: []string{"restart", dagFile}})
 		close(done)
 	}()
 
@@ -90,7 +90,7 @@ func TestRestartCommand(t *testing.T) {
 	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Stop the restarted DAG.
-	testRunCommand(t, stopCommand(), cmdTest{args: []string{"stop", dagFile}})
+	testRunCommand(t, createStopCommand(), cmdTest{args: []string{"stop", dagFile}})
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -112,7 +112,7 @@ func TestRetryCommand(t *testing.T) {
 	dagFile := testDAGFile("retry.yaml")
 
 	// Run a DAG.
-	testRunCommand(t, startCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+	testRunCommand(t, createStartCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 	// Find the request ID.
 	dsts, err := controller.NewDAGStatusReader().ReadStatus(dagFile, false)
@@ -123,7 +123,7 @@ func TestRetryCommand(t *testing.T) {
 	reqID := dsts.Status.RequestId
 
 	// Retry with the request ID.
-	testRunCommand(t, retryCommand(), cmdTest{
+	testRunCommand(t, createRetryCommand(), cmdTest{
 		args:        []string{"retry", fmt.Sprintf("--req=%s", reqID), dagFile},
 		expectedOut: []string{"param is foo"},
 	})
@@ -133,7 +133,7 @@ func TestSchedulerCommand(t *testing.T) {
 	// Start the scheduler.
 	done := make(chan struct{})
 	go func() {
-		testRunCommand(t, schedulerCommand(), cmdTest{
+		testRunCommand(t, createSchedulerCommand(), cmdTest{
 			args:        []string{"scheduler"},
 			expectedOut: []string{"starting dagu scheduler"},
 		})
@@ -143,7 +143,7 @@ func TestSchedulerCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 300)
 
 	// Stop the scheduler.
-	sigs <- syscall.SIGTERM
+	signalChan <- syscall.SIGTERM
 	<-done
 }
 
@@ -153,7 +153,7 @@ func TestServerCommand(t *testing.T) {
 	// Start the server.
 	done := make(chan struct{})
 	go func() {
-		testRunCommand(t, serverCommand(), cmdTest{
+		testRunCommand(t, createServerCommand(), cmdTest{
 			args:        []string{"server", fmt.Sprintf("--port=%s", port)},
 			expectedOut: []string{"server is running"},
 		})
@@ -181,7 +181,7 @@ func TestStatusCommand(t *testing.T) {
 	// Start the DAG.
 	done := make(chan struct{})
 	go func() {
-		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
+		testRunCommand(t, createStartCommand(), cmdTest{args: []string{"start", dagFile}})
 		close(done)
 	}()
 
@@ -191,13 +191,13 @@ func TestStatusCommand(t *testing.T) {
 	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Check the current status.
-	testRunCommand(t, statusCommand(), cmdTest{
+	testRunCommand(t, createStatusCommand(), cmdTest{
 		args:        []string{"status", dagFile},
 		expectedOut: []string{"Status=running"},
 	})
 
 	// Stop the DAG.
-	testRunCommand(t, stopCommand(), cmdTest{args: []string{"stop", dagFile}})
+	testRunCommand(t, createStopCommand(), cmdTest{args: []string{"stop", dagFile}})
 	<-done
 }
 
@@ -207,7 +207,7 @@ func TestStopCommand(t *testing.T) {
 	// Start the DAG.
 	done := make(chan struct{})
 	go func() {
-		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
+		testRunCommand(t, createStartCommand(), cmdTest{args: []string{"start", dagFile}})
 		close(done)
 	}()
 
@@ -217,7 +217,7 @@ func TestStopCommand(t *testing.T) {
 	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Stop the DAG.
-	testRunCommand(t, stopCommand(), cmdTest{
+	testRunCommand(t, createStopCommand(), cmdTest{
 		args:        []string{"stop", dagFile},
 		expectedOut: []string{"Stopping..."}})
 
@@ -228,7 +228,7 @@ func TestStopCommand(t *testing.T) {
 
 func TestVersionCommand(t *testing.T) {
 	constants.Version = "1.2.3"
-	testRunCommand(t, versionCommand(), cmdTest{
+	testRunCommand(t, createVersionCommand(), cmdTest{
 		args:        []string{"version"},
 		expectedOut: []string{"1.2.3"}})
 }
