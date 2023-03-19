@@ -9,6 +9,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"github.com/yohamta/dagu/internal/constants"
+	"github.com/yohamta/dagu/internal/errors"
 	"github.com/yohamta/dagu/internal/utils"
 	"golang.org/x/sys/unix"
 )
@@ -62,26 +63,21 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 }
 
 func buildAll(def *configDefinition, d *DAG, options BuildDAGOptions) error {
-	errs := []error{}
-	checkErr(buildLogDir(def, d), &errs)
-	checkErr(buildSteps(def, d, options), &errs)
-	checkErr(buildHandlers(def, d, options), &errs)
-	checkErr(buildConfig(def, d), &errs)
-	checkErr(buildSMTPConfig(def, d), &errs)
-	checkErr(buildErrMailConfig(def, d), &errs)
-	checkErr(buildInfoMailConfig(def, d), &errs)
+	errList := &errors.ErrorList{}
 
-	if len(errs) != 0 {
-		return errs[0]
+	errList.Add(buildLogDir(def, d))
+	errList.Add(buildSteps(def, d, options))
+	errList.Add(buildHandlers(def, d, options))
+	errList.Add(buildConfig(def, d))
+	errList.Add(buildSMTPConfig(def, d))
+	errList.Add(buildErrMailConfig(def, d))
+	errList.Add(buildInfoMailConfig(def, d))
+
+	if errList.HasErrors() {
+		return errList
 	}
 
 	return nil
-}
-
-func checkErr(err error, errs *[]error) {
-	if err != nil {
-		*errs = append(*errs, err)
-	}
 }
 
 const (
