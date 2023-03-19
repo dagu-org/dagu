@@ -24,35 +24,28 @@ type Loader struct {
 }
 
 // Load loads config from file.
-
 func (cl *Loader) Load(f, params string) (*DAG, error) {
-	return cl.loadDAG(f,
-		&BuildDAGOptions{
-			parameters: params,
-		},
-	)
+	return cl.loadDAGWithOptions(f, params, false, false, false)
 }
 
 // LoadwIithoutEval loads config from file without evaluating env variables.
 func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
-	return cl.loadDAG(f,
-		&BuildDAGOptions{
-			parameters: "",
-			headOnly:   false,
-			noEval:     true,
-			noSetenv:   true,
-		},
-	)
+	return cl.loadDAGWithOptions(f, "", false, true, true)
 }
 
 // LoadHeadOnly loads config from file and returns only the headline data.
 func (cl *Loader) LoadHeadOnly(f string) (*DAG, error) {
+	return cl.loadDAGWithOptions(f, "", true, true, true)
+}
+
+// loadDAGWithOptions loads the config file with the provided options.
+func (cl *Loader) loadDAGWithOptions(f, params string, headOnly, noEval, noSetenv bool) (*DAG, error) {
 	return cl.loadDAG(f,
 		&BuildDAGOptions{
-			parameters: "",
-			headOnly:   true,
-			noEval:     true,
-			noSetenv:   true,
+			parameters: params,
+			headOnly:   headOnly,
+			noEval:     noEval,
+			noSetenv:   noSetenv,
 		},
 	)
 }
@@ -102,31 +95,15 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 }
 
 func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
-	if f == "" {
-		return nil, fmt.Errorf("config file was not specified")
-	}
-	if !strings.HasSuffix(f, ".yaml") && !strings.HasSuffix(f, ".yml") {
-		f = fmt.Sprintf("%s.yaml", f)
-	}
-	file, err := filepath.Abs(f)
+	file, err := cl.prepareFilepath(f)
 	if err != nil {
 		return nil, err
 	}
 
-	var dst *DAG = nil
-
-	if !opts.headOnly && cl.BaseConfig != "" {
-		dst, err = cl.loadBaseConfig(cl.BaseConfig, opts)
-		if err != nil {
-			return nil, err
-		}
+	dst, err := cl.loadBaseConfigIfRequired(file, opts)
+	if err != nil {
+		return nil, err
 	}
-
-	if dst == nil {
-		dst = &DAG{}
-	}
-
-	dst.Name = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 
 	raw, err := cl.load(file)
 	if err != nil {
@@ -159,8 +136,26 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 	return dst, nil
 }
 
-type mergeTranformer struct {
+// prepareFilepath prepares the filepath for the given file.
+func (cl *Loader) prepareFilepath(f string) (string, error) {
+	if f == "" {
+		return "", fmt.Errorf("config file was not specified")
+	}
+	if !strings.HasSuffix(f, ".yaml") && !strings.HasSuffix(f, ".yml") {
+		f = fmt.Sprintf("%s.yaml", f)
+	}
+	return filepath.Abs(f)
 }
+
+// loadBaseConfigIfRequired loads the base config if needed, based on the given options.
+func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (*DAG, error) {
+	if !opts.headOnly && cl.BaseConfig != "" {
+		return cl.loadBaseConfig(cl.BaseConfig, opts)
+	}
+	return &DAG{Name: strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))}, nil
+}
+
+type mergeTranformer struct{}
 
 var _ mergo.Transformers = (*mergeTranformer)(nil)
 
