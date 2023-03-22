@@ -184,8 +184,8 @@ func createServerCommand() *cobra.Command {
 
 func bindServerCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
-	cmd.Flags().StringP("host", "s", "", "server port (default is 8080)")
-	cmd.Flags().StringP("port", "p", "", "server host (default is localhost)")
+	cmd.Flags().StringP("host", "s", "", "server host (default is localhost)")
+	cmd.Flags().StringP("port", "p", "", "server port (default is 8080)")
 
 	viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 	viper.BindPFlag("host", cmd.Flags().Lookup("host"))
