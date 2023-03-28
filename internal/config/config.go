@@ -43,8 +43,8 @@ func Get() *Config {
 	return instance
 }
 
-func LoadConfig(homeDir string) error {
-	appHome := path.Join(homeDir, appHomeDir())
+func LoadConfig(userHomeDir string) error {
+	appHome := appHomeDir(userHomeDir)
 
 	viper.SetEnvPrefix("dagu")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
@@ -155,10 +155,10 @@ const (
 	appHomeDefault = ".dagu"
 )
 
-func appHomeDir() string {
+func appHomeDir(userHomeDir string) string {
 	appDir := os.Getenv(appHomeEnv)
 	if appDir == "" {
-		return appHomeDefault
+		return path.Join(userHomeDir, appHomeDefault)
 	}
 	return appDir
 }
