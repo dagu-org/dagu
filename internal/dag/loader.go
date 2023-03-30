@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/yohamta/dagu/internal/pipeline"
+	"go.starlark.net/starlark"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -82,16 +85,10 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 		return nil, nil
 	}
 
-	raw, err := cl.load(file)
+	def, err := cl.loadFromYAML(file)
 	if err != nil {
 		return nil, err
 	}
-
-	def, err := cl.decode(raw)
-	if err != nil {
-		return nil, err
-	}
-
 	buildOpts := *opts
 	buildOpts.headOnly = false
 	buildOpts.defaultEnv = utils.DefaultEnv()
@@ -105,7 +102,8 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 	if f == "" {
 		return nil, fmt.Errorf("config file was not specified")
 	}
-	if !strings.HasSuffix(f, ".yaml") && !strings.HasSuffix(f, ".yml") {
+	ext := filepath.Ext(f)
+	if ext == "" {
 		f = fmt.Sprintf("%s.yaml", f)
 	}
 	file, err := filepath.Abs(f)
@@ -129,12 +127,12 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 
 	dst.Name = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 
-	raw, err := cl.load(file)
-	if err != nil {
-		return nil, err
+	var def *configDefinition
+	if ext == ".star" {
+		def, err = cl.loadFromStarLark(file)
+	} else {
+		def, err = cl.loadFromYAML(file)
 	}
-
-	def, err := cl.decode(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +156,50 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 	}
 
 	return dst, nil
+}
+
+func (cl *Loader) loadFromYAML(file string) (*configDefinition, error) {
+	raw, err := cl.load(file)
+	if err != nil {
+		return nil, err
+	}
+
+	def, err := cl.decode(raw)
+	if err != nil {
+		return nil, err
+	}
+	return def, nil
+}
+
+func (cl *Loader) loadFromStarLark(file string) (*configDefinition, error) {
+	graph, err := pipeline.NewPipeline(file)
+	if err != nil {
+		return nil, err
+	}
+	c := &configDefinition{}
+	c.Name = path.Base(file)
+	nodes := graph["nodes"].(*starlark.Dict)
+	edges := graph["edges"].(*starlark.List)
+	dependencyMap := pipeline.EdgesToDependencyMap(edges)
+	for _, name := range nodes.Keys() {
+		_, found, err := nodes.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("node %v not found", name)
+		}
+		nameStr := name.(starlark.String).GoString()
+		step := &stepDef{
+			Name:     nameStr,
+			Depends:  dependencyMap[nameStr],
+			Executor: "http",
+			Command:  "GET https://httpbin.org/get",
+			Script:   "{}", //node.String(),
+		}
+		c.Steps = append(c.Steps, step)
+	}
+	return c, nil
 }
 
 type mergeTranformer struct {

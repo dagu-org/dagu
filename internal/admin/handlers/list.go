@@ -2,12 +2,10 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/yohamta/dagu/internal/controller"
 	"net/http"
 	"path"
 	"path/filepath"
-	"strings"
-
-	"github.com/yohamta/dagu/internal/controller"
 )
 
 type dagListResponse struct {
@@ -81,6 +79,9 @@ func HandlePostList(hc *DAGListHandlerConfig) http.HandlerFunc {
 }
 
 func nameWithExt(name string) string {
-	s := strings.TrimSuffix(name, ".yaml")
-	return fmt.Sprintf("%s.yaml", s)
+	ext := filepath.Ext(name)
+	if ext == "" {
+		return fmt.Sprintf("%s.yaml", name)
+	}
+	return name
 }

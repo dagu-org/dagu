@@ -96,7 +96,7 @@ func HandleGetDAG(hc *DAGHandlerConfig, tc *TemplateConfig) http.HandlerFunc {
 		}
 
 		params := getDAGParameter(r)
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(hc.DAGsDir, nameWithExt(dn))
 		dr := controller.NewDAGStatusReader()
 		d, err := dr.ReadStatus(file, false)
 		if d == nil {
@@ -172,7 +172,7 @@ func HandlePostDAG(hc *PostDAGHandlerConfig) http.HandlerFunc {
 			return
 		}
 
-		file := filepath.Join(hc.DAGsDir, fmt.Sprintf("%s.yaml", dn))
+		file := filepath.Join(hc.DAGsDir, nameWithExt(dn))
 		dr := controller.NewDAGStatusReader()
 		dag, err := dr.ReadStatus(file, false)
 		if err != nil && action != "save" {

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var EXTENSIONS = []string{".yaml", ".yml"}
+var EXTENSIONS = []string{".yaml", ".yml", ".star"}
 
 type BuildDAGOptions struct {
 	headOnly   bool

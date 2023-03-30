@@ -133,6 +133,10 @@ func (dc *DAGController) Start(binPath string, workDir string, params string) er
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
 	cmd.Env = os.Environ()
+	// for debug purpose
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	// end debug
 	err := cmd.Start()
 	if err != nil {
 		return err
