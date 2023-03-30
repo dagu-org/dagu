@@ -5,9 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/yohamta/dagu/internal/pipeline"
+	"go.starlark.net/starlark"
 
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
@@ -73,13 +77,7 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 		return nil, nil
 	}
 
-	raw, err := cl.load(file)
-	if err != nil {
-		return nil, err
-	}
-
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(raw)
+	def, err := cl.loadFromYAML(file)
 	if err != nil {
 		return nil, err
 	}
@@ -104,14 +102,20 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	raw, err := cl.load(file)
-	if err != nil {
-		return nil, err
+	if dst == nil {
+		dst = &DAG{}
 	}
 
-	cdl := &configDefinitionLoader{}
+	ext := filepath.Ext(file)
+	dst.Name = strings.TrimSuffix(filepath.Base(file), ext)
 
-	def, err := cdl.decode(raw)
+	var def *configDefinition
+	if ext == ".star" {
+		def, err = cl.loadFromStarLark(file)
+	} else {
+		def, err = cl.loadFromYAML(file)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +127,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	err = cdl.merge(dst, c)
+	err = merge(dst, c)
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +150,52 @@ func (cl *Loader) prepareFilepath(f string) (string, error) {
 		f = fmt.Sprintf("%s.yaml", f)
 	}
 	return filepath.Abs(f)
+}
+
+func (cl *Loader) loadFromYAML(file string) (*configDefinition, error) {
+	raw, err := cl.load(file)
+	if err != nil {
+		return nil, err
+	}
+
+	cdl := &configDefinitionLoader{}
+	def, err := cdl.decode(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return def, nil
+}
+
+func (cl *Loader) loadFromStarLark(file string) (*configDefinition, error) {
+	graph, err := pipeline.NewPipeline(file)
+	if err != nil {
+		return nil, err
+	}
+	c := &configDefinition{}
+	c.Name = path.Base(file)
+	nodes := graph["nodes"].(*starlark.Dict)
+	edges := graph["edges"].(*starlark.List)
+	dependencyMap := pipeline.EdgesToDependencyMap(edges)
+	for _, name := range nodes.Keys() {
+		_, found, err := nodes.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, fmt.Errorf("node %v not found", name)
+		}
+		nameStr := name.(starlark.String).GoString()
+		step := &stepDef{
+			Name:     nameStr,
+			Depends:  dependencyMap[nameStr],
+			Executor: "http",
+			Command:  "GET https://httpbin.org/get",
+			Script:   "{}", //node.String(),
+		}
+		c.Steps = append(c.Steps, step)
+	}
+	return c, nil
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
@@ -222,7 +272,7 @@ func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDef
 }
 
 // merge merges the source DAG into the destination DAG.
-func (cdl *configDefinitionLoader) merge(dst, src *DAG) error {
+func merge(dst, src *DAG) error {
 	err := mergo.Merge(dst, src, mergo.WithOverride,
 		mergo.WithTransformers(&mergeTranformer{}))
 	return err

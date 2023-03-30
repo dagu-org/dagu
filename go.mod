@@ -59,7 +59,8 @@ require (
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/samber/lo v1.27.0
+	github.com/samber/lo v1.38.1
+	go.starlark.net v0.0.0-20230128213706-3f75dec8e403
 	golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sys v0.5.0
