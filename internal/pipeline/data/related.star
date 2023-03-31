@@ -47,19 +47,6 @@ def main(args):
     )
     content_holdback_op = content_holdback('content_holdback')
 
-    # apply_rank_int = apply_node(rank_int)
-    # apply_related_rank_specific = apply_node(related_rank_specific)
-    # apply_related_rank_specific_rt = apply_node(related_rank_specific_rt)
-    # apply_related_rank_specific_rt_returning_user = apply_node(related_rank_specific_rt_returning_user)
-    # edge(rank_int, apply_rank_int)
-    # edge(related_rank_specific, apply_rank_int)
-    # edge(related_rank_specific_rt, apply_rank_int)
-    # edge(related_rank_specific_rt_returning_user, apply_rank_int)
-    #
-    # edge(apply_rank_int, apply_related_rank_specific)
-    # edge(apply_related_rank_specific, apply_related_rank_specific_rt)
-    # edge(apply_related_rank_specific_rt, apply_related_rank_specific_rt_returning_user)
-    # edge(apply_related_rank_specific_rt_returning_user, content_holdback_op)
     last = sequence(rank_int, related_rank_specific, related_rank_specific_rt, related_rank_specific_rt_returning_user)
     edge(last, content_holdback_op)
     return 0
