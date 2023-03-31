@@ -35,6 +35,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/google/go-cmp v0.5.5 // indirect
 	github.com/moby/term v0.0.0-20221205130635-1aeaba878587 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -49,8 +50,12 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.1.12 // indirect
+<<<<<<< HEAD
 	gopkg.in/ini.v1 v1.67.0 // indirect
+=======
+>>>>>>> 8ab38f8 (Tidy go modules)
 	gotest.tools/v3 v3.4.0 // indirect
 )
 
@@ -62,7 +67,12 @@ require (
 	github.com/samber/lo v1.38.1
 	go.starlark.net v0.0.0-20230128213706-3f75dec8e403
 	golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b
+<<<<<<< HEAD
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sys v0.5.0
+=======
+	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
+	golang.org/x/sys v0.1.0
+>>>>>>> 8ab38f8 (Tidy go modules)
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
