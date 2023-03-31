@@ -4,6 +4,11 @@
 # graph.nodes = {}
 # graph.edges = []
 
+task = {
+    "executor": "http",
+    "command": "GET https://httpbin.org/get",
+    "script": "{}"
+}
 
 def node(name, operation, conf={}, predicate=None):
     """
@@ -13,9 +18,12 @@ def node(name, operation, conf={}, predicate=None):
     :param conf: object, the configuration for the operation
     :param predicate: （ctx, inputs) -> boolean, a predicate
     """
+    t = dict(task)
+    if operation:
+        t["script"] = str(operation)
     n = {
         "name": name,
-        "operation": operation,
+        "task": t,
         "conf": conf,
         "predicate": predicate
     }

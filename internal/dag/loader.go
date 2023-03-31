@@ -178,20 +178,32 @@ func (cl *Loader) loadFromStarLark(file string) (*configDefinition, error) {
 	edges := graph["edges"].(*starlark.List)
 	dependencyMap := pipeline.EdgesToDependencyMap(edges)
 	for _, name := range nodes.Keys() {
-		_, found, err := nodes.Get(name)
+		value, found, err := nodes.Get(name)
 		if err != nil {
 			return nil, err
 		}
 		if !found {
 			return nil, fmt.Errorf("node %v not found", name)
 		}
+		node := value.(*starlark.Dict)
+		task, found, err := node.Get(starlark.String("task"))
+		if task == nil || !found {
+			return nil, fmt.Errorf("task of node %v missing", name)
+		}
+		if err != nil {
+			return nil, err
+		}
+		taskDict := task.(*starlark.Dict)
 		nameStr := name.(starlark.String).GoString()
+		executor := lookupDict(taskDict, "executor")
+		command := lookupDict(taskDict, "command")
+		script := lookupDict(taskDict, "script")
 		step := &stepDef{
 			Name:     nameStr,
 			Depends:  dependencyMap[nameStr],
-			Executor: "http",
-			Command:  "GET https://httpbin.org/get",
-			Script:   "{}", //node.String(),
+			Executor: executor,
+			Command:  command,
+			Script:   script,
 		}
 		c.Steps = append(c.Steps, step)
 	}
@@ -210,6 +222,17 @@ func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (
 		}
 	}
 	return &DAG{Name: strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))}, nil
+}
+
+func lookupDict(dict *starlark.Dict, name string) string {
+	value, found, err := dict.Get(starlark.String(name))
+	if !found {
+		fmt.Printf("missing %v in dict", name)
+	}
+	if err != nil {
+		fmt.Printf("lookup error: %v", err)
+	}
+	return value.(starlark.String).GoString()
 }
 
 type mergeTranformer struct{}
