@@ -27,8 +27,9 @@ def node(name, operation, conf={}, predicate=None):
         "conf": conf,
         "predicate": predicate
     }
-    message = "node {}".format(n)
-    print(message)
+    # Uncomment to inspect nodes
+    # message = "node {}".format(n)
+    # print(message)
     graph.nodes[name] = n
     return name
 
@@ -44,8 +45,9 @@ def is_runnable(ctx, inputs):
     return inputs[0].size > 0
 
 def edge(src, dst):
-    message = "{} -> {}".format(src, dst)
-    print(message)
+    # Uncomment to inspect nodes
+    # message = "{} -> {}".format(src, dst)
+    # print(message)
     graph.edges.append((src, dst))
 
 def sequence(*nodes):
