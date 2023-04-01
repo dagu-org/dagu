@@ -40,8 +40,6 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Highlights](#highlights)
 - [Contents](#contents)
 - [Getting started](#getting-started)
-- [Motivation](#motivation)
-- [Why Not Use an Existing Workflow Scheduler Like Airflow?](#why-not-use-an-existing-workflow-scheduler-like-airflow)
 - [How it Works](#how-it-works)
 - [Installation](#installation)
   - [Via Homebrew](#via-homebrew)
@@ -100,15 +98,7 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 
 ## Getting started
 
-To get started with Dagu, see the [installation instructions](#install-dagu) below and then check out the [️Quick start](#️quick-start) guide.
-
-## Motivation
-
-Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
-
-## Why Not Use an Existing Workflow Scheduler Like Airflow?
-
-There are many existing tools such as Airflow, Prefect, and Temporal, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+To get started with Dagu, see the [installation instructions](#installation) below and then check out the [️Quick start](#️quick-start-guide) guide.
 
 ## How it Works
 
@@ -644,7 +634,6 @@ The following environment variables can be used to configure the Dagu. Default v
 - `DAGU_HOST` (`127.0.0.1`): The host to bind the server to.
 - `DAGU_PORT` (`8080`): The port to bind the server to.
 - `DAGU_DAGS` (`$DAGU_HOME/dags`): The directory containing the DAGs.
-- `DAGU_COMMAND` (`dagu`): The command used to start the application.
 - `DAGU_IS_BASIC_AUTH` (`0`): Set to 1 to enable basic authentication.
 - `DAGU_BASIC_AUTH_USERNAME` (`""`): The username to use for basic authentication.
 - `DAGU_BASIC_AUTH_PASSWORD` (`""`): The password to use for basic authentication.
