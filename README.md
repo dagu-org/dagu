@@ -19,6 +19,12 @@
   <img src="https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg" />
 </p>
 
+<div align="center">
+
+[Installation](#installation) | [Quick Start](#️quick-start-guide) | [Community](https://discord.gg/4s4feC8r)
+
+</div>
+
 <p align="center">
 <b>Just another Cron alternative with a Web UI, but with much more capabilities</b><br />
 It runs <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">DAGs (Directed acyclic graph)</a> defined in a simple YAML format.
@@ -29,7 +35,7 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 ## Highlights
 - Single binary file installation
 - Declarative YAML format for defining DAGs
-- Web UI for visualizing, managing, and rerunning pipelines
+- Web UI for visually managing, rerunning, and monitoring pipelines
 - No programming required, making it easy to use and ideal for small projects
 - Self-contained, with no need for a DBMS or cloud service
 
@@ -40,7 +46,9 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
 - [Highlights](#highlights)
 - [Contents](#contents)
 - [Getting started](#getting-started)
-- [How it Works](#how-it-works)
+- [Motivation](#motivation)
+- [Why Not Use an Existing Workflow Scheduler Like Airflow?](#why-not-use-an-existing-workflow-scheduler-like-airflow)
+- [How It Works](#how-it-works)
 - [Installation](#installation)
   - [Via Homebrew](#via-homebrew)
   - [Via Bash script](#via-bash-script)
@@ -95,12 +103,21 @@ Dagu is a tool for scheduling and running tasks based on a directed acyclic grap
   - [How Does It Track Running Processes Without DBMS?](#how-does-it-track-running-processes-without-dbms)
 - [Contributions](#contributions)
 - [License](#license)
+- [Support and Community](#support-and-community)
 
 ## Getting started
 
 To get started with Dagu, see the [installation instructions](#installation) below and then check out the [️Quick start](#️quick-start-guide) guide.
 
-## How it Works
+## Motivation
+
+Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
+
+## Why Not Use an Existing Workflow Scheduler Like Airflow?
+
+There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+
+## How It Works
 
 Dagu is a single command line tool that uses the local file system to store data, so no database management system or cloud service is required. DAGs are defined in a declarative YAML format, and existing programs can be used without modification.
 
@@ -955,3 +972,6 @@ We welcome contributions to Dagu! If you have an idea for a new feature or have 
 ## License
 
 This project is licensed under the GNU GPLv3. Refer to the [LICENSE.md](LICENSE.md) file for more details.
+
+## Support and Community
+Join our [Discord community](https://discord.gg/4s4feC8r).
