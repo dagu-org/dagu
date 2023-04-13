@@ -1,2 +1,6 @@
 .venv
+<<<<<<< HEAD
 build
+=======
+build/
+>>>>>>> 88c2c2a (setup sphinx)
