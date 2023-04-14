@@ -1,0 +1,32 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-04-14 21:57+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../source/docker-compose.rst:2
+msgid "Using Docker Compose"
+msgstr ""
+
+#: ../../source/docker-compose.rst:4
+msgid ""
+"To automate workflows based on cron expressions, it is necessary to run "
+"both the admin server and scheduler process. Here is an example `docker-"
+"compose.yml` setup for running Dagu using Docker Compose."
+msgstr ""
+

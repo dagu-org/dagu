@@ -1,0 +1,81 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-04-14 21:55+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../../config.rst:4
+msgid "Configuration Options"
+msgstr ""
+
+#: ../../config.rst:6
+msgid "The following environment variables can be used to configure the Dagu. Default values are provided in the parentheses:"
+msgstr ""
+
+#: ../../config.rst:8
+msgid "``DAGU_HOST`` (``127.0.0.1``): The host to bind the server to."
+msgstr ""
+
+#: ../../config.rst:9
+msgid "``DAGU_PORT`` (``8080``): The port to bind the server to."
+msgstr ""
+
+#: ../../config.rst:10
+msgid "``DAGU_DAGS`` (``$DAGU_HOME/dags``): The directory containing the DAGs."
+msgstr ""
+
+#: ../../config.rst:11
+msgid "``DAGU_IS_BASIC_AUTH`` (``0``): Set to 1 to enable basic authentication."
+msgstr ""
+
+#: ../../config.rst:12
+msgid "``DAGU_BASIC_AUTH_USERNAME`` (``\"\"``): The username to use for basic authentication."
+msgstr ""
+
+#: ../../config.rst:13
+msgid "``DAGU_BASIC_AUTH_PASSWORD`` (``\"\"``): The password to use for basic authentication."
+msgstr ""
+
+#: ../../config.rst:14
+msgid "``DAGU_LOG_DIR`` (``$DAGU_HOME/logs``): The directory where logs will be stored."
+msgstr ""
+
+#: ../../config.rst:15
+msgid "``DAGU_DATA_DIR`` (``$DAGU_HOME/data``): The directory where application data will be stored."
+msgstr ""
+
+#: ../../config.rst:16
+msgid "``DAGU_SUSPEND_FLAGS_DIR`` (``$DAGU_HOME/suspend``): The directory containing DAG suspend flags."
+msgstr ""
+
+#: ../../config.rst:17
+msgid "``DAGU_ADMIN_LOG_DIR`` (``$DAGU_HOME/logs/admin``): The directory where admin logs will be stored."
+msgstr ""
+
+#: ../../config.rst:18
+msgid "``DAGU_BASE_CONFIG`` (``$DAGU_HOME/config.yaml``): The path to the base configuration file."
+msgstr ""
+
+#: ../../config.rst:19
+msgid "``DAGU_NAVBAR_COLOR`` (``\"\"``): The color to use for the navigation bar. E.g., ``red`` or ``#ff0000``."
+msgstr ""
+
+#: ../../config.rst:20
+msgid "``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``"
+msgstr ""
+
+#: ../../config.rst:22
+msgid "Note: If ``DAGU_HOME`` environment variable is not set, the default value is ``$HOME/.dagu``."
+msgstr ""

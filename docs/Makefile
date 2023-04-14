@@ -31,6 +31,10 @@ install-libs:
 build:
 	sphinx-build -b html source/ build/html
 
+gettext-ja:
+	sphinx-build -b gettext source/ build/html
+	sphinx-intl update -p _build/gettext -l ja
+
 PYTHON_VER = 3.7.16
 
 venv:

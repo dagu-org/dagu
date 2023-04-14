@@ -1,0 +1,89 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-04-14 21:55+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../../contrib.rst:2
+msgid "Contribution Guide"
+msgstr ""
+
+#: ../../contrib.rst:4
+msgid "We welcome contributions to Dagu! If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository. If you would like to contribute code, please follow these steps:"
+msgstr ""
+
+#: ../../contrib.rst:6
+msgid "Fork the repository"
+msgstr ""
+
+#: ../../contrib.rst:7
+msgid "Create a new branch for your changes"
+msgstr ""
+
+#: ../../contrib.rst:8
+msgid "Make your changes and commit them to your branch"
+msgstr ""
+
+#: ../../contrib.rst:9
+msgid "Push your branch to your fork and open a pull request"
+msgstr ""
+
+#: ../../contrib.rst:12
+msgid "Building Binary From Source Code"
+msgstr ""
+
+#: ../../contrib.rst:15
+msgid "Prerequisite"
+msgstr ""
+
+#: ../../contrib.rst:17
+msgid "Before building the binary from the source code, make sure that you have the following software installed on your system:"
+msgstr ""
+
+#: ../../contrib.rst:19
+msgid "`Go version 1.18 or later. <https://go.dev/doc/install>`_"
+msgstr ""
+
+#: ../../contrib.rst:20
+msgid "Latest version of `Node.js <https://nodejs.org/en/download/>`_."
+msgstr ""
+
+#: ../../contrib.rst:21
+msgid "`yarn <https://yarnpkg.com/>`_ package manager."
+msgstr ""
+
+#: ../../contrib.rst:24
+msgid "Build Binary"
+msgstr ""
+
+#: ../../contrib.rst:26
+msgid "To build the binary from the source code, follow these steps:"
+msgstr ""
+
+#: ../../contrib.rst:28
+msgid "Clone the repository to your local machine."
+msgstr ""
+
+#: ../../contrib.rst:29
+msgid "Navigate to the root directory of the cloned repository and build the frontend project by running the following command:"
+msgstr ""
+
+#: ../../contrib.rst:35
+msgid "Build the `dagu` binary by running the following command:"
+msgstr ""
+
+#: ../../contrib.rst:41
+msgid "You can now use the `dagu` binary that is created in the `./bin` directory."
+msgstr ""

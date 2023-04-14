@@ -1,0 +1,69 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2023-04-14 21:57+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../source/cli.rst:2
+msgid "Command Line Interface"
+msgstr ""
+
+#: ../../source/cli.rst:4
+msgid "``dagu start [--params=<params>] <file>`` - Runs the DAG"
+msgstr ""
+
+#: ../../source/cli.rst:5
+msgid "``dagu status <file>`` - Displays the current status of the DAG"
+msgstr ""
+
+#: ../../source/cli.rst:6
+msgid "``dagu retry --req=<request-id> <file>`` - Re-runs the specified DAG run"
+msgstr ""
+
+#: ../../source/cli.rst:7
+msgid "``dagu stop <file>`` - Stops the DAG execution by sending TERM signals"
+msgstr ""
+
+#: ../../source/cli.rst:8
+msgid "``dagu restart <file>`` - Restarts the current running DAG"
+msgstr ""
+
+#: ../../source/cli.rst:9
+msgid "``dagu dry [--params=<params>] <file>`` - Dry-runs the DAG"
+msgstr ""
+
+#: ../../source/cli.rst:10
+msgid ""
+"``dagu server [--host=<host>] [--port=<port>] [--dags=<path/to/the DAGs "
+"directory>]`` - Launches the Dagu web UI server"
+msgstr ""
+
+#: ../../source/cli.rst:11
+msgid ""
+"``dagu scheduler [--dags=<path/to/the DAGs directory>]`` - Starts the "
+"scheduler process"
+msgstr ""
+
+#: ../../source/cli.rst:12
+msgid "``dagu version`` - Shows the current binary version"
+msgstr ""
+
+#: ../../source/cli.rst:14
+msgid "For example:"
+msgstr ""
+
