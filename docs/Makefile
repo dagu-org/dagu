@@ -19,23 +19,23 @@ help:
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-local: venv
+local:
 	sphinx-autobuild --watch docs --port 8000 --open-browser --delay 1 source docs/build/html
 
-venv:
-	python -m venv .venv
-
 install-dependencies:
 	python -m pip install -r requirements.txt
+
+install-libs:
+	pip install sphinx sphinx-autobuild
 
 build:
 	sphinx-build -b html source/ build/html
 
+PYTHON_VER = 3.7.16
+
 venv:
+	pyenv local $(PYTHON_VER)
 	python -m venv .venv
 
-install-dependencies:
-	python -m pip install -r requirements.txt
-
-build:
-	sphinx-build -b html source/ build/html
+install-python:
+	@pyenv install $(PYTHON_VER)

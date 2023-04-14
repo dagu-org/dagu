@@ -29,7 +29,63 @@ Example Log output:
 
 .. image:: https://raw.githubusercontent.com/yohamta/dagu/main/examples/images/docker.png
 
-To see more configurations, visit `this <https://github.com/yohamta/dagu/tree/main/examples#running-docker-containers>`_ page.
+Configuring Container Volumes, Environment Variables, and More
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
+
+For example:
+
+.. code-block:: yaml
+
+    steps:
+      - name: deno_hello_world
+        executor:
+          type: docker
+          config:
+            image: "denoland/deno:1.10.3"
+            container:
+              volumes:
+                /app:/app:
+              env:
+                - FOO=BAR
+            host:
+              autoRemove: true
+        command: run https://examples.deno.land/hello-world.ts
+
+See the Docker's API documentation for all available options.
+
+- For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
+- For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.
+
+
+Running Containers on the Host's Docker Environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you are running `dagu` using a container, you need the setup below.
+
+1. Run a `socat` conainer with the command below.
+
+.. code-block:: sh
+
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -p 2376:2375 bobrik/socat TCP4-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
+
+2. Then you can set the `DOCKER_HOST` environment as follows.
+
+.. code-block:: yaml
+
+    env:
+      - DOCKER_HOST : "tcp://host.docker.internal:2376"
+    steps:
+      - name: deno_hello_world
+        executor:
+          type: docker
+          config:
+            image: "denoland/deno:1.10.3"
+            autoRemove: true
+        command: run https://examples.deno.land/hello-world.ts
+
+For more details, see `this page <https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2>`_.
 
 Making HTTP Requests
 --------------------
@@ -137,8 +193,6 @@ Formatting JSON
         },
         "id": "sample"
     }
-
-The `jq` result can be used in following steps via `Output` or `Stdout Redirection`. See `Setting Environment Variables with Standard Output`_ and `Redirecting stdout and stderr`_.
 
 .. _command-execution-over-ssh:
 
