@@ -38,6 +38,6 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
           - "S3"
 
 4. Execute the DAG
----------------
+-------------------
 
 You can execute the example by pressing the `Start` button.
