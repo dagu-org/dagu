@@ -1,6 +1,9 @@
 YAML Format
 ============
 
+.. contents::
+    :local:
+
 Minimal DAG Definition
 -----------------------
 
@@ -178,8 +181,8 @@ If you want a task to repeat execution at regular intervals, you can use the `re
          repeat: true
          intervalSec: 60
 
-Available Fields for DAGs
--------------------------
+All Available Fields for DAGs
+-------------------------------
 
 This section provides a comprehensive list of available fields that can be used to configure DAGs and their steps in detail. Each field serves a specific purpose, enabling granular control over how the DAG runs. The fields include:
 
@@ -205,27 +208,7 @@ In addition, a global configuration file, ``$DAGU_HOME/config.yaml``, can be use
 
 Note: If ``DAGU_HOME`` environment variable is not set, the default path is ``$HOME/.dagu/config.yaml``.
 
-Available Fields for Steps
----------------------------
-
-Each step can have its own set of configurations, including:
-
-- ``name``: The name of the step.
-- ``description``: A brief description of the step.
-- ``dir``: The working directory for the step.
-- ``command``: The command and parameters to execute.
-- ``stdout``: The file to which the standard output is written.
-- ``output``: The variable to which the result is written.
-- ``script``: The script to execute.
-- ``signalOnStop``: The signal name (e.g., ``SIGINT``) to be sent when the process is stopped.
-- ``mailOn``: Whether to send an email notification when the step fails or succeeds.
-- ``continueOn``: Whether to continue to the next step, regardless of whether the step failed or not or the preconditions are met or not.
-- ``retryPolicy``: The retry policy for the step.
-- ``repeatPolicy``: The repeat policy for the step.
-- ``preconditions``: The conditions that must be met before a step can run.
-
-Example
---------
+Example: 
 
 .. code-block:: yaml
 
@@ -259,6 +242,30 @@ Example
         command: "echo canceled"         
       exit:
         command: "echo finished"         
+
+All Available Fields for Steps
+--------------------------------
+
+Each step can have its own set of configurations, including:
+
+- ``name``: The name of the step.
+- ``description``: A brief description of the step.
+- ``dir``: The working directory for the step.
+- ``command``: The command and parameters to execute.
+- ``stdout``: The file to which the standard output is written.
+- ``output``: The variable to which the result is written.
+- ``script``: The script to execute.
+- ``signalOnStop``: The signal name (e.g., ``SIGINT``) to be sent when the process is stopped.
+- ``mailOn``: Whether to send an email notification when the step fails or succeeds.
+- ``continueOn``: Whether to continue to the next step, regardless of whether the step failed or not or the preconditions are met or not.
+- ``retryPolicy``: The retry policy for the step.
+- ``repeatPolicy``: The repeat policy for the step.
+- ``preconditions``: The conditions that must be met before a step can run.
+
+Example:
+
+.. code-block:: yaml
+
     steps:
       - name: some task                  
         description: some task           

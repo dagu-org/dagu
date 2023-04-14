@@ -29,4 +29,4 @@ Email notifications can be sent when a DAG finished with an error or successfull
       to: "foo@bar.com"
       prefix: "[Info]"
 
-If you want to use the same settings for all DAGs, set them to the `base configuration`_.
+If you want to use the same settings for all DAGs, set them to the :ref:`base configuration`.

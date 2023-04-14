@@ -11,14 +11,6 @@ Dagu server provides simple APIs to query and control workflows.
 API Endpoints
 -------------
 This document provides information about the following endpoints:
-    
-.. toctree::
-   :maxdepth: 2
-
-   show-workflows-get-dags
-   show-workflow-detail-get-dagsname
-   submit-workflow-action-post-dagsname
-
 
 Show DAGs `GET dags/`
 ---------------------
@@ -50,7 +42,7 @@ TBU
 
 
 Show Workflow Detail `GET dags/:name`
-------------------------------------
+--------------------------------------
 
 Return details about the specified workflow.
 

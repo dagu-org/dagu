@@ -1,5 +1,13 @@
+.. _Configuration Options:
+
 Configuration Options
 =====================
+
+.. contents::
+    :local:
+
+Environment Variables
+----------------------
 
 The following environment variables can be used to configure the Dagu. Default values are provided in the parentheses:
 
@@ -18,3 +26,29 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``
 
 Note: If ``DAGU_HOME`` environment variable is not set, the default value is ``$HOME/.dagu``.
+
+Config File
+--------------
+
+You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$HOME/.dagu/``) to override the default configuration values. The following configuration options are available:
+
+.. code-block:: yaml
+
+    host: <hostname for web UI address>                          # default: 127.0.0.1
+    port: <port number for web UI address>                       # default: 8080
+
+    # path to the DAGs directory
+    dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
+    
+    # Web UI Color & Title
+    navbarColor: <admin-web header color>                        # header color for web UI (e.g. "#ff0000")
+    navbarTitle: <admin-web title text>                          # header title for web UI (e.g. "PROD")
+    
+    # Basic Auth
+    isBasicAuth: <true|false>                                    # enables basic auth
+    basicAuthUsername: <username for basic auth of web UI>       # basic auth user
+    basicAuthPassword: <password for basic auth of web UI>       # basic auth password
+
+    # Base Config
+    baseConfig: <base DAG config path>                           # default: ${DAGU_HOME}/config.yaml
+    

@@ -6,6 +6,19 @@
 Welcome to Dagu's documentation!
 ======================================
 
+Dagu
+-----
+
+.. raw:: html
+
+   <div>
+   <div class="github-star-button">
+    <iframe src="https://ghbtns.com/github-btn.html?user=yohamta&repo=dagu&type=star&count=true&size=large" frameborder="0" scrolling="0" width="160px" height="30px"></iframe>
+   </div>
+   </div>
+
+Dagu is a tool for scheduling and running tasks based on DAGs defined in a simple YAML format. It allows you to define dependencies between commands and represent them as a single DAG, schedule the execution with Cron expressions.
+
 Contents
 --------
 
@@ -17,6 +30,7 @@ Contents
    docker-compose
    cli
    web_interface
+   examples
    config
    yaml_format
    base_config
