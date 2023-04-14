@@ -1,6 +1,9 @@
 Quick Start Guide
 =================
 
+.. contents::
+    :local:
+
 1. Launch the Web UI
 ---------------------
 
