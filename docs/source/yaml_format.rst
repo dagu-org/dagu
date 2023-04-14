@@ -19,6 +19,16 @@ The minimal DAG definition is as simple as follows.
         depends:
           - step 1
 
+Specifying Working Directory
+------------------------------
+
+.. code-block:: yaml
+
+    steps:
+      - name: step 1
+        dir: /path/to/working/directory
+        command: some command
+
 Running Arbitrary Code Snippets
 -------------------------------
 
