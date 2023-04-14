@@ -4,17 +4,26 @@
    contain the root `toctree` directive.
 
 Welcome to Dagu's documentation!
-================================
+======================================
+
+Contents
+--------
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   installation
+   quickstart
+   docker-compose
+   cli
+   web_interface
+   config
+   yaml_format
+   base_config
+   executors
+   email
+   scheduler
+   rest
+   docker
+   faq
+   contrib
