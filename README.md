@@ -57,6 +57,7 @@ Dagu is a tool for scheduling and running tasks based on [DAGs](https://en.wikip
 - Support for Email notification
 - Support for configuration options through environment variables
 - Scheduling with Cron expressions
+- Support for REST API Interface
 
 ## **Documentation**
 
