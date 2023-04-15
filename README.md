@@ -76,6 +76,7 @@ Dagu is a tool for scheduling and running tasks based on [DAGs](https://en.wikip
 - [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
 - ️[Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
 - [Command Line Interface](https://dagu.readthedocs.io/en/latest/cli.html)
+- [Web User Interface](https://dagu.readthedocs.io/en/latest/web_interface.html)
 - YAML Format
   - [Minimal DAG Definition](https://dagu.readthedocs.io/en/latest/yaml_format.html#minimal-dag-definition)
   - [Running Arbitrary Code Snippets](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-arbitrary-code-snippets)
