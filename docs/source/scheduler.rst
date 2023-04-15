@@ -65,9 +65,9 @@ If you want to restart a DAG process on a fixed schedule, the ``restart`` field 
 .. code-block:: yaml
 
     schedule:
-    start: "0 8 * * *"    # starts at 8:00
-    restart: "0 12 * * *" # restarts at 12:00
-    stop: "0 13 * * *"    # stops at 13:00
+      start: "0 8 * * *"    # starts at 8:00
+      restart: "0 12 * * *" # restarts at 12:00
+      stop: "0 13 * * *"    # stops at 13:00
     steps:
       - name: scheduled job
         command: job.sh
