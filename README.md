@@ -219,7 +219,9 @@ Dagu is a single command line tool that uses the local file system to store data
 
 ## **Contributing**
 
-Feel free to contribute in any way you want. Check out our [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for help getting started.
+Feel free to contribute in any way you want! Share ideas, questions, submit issues, and create pull requests. Check out our [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for help getting started.
+
+We welcome any and all contributions!
 
 ## **License**
 
