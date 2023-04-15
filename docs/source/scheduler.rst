@@ -1,3 +1,5 @@
+.. _scheduler configuration:
+
 Scheduler
 ==========
 
@@ -12,19 +14,19 @@ You can specify the schedule with cron expression in the ``schedule`` field in t
 
     schedule: "5 4 * * *" # Run at 04:05.
     steps:
-    - name: scheduled job
-      command: job.sh
+      - name: scheduled job
+        command: job.sh
 
 Or you can set multiple schedules.
 
 .. code-block:: yaml
 
     schedule:
-    - "30 7 * * *" # Run at 7:30
-    - "0 20 * * *" # Also run at 20:00
+      - "30 7 * * *" # Run at 7:30
+      - "0 20 * * *" # Also run at 20:00
     steps:
-    - name: scheduled job
-      command: job.sh
+      - name: scheduled job
+        command: job.sh
 
 Stop Schedule
 --------------
@@ -37,8 +39,8 @@ If you want to start and stop a long-running process on a fixed schedule, you ca
     start: "0 8 * * *" # starts at 8:00
     stop: "0 13 * * *" # stops at 13:00
     steps:
-    - name: scheduled job
-      command: job.sh
+      - name: scheduled job
+        command: job.sh
 
 You can also set multiple start/stop schedules. In the following example, the process will run from 0:00-5:00 and 12:00-17:00.
 
@@ -46,14 +48,14 @@ You can also set multiple start/stop schedules. In the following example, the pr
 
     schedule:
     start:
-    - "0 0 * * *"
-    - "12 0 * * *"
+      - "0 0 * * *"
+      - "12 0 * * *"
     stop:
-    - "5 0 * * *"
-    - "17 0 * * *"
+      - "5 0 * * *"
+      - "17 0 * * *"
     steps:
-    - name: some long-process
-      command: main.sh
+      - name: some long-process
+        command: main.sh
 
 Restart Schedule
 ----------------
@@ -67,8 +69,8 @@ If you want to restart a DAG process on a fixed schedule, the ``restart`` field 
     restart: "0 12 * * *" # restarts at 12:00
     stop: "0 13 * * *"    # stops at 13:00
     steps:
-    - name: scheduled job
-      command: job.sh
+      - name: scheduled job
+        command: job.sh
 
 The wait time after the job is stopped before restart can be configured in the DAG definition as follows. The default value is ``0`` (zero).
 
@@ -76,8 +78,8 @@ The wait time after the job is stopped before restart can be configured in the D
 
     restartWaitSec: 60 # Wait 60s after the process is stopped, then restart the DAG.
     steps:
-    - name: step1
-      command: python some_app.py
+      - name: step1
+        command: python some_app.py
 
 Run Scheduler as a Daemon
 -------------------------

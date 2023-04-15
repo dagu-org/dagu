@@ -11,23 +11,23 @@ The minimal DAG definition is as simple as follows.
 
 .. code-block:: yaml
 
-    steps:
-      - name: step 1
-        command: echo hello
-      - name: step 2
-        command: echo world
-        depends:
-          - step 1
+  steps:
+    - name: step 1
+      command: echo hello
+    - name: step 2
+      command: echo world
+      depends:
+        - step 1
 
 Specifying Working Directory
 ------------------------------
 
 .. code-block:: yaml
 
-    steps:
-      - name: step 1
-        dir: /path/to/working/directory
-        command: some command
+  steps:
+    - name: step 1
+      dir: /path/to/working/directory
+      command: some command
 
 Running Arbitrary Code Snippets
 -------------------------------
@@ -36,18 +36,18 @@ Running Arbitrary Code Snippets
 
 .. code-block:: yaml
 
-    steps:
-      - name: step 1
-        command: "bash"
-        script: |
-          cd /tmp
-          echo "hello world" > hello
-          cat hello
-        output: RESULT
-      - name: step 2
-        command: echo ${RESULT} # hello world
-        depends:
-          - step 1
+  steps:
+    - name: step 1
+      command: "bash"
+      script: |
+        cd /tmp
+        echo "hello world" > hello
+        cat hello
+      output: RESULT
+    - name: step 2
+      command: echo ${RESULT} # hello world
+      depends:
+        - step 1
 
 Defining Environment Variables
 -------------------------------
@@ -56,13 +56,13 @@ You can define environment variables and refer to them using the ``env`` field.
 
 .. code-block:: yaml
 
-    env:
-      - SOME_DIR: ${HOME}/batch
-      - SOME_FILE: ${SOME_DIR}/some_file 
-    steps:
-      - name: some task in some dir
-        dir: ${SOME_DIR}
-        command: python main.py ${SOME_FILE}
+  env:
+    - SOME_DIR: ${HOME}/batch
+    - SOME_FILE: ${SOME_DIR}/some_file 
+  steps:
+    - name: some task in some dir
+      dir: ${SOME_DIR}
+      command: python main.py ${SOME_FILE}
 
 Defining and Using Parameters
 ------------------------------
@@ -71,19 +71,19 @@ You can define parameters using the ``params`` field and refer to each parameter
 
 .. code-block:: yaml
 
-    params: param1 param2
-    steps:
-      - name: some task with parameters
-        command: python main.py $1 $2
+  params: param1 param2
+  steps:
+    - name: some task with parameters
+      command: python main.py $1 $2
 
 Named parameters are also available as follows.
 
 .. code-block:: yaml
 
-    params: ONE=1 TWO=`echo 2`
-    steps:
-      - name: some task with parameters
-        command: python main.py $ONE $TWO
+  params: ONE=1 TWO=`echo 2`
+  steps:
+    - name: some task with parameters
+      command: python main.py $ONE $TWO
 
 Using Command Substitution
 --------------------------
@@ -92,11 +92,11 @@ You can use command substitution in field values. I.e., a string enclosed in bac
 
 .. code-block:: yaml
 
-    env:
-      TODAY: "`date '+%Y%m%d'`"
-    steps:
-      - name: hello
-        command: "echo hello, today is ${TODAY}"
+  env:
+    TODAY: "`date '+%Y%m%d'`"
+  steps:
+    - name: hello
+      command: "echo hello, today is ${TODAY}"
 
 Adding Conditional Logic
 ------------------------
@@ -107,25 +107,25 @@ For example, the task below only runs on the first date of each month.
 
 .. code-block:: yaml
 
-    steps:
-      - name: A monthly task
-        command: monthly.sh
-        preconditions:
-          - condition: "`date '+%d'`"
-            expected: "01"
+  steps:
+    - name: A monthly task
+      command: monthly.sh
+      preconditions:
+        - condition: "`date '+%d'`"
+          expected: "01"
 
 If you want the DAG to continue to the next step regardless of the step's conditional check result, you can use the ``continueOn`` field:
 
 .. code-block:: yaml
 
-    steps:
-      - name: A monthly task
-        command: monthly.sh
-        preconditions:
-          - condition: "`date '+%d'`"
-            expected: "01"
-        continueOn:
-          skipped: true
+  steps:
+    - name: A monthly task
+      command: monthly.sh
+      preconditions:
+        - condition: "`date '+%d'`"
+          expected: "01"
+      continueOn:
+        skipped: true
 
 Setting Environment Variables with Standard Output
 ---------------------------------------------------
@@ -134,10 +134,10 @@ The ``output`` field can be used to set an environment variable with standard ou
 
 .. code-block:: yaml
 
-    steps:
-      - name: step 1
-        command: "echo foo"
-        output: FOO # will contain "foo"
+  steps:
+    - name: step 1
+      command: "echo foo"
+      output: FOO # will contain "foo"
 
 Redirecting Stdout and Stderr
 -----------------------------
@@ -146,19 +146,19 @@ The `stdout` field can be used to write standard output to a file.
 
 .. code-block:: yaml
 
-   steps:
-     - name: create a file
-       command: "echo hello"
-       stdout: "/tmp/hello" # the content will be "hello\n"
+  steps:
+    - name: create a file
+      command: "echo hello"
+      stdout: "/tmp/hello" # the content will be "hello\n"
 
 The `stderr` field allows to redirect stderr to other file without writing to the normal log file.
 
 .. code-block:: yaml
 
-   steps:
-     - name: output error file
-       command: "echo error message >&2"
-       stderr: "/tmp/error.txt"
+  steps:
+    - name: output error file
+      command: "echo error message >&2"
+      stderr: "/tmp/error.txt"
 
 
 Adding Lifecycle Hooks
@@ -168,14 +168,14 @@ It is often desirable to take action when a specific event happens, for example,
 
 .. code-block:: yaml
 
-   handlerOn:
-     failure:
-       command: notify_error.sh
-     exit:
-       command: cleanup.sh
-   steps:
-     - name: A task
-       command: main.sh
+  handlerOn:
+    failure:
+      command: notify_error.sh
+    exit:
+      command: cleanup.sh
+  steps:
+    - name: A task
+      command: main.sh
 
 Repeating a Task at Regular Intervals
 -------------------------------------
@@ -184,12 +184,26 @@ If you want a task to repeat execution at regular intervals, you can use the `re
 
 .. code-block:: yaml
 
-   steps:
-     - name: A task
-       command: main.sh
-       repeatPolicy:
-         repeat: true
-         intervalSec: 60
+  steps:
+    - name: A task
+      command: main.sh
+      repeatPolicy:
+        repeat: true
+        intervalSec: 60
+
+Scheduling a DAG with Cron Expression
+--------------------------------------
+
+You can use the `schedule` field to schedule a DAG with Cron expression.
+
+.. code-block:: yaml
+
+  schedule: "5 4 * * *" # Run at 04:05.
+  steps:
+    - name: scheduled job
+      command: job.sh
+
+See :ref:`scheduler configuration` for more details.
 
 All Available Fields for DAGs
 -------------------------------
