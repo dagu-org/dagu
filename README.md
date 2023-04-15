@@ -123,6 +123,8 @@ smtp:
   username: "MAILGUN_USERNAME"
   password: "MAILGUN_PASSWORD"
 
+params: QUESTION="Can you explain your philosophy of Stoicism?"
+
 steps:
   - name: ask chatgpt
     executor:
@@ -135,7 +137,7 @@ steps:
         silent: true
         body: |
           { "model": "gpt-3.5-turbo", "messages": [
-              {"role": "system", "content": "You are a philosopher of the Roman Imperial Period"},
+              {"role": "system", "content": "Respond as a philosopher of the Roman Imperial Period"},
               {"role": "user", "content": "$QUESTION"}
             ] 
           }
@@ -163,8 +165,8 @@ steps:
         message: |
           <html>
             <body>
-              <div>$QUESTION</div>
-              <div>$MESSAGE_CONTENT<div>
+              <h1>$QUESTION</h1>
+              <p>$MESSAGE_CONTENT</p>
             </body>
           </html>
     depends:
@@ -189,12 +191,14 @@ Dagu is a single command line tool that uses the local file system to store data
 
 ## **Roadmap**
 
-- Writing dags in the starlark language
+- Writing dags in the Starlark Language
+- Writing dags in the Cue
 - AWS Lambda Execution
-- DAG Versioning
 - Slack Integration
 - Database Option
+- DAG Versioning
 - Cluster Mode
+- User Defined Function
 
 ## **Contributing**
 
