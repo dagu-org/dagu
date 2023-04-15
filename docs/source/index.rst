@@ -32,6 +32,7 @@ Contents
    web_interface
    examples
    config
+   auth
    yaml_format
    base_config
    executors

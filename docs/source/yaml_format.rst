@@ -19,6 +19,8 @@ The minimal DAG definition is as simple as follows.
       depends:
         - step 1
 
+.. _specifying working dir:
+
 Specifying Working Directory
 ------------------------------
 

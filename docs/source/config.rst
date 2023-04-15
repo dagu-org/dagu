@@ -24,7 +24,7 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_BASE_CONFIG`` (``$DAGU_HOME/config.yaml``): The path to the base configuration file.
 - ``DAGU_NAVBAR_COLOR`` (``""``): The color to use for the navigation bar. E.g., ``red`` or ``#ff0000``.
 - ``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``
-- ``DAGU_WORK_DIR``: The working directory for DAGs. If not set, the default value is DAG location.
+- ``DAGU_WORK_DIR``: The working directory for DAGs. If not set, the default value is DAG location. Also you can set the working directory for each DAG steps in the DAG configuration file. For more information, see :ref:`specifying working dir`.
 
 Note: If ``DAGU_HOME`` environment variable is not set, the default value is ``$HOME/.dagu``.
 

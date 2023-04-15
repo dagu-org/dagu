@@ -54,10 +54,10 @@ Dagu is a tool for scheduling and running tasks based on [DAGs](https://en.wikip
   - Sending emails
   - Running jq command
   - Executing remote commands via SSH
-- Support for Email notification
-- Support for configuration options through environment variables
+- Email notification
 - Scheduling with Cron expressions
-- Support for REST API Interface
+- REST API Interface
+- Basic Authentication
 
 ## **Usecase**
 
@@ -208,10 +208,14 @@ Dagu is a single command line tool that uses the local file system to store data
 - Writing dags in Cue
 - AWS Lambda Execution
 - Slack Integration
+- User Defined Function
+- Observability
+- Project concept for grouping dags
+- Simple User management and RBAC
+- Keycloak Integration Option
+- HA Cluster Mode
 - Database Option
 - DAG Versioning
-- Cluster Mode
-- User Defined Function
 
 ## **Contributing**
 
