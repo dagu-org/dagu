@@ -1,41 +1,99 @@
 Contribution Guide
 ===================
 
-We welcome contributions to Dagu! If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository. If you would like to contribute code, please follow these steps:
-
-1. Fork the repository
-2. Create a new branch for your changes
-3. Make your changes and commit them to your branch
-4. Push your branch to your fork and open a pull request
-
-Building Binary From Source Code
---------------------------------
+We welcome contributions of any size and skill level. If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository.
 
 Prerequisite
-~~~~~~~~~~~~
+-------------
 
-Before building the binary from the source code, make sure that you have the following software installed on your system:
+* `Go version 1.19 or later. <https://go.dev/doc/install>`_
+* Latest version of `Node.js <https://nodejs.org/en/download/>`_.
+* `yarn <https://yarnpkg.com/>`_ package manager.
 
-1. `Go version 1.18 or later. <https://go.dev/doc/install>`_
-2. Latest version of `Node.js <https://nodejs.org/en/download/>`_.
-3. `yarn <https://yarnpkg.com/>`_ package manager.
+Setting up your local environment
+----------------------------------
 
-Build Binary
-~~~~~~~~~~~~
-
-To build the binary from the source code, follow these steps:
-
-1. Clone the repository to your local machine.
-2. Navigate to the root directory of the cloned repository and build the frontend project by running the following command:
+#. Clone the repository to your local machine.
+#. Navigate to the root directory of the cloned repository and build the frontend project by running the following command:
 
    .. code-block:: sh
 
       make build-admin
 
-3. Build the `dagu` binary by running the following command:
+#. Run the following command to start the `Dagu` application:
+
+   .. code-block:: sh
+
+      go run main.go
+
+#. Now you can change the source code and build the binary by running the following command:
 
    .. code-block:: sh
 
       make build
 
-You can now use the `dagu` binary that is created in the `./bin` directory.
+#. Run the following command to start the `Dagu` application:
+
+   .. code-block:: sh
+
+      ./bin/dagu
+
+Running Tests
+-------------
+
+   Run the following command to run the tests:
+
+   .. code-block:: sh
+
+      make test
+
+Code Structure
+---------------
+
+- ``admin``: Frontend code for the Web UI.
+- ``cmd``: Contains the main application entry point.
+- ``docs``: Contains the documentation for the project.
+- ``examples``: Contains the example workflows.
+- ``internal``: Contains the internal code for the project.
+
+  - ``admin``: Contains the backend code for the Web UI.
+  - ``agent``: Contains the code for runnning the workflows.
+  - ``config``: Contains the code for loading the configuration.
+  - ``controller``: Contains the code for managing the workflows.
+  - ``dag``: Contains the code for parsing the workflow definition.
+  - ``database``: Contains the code for interacting with the database.
+  - ``executor``: Contains the code for different types of executors.
+  - ``runner``: Contains the code for scheduler.
+  - ``sock``: Contains the code for interacting with the socket.
+
+Setting up your local environment for front end development
+-------------------------------------------------------------
+
+#. Clone the repository to your local machine.
+#. Navigate to the root directory of the cloned repository and build the frontend project by running the following command:
+
+   .. code-block:: sh
+
+      make build-admin
+
+#. Run the following command to start the `Dagu` application:
+
+   .. code-block:: sh
+
+      go run main.go server
+
+#. Navigate to ``admin`` directory and run the following command to install the dependencies:
+
+   .. code-block:: sh
+
+      yarn install
+      yarn start
+
+#. Open the browser and navigate to http://localhost:8081.
+
+#. Make changes to the source code and refresh the browser to see the changes.
+
+Branches
+---------
+
+* ``main``: The main branch where the source code always reflects a production-ready state.
