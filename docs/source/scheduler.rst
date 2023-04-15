@@ -36,8 +36,8 @@ If you want to start and stop a long-running process on a fixed schedule, you ca
 .. code-block:: yaml
 
     schedule:
-    start: "0 8 * * *" # starts at 8:00
-    stop: "0 13 * * *" # stops at 13:00
+      start: "0 8 * * *" # starts at 8:00
+      stop: "0 13 * * *" # stops at 13:00
     steps:
       - name: scheduled job
         command: job.sh
