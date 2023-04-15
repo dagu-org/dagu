@@ -192,7 +192,7 @@ Dagu is a single command line tool that uses the local file system to store data
 ## **Roadmap**
 
 - Writing dags in the Starlark Language
-- Writing dags in the Cue
+- Writing dags in Cue
 - AWS Lambda Execution
 - Slack Integration
 - Database Option
