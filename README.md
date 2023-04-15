@@ -59,6 +59,18 @@ Dagu is a tool for scheduling and running tasks based on [DAGs](https://en.wikip
 - Scheduling with Cron expressions
 - Support for REST API Interface
 
+## **Usecase**
+
+- **Data Pipeline Automation:** Schedule ETL tasks for data processing and centralization.
+- **Infrastructure Monitoring:** Periodically check infrastructure components with HTTP requests or SSH commands.
+- **Automated Reporting:** Generate and send periodic reports via email.
+- **Batch Processing:** Schedule batch jobs for tasks like data cleansing or model training.
+- **Task Dependency Management:** Manage complex workflows with interdependent tasks.
+- **Microservices Orchestration:** Define and manage dependencies between microservices.
+- **CI/CD Integration:** Automate code deployment, testing, and environment updates.
+- **Alerting System:** Create notifications based on specific triggers or conditions.
+- **Custom Task Automation:** Define and schedule custom tasks using code snippets.
+
 ## **Documentation**
 
 - [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
@@ -173,7 +185,7 @@ steps:
       - get result
 ```
 
-You can input the ChatGPT prompt on the Web UI.
+You can input the ChatGPT prompt in the Web UI.
 
 ![params-input](./assets/images/ui-params.png)
 
