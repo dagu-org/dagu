@@ -26,7 +26,7 @@
 Dagu is a tool for scheduling and running tasks based on [DAGs](https://en.wikipedia.org/wiki/Directed_acyclic_graph) defined in a simple YAML format. It allows you to define dependencies between commands and represent them as a single DAG, schedule the execution of DAGs with Cron expressions, and natively support running Docker containers, making HTTP requests, and executing commands over SSH.
 
 - [Documentation](https://dagu.readthedocs.io) 
-- [Discord](https://discord.gg/4s4feC8r)
+- [Discord Community](https://discord.gg/4s4feC8r)
 
 ## **Highlights**
 - Single binary file installation
@@ -219,10 +219,7 @@ Dagu is a single command line tool that uses the local file system to store data
 
 ## **Contributing**
 
-Feel free to contribute in any way you want. Share ideas, questions, submit issues, and create pull requests.
-
-- Request a feature in our [Discord community](https://discord.gg/4s4feC8r).
-- Open a PR or Issue
+Feel free to contribute in any way you want. Check out our [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for help getting started.
 
 ## **License**
 
@@ -230,4 +227,4 @@ This project is licensed under the GNU GPLv3.
 
 ## **Support and Community**
 
-Join our [Discord community](https://discord.gg/4s4feC8r).
+Join our [Discord community](https://discord.gg/4s4feC8r) to ask questions, request features, and share your ideas.
