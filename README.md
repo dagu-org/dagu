@@ -125,6 +125,10 @@ steps:
 
 This example workflow calls the ChatGPT API and sends the result to your email address.
 
+Create a new DAG in the Web UI and copy-paste the following YAML in the editor.
+Replace `OPEN_API_KEY`, `YOUR_EMAIL_ADDRESS`, `MAILGUN_USERNAME`, and `MAILGUN_PASSWORD` in the `env` and `smtp` section with your own information. [Mailgun](https://www.mailgun.com/) offers a free tier for testing.
+You can then run the DAG.
+
 ```yaml
 env:
   - OPENAI_API_KEY: "OPEN_API_KEY"
@@ -216,6 +220,7 @@ Dagu is a single command line tool that uses the local file system to store data
 - HA Cluster Mode
 - Database Option
 - DAG Versioning
+- Built-in TLS
 
 ## **Contributing**
 
