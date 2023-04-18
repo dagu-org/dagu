@@ -1,3 +1,5 @@
+.. _Yaml Format:
+
 YAML Format
 ============
 

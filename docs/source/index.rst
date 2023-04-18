@@ -17,7 +17,7 @@ Dagu
       </div>
    </div>
 
-Dagu is a powerful Cron alternative with Web UI. It allows you to define dependencies between commands in a declarative YAML format. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands as a `Directed Acyclic Graph (DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a declarative :ref:`YAML Format`. Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
 Contents
 --------
