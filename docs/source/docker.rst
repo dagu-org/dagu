@@ -5,6 +5,7 @@ Create the ``Dockerfile`` and you can build an image.
 
 .. code-block:: dockerfile
 
+    # syntax=docker/dockerfile:1.4
     FROM alpine:latest
 
     ARG TARGETARCH
