@@ -17,7 +17,7 @@ Dagu
       </div>
    </div>
 
-Dagu is a tool for scheduling and running tasks based on DAGs defined in a simple YAML format. It allows you to define dependencies between commands and represent them as a single DAG, schedule the execution with Cron expressions.
+Dagu is a powerful Cron alternative with Web UI. It allows you to define dependencies between commands in a declarative YAML format. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
 Contents
 --------
