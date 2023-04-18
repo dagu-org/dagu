@@ -6,6 +6,8 @@ Configuration Options
 .. contents::
     :local:
 
+.. _Environment Variables:
+
 Environment Variables
 ----------------------
 
@@ -56,3 +58,24 @@ You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$
     # Working Directory
     workDir: <working directory for DAGs>                        # default: DAG location
     
+
+.. _Host and Port Configuration:
+
+Server's Host and Port Configuration
+-------------------------------------
+
+To specify the host and port for running the Dagu server, there are a couple of ways to do it.
+
+The first way is to specify the ``DAGU_HOST`` and ``DAGU_PORT`` environment variables. For example, you could run the following command:
+
+.. code-block:: sh
+
+    DAGU_PORT=8000 dagu server
+
+The second way is to use the ``--host`` and ``--port`` options when running the ``dagu server`` command. For example:
+
+.. code-block:: sh
+
+    dagu server --port=8000
+
+See :ref:`Environment Variables` for more information.
