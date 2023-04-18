@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-FROM alpine:latest
+FROM --platform=$BUILDPLATFORM alpine:latest
 
 ARG TARGETARCH
 ARG VERSION=1.3.15 

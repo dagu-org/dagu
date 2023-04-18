@@ -36,3 +36,12 @@ lint:
 
 clean:
 	rm -rf bin admin/dist
+
+DAGU_VERSION=
+BUILD_IMAGE_ARGS := buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg VERSION=$(DAGU_VERSION) --push --no-cache
+build-image:
+ifeq ($(DAGU_VERSION),)
+	$(error "DAGU_VERSION is null")
+endif
+	docker $(BUILD_IMAGE_ARGS) -t yohamta/dagu:$(DAGU_VERSION) .
+	docker $(BUILD_IMAGE_ARGS) -t yohamta/dagu:latest .
