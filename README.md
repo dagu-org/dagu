@@ -69,6 +69,77 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - **Alerting System:** Create notifications based on specific triggers or conditions.
 - **Custom Task Automation:** Define and schedule custom tasks using code snippets.
 
+## **Web User Interface**
+
+![example](assets/images/demo.gif?raw=true)
+
+## Installation
+
+You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
+
+### Via Homebrew
+```sh
+brew install yohamta/tap/dagu
+```
+
+Upgrade to the latest version:
+```sh
+brew upgrade yohamta/tap/dagu
+```
+
+### Via Bash script
+
+```sh
+curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
+```
+
+### Via Docker
+
+```sh
+docker run \
+--rm \
+-p 8080:8080 \
+-v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
+-v $HOME/.dagu/data:/home/dagu/.dagu/data \
+-v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
+yohamta/dagu:latest
+```
+
+### Via GitHub Release Page 
+
+Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
+
+## ️Quick Start Guide
+
+### 1. Launch the Web UI
+
+Start the server with the command `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
+
+### 2. Create a New DAG
+
+Navigate to the DAG List page by clicking the menu in the left panel of the Web UI. Then create a DAG by clicking the `New DAG` button at the top of the page. Enter `example` in the dialog.
+
+*Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Configuration Options](https://dagu.readthedocs.io/en/latest/config.html) for more details.*
+
+### 3. Edit the DAG
+
+Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste the following example and click the `Save` button.
+
+Example:
+```yaml
+steps:
+  - name: s1
+    command: echo Hello Dagu
+  - name: s2
+    command: echo done!
+    depends:
+      - s1
+```
+
+### 4. Execute the DAG
+
+You can execute the example by pressing the `Start` button. You can see "Hello Dagu" in the log page in the Web UI.
+
 ## **Documentation**
 
 - [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
@@ -100,24 +171,6 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - [Configurations](https://dagu.readthedocs.io/en/latest/config.html)
 - [Scheduler](https://dagu.readthedocs.io/en/latest/scheduler.html)
 - [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
-
-## **Web User Interface**
-
-![example](assets/images/demo.gif?raw=true)
-
-## **Hello World**
-
-This example outputs "hello world" to the log.
-
-```yaml
-steps:
-  - name: s1
-    command: echo hello world
-  - name: s2
-    command: echo done!
-    depends:
-      - s1
-```
 
 ## **Example Workflow**
 
@@ -220,7 +273,12 @@ Dagu is a single command line tool that uses the local file system to store data
 - DAG Versioning
 - Built-in TLS
 
-## **Contributing**
+## **Contributors**
+<a href="https://github.com/yohamta/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
+</a>
+
+----
 
 Feel free to contribute in any way you want! Share ideas, questions, submit issues, and create pull requests. Check out our [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for help getting started.
 
