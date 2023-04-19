@@ -19,12 +19,18 @@
   <img src="https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg" />
 </p>
 
-# **Dagu**
+<div align="center">
+
+[Installation](#installation) | [Community](https://discord.gg/gpahPUjGRk) | [Quick Start](#️quick-start-guide) 
+
+</div>
+
+<h1><b>Dagu</b></h1>
 
 Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands as a [Directed Acyclic Graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) in a declarative [YAML format](https://dagu.readthedocs.io/en/latest/yaml_format.html). Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH.
 
 - [Documentation](https://dagu.readthedocs.io) 
-- [Discord Community](https://discord.gg/4s4feC8r)
+- [Discord Community](https://discord.gg/gpahPUjGRk)
 
 ## **Highlights**
 - Single binary file installation
@@ -32,6 +38,33 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - Web UI for visually managing, rerunning, and monitoring pipelines
 - Use existing programs without any modification
 - Self-contained, with no need for a DBMS
+
+## **Contents**
+
+- [**Highlights**](#highlights)
+- [**Contents**](#contents)
+- [**Features**](#features)
+- [**Usecase**](#usecase)
+- [**Web User Interface**](#web-user-interface)
+- [**Installation**](#installation)
+  - [Via Homebrew](#via-homebrew)
+  - [Via Bash script](#via-bash-script)
+  - [Via Docker](#via-docker)
+  - [Via GitHub Release Page](#via-github-release-page)
+- [️**Quick Start Guide**](#️quick-start-guide)
+  - [1. Launch the Web UI](#1-launch-the-web-ui)
+  - [2. Create a New DAG](#2-create-a-new-dag)
+  - [3. Edit the DAG](#3-edit-the-dag)
+  - [4. Execute the DAG](#4-execute-the-dag)
+- [**Documentation**](#documentation)
+- [**Example Workflow**](#example-workflow)
+- [**Motivation**](#motivation)
+- [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#why-not-use-an-existing-workflow-scheduler-like-airflow)
+- [**How It Works**](#how-it-works)
+- [**Roadmap**](#roadmap)
+- [**Contributors**](#contributors)
+- [**License**](#license)
+- [**Support and Community**](#support-and-community)
 
 ## **Features**
 
@@ -71,9 +104,30 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
 ## **Web User Interface**
 
-![example](assets/images/demo.gif?raw=true)
+- **DAG Details**: It shows the real-time status, logs, and DAG configurations. You can edit DAG configurations on a browser.
 
-## Installation
+  ![example](assets/images/demo.gif?raw=true)
+
+  You can switch to the vertical graph with the button on the top right corner.
+
+  ![Details-TD](assets/images/ui-details2.png?raw=true)
+
+- **DAGs**: It shows all DAGs and the real-time status.
+
+  ![DAGs](assets/images/ui-dags.png?raw=true)
+
+- **Search DAGs**: It greps given text across all DAGs.
+  ![History](assets/images/ui-search.png?raw=true)
+
+- **Execution History**: It shows past execution results and logs.
+
+  ![History](assets/images/ui-history.png?raw=true)
+
+- **DAG Execution Log**: It shows the detail log and standard output of each execution and step.
+
+  ![DAG Log](assets/images/ui-logoutput.png?raw=true)
+
+## **Installation**
 
 You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
 
@@ -109,7 +163,7 @@ yohamta/dagu:latest
 
 Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 
-## ️Quick Start Guide
+## ️**Quick Start Guide**
 
 ### 1. Launch the Web UI
 
@@ -290,4 +344,4 @@ This project is licensed under the GNU GPLv3.
 
 ## **Support and Community**
 
-Join our [Discord community](https://discord.gg/4s4feC8r) to ask questions, request features, and share your ideas.
+Join our [Discord community](https://discord.gg/gpahPUjGRk) to ask questions, request features, and share your ideas.
