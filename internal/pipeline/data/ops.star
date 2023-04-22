@@ -1,4 +1,4 @@
-load("internal/pipeline/data/dag.star", "node")
+load("data/dag.star", "node")
 
 def content_holdback(name, conf={}, predicate=None):
     return node(

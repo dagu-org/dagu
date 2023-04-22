@@ -1,7 +1,7 @@
-load("internal/pipeline/data/dag.star", "node", "edge", "is_runnable", "sequence", "before")
-load("internal/pipeline/data/ops.star", "content_holdback", "ranking", "batch_ranking", "realtime_ranking",
+load("data/dag.star", "node", "edge", "is_runnable", "sequence", "before")
+load("data/ops.star", "content_holdback", "ranking", "batch_ranking", "realtime_ranking",
      "container_pinning", "apply_node")
-load("internal/pipeline/data/predicates.star", "is_returning_user", "is_new_user")
+load("data/predicates.star", "is_returning_user", "is_new_user")
 
 
 def container_pinning_i18n_predicate(req):

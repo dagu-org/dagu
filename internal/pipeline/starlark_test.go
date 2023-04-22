@@ -2,13 +2,14 @@ package pipeline
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"go.starlark.net/starlark"
-	"testing"
 )
 
 func TestNewPipeline(t *testing.T) {
-	g, err := NewPipeline("data/home.star")
+	g, err := NewPipeline("./data/home.star")
 	require.NoError(t, err)
 	fmt.Println(g)
 }
