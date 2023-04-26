@@ -236,14 +236,14 @@ You can then run the DAG.
 
 ```yaml
 env:
-  - OPENAI_API_KEY: "OPEN_API_KEY"
-  - MY_EMAIL: "YOUR_EMAIL_ADDRESS"
+  - OPENAI_API_KEY: "$OPEN_API_KEY"
+  - MY_EMAIL: "$YOUR_EMAIL_ADDRESS"
 
 smtp:
   host: "smtp.mailgun.org"
   port: "587"
-  username: "MAILGUN_USERNAME"
-  password: "MAILGUN_PASSWORD"
+  username: "$MAILGUN_USERNAME"
+  password: "$MAILGUN_PASSWORD"
 
 params: QUESTION="Can you explain your philosophy of Stoicism?"
 
@@ -283,7 +283,7 @@ steps:
       config:
         to: "$MY_EMAIL"
         from: "$MY_EMAIL"
-        subject: "philosopher's reply"
+        subject: "[dagu-auto] philosopher's reply"
         message: |
           <html>
             <body>
