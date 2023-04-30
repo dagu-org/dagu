@@ -619,22 +619,17 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 			return fmt.Errorf("call must specify a functions that exists")
 		}
 
-		// TODO: fix
-		// passedParamNames := make([]string, 0, len(def.Call.Args))
-		// for k := range def.Call.Args {
-		// 	passedParamNames = append(passedParamNames, k)
-		// }
+		definedParamNames := strings.Split(calledFuncDef.Params, " ")
+		if len(def.Call.Args) != len(definedParamNames) {
+			return fmt.Errorf("the number of parameters defined in the function does not match the number of parameters given")
+		}
 
-		// definedParamNames := strings.Split(calledFuncDef.Params, " ")
-		// if len(passedParamNames) != len(definedParamNames) {
-		// 	return fmt.Errorf("invalid parameter passed")
-		// }
-
-		// for i := 0; i < len(definedParamNames); i++ {
-		// 	if passedParamNames[i] != definedParamNames[i] {
-		// 		return fmt.Errorf("invalid parameter passed")
-		// 	}
-		// }
+		for _, paramName := range definedParamNames {
+			_, exists := def.Call.Args[paramName]
+			if !exists {
+				return fmt.Errorf("required parameter not found")
+			}
+		}
 	}
 
 	return nil
