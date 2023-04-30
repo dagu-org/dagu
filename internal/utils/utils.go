@@ -100,6 +100,39 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 	return vals[0], []string{}
 }
 
+// Assign values to command parameters
+func AssignValues(command string, params map[string]string) string {
+	updatedCommand := command
+
+	for k, v := range params {
+		updatedCommand = strings.ReplaceAll(updatedCommand, fmt.Sprintf("$%v", k), v)
+	}
+
+	return updatedCommand
+}
+
+// Returns a command with parameters stripped from it.
+func RemoveParams(command string) string {
+	paramRegex := regexp.MustCompile(`\$\w+`)
+
+	return paramRegex.ReplaceAllString(command, "")
+}
+
+// extracts a slice of parameter names by removing the '$' from the command string.
+func ExtractParamNames(command string) []string {
+	words := strings.Fields(command)
+
+	var params []string
+	for _, word := range words {
+		if strings.HasPrefix(word, "$") {
+			paramName := strings.TrimPrefix(word, "$")
+			params = append(params, paramName)
+		}
+	}
+
+	return params
+}
+
 func UnescapeSpecialchars(str string) string {
 	repl := strings.NewReplacer(
 		`\\t`, `\t`,
