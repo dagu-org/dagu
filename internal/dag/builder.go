@@ -580,7 +580,13 @@ func assertFunctions(funcs []*funcDef) error {
 		return nil
 	}
 
+	nameMap := make(map[string]bool)
 	for _, funcDef := range funcs {
+		if _, exists := nameMap[funcDef.Name]; exists {
+			return fmt.Errorf("duplicate function")
+		}
+		nameMap[funcDef.Name] = true
+
 		params := strings.Split(funcDef.Params, " ")
 		extractedParams := utils.ExtractParamNames(funcDef.Command)
 		if len(params) != len(extractedParams) {
