@@ -8,6 +8,7 @@ type configDefinition struct {
 	LogDir            string
 	Env               interface{}
 	HandlerOn         handerOnDef
+	Functions         []*funcDef
 	Steps             []*stepDef
 	Smtp              smtpConfigDef
 	MailOn            *mailOnDef
@@ -52,7 +53,19 @@ type stepDef struct {
 	MailOnError   bool
 	Preconditions []*conditionDef
 	SignalOnStop  *string
-	Env 		  string
+	Env           string
+	Call          *callFuncDef
+}
+
+type funcDef struct {
+	Name    string
+	Params  string
+	Command string
+}
+
+type callFuncDef struct {
+	Function string
+	Args     map[string]interface{}
 }
 
 type continueOnDef struct {
