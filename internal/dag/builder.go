@@ -587,14 +587,14 @@ func assertFunctions(funcs []*funcDef) error {
 		}
 		nameMap[funcDef.Name] = true
 
-		params := strings.Split(funcDef.Params, " ")
-		extractedParams := utils.ExtractParamNames(funcDef.Command)
-		if len(params) != len(extractedParams) {
+		definedParamNames := strings.Split(funcDef.Params, " ")
+		passedParamNames := utils.ExtractParamNames(funcDef.Command)
+		if len(definedParamNames) != len(passedParamNames) {
 			return fmt.Errorf("func params and args given to func command do not match")
 		}
 
-		for i := 0; i < len(params); i++ {
-			if params[i] != extractedParams[i] {
+		for i := 0; i < len(definedParamNames); i++ {
+			if definedParamNames[i] != passedParamNames[i] {
 				return fmt.Errorf("func params and args given to func command do not match")
 			}
 		}
