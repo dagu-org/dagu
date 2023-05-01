@@ -362,10 +362,9 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 			return nil, fmt.Errorf("args must be convertible to either int or string")
 		}
 
-		calledFunc := def.Call.Function
 		calledFuncDef := &funcDef{}
 		for _, funcDef := range funcs {
-			if funcDef.Name == calledFunc {
+			if funcDef.Name == def.Call.Function {
 				calledFuncDef = funcDef
 				break
 			}
