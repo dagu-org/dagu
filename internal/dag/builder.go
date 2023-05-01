@@ -574,6 +574,7 @@ func parseSchedule(values []string) ([]*Schedule, error) {
 	return ret, nil
 }
 
+// only assert functions clause
 func assertFunctions(funcs []*funcDef) error {
 	if funcs == nil {
 		return nil
@@ -608,7 +609,7 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 	}
 	// TODO: Refactor the validation check for each executor.
 	if def.Executor == nil && (def.Command == "" && def.Call == nil) {
-		return fmt.Errorf("either step command or step call must be specified")
+		return fmt.Errorf("either step command or step call must be specified if executor is nil")
 	}
 
 	if def.Call != nil {
