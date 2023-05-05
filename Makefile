@@ -3,6 +3,9 @@ LDFLAGS=-X 'main.version=$(VERSION)'
 
 .PHONY: build server scheduler test
 
+main:
+	go run main.go server
+
 build-dir:
 	mkdir -p ./bin
 
