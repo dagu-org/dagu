@@ -1,17 +1,22 @@
 VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(VERSION)'
+SRC_DIR=./
+DST_DIR=$(SRC_DIR)/internal
 
 .PHONY: build server scheduler test
 
 build-dir:
 	mkdir -p ./bin
 
-build: build-admin build-dir build-bin
+build: build-admin build-dir gen-pb build-bin
 
 build-admin:
 	cd admin; \
 		yarn && yarn build
 	cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+
+gen-pb:
+	protoc -I=$(SRC_DIR) --go_out=$(DST_DIR) $(SRC_DIR)/internal/proto/*.proto
 
 build-bin:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
