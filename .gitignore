@@ -3,7 +3,7 @@ bin/*
 dist/
 internal/admin/handlers/web/assets/fonts/*
 internal/admin/handlers/web/assets/js/*
-internal/generated/*
+internal/generated/**/*.pb.go
 
 # NVM
 .nvmrc

@@ -1,35 +1,71 @@
 syntax = "proto3";
 package models;
 
-import "google/protobuf/timestamp.proto";
+// import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
 
 option go_package = "./generated";
 
 message Status {
-    string request_id = 1;
-    string name = 2;
-    int32 status = 3; // TODO: implement helper: type scheduler.SchedulerStatus 型に対応
-    string status_text = 4;
-    int32 pid = 5; // TODO: implement helper: type Pid
-    repeated Node nodes = 6;
-    Node on_exit = 7;
-    Node on_success = 8;
-    Node on_failure = 9;
-    Node on_cancel = 10;
-    string started_at = 11; // TODO: to timestamp?
-    string finished_at = 12;
-    string log = 13;
-    string params = 14;
+  string request_id = 1;
+  string name = 2;
+  int32 status = 3; // TODO: implement helper: type scheduler.SchedulerStatus
+  string status_text = 4;
+  int32 pid = 5; // TODO: implement helper: type Pid
+  repeated google.protobuf.Any nodes = 6;
+  google.protobuf.Any on_exit = 7;
+  google.protobuf.Any on_success = 8;
+  google.protobuf.Any on_failure = 9;
+  google.protobuf.Any on_cancel = 10;
+  string started_at = 11; // TODO: to timestamp?
+  string finished_at = 12;
+  string log = 13;
+  string params = 14;
 }
 
-message Node {
-    string step = 1; // TODO: implement helper: type dag.Step
-    string log = 2;
-    string started_at = 3; // TODO: to timestamp?
-    string finished_at = 4;
-    int32 status = 5; // TODO: implement helper: type scheduler.NodeStatus。enumでも良いかも
-    int32 retry_count = 6;
-    int32 done_count = 7;
-    string error = 8;
-    string status_text = 9;
+message Step {
+  string name = 1;
+  string description = 2;
+  repeated string variables = 3;
+  string dir = 4;
+  ExecutorConfig executor_config = 5;
+  string cmd_with_args = 6;
+  string command = 7;
+  string script = 8;
+  string stdout = 9;
+  string stderr = 10;
+  string output = 11;
+  repeated string args = 12;
+  repeated string depends = 13;
+  ContinueOn continue_on = 14;
+  RetryPolicy retry_policy = 15;
+  RepeatPolicy repeat_policy = 16;
+  bool mail_on_error = 17;
+  repeated Condition preconditions = 18;
+  string signal_on_stop = 19;
+}
+  
+message ExecutorConfig {
+  string type = 1;
+  map<string, google.protobuf.Any> fields = 2;
+}
+  
+message ContinueOn {
+  bool failure = 1;
+  bool skipped = 2;
+}
+  
+message RetryPolicy {
+  int32 limit = 1;
+  int32 interval = 2; // TODO: type
+}
+  
+message RepeatPolicy {
+  int32 limit = 1;
+  int32 interval = 2; // TODO: type
+}
+  
+message Condition {
+  string condition = 1;
+  string expected = 2;
 }
