@@ -88,7 +88,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - Email notification
 - Scheduling with Cron expressions
 - REST API Interface
-- Basic Authentication
+- Basic Authentication over HTTPS
 
 ## **Usecase**
 
