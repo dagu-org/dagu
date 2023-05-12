@@ -131,6 +131,26 @@ If you want the DAG to continue to the next step regardless of the step's condit
       continueOn:
         skipped: true
 
+User Defined Functions
+-----------------------
+
+You can define functions in the DAG file and call them in steps. The ``params`` field is required for functions. The ``args`` field is used to pass arguments to functions. The arguments can be command substitutions or environment variables.
+
+.. code-block:: yaml
+
+  functions:
+    - name: my_function
+      params: param1 param2
+      command: python main.py $param1 $param2
+
+  steps:
+    - name: step 1
+      call:
+        function: my_function
+        args:
+          param1: 1
+          param2: 2
+
 Setting Environment Variables with Standard Output
 ---------------------------------------------------
 
