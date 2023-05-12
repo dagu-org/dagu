@@ -27,17 +27,17 @@ Contents
 
    installation
    quickstart
-   docker-compose
    cli
    web_interface
+   yaml_format
+   base_config
    examples
    config
    auth
-   yaml_format
-   base_config
    executors
    email
    scheduler
+   docker-compose
    rest
    docker
    faq
