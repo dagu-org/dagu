@@ -1,27 +1,11 @@
 syntax = "proto3";
 package models;
 
-// import "google/protobuf/timestamp.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/any.proto";
 
-option go_package = "./generated";
-
-message Status {
-  string request_id = 1;
-  string name = 2;
-  int32 status = 3; // TODO: implement helper: type scheduler.SchedulerStatus
-  string status_text = 4;
-  int32 pid = 5; // TODO: implement helper: type Pid
-  repeated google.protobuf.Any nodes = 6;
-  google.protobuf.Any on_exit = 7;
-  google.protobuf.Any on_success = 8;
-  google.protobuf.Any on_failure = 9;
-  google.protobuf.Any on_cancel = 10;
-  string started_at = 11; // TODO: to timestamp?
-  string finished_at = 12;
-  string log = 13;
-  string params = 14;
-}
+option go_package = "./pb";
 
 message Step {
   string name = 1;
@@ -44,10 +28,10 @@ message Step {
   repeated Condition preconditions = 18;
   string signal_on_stop = 19;
 }
-  
+
 message ExecutorConfig {
   string type = 1;
-  map<string, google.protobuf.Any> fields = 2;
+  map<string, google.protobuf.Any> config = 2;
 }
   
 message ContinueOn {
@@ -57,15 +41,32 @@ message ContinueOn {
   
 message RetryPolicy {
   int32 limit = 1;
-  int32 interval = 2; // TODO: type
+  google.protobuf.Duration interval = 2;
 }
   
 message RepeatPolicy {
   int32 limit = 1;
-  int32 interval = 2; // TODO: type
+  google.protobuf.Duration interval = 2;
 }
   
 message Condition {
   string condition = 1;
   string expected = 2;
 }
+
+// message Status {
+//   string request_id = 1;
+//   string name = 2;
+//   int32 status = 3; // TODO: implement helper: type scheduler.SchedulerStatus
+//   string status_text = 4;
+//   int32 pid = 5; // TODO: implement helper: type Pid
+//   repeated google.protobuf.Any nodes = 6;
+//   google.protobuf.Any on_exit = 7;
+//   google.protobuf.Any on_success = 8;
+//   google.protobuf.Any on_failure = 9;
+//   google.protobuf.Any on_cancel = 10;
+//   string started_at = 11; // TODO: to timestamp?
+//   string finished_at = 12;
+//   string log = 13;
+//   string params = 14;
+// }
