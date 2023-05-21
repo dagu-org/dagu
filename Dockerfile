@@ -2,8 +2,8 @@
 FROM --platform=$BUILDPLATFORM alpine:latest
 
 ARG TARGETARCH
-ARG VERSION=1.3.15 
-ARG RELEASES_URL="https://github.com/yohamta/dagu/releases"
+ARG VERSION=1.10.5 
+ARG RELEASES_URL="https://github.com/dagu-dev/dagu/releases"
 
 ARG USER="dagu"
 ARG USER_UID=1000
