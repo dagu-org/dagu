@@ -6,7 +6,7 @@ LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 
 # parameter for build image
 VERSION=
-DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg BUILD_VERSION=$(VERSION) --push --no-cache
+DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg VERSION=$(VERSION) --push --no-cache
 
 ### Commands ###
 
