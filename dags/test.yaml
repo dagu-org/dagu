@@ -1,0 +1,12 @@
+functions:
+  - name: my_function
+    params: param1 param2
+    command: python main.py $param1 $param2
+
+steps:
+  - name: step 1
+    call:
+      function: my_function
+      args:
+        param1: 1
+        param2: 2

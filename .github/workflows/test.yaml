@@ -40,7 +40,7 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Build
+      - name: Build # TODO: Check if code generation is required 
         run: |
           mkdir ./bin && go build -o ./bin/dagu .
       - name: Test
