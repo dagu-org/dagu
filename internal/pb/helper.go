@@ -13,6 +13,9 @@ import (
 )
 
 func ToDagStep(pbStep *Step) (*dag.Step, error) {
+	if pbStep == nil {
+		return nil, fmt.Errorf("pbStep must not be nil")
+	}
 	dagStep := &dag.Step{
 		Name:         pbStep.Name,
 		Description:  pbStep.Description,
@@ -78,7 +81,9 @@ func ToDagStep(pbStep *Step) (*dag.Step, error) {
 }
 
 func ToPbStep(dagStep *dag.Step) (*Step, error) {
-	fmt.Printf("dagStep: %+v\n", dagStep)
+	if dagStep == nil {
+		return nil, fmt.Errorf("dagStep must not be nil")
+	}
 	step := &Step{
 		Name:         dagStep.Name,
 		Description:  dagStep.Description,
