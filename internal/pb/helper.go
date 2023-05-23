@@ -34,9 +34,13 @@ func ToDagStep(pbStep *Step) (*dag.Step, error) {
 	}
 
 	if pbStep.ExecutorConfig != nil {
-		config, err := convertPbAnyToInterface(pbStep.ExecutorConfig.Config)
-		if err != nil {
-			return nil, err
+		config := make(map[string]interface{}, len(pbStep.ExecutorConfig.Config))
+		for k, v := range pbStep.ExecutorConfig.Config {
+			vInterface, err := convertPbAnyToInterface(v)
+			if err != nil {
+				return nil, err
+			}
+			config[k] = vInterface
 		}
 
 		dagStep.ExecutorConfig = dag.ExecutorConfig{
@@ -157,39 +161,35 @@ func ToPbStep(dagStep *dag.Step) (*Step, error) {
 	return step, nil
 }
 
-func convertPbAnyToInterface(src map[string]*anypb.Any) (map[string]interface{}, error) {
-	dst := make(map[string]interface{}, len(src))
-	for k, v := range src {
-		switch v.TypeUrl {
-		case "type.googleapis.com/google.protobuf.IntValue":
-			var intValue wrapperspb.Int32Value
-			if err := v.UnmarshalTo(&intValue); err != nil {
-				return nil, fmt.Errorf("could not unmarshal IntValue: %w", err)
-			}
-			dst[k] = intValue.GetValue()
-		case "type.googleapis.com/google.protobuf.StringValue":
-			var stringValue wrapperspb.StringValue
-			if err := v.UnmarshalTo(&stringValue); err != nil {
-				return nil, fmt.Errorf("could not unmarshal StringValue: %w", err)
-			}
-			dst[k] = stringValue.GetValue()
-		case "type.googleapis.com/google.protobuf.BoolValue":
-			var boolValue wrapperspb.BoolValue
-			if err := v.UnmarshalTo(&boolValue); err != nil {
-				return nil, fmt.Errorf("could not unmarshal BoolValue: %w", err)
-			}
-			dst[k] = boolValue.GetValue()
-		case "type.googleapis.com/google.protobuf.Struct":
-			var structValue structpb.Struct
-			if err := v.UnmarshalTo(&structValue); err != nil {
-				return nil, fmt.Errorf("could not unmarshal Struct: %w", err)
-			}
-			dst[k] = structValue.AsMap()
-		default:
-			return nil, fmt.Errorf("unknown type URL: %s", v.TypeUrl)
+func convertPbAnyToInterface(any *anypb.Any) (interface{}, error) {
+	switch any.TypeUrl {
+	case "type.googleapis.com/google.protobuf.IntValue":
+		var intValue wrapperspb.Int32Value
+		if err := any.UnmarshalTo(&intValue); err != nil {
+			return nil, fmt.Errorf("could not unmarshal IntValue: %w", err)
 		}
+		return intValue.GetValue(), nil
+	case "type.googleapis.com/google.protobuf.StringValue":
+		var stringValue wrapperspb.StringValue
+		if err := any.UnmarshalTo(&stringValue); err != nil {
+			return nil, fmt.Errorf("could not unmarshal StringValue: %w", err)
+		}
+		return stringValue.GetValue(), nil
+	case "type.googleapis.com/google.protobuf.BoolValue":
+		var boolValue wrapperspb.BoolValue
+		if err := any.UnmarshalTo(&boolValue); err != nil {
+			return nil, fmt.Errorf("could not unmarshal BoolValue: %w", err)
+		}
+		return boolValue.GetValue(), nil
+	case "type.googleapis.com/google.protobuf.Struct":
+		var structValue structpb.Struct
+		if err := any.UnmarshalTo(&structValue); err != nil {
+			return nil, fmt.Errorf("could not unmarshal Struct: %w", err)
+		}
+		return structValue.AsMap(), nil
+	default:
+		return nil, fmt.Errorf("unknown type URL: %s", any.TypeUrl)
 	}
-	return dst, nil
 }
 
 func convertToProtoMessage(v interface{}) (proto.Message, error) {
