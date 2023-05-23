@@ -26,5 +26,14 @@ To enable basic authentication for Dagu, follow these steps:
        isBasicAuth: true
        basicAuthUsername: "<your-username>"
        basicAuthPassword: "<your-password>"
+
+#. You can enable HTTPS by configuring the following environment variables:
+
+   .. code-block:: bash
   
+       export DAGU_CERT_FILE="<path-to-cert-file>"
+       export DAGU_KEY_FILE="<path-to-key-file>"
+  
+   Replace ``<path-to-cert-file>`` and ``<path-to-key-file>`` with the paths to your certificate and key files.
+
    See :ref:`Configuration Options` for more information on the configuration file.

@@ -13,7 +13,7 @@ Dagu
 
    <div>
       <div class="github-star-button">
-      <iframe src="https://ghbtns.com/github-btn.html?user=dagu-labs&repo=dagu&type=star&count=true&size=large" frameborder="0" scrolling="0" width="160px" height="30px"></iframe>
+      <iframe src="https://ghbtns.com/github-btn.html?user=dagu-dev&repo=dagu&type=star&count=true&size=large" frameborder="0" scrolling="0" width="160px" height="30px"></iframe>
       </div>
    </div>
 
@@ -27,17 +27,17 @@ Contents
 
    installation
    quickstart
-   docker-compose
    cli
    web_interface
+   yaml_format
+   base_config
    examples
    config
    auth
-   yaml_format
-   base_config
    executors
    email
    scheduler
+   docker-compose
    rest
    docker
    faq

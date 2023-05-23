@@ -20,6 +20,7 @@ type server struct {
 	addr            string
 	server          *http.Server
 	idleConnsClosed chan struct{}
+	scheme          string
 }
 
 func NewServer(cfg *config.Config) *server {
@@ -50,12 +51,31 @@ func (svr *server) Serve() (err error) {
 	svr.setupHandler()
 
 	svr.idleConnsClosed = make(chan struct{})
-
 	host := utils.StringWithFallback(svr.config.Host, "localhost")
-	log.Printf("admin server is running at \"http://%s:%d\"\n",
-		host, svr.config.Port)
 
-	err = svr.server.ListenAndServe()
+	var (
+		certFile = ""
+		keyFile  = ""
+		scheme   = "http"
+	)
+
+	if svr.config.TLS != nil {
+		certFile = svr.config.TLS.CertFile
+		keyFile = svr.config.TLS.KeyFile
+	}
+
+	if svr.config.TLS != nil && certFile != "" && keyFile != "" {
+		scheme = "https"
+	}
+
+	log.Printf("admin server is running at \"%s://%s:%d\"\n", scheme, host, svr.config.Port)
+
+	switch {
+	case svr.config.TLS != nil && certFile != "" && keyFile != "":
+		err = svr.server.ListenAndServeTLS(certFile, keyFile)
+	default:
+		err = svr.server.ListenAndServe()
+	}
 	if err == http.ErrServerClosed {
 		err = nil
 	}
@@ -71,9 +91,7 @@ func (svr *server) Serve() (err error) {
 }
 
 func (svr *server) setupServer() {
-	svr.server = &http.Server{
-		Addr: svr.addr,
-	}
+	svr.server = &http.Server{Addr: svr.addr}
 }
 
 func (svr *server) setupHandler() {

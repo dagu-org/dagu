@@ -16,3 +16,7 @@ tmp/*
 
 # VSCode
 .vscode
+
+# certs
+cert/*.pem
+cert/*.srl

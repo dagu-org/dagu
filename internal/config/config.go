@@ -29,6 +29,10 @@ type Config struct {
 	NavbarColor        string
 	NavbarTitle        string
 	Env                map[string]string
+	TLS                *struct {
+		CertFile string
+		KeyFile  string
+	}
 }
 
 var instance *Config = nil
@@ -63,6 +67,8 @@ func LoadConfig(userHomeDir string) error {
 	viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
 	viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
 	viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+	viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
+	viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
 
 	exectable := "dagu"
 	if ex, err := os.Executable(); err == nil {
