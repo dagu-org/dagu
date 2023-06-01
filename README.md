@@ -228,76 +228,81 @@ You can execute the example by pressing the `Start` button. You can see "Hello D
 
 ## **Example Workflow**
 
-This example workflow calls the ChatGPT API and sends the result to your email address.
+This example workflow showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
 
-Create a new DAG in the Web UI and copy-paste the following YAML in the editor.
-Replace `OPEN_API_KEY`, `YOUR_EMAIL_ADDRESS`, `MAILGUN_USERNAME`, and `MAILGUN_PASSWORD` in the `env` and `smtp` section with your own information. [Mailgun](https://www.mailgun.com/) offers a free tier for testing.
-You can then run the DAG.
+![Details-TD](assets/images/example.png?raw=true)
+
+The YAML code below represents this workflow:
 
 ```yaml
+# Environment variables used throughout the pipeline
 env:
-  - OPENAI_API_KEY: "$OPEN_API_KEY"
-  - MY_EMAIL: "$YOUR_EMAIL_ADDRESS"
+  - DATA_DIR: /data
+  - SCRIPT_DIR: /scripts
+  - LOG_DIR: /log
 
-smtp:
-  host: "smtp.mailgun.org"
-  port: "587"
-  username: "$MAILGUN_USERNAME"
-  password: "$MAILGUN_PASSWORD"
+# Handlers to manage errors and cleanup after execution
+handlerOn:
+  failure:
+    command: "echo error"
+  exit:
+    command: "echo clean up"
 
-params: QUESTION="Can you explain your philosophy of Stoicism?"
+# The schedule for the workflow execution in cron format
+# This schedule runs the workflow daily at 12:00 AM
+schedule: "0 0 * * *"
 
 steps:
-  - name: ask chatgpt
-    executor:
-      type: http
-      config:
-        timeout: 180
-        headers:
-          Authorization: "Bearer $OPENAI_API_KEY"
-          Content-Type: "application/json"
-        silent: true
-        body: |
-          { "model": "gpt-3.5-turbo", "messages": [
-              {"role": "system", "content": "Respond as a philosopher of the Roman Imperial Period"},
-              {"role": "user", "content": "$QUESTION"}
-            ] 
-          }
-    command: POST https://api.openai.com/v1/chat/completions
-    output: API_RESPONSE
+  # Step 1: Pull the latest data from a data source
+  - name: pull_data
+    command: "bash"
+    script: |
+      echo `date '+%Y-%m-%d'`
+    output: DATE
 
-  - name: get result
-    executor:
-      type: jq
-      config:
-        raw: true
-    command: ".choices[0].message.content"
-    script: "$API_RESPONSE"
-    output: MESSAGE_CONTENT
+ # Step 2: Cleanse and prepare the data
+  - name: cleanse_data
+    command: echo cleansing ${DATA_DIR}/${DATE}.csv
     depends:
-      - ask chatgpt
-  
-  - name: send mail
-    executor:
-      type: mail
-      config:
-        to: "$MY_EMAIL"
-        from: "$MY_EMAIL"
-        subject: "[dagu-auto] philosopher's reply"
-        message: |
-          <html>
-            <body>
-              <h1>$QUESTION</h1>
-              <p>$MESSAGE_CONTENT</p>
-            </body>
-          </html>
+      - pull_data
+
+  # Step 3: Transform the data
+  - name: transform_data
+    command: echo transforming ${DATA_DIR}/${DATE}_clean.csv
     depends:
-      - get result
+      - cleanse_data
+
+  # Parallel Step 1: Load the data into a database
+  - name: load_data
+    command: echo loading ${DATA_DIR}/${DATE}_transformed.csv
+    depends:
+      - transform_data
+
+  # Parallel Step 2: Generate a statistical report
+  - name: generate_report
+    command: echo generating report ${DATA_DIR}/${DATE}_transformed.csv
+    depends:
+      - transform_data
+
+  # Step 4: Run some analytics
+  - name: run_analytics
+    command: echo running analytics ${DATA_DIR}/${DATE}_transformed.csv
+    depends:
+      - load_data
+
+  # Step 5: Send an email report
+  - name: send_report
+    command: echo sending email ${DATA_DIR}/${DATE}_analytics.csv
+    depends:
+      - run_analytics
+      - generate_report
+
+  # Step 6: Cleanup temporary files
+  - name: cleanup
+    command: echo removing ${DATE}*.csv
+    depends:
+      - send_report
 ```
-
-You can input the ChatGPT prompt in the Web UI.
-
-![params-input](./assets/images/ui-params.png)
 
 ## **Motivation**
 
