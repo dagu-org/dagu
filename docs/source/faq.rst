@@ -6,7 +6,7 @@ How Long Will the History Data be Stored?
 
 By default, the execution history data is retained for 30 days. However, you can customize this setting by modifying the `histRetentionDays` field in a YAML file.
 
-How to Use Specific Host and Port eor `dagu server`?
+How to Use Specific Host and Port or `dagu server`?
 -----------------------------------------------------
 
 To configure the host and port for `dagu server`, you can set the environment variables `DAGU_HOST` and `DAGU_PORT`. Refer to the :ref:`Configuration Options` for more details.

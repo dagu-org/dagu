@@ -15,7 +15,7 @@ Example:
     # history retention days (default: 30)
     histRetentionDays: 3
 
-    # Eamil notification settings
+    # Email notification settings
     mailOn:
       failure: true
       success: true
