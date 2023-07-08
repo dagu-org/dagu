@@ -7,8 +7,8 @@
   <a href="https://goreportcard.com/report/github.com/yohamta/dagu">
     <img src="https://goreportcard.com/badge/github.com/yohamta/dagu" />
   </a>
-  <a href="https://codecov.io/gh/yohamta/dagu">
-    <img src="https://codecov.io/gh/yohamta/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
+  <a href="https://codecov.io/gh/dagu-dev/dagu">
+    <img src="https://codecov.io/gh/dagu-dev/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
   </a>
   <a href="https://github.com/yohamta/dagu/releases">
     <img src="https://img.shields.io/github/release/yohamta/dagu.svg" />
