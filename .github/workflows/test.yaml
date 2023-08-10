@@ -48,11 +48,14 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
       - name: Build
         run: |
           mkdir ./bin && protoc -I=./ --go_out=./internal ./internal/proto/*.proto  && go build -o ./bin/dagu .
+
       - name: Test
         run: |
           go test -v -coverprofile="coverage.txt" -covermode=atomic ./...
+
       - name: Upload coverage
         uses: codecov/codecov-action@v2

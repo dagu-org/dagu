@@ -13,6 +13,14 @@ jobs:
         with:
           go-version: 1.19.x
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2
+
+      - name: Installing protoc-gen-go
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
       - name: Set up NodeJS
         uses: actions/setup-node@v3
         with:
@@ -35,6 +43,10 @@ jobs:
       - name: Copy web assets
         run: |
           cp ui/dist/bundle.js ./internal/web/handlers/assets/js/
+
+      - name: Run protoc
+        run: |
+          protoc -I=./ --go_out=./internal ./internal/proto/*.proto
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
