@@ -38,9 +38,8 @@ func ConfigRoutes(r *chi.Mux) {
 
 func handleGetAssets() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = "/web" + r.URL.Path
 		w.Header().Set("Cache-Control", "max-age=86400")
-		http.FileServer(http.FS(assets)).ServeHTTP(w, r)
+		http.FileServer(http.FS(assetsFS)).ServeHTTP(w, r)
 	}
 }
 

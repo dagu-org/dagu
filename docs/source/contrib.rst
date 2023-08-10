@@ -18,7 +18,7 @@ Setting up your local environment
 
    .. code-block:: sh
 
-      make build-admin
+      make build-ui
 
 #. Run the following command to start the `Dagu` application:
 
@@ -50,13 +50,13 @@ Running Tests
 Code Structure
 ---------------
 
-- ``admin``: Frontend code for the Web UI.
+- ``ui``: Frontend code for the Web UI.
 - ``cmd``: Contains the main application entry point.
 - ``docs``: Contains the documentation for the project.
 - ``examples``: Contains the example workflows.
 - ``internal``: Contains the internal code for the project.
 
-  - ``admin``: Contains the backend code for the Web UI.
+  - ``web``: Contains the backend code for the Web UI.
   - ``agent``: Contains the code for runnning the workflows.
   - ``config``: Contains the code for loading the configuration.
   - ``controller``: Contains the code for managing the workflows.
@@ -74,7 +74,7 @@ Setting up your local environment for front end development
 
    .. code-block:: sh
 
-      make build-admin
+      make build-ui
 
 #. Run the following command to start the `Dagu` application:
 
@@ -82,7 +82,7 @@ Setting up your local environment for front end development
 
       go run main.go server
 
-#. Navigate to ``admin`` directory and run the following command to install the dependencies:
+#. Navigate to ``ui`` directory and run the following command to install the dependencies:
 
    .. code-block:: sh
 

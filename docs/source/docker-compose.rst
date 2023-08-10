@@ -1,7 +1,7 @@
 Using Docker Compose
 ===================================
 
-To automate workflows based on cron expressions, it is necessary to run both the admin server and scheduler process. Here is an example `docker-compose.yml` setup for running Dagu using Docker Compose.
+To automate workflows based on cron expressions, it is necessary to run both the ui server and scheduler process. Here is an example `docker-compose.yml` setup for running Dagu using Docker Compose.
 
 .. code-block:: yaml
 
@@ -16,7 +16,7 @@ To automate workflows based on cron expressions, it is necessary to run both the
           - dagu:/home/dagu/.dagu
         command: chown -R dagu /home/dagu/.dagu/
 
-      # admin web server process
+      # ui server process
       server:
         image: "yohamta/dagu:latest"
         environment:

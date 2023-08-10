@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/yohamta/dagu/internal/admin"
 	"github.com/yohamta/dagu/internal/agent"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
@@ -22,6 +21,7 @@ import (
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/runner"
 	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/yohamta/dagu/internal/web"
 )
 
 func registerCommands(root *cobra.Command) {
@@ -173,7 +173,7 @@ func createServerCommand() *cobra.Command {
 		Short: "Start the server",
 		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			server := admin.NewServer(config.Get())
+			server := web.NewServer(config.Get())
 			go listenSignals(cmd.Context(), server)
 			checkError(server.Serve())
 		},

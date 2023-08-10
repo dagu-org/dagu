@@ -401,11 +401,11 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
   useEffect(() => {
     const searchText = searchParams.get('search');
     if (searchText) {
-      instance.getColumn('Name').setFilterValue(searchText);
+      instance.getColumn('Name')?.setFilterValue(searchText);
     }
     const t = searchParams.get('tag');
     if (t) {
-      instance.getColumn('Tags').setFilterValue(t);
+      instance.getColumn('Tags')?.setFilterValue(t);
     }
   }, []);
 
@@ -525,11 +525,11 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
           size="small"
           variant="filled"
           InputProps={{
-            value: instance.getColumn('Name').getFilterValue(),
+            value: instance.getColumn('Name')?.getFilterValue(),
             onChange: (e) => {
               const value = e.target.value || '';
               addSearchParam('search', value);
-              instance.getColumn('Name').setFilterValue(value);
+              instance.getColumn('Name')?.setFilterValue(value);
             },
             type: 'search',
           }}
@@ -542,7 +542,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
           onChange={(_, value) => {
             const v = value || '';
             addSearchParam('tag', v);
-            instance.getColumn('Tags').setFilterValue(v);
+            instance.getColumn('Tags')?.setFilterValue(v);
           }}
           renderInput={(params) => (
             <TextField {...params} variant="filled" label="Search Tag" />

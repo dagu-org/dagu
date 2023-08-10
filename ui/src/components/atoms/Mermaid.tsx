@@ -1,4 +1,5 @@
 import React, { CSSProperties } from 'react';
+// @ts-ignore
 import mermaidAPI, { Mermaid } from 'mermaid';
 
 type Props = {
@@ -49,6 +50,7 @@ function Mermaid({ def, style = {} }: Props) {
         }
         setTimeout(() => {
           if (ref.current) {
+            // @ts-ignore
             bindFunc(ref.current);
           }
         }, 500);

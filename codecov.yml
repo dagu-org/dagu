@@ -1,6 +1,6 @@
 coverage:
   ignore:
-    - "internal/admin/handlers"
+    - "internal/web/handlers"
   status:
     project:
       default:

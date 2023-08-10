@@ -31,15 +31,15 @@ jobs:
 
       - name: Yarn install
         run: yarn install
-        working-directory: admin
+        working-directory: ui
 
       - name: Build web UI
         run: yarn build
-        working-directory: admin
+        working-directory: ui
 
       - name: Copy web assets
         run: |
-          cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+          cp ui/dist/bundle.js ./internal/web/handlers/assets/js/
 
       - name: Cache Go modules
         uses: actions/cache@v1

@@ -47,8 +47,8 @@ You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$
     dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
     
     # Web UI Color & Title
-    navbarColor: <admin-web header color>                        # header color for web UI (e.g. "#ff0000")
-    navbarTitle: <admin-web title text>                          # header title for web UI (e.g. "PROD")
+    navbarColor: <ui header color>                               # header color for web UI (e.g. "#ff0000")
+    navbarTitle: <ui title text>                                 # header title for web UI (e.g. "PROD")
     
     # Basic Auth
     isBasicAuth: <true|false>                                    # enables basic auth

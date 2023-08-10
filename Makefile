@@ -11,6 +11,9 @@ VERSION=
 DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg VERSION=$(VERSION) --push --no-cache
 
 ### Commands ###
+watch:
+	nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
+
 gen-pb:
 	protoc -I=$(SRC_DIR) --go_out=$(DST_DIR) $(SRC_DIR)/internal/proto/*.proto
 
@@ -28,12 +31,12 @@ scheduler: build-dir
 build-dir:
 	@mkdir -p ./bin
 
-build: build-admin build-dir gen-pb build-bin
+build: build-ui build-dir gen-pb build-bin
 
-build-admin:
-	@cd admin; \
+build-ui:
+	@cd ui; \
 		yarn && yarn build
-	@cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+	@cp ui/dist/bundle.js ./internal/web/handlers/assets/js/
 
 test:
 	@go test -v ./...
@@ -93,3 +96,9 @@ gencert-check:
 
 server-tls:
 	@DAGU_CERT_FILE=./cert/server-cert.pem DAGU_KEY_FILE=./cert/server-key.pem go run . server
+
+install-tools:
+	brew install protobuf
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+	npm install -g nodemon

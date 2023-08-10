@@ -10,7 +10,7 @@ function DAGEditor({ value, onChange }: Props) {
   return (
     <MonacoEditor
       height="60vh"
-      defaultValue={value}
+      value={value}
       onChange={onChange}
       language="yaml"
     />
