@@ -1,7 +1,7 @@
 {
-  "name": "dagu-admin",
+  "name": "dagu",
   "version": "1.0.0",
-  "description": "admin Web UI for dagu",
+  "description": "Web UI for dagu",
   "private": true,
   "scripts": {
     "build": "webpack --config webpack.prod.js",

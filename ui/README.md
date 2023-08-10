@@ -1,9 +1,9 @@
-# dagu Admin UI
+# dagu UI
 
 ## Development Instructions
 
 ### 1. Starting the Backend Server
-The Dagu Admin UI relies on a backend server that provides the necessary data for the UI to function properly. To start the backend server, navigate to the project root directory and execute the following command:
+The Dagu UI relies on a backend server that provides the necessary data for the UI to function properly. To start the backend server, navigate to the project root directory and execute the following command:
 
 ```bash
 git clone git@github.com:yohamta/dagu.git
@@ -15,10 +15,10 @@ This command will start the backend server at 127.0.0.1:8080 by default. If you 
 
 ### 2. Starting the Webpack Dev Server
 
-Once the backend server is up and running, you can start the Webpack dev server to serve the frontend assets. To do this, navigate to the admin/ directory and execute the following commands:
+Once the backend server is up and running, you can start the Webpack dev server to serve the frontend assets. To do this, navigate to the ui/ directory and execute the following commands:
 
 ```bash
-cd admin/
+cd ui/
 yarn install
 yarn start
 ```
@@ -31,7 +31,7 @@ If you need to build the `bundle.js` file, which contains all the necessary fron
 
 ```
 cd dagu
-make build-admin
+make build-ui
 ```
 
-This command will build the `bundle.js` file and copy it to dagu/internal/admin/handlers/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.
+This command will build the `bundle.js` file and copy it to dagu/internal/web/handlers/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.

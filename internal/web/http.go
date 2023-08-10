@@ -67,7 +67,7 @@ func (svr *server) Serve() (err error) {
 		scheme = "https"
 	}
 
-	log.Printf("admin server is running at \"%s://%s:%d\"\n", scheme, host, svr.config.Port)
+	log.Printf("server is running at \"%s://%s:%d\"\n", scheme, host, svr.config.Port)
 
 	switch {
 	case svr.config.TLS != nil && certFile != "" && keyFile != "":

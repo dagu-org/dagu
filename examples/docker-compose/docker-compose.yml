@@ -9,7 +9,7 @@ services:
       - dagu:/home/dagu/.dagu
     command: chown -R dagu /home/dagu/.dagu/
 
-  # admin web server process
+  # ui server process
   server:
     image: "yohamta/dagu:latest"
     environment:

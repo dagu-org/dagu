@@ -31,12 +31,12 @@ scheduler: build-dir
 build-dir:
 	@mkdir -p ./bin
 
-build: build-admin build-dir gen-pb build-bin
+build: build-ui build-dir gen-pb build-bin
 
-build-admin:
-	@cd admin; \
+build-ui:
+	@cd ui; \
 		yarn && yarn build
-	@cp admin/dist/bundle.js ./internal/web/handlers/assets/js/
+	@cp ui/dist/bundle.js ./internal/web/handlers/assets/js/
 
 test:
 	@go test -v ./...
