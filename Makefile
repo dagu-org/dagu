@@ -1,6 +1,8 @@
 .PHONY: build server scheduler test
 
 ### Variables ###
+SRC_DIR=./
+DST_DIR=$(SRC_DIR)/internal
 BUILD_VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 
@@ -9,6 +11,11 @@ VERSION=
 DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg VERSION=$(VERSION) --push --no-cache
 
 ### Commands ###
+gen-pb:
+	protoc -I=$(SRC_DIR) --go_out=$(DST_DIR) $(SRC_DIR)/internal/proto/*.proto
+
+build-bin:
+	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
 
 server:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
@@ -21,15 +28,12 @@ scheduler: build-dir
 build-dir:
 	@mkdir -p ./bin
 
-build: build-admin build-dir build-bin
+build: build-admin build-dir gen-pb build-bin
 
 build-admin:
 	@cd admin; \
 		yarn && yarn build
 	@cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
-
-build-bin:
-	@go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
 
 test:
 	@go test -v ./...

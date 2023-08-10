@@ -11,6 +11,7 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/dag"
+	"github.com/yohamta/dagu/internal/pb"
 )
 
 type SchedulerStatus int
@@ -57,10 +58,10 @@ type Config struct {
 	MaxActiveRuns int
 	Delay         time.Duration
 	Dry           bool
-	OnExit        *dag.Step
-	OnSuccess     *dag.Step
-	OnFailure     *dag.Step
-	OnCancel      *dag.Step
+	OnExit        *pb.Step
+	OnSuccess     *pb.Step
+	OnFailure     *pb.Step
+	OnCancel      *pb.Step
 	RequestId     string
 }
 
@@ -349,16 +350,20 @@ func (sc *Scheduler) setup() (err error) {
 	}
 	sc.handlers = map[string]*Node{}
 	if sc.OnExit != nil {
-		sc.handlers[constants.OnExit] = &Node{Step: sc.OnExit}
+		onExit, _ := pb.ToDagStep(sc.OnExit)
+		sc.handlers[constants.OnExit] = &Node{Step: onExit}
 	}
 	if sc.OnSuccess != nil {
-		sc.handlers[constants.OnSuccess] = &Node{Step: sc.OnSuccess}
+		onSuccess, _ := pb.ToDagStep(sc.OnSuccess)
+		sc.handlers[constants.OnSuccess] = &Node{Step: onSuccess}
 	}
 	if sc.OnFailure != nil {
-		sc.handlers[constants.OnFailure] = &Node{Step: sc.OnFailure}
+		onFailure, _ := pb.ToDagStep(sc.OnFailure)
+		sc.handlers[constants.OnFailure] = &Node{Step: onFailure}
 	}
 	if sc.OnCancel != nil {
-		sc.handlers[constants.OnCancel] = &Node{Step: sc.OnCancel}
+		onCancel, _ := pb.ToDagStep(sc.OnCancel)
+		sc.handlers[constants.OnCancel] = &Node{Step: onCancel}
 	}
 	return
 }

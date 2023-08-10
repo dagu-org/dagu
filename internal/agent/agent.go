@@ -21,6 +21,7 @@ import (
 	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/mailer"
 	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/pb"
 	"github.com/yohamta/dagu/internal/reporter"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/sock"
@@ -162,18 +163,37 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 
 func (a *Agent) init() {
 	logDir := path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_"))
+	config := &scheduler.Config{
+		LogDir:        logDir,
+		MaxActiveRuns: a.DAG.MaxActiveRuns,
+		Delay:         a.DAG.Delay,
+		Dry:           a.Dry,
+		RequestId:     a.requestId,
+	}
+
+	if a.DAG.HandlerOn.Exit != nil {
+		onExit, _ := pb.ToPbStep(a.DAG.HandlerOn.Exit)
+		config.OnExit = onExit
+	}
+
+	if a.DAG.HandlerOn.Success != nil {
+		onSuccess, _ := pb.ToPbStep(a.DAG.HandlerOn.Success)
+		config.OnSuccess = onSuccess
+	}
+
+	if a.DAG.HandlerOn.Failure != nil {
+		onFailure, _ := pb.ToPbStep(a.DAG.HandlerOn.Failure)
+		config.OnFailure = onFailure
+	}
+
+	if a.DAG.HandlerOn.Cancel != nil {
+		onCancel, _ := pb.ToPbStep(a.DAG.HandlerOn.Cancel)
+		config.OnCancel = onCancel
+	}
+
 	a.scheduler = &scheduler.Scheduler{
-		Config: &scheduler.Config{
-			LogDir:        logDir,
-			MaxActiveRuns: a.DAG.MaxActiveRuns,
-			Delay:         a.DAG.Delay,
-			Dry:           a.Dry,
-			OnExit:        a.DAG.HandlerOn.Exit,
-			OnSuccess:     a.DAG.HandlerOn.Success,
-			OnFailure:     a.DAG.HandlerOn.Failure,
-			OnCancel:      a.DAG.HandlerOn.Cancel,
-			RequestId:     a.requestId,
-		}}
+		Config: config,
+	}
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{
