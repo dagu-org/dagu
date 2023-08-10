@@ -35,13 +35,13 @@ func defaultFuncs() template.FuncMap {
 	}
 }
 
-//go:embed web/templates/* web/assets/*
-var assets embed.FS
-var templatePath = "web/templates/"
+//go:embed templates/* assets/*
+var assetsFS embed.FS
+var templatePath = "templates/"
 
 func useTemplate(layout string, name string) func(http.ResponseWriter, interface{}) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))
-	tmpl, err := template.New(name).Funcs(defaultFuncs()).ParseFS(assets, files...)
+	tmpl, err := template.New(name).Funcs(defaultFuncs()).ParseFS(assetsFS, files...)
 	if err != nil {
 		panic(err)
 	}

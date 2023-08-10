@@ -34,7 +34,7 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+          cp admin/dist/bundle.js ./internal/web/handlers/assets/js/
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2

@@ -33,7 +33,7 @@ build: build-admin build-dir gen-pb build-bin
 build-admin:
 	@cd admin; \
 		yarn && yarn build
-	@cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
+	@cp admin/dist/bundle.js ./internal/web/handlers/assets/js/
 
 test:
 	@go test -v ./...

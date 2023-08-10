@@ -1,4 +1,4 @@
-package admin
+package web
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/yohamta/dagu/internal/admin/handlers"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
+	"github.com/yohamta/dagu/internal/web/handlers"
 )
 
 type server struct {
@@ -20,7 +20,6 @@ type server struct {
 	addr            string
 	server          *http.Server
 	idleConnsClosed chan struct{}
-	scheme          string
 }
 
 func NewServer(cfg *config.Config) *server {
