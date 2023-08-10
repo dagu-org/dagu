@@ -24,13 +24,7 @@ EOF
 USER dagu
 WORKDIR /home/dagu
 RUN <<EOF
-    #dagu binary setup
-    if [ "${TARGETARCH}" == "amd64" ]; then 
-        arch="x86_64";
-    else 
-        arch="${TARGETARCH}"
-    fi
-    export TARGET_FILE="dagu_${VERSION}_Linux_${arch}.tar.gz"
+    export TARGET_FILE="dagu_${VERSION}_Linux_${TARGETARCH}.tar.gz"
     wget ${RELEASES_URL}/download/v${VERSION}/${TARGET_FILE}
     tar -xf ${TARGET_FILE} && rm *.tar.gz 
     sudo mv dagu /usr/local/bin/ 
