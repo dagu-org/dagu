@@ -35,9 +35,6 @@ build-admin:
 		yarn && yarn build
 	@cp admin/dist/bundle.js ./internal/admin/handlers/web/assets/js/
 
-build-bin:
-	@go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
-
 test:
 	@go test -v ./...
 
