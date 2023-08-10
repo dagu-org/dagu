@@ -36,7 +36,7 @@ build: build-ui build-dir gen-pb build-bin
 build-ui:
 	@cd ui; \
 		yarn && yarn build
-	@cp ui/dist/bundle.js ./internal/web/handlers/assets/js/
+	@cp ui/dist/*.js ./internal/web/handlers/assets/js/
 
 test:
 	@go test -v ./...
