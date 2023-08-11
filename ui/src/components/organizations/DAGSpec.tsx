@@ -124,7 +124,7 @@ function DAGSpec({ data }: Props) {
                       <Button
                         id="save-config"
                         color="primary"
-                        variant="contained"
+                        variant="outlined"
                         startIcon={
                           <span className="icon">
                             <FontAwesomeIcon icon={faFloppyDisk} />
@@ -155,7 +155,7 @@ function DAGSpec({ data }: Props) {
                       </Button>
                       <Button
                         color="error"
-                        variant="contained"
+                        variant="outlined"
                         onClick={() => setEditing(false)}
                         sx={{ ml: 2 }}
                         startIcon={
@@ -171,7 +171,7 @@ function DAGSpec({ data }: Props) {
                     <Stack direction="row">
                       <Button
                         id="edit-config"
-                        variant="contained"
+                        variant="outlined"
                         color="primary"
                         onClick={() => setEditing(true)}
                         startIcon={

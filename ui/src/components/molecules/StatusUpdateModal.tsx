@@ -57,20 +57,20 @@ function StatusUpdateModal({ visible, dismissModal, step, onSubmit }: Props) {
             spacing={2}
           >
             <Button
-              variant="contained"
+              variant="outlined"
               onClick={() => onSubmit(step, 'mark-success')}
             >
               Mark Success
             </Button>
             <Button
-              variant="contained"
+              variant="outlined"
               onClick={() => onSubmit(step, 'mark-failed')}
             >
               Mark Failed
             </Button>
           </Stack>
           <Stack direction="row" alignContent="center" justifyContent="center">
-            <Button variant="contained" color="error" onClick={dismissModal}>
+            <Button variant="outlined" color="error" onClick={dismissModal}>
               Cancel
             </Button>
           </Stack>
