@@ -110,22 +110,22 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
   You can switch to the vertical graph with the button on the top right corner.
 
-  ![Details-TD](assets/images/ui-details2.png?raw=true)
+  ![Details-TD](assets/images/ui-details2.webp?raw=true)
 
 - **DAGs**: It shows all DAGs and the real-time status.
 
-  ![DAGs](assets/images/ui-dags.png?raw=true)
+  ![DAGs](assets/images/ui-dags.webp?raw=true)
 
 - **Search DAGs**: It greps given text across all DAGs.
-  ![History](assets/images/ui-search.png?raw=true)
+  ![History](assets/images/ui-search.webp?raw=true)
 
 - **Execution History**: It shows past execution results and logs.
 
-  ![History](assets/images/ui-history.png?raw=true)
+  ![History](assets/images/ui-history.webp?raw=true)
 
 - **DAG Execution Log**: It shows the detail log and standard output of each execution and step.
 
-  ![DAG Log](assets/images/ui-logoutput.png?raw=true)
+  ![DAG Log](assets/images/ui-logoutput.webp?raw=true)
 
 ## **Installation**
 
@@ -230,7 +230,7 @@ You can execute the example by pressing the `Start` button. You can see "Hello D
 
 This example workflow showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
 
-![Details-TD](assets/images/example.png?raw=true)
+![Details-TD](assets/images/example.webp?raw=true)
 
 The YAML code below represents this workflow:
 
