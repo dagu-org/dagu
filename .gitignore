@@ -2,8 +2,8 @@
 bin/*
 dist/
 internal/web/handlers/assets/fonts/*
-internal/web/handlers/assets/js/*
-!internal/web/handlers/assets/js/.gitkeep
+internal/web/handlers/assets/*
+!internal/web/handlers/assets/.gitkeep
 internal/**/*.pb.go
 
 # NVM

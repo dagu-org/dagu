@@ -9,9 +9,6 @@ import { SWRConfig } from 'swr';
 import fetchJson from './lib/fetchJson';
 import Search from './pages/search';
 
-import "@fontsource/inter"
-import "@fontsource/inter/100.css"
-
 export type Config = {
   title: string;
   navbarColor: string;

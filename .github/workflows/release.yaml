@@ -42,7 +42,9 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp ui/dist/*.js ./internal/web/handlers/assets/js/
+          cp ui/dist/*.js ./internal/web/handlers/assets/
+          cp ui/dist/*.woff ./internal/web/handlers/assets/
+          cp ui/dist/*.woff2 ./internal/web/handlers/assets/
 
       - name: Run protoc
         run: |
