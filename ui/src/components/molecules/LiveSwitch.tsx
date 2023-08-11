@@ -43,7 +43,11 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
     });
   }, [DAG, checked]);
   return (
-    <Switch checked={checked} onChange={onChange} inputProps={inputProps} />
+    <Switch
+      checked={checked}
+      onChange={onChange}
+      inputProps={inputProps}
+    />
   );
 }
 export default LiveSwitch;

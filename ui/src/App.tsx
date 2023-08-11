@@ -9,6 +9,9 @@ import { SWRConfig } from 'swr';
 import fetchJson from './lib/fetchJson';
 import Search from './pages/search';
 
+import "@fontsource/inter"
+import "@fontsource/inter/100.css"
+
 export type Config = {
   title: string;
   navbarColor: string;
@@ -40,7 +43,7 @@ function App({ config }: Props) {
           <Layout {...config}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="" element={<DAGs />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dags/" element={<DAGs />} />
               <Route path="/dags/:name/*" element={<DAGDetails />} />
               <Route path="/search/" element={<Search />} />

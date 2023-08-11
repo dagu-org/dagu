@@ -142,14 +142,14 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
             }
           })}
           <Button
-            variant="contained"
+            variant="outlined"
             onClick={() => {
               onSubmit(stringifyParams(params));
             }}
           >
             Start
           </Button>
-          <Button variant="contained" color="error" onClick={dismissModal}>
+          <Button variant="outlined" color="error" onClick={dismissModal}>
             Cancel
           </Button>
         </Stack>

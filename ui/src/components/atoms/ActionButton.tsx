@@ -18,7 +18,7 @@ export default function ActionButton({
 }: ActionButtonProps) {
   return label ? (
     <Button
-      variant="contained"
+      variant="outlined"
       color="primary"
       size="small"
       startIcon={icon}

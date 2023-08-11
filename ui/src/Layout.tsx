@@ -8,8 +8,7 @@ import Toolbar from '@mui/material/Toolbar';
 import List from '@mui/material/List';
 import Typography from '@mui/material/Typography';
 import { mainListItems } from './menu';
-import { Grid, IconButton } from '@mui/material';
-import icon from '../../assets/images/dagu.png';
+import { Grid } from '@mui/material';
 import { AppBarContext } from './contexts/AppBarContext';
 
 const drawerWidthClosed = 64;
@@ -64,13 +63,7 @@ const Drawer = styled(MuiDrawer, {
 
 const mdTheme = createTheme({
   typography: {
-    fontFamily:
-      "'SF Pro Display','SF Compact Display',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol'",
-  },
-  palette: {
-    primary: {
-      main: '#485fc7',
-    },
+    fontFamily: 'Inter',
   },
 });
 
@@ -81,12 +74,7 @@ type DashboardContentProps = {
   children?: React.ReactElement | React.ReactElement[];
 };
 
-function Content({
-  title,
-  navbarColor,
-  version,
-  children,
-}: DashboardContentProps) {
+function Content({ title, navbarColor, children }: DashboardContentProps) {
   const [open, setOpen] = React.useState(false);
   const toggleDrawer = () => {
     setOpen(!open);
@@ -106,41 +94,7 @@ function Content({
               height: '100%',
             }}
           >
-            <Toolbar
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <IconButton onClick={toggleDrawer}>
-                <img
-                  src={icon}
-                  alt="dagu"
-                  width={64}
-                  style={{
-                    maxWidth: '64px',
-                  }}
-                />
-              </IconButton>
-            </Toolbar>
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                color: '#fff',
-                overflowWrap: 'break-word',
-              }}
-            >
-              {version ? `v${version}` : "dev"}
-            </Box>
-            <List
-              component="nav"
-              sx={{
-                pl: '6px',
-              }}
-            >
+            <List component="nav" sx={{ pl: '6px' }}>
               {mainListItems}
             </List>
           </Box>
@@ -162,10 +116,10 @@ function Content({
             elevation={0}
             sx={{
               width: '100%',
-              backgroundColor: 'white',
+              backgroundColor: '#F2F4F8',
               borderBottom: scrolled ? 1 : 0,
               borderColor: 'grey.300',
-              pr: 2,
+              pr: 3,
               position: 'relative',
               display: 'block',
             }}
@@ -173,7 +127,6 @@ function Content({
             <Toolbar
               sx={{
                 width: '100%',
-                backgroundColor: 'white',
                 display: 'flex',
                 direction: 'row',
                 justifyContent: 'space-between',
@@ -188,7 +141,7 @@ function Content({
                   </NavBarTitleText>
                 )}
               </AppBarContext.Consumer>
-              <NavBarTitleText>{title || 'dagu'}</NavBarTitleText>
+              <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
             </Toolbar>
           </AppBar>
           <Grid
@@ -196,9 +149,9 @@ function Content({
             ref={containerRef}
             sx={{
               flex: 1,
-              pt: 2,
               pb: 4,
               overflow: 'auto',
+              backgroundColor: '#F2F4F8',
             }}
             onScroll={() => {
               const curr = containerRef.current;

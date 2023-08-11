@@ -55,7 +55,7 @@ function Search() {
           />
           <Button
             disabled={!searchVal}
-            variant="contained"
+            variant="outlined"
             sx={{
               width: '100px',
               border: 0,

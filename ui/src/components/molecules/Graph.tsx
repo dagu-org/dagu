@@ -48,11 +48,11 @@ function Graph({
     const addNodeFn = (step: Step, status: NodeStatus) => {
       const id = step.Name.replace(/\s/g, '_');
       const c = graphStatusMap[status] || '';
-      dat.push(`${id}(${step.Name})${c};`);
+      dat.push(`${id}[${step.Name}]${c};`);
       if (step.Depends) {
         step.Depends.forEach((d) => {
           const depId = d.replace(/\s/g, '_');
-          dat.push(`${depId} -.-> ${id};`);
+          dat.push(`${depId} --> ${id};`);
         });
       }
       if (onClickNode) {
@@ -65,14 +65,14 @@ function Graph({
       (steps as Step[]).forEach((s) => addNodeFn(s, NodeStatus.None));
     }
     dat.push(
-      'linkStyle default stroke:#ddeeff,stroke-width:2px,fill:none,color:#404040'
+      'linkStyle default stroke:#999,stroke-width:1px,fill:none,color:#333'
     );
-    dat.push('classDef none fill:white,stroke:lightblue,stroke-width:2px');
-    dat.push('classDef running fill:white,stroke:lime,stroke-width:2px');
-    dat.push('classDef error fill:white,stroke:red,stroke-width:2px');
-    dat.push('classDef cancel fill:white,stroke:pink,stroke-width:2px');
-    dat.push('classDef done fill:white,stroke:green,stroke-width:2px');
-    dat.push('classDef skipped fill:white,stroke:gray,stroke-width:2px');
+    dat.push('classDef none color:#333,fill:white,stroke:lightblue,stroke-width:1.2px');
+    dat.push('classDef running color:#333,fill:white,stroke:lime,stroke-width:1.2px');
+    dat.push('classDef error color:#333,fill:white,stroke:red,stroke-width:1.2px');
+    dat.push('classDef cancel color:#333,fill:white,stroke:pink,stroke-width:1.2px');
+    dat.push('classDef done color:#333,fill:white,stroke:green,stroke-width:1.2px');
+    dat.push('classDef skipped color:#333,fill:white,stroke:gray,stroke-width:1.2px');
     return dat.join('\n');
   }, [steps, onClickNode, flowchart]);
   return <Mermaid style={mermaidStyle} def={graph} />;

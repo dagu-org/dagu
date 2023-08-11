@@ -76,9 +76,7 @@ const defaultColumns = [
       return (
         <IconButton
           onClick={table.getToggleAllRowsExpandedHandler()}
-          sx={{
-            color: 'white',
-          }}
+          className="gray-90"
         >
           {table.getIsAllRowsExpanded() ? (
             <>
@@ -552,8 +550,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       </Stack>
       <Box
         sx={{
-          border: '1px solid #485fc7',
-          borderRadius: '6px',
+          border: '1px solid #e0e0e0',
           mt: 2,
         }}
       >
@@ -580,6 +577,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                               : 'default',
                           },
                           onClick: header.column.getToggleSortingHandler(),
+                          className: 'gray-90',
                         }}
                       >
                         <Stack direction="row" alignItems="center">
@@ -593,19 +591,19 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                             asc: (
                               <ArrowUpward
                                 sx={{
-                                  color: 'white',
                                   fontSize: '0.95rem',
                                   ml: 1,
                                 }}
+                                className="gray-90"
                               />
                             ),
                             desc: (
                               <ArrowDownward
                                 sx={{
-                                  color: 'white',
                                   fontSize: '0.95rem',
                                   ml: 1,
                                 }}
+                                className="gray-90"
                               />
                             ),
                           }[header.column.getIsSorted() as string] ?? null}
@@ -624,7 +622,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
           </TableHead>
           <TableBody>
             {instance.getRowModel().rows.map((row) => (
-              <StyledTableRow key={row.id} style={{ height: '44px' }}>
+              <StyledTableRow
+                key={row.id}
+                style={{ height: '44px', backgroundColor: 'white' }}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}

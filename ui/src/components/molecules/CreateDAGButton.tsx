@@ -4,11 +4,10 @@ import React from 'react';
 function CreateDAGButton() {
   return (
     <Button
-      variant="contained"
+      variant="outlined"
       size="small"
       sx={{
         width: '100px',
-        border: 0,
       }}
       onClick={async () => {
         const name = window.prompt('Please input the new DAG name', '');
