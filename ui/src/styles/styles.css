@@ -16,6 +16,10 @@ a {
   box-sizing: border-box;
 }
 
+body {
+  font-family: 'Inter';
+}
+
 #nav-title {
   color: white;
   font: 20px 'Arial';
@@ -24,16 +28,47 @@ a {
 }
 
 .MuiTableRow-root th {
-  background-color: #485fc7;
-  color: #fff;
-  font-weight: 600;
+  background-color: #F2F4F8;
+  font-weight: 500;
 }
 
 .MuiTableRow-root td {
-  font-weight: 600;
+  color: #333333;
+  font-weight: 500;
 }
 
 .line-highlight {
   margin-top: 1.4em !important;
-  background-color: rgba(255,255,0,0.2) !important;
+  background-color: rgba(255, 255, 0, 0.2) !important;
+}
+
+.gray-10 {
+  color: #f5f5f5;
+}
+.gray-20 {
+  color: #e0e0e0;
+}
+.gray-30 {
+  color: #cccccc;
+}
+.gray-40 {
+  color: #b3b3b3;
+}
+.gray-50 {
+  color: #999999;
+}
+.gray-60 {
+  color: #808080;
+}
+.gray-70 {
+  color: #666666;
+}
+.gray-80 {
+  color: #4d4d4d;
+}
+.gray-90 {
+  color: #333333;
+}
+.gray-100 {
+  color: #000000;
 }

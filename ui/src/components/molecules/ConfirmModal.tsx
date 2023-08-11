@@ -57,10 +57,10 @@ function ConfirmModal({
           mt={2}
         >
           <Box>{children}</Box>
-          <Button variant="contained" onClick={() => onSubmit()}>
+          <Button variant="outlined" onClick={() => onSubmit()}>
             {buttonText}
           </Button>
-          <Button variant="contained" color="error" onClick={dismissModal}>
+          <Button variant="outlined" color="error" onClick={dismissModal}>
             Cancel
           </Button>
         </Stack>
