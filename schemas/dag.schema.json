@@ -132,11 +132,19 @@
     },
     "steps": {
       "type": "array",
+      "required": ["name"],
       "items": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"  
+            "type": "string"
+          },
+          "depends": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of step names this step depends on"
           },
           "description": {
             "type": "string" 
@@ -216,7 +224,7 @@
                 }
               }
             }
-          } 
+          }
         }
       },
       "description": "List of steps to execute in the DAG"
