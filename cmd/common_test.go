@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"bytes"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"io"
 	"log"
 	"os"
@@ -12,10 +14,22 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
+
+func TestMain(m *testing.M) {
+	tmpDir := utils.MustTempDir("dagu_test")
+	changeHomeDir(tmpDir)
+	code := m.Run()
+	_ = os.RemoveAll(tmpDir)
+	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	_ = os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
+}
 
 type cmdTest struct {
 	args        []string
@@ -57,7 +71,7 @@ func withSpool(t *testing.T, f func()) string {
 	defer func() {
 		os.Stdout = origStdout
 		log.SetOutput(origStdout)
-		w.Close()
+		_ = w.Close()
 	}()
 
 	f()
@@ -82,7 +96,7 @@ func testStatusEventual(t *testing.T, dagFile string, expected scheduler.Schedul
 
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
-	ctrl := controller.NewDAGController(d)
+	ctrl := controller.New(d, jsondb.New())
 
 	require.Eventually(t, func() bool {
 		status, err := ctrl.GetStatus()
@@ -94,8 +108,8 @@ func testStatusEventual(t *testing.T, dagFile string, expected scheduler.Schedul
 func testLastStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		db := &database.Database{Config: database.DefaultConfig()}
-		status := db.ReadStatusHist(dagFile, 1)
+		hs := jsondb.New()
+		status := hs.ReadStatusHist(dagFile, 1)
 		if len(status) < 1 {
 			return false
 		}

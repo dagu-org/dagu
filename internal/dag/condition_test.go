@@ -14,7 +14,7 @@ func TestCondition(t *testing.T) {
 		require.NoError(t, err)
 	}
 	{
-		os.Setenv("TEST_CONDITION", "100")
+		_ = os.Setenv("TEST_CONDITION", "100")
 		c := &Condition{Condition: "${TEST_CONDITION}", Expected: "100"}
 		err := EvalCondition(c)
 		require.NoError(t, err)

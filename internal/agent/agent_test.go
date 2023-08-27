@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"github.com/yohamta/dagu/internal/persistence"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,20 +27,24 @@ func TestMain(m *testing.M) {
 	testHomeDir := utils.MustTempDir("agent_test")
 	changeHomeDir(testHomeDir)
 	code := m.Run()
-	os.RemoveAll(testHomeDir)
+	_ = os.RemoveAll(testHomeDir)
 	os.Exit(code)
 }
 
 func changeHomeDir(homeDir string) {
-	os.Setenv("HOME", homeDir)
+	_ = os.Setenv("HOME", homeDir)
 	_ = config.LoadConfig(homeDir)
+}
+
+func defaultHistoryStore() persistence.HistoryStore {
+	return jsondb.New()
 }
 
 func TestRunDAG(t *testing.T) {
 	d := testLoadDAG(t, "run.yaml")
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
-	status, _ := controller.NewDAGController(d).GetLastStatus()
+	status, _ := controller.New(d, defaultHistoryStore()).GetLastStatus()
 	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
 
 	go func() {
@@ -49,7 +55,7 @@ func TestRunDAG(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	require.Eventually(t, func() bool {
-		status, err := controller.NewDAGController(d).GetLastStatus()
+		status, err := controller.New(d, defaultHistoryStore()).GetLastStatus()
 		require.NoError(t, err)
 		return status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*2, time.Millisecond*100)
@@ -59,7 +65,7 @@ func TestRunDAG(t *testing.T) {
 	a = &Agent{AgentConfig: &AgentConfig{DAG: d}}
 	err := a.Run(context.Background())
 	require.NoError(t, err)
-	statusList := controller.NewDAGController(d).GetRecentStatuses(100)
+	statusList := controller.New(d, defaultHistoryStore()).GetRecentStatuses(100)
 	require.Equal(t, 1, len(statusList))
 }
 
@@ -101,7 +107,7 @@ func TestCancelDAG(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
-		status, err := controller.NewDAGController(d).GetLastStatus()
+		status, err := controller.New(d, defaultHistoryStore()).GetLastStatus()
 		require.NoError(t, err)
 		require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
 	}

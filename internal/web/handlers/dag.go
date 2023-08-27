@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"io"
 	"net/http"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"github.com/yohamta/dagu/internal/constants"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/storage"
@@ -86,13 +86,13 @@ func handleGetDAG() http.HandlerFunc {
 		paramStep := getReqParam(r, "step")
 
 		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
-		dr := controller.NewDAGStatusReader()
+		dr := controller.NewDAGStatusReader(jsondb.New())
 		d, err := dr.ReadStatus(file, false)
 		if d == nil {
 			encodeError(w, err)
 			return
 		}
-		c := controller.NewDAGController(d.DAG)
+		c := controller.New(d.DAG, jsondb.New())
 		data := newDAGResponse(d.DAG.Name, d, tab)
 		if err != nil {
 			data.Errors = append(data.Errors, err.Error())
@@ -104,7 +104,7 @@ func handleGetDAG() http.HandlerFunc {
 			data.Definition, _ = dag.ReadFile(file)
 
 		case dag_TabType_History:
-			logs := controller.NewDAGController(d.DAG).GetRecentStatuses(30)
+			logs := controller.New(d.DAG, jsondb.New()).GetRecentStatuses(30)
 			data.LogData = buildLog(logs)
 
 		case dag_TabType_StepLog:
@@ -153,17 +153,17 @@ func handlePostDAG() http.HandlerFunc {
 		dn := dagNameFromCtx(r.Context())
 
 		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
-		dr := controller.NewDAGStatusReader()
-		dag, err := dr.ReadStatus(file, false)
+		dr := controller.NewDAGStatusReader(jsondb.New())
+		d, err := dr.ReadStatus(file, false)
 		if err != nil && action != "save" {
 			encodeError(w, err)
 			return
 		}
-		c := controller.NewDAGController(dag.DAG)
+		c := controller.New(d.DAG, jsondb.New())
 
 		switch action {
 		case "start":
-			if dag.Status.Status == scheduler.SchedulerStatus_Running {
+			if d.Status.Status == scheduler.SchedulerStatus_Running {
 				encodeError(w, fmt.Errorf("already running: %w", errInvalidArgs))
 				return
 			}
@@ -171,10 +171,10 @@ func handlePostDAG() http.HandlerFunc {
 
 		case "suspend":
 			sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
-			_ = sc.ToggleSuspend(dag.DAG, value == "true")
+			_ = sc.ToggleSuspend(d.DAG, value == "true")
 
 		case "stop":
-			if dag.Status.Status != scheduler.SchedulerStatus_Running {
+			if d.Status.Status != scheduler.SchedulerStatus_Running {
 				encodeError(w, fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 				return
 			}
@@ -196,7 +196,7 @@ func handlePostDAG() http.HandlerFunc {
 			}
 
 		case "mark-success":
-			if dag.Status.Status == scheduler.SchedulerStatus_Running {
+			if d.Status.Status == scheduler.SchedulerStatus_Running {
 				encodeError(w, fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 				return
 			}
@@ -216,7 +216,7 @@ func handlePostDAG() http.HandlerFunc {
 			}
 
 		case "mark-failed":
-			if dag.Status.Status == scheduler.SchedulerStatus_Running {
+			if d.Status.Status == scheduler.SchedulerStatus_Running {
 				encodeError(w, fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 				return
 			}
@@ -247,7 +247,8 @@ func handlePostDAG() http.HandlerFunc {
 
 		case "rename":
 			newfile := nameWithExt(path.Join(cfg.DAGs, value))
-			err := controller.MoveDAG(file, newfile)
+			c := controller.New(d.DAG, jsondb.New())
+			err := c.MoveDAG(file, newfile)
 			if err != nil {
 				encodeError(w, err)
 				return
@@ -271,13 +272,13 @@ func handleDeleteDAG() http.HandlerFunc {
 		dn := dagNameFromCtx(r.Context())
 
 		file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dn))
-		dr := controller.NewDAGStatusReader()
-		dag, err := dr.ReadStatus(file, false)
+		dr := controller.NewDAGStatusReader(jsondb.New())
+		d, err := dr.ReadStatus(file, false)
 		if err != nil {
 			encodeError(w, err)
 		}
 
-		c := controller.NewDAGController(dag.DAG)
+		c := controller.New(d.DAG, jsondb.New())
 
 		err = c.DeleteDAG()
 
@@ -320,7 +321,7 @@ func readSchedulerLog(c *controller.DAGController, file string) (*logFile, error
 		}
 		f = s.Log
 	} else {
-		s, err := database.ParseFile(file)
+		s, err := jsondb.ParseFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", file, err)
 		}
@@ -355,7 +356,7 @@ func readStepLog(c *controller.DAGController, file, stepName, enc string) (*logF
 		stepm[constants.OnCancel] = s.OnCancel
 		stepm[constants.OnExit] = s.OnExit
 	} else {
-		s, err := database.ParseFile(file)
+		s, err := jsondb.ParseFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", file, err)
 		}
@@ -400,7 +401,9 @@ func readFile(f string, decorder *encoding.Decoder) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", f, err)
 	}
-	defer r.Close()
+	defer func() {
+		_ = r.Close()
+	}()
 	tr := transform.NewReader(r, decorder)
 	ret, err := io.ReadAll(tr)
 	return ret, err

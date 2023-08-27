@@ -75,3 +75,15 @@ func getFlagString(cmd *cobra.Command, name, fallback string) string {
 	}
 	return fallback
 }
+
+func registerCommands(root *cobra.Command) {
+	rootCmd.AddCommand(startCmd())
+	rootCmd.AddCommand(stopCmd())
+	rootCmd.AddCommand(restartCmd())
+	rootCmd.AddCommand(dryCmd())
+	rootCmd.AddCommand(createStatusCommand())
+	rootCmd.AddCommand(versionCmd())
+	rootCmd.AddCommand(serverCmd())
+	rootCmd.AddCommand(createSchedulerCommand())
+	rootCmd.AddCommand(retryCmd())
+}

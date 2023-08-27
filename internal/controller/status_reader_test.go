@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"path"
 	"path/filepath"
 	"testing"
@@ -12,7 +13,7 @@ import (
 func TestLoadConfig(t *testing.T) {
 	var (
 		file = testDAG("invalid_dag.yaml")
-		dr   = controller.NewDAGStatusReader()
+		dr   = controller.NewDAGStatusReader(jsondb.New())
 	)
 
 	dag, err := dr.ReadStatus(file, false)
@@ -24,7 +25,7 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestReadAll(t *testing.T) {
-	dr := controller.NewDAGStatusReader()
+	dr := controller.NewDAGStatusReader(jsondb.New())
 	dags, _, err := dr.ReadAllStatus(testdataDir)
 	require.NoError(t, err)
 	require.Greater(t, len(dags), 0)
@@ -40,7 +41,7 @@ func TestReadAll(t *testing.T) {
 func TestReadDAGStatus(t *testing.T) {
 	var (
 		file = testDAG("read_status.yaml")
-		dr   = controller.NewDAGStatusReader()
+		dr   = controller.NewDAGStatusReader(jsondb.New())
 	)
 
 	_, err := dr.ReadStatus(file, false)

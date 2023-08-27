@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"path"
 	"testing"
 	"time"
@@ -13,9 +14,9 @@ import (
 
 func TestJobStart(t *testing.T) {
 	file := path.Join(testdataDir, "start.yaml")
-	dr := controller.NewDAGStatusReader()
+	dr := controller.NewDAGStatusReader(jsondb.New())
 	dag, _ := dr.ReadStatus(file, false)
-	c := controller.NewDAGController(dag.DAG)
+	c := controller.New(dag.DAG, jsondb.New())
 
 	j := &job{
 		DAG:    dag.DAG,
@@ -46,7 +47,7 @@ func TestJobStart(t *testing.T) {
 
 func TestJobSop(t *testing.T) {
 	file := path.Join(testdataDir, "stop.yaml")
-	dr := controller.NewDAGStatusReader()
+	dr := controller.NewDAGStatusReader(jsondb.New())
 	dag, _ := dr.ReadStatus(file, false)
 
 	j := &job{
@@ -59,7 +60,7 @@ func TestJobSop(t *testing.T) {
 		_ = j.Start()
 	}()
 
-	c := controller.NewDAGController(dag.DAG)
+	c := controller.New(dag.DAG, jsondb.New())
 
 	require.Eventually(t, func() bool {
 		s, _ := c.GetLastStatus()

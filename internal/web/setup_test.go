@@ -14,7 +14,7 @@ var testHomeDir string
 
 func TestMain(m *testing.M) {
 	testHomeDir = utils.MustTempDir("dagu-admin-test")
-	os.Setenv("HOST", "localhost")
+	_ = os.Setenv("HOST", "localhost")
 	changeHomeDir(testdataDir)
 	code := m.Run()
 	_ = os.RemoveAll(testHomeDir)
@@ -22,6 +22,6 @@ func TestMain(m *testing.M) {
 }
 
 func changeHomeDir(homeDir string) {
-	os.Setenv("HOME", homeDir)
+	_ = os.Setenv("HOME", homeDir)
 	_ = config.LoadConfig(homeDir)
 }
