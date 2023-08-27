@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"github.com/yohamta/dagu/internal/config"
 	"io"
 	"log"
 	"os"
@@ -16,6 +17,19 @@ import (
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/utils"
 )
+
+func TestMain(m *testing.M) {
+	tmpDir := utils.MustTempDir("dagu_test")
+	changeHomeDir(tmpDir)
+	code := m.Run()
+	os.RemoveAll(tmpDir)
+	os.Exit(code)
+}
+
+func changeHomeDir(homeDir string) {
+	os.Setenv("HOME", homeDir)
+	_ = config.LoadConfig(homeDir)
+}
 
 type cmdTest struct {
 	args        []string
