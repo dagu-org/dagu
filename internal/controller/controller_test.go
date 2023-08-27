@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"io"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/sock"
@@ -27,23 +27,23 @@ func TestMain(m *testing.M) {
 	tempDir := utils.MustTempDir("controller_test")
 	changeHomeDir(tempDir)
 	code := m.Run()
-	os.RemoveAll(tempDir)
+	_ = os.RemoveAll(tempDir)
 	os.Exit(code)
 }
 
 func changeHomeDir(homeDir string) {
-	os.Setenv("HOME", homeDir)
+	_ = os.Setenv("HOME", homeDir)
 	_ = config.LoadConfig(homeDir)
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
 	file := testDAG("get_status.yaml")
 
-	dr := controller.NewDAGStatusReader()
+	dr := controller.NewDAGStatusReader(jsondb.New())
 	ds, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(ds.DAG)
+	dc := controller.New(ds.DAG, jsondb.New())
 
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
@@ -90,25 +90,24 @@ func TestUpdateStatus(t *testing.T) {
 		file      = testDAG("update_status.yaml")
 		requestId = "test-update-status"
 		now       = time.Now()
-		dr        = controller.NewDAGStatusReader()
-		db        = &database.Database{Config: database.DefaultConfig()}
+		dr        = controller.NewDAGStatusReader(jsondb.New())
 	)
 
-	dag, err := dr.ReadStatus(file, false)
+	d, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(dag.DAG)
+	hs := jsondb.New()
+	dc := controller.New(d.DAG, hs)
 
-	w, _, _ := db.NewWriter(dag.DAG.Location, now, requestId)
-	err = w.Open()
+	err = hs.Open(d.DAG.Location, now, requestId)
 	require.NoError(t, err)
 
-	st := testNewStatus(dag.DAG, requestId,
+	st := testNewStatus(d.DAG, requestId,
 		scheduler.SchedulerStatus_Success, scheduler.NodeStatus_Success)
 
-	err = w.Write(st)
+	err = hs.Write(st)
 	require.NoError(t, err)
-	w.Close()
+	_ = hs.Close()
 
 	time.Sleep(time.Millisecond * 100)
 
@@ -133,15 +132,15 @@ func TestUpdateStatusError(t *testing.T) {
 	var (
 		file      = testDAG("update_status_failed.yaml")
 		requestId = "test-update-status-failure"
-		dr        = controller.NewDAGStatusReader()
+		dr        = controller.NewDAGStatusReader(jsondb.New())
 	)
 
-	dag, err := dr.ReadStatus(file, false)
+	d, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(dag.DAG)
+	dc := controller.New(d.DAG, jsondb.New())
 
-	status := testNewStatus(dag.DAG, requestId,
+	status := testNewStatus(d.DAG, requestId,
 		scheduler.SchedulerStatus_Error, scheduler.NodeStatus_Error)
 
 	err = dc.UpdateStatus(status)
@@ -156,13 +155,13 @@ func TestUpdateStatusError(t *testing.T) {
 func TestStart(t *testing.T) {
 	var (
 		file = testDAG("start.yaml")
-		dr   = controller.NewDAGStatusReader()
+		dr   = controller.NewDAGStatusReader(jsondb.New())
 	)
 
-	dag, err := dr.ReadStatus(file, false)
+	d, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(dag.DAG)
+	dc := controller.New(d.DAG, jsondb.New())
 	err = dc.Start(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
 	require.Error(t, err)
 
@@ -174,13 +173,13 @@ func TestStart(t *testing.T) {
 func TestStop(t *testing.T) {
 	var (
 		file = testDAG("stop.yaml")
-		dr   = controller.NewDAGStatusReader()
+		dr   = controller.NewDAGStatusReader(jsondb.New())
 	)
 
-	dag, err := dr.ReadStatus(file, false)
+	d, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(dag.DAG)
+	dc := controller.New(d.DAG, jsondb.New())
 	dc.StartAsync(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
 
 	require.Eventually(t, func() bool {
@@ -199,13 +198,13 @@ func TestStop(t *testing.T) {
 func TestRestart(t *testing.T) {
 	var (
 		file = testDAG("restart.yaml")
-		dr   = controller.NewDAGStatusReader()
+		dr   = controller.NewDAGStatusReader(jsondb.New())
 	)
 
-	dag, err := dr.ReadStatus(file, false)
+	d, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(dag.DAG)
+	dc := controller.New(d.DAG, jsondb.New())
 	err = dc.Restart(path.Join(utils.MustGetwd(), "../../bin/dagu"), "")
 	require.NoError(t, err)
 
@@ -217,13 +216,13 @@ func TestRestart(t *testing.T) {
 func TestRetry(t *testing.T) {
 	var (
 		file = testDAG("retry.yaml")
-		dr   = controller.NewDAGStatusReader()
+		dr   = controller.NewDAGStatusReader(jsondb.New())
 	)
 
-	dag, err := dr.ReadStatus(file, false)
+	d, err := dr.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	dc := controller.NewDAGController(dag.DAG)
+	dc := controller.New(d.DAG, jsondb.New())
 	err = dc.Start(path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "x y z")
 	require.NoError(t, err)
 
@@ -252,14 +251,16 @@ func TestRetry(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	loc := path.Join(tmpDir, "test.yaml")
 	d := &dag.DAG{
 		Name:     "test",
 		Location: loc,
 	}
-	dc := controller.NewDAGController(d)
+	dc := controller.New(d, jsondb.New())
 
 	// invalid DAG
 	invalidDAG := `name: test DAG`
@@ -278,7 +279,9 @@ steps:
 
 	// create a new DAG file
 	newFile, _ := utils.CreateFile(loc)
-	defer newFile.Close()
+	defer func() {
+		_ = newFile.Close()
+	}()
 
 	// Update the DAG
 	err = dc.UpdateDAGSpec(validDAG)
@@ -286,7 +289,9 @@ steps:
 
 	// Check the content of the DAG file
 	updatedFile, _ := os.Open(loc)
-	defer updatedFile.Close()
+	defer func() {
+		_ = updatedFile.Close()
+	}()
 	b, err := io.ReadAll(updatedFile)
 	require.NoError(t, err)
 	require.Equal(t, validDAG, string(b))
@@ -294,7 +299,9 @@ steps:
 
 func TestRemove(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-remove")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	loc := path.Join(tmpDir, "test.yaml")
 	d := &dag.DAG{
@@ -302,7 +309,7 @@ func TestRemove(t *testing.T) {
 		Location: loc,
 	}
 
-	dc := controller.NewDAGController(d)
+	dc := controller.New(d, jsondb.New())
 	dagSpec := `name: test DAG
 steps:
   - name: "1"
@@ -310,14 +317,18 @@ steps:
 `
 	// create file
 	newFile, _ := utils.CreateFile(loc)
-	defer newFile.Close()
+	defer func() {
+		_ = newFile.Close()
+	}()
 
 	err := dc.UpdateDAGSpec(dagSpec)
 	require.NoError(t, err)
 
 	// check file
 	saved, _ := os.Open(loc)
-	defer saved.Close()
+	defer func() {
+		_ = saved.Close()
+	}()
 	b, err := io.ReadAll(saved)
 	require.NoError(t, err)
 	require.Equal(t, dagSpec, string(b))
@@ -330,7 +341,9 @@ steps:
 
 func TestCreateNewDAG(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-save")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	// invalid filename
 	filename := path.Join(tmpDir, "test")
@@ -357,7 +370,9 @@ func TestCreateNewDAG(t *testing.T) {
 
 func TestRenameDAG(t *testing.T) {
 	tmpDir := utils.MustTempDir("controller-test-rename")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	oldName := path.Join(tmpDir, "rename_dag.yaml")
 	newName := path.Join(tmpDir, "rename_dag_renamed.yaml")
@@ -365,10 +380,16 @@ func TestRenameDAG(t *testing.T) {
 	err := controller.CreateDAG(oldName)
 	require.NoError(t, err)
 
-	err = controller.MoveDAG(oldName, "invalid-config-name")
+	dr := controller.NewDAGStatusReader(jsondb.New())
+	d, err := dr.ReadStatus(oldName, false)
+	require.NoError(t, err)
+
+	c := controller.New(d.DAG, jsondb.New())
+
+	err = c.MoveDAG(oldName, "invalid-config-name")
 	require.Error(t, err)
 
-	err = controller.MoveDAG(oldName, newName)
+	err = c.MoveDAG(oldName, newName)
 	require.NoError(t, err)
 	require.FileExists(t, newName)
 }

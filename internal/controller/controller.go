@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"github.com/yohamta/dagu/internal/persistence"
 	"os"
 	"os/exec"
 	"path"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/database"
 	"github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"github.com/yohamta/dagu/internal/sock"
@@ -54,14 +54,14 @@ func GrepDAG(dir string, pattern string) (ret []*GrepResult, errs []string, err 
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
-			dag, err := dl.LoadMetadataOnly(fn)
+			d, err := dl.LoadMetadataOnly(fn)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue
 			}
 			ret = append(ret, &GrepResult{
 				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
-				DAG:     dag,
+				DAG:     d,
 				Matches: m,
 			})
 		}
@@ -87,31 +87,32 @@ func CreateDAG(file string) error {
 	return os.WriteFile(file, []byte(_DAGTemplate), 0644)
 }
 
+// DAGController is a object to interact with a DAG.
+type DAGController struct {
+	DAG          *dag.DAG
+	historyStore persistence.HistoryStore
+}
+
+func New(d *dag.DAG, historyStore persistence.HistoryStore) *DAGController {
+	return &DAGController{
+		DAG:          d,
+		historyStore: historyStore,
+	}
+}
+
 // MoveDAG moves the DAG file.
-func MoveDAG(oldDAGPath, newDAGPath string) error {
+func (dc *DAGController) MoveDAG(oldDAGPath, newDAGPath string) error {
 	if err := validateLocation(newDAGPath); err != nil {
 		return err
 	}
 	if err := os.Rename(oldDAGPath, newDAGPath); err != nil {
 		return err
 	}
-	db := database.New()
-	return db.MoveData(oldDAGPath, newDAGPath)
-}
-
-// DAGController is a object to interact with a DAG.
-type DAGController struct {
-	*dag.DAG
-}
-
-func NewDAGController(d *dag.DAG) *DAGController {
-	return &DAGController{
-		DAG: d,
-	}
+	return dc.historyStore.Rename(oldDAGPath, newDAGPath)
 }
 
 func (dc *DAGController) Stop() error {
-	client := sock.Client{Addr: dc.SockAddr()}
+	client := sock.Client{Addr: dc.DAG.SockAddr()}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
@@ -129,7 +130,7 @@ func (dc *DAGController) Start(binPath string, workDir string, params string) er
 		args = append(args, "-p")
 		args = append(args, fmt.Sprintf(`"%s"`, utils.EscapeArg(params, false)))
 	}
-	args = append(args, dc.Location)
+	args = append(args, dc.DAG.Location)
 	cmd := exec.Command(binPath, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
@@ -148,7 +149,7 @@ func (dc *DAGController) Retry(binPath string, workDir string, reqId string) (er
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
-		args = append(args, dc.Location)
+		args = append(args, dc.DAG.Location)
 		cmd := exec.Command(binPath, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 		cmd.Dir = workDir
@@ -164,7 +165,7 @@ func (dc *DAGController) Retry(binPath string, workDir string, reqId string) (er
 }
 
 func (dc *DAGController) Restart(bin string, workDir string) error {
-	args := []string{"restart", dc.Location}
+	args := []string{"restart", dc.DAG.Location}
 	cmd := exec.Command(bin, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = workDir
@@ -177,7 +178,7 @@ func (dc *DAGController) Restart(bin string, workDir string) error {
 }
 
 func (dc *DAGController) GetStatus() (*models.Status, error) {
-	client := sock.Client{Addr: dc.SockAddr()}
+	client := sock.Client{Addr: dc.DAG.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -190,18 +191,17 @@ func (dc *DAGController) GetStatus() (*models.Status, error) {
 }
 
 func (dc *DAGController) GetLastStatus() (*models.Status, error) {
-	client := sock.Client{Addr: dc.SockAddr()}
+	client := sock.Client{Addr: dc.DAG.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err == nil {
 		return models.StatusFromJson(ret)
 	}
 
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		db := database.New()
-		status, err := db.ReadStatusToday(dc.Location)
+		status, err := dc.historyStore.ReadStatusToday(dc.DAG.Location)
 		if err != nil {
 			var readErr error = nil
-			if err != database.ErrNoStatusDataToday && err != database.ErrNoStatusData {
+			if !errors.Is(err, persistence.ErrNoStatusDataToday) && !errors.Is(err, persistence.ErrNoStatusData) {
 				fmt.Printf("read status failed : %s", err)
 				readErr = err
 			}
@@ -215,8 +215,7 @@ func (dc *DAGController) GetLastStatus() (*models.Status, error) {
 }
 
 func (dc *DAGController) GetStatusByRequestId(requestId string) (*models.Status, error) {
-	db := database.New()
-	ret, err := db.FindByRequestId(dc.Location, requestId)
+	ret, err := dc.historyStore.FindByRequestId(dc.DAG.Location, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -229,13 +228,12 @@ func (dc *DAGController) GetStatusByRequestId(requestId string) (*models.Status,
 }
 
 func (dc *DAGController) GetRecentStatuses(n int) []*models.StatusFile {
-	db := database.New()
-	ret := db.ReadStatusHist(dc.Location, n)
+	ret := dc.historyStore.ReadStatusHist(dc.DAG.Location, n)
 	return ret
 }
 
 func (dc *DAGController) UpdateStatus(status *models.Status) error {
-	client := sock.Client{Addr: dc.SockAddr()}
+	client := sock.Client{Addr: dc.DAG.SockAddr()}
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -248,17 +246,7 @@ func (dc *DAGController) UpdateStatus(status *models.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	db := database.New()
-	toUpdate, err := db.FindByRequestId(dc.Location, status.RequestId)
-	if err != nil {
-		return err
-	}
-	w := &database.Writer{Target: toUpdate.File}
-	if err := w.Open(); err != nil {
-		return err
-	}
-	defer w.Close()
-	return w.Write(status)
+	return dc.historyStore.Update(dc.DAG.Location, status.RequestId, status)
 }
 
 func (dc *DAGController) UpdateDAGSpec(value string) error {
@@ -268,20 +256,19 @@ func (dc *DAGController) UpdateDAGSpec(value string) error {
 	if err != nil {
 		return err
 	}
-	if !utils.FileExists(dc.Location) {
-		return fmt.Errorf("the config file %s does not exist", dc.Location)
+	if !utils.FileExists(dc.DAG.Location) {
+		return fmt.Errorf("the config file %s does not exist", dc.DAG.Location)
 	}
-	err = os.WriteFile(dc.Location, []byte(value), 0755)
+	err = os.WriteFile(dc.DAG.Location, []byte(value), 0755)
 	return err
 }
 
 func (dc *DAGController) DeleteDAG() error {
-	db := database.New()
-	err := db.RemoveAll(dc.Location)
+	err := dc.historyStore.RemoveAll(dc.DAG.Location)
 	if err != nil {
 		return err
 	}
-	return os.Remove(dc.Location)
+	return os.Remove(dc.DAG.Location)
 }
 
 func validateLocation(dagLocation string) error {

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"github.com/yohamta/dagu/internal/persistence"
 	"os"
 	"path/filepath"
 
@@ -28,13 +29,15 @@ type DAGStatus struct {
 // DAGStatusReader is the struct to read DAGStatus.
 type DAGStatusReader struct {
 	suspendChecker *suspend.SuspendChecker
+	historyStore   persistence.HistoryStore
 }
 
-func NewDAGStatusReader() *DAGStatusReader {
+func NewDAGStatusReader(historyStore persistence.HistoryStore) *DAGStatusReader {
 	return &DAGStatusReader{
 		suspendChecker: suspend.NewSuspendChecker(
 			storage.NewStorage(config.Get().SuspendFlagsDir),
 		),
+		historyStore: historyStore,
 	}
 }
 
@@ -92,7 +95,7 @@ func (dr *DAGStatusReader) ReadStatus(dagLocation string, loadMetadataOnly bool)
 		}
 	}
 
-	dc := NewDAGController(d)
+	dc := New(d, dr.historyStore)
 	status, err := dc.GetLastStatus()
 	return dr.newDAGStatus(d, status, err), err
 }

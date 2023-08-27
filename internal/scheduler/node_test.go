@@ -231,7 +231,7 @@ func TestOutputJson(t *testing.T) {
 					OutputVariables: &utils.SyncMap{},
 				},
 			}
-			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-json-%d", i))
+			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-jsondb-%d", i))
 			require.NoError(t, err)
 			defer func() {
 				_ = n.teardown()

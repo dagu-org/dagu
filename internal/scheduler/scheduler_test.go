@@ -26,12 +26,12 @@ func TestMain(m *testing.M) {
 	testHomeDir = utils.MustTempDir("scheduler-test")
 	changeHomeDir(testHomeDir)
 	code := m.Run()
-	os.RemoveAll(testHomeDir)
+	_ = os.RemoveAll(testHomeDir)
 	os.Exit(code)
 }
 
 func changeHomeDir(homeDir string) {
-	os.Setenv("HOME", homeDir)
+	_ = os.Setenv("HOME", homeDir)
 	_ = config.LoadConfig(homeDir)
 }
 

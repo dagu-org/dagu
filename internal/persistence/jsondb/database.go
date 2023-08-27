@@ -1,10 +1,11 @@
-package database
+package jsondb
 
 import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"github.com/yohamta/dagu/internal/persistence"
 	"io"
 	"log"
 	"os"
@@ -20,30 +21,75 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-// Database is the interfact to store workflow status in local.
-// It stores status in JSON format in a directory as per each configPath.
+// Store is the interfact to store workflow status in local.
+// It stores status in JSON format in a directory as per each dagFile.
 // Multiple JSON data can be stored in a single file and each data
 // is separated by newline.
 // When a data is updated, it appends a new line to the file.
 // Only the latest data in a single file can be read.
 // When Compact is called, it removes old data.
 // Compact must be called only once per file.
-type Database struct {
+type Store struct {
 	*Config
+	writer *writer
 }
 
 type Config struct {
 	Dir string
 }
 
-// DefaultConfig is the default configuration for Database.
-func DefaultConfig() *Config {
+// defaultConfig is the default configuration for Store.
+func defaultConfig() *Config {
 	return &Config{Dir: config.Get().DataDir}
 }
 
-// New creates a new Database with default configuration.
-func New() *Database {
-	return &Database{Config: DefaultConfig()}
+// New creates a new Store with default configuration.
+func New() *Store {
+	return &Store{Config: defaultConfig()}
+}
+
+func (store *Store) Update(dagFile, requestId string, s *models.Status) error {
+	f, err := store.FindByRequestId(dagFile, requestId)
+	if err != nil {
+		return err
+	}
+	w := &writer{target: f.File}
+	if err := w.open(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = w.close()
+	}()
+	return w.write(s)
+}
+
+func (store *Store) Open(dagFile string, t time.Time, requestId string) error {
+	writer, _, err := store.newWriter(dagFile, t, requestId)
+	if err != nil {
+		return err
+	}
+	if err := writer.open(); err != nil {
+		return err
+	}
+	store.writer = writer
+	return nil
+}
+
+func (store *Store) Write(s *models.Status) error {
+	return store.writer.write(s)
+}
+
+func (store *Store) Close() error {
+	if store.writer == nil {
+		return nil
+	}
+	defer func() {
+		_ = store.writer.close()
+	}()
+	if err := store.Compact(store.writer.dagFile, store.writer.target); err != nil {
+		return err
+	}
+	return store.writer.close()
 }
 
 // ParseFile parses a status file.
@@ -53,7 +99,9 @@ func ParseFile(file string) (*models.Status, error) {
 		log.Printf("failed to open file. err: %v", err)
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	var offset int64 = 0
 	var ret *models.Status
 	for {
@@ -79,19 +127,19 @@ func ParseFile(file string) (*models.Status, error) {
 }
 
 // NewWriter creates a new writer for a status.
-func (db *Database) NewWriter(configPath string, t time.Time, requestId string) (*Writer, string, error) {
-	f, err := db.newFile(configPath, t, requestId)
+func (store *Store) newWriter(dagFile string, t time.Time, requestId string) (*writer, string, error) {
+	f, err := store.newFile(dagFile, t, requestId)
 	if err != nil {
 		return nil, "", err
 	}
-	w := &Writer{Target: f}
+	w := &writer{target: f, dagFile: dagFile}
 	return w, f, nil
 }
 
 // ReadStatusHist returns a list of status files.
-func (db *Database) ReadStatusHist(configPath string, n int) []*models.StatusFile {
+func (store *Store) ReadStatusHist(dagFile string, n int) []*models.StatusFile {
 	ret := make([]*models.StatusFile, 0)
-	files := db.latest(db.pattern(configPath)+"*.dat", n)
+	files := store.latest(store.pattern(dagFile)+"*.dat", n)
 	for _, file := range files {
 		status, err := ParseFile(file)
 		if err == nil {
@@ -105,8 +153,8 @@ func (db *Database) ReadStatusHist(configPath string, n int) []*models.StatusFil
 }
 
 // ReadStatusToday returns a list of status files.
-func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
-	file, err := db.latestToday(configPath, time.Now())
+func (store *Store) ReadStatusToday(dagFile string) (*models.Status, error) {
+	file, err := store.latestToday(dagFile, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -114,11 +162,11 @@ func (db *Database) ReadStatusToday(configPath string) (*models.Status, error) {
 }
 
 // FindByRequestId finds a status file by requestId.
-func (db *Database) FindByRequestId(configPath string, requestId string) (*models.StatusFile, error) {
+func (store *Store) FindByRequestId(dagFile string, requestId string) (*models.StatusFile, error) {
 	if requestId == "" {
 		return nil, fmt.Errorf("requestId is empty")
 	}
-	pattern := db.pattern(configPath) + "*.dat"
+	pattern := store.pattern(dagFile) + "*.dat"
 	matches, err := filepath.Glob(pattern)
 	if len(matches) > 0 || err == nil {
 		sort.Slice(matches, func(i, j int) bool {
@@ -138,17 +186,17 @@ func (db *Database) FindByRequestId(configPath string, requestId string) (*model
 			}
 		}
 	}
-	return nil, fmt.Errorf("%w : %s", ErrRequestIdNotFound, requestId)
+	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIdNotFound, requestId)
 }
 
 // RemoveAll removes all files in a directory.
-func (db *Database) RemoveAll(configPath string) error {
-	return db.RemoveOld(configPath, 0)
+func (store *Store) RemoveAll(dagFile string) error {
+	return store.RemoveOld(dagFile, 0)
 }
 
 // RemoveOld removes old files.
-func (db *Database) RemoveOld(configPath string, retentionDays int) error {
-	pattern := db.pattern(configPath) + "*.dat"
+func (store *Store) RemoveOld(dagFile string, retentionDays int) error {
+	pattern := store.pattern(dagFile) + "*.dat"
 	var lastErr error = nil
 	if retentionDays >= 0 {
 		matches, _ := filepath.Glob(pattern)
@@ -166,22 +214,24 @@ func (db *Database) RemoveOld(configPath string, retentionDays int) error {
 }
 
 // Compact creates a new file with only the latest data and removes old data.
-func (db *Database) Compact(configPath, original string) error {
+func (store *Store) Compact(_, original string) error {
 	status, err := ParseFile(original)
 	if err != nil {
 		return err
 	}
 
-	new := fmt.Sprintf("%s_c.dat",
+	newFile := fmt.Sprintf("%s_c.dat",
 		strings.TrimSuffix(filepath.Base(original), path.Ext(original)))
-	f := path.Join(filepath.Dir(original), new)
-	w := &Writer{Target: f}
-	if err := w.Open(); err != nil {
+	f := path.Join(filepath.Dir(original), newFile)
+	w := &writer{target: f}
+	if err := w.open(); err != nil {
 		return err
 	}
-	defer w.Close()
+	defer func() {
+		_ = w.close()
+	}()
 
-	if err := w.Write(status); err != nil {
+	if err := w.write(status); err != nil {
 		if err := os.Remove(f); err != nil {
 			log.Printf("failed to remove %s : %s", f, err.Error())
 		}
@@ -196,9 +246,9 @@ func (db *Database) Compact(configPath, original string) error {
 }
 
 // MoveData moves data from one directory to another.
-func (db *Database) MoveData(oldPath, newPath string) error {
-	oldDir := db.dir(oldPath, prefix(oldPath))
-	newDir := db.dir(newPath, prefix(newPath))
+func (store *Store) Rename(oldPath, newPath string) error {
+	oldDir := store.dir(oldPath, prefix(oldPath))
+	newDir := store.dir(newPath, prefix(newPath))
 	if !utils.FileExists(oldDir) {
 		// No need to move data
 		return nil
@@ -208,60 +258,60 @@ func (db *Database) MoveData(oldPath, newPath string) error {
 			return err
 		}
 	}
-	matches, err := filepath.Glob(db.pattern(oldPath) + "*.dat")
+	matches, err := filepath.Glob(store.pattern(oldPath) + "*.dat")
 	if err != nil {
 		return err
 	}
-	oldPattern := path.Base(db.pattern(oldPath))
-	newPattern := path.Base(db.pattern(newPath))
+	oldPattern := path.Base(store.pattern(oldPath))
+	newPattern := path.Base(store.pattern(newPath))
 	for _, m := range matches {
 		base := path.Base(m)
 		f := strings.Replace(base, oldPattern, newPattern, 1)
 		_ = os.Rename(m, path.Join(newDir, f))
 	}
 	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
-		os.Remove(oldDir)
+		_ = os.Remove(oldDir)
 	}
 	return nil
 }
 
-func (db *Database) dir(configPath string, prefix string) string {
+func (store *Store) dir(dagFile string, prefix string) string {
 	h := md5.New()
-	h.Write([]byte(configPath))
+	h.Write([]byte(dagFile))
 	v := hex.EncodeToString(h.Sum(nil))
-	return filepath.Join(db.Dir, fmt.Sprintf("%s-%s", prefix, v))
+	return filepath.Join(store.Dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
-func (db *Database) newFile(configPath string, t time.Time, requestId string) (string, error) {
-	if configPath == "" {
-		return "", fmt.Errorf("configPath is empty")
+func (store *Store) newFile(dagFile string, t time.Time, requestId string) (string, error) {
+	if dagFile == "" {
+		return "", fmt.Errorf("dagFile is empty")
 	}
-	fileName := fmt.Sprintf("%s.%s.%s.dat", db.pattern(configPath), t.Format("20060102.15:04:05.000"), utils.TruncString(requestId, 8))
+	fileName := fmt.Sprintf("%s.%s.%s.dat", store.pattern(dagFile), t.Format("20060102.15:04:05.000"), utils.TruncString(requestId, 8))
 	return fileName, nil
 }
 
-func (db *Database) pattern(configPath string) string {
-	p := prefix(configPath)
-	dir := db.dir(configPath, p)
+func (store *Store) pattern(dagFile string) string {
+	p := prefix(dagFile)
+	dir := store.dir(dagFile, p)
 	return filepath.Join(dir, p)
 }
 
-func (db *Database) latestToday(configPath string, day time.Time) (string, error) {
+func (store *Store) latestToday(dagFile string, day time.Time) (string, error) {
 	var ret []string
-	pattern := fmt.Sprintf("%s.%s*.*.dat", db.pattern(configPath), day.Format("20060102"))
+	pattern := fmt.Sprintf("%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"))
 	matches, err := filepath.Glob(pattern)
 	if err == nil || len(matches) > 0 {
 		ret = filterLatest(matches, 1)
 	} else {
-		return "", ErrNoStatusDataToday
+		return "", persistence.ErrNoStatusDataToday
 	}
 	if len(ret) == 0 {
-		return "", ErrNoStatusData
+		return "", persistence.ErrNoStatusData
 	}
 	return ret[0], err
 }
 
-func (db *Database) latest(pattern string, n int) []string {
+func (store *Store) latest(pattern string, n int) []string {
 	matches, err := filepath.Glob(pattern)
 	var ret = []string{}
 	if err == nil || len(matches) >= 0 {
@@ -269,12 +319,6 @@ func (db *Database) latest(pattern string, n int) []string {
 	}
 	return ret
 }
-
-var (
-	ErrRequestIdNotFound = fmt.Errorf("request id not found")
-	ErrNoStatusDataToday = fmt.Errorf("no status data today")
-	ErrNoStatusData      = fmt.Errorf("no status data")
-)
 
 var rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
 
@@ -322,9 +366,9 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 	return ret, nil
 }
 
-func prefix(configPath string) string {
+func prefix(dagFile string) string {
 	return strings.TrimSuffix(
-		filepath.Base(configPath),
-		path.Ext(configPath),
+		filepath.Base(dagFile),
+		path.Ext(dagFile),
 	)
 }

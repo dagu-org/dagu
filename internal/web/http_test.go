@@ -15,7 +15,7 @@ import (
 func TestHttpServerStartShutdown(t *testing.T) {
 	dir, err := os.MkdirTemp("", "test_http_server")
 	require.NoError(t, err)
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 
 	host := "127.0.0.1"
 	port := findPort(t)
@@ -45,7 +45,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 func TestHttpServerShutdownWithAPI(t *testing.T) {
 	dir, err := os.MkdirTemp("", "test_http_server")
 	require.NoError(t, err)
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 
 	host := "127.0.0.1"
 	port := findPort(t)

@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"log"
 	"time"
@@ -19,7 +20,7 @@ func restartCmd() *cobra.Command {
 			loadedDAG, err := loadDAG(dagFile, "")
 			checkError(err)
 
-			ctrl := controller.NewDAGController(loadedDAG)
+			ctrl := controller.New(loadedDAG, jsondb.New())
 
 			// Check the current status and stop the DAG if it is running.
 			stopDAGIfRunning(ctrl)

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"errors"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"time"
 
 	"github.com/yohamta/dagu/internal/config"
@@ -33,7 +34,7 @@ var (
 )
 
 func (j *job) Start() error {
-	c := controller.NewDAGController(j.DAG)
+	c := controller.New(j.DAG, jsondb.New())
 	s, err := c.GetLastStatus()
 	if err != nil {
 		return err
@@ -58,7 +59,7 @@ func (j *job) Start() error {
 }
 
 func (j *job) Stop() error {
-	c := controller.NewDAGController(j.DAG)
+	c := controller.New(j.DAG, jsondb.New())
 	s, err := c.GetLastStatus()
 	if err != nil {
 		return err
@@ -70,7 +71,7 @@ func (j *job) Stop() error {
 }
 
 func (j *job) Restart() error {
-	c := controller.NewDAGController(j.DAG)
+	c := controller.New(j.DAG, jsondb.New())
 	return c.Restart(j.Config.Command, j.Config.WorkDir)
 }
 

@@ -24,11 +24,11 @@ type HTTPExecutor struct {
 }
 
 type HTTPConfig struct {
-	Timeout     int               `json:"timeout"`
-	Headers     map[string]string `json:"headers"`
-	QueryParams map[string]string `json:"query"`
-	Body        string            `json:"body"`
-	Silent      bool              `json:"silent"`
+	Timeout     int               `jsondb:"timeout"`
+	Headers     map[string]string `jsondb:"headers"`
+	QueryParams map[string]string `jsondb:"query"`
+	Body        string            `jsondb:"body"`
+	Silent      bool              `jsondb:"silent"`
 }
 
 func (e *HTTPExecutor) SetStdout(out io.Writer) {

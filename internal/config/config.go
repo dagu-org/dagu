@@ -99,7 +99,7 @@ func LoadConfig(userHomeDir string) error {
 	cfg := &Config{}
 	err := viper.Unmarshal(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal Config file: %w", err)
+		return fmt.Errorf("failed to unmarshal cfg file: %w", err)
 	}
 	instance = cfg
 	loadLegacyEnvs()

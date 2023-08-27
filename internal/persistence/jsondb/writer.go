@@ -1,4 +1,4 @@
-package database
+package jsondb
 
 import (
 	"bufio"
@@ -12,18 +12,19 @@ import (
 )
 
 // Writer is the interface to write status to local file.
-type Writer struct {
-	Target string
-	writer *bufio.Writer
-	file   *os.File
-	mu     sync.Mutex
-	closed bool
+type writer struct {
+	target  string
+	dagFile string
+	writer  *bufio.Writer
+	file    *os.File
+	mu      sync.Mutex
+	closed  bool
 }
 
 // Open opens the writer.
-func (w *Writer) Open() (err error) {
-	_ = os.MkdirAll(path.Dir(w.Target), 0755)
-	w.file, err = utils.OpenOrCreateFile(w.Target)
+func (w *writer) open() (err error) {
+	_ = os.MkdirAll(path.Dir(w.target), 0755)
+	w.file, err = utils.OpenOrCreateFile(w.target)
 	if err == nil {
 		w.writer = bufio.NewWriter(w.file)
 	}
@@ -31,7 +32,7 @@ func (w *Writer) Open() (err error) {
 }
 
 // Writer appends the status to the local file.
-func (w *Writer) Write(st *models.Status) error {
+func (w *writer) write(st *models.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	jsonb, _ := st.ToJson()
@@ -43,7 +44,9 @@ func (w *Writer) Write(st *models.Status) error {
 }
 
 // Close closes the writer.
-func (w *Writer) Close() (err error) {
+func (w *writer) close() (err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if !w.closed {
 		err = w.writer.Flush()
 		utils.LogErr("flush file", err)

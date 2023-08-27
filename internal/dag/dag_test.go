@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 }
 
 func changeHomeDir(homeDir string) {
-	os.Setenv("HOME", homeDir)
+	_ = os.Setenv("HOME", homeDir)
 	_ = config.LoadConfig(homeDir)
 }
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"log"
 )
 
@@ -17,7 +18,7 @@ func stopCmd() *cobra.Command {
 			checkError(err)
 
 			log.Printf("Stopping...")
-			checkError(controller.NewDAGController(loadedDAG).Stop())
+			checkError(controller.New(loadedDAG, jsondb.New()).Stop())
 		},
 	}
 }

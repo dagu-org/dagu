@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ func TestRestartCommand(t *testing.T) {
 	// Check parameter was the same as the first execution
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
-	ctrl := controller.NewDAGController(d)
+	ctrl := controller.New(d, jsondb.New())
 	sts := ctrl.GetRecentStatuses(2)
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)

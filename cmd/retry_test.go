@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/controller"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"github.com/yohamta/dagu/internal/scheduler"
 	"testing"
 )
@@ -15,7 +16,7 @@ func TestRetryCommand(t *testing.T) {
 	testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 	// Find the request ID.
-	s, err := controller.NewDAGStatusReader().ReadStatus(dagFile, false)
+	s, err := controller.NewDAGStatusReader(jsondb.New()).ReadStatus(dagFile, false)
 	require.NoError(t, err)
 	require.Equal(t, s.Status.Status, scheduler.SchedulerStatus_Success)
 	require.NotNil(t, s.Status)

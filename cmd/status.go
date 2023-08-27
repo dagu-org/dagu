@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/models"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"log"
 )
 
@@ -17,7 +18,7 @@ func createStatusCommand() *cobra.Command {
 			loadedDAG, err := loadDAG(args[0], "")
 			checkError(err)
 
-			status, err := controller.NewDAGController(loadedDAG).GetStatus()
+			status, err := controller.New(loadedDAG, jsondb.New()).GetStatus()
 			checkError(err)
 
 			res := &models.StatusResponse{Status: status}

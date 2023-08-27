@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/yohamta/dagu/internal/agent"
-	"github.com/yohamta/dagu/internal/database"
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"path/filepath"
 )
 
@@ -18,7 +18,7 @@ func retryCmd() *cobra.Command {
 			reqID, err := cmd.Flags().GetString("req")
 			checkError(err)
 
-			status, err := database.New().FindByRequestId(f, reqID)
+			status, err := jsondb.New().FindByRequestId(f, reqID)
 			checkError(err)
 
 			loadedDAG, err := loadDAG(args[0], status.Status.Params)

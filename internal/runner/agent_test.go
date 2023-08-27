@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"os"
 	"path"
 	"testing"
@@ -17,7 +18,7 @@ import (
 func TestAgent(t *testing.T) {
 	tmpDir := utils.MustTempDir("runner_agent_test")
 	defer func() {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
@@ -36,9 +37,9 @@ func TestAgent(t *testing.T) {
 
 	pathToDAG := path.Join(testdataDir, "scheduled_job.yaml")
 	loader := &dag.Loader{}
-	dag, err := loader.LoadMetadataOnly(pathToDAG)
+	d, err := loader.LoadMetadataOnly(pathToDAG)
 	require.NoError(t, err)
-	c := controller.NewDAGController(dag)
+	c := controller.New(d, jsondb.New())
 
 	require.Eventually(t, func() bool {
 		status, err := c.GetLastStatus()
@@ -51,7 +52,7 @@ func TestAgent(t *testing.T) {
 func TestAgentForStop(t *testing.T) {
 	tmpDir := utils.MustTempDir("runner_agent_test_for_stop")
 	defer func() {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC)
@@ -65,12 +66,12 @@ func TestAgentForStop(t *testing.T) {
 
 	// read the test DAG
 	file := path.Join(testdataDir, "start_stop.yaml")
-	dr := controller.NewDAGStatusReader()
-	dag, _ := dr.ReadStatus(file, false)
-	c := controller.NewDAGController(dag.DAG)
+	dr := controller.NewDAGStatusReader(jsondb.New())
+	d, _ := dr.ReadStatus(file, false)
+	c := controller.New(d.DAG, jsondb.New())
 
 	j := &job{
-		DAG:    dag.DAG,
+		DAG:    d.DAG,
 		Config: testConfig,
 		Next:   time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
 	}

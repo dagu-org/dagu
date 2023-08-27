@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -22,7 +23,7 @@ func handleGetList() http.HandlerFunc {
 	cfg := config.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
 		dir := filepath.Join(cfg.DAGs)
-		dr := controller.NewDAGStatusReader()
+		dr := controller.NewDAGStatusReader(jsondb.New())
 		dags, errs, err := dr.ReadAllStatus(dir)
 		if err != nil {
 			encodeError(w, err)
@@ -46,7 +47,7 @@ func handleGetList() http.HandlerFunc {
 			Errors:   errs,
 			HasError: hasErr,
 		}
-		if r.Header.Get("Accept") == "application/json" {
+		if r.Header.Get("Accept") == "application/jsondb" {
 			renderJson(w, data)
 		} else {
 			renderFunc(w, data)
