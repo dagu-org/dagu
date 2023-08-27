@@ -9,15 +9,15 @@ import (
 )
 
 type Node struct {
-	*dag.Step  `jsondb:"Step"`
-	Log        string               `jsondb:"Log"`
-	StartedAt  string               `jsondb:"StartedAt"`
-	FinishedAt string               `jsondb:"FinishedAt"`
-	Status     scheduler.NodeStatus `jsondb:"Status"`
-	RetryCount int                  `jsondb:"RetryCount"`
-	DoneCount  int                  `jsondb:"DoneCount"`
-	Error      string               `jsondb:"Error"`
-	StatusText string               `jsondb:"StatusText"`
+	*dag.Step  `json:"Step"`
+	Log        string               `json:"Log"`
+	StartedAt  string               `json:"StartedAt"`
+	FinishedAt string               `json:"FinishedAt"`
+	Status     scheduler.NodeStatus `json:"Status"`
+	RetryCount int                  `json:"RetryCount"`
+	DoneCount  int                  `json:"DoneCount"`
+	Error      string               `json:"Error"`
+	StatusText string               `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *scheduler.Node {

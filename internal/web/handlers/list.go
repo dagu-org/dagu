@@ -47,7 +47,7 @@ func handleGetList() http.HandlerFunc {
 			Errors:   errs,
 			HasError: hasErr,
 		}
-		if r.Header.Get("Accept") == "application/jsondb" {
+		if r.Header.Get("Accept") == "application/json" {
 			renderJson(w, data)
 		} else {
 			renderFunc(w, data)

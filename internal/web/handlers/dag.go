@@ -137,7 +137,7 @@ func handleGetDAG() http.HandlerFunc {
 }
 
 func isJsonRequest(r *http.Request) bool {
-	return r.Header.Get("Accept") == "application/jsondb"
+	return r.Header.Get("Accept") == "application/json"
 }
 
 func handlePostDAG() http.HandlerFunc {

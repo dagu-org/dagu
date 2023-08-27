@@ -383,7 +383,7 @@ var (
 )
 
 func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/jsondb")
+	w.Header().Set("content-type", "application/json")
 	switch {
 	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 		status := a.Status()

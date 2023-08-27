@@ -44,7 +44,7 @@ func handleGetAssets() http.HandlerFunc {
 }
 
 func renderJson(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/jsondb; charset=utf-8")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(data)
 	if err != nil {

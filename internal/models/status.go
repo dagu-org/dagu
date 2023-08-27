@@ -12,7 +12,7 @@ import (
 )
 
 type StatusResponse struct {
-	Status *Status `jsondb:"status"`
+	Status *Status `json:"status"`
 }
 
 type Pid int
@@ -31,20 +31,20 @@ func (p Pid) IsRunning() bool {
 }
 
 type Status struct {
-	RequestId  string                    `jsondb:"RequestId"`
-	Name       string                    `jsondb:"Name"`
-	Status     scheduler.SchedulerStatus `jsondb:"Status"`
-	StatusText string                    `jsondb:"StatusText"`
-	Pid        Pid                       `jsondb:"Pid"`
-	Nodes      []*Node                   `jsondb:"Nodes"`
-	OnExit     *Node                     `jsondb:"OnExit"`
-	OnSuccess  *Node                     `jsondb:"OnSuccess"`
-	OnFailure  *Node                     `jsondb:"OnFailure"`
-	OnCancel   *Node                     `jsondb:"OnCancel"`
-	StartedAt  string                    `jsondb:"StartedAt"`
-	FinishedAt string                    `jsondb:"FinishedAt"`
-	Log        string                    `jsondb:"Log"`
-	Params     string                    `jsondb:"Params"`
+	RequestId  string                    `json:"RequestId"`
+	Name       string                    `json:"Name"`
+	Status     scheduler.SchedulerStatus `json:"Status"`
+	StatusText string                    `json:"StatusText"`
+	Pid        Pid                       `json:"Pid"`
+	Nodes      []*Node                   `json:"Nodes"`
+	OnExit     *Node                     `json:"OnExit"`
+	OnSuccess  *Node                     `json:"OnSuccess"`
+	OnFailure  *Node                     `json:"OnFailure"`
+	OnCancel   *Node                     `json:"OnCancel"`
+	StartedAt  string                    `json:"StartedAt"`
+	FinishedAt string                    `json:"FinishedAt"`
+	Log        string                    `json:"Log"`
+	Params     string                    `json:"Params"`
 }
 
 type StatusFile struct {
