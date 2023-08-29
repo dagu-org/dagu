@@ -39,8 +39,10 @@ func ToDAG(d *dag.DAG) *models.WorkflowDef {
 	return &models.WorkflowDef{
 		Name:          d.Name,
 		Group:         d.Group,
+		Description:   d.Description,
 		Params:        d.Params,
 		DefaultParams: d.DefaultParams,
+		Tags:          d.Tags,
 		Schedule: lo.Map(d.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
@@ -55,13 +57,13 @@ func ToSchedule(s *dag.Schedule) *models.Schedule {
 
 func ToWorkflowStatus(s *pkgmodels.Status) *models.WorkflowStatus {
 	return &models.WorkflowStatus{
-		FinishedAt: s.FinishedAt,
 		Log:        s.Log,
 		Name:       s.Name,
 		Params:     s.Params,
 		Pid:        int64(s.Pid),
 		RequestID:  s.RequestId,
 		StartedAt:  s.StartedAt,
+		FinishedAt: s.FinishedAt,
 		Status:     int64(s.Status),
 		StatusText: s.StatusText,
 	}

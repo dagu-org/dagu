@@ -7,7 +7,7 @@ import DAGTable from '../../components/molecules/DAGTable';
 import Title from '../../components/atoms/Title';
 import { DAGItem, DAGDataType } from '../../models';
 import { useLocation } from 'react-router-dom';
-import { GetDAGsResponse } from '../../models/api';
+import { ListWorkflowsResponse } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import useSWR, { useSWRConfig } from 'swr';
 
@@ -18,12 +18,12 @@ function DAGs() {
   const appBarContext = React.useContext(AppBarContext);
 
   const { cache, mutate } = useSWRConfig();
-  const { data } = useSWR<GetDAGsResponse>('/api/v1/workflows', null, {
+  const { data } = useSWR<ListWorkflowsResponse>('/api/v1/workflows', null, {
     refreshInterval: 10000,
   });
 
   const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate('/'), 500);
+    setTimeout(() => mutate('/api/v1/workflows'), 500);
   }, [mutate, cache]);
 
   React.useEffect(() => {

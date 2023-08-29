@@ -1,5 +1,5 @@
 import React from 'react';
-import { GetDAGsResponse } from '../models/api';
+import { ListWorkflowsResponse } from '../models/api';
 import { Box, Grid } from '@mui/material';
 import { SchedulerStatus } from '../models';
 import { statusColorMapping } from '../consts';
@@ -22,7 +22,7 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
-  const { data } = useSWR<GetDAGsResponse>('/', null, {
+  const { data } = useSWR<ListWorkflowsResponse>('/', null, {
     refreshInterval: 10000,
   });
 

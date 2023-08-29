@@ -1,4 +1,4 @@
-import { DAG, DAGStatus, Node, NodeStatus, StatusFile, WorkflowListItem } from './index';
+import { DAG, DAGStatus, Node, NodeStatus, SchedulerStatus, Status, StatusFile } from './index';
 
 export type GetDAGResponse = {
   Title: string;
@@ -46,10 +46,40 @@ export type GridData = {
   Vals: NodeStatus[];
 };
 
-export type GetDAGsResponse = {
+export type ListWorkflowsResponse = {
   Title: string;
   Charset: string;
   DAGs: WorkflowListItem[];
   Errors: string[];
   HasError: boolean;
+};
+
+export type WorkflowListItem = {
+  File: string;
+  Dir: string;
+  Status?: WorkflowStatus;
+  Suspended: boolean;
+  ErrorT: string;
+  DAG: WorkflowDefinition;
+};
+
+export type WorkflowDefinition = {
+  Name: string;
+  Group: string;
+  Tags: string[];
+  Description: string;
+  Params: string[];
+  DefaultParams?: string;
+};
+
+export type WorkflowStatus = {
+  RequestId: string;
+  Name: string;
+  Status: SchedulerStatus;
+  StatusText: string;
+  Pid: number;
+  StartedAt: string;
+  FinishedAt: string;
+  Log: string;
+  Params: string;
 };

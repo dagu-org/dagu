@@ -76,8 +76,6 @@ definitions:
   workflowDef:
     type: object
     properties:
-      Location:
-        type: string
       Group:
         type: string
       Name:
@@ -86,44 +84,18 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/schedule'
-      StopSchedule:
-        type: string
-      RestartSchedule:
-        type: string
       Description:
         type: string
-      Env:
-        type: string
-      LogDir:
-        type: string
-      MailOn:
-        type: string
-      ErrorMail:
-        type: string
-      InfoMail:
-        type: string
-      Smtp:
-        type: string
-      Delay:
-        type: integer
-      RestartWait:
-        type: integer
-      HistRetentionDays:
-        type: integer
-      Preconditions:
-        type: string
-      MaxActiveRuns:
-        type: integer
       Params:
         type: array
         items:
           type: string
       DefaultParams:
         type: string
-      MaxCleanUpTime:
-        type: integer
       Tags:
-        type: string
+        type: array
+        items:
+          type: string
 
   schedule:
     type: object

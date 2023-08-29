@@ -127,41 +127,11 @@ func init() {
         "DefaultParams": {
           "type": "string"
         },
-        "Delay": {
-          "type": "integer"
-        },
         "Description": {
-          "type": "string"
-        },
-        "Env": {
-          "type": "string"
-        },
-        "ErrorMail": {
           "type": "string"
         },
         "Group": {
           "type": "string"
-        },
-        "HistRetentionDays": {
-          "type": "integer"
-        },
-        "InfoMail": {
-          "type": "string"
-        },
-        "Location": {
-          "type": "string"
-        },
-        "LogDir": {
-          "type": "string"
-        },
-        "MailOn": {
-          "type": "string"
-        },
-        "MaxActiveRuns": {
-          "type": "integer"
-        },
-        "MaxCleanUpTime": {
-          "type": "integer"
         },
         "Name": {
           "type": "string"
@@ -172,29 +142,17 @@ func init() {
             "type": "string"
           }
         },
-        "Preconditions": {
-          "type": "string"
-        },
-        "RestartSchedule": {
-          "type": "string"
-        },
-        "RestartWait": {
-          "type": "integer"
-        },
         "Schedule": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/schedule"
           }
         },
-        "Smtp": {
-          "type": "string"
-        },
-        "StopSchedule": {
-          "type": "string"
-        },
         "Tags": {
-          "type": "string"
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -386,41 +344,11 @@ func init() {
         "DefaultParams": {
           "type": "string"
         },
-        "Delay": {
-          "type": "integer"
-        },
         "Description": {
-          "type": "string"
-        },
-        "Env": {
-          "type": "string"
-        },
-        "ErrorMail": {
           "type": "string"
         },
         "Group": {
           "type": "string"
-        },
-        "HistRetentionDays": {
-          "type": "integer"
-        },
-        "InfoMail": {
-          "type": "string"
-        },
-        "Location": {
-          "type": "string"
-        },
-        "LogDir": {
-          "type": "string"
-        },
-        "MailOn": {
-          "type": "string"
-        },
-        "MaxActiveRuns": {
-          "type": "integer"
-        },
-        "MaxCleanUpTime": {
-          "type": "integer"
         },
         "Name": {
           "type": "string"
@@ -431,29 +359,17 @@ func init() {
             "type": "string"
           }
         },
-        "Preconditions": {
-          "type": "string"
-        },
-        "RestartSchedule": {
-          "type": "string"
-        },
-        "RestartWait": {
-          "type": "integer"
-        },
         "Schedule": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/schedule"
           }
         },
-        "Smtp": {
-          "type": "string"
-        },
-        "StopSchedule": {
-          "type": "string"
-        },
         "Tags": {
-          "type": "string"
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

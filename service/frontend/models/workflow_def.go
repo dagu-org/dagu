@@ -22,41 +22,11 @@ type WorkflowDef struct {
 	// default params
 	DefaultParams string `json:"DefaultParams,omitempty"`
 
-	// delay
-	Delay int64 `json:"Delay,omitempty"`
-
 	// description
 	Description string `json:"Description,omitempty"`
 
-	// env
-	Env string `json:"Env,omitempty"`
-
-	// error mail
-	ErrorMail string `json:"ErrorMail,omitempty"`
-
 	// group
 	Group string `json:"Group,omitempty"`
-
-	// hist retention days
-	HistRetentionDays int64 `json:"HistRetentionDays,omitempty"`
-
-	// info mail
-	InfoMail string `json:"InfoMail,omitempty"`
-
-	// location
-	Location string `json:"Location,omitempty"`
-
-	// log dir
-	LogDir string `json:"LogDir,omitempty"`
-
-	// mail on
-	MailOn string `json:"MailOn,omitempty"`
-
-	// max active runs
-	MaxActiveRuns int64 `json:"MaxActiveRuns,omitempty"`
-
-	// max clean up time
-	MaxCleanUpTime int64 `json:"MaxCleanUpTime,omitempty"`
 
 	// name
 	Name string `json:"Name,omitempty"`
@@ -64,26 +34,11 @@ type WorkflowDef struct {
 	// params
 	Params []string `json:"Params"`
 
-	// preconditions
-	Preconditions string `json:"Preconditions,omitempty"`
-
-	// restart schedule
-	RestartSchedule string `json:"RestartSchedule,omitempty"`
-
-	// restart wait
-	RestartWait int64 `json:"RestartWait,omitempty"`
-
 	// schedule
 	Schedule []*Schedule `json:"Schedule"`
 
-	// Smtp
-	SMTP string `json:"Smtp,omitempty"`
-
-	// stop schedule
-	StopSchedule string `json:"StopSchedule,omitempty"`
-
 	// tags
-	Tags string `json:"Tags,omitempty"`
+	Tags []string `json:"Tags"`
 }
 
 // Validate validates this workflow def

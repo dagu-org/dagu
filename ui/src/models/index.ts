@@ -1,4 +1,5 @@
 import cronParser from 'cron-parser';
+import { WorkflowListItem } from './api';
 
 export enum SchedulerStatus {
   None = 0,
@@ -79,15 +80,6 @@ export type HandlerOn = {
   Exit: Step;
 };
 
-export type WorkflowListItem = {
-  File: string;
-  Dir: string;
-  Status?: Status;
-  Suspended: boolean;
-  ErrorT: string;
-  DAG: DAG;
-};
-
 export type DAGStatus = {
   File: string;
   Dir: string;
@@ -107,7 +99,7 @@ export type DAGItem = DAGData | DAGGroup;
 export type DAGData = {
   Type: DAGDataType.DAG;
   Name: string;
-  DAGStatus: DAGStatus;
+  DAGStatus: WorkflowListItem;
 };
 
 export type DAGGroup = {
