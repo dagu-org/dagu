@@ -1,3 +1,42 @@
 package app
 
-var ()
+import (
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/service/frontend"
+	"go.uber.org/fx"
+	"os"
+)
+
+var (
+	CommonModule = fx.Options(
+		fx.Provide(ConfigProvider),
+	)
+)
+
+var (
+	cfgInstance *config.Config = nil
+)
+
+func ConfigProvider() *config.Config {
+	if cfgInstance != nil {
+		return cfgInstance
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	if err := config.LoadConfig(home); err != nil {
+		panic(err)
+	}
+	// TODO: fixme
+	cfgInstance = config.Get()
+	return cfgInstance
+}
+
+func NewFrontendService() *fx.App {
+	return fx.New(
+		CommonModule,
+		frontend.Module,
+		fx.Invoke(frontend.LifetimeHooks),
+	)
+}

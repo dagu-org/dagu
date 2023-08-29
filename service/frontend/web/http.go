@@ -16,37 +16,38 @@ import (
 	"github.com/yohamta/dagu/internal/utils"
 )
 
-type server struct {
+type Server struct {
 	config          *config.Config
 	addr            string
 	server          *http.Server
 	idleConnsClosed chan struct{}
 }
 
-func NewServer(cfg *config.Config) *server {
-	return &server{
+func NewServer(cfg *config.Config) *Server {
+	return &Server{
 		addr:            net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
 		config:          cfg,
 		idleConnsClosed: nil,
 	}
 }
 
-func (svr *server) Shutdown() {
+func (svr *Server) Shutdown(_ context.Context) error {
 	err := svr.server.Shutdown(context.Background())
 	if err != nil {
-		log.Printf("server shutdown: %v", err)
+		log.Printf("Server shutdown: %v", err)
 	}
 	if svr.idleConnsClosed != nil {
 		close(svr.idleConnsClosed)
 		svr.idleConnsClosed = nil
 	}
+	return nil
 }
 
-func (svr *server) Signal(_ os.Signal) {
-	svr.Shutdown()
+func (svr *Server) Signal(_ os.Signal) {
+	_ = svr.Shutdown(context.Background())
 }
 
-func (svr *server) Serve() (err error) {
+func (svr *Server) Start() (err error) {
 	svr.setupServer()
 	svr.setupHandler()
 
@@ -68,7 +69,7 @@ func (svr *server) Serve() (err error) {
 		scheme = "https"
 	}
 
-	log.Printf("server is running at \"%s://%s:%d\"\n", scheme, host, svr.config.Port)
+	log.Printf("Server is running at \"%s://%s:%d\"\n", scheme, host, svr.config.Port)
 
 	switch {
 	case svr.config.TLS != nil && certFile != "" && keyFile != "":
@@ -90,11 +91,11 @@ func (svr *server) Serve() (err error) {
 	return
 }
 
-func (svr *server) setupServer() {
+func (svr *Server) setupServer() {
 	svr.server = &http.Server{Addr: svr.addr}
 }
 
-func (svr *server) setupHandler() {
+func (svr *Server) setupHandler() {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -127,10 +128,10 @@ func (svr *server) setupHandler() {
 	svr.server.Handler = r
 }
 
-func (svr *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+func (svr *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	log.Println("received shutdown request")
-	_, _ = w.Write([]byte("shutting down the server...\n"))
+	_, _ = w.Write([]byte("shutting down the Server...\n"))
 	go func() {
-		svr.Shutdown()
+		_ = svr.Shutdown(r.Context())
 	}()
 }

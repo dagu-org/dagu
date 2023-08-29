@@ -26,7 +26,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 	})
 
 	go func() {
-		err := server.Serve()
+		err := server.Start()
 		require.NoError(t, err)
 	}()
 
@@ -56,7 +56,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 	})
 
 	go func() {
-		err := server.Serve()
+		err := server.Start()
 		require.NoError(t, err)
 	}()
 
