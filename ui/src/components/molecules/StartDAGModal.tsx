@@ -47,7 +47,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   const parsedParams = React.useMemo(() => {
-    if (dag.DefaultParams.trim() == '') {
+    if (!dag.DefaultParams) {
       return [];
     }
     return parseParams(dag.DefaultParams);

@@ -18,7 +18,7 @@ function DAGs() {
   const appBarContext = React.useContext(AppBarContext);
 
   const { cache, mutate } = useSWRConfig();
-  const { data } = useSWR<GetDAGsResponse>('/', null, {
+  const { data } = useSWR<GetDAGsResponse>('/api/v1/workflows', null, {
     refreshInterval: 10000,
   });
 

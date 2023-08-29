@@ -63,7 +63,7 @@ export type DAG = {
   Preconditions: Condition[];
   MaxActiveRuns: number;
   Params: string[];
-  DefaultParams: string;
+  DefaultParams?: string;
   Delay: number;
   MaxCleanUpTime: number;
 };
@@ -77,6 +77,15 @@ export type HandlerOn = {
   Success: Step;
   Cancel: Step;
   Exit: Step;
+};
+
+export type WorkflowListItem = {
+  File: string;
+  Dir: string;
+  Status?: Status;
+  Suspended: boolean;
+  ErrorT: string;
+  DAG: DAG;
 };
 
 export type DAGStatus = {
