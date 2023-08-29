@@ -24,10 +24,11 @@ func LifetimeHooks(lc fx.Lifecycle, srv *http.Server) {
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) (err error) {
-				return srv.Start()
+				return srv.Serve(ctx)
 			},
-			OnStop: func(ctx context.Context) error {
-				return srv.Shutdown(ctx)
+			OnStop: func(_ context.Context) error {
+				srv.Shutdown()
+				return nil
 			},
 		},
 	)

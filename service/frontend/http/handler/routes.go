@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func ConfigRoutes(r *chi.Mux) {
+func ConfigRoutes(r *chi.Mux) *chi.Mux {
 	r.Get("/", handleGetList())
 
 	r.Post("/", handlePostList())
@@ -34,6 +34,8 @@ func ConfigRoutes(r *chi.Mux) {
 
 	r.Get("/search", handleGetSearch())
 	r.Get("/assets/*", handleGetAssets())
+
+	return r
 }
 
 func handleGetAssets() http.HandlerFunc {

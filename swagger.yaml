@@ -1,0 +1,178 @@
+---
+swagger: '2.0'
+info:
+  version: 0.0.1
+  title: Dagu
+consumes:
+  - application/json
+produces:
+  - application/json
+basePath: "/api/v1"
+schemes:
+  - http
+host: "localhost:8080"
+
+paths:
+  /workflows:
+    get:
+      produces:
+        - application/json
+      operationId: listWorkflows
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/listWorkflowsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
+definitions:
+  ApiError:
+    type: object
+    properties:
+      message:
+        type: string
+      detailedMessage:
+        type: string
+
+  listWorkflowsResponse:
+    type: object
+    properties:
+      Title:
+        type: string
+      Charset:
+        type: string
+      DAGs:
+        type: array
+        items:
+          $ref: '#/definitions/workflowListItem'
+      Errors:
+        type: array
+        items:
+          type: string
+      HasError:
+        type: boolean
+
+  workflowListItem:
+    type: object
+    properties:
+      File:
+        type: string
+      Dir:
+        type: string
+      DAG:
+        $ref: '#/definitions/workflowDef'
+      Status:
+        $ref: '#/definitions/workflowStatus'
+      Suspended:
+        type: boolean
+      Error:
+        type: string
+      ErrorT:
+        type: string
+
+  workflowDef:
+    type: object
+    properties:
+      Location:
+        type: string
+      Group:
+        type: string
+      Name:
+        type: string
+      Schedule:
+        type: array
+        items:
+          $ref: '#/definitions/schedule'
+      StopSchedule:
+        type: string
+      RestartSchedule:
+        type: string
+      Description:
+        type: string
+      Env:
+        type: string
+      LogDir:
+        type: string
+      MailOn:
+        type: string
+      ErrorMail:
+        type: string
+      InfoMail:
+        type: string
+      Smtp:
+        type: string
+      Delay:
+        type: integer
+      RestartWait:
+        type: integer
+      HistRetentionDays:
+        type: integer
+      Preconditions:
+        type: string
+      MaxActiveRuns:
+        type: integer
+      Params:
+        type: array
+        items:
+          type: string
+      DefaultParams:
+        type: string
+      MaxCleanUpTime:
+        type: integer
+      Tags:
+        type: string
+
+  schedule:
+    type: object
+    properties:
+      Expression:
+        type: string
+
+  handlerOn:
+    type: object
+    properties:
+      Failure:
+        type: string
+      Success:
+        type: string
+      Cancel:
+        type: string
+      Exit:
+        type: string
+
+  workflowStatus:
+    type: object
+    properties:
+      RequestId:
+        type: string
+      Name:
+        type: string
+      Status:
+        type: integer
+      StatusText:
+        type: string
+      Pid:
+        type: integer
+      Nodes:
+        type: array
+        items:
+          type: string
+      OnExit:
+        type: string
+      OnSuccess:
+        type: string
+      OnFailure:
+        type: string
+      OnCancel:
+        type: string
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Log:
+        type: string
+      Params:
+        type: string
