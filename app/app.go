@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/service/frontend"
 	"go.uber.org/fx"
 	"os"
@@ -10,6 +11,7 @@ import (
 var (
 	CommonModule = fx.Options(
 		fx.Provide(ConfigProvider),
+		fx.Provide(logger.NewSlogLogger),
 	)
 )
 

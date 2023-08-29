@@ -268,7 +268,7 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run(ctx context.Context) error {
-	tl := &logger.TeeLogger{Writer: a.logManager.logFile}
+	tl := &logger.Tee{Writer: a.logManager.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ func TestTeeLogger(t *testing.T) {
 	tmpFile := path.Join(tmpDir, "test.log")
 	f, err := os.Create(tmpFile)
 	require.NoError(t, err)
-	l := &TeeLogger{Writer: f}
+	l := &Tee{Writer: f}
 	err = l.Open()
 	require.NoError(t, err)
 

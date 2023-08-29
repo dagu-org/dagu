@@ -29,10 +29,12 @@ type Config struct {
 	NavbarColor        string
 	NavbarTitle        string
 	Env                map[string]string
-	TLS                *struct {
-		CertFile string
-		KeyFile  string
-	}
+	TLS                *TLS
+}
+
+type TLS struct {
+	CertFile string
+	KeyFile  string
 }
 
 var instance *Config = nil

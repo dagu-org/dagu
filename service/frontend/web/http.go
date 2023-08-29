@@ -3,8 +3,11 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/logger"
+	"github.com/yohamta/dagu/internal/logger/tag"
 	"github.com/yohamta/dagu/service/frontend/web/handler"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,29 +15,49 @@ import (
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
 )
 
+type ServerParams struct {
+	Host      string
+	Port      int
+	BasicAuth *BasicAuth
+	TLS       *config.TLS
+	Logger    logger.Logger
+}
+
+type BasicAuth struct {
+	Username string
+	Password string
+}
+
 type Server struct {
-	config          *config.Config
+	host            string
+	port            int
+	basicAuth       *BasicAuth
+	tls             *config.TLS
 	addr            string
 	server          *http.Server
 	idleConnsClosed chan struct{}
+	logger          logger.Logger
 }
 
-func NewServer(cfg *config.Config) *Server {
+func NewServer(params ServerParams) *Server {
 	return &Server{
-		addr:            net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
-		config:          cfg,
+		addr:            net.JoinHostPort(params.Host, strconv.Itoa(params.Port)),
 		idleConnsClosed: nil,
+		host:            params.Host,
+		port:            params.Port,
+		basicAuth:       params.BasicAuth,
+		tls:             params.TLS,
+		logger:          params.Logger,
 	}
 }
 
 func (svr *Server) Shutdown(_ context.Context) error {
 	err := svr.server.Shutdown(context.Background())
 	if err != nil {
-		log.Printf("Server shutdown: %v", err)
+		svr.logger.Warn("Server shutdown", tag.Error(err))
 	}
 	if svr.idleConnsClosed != nil {
 		close(svr.idleConnsClosed)
@@ -52,7 +75,7 @@ func (svr *Server) Start() (err error) {
 	svr.setupHandler()
 
 	svr.idleConnsClosed = make(chan struct{})
-	host := utils.StringWithFallback(svr.config.Host, "localhost")
+	host := utils.StringWithFallback(svr.host, "localhost")
 
 	var (
 		certFile = ""
@@ -60,19 +83,20 @@ func (svr *Server) Start() (err error) {
 		scheme   = "http"
 	)
 
-	if svr.config.TLS != nil {
-		certFile = svr.config.TLS.CertFile
-		keyFile = svr.config.TLS.KeyFile
+	if svr.tls != nil {
+		certFile = svr.tls.CertFile
+		keyFile = svr.tls.KeyFile
 	}
 
-	if svr.config.TLS != nil && certFile != "" && keyFile != "" {
+	if svr.tls != nil && certFile != "" && keyFile != "" {
 		scheme = "https"
 	}
 
-	log.Printf("Server is running at \"%s://%s:%d\"\n", scheme, host, svr.config.Port)
+	svr.logger.Info("Server is running", "URL",
+		fmt.Sprintf("%s://%s:%d", scheme, host, svr.port))
 
 	switch {
-	case svr.config.TLS != nil && certFile != "" && keyFile != "":
+	case svr.tls != nil && certFile != "" && keyFile != "":
 		err = svr.server.ListenAndServeTLS(certFile, keyFile)
 	default:
 		err = svr.server.ListenAndServe()
@@ -86,7 +110,7 @@ func (svr *Server) Start() (err error) {
 
 	<-svr.idleConnsClosed
 
-	log.Printf("frontend closed")
+	svr.logger.Info("frontend closed")
 
 	return
 }
@@ -112,12 +136,10 @@ func (svr *Server) setupHandler() {
 			})
 	})
 
-	if svr.config.IsBasicAuth {
+	if svr.basicAuth != nil {
 		r.Use(middleware.BasicAuth(
 			"restricted",
-			map[string]string{
-				svr.config.BasicAuthUsername: svr.config.BasicAuthPassword,
-			},
+			map[string]string{svr.basicAuth.Username: svr.basicAuth.Password},
 		))
 	}
 
@@ -129,7 +151,7 @@ func (svr *Server) setupHandler() {
 }
 
 func (svr *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
-	log.Println("received shutdown request")
+	svr.logger.Info("received shutdown request")
 	_, _ = w.Write([]byte("shutting down the Server...\n"))
 	go func() {
 		_ = svr.Shutdown(r.Context())

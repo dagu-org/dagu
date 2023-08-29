@@ -3,6 +3,7 @@ package frontend
 import (
 	"context"
 	"github.com/yohamta/dagu/internal/config"
+	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/service/frontend/web"
 	"go.uber.org/fx"
 )
@@ -16,6 +17,7 @@ type Params struct {
 	fx.In
 
 	Config *config.Config
+	Logger logger.Logger
 }
 
 func LifetimeHooks(lc fx.Lifecycle, srv *web.Server) {
@@ -32,5 +34,19 @@ func LifetimeHooks(lc fx.Lifecycle, srv *web.Server) {
 }
 
 func New(params Params) *web.Server {
-	return web.NewServer(params.Config)
+	serverParams := web.ServerParams{
+		Host:   params.Config.Host,
+		Port:   params.Config.Port,
+		TLS:    params.Config.TLS,
+		Logger: params.Logger,
+	}
+
+	if params.Config.IsBasicAuth {
+		serverParams.BasicAuth = &web.BasicAuth{
+			Username: params.Config.BasicAuthUsername,
+			Password: params.Config.BasicAuthUsername,
+		}
+	}
+
+	return web.NewServer(serverParams)
 }
