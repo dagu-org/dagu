@@ -12,7 +12,7 @@ import (
 func TestServerCommand(t *testing.T) {
 	port := findPort(t)
 
-	// Start the server.
+	// Start the frontend.
 	done := make(chan struct{})
 	go func() {
 		testRunCommand(t, serverCmd(), cmdTest{
@@ -24,7 +24,7 @@ func TestServerCommand(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 300)
 
-	// Stop the server.
+	// Stop the frontend.
 	res, err := http.Post(
 		fmt.Sprintf("http://%s/shutdown", net.JoinHostPort("localhost", port)),
 		"application/json",

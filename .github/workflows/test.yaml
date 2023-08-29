@@ -39,9 +39,9 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp ui/dist/*.js ./internal/web/handlers/assets/
-          cp ui/dist/*.woff ./internal/web/handlers/assets/
-          cp ui/dist/*.woff2 ./internal/web/handlers/assets/
+          cp ui/dist/*.js ./service/frontend/web/handler/assets/
+          cp ui/dist/*.woff ./service/frontend/web/handler/assets/
+          cp ui/dist/*.woff2 ./service/frontend/web/handler/assets/
 
       - name: Cache Go modules
         uses: actions/cache@v1

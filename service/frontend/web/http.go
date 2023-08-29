@@ -2,6 +2,8 @@ package web
 
 import (
 	"context"
+	"errors"
+	"github.com/yohamta/dagu/service/frontend/web/handler"
 	"log"
 	"net"
 	"net/http"
@@ -12,7 +14,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/utils"
-	"github.com/yohamta/dagu/internal/web/handlers"
 )
 
 type server struct {
@@ -75,7 +76,7 @@ func (svr *server) Serve() (err error) {
 	default:
 		err = svr.server.ListenAndServe()
 	}
-	if err == http.ErrServerClosed {
+	if errors.Is(err, http.ErrServerClosed) {
 		err = nil
 	}
 	if err != nil {
@@ -84,7 +85,7 @@ func (svr *server) Serve() (err error) {
 
 	<-svr.idleConnsClosed
 
-	log.Printf("server closed")
+	log.Printf("frontend closed")
 
 	return
 }
@@ -128,7 +129,7 @@ func (svr *server) setupHandler() {
 
 func (svr *server) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	log.Println("received shutdown request")
-	_, _ = w.Write([]byte("shutting down the dagu server...\n"))
+	_, _ = w.Write([]byte("shutting down the server...\n"))
 	go func() {
 		svr.Shutdown()
 	}()

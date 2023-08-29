@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/web"
+	"github.com/yohamta/dagu/service/frontend/web"
 	"net"
 	"testing"
 )

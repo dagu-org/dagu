@@ -289,16 +289,16 @@ func (a *Agent) run(ctx context.Context) error {
 	go func() {
 		err := a.socketServer.Serve(listen)
 		if err != nil && err != sock.ErrServerRequestedShutdown {
-			log.Printf("failed to start socket server %v", err)
+			log.Printf("failed to start socket frontend %v", err)
 		}
 	}()
 
 	defer func() {
-		utils.LogErr("shutdown socket server", a.socketServer.Shutdown())
+		utils.LogErr("shutdown socket frontend", a.socketServer.Shutdown())
 	}()
 
 	if err := <-listen; err != nil {
-		return fmt.Errorf("failed to start the socket server")
+		return fmt.Errorf("failed to start the socket frontend")
 	}
 
 	done := make(chan *scheduler.Node)

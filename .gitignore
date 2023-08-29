@@ -1,9 +1,9 @@
 # build
 bin/*
 dist/
-internal/web/handlers/assets/fonts/*
-internal/web/handlers/assets/*
-!internal/web/handlers/assets/.gitkeep
+service/frontend/web/handler/assets/fonts/*
+service/frontend/web/handler/assets/*
+!service/frontend/web/handler/assets/.gitkeep
 internal/**/*.pb.go
 
 # NVM
@@ -17,6 +17,9 @@ tmp/*
 
 # VSCode
 .vscode
+
+# Goland
+.idea
 
 # certs
 cert/*.pem
