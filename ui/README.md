@@ -34,4 +34,4 @@ cd dagu
 make build-ui
 ```
 
-This command will build the `bundle.js` file and copy it to dagu/service/frontend/web/handler/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.
+This command will build the `bundle.js` file and copy it to dagu/service/frontend/http/handler/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.

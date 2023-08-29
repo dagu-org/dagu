@@ -1,7 +1,9 @@
-package web
+package http
 
 import (
+	"context"
 	"fmt"
+	"github.com/yohamta/dagu/internal/logger"
 	"net"
 	"net/http"
 	"os"
@@ -9,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
 )
 
 func TestHttpServerStartShutdown(t *testing.T) {
@@ -19,11 +20,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&config.Config{
-		Host: host,
-		Port: port,
-		DAGs: testHomeDir,
-	})
+	server := NewServer(ServerParams{Host: host, Port: port, Logger: logger.NewSlogLogger()})
 
 	go func() {
 		err := server.Start()
@@ -36,7 +33,7 @@ func TestHttpServerStartShutdown(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "200 OK", resp.Status)
 
-	server.Shutdown()
+	server.Shutdown(context.Background())
 
 	_, err = http.Get(fmt.Sprintf("http://%s:%d", host, port))
 	require.Error(t, err)
@@ -49,11 +46,7 @@ func TestHttpServerShutdownWithAPI(t *testing.T) {
 
 	host := "127.0.0.1"
 	port := findPort(t)
-	server := NewServer(&config.Config{
-		Host: host,
-		Port: port,
-		DAGs: dir,
-	})
+	server := NewServer(ServerParams{Host: host, Port: port, Logger: logger.NewSlogLogger()})
 
 	go func() {
 		err := server.Start()

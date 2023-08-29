@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/persistence/jsondb"
 	"io"
@@ -50,6 +51,10 @@ func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 		err := root.Execute()
 		require.NoError(t, err)
 	})
+
+	ctx := root.Context()
+	ctx, fn := context.WithCancel(ctx)
+	fn()
 
 	// Check outputs.
 	for _, s := range test.expectedOut {

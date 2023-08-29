@@ -1,9 +1,9 @@
 # build
 bin/*
 dist/
-service/frontend/web/handler/assets/fonts/*
-service/frontend/web/handler/assets/*
-!service/frontend/web/handler/assets/.gitkeep
+service/frontend/http/handler/assets/fonts/*
+service/frontend/http/handler/assets/*
+!service/frontend/http/handler/assets/.gitkeep
 internal/**/*.pb.go
 
 # NVM

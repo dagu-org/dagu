@@ -1,4 +1,4 @@
-package web
+package http
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/logger"
 	"github.com/yohamta/dagu/internal/logger/tag"
-	"github.com/yohamta/dagu/service/frontend/web/handler"
+	"github.com/yohamta/dagu/service/frontend/http/handler"
 	"net"
 	"net/http"
 	"os"

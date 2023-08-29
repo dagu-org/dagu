@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/service/frontend/web"
+	"github.com/yohamta/dagu/service/frontend/http"
 	"go.uber.org/fx"
 )
 
@@ -20,7 +20,7 @@ type Params struct {
 	Logger logger.Logger
 }
 
-func LifetimeHooks(lc fx.Lifecycle, srv *web.Server) {
+func LifetimeHooks(lc fx.Lifecycle, srv *http.Server) {
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) (err error) {
@@ -33,8 +33,8 @@ func LifetimeHooks(lc fx.Lifecycle, srv *web.Server) {
 	)
 }
 
-func New(params Params) *web.Server {
-	serverParams := web.ServerParams{
+func New(params Params) *http.Server {
+	serverParams := http.ServerParams{
 		Host:   params.Config.Host,
 		Port:   params.Config.Port,
 		TLS:    params.Config.TLS,
@@ -42,11 +42,11 @@ func New(params Params) *web.Server {
 	}
 
 	if params.Config.IsBasicAuth {
-		serverParams.BasicAuth = &web.BasicAuth{
+		serverParams.BasicAuth = &http.BasicAuth{
 			Username: params.Config.BasicAuthUsername,
 			Password: params.Config.BasicAuthUsername,
 		}
 	}
 
-	return web.NewServer(serverParams)
+	return http.NewServer(serverParams)
 }
