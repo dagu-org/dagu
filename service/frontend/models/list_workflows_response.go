@@ -19,9 +19,6 @@ import (
 // swagger:model listWorkflowsResponse
 type ListWorkflowsResponse struct {
 
-	// charset
-	Charset string `json:"Charset,omitempty"`
-
 	// d a gs
 	DAGs []*WorkflowListItem `json:"DAGs"`
 
@@ -30,9 +27,6 @@ type ListWorkflowsResponse struct {
 
 	// has error
 	HasError bool `json:"HasError,omitempty"`
-
-	// title
-	Title string `json:"Title,omitempty"`
 }
 
 // Validate validates this list workflows response

@@ -14,7 +14,6 @@ func ToListWorkflowResponse(
 	hasError bool,
 ) *models.ListWorkflowsResponse {
 	return &models.ListWorkflowsResponse{
-		Title: "DAGList",
 		DAGs: lo.Map(workflows, func(item *controller.DAGStatus, _ int) *models.WorkflowListItem {
 			return ToWorkflowListItem(item)
 		}),

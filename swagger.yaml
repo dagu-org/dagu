@@ -40,10 +40,6 @@ definitions:
   listWorkflowsResponse:
     type: object
     properties:
-      Title:
-        type: string
-      Charset:
-        type: string
       DAGs:
         type: array
         items:

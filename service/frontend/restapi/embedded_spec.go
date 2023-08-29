@@ -90,9 +90,6 @@ func init() {
     "listWorkflowsResponse": {
       "type": "object",
       "properties": {
-        "Charset": {
-          "type": "string"
-        },
         "DAGs": {
           "type": "array",
           "items": {
@@ -107,9 +104,6 @@ func init() {
         },
         "HasError": {
           "type": "boolean"
-        },
-        "Title": {
-          "type": "string"
         }
       }
     },
@@ -307,9 +301,6 @@ func init() {
     "listWorkflowsResponse": {
       "type": "object",
       "properties": {
-        "Charset": {
-          "type": "string"
-        },
         "DAGs": {
           "type": "array",
           "items": {
@@ -324,9 +315,6 @@ func init() {
         },
         "HasError": {
           "type": "boolean"
-        },
-        "Title": {
-          "type": "string"
         }
       }
     },

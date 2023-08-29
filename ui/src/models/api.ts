@@ -47,8 +47,6 @@ export type GridData = {
 };
 
 export type ListWorkflowsResponse = {
-  Title: string;
-  Charset: string;
   DAGs: WorkflowListItem[];
   Errors: string[];
   HasError: boolean;
