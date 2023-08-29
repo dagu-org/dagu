@@ -188,24 +188,6 @@ func init() {
         "Name": {
           "type": "string"
         },
-        "Nodes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "OnCancel": {
-          "type": "string"
-        },
-        "OnExit": {
-          "type": "string"
-        },
-        "OnFailure": {
-          "type": "string"
-        },
-        "OnSuccess": {
-          "type": "string"
-        },
         "Params": {
           "type": "string"
         },
@@ -397,24 +379,6 @@ func init() {
           "type": "string"
         },
         "Name": {
-          "type": "string"
-        },
-        "Nodes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "OnCancel": {
-          "type": "string"
-        },
-        "OnExit": {
-          "type": "string"
-        },
-        "OnFailure": {
-          "type": "string"
-        },
-        "OnSuccess": {
           "type": "string"
         },
         "Params": {

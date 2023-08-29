@@ -124,18 +124,6 @@ definitions:
         type: string
       Pid:
         type: integer
-      Nodes:
-        type: array
-        items:
-          type: string
-      OnExit:
-        type: string
-      OnSuccess:
-        type: string
-      OnFailure:
-        type: string
-      OnCancel:
-        type: string
       StartedAt:
         type: string
       FinishedAt:

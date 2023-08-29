@@ -26,21 +26,6 @@ type WorkflowStatus struct {
 	// name
 	Name string `json:"Name,omitempty"`
 
-	// nodes
-	Nodes []string `json:"Nodes"`
-
-	// on cancel
-	OnCancel string `json:"OnCancel,omitempty"`
-
-	// on exit
-	OnExit string `json:"OnExit,omitempty"`
-
-	// on failure
-	OnFailure string `json:"OnFailure,omitempty"`
-
-	// on success
-	OnSuccess string `json:"OnSuccess,omitempty"`
-
 	// params
 	Params string `json:"Params,omitempty"`
 
