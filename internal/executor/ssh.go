@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -114,7 +114,7 @@ func CreateSSHExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
 //	https://gist.github.com/boyzhujian/73b5ecd37efd6f8dd38f56e7588f1b58
 func getPublicKeySigner(path string) (ssh.Signer, error) {
 	// A public key may be used to authenticate against the remote
-	// server by using an unencrypted PEM-encoded private key file.
+	// frontend by using an unencrypted PEM-encoded private key file.
 	//
 	// If you have an encrypted private key, the crypto/x509 package
 	// can be used to decrypt it.

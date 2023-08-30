@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // ExecutionGraph represents a graph of steps.

@@ -9,6 +9,7 @@ import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
 import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
+import { Workflow, WorkflowStatus } from '../../models/api';
 
 type LabelProps = {
   show: boolean;
@@ -16,9 +17,9 @@ type LabelProps = {
 };
 
 type Props = {
-  status?: Status;
+  status?: Status | WorkflowStatus;
   name: string;
-  dag: DAG;
+  dag: DAG | Workflow;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -50,19 +51,14 @@ function DAGActions({
       requestId?: string;
       params?: string;
     }) => {
-      const form = new FormData();
-      if (params.action == 'start') {
-        form.set('params', params.params!);
-      }
-      form.set('action', params.action);
-      if (params.requestId) {
-        form.set('request-id', params.requestId);
-      }
-      const url = `${API_URL}/dags/${params.name}`;
+      const url = `${getConfig().apiURL}/workflows/${params.name}`;
       const ret = await fetch(url, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         mode: 'cors',
-        body: form,
+        body: JSON.stringify(params),
       });
       if (redirectTo) {
         nav(redirectTo);

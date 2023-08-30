@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 var (

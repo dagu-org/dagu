@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/spf13/viper"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Config struct {
@@ -29,10 +29,12 @@ type Config struct {
 	NavbarColor        string
 	NavbarTitle        string
 	Env                map[string]string
-	TLS                *struct {
-		CertFile string
-		KeyFile  string
-	}
+	TLS                *TLS
+}
+
+type TLS struct {
+	CertFile string
+	KeyFile  string
 }
 
 var instance *Config = nil
@@ -106,6 +108,18 @@ func LoadConfig(userHomeDir string) error {
 	loadEnvs()
 
 	return nil
+}
+
+func (cfg *Config) GetAPIBaseURL() string {
+	isHTTPS := false
+	if cfg.TLS != nil && cfg.TLS.CertFile != "" && cfg.TLS.KeyFile != "" {
+		isHTTPS = true
+	}
+	schema := "http"
+	if isHTTPS {
+		schema = "https"
+	}
+	return fmt.Sprintf("%s://%s:%d%s", schema, cfg.Host, cfg.Port, "/api/v1/")
 }
 
 func loadEnvs() {

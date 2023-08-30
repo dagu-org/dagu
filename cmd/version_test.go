@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/yohamta/dagu/internal/constants"
+	"github.com/dagu-dev/dagu/internal/constants"
 	"testing"
 )
 

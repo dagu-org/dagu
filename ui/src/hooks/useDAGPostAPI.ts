@@ -10,19 +10,18 @@ type Options = {
 export function useDAGPostAPI(opts: Options) {
   const doPost = React.useCallback(
     async (action: string, step?: string) => {
-      const form = new FormData();
-      form.set('action', action);
-      if (opts.requestId) {
-        form.set('request-id', opts.requestId);
-      }
-      if (step) {
-        form.set('step', step);
-      }
-      const url = `${API_URL}/dags/${opts.name}`;
+      const url = `${getConfig().apiURL}/workflows/${opts.name}`;
       const ret = await fetch(url, {
         method: 'POST',
         mode: 'cors',
-        body: form,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: action,
+          step: step,
+          requestId: opts.requestId,
+        }),
       });
       if (ret.ok) {
         opts?.onSuccess?.();

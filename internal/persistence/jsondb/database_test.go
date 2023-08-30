@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 func TestDatabase(t *testing.T) {

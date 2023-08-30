@@ -61,6 +61,8 @@ const durFormatSec = 'd[d]h[h]m[m]s[s]';
 const durFormatMin = 'd[d]h[h]m[m]';
 
 declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData extends RowData> {
     group: string;
     refreshFn: () => void;
@@ -290,7 +292,7 @@ const defaultColumns = [
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
         const schedules = data.DAGStatus.DAG.Schedule;
-        if (schedules && !data.DAGStatus.Suspended) {
+        if (schedules && schedules.length && !data.DAGStatus.Suspended) {
           return (
             <React.Fragment>
               in{' '}

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yohamta/dagu/internal/persistence"
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"log"
 	"net/http"
 	"os"
@@ -16,17 +16,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yohamta/dagu/internal/constants"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/internal/mailer"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/pb"
-	"github.com/yohamta/dagu/internal/reporter"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/sock"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/constants"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/mailer"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/pb"
+	"github.com/dagu-dev/dagu/internal/reporter"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/sock"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // Agent is the interface to run / cancel / signal / status / etc.
@@ -268,7 +268,7 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run(ctx context.Context) error {
-	tl := &logger.TeeLogger{Writer: a.logManager.logFile}
+	tl := &logger.Tee{Writer: a.logManager.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}
@@ -289,16 +289,16 @@ func (a *Agent) run(ctx context.Context) error {
 	go func() {
 		err := a.socketServer.Serve(listen)
 		if err != nil && err != sock.ErrServerRequestedShutdown {
-			log.Printf("failed to start socket server %v", err)
+			log.Printf("failed to start socket frontend %v", err)
 		}
 	}()
 
 	defer func() {
-		utils.LogErr("shutdown socket server", a.socketServer.Shutdown())
+		utils.LogErr("shutdown socket frontend", a.socketServer.Shutdown())
 	}()
 
 	if err := <-listen; err != nil {
-		return fmt.Errorf("failed to start the socket server")
+		return fmt.Errorf("failed to start the socket frontend")
 	}
 
 	done := make(chan *scheduler.Node)

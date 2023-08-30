@@ -9,11 +9,11 @@ import {
 import React from 'react';
 import { Parameter, parseParams, stringifyParams } from '../../lib/parseParams';
 import { DAG } from '../../models';
-import LabeledItem from '../atoms/LabeledItem';
+import { Workflow } from '../../models/api';
 
 type Props = {
   visible: boolean;
-  dag: DAG;
+  dag: DAG | Workflow;
   dismissModal: () => void;
   onSubmit: (params: string) => void;
 };
@@ -47,7 +47,7 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
   const ref = React.useRef<HTMLInputElement>(null);
 
   const parsedParams = React.useMemo(() => {
-    if (dag.DefaultParams.trim() == '') {
+    if (!dag.DefaultParams) {
       return [];
     }
     return parseParams(dag.DefaultParams);

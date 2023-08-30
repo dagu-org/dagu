@@ -11,6 +11,10 @@ VERSION=
 DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 --build-arg VERSION=$(VERSION) --push --no-cache
 
 ### Commands ###
+server:
+	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
+	./bin/dagu server
+
 watch:
 	nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
 
@@ -20,25 +24,21 @@ gen-pb:
 build-bin:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
 
-server:
-	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
-	./bin/dagu server
-
 scheduler: build-dir
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
 	./bin/dagu scheduler
 
+build: build-ui build-dir gen-pb build-bin
+
 build-dir:
 	@mkdir -p ./bin
-
-build: build-ui build-dir gen-pb build-bin
 
 build-ui:
 	@cd ui; \
 		yarn && yarn build
-	@cp ui/dist/*.js ./internal/web/handlers/assets/
-	@cp ui/dist/*.woff ./internal/web/handlers/assets/
-	@cp ui/dist/*.woff2 ./internal/web/handlers/assets/
+	@cp ui/dist/*.js ./service/frontend/http/handler/assets/
+	@cp ui/dist/*.woff ./service/frontend/http/handler/assets/
+	@cp ui/dist/*.woff2 ./service/frontend/http/handler/assets/
 
 test:
 	@go test ./...
@@ -99,8 +99,37 @@ gencert-check:
 server-tls:
 	@DAGU_CERT_FILE=./cert/server-cert.pem DAGU_KEY_FILE=./cert/server-key.pem go run . server
 
-install-tools:
+### Swagger ###
+
+gen-swagger: clean-swagger swagger
+
+clean-swagger:
+	@echo "Cleaning files"
+	@rm -rf service/frontend/restapi/models
+	@rm -rf service/frontend/restapi/operations
+
+swagger:
+	@echo "Validating swagger yaml"
+	@swagger validate ./swagger.yaml
+	@echo "Generating swagger server code from yaml"
+	@swagger generate server -t service/frontend --server-package=restapi --exclude-main -f ./swagger.yaml
+	@go mod tidy
+
+swagger-validate:
+	@echo "Validating swagger yaml"
+	@swagger validate ./swagger.yaml
+
+### tools ###
+
+install-protobuf:
 	brew install protobuf
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+install-nodemon:
 	npm install -g nodemon
+
+install-swagger:
+	brew tap go-swagger/go-swagger
+	brew install go-swagger

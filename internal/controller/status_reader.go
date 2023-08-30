@@ -2,17 +2,17 @@ package controller
 
 import (
 	"fmt"
-	"github.com/yohamta/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"os"
 	"path/filepath"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/storage"
-	"github.com/yohamta/dagu/internal/suspend"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/storage"
+	"github.com/dagu-dev/dagu/internal/suspend"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // DAGStatus is the struct to contain DAGStatus spec and status.

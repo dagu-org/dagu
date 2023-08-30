@@ -11,7 +11,7 @@ import (
 
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/utils"
 
 	"gopkg.in/yaml.v2"
 )

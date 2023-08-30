@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 type Runner struct {

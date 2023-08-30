@@ -2,14 +2,14 @@ package runner
 
 import (
 	"errors"
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 type Job interface {

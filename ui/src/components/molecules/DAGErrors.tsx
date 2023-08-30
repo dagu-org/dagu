@@ -1,8 +1,8 @@
 import React from 'react';
-import { DAGStatus } from '../../models';
+import { WorkflowListItem } from '../../models/api';
 
 type Props = {
-  DAGs: DAGStatus[];
+  DAGs: WorkflowListItem[];
   errors: string[];
   hasError: boolean;
 };

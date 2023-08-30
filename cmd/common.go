@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 	"github.com/spf13/cobra"
-	"github.com/yohamta/dagu/internal/agent"
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/agent"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"log"
 	"os"
 	"os/signal"

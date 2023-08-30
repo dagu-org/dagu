@@ -10,7 +10,7 @@ import (
 
 	"github.com/itchyny/gojq"
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 type JqExecutor struct {

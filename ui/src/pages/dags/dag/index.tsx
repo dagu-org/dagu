@@ -17,34 +17,41 @@ import useSWR, { useSWRConfig } from 'swr';
 
 type Params = {
   name: string;
+  tab?: string;
 };
 
 function DAGDetails() {
   const params = useParams<Params>();
   const appBarContext = React.useContext(AppBarContext);
-  const path = useLocation().pathname;
+  const { pathname } = useLocation();
+
   const baseUrl = useMemo(
     () => `/dags/${encodeURI(params.name!)}`,
     [params.name]
   );
-  const { data, isValidating } = useSWR<GetDAGResponse>(
-    `${path}?${new URLSearchParams(window.location.search).toString()}`,
+  const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
+    `/workflows/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
+      window.location.search
+    ).toString()}`,
     null,
     {
       refreshInterval: 2000,
     }
   );
-  const { mutate } = useSWRConfig();
 
   const refreshFn = React.useCallback(() => {
-    mutate(`${baseUrl}/`);
-  }, [mutate, baseUrl]);
+    setTimeout(() => mutate(), 500);
+  }, [mutate, params.name]);
 
   React.useEffect(() => {
     if (data) {
       appBarContext.setTitle(data.Title);
     }
   }, [data, appBarContext]);
+
+  const tab = useMemo(() => {
+    return params.tab || 'status';
+  }, [params]);
 
   if (!params.name || !data || !data.DAG) {
     return <LoadingIndicator />;
@@ -91,15 +98,16 @@ function DAGDetails() {
             alignItems: 'center',
           }}
         >
-          <Tabs value={`${path}`}>
+          <Tabs value={`${pathname}`}>
             <LinkTab label="Status" value={`${baseUrl}`} />
             <LinkTab label="Spec" value={`${baseUrl}/spec`} />
             <LinkTab label="History" value={`${baseUrl}/history`} />
-            {path == `${baseUrl}/log` || path == `${baseUrl}/scheduler-log` ? (
-              <Tab label="Log" value={path} />
+            {pathname == `${baseUrl}/log` ||
+            pathname == `${baseUrl}/scheduler-log` ? (
+              <Tab label="Log" value={pathname} />
             ) : null}
           </Tabs>
-          {path == `${baseUrl}/spec` ? (
+          {pathname == `${baseUrl}/spec` ? (
             <DAGEditButtons name={params.name} />
           ) : null}
         </Stack>
@@ -109,36 +117,15 @@ function DAGDetails() {
         </Box>
 
         <Box sx={{ mx: 4, flex: 1 }}>
-          <Routes>
-            <Route
-              index
-              element={
-                <DAGStatus
-                  DAG={data.DAG}
-                  name={params.name}
-                  refresh={refreshFn}
-                />
-              }
-            />
-            <Route path={'/spec'} element={<DAGSpec data={data} />} />
-            <Route
-              path={'/history'}
-              element={
-                <ExecutionHistory
-                  logData={data.LogData}
-                  isLoading={isValidating}
-                />
-              }
-            />
-            <Route
-              path={'/scheduler-log'}
-              element={<ExecutionLog log={data.ScLog} />}
-            />
-            <Route
-              path={'/log'}
-              element={<ExecutionLog log={data.StepLog} />}
-            />
-          </Routes>
+          {tab == 'status' ? (
+            <DAGStatus DAG={data.DAG} name={params.name} refresh={refreshFn} />
+          ) : null}
+          {tab == 'spec' ? <DAGSpec data={data} /> : null}
+          {tab == 'history' ? (
+            <ExecutionHistory logData={data.LogData} isLoading={isValidating} />
+          ) : null}
+          {tab == 'scheduler-log' ? <ExecutionLog log={data.ScLog} /> : null}
+          {tab == 'log' ? <ExecutionLog log={data.StepLog} /> : null}
         </Box>
       </Stack>
     </DAGContext.Provider>

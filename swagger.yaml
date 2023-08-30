@@ -1,0 +1,694 @@
+---
+swagger: '2.0'
+info:
+  version: 0.0.1
+  title: Dagu
+consumes:
+  - application/json
+produces:
+  - application/json
+basePath: "/api/v1"
+schemes:
+  - http
+host: "localhost:8080"
+
+paths:
+  /workflows:
+    get:
+      produces:
+        - application/json
+      operationId: listWorkflows
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/listWorkflowsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+    post:
+      produces:
+        - application/json
+      operationId: createWorkflow
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              action:
+                type: string
+              value:
+                type: string
+            required:
+              - action
+              - value
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/createWorkflowResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
+  /workflows/{workflowId}:
+    get:
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          type: string
+        - name: tab
+          in: query
+          required: false
+          type: string
+        - name: file
+          in: query
+          required: false
+          type: string
+        - name: step
+          in: query
+          required: false
+          type: string
+      produces:
+        - application/json
+      operationId: getWorkflowDetail
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/getWorkflowDetailResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+    post:
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              action:
+                type: string
+              value:
+                type: string
+              requestId:
+                type: string
+              step:
+                type: string
+              params:
+                type: string
+      produces:
+        - application/json
+      operationId: postWorkflowAction
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/postWorkflowActionResponse'
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
+    delete:
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          type: string
+      produces:
+        - application/json
+      operationId: deleteWorkflow
+      responses:
+        200:
+          description: A successful response.
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
+  /search:
+    get:
+      produces:
+        - application/json
+      operationId: searchWorkflows
+      parameters:
+        - name: q
+          in: query
+          required: true
+          type: string
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/searchWorkflowsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
+definitions:
+  ApiError:
+    type: object
+    properties:
+      message:
+        type: string
+      detailedMessage:
+        type: string
+    required:
+      - message
+      - detailedMessage
+
+  listWorkflowsResponse:
+    type: object
+    properties:
+      DAGs:
+        type: array
+        items:
+          $ref: '#/definitions/workflowListItem'
+      Errors:
+        type: array
+        items:
+          type: string
+      HasError:
+        type: boolean
+    required:
+      - DAGs
+      - Errors
+      - HasError
+
+  createWorkflowResponse:
+    type: object
+    properties:
+      WorkflowID:
+        type: string
+    required:
+      - WorkflowID
+
+  workflowListItem:
+    type: object
+    properties:
+      File:
+        type: string
+      Dir:
+        type: string
+      DAG:
+        $ref: '#/definitions/workflow'
+      Status:
+        $ref: '#/definitions/workflowStatus'
+      Suspended:
+        type: boolean
+      Error:
+        type: string
+      ErrorT:
+        type: string
+    required:
+      - File
+      - Dir
+      - DAG
+      - Status
+      - Suspended
+      - Error
+      - ErrorT
+
+  workflow:
+    type: object
+    properties:
+      Group:
+        type: string
+      Name:
+        type: string
+      Schedule:
+        type: array
+        items:
+          $ref: '#/definitions/schedule'
+      Description:
+        type: string
+      Params:
+        type: array
+        items:
+          type: string
+      DefaultParams:
+        type: string
+      Tags:
+        type: array
+        items:
+          type: string
+    required:
+      - Group
+      - Name
+      - Schedule
+      - Description
+      - Params
+      - DefaultParams
+      - Tags
+
+  schedule:
+    type: object
+    properties:
+      Expression:
+        type: string
+    required:
+      - Expression
+
+  workflowStatus:
+    type: object
+    properties:
+      RequestId:
+        type: string
+      Name:
+        type: string
+      Status:
+        type: integer
+      StatusText:
+        type: string
+      Pid:
+        type: integer
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Log:
+        type: string
+      Params:
+        type: string
+    required:
+      - RequestId
+      - Name
+      - Status
+      - StatusText
+      - Pid
+      - StartedAt
+      - FinishedAt
+      - Log
+      - Params
+
+  getWorkflowDetailResponse:
+    type: object
+    properties:
+      Title:
+        type: string
+      DAG:
+        $ref: '#/definitions/workflowStatusWithDetail'
+      Tab:
+        type: string
+      Graph:
+        type: string
+      Definition:
+        type: string
+      LogData:
+        $ref: '#/definitions/workflowLogResponse'
+      LogUrl:
+        type: string
+      StepLog:
+        $ref: '#/definitions/workflowStepLogResponse'
+      ScLog:
+        $ref: '#/definitions/workflowSchedulerLogResponse'
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Title
+      - DAG
+      - Tab
+      - Graph
+      - Definition
+      - LogData
+      - LogUrl
+      - StepLog
+      - ScLog
+      - Errors
+
+  postWorkflowActionResponse:
+    type: object
+    properties:
+      NewWorkflowID:
+        type: string
+
+  workflowStepLogResponse:
+    type: object
+    properties:
+      Step:
+        $ref: '#/definitions/statusNode'
+      LogFile:
+        type: string
+      Content:
+        type: string
+    required:
+      - Step
+      - LogFile
+      - Content
+
+  workflowSchedulerLogResponse:
+    type: object
+    properties:
+      LogFile:
+        type: string
+      Content:
+        type: string
+    required:
+      - LogFile
+      - Content
+
+  workflowLogResponse:
+    type: object
+    properties:
+      GridData:
+        type: array
+        items:
+          $ref: '#/definitions/workflowLogGridItem'
+      Logs:
+        type: array
+        items:
+          $ref: '#/definitions/workflowStatusFile'
+    required:
+      - GridData
+      - Logs
+
+  workflowLogGridItem:
+    type: object
+    properties:
+      Name:
+        type: string
+      Vals:
+        type: array
+        items:
+          type: integer
+    required:
+      - Name
+      - Vals
+
+  workflowStatusFile:
+    type: object
+    properties:
+      File:
+        type: string
+      Status:
+        $ref: '#/definitions/workflowStatusDetail'
+    required:
+      - File
+
+  workflowStatusWithDetail:
+    type: object
+    properties:
+      File:
+        type: string
+      Dir:
+        type: string
+      DAG:
+        $ref: '#/definitions/workflowDetail'
+      Status:
+        $ref: '#/definitions/workflowStatusDetail'
+      Suspended:
+        type: boolean
+      Error:
+        type: string
+      ErrorT:
+        type: string
+    required:
+      - File
+      - Dir
+      - DAG
+      - Status
+      - Suspended
+      - Error
+      - ErrorT
+
+  workflowDetail:
+    type: object
+    properties:
+      Location:
+        type: string
+      Group:
+        type: string
+      Name:
+        type: string
+      Schedule:
+        type: array
+        items:
+          $ref: '#/definitions/schedule'
+      Description:
+        type: string
+      Env:
+        type: array
+        items:
+          type: string
+      LogDir:
+        type: string
+      HandlerOn:
+        $ref: '#/definitions/handlerOn'
+      Steps:
+        type: array
+        items:
+          $ref: '#/definitions/stepObject'
+      Delay:
+        type: integer
+      HistRetentionDays:
+        type: integer
+      Preconditions:
+        type: array
+        items:
+          $ref: '#/definitions/condition'
+      MaxActiveRuns:
+        type: integer
+      Params:
+        type: array
+        items:
+          type: string
+      DefaultParams:
+        type: string
+      Tags:
+        type: array
+        items:
+          type: string
+    required:
+      - Location
+      - Group
+      - Name
+      - Schedule
+      - Description
+      - Env
+      - LogDir
+      - HandlerOn
+      - Steps
+      - Delay
+      - HistRetentionDays
+      - Preconditions
+      - MaxActiveRuns
+      - Params
+      - DefaultParams
+      - Tags
+
+  handlerOn:
+    type: object
+    properties:
+      Failure:
+        $ref: '#/definitions/stepObject'
+      Success:
+        $ref: '#/definitions/stepObject'
+      Cancel:
+        $ref: '#/definitions/stepObject'
+      Exit:
+        $ref: '#/definitions/stepObject'
+
+  workflowStatusDetail:
+    type: object
+    properties:
+      RequestId:
+        type: string
+      Name:
+        type: string
+      Status:
+        type: integer
+      StatusText:
+        type: string
+      Pid:
+        type: integer
+      Nodes:
+        type: array
+        items:
+          $ref: '#/definitions/statusNode'
+      OnExit:
+        $ref: '#/definitions/statusNode'
+      OnSuccess:
+        $ref: '#/definitions/statusNode'
+      OnFailure:
+        $ref: '#/definitions/statusNode'
+      OnCancel:
+        $ref: '#/definitions/statusNode'
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Log:
+        type: string
+      Params:
+        type: string
+    required:
+      - RequestId
+      - Name
+      - Status
+      - StatusText
+      - Pid
+      - Nodes
+      - OnExit
+      - OnSuccess
+      - OnFailure
+      - OnCancel
+      - StartedAt
+      - FinishedAt
+      - Log
+      - Params
+
+  statusNode:
+    type: object
+    properties:
+      Step:
+        $ref: '#/definitions/stepObject'
+      Log:
+        type: string
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Status:
+        type: integer
+      RetryCount:
+        type: integer
+      DoneCount:
+        type: integer
+      Error:
+        type: string
+      StatusText:
+        type: string
+    required:
+      - Step
+      - Log
+      - StartedAt
+      - FinishedAt
+      - Status
+      - RetryCount
+      - DoneCount
+      - Error
+      - StatusText
+
+  stepObject:
+    type: object
+    properties:
+      Name:
+        type: string
+      Description:
+        type: string
+      Variables:
+        type: array
+        items:
+          type: string
+      Dir:
+        type: string
+      CmdWithArgs:
+        type: string
+      Command:
+        type: string
+      Script:
+        type: string
+      Stdout:
+        type: string
+      Stderr:
+        type: string
+      Output:
+        type: string
+      Args:
+        type: array
+        items:
+          type: string
+      Depends:
+        type: array
+        items:
+          type: string
+      RepeatPolicy:
+        $ref: '#/definitions/repeatPolicy'
+      MailOnError:
+        type: boolean
+      Preconditions:
+        type: array
+        items:
+          $ref: '#/definitions/condition'
+    required:
+      - Name
+      - Description
+      - Variables
+      - Dir
+      - CmdWithArgs
+      - Command
+      - Script
+      - Stdout
+      - Stderr
+      - Output
+      - Args
+      - Depends
+      - RepeatPolicy
+      - MailOnError
+      - Preconditions
+
+  searchWorkflowsResponse:
+    type: object
+    properties:
+      Results:
+        type: array
+        items:
+          $ref: '#/definitions/searchWorkflowsResultItem'
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Results
+      - Errors
+
+  searchWorkflowsResultItem:
+    type: object
+    properties:
+      Name:
+        type: string
+      DAG:
+        $ref: '#/definitions/workflow'
+      Matches:
+        type: array
+        items:
+          $ref: '#/definitions/searchWorkflowsMatchItem'
+
+  searchWorkflowsMatchItem:
+    type: object
+    properties:
+      Line:
+        type: string
+      LineNumber:
+        type: integer
+      StartLine:
+        type: integer
+
+  condition:
+    type: object
+    properties:
+      Condition:
+        type: string
+      Expected:
+        type: string
+
+  repeatPolicy:
+    type: object
+    properties:
+      Repeat:
+        type: boolean
+      Interval:
+        type: integer

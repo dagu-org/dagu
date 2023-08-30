@@ -17,12 +17,12 @@ var (
 )
 
 // Client is a unix socket client that can send requests
-// to the server over HTTP.
+// to the frontend over HTTP.
 type Client struct {
 	Addr string
 }
 
-// Request sends a request to the server and returns the response.
+// Request sends a request to the frontend and returns the response.
 func (cl *Client) Request(method, url string) (string, error) {
 	conn, err := net.DialTimeout("unix", cl.Addr, timeout)
 	if err != nil {

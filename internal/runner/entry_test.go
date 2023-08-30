@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/storage"
-	"github.com/yohamta/dagu/internal/suspend"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/storage"
+	"github.com/dagu-dev/dagu/internal/suspend"
 )
 
 func TestReadEntries(t *testing.T) {

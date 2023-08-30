@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/spf13/cobra"
-	"github.com/yohamta/dagu/internal/constants"
 )
 
 func versionCmd() *cobra.Command {

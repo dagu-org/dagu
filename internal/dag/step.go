@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // Step represents a step in a DAG.

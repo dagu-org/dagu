@@ -10,13 +10,13 @@
   <a href="https://codecov.io/gh/dagu-dev/dagu">
     <img src="https://codecov.io/gh/dagu-dev/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
   </a>
-  <a href="https://github.com/yohamta/dagu/releases">
+  <a href="https://github.com/dagu-dev/dagu/releases">
     <img src="https://img.shields.io/github/release/yohamta/dagu.svg" />
   </a>
   <a href="https://godoc.org/github.com/yohamta/dagu">
     <img src="https://godoc.org/github.com/yohamta/dagu?status.svg" />
   </a>
-  <img src="https://github.com/yohamta/dagu/actions/workflows/test.yaml/badge.svg" />
+  <img src="https://github.com/dagu-dev/dagu/actions/workflows/test.yaml/badge.svg" />
 </p>
 
 <div align="center">
@@ -161,7 +161,7 @@ yohamta/dagu:latest
 
 ### Via GitHub Release Page 
 
-Download the latest binary from the [Releases page](https://github.com/yohamta/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
+Download the latest binary from the [Releases page](https://github.com/dagu-dev/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 
 ## ️**Quick Start Guide**
 
@@ -318,22 +318,15 @@ Dagu is a single command line tool that uses the local file system to store data
 
 ## **Roadmap**
 
-- Writing dags in the Starlark Language
-- Writing dags in Cue
-- AWS Lambda Execution
-- Slack Integration
-- User Defined Function
-- Observability
-- Project concept for grouping dags
-- Simple User management and RBAC
-- Keycloak Integration Option
-- HA Cluster Mode
-- Database Option
-- DAG Versioning
-- Built-in TLS
+- Refactor to worker architecture
+- Database support
+- Allow saving DAGs in database
+- Allow embedding in other applications
+- Allow custom executors
+- Allow calling DAGs from other DAGs
 
 ## **Contributors**
-<a href="https://github.com/yohamta/dagu/graphs/contributors">
+<a href="https://github.com/dagu-dev/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
 </a>
 

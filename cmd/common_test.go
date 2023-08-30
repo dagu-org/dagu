@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"bytes"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"context"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"io"
 	"log"
 	"os"
@@ -13,9 +14,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 func TestMain(m *testing.M) {
@@ -50,6 +51,10 @@ func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 		err := root.Execute()
 		require.NoError(t, err)
 	})
+
+	ctx := root.Context()
+	ctx, fn := context.WithCancel(ctx)
+	fn()
 
 	// Check outputs.
 	for _, s := range test.expectedOut {

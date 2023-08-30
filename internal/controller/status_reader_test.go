@@ -1,13 +1,13 @@
 package controller_test
 
 import (
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"path"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/controller"
 )
 
 func TestLoadConfig(t *testing.T) {

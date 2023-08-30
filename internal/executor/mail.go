@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/mailer"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/mailer"
 )
 
 type MailExecutor struct {

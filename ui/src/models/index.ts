@@ -1,4 +1,5 @@
 import cronParser from 'cron-parser';
+import { WorkflowListItem } from './api';
 
 export enum SchedulerStatus {
   None = 0,
@@ -63,7 +64,7 @@ export type DAG = {
   Preconditions: Condition[];
   MaxActiveRuns: number;
   Params: string[];
-  DefaultParams: string;
+  DefaultParams?: string;
   Delay: number;
   MaxCleanUpTime: number;
 };
@@ -98,7 +99,7 @@ export type DAGItem = DAGData | DAGGroup;
 export type DAGData = {
   Type: DAGDataType.DAG;
   Name: string;
-  DAGStatus: DAGStatus;
+  DAGStatus: WorkflowListItem;
 };
 
 export type DAGGroup = {
@@ -144,7 +145,7 @@ export function getStatusField(
   return '';
 }
 
-export function getNextSchedule(data: DAGStatus): number {
+export function getNextSchedule(data: WorkflowListItem): number {
   const schedules = data.DAG.Schedule;
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;

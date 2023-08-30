@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/mitchellh/mapstructure"
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 type HTTPExecutor struct {

@@ -20,7 +20,7 @@
   "author": "Yota Hamada",
   "license": "SEE LICENSE.md",
   "bugs": {
-    "url": "https://github.com/yohamta/dagu/issues"
+    "url": "https://github.com/dagu-dev/dagu/issues"
   },
   "homepage": "https://github.com/yohamta/dagu#readme",
   "devDependencies": {

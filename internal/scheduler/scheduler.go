@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/constants"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/pb"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/constants"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/pb"
 )
 
 type SchedulerStatus int

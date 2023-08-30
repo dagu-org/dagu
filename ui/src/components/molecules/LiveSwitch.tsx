@@ -1,10 +1,10 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { DAGStatus } from '../../models';
+import { WorkflowListItem } from '../../models/api';
 
 type Props = {
   inputProps?: React.HTMLProps<HTMLInputElement>;
-  DAG: DAGStatus;
+  DAG: WorkflowListItem;
   refresh?: () => void;
 };
 
@@ -12,14 +12,17 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
   const [checked, setChecked] = React.useState(!DAG.Suspended);
   const onSubmit = React.useCallback(
     async (params: { name: string; action: string; value: string }) => {
-      const form = new FormData();
-      form.set('action', params.action);
-      form.set('value', params.value);
-      const url = `${API_URL}/dags/${params.name}`;
+      const url = `${getConfig().apiURL}/workflows/${params.name}`;
       const ret = await fetch(url, {
         method: 'POST',
         mode: 'cors',
-        body: form,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: params.action,
+          value: params.value,
+        }),
       });
       if (ret.ok) {
         if (refresh) {
@@ -43,11 +46,7 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
     });
   }, [DAG, checked]);
   return (
-    <Switch
-      checked={checked}
-      onChange={onChange}
-      inputProps={inputProps}
-    />
+    <Switch checked={checked} onChange={onChange} inputProps={inputProps} />
   );
 }
 export default LiveSwitch;

@@ -75,10 +75,6 @@ type DashboardContentProps = {
 };
 
 function Content({ title, navbarColor, children }: DashboardContentProps) {
-  const [open, setOpen] = React.useState(false);
-  const toggleDrawer = () => {
-    setOpen(!open);
-  };
   const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const gradientColor = navbarColor || '#485fc7';
@@ -87,7 +83,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
     <ThemeProvider theme={mdTheme}>
       <Box sx={{ display: 'flex', flexDirection: 'row', width: '100vw' }}>
         <CssBaseline />
-        <Drawer variant="permanent" open={open}>
+        <Drawer variant="permanent" open={false}>
           <Box
             sx={{
               background: `linear-gradient(0deg, #fff 0%, ${gradientColor} 70%, ${gradientColor} 100%);`,
@@ -112,7 +108,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
           }}
         >
           <AppBar
-            open={open}
+            open={false}
             elevation={0}
             sx={{
               width: '100%',

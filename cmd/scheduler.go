@@ -3,8 +3,8 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/runner"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/runner"
 )
 
 func createSchedulerCommand() *cobra.Command {

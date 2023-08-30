@@ -7,14 +7,14 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type Agent struct {
 	*config.Config
-	logger *logger.TeeLogger
+	logger *logger.Tee
 	stop   chan struct{}
 }
 
@@ -83,7 +83,7 @@ func (a *Agent) setupLogFile() (err error) {
 	}
 	log.Printf("setup log file: %s", filename)
 
-	a.logger = &logger.TeeLogger{
+	a.logger = &logger.Tee{
 		Writer: &lumberjack.Logger{
 			Filename:   filename,
 			MaxSize:    20, // megabytes

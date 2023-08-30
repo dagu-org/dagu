@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/scheduler"
 	"testing"
 	"time"
 )

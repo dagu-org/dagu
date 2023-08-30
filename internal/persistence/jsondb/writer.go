@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // Writer is the interface to write status to local file.

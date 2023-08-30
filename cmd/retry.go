@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/yohamta/dagu/internal/agent"
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/agent"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"path/filepath"
 )
 

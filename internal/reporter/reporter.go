@@ -6,10 +6,10 @@ import (
 	"log"
 	"strings"
 
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
 )
 
 // Reporter is responsible for reporting the status of the scheduler

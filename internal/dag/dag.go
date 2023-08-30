@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/config"
 )
 
 // DAG represents a DAG configuration.

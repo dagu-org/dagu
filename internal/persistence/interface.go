@@ -2,7 +2,7 @@ package persistence
 
 import (
 	"fmt"
-	"github.com/yohamta/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/models"
 	"time"
 )
 

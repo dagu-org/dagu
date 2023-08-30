@@ -3,7 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"github.com/yohamta/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"os"
 	"os/exec"
 	"path"
@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/sock"
-	"github.com/yohamta/dagu/internal/utils"
-	"github.com/yohamta/grep"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/grep"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/sock"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // GrepResult is a result of grep.

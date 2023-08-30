@@ -10,10 +10,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
-// Server is a unix socket server that passes http requests to HandlerFunc.
+// Server is a unix socket frontend that passes http requests to HandlerFunc.
 type Server struct {
 	*Config
 	listener net.Listener
@@ -28,7 +28,7 @@ type Config struct {
 // HttpHandlerFunc is a function that handles HTTP requests.
 type HttpHandlerFunc func(w http.ResponseWriter, r *http.Request)
 
-// NewServer creates a new unix socket server.
+// NewServer creates a new unix socket frontend.
 func NewServer(c *Config) (*Server, error) {
 	return &Server{
 		Config: c,
@@ -37,7 +37,7 @@ func NewServer(c *Config) (*Server, error) {
 }
 
 var (
-	ErrServerRequestedShutdown = errors.New("socket server is requested to shutdown")
+	ErrServerRequestedShutdown = errors.New("socket frontend is requested to shutdown")
 )
 
 // Serve starts listening and serving requests.
@@ -54,7 +54,7 @@ func (svr *Server) Serve(listen chan error) error {
 	if listen != nil {
 		listen <- err
 	}
-	log.Printf("server is running at \"%v\"\n", svr.Addr)
+	log.Printf("frontend is running at \"%v\"\n", svr.Addr)
 	defer func() {
 		_ = svr.Shutdown()
 		_ = os.Remove(svr.Addr)
@@ -77,7 +77,7 @@ func (svr *Server) Serve(listen chan error) error {
 	}
 }
 
-// Shutdown stops the server.
+// Shutdown stops the frontend.
 func (svr *Server) Shutdown() error {
 	if !svr.quit {
 		svr.quit = true

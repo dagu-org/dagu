@@ -10,6 +10,7 @@ import fetchJson from './lib/fetchJson';
 import Search from './pages/search';
 
 export type Config = {
+  apiURL: string;
   title: string;
   navbarColor: string;
   version: string;
@@ -42,7 +43,8 @@ function App({ config }: Props) {
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dags/" element={<DAGs />} />
-              <Route path="/dags/:name/*" element={<DAGDetails />} />
+              <Route path="/dags/:name/:tab" element={<DAGDetails />} />
+              <Route path="/dags/:name/" element={<DAGDetails />} />
               <Route path="/search/" element={<Search />} />
             </Routes>
           </Layout>
