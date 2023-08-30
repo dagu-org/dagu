@@ -65,26 +65,21 @@ paths:
           in: path
           required: true
           type: string
-        - name: action
-          in: query
-          required: true
-          type: string
-        - name: value
-          in: query
-          required: false
-          type: string
-        - name: request-id
-          in: query
-          required: false
-          type: string
-        - name: step
-          in: query
-          required: false
-          type: string
-        - name: params
-          in: query
-          required: false
-          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              action:
+                type: string
+              value:
+                type: string
+              requestId:
+                type: string
+              step:
+                type: string
+              params:
+                type: string
       produces:
         - application/json
       operationId: postWorkflowAction

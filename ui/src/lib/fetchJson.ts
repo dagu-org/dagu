@@ -2,7 +2,7 @@ export default async function fetchJson<JSON = unknown>(
   input: RequestInfo,
   init?: RequestInit
 ): Promise<JSON> {
-  const response = await fetch(`${API_URL}${input}`, {
+  const response = await fetch(`${getConfig().apiURL}${input}`, {
     ...init,
     headers: {
       ...(init?.headers || {}),

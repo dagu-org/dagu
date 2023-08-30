@@ -48,6 +48,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		ListWorkflowsHandler: ListWorkflowsHandlerFunc(func(params ListWorkflowsParams) middleware.Responder {
 			return middleware.NotImplemented("operation ListWorkflows has not yet been implemented")
 		}),
+		OptionsWorkflowHandler: OptionsWorkflowHandlerFunc(func(params OptionsWorkflowParams) middleware.Responder {
+			return middleware.NotImplemented("operation OptionsWorkflow has not yet been implemented")
+		}),
 		PostWorkflowActionHandler: PostWorkflowActionHandlerFunc(func(params PostWorkflowActionParams) middleware.Responder {
 			return middleware.NotImplemented("operation PostWorkflowAction has not yet been implemented")
 		}),
@@ -91,6 +94,8 @@ type DaguAPI struct {
 	GetWorkflowHandler GetWorkflowHandler
 	// ListWorkflowsHandler sets the operation handler for the list workflows operation
 	ListWorkflowsHandler ListWorkflowsHandler
+	// OptionsWorkflowHandler sets the operation handler for the options workflow operation
+	OptionsWorkflowHandler OptionsWorkflowHandler
 	// PostWorkflowActionHandler sets the operation handler for the post workflow action operation
 	PostWorkflowActionHandler PostWorkflowActionHandler
 
@@ -175,6 +180,9 @@ func (o *DaguAPI) Validate() error {
 	}
 	if o.ListWorkflowsHandler == nil {
 		unregistered = append(unregistered, "ListWorkflowsHandler")
+	}
+	if o.OptionsWorkflowHandler == nil {
+		unregistered = append(unregistered, "OptionsWorkflowHandler")
 	}
 	if o.PostWorkflowActionHandler == nil {
 		unregistered = append(unregistered, "PostWorkflowActionHandler")
@@ -275,6 +283,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/workflows"] = NewListWorkflows(o.context, o.ListWorkflowsHandler)
+	if o.handlers["OPTIONS"] == nil {
+		o.handlers["OPTIONS"] = make(map[string]http.Handler)
+	}
+	o.handlers["OPTIONS"]["/workflows/{workflowId}"] = NewOptionsWorkflow(o.context, o.OptionsWorkflowHandler)
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}

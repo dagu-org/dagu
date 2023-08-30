@@ -7,9 +7,7 @@ import (
 )
 
 func SetupGlobalMiddleware(handler http.Handler) http.Handler {
-	next := prefixChecker(handler)
-	next = cors(next)
-
+	next := cors(handler)
 	next = middleware.RequestID(next)
 	next = middleware.Logger(next)
 	next = middleware.Recoverer(next)
@@ -19,6 +17,8 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 			"restricted", map[string]string{basicAuth.Username: basicAuth.Password},
 		)(next)
 	}
+
+	next = prefixChecker(next)
 
 	return next
 }
@@ -60,6 +60,9 @@ func cors(h http.Handler) http.Handler {
 			w.Header().Add("Access-Control-Allow-Origin", "*")
 			w.Header().Add("Access-Control-Allow-Methods", "*")
 			w.Header().Add("Access-Control-Allow-Headers", "*")
+			if r.Method == http.MethodOptions {
+				return
+			}
 			h.ServeHTTP(w, r)
 		})
 }

@@ -21,7 +21,7 @@ function CreateDAGButton() {
         const formData = new FormData();
         formData.append('action', 'new');
         formData.append('value', name);
-        const resp = await fetch(API_URL, {
+        const resp = await fetch(getConfig().apiURL, {
           method: 'POST',
           mode: 'cors',
           headers: {

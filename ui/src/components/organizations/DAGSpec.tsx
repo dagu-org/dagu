@@ -131,16 +131,18 @@ function DAGSpec({ data }: Props) {
                           </span>
                         }
                         onClick={async () => {
-                          const formData = new FormData();
-                          formData.append('action', 'save');
-                          formData.append('value', currentValue);
-                          const url = `${API_URL}/dags/${props.name}`;
+                          const url = `${getConfig().apiURL}/workflows/${
+                            props.name
+                          }`;
                           const resp = await fetch(url, {
                             method: 'POST',
                             headers: {
-                              Accept: 'application/json',
+                              'Content-Type': 'application/json',
                             },
-                            body: formData,
+                            body: JSON.stringify({
+                              action: 'save',
+                              value: currentValue,
+                            }),
                           });
                           if (resp.ok) {
                             setEditing(false);

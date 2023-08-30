@@ -18,12 +18,12 @@ function DAGs() {
   const appBarContext = React.useContext(AppBarContext);
 
   const { cache, mutate } = useSWRConfig();
-  const { data } = useSWR<ListWorkflowsResponse>('/api/v1/workflows', null, {
+  const { data } = useSWR<ListWorkflowsResponse>(`/workflows`, null, {
     refreshInterval: 10000,
   });
 
   const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate('/api/v1/workflows'), 500);
+    setTimeout(() => mutate(`/workflows`), 500);
   }, [mutate, cache]);
 
   React.useEffect(() => {

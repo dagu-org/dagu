@@ -6,9 +6,12 @@ package operations
 // Editing this file might prove futile when you re-run the generate command
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/swag"
 )
 
 // PostWorkflowActionHandlerFunc turns a function with the right signature into a post workflow action handler
@@ -53,4 +56,53 @@ func (o *PostWorkflowAction) ServeHTTP(rw http.ResponseWriter, r *http.Request) 
 	res := o.Handler.Handle(Params) // actually handle the request
 	o.Context.Respond(rw, r, route.Produces, route, res)
 
+}
+
+// PostWorkflowActionBody post workflow action body
+//
+// swagger:model PostWorkflowActionBody
+type PostWorkflowActionBody struct {
+
+	// action
+	Action string `json:"action,omitempty"`
+
+	// params
+	Params string `json:"params,omitempty"`
+
+	// request Id
+	RequestID string `json:"requestId,omitempty"`
+
+	// step
+	Step string `json:"step,omitempty"`
+
+	// value
+	Value string `json:"value,omitempty"`
+}
+
+// Validate validates this post workflow action body
+func (o *PostWorkflowActionBody) Validate(formats strfmt.Registry) error {
+	return nil
+}
+
+// ContextValidate validates this post workflow action body based on context it is used
+func (o *PostWorkflowActionBody) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	return nil
+}
+
+// MarshalBinary interface implementation
+func (o *PostWorkflowActionBody) MarshalBinary() ([]byte, error) {
+	if o == nil {
+		return nil, nil
+	}
+	return swag.WriteJSON(o)
+}
+
+// UnmarshalBinary interface implementation
+func (o *PostWorkflowActionBody) UnmarshalBinary(b []byte) error {
+	var res PostWorkflowActionBody
+	if err := swag.ReadJSON(b, &res); err != nil {
+		return err
+	}
+	*o = res
+	return nil
 }

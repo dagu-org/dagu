@@ -10,6 +10,7 @@ import fetchJson from './lib/fetchJson';
 import Search from './pages/search';
 
 export type Config = {
+  apiURL: string;
   title: string;
   navbarColor: string;
   version: string;

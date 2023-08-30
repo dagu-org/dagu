@@ -18,14 +18,16 @@ function DAGEditButtons({ name }: Props) {
             alert('DAG name cannot contain space');
             return;
           }
-          const formData = new FormData();
-          formData.append('action', 'rename');
-          formData.append('value', val);
-          const url = `${API_URL}/dags/${name}`;
+          const url = `${getConfig().apiURL}/workflows/${name}`;
           const resp = await fetch(url, {
             method: 'POST',
-            headers: { Accept: 'application/json' },
-            body: formData,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'rename',
+              value: val,
+            }),
           });
           if (resp.ok) {
             window.location.href = `/dags/${val}`;
@@ -42,7 +44,7 @@ function DAGEditButtons({ name }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const url = `${API_URL}/dags/${name}`;
+          const url = `${getConfig().apiURL}/dags/${name}`;
           const resp = await fetch(url, {
             method: 'DELETE',
             headers: { Accept: 'application/json' },

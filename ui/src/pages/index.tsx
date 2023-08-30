@@ -22,7 +22,7 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
-  const { data } = useSWR<ListWorkflowsResponse>('/', null, {
+  const { data } = useSWR<ListWorkflowsResponse>(`/workflows`, null, {
     refreshInterval: 10000,
   });
 

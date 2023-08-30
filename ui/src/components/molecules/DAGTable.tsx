@@ -292,7 +292,7 @@ const defaultColumns = [
       const data = props.row.original!;
       if (data.Type == DAGDataType.DAG) {
         const schedules = data.DAGStatus.DAG.Schedule;
-        if (schedules && !data.DAGStatus.Suspended) {
+        if (schedules && schedules.length && !data.DAGStatus.Suspended) {
           return (
             <React.Fragment>
               in{' '}

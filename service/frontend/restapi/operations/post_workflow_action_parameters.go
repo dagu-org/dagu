@@ -33,26 +33,9 @@ type PostWorkflowActionParams struct {
 	HTTPRequest *http.Request `json:"-"`
 
 	/*
-	  Required: true
-	  In: query
+	  In: body
 	*/
-	Action string
-	/*
-	  In: query
-	*/
-	Params *string
-	/*
-	  In: query
-	*/
-	RequestID *string
-	/*
-	  In: query
-	*/
-	Step *string
-	/*
-	  In: query
-	*/
-	Value *string
+	Body PostWorkflowActionBody
 	/*
 	  Required: true
 	  In: path
@@ -69,31 +52,26 @@ func (o *PostWorkflowActionParams) BindRequest(r *http.Request, route *middlewar
 
 	o.HTTPRequest = r
 
-	qs := runtime.Values(r.URL.Query())
+	if runtime.HasBody(r) {
+		defer r.Body.Close()
+		var body PostWorkflowActionBody
+		if err := route.Consumer.Consume(r.Body, &body); err != nil {
+			res = append(res, errors.NewParseError("body", "body", "", err))
+		} else {
+			// validate body object
+			if err := body.Validate(route.Formats); err != nil {
+				res = append(res, err)
+			}
 
-	qAction, qhkAction, _ := qs.GetOK("action")
-	if err := o.bindAction(qAction, qhkAction, route.Formats); err != nil {
-		res = append(res, err)
-	}
+			ctx := validate.WithOperationRequest(r.Context())
+			if err := body.ContextValidate(ctx, route.Formats); err != nil {
+				res = append(res, err)
+			}
 
-	qParams, qhkParams, _ := qs.GetOK("params")
-	if err := o.bindParams(qParams, qhkParams, route.Formats); err != nil {
-		res = append(res, err)
-	}
-
-	qRequestID, qhkRequestID, _ := qs.GetOK("request-id")
-	if err := o.bindRequestID(qRequestID, qhkRequestID, route.Formats); err != nil {
-		res = append(res, err)
-	}
-
-	qStep, qhkStep, _ := qs.GetOK("step")
-	if err := o.bindStep(qStep, qhkStep, route.Formats); err != nil {
-		res = append(res, err)
-	}
-
-	qValue, qhkValue, _ := qs.GetOK("value")
-	if err := o.bindValue(qValue, qhkValue, route.Formats); err != nil {
-		res = append(res, err)
+			if len(res) == 0 {
+				o.Body = body
+			}
+		}
 	}
 
 	rWorkflowID, rhkWorkflowID, _ := route.Params.GetOK("workflowId")
@@ -103,99 +81,6 @@ func (o *PostWorkflowActionParams) BindRequest(r *http.Request, route *middlewar
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
-	return nil
-}
-
-// bindAction binds and validates parameter Action from query.
-func (o *PostWorkflowActionParams) bindAction(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	if !hasKey {
-		return errors.Required("action", "query", rawData)
-	}
-	var raw string
-	if len(rawData) > 0 {
-		raw = rawData[len(rawData)-1]
-	}
-
-	// Required: true
-	// AllowEmptyValue: false
-
-	if err := validate.RequiredString("action", "query", raw); err != nil {
-		return err
-	}
-	o.Action = raw
-
-	return nil
-}
-
-// bindParams binds and validates parameter Params from query.
-func (o *PostWorkflowActionParams) bindParams(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	var raw string
-	if len(rawData) > 0 {
-		raw = rawData[len(rawData)-1]
-	}
-
-	// Required: false
-	// AllowEmptyValue: false
-
-	if raw == "" { // empty values pass all other validations
-		return nil
-	}
-	o.Params = &raw
-
-	return nil
-}
-
-// bindRequestID binds and validates parameter RequestID from query.
-func (o *PostWorkflowActionParams) bindRequestID(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	var raw string
-	if len(rawData) > 0 {
-		raw = rawData[len(rawData)-1]
-	}
-
-	// Required: false
-	// AllowEmptyValue: false
-
-	if raw == "" { // empty values pass all other validations
-		return nil
-	}
-	o.RequestID = &raw
-
-	return nil
-}
-
-// bindStep binds and validates parameter Step from query.
-func (o *PostWorkflowActionParams) bindStep(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	var raw string
-	if len(rawData) > 0 {
-		raw = rawData[len(rawData)-1]
-	}
-
-	// Required: false
-	// AllowEmptyValue: false
-
-	if raw == "" { // empty values pass all other validations
-		return nil
-	}
-	o.Step = &raw
-
-	return nil
-}
-
-// bindValue binds and validates parameter Value from query.
-func (o *PostWorkflowActionParams) bindValue(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	var raw string
-	if len(rawData) > 0 {
-		raw = rawData[len(rawData)-1]
-	}
-
-	// Required: false
-	// AllowEmptyValue: false
-
-	if raw == "" { // empty values pass all other validations
-		return nil
-	}
-	o.Value = &raw
-
 	return nil
 }
 

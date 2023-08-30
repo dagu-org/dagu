@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// PostWorkflowActionURL generates an URL for the post workflow action operation
-type PostWorkflowActionURL struct {
+// OptionsWorkflowURL generates an URL for the options workflow operation
+type OptionsWorkflowURL struct {
 	WorkflowID string
 
 	_basePath string
@@ -24,7 +24,7 @@ type PostWorkflowActionURL struct {
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *PostWorkflowActionURL) WithBasePath(bp string) *PostWorkflowActionURL {
+func (o *OptionsWorkflowURL) WithBasePath(bp string) *OptionsWorkflowURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -32,12 +32,12 @@ func (o *PostWorkflowActionURL) WithBasePath(bp string) *PostWorkflowActionURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *PostWorkflowActionURL) SetBasePath(bp string) {
+func (o *OptionsWorkflowURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *PostWorkflowActionURL) Build() (*url.URL, error) {
+func (o *OptionsWorkflowURL) Build() (*url.URL, error) {
 	var _result url.URL
 
 	var _path = "/workflows/{workflowId}"
@@ -46,7 +46,7 @@ func (o *PostWorkflowActionURL) Build() (*url.URL, error) {
 	if workflowID != "" {
 		_path = strings.Replace(_path, "{workflowId}", workflowID, -1)
 	} else {
-		return nil, errors.New("workflowId is required on PostWorkflowActionURL")
+		return nil, errors.New("workflowId is required on OptionsWorkflowURL")
 	}
 
 	_basePath := o._basePath
@@ -59,7 +59,7 @@ func (o *PostWorkflowActionURL) Build() (*url.URL, error) {
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *PostWorkflowActionURL) Must(u *url.URL, err error) *url.URL {
+func (o *OptionsWorkflowURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -70,17 +70,17 @@ func (o *PostWorkflowActionURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *PostWorkflowActionURL) String() string {
+func (o *OptionsWorkflowURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *PostWorkflowActionURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *OptionsWorkflowURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on PostWorkflowActionURL")
+		return nil, errors.New("scheme is required for a full url on OptionsWorkflowURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on PostWorkflowActionURL")
+		return nil, errors.New("host is required for a full url on OptionsWorkflowURL")
 	}
 
 	base, err := o.Build()
@@ -94,6 +94,6 @@ func (o *PostWorkflowActionURL) BuildFull(scheme, host string) (*url.URL, error)
 }
 
 // StringFull returns the string representation of a complete url
-func (o *PostWorkflowActionURL) StringFull(scheme, host string) string {
+func (o *OptionsWorkflowURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

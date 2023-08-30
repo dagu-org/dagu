@@ -114,30 +114,28 @@ func init() {
             "required": true
           },
           {
-            "type": "string",
-            "name": "action",
-            "in": "query",
-            "required": true
-          },
-          {
-            "type": "string",
-            "name": "value",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "name": "request-id",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "name": "step",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "name": "params",
-            "in": "query"
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "string"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "step": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -152,6 +150,25 @@ func init() {
             "schema": {
               "$ref": "#/definitions/ApiError"
             }
+          }
+        }
+      },
+      "options": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "optionsWorkflow",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CORS header information or other options supported."
           }
         }
       }
@@ -926,30 +943,28 @@ func init() {
             "required": true
           },
           {
-            "type": "string",
-            "name": "action",
-            "in": "query",
-            "required": true
-          },
-          {
-            "type": "string",
-            "name": "value",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "name": "request-id",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "name": "step",
-            "in": "query"
-          },
-          {
-            "type": "string",
-            "name": "params",
-            "in": "query"
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "string"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "step": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
           }
         ],
         "responses": {
@@ -964,6 +979,25 @@ func init() {
             "schema": {
               "$ref": "#/definitions/ApiError"
             }
+          }
+        }
+      },
+      "options": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "optionsWorkflow",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CORS header information or other options supported."
           }
         }
       }

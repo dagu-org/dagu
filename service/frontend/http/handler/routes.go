@@ -23,7 +23,6 @@ func ConfigRoutes(r *chi.Mux) *chi.Mux {
 		dagRoute := func(r chi.Router) {
 			r.Use(dagContext)
 			r.Get("/", handleGetDAG())
-			r.Post("/", handlePostDAG())
 			r.Delete("/", handleDeleteDAG())
 		}
 
