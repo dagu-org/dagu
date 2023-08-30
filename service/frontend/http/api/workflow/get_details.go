@@ -1,8 +1,7 @@
-package api
+package workflow
 
 import (
 	"fmt"
-	"github.com/go-openapi/runtime/middleware"
 	"github.com/samber/lo"
 	"github.com/yohamta/dagu/internal/config"
 	"github.com/yohamta/dagu/internal/constants"
@@ -21,49 +20,6 @@ import (
 	"strings"
 )
 
-func registerWorkflows(api *operations.DaguAPI) {
-	api.ListWorkflowsHandler = operations.ListWorkflowsHandlerFunc(
-		func(params operations.ListWorkflowsParams) middleware.Responder {
-			resp, err := listWorkflows(params)
-			if err != nil {
-				return operations.NewListWorkflowsDefault(err.Code).WithPayload(err.APIError)
-			}
-			return operations.NewListWorkflowsOK().WithPayload(resp)
-		})
-
-	api.GetWorkflowHandler = operations.GetWorkflowHandlerFunc(
-		func(params operations.GetWorkflowParams) middleware.Responder {
-			resp, err := getWorkflow(params)
-			if err != nil {
-				return operations.NewGetWorkflowDefault(err.Code).WithPayload(err.APIError)
-			}
-			return operations.NewGetWorkflowOK().WithPayload(resp)
-		})
-}
-
-func listWorkflows(_ operations.ListWorkflowsParams) (*models.ListWorkflowsResponse, *CodedError) {
-	cfg := config.Get()
-
-	// TODO: fix this to use workflow store & history store
-	dir := filepath.Join(cfg.DAGs)
-	dr := controller.NewDAGStatusReader(jsondb.New())
-	dags, errs, err := dr.ReadAllStatus(dir)
-	if err != nil {
-		return nil, NewInternalError(err)
-	}
-
-	// TODO: remove this if it's not needed
-	_, _, hasErr := lo.FindIndexOf(dags, func(d *controller.DAGStatus) bool {
-		return d.Error != nil
-	})
-
-	if len(errs) > 0 {
-		hasErr = true
-	}
-
-	return response.ToListWorkflowResponse(dags, errs, hasErr), nil
-}
-
 const (
 	// TODO: separate API
 	dagTabTypeStatus       = "status"
@@ -73,7 +29,7 @@ const (
 	dagTabTypeSchedulerLog = "scheduler-log"
 )
 
-func getWorkflow(params operations.GetWorkflowParams) (*models.GetWorkflowDetailResponse, *CodedError) {
+func GetDetail(params operations.GetWorkflowParams) (*models.GetWorkflowDetailResponse, *response.CodedError) {
 	workflowID := params.WorkflowID
 
 	// TODO: separate API
@@ -93,7 +49,7 @@ func getWorkflow(params operations.GetWorkflowParams) (*models.GetWorkflowDetail
 	dr := controller.NewDAGStatusReader(jsondb.New())
 	workflowStatus, err := dr.ReadStatus(file, false)
 	if workflowStatus == nil {
-		return nil, NewNotFoundError(err)
+		return nil, response.NewNotFoundError(err)
 	}
 
 	ctrl := controller.New(workflowStatus.DAG, jsondb.New())
@@ -111,7 +67,7 @@ func getWorkflow(params operations.GetWorkflowParams) (*models.GetWorkflowDetail
 	case dagTabTypeSpec:
 		dagContent, err := readFileContent(file, nil)
 		if err != nil {
-			return nil, NewNotFoundError(err)
+			return nil, response.NewNotFoundError(err)
 		}
 		resp.Definition = lo.ToPtr(string(dagContent))
 
@@ -122,14 +78,14 @@ func getWorkflow(params operations.GetWorkflowParams) (*models.GetWorkflowDetail
 	case dagTabTypeStepLog:
 		stepLog, err := getStepLog(ctrl, lo.FromPtr(logFile), lo.FromPtr(stepName))
 		if err != nil {
-			return nil, NewNotFoundError(err)
+			return nil, response.NewNotFoundError(err)
 		}
 		resp.StepLog = stepLog
 
 	case dagTabTypeSchedulerLog:
 		schedulerLog, err := readSchedulerLog(ctrl, lo.FromPtr(logFile))
 		if err != nil {
-			return nil, NewNotFoundError(err)
+			return nil, response.NewNotFoundError(err)
 		}
 		resp.ScLog = schedulerLog
 

@@ -100,6 +100,60 @@ func init() {
             }
           }
         }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "postWorkflowAction",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "action",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "value",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "request-id",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "step",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "params",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/postWorkflowActionResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
       }
     }
   },
@@ -219,6 +273,14 @@ func init() {
         },
         "HasError": {
           "type": "boolean"
+        }
+      }
+    },
+    "postWorkflowActionResponse": {
+      "type": "object",
+      "properties": {
+        "NewWorkflowID": {
+          "type": "string"
         }
       }
     },
@@ -850,6 +912,60 @@ func init() {
             }
           }
         }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "postWorkflowAction",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "action",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "value",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "request-id",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "step",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "params",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/postWorkflowActionResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
       }
     }
   },
@@ -969,6 +1085,14 @@ func init() {
         },
         "HasError": {
           "type": "boolean"
+        }
+      }
+    },
+    "postWorkflowActionResponse": {
+      "type": "object",
+      "properties": {
+        "NewWorkflowID": {
+          "type": "string"
         }
       }
     },

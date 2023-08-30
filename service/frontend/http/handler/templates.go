@@ -15,6 +15,7 @@ import (
 
 func defaultFuncs() template.FuncMap {
 	cfg := config.Get()
+
 	return template.FuncMap{
 		"defTitle": func(ip interface{}) string {
 			v, ok := ip.(string)
@@ -31,6 +32,9 @@ func defaultFuncs() template.FuncMap {
 		},
 		"navbarTitle": func() string {
 			return cfg.NavbarTitle
+		},
+		"apiURL": func() string {
+			return cfg.GetAPIBaseURL()
 		},
 	}
 }

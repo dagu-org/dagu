@@ -41,8 +41,8 @@ function DAGDetails() {
   const { mutate } = useSWRConfig();
 
   const refreshFn = React.useCallback(() => {
-    mutate(`${baseUrl}/`);
-  }, [mutate, baseUrl]);
+    mutate(`/api/v1/workflows/${params.name}`);
+  }, [mutate, params.name]);
 
   React.useEffect(() => {
     if (data) {

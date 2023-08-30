@@ -74,7 +74,7 @@ function DAGActions({
         const e = await ret.text();
         alert(e || 'Failed to submit');
       }
-      window.location.reload();
+      refresh && refresh();
     },
     [refresh]
   );

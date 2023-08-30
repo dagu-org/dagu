@@ -126,9 +126,9 @@ func handlePostDAG() http.HandlerFunc {
 			return
 
 		case "rename":
-			newfile := nameWithExt(path.Join(cfg.DAGs, value))
-			c := controller.New(d.DAG, jsondb.New())
-			err := c.MoveDAG(file, newfile)
+			newFileName := nameWithExt(path.Join(cfg.DAGs, value))
+			ctrl := controller.New(d.DAG, jsondb.New())
+			err := ctrl.MoveDAG(file, newFileName)
 			if err != nil {
 				encodeError(w, err)
 				return
