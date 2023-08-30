@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/config"
 )
 
 func TestLoadingFile(t *testing.T) {

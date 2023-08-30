@@ -2,11 +2,11 @@ package workflow
 
 import (
 	"github.com/samber/lo"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/service/frontend/http/api/response"
-	"github.com/yohamta/dagu/service/frontend/models"
-	"github.com/yohamta/dagu/service/frontend/restapi/operations"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
+	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"path"
 )
 

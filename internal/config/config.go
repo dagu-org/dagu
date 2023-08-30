@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/spf13/viper"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 type Config struct {

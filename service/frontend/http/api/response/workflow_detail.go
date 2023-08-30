@@ -1,11 +1,11 @@
 package response
 
 import (
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/dag"
+	domain "github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
-	domain "github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/service/frontend/models"
 )
 
 func ToGetWorkflowDetailResponse(

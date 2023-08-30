@@ -9,8 +9,8 @@ import (
 	"path"
 	"text/template"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/constants"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/constants"
 )
 
 func defaultFuncs() template.FuncMap {

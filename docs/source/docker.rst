@@ -10,7 +10,7 @@ Create the ``Dockerfile`` and you can build an image.
 
     ARG TARGETARCH
     ARG VERSION=
-    ARG RELEASES_URL="https://github.com/yohamta/dagu/releases"
+    ARG RELEASES_URL="https://github.com/dagu-dev/dagu/releases"
 
     ARG USER="dagu"
     ARG USER_UID=1000

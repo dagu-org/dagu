@@ -1,9 +1,9 @@
 package response
 
 import (
+	domain "github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
-	domain "github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/service/frontend/models"
 )
 
 func ToNode(node *domain.Node) *models.StatusNode {

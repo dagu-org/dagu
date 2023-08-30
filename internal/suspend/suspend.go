@@ -3,9 +3,9 @@ package suspend
 import (
 	"fmt"
 
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/storage"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/storage"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 type SuspendChecker struct {

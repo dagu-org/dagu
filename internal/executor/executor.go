@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/yohamta/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 type Executor interface {

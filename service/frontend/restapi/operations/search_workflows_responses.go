@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-openapi/runtime"
 
-	"github.com/yohamta/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/service/frontend/models"
 )
 
 // SearchWorkflowsOKCode is the HTTP code returned for type SearchWorkflowsOK

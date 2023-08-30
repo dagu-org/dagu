@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // Server is a unix socket frontend that passes http requests to HandlerFunc.

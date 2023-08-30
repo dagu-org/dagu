@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/config"
 )
 
 func TestBuildErrors(t *testing.T) {

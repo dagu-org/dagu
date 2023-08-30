@@ -2,8 +2,8 @@ package api
 
 import (
 	"github.com/go-openapi/runtime/middleware"
-	"github.com/yohamta/dagu/service/frontend/http/api/workflow"
-	"github.com/yohamta/dagu/service/frontend/restapi/operations"
+	"github.com/dagu-dev/dagu/service/frontend/http/api/workflow"
+	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 )
 
 func Configure(api *operations.DaguAPI) {

@@ -1,15 +1,15 @@
 package runner
 
 import (
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"path"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/scheduler"
 )
 
 func TestJobStart(t *testing.T) {

@@ -2,10 +2,10 @@ package response
 
 import (
 	"github.com/samber/lo"
-	"github.com/yohamta/dagu/internal/constants"
-	domain "github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/internal/constants"
+	domain "github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/service/frontend/models"
 	"sort"
 	"strings"
 )

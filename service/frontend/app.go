@@ -2,9 +2,9 @@ package frontend
 
 import (
 	"context"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/service/frontend/http"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/service/frontend/http"
 	"go.uber.org/fx"
 )
 

@@ -42,4 +42,4 @@ Via Docker
 Via GitHub Release Page
 -----------------------
 
-Download the latest binary from the `Releases page <https://github.com/yohamta/dagu/releases>`_ and place it in your ``$PATH`` (e.g. ``/usr/local/bin``).
+Download the latest binary from the `Releases page <https://github.com/dagu-dev/dagu/releases>`_ and place it in your ``$PATH`` (e.g. ``/usr/local/bin``).

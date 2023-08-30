@@ -7,8 +7,8 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 

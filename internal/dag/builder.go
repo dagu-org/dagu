@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/yohamta/dagu/internal/constants"
-	"github.com/yohamta/dagu/internal/errors"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/constants"
+	"github.com/dagu-dev/dagu/internal/errors"
+	"github.com/dagu-dev/dagu/internal/utils"
 	"golang.org/x/sys/unix"
 )
 

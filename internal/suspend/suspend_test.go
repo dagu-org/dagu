@@ -4,10 +4,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/storage"
+	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/storage"
-	"github.com/yohamta/dagu/internal/utils"
 )
 
 func TestSuspendChecker(t *testing.T) {

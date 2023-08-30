@@ -4,14 +4,14 @@ package restapi
 
 import (
 	"crypto/tls"
-	pkgmiddleware "github.com/yohamta/dagu/service/frontend/http/middleware"
+	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/http/middleware"
 	"net/http"
 
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
 
-	"github.com/yohamta/dagu/service/frontend/restapi/operations"
+	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 )
 
 //go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal interface{} --exclude-main

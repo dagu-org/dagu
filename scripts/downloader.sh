@@ -1,6 +1,6 @@
 #!/bin/sh
 
-RELEASES_URL="https://github.com/yohamta/dagu/releases"
+RELEASES_URL="https://github.com/dagu-dev/dagu/releases"
 FILE_BASENAME="dagu"
 
 echo "Downloading the latest binary to the current directory..."

@@ -5,7 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/yohamta/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"io"
 	"log"
 	"os"
@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // Store is the interfact to store workflow status in local.

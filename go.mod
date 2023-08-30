@@ -1,4 +1,4 @@
-module github.com/yohamta/dagu
+module github.com/dagu-dev/dagu
 
 go 1.19
 

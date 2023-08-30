@@ -2,9 +2,9 @@ package response
 
 import (
 	"github.com/samber/lo"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/grep"
-	"github.com/yohamta/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/grep"
+	"github.com/dagu-dev/dagu/service/frontend/models"
 )
 
 func ToSearchWorkflowsResponse(ret []*controller.GrepResult, errs []string) *models.SearchWorkflowsResponse {

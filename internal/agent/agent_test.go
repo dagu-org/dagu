@@ -2,8 +2,8 @@ package agent
 
 import (
 	"context"
-	"github.com/yohamta/dagu/internal/persistence"
-	"github.com/yohamta/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/controller"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/internal/models"
-	"github.com/yohamta/dagu/internal/scheduler"
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 var testdataDir = path.Join(utils.MustGetwd(), "testdata")

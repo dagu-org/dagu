@@ -4,8 +4,8 @@ Copyright © 2023 Dagu Yota Hamada
 package main
 
 import (
-	cmd "github.com/yohamta/dagu/cmd"
-	"github.com/yohamta/dagu/internal/constants"
+	cmd "github.com/dagu-dev/dagu/cmd"
+	"github.com/dagu-dev/dagu/internal/constants"
 )
 
 func main() {

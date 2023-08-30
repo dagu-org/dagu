@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/mattn/go-shellwords"
-	"github.com/yohamta/dagu/internal/constants"
 )
 
 var defaultEnv map[string]string

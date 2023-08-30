@@ -3,7 +3,7 @@ package dag
 import (
 	"fmt"
 
-	"github.com/yohamta/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // Condition represents a condition to be evaluated by the agent.

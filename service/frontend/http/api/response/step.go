@@ -2,8 +2,8 @@ package response
 
 import (
 	"github.com/samber/lo"
-	"github.com/yohamta/dagu/internal/dag"
-	"github.com/yohamta/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/service/frontend/models"
 )
 
 func ToStepObject(step *dag.Step) *models.StepObject {

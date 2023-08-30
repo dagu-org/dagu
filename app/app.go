@@ -1,9 +1,9 @@
 package app
 
 import (
-	"github.com/yohamta/dagu/internal/config"
-	"github.com/yohamta/dagu/internal/logger"
-	"github.com/yohamta/dagu/service/frontend"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/service/frontend"
 	"go.uber.org/fx"
 	"os"
 )
