@@ -35,7 +35,7 @@ function NodeStatusTableRow({
       <TableCell> {rownum} </TableCell>
       <TableCell> {node.Step.Name} </TableCell>
       <TableCell>
-        {/* <MultilineText>{node.Step.Description}</MultilineText> */}
+        <MultilineText>{node.Step.Description}</MultilineText>
       </TableCell>
       <TableCell> {node.Step.Command} </TableCell>
       <TableCell> {node.Step.Args ? node.Step.Args.join(' ') : ''} </TableCell>
