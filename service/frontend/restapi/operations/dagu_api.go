@@ -57,6 +57,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		PostWorkflowActionHandler: PostWorkflowActionHandlerFunc(func(params PostWorkflowActionParams) middleware.Responder {
 			return middleware.NotImplemented("operation PostWorkflowAction has not yet been implemented")
 		}),
+		SearchWorkflowsHandler: SearchWorkflowsHandlerFunc(func(params SearchWorkflowsParams) middleware.Responder {
+			return middleware.NotImplemented("operation SearchWorkflows has not yet been implemented")
+		}),
 	}
 }
 
@@ -103,6 +106,8 @@ type DaguAPI struct {
 	ListWorkflowsHandler ListWorkflowsHandler
 	// PostWorkflowActionHandler sets the operation handler for the post workflow action operation
 	PostWorkflowActionHandler PostWorkflowActionHandler
+	// SearchWorkflowsHandler sets the operation handler for the search workflows operation
+	SearchWorkflowsHandler SearchWorkflowsHandler
 
 	// ServeError is called when an error is received, there is a default handler
 	// but you can set your own with this
@@ -194,6 +199,9 @@ func (o *DaguAPI) Validate() error {
 	}
 	if o.PostWorkflowActionHandler == nil {
 		unregistered = append(unregistered, "PostWorkflowActionHandler")
+	}
+	if o.SearchWorkflowsHandler == nil {
+		unregistered = append(unregistered, "SearchWorkflowsHandler")
 	}
 
 	if len(unregistered) > 0 {
@@ -303,6 +311,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
 	o.handlers["POST"]["/workflows/{workflowId}"] = NewPostWorkflowAction(o.context, o.PostWorkflowActionHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/search"] = NewSearchWorkflows(o.context, o.SearchWorkflowsHandler)
 }
 
 // Serve creates a http handler to serve the API over HTTP

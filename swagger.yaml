@@ -136,6 +136,26 @@ paths:
           schema:
             $ref: "#/definitions/ApiError"
 
+  /search:
+    get:
+      produces:
+        - application/json
+      operationId: searchWorkflows
+      parameters:
+        - name: q
+          in: query
+          required: true
+          type: string
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/searchWorkflowsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
 definitions:
   ApiError:
     type: object
@@ -619,6 +639,43 @@ definitions:
       - RepeatPolicy
       - MailOnError
       - Preconditions
+
+  searchWorkflowsResponse:
+    type: object
+    properties:
+      Results:
+        type: array
+        items:
+          $ref: '#/definitions/searchWorkflowsResultItem'
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Results
+      - Errors
+
+  searchWorkflowsResultItem:
+    type: object
+    properties:
+      Name:
+        type: string
+      DAG:
+        $ref: '#/definitions/workflow'
+      Matches:
+        type: array
+        items:
+          $ref: '#/definitions/searchWorkflowsMatchItem'
+
+  searchWorkflowsMatchItem:
+    type: object
+    properties:
+      Line:
+        type: string
+      LineNumber:
+        type: integer
+      StartLine:
+        type: integer
 
   condition:
     type: object

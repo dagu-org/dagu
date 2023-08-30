@@ -51,4 +51,13 @@ func Configure(api *operations.DaguAPI) {
 			}
 			return operations.NewDeleteWorkflowOK()
 		})
+
+	api.SearchWorkflowsHandler = operations.SearchWorkflowsHandlerFunc(
+		func(params operations.SearchWorkflowsParams) middleware.Responder {
+			resp, err := workflow.Search(params)
+			if err != nil {
+				return operations.NewSearchWorkflowsDefault(err.Code).WithPayload(err.APIError)
+			}
+			return operations.NewSearchWorkflowsOK().WithPayload(resp)
+		})
 }

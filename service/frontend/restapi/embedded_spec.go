@@ -35,6 +35,36 @@ func init() {
   "host": "localhost:8080",
   "basePath": "/api/v1",
   "paths": {
+    "/search": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "searchWorkflows",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "q",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/searchWorkflowsResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
     "/workflows": {
       "get": {
         "produces": [
@@ -377,6 +407,58 @@ func init() {
       ],
       "properties": {
         "Expression": {
+          "type": "string"
+        }
+      }
+    },
+    "searchWorkflowsMatchItem": {
+      "type": "object",
+      "properties": {
+        "Line": {
+          "type": "string"
+        },
+        "LineNumber": {
+          "type": "integer"
+        },
+        "StartLine": {
+          "type": "integer"
+        }
+      }
+    },
+    "searchWorkflowsResponse": {
+      "type": "object",
+      "required": [
+        "Results",
+        "Errors"
+      ],
+      "properties": {
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/searchWorkflowsResultItem"
+          }
+        }
+      }
+    },
+    "searchWorkflowsResultItem": {
+      "type": "object",
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/workflow"
+        },
+        "Matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/searchWorkflowsMatchItem"
+          }
+        },
+        "Name": {
           "type": "string"
         }
       }
@@ -922,6 +1004,36 @@ func init() {
   "host": "localhost:8080",
   "basePath": "/api/v1",
   "paths": {
+    "/search": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "searchWorkflows",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "q",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/searchWorkflowsResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
     "/workflows": {
       "get": {
         "produces": [
@@ -1264,6 +1376,58 @@ func init() {
       ],
       "properties": {
         "Expression": {
+          "type": "string"
+        }
+      }
+    },
+    "searchWorkflowsMatchItem": {
+      "type": "object",
+      "properties": {
+        "Line": {
+          "type": "string"
+        },
+        "LineNumber": {
+          "type": "integer"
+        },
+        "StartLine": {
+          "type": "integer"
+        }
+      }
+    },
+    "searchWorkflowsResponse": {
+      "type": "object",
+      "required": [
+        "Results",
+        "Errors"
+      ],
+      "properties": {
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/searchWorkflowsResultItem"
+          }
+        }
+      }
+    },
+    "searchWorkflowsResultItem": {
+      "type": "object",
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/workflow"
+        },
+        "Matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/searchWorkflowsMatchItem"
+          }
+        },
+        "Name": {
           "type": "string"
         }
       }

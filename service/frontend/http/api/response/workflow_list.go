@@ -29,11 +29,11 @@ func ToWorkflowListItem(s *controller.DAGStatus) *models.WorkflowListItem {
 		File:      lo.ToPtr(s.File),
 		Status:    ToWorkflowStatus(s.Status),
 		Suspended: lo.ToPtr(s.Suspended),
-		DAG:       ToDAG(s.DAG),
+		DAG:       ToWorkflow(s.DAG),
 	}
 }
 
-func ToDAG(d *dag.DAG) *models.Workflow {
+func ToWorkflow(d *dag.DAG) *models.Workflow {
 	return &models.Workflow{
 		Name:          lo.ToPtr(d.Name),
 		Group:         lo.ToPtr(d.Group),
