@@ -12,6 +12,7 @@ import (
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // ListWorkflowsResponse list workflows response
@@ -20,13 +21,16 @@ import (
 type ListWorkflowsResponse struct {
 
 	// d a gs
+	// Required: true
 	DAGs []*WorkflowListItem `json:"DAGs"`
 
 	// errors
+	// Required: true
 	Errors []string `json:"Errors"`
 
 	// has error
-	HasError bool `json:"HasError,omitempty"`
+	// Required: true
+	HasError *bool `json:"HasError"`
 }
 
 // Validate validates this list workflows response
@@ -37,6 +41,14 @@ func (m *ListWorkflowsResponse) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
+	if err := m.validateErrors(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateHasError(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
@@ -44,8 +56,9 @@ func (m *ListWorkflowsResponse) Validate(formats strfmt.Registry) error {
 }
 
 func (m *ListWorkflowsResponse) validateDAGs(formats strfmt.Registry) error {
-	if swag.IsZero(m.DAGs) { // not required
-		return nil
+
+	if err := validate.Required("DAGs", "body", m.DAGs); err != nil {
+		return err
 	}
 
 	for i := 0; i < len(m.DAGs); i++ {
@@ -64,6 +77,24 @@ func (m *ListWorkflowsResponse) validateDAGs(formats strfmt.Registry) error {
 			}
 		}
 
+	}
+
+	return nil
+}
+
+func (m *ListWorkflowsResponse) validateErrors(formats strfmt.Registry) error {
+
+	if err := validate.Required("Errors", "body", m.Errors); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *ListWorkflowsResponse) validateHasError(formats strfmt.Registry) error {
+
+	if err := validate.Required("HasError", "body", m.HasError); err != nil {
+		return err
 	}
 
 	return nil

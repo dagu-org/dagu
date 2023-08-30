@@ -61,6 +61,8 @@ const durFormatSec = 'd[d]h[h]m[m]s[s]';
 const durFormatMin = 'd[d]h[h]m[m]';
 
 declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface TableMeta<TData extends RowData> {
     group: string;
     refreshFn: () => void;

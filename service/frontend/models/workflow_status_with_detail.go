@@ -14,14 +14,14 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// WorkflowListItem workflow list item
+// WorkflowStatusWithDetail workflow status with detail
 //
-// swagger:model workflowListItem
-type WorkflowListItem struct {
+// swagger:model workflowStatusWithDetail
+type WorkflowStatusWithDetail struct {
 
 	// d a g
 	// Required: true
-	DAG *Workflow `json:"DAG"`
+	DAG *WorkflowDetail `json:"DAG"`
 
 	// dir
 	// Required: true
@@ -41,15 +41,15 @@ type WorkflowListItem struct {
 
 	// status
 	// Required: true
-	Status *WorkflowStatus `json:"Status"`
+	Status *WorkflowStatusDetail `json:"Status"`
 
 	// suspended
 	// Required: true
 	Suspended *bool `json:"Suspended"`
 }
 
-// Validate validates this workflow list item
-func (m *WorkflowListItem) Validate(formats strfmt.Registry) error {
+// Validate validates this workflow status with detail
+func (m *WorkflowStatusWithDetail) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDAG(formats); err != nil {
@@ -86,7 +86,7 @@ func (m *WorkflowListItem) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateDAG(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateDAG(formats strfmt.Registry) error {
 
 	if err := validate.Required("DAG", "body", m.DAG); err != nil {
 		return err
@@ -106,7 +106,7 @@ func (m *WorkflowListItem) validateDAG(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateDir(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateDir(formats strfmt.Registry) error {
 
 	if err := validate.Required("Dir", "body", m.Dir); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (m *WorkflowListItem) validateDir(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateError(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateError(formats strfmt.Registry) error {
 
 	if err := validate.Required("Error", "body", m.Error); err != nil {
 		return err
@@ -124,7 +124,7 @@ func (m *WorkflowListItem) validateError(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateErrorT(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateErrorT(formats strfmt.Registry) error {
 
 	if err := validate.Required("ErrorT", "body", m.ErrorT); err != nil {
 		return err
@@ -133,7 +133,7 @@ func (m *WorkflowListItem) validateErrorT(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateFile(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateFile(formats strfmt.Registry) error {
 
 	if err := validate.Required("File", "body", m.File); err != nil {
 		return err
@@ -142,7 +142,7 @@ func (m *WorkflowListItem) validateFile(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateStatus(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateStatus(formats strfmt.Registry) error {
 
 	if err := validate.Required("Status", "body", m.Status); err != nil {
 		return err
@@ -162,7 +162,7 @@ func (m *WorkflowListItem) validateStatus(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *WorkflowListItem) validateSuspended(formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) validateSuspended(formats strfmt.Registry) error {
 
 	if err := validate.Required("Suspended", "body", m.Suspended); err != nil {
 		return err
@@ -171,8 +171,8 @@ func (m *WorkflowListItem) validateSuspended(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this workflow list item based on the context it is used
-func (m *WorkflowListItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this workflow status with detail based on the context it is used
+func (m *WorkflowStatusWithDetail) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateDAG(ctx, formats); err != nil {
@@ -189,7 +189,7 @@ func (m *WorkflowListItem) ContextValidate(ctx context.Context, formats strfmt.R
 	return nil
 }
 
-func (m *WorkflowListItem) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.DAG != nil {
 
@@ -206,7 +206,7 @@ func (m *WorkflowListItem) contextValidateDAG(ctx context.Context, formats strfm
 	return nil
 }
 
-func (m *WorkflowListItem) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
+func (m *WorkflowStatusWithDetail) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Status != nil {
 
@@ -224,7 +224,7 @@ func (m *WorkflowListItem) contextValidateStatus(ctx context.Context, formats st
 }
 
 // MarshalBinary interface implementation
-func (m *WorkflowListItem) MarshalBinary() ([]byte, error) {
+func (m *WorkflowStatusWithDetail) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -232,8 +232,8 @@ func (m *WorkflowListItem) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *WorkflowListItem) UnmarshalBinary(b []byte) error {
-	var res WorkflowListItem
+func (m *WorkflowStatusWithDetail) UnmarshalBinary(b []byte) error {
+	var res WorkflowStatusWithDetail
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

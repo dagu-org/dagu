@@ -1,4 +1,4 @@
-import { DAG, DAGStatus, Node, NodeStatus, SchedulerStatus, Status, StatusFile } from './index';
+import { DAG, DAGStatus, Node, NodeStatus, Schedule, SchedulerStatus, StatusFile } from './index';
 
 export type GetDAGResponse = {
   Title: string;
@@ -58,16 +58,17 @@ export type WorkflowListItem = {
   Status?: WorkflowStatus;
   Suspended: boolean;
   ErrorT: string;
-  DAG: WorkflowDefinition;
+  DAG: Workflow;
 };
 
-export type WorkflowDefinition = {
+export type Workflow = {
   Name: string;
   Group: string;
   Tags: string[];
   Description: string;
   Params: string[];
   DefaultParams?: string;
+  Schedule: Schedule[];
 };
 
 export type WorkflowStatus = {

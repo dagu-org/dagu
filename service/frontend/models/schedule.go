@@ -8,8 +8,10 @@ package models
 import (
 	"context"
 
+	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // Schedule schedule
@@ -18,11 +20,30 @@ import (
 type Schedule struct {
 
 	// expression
-	Expression string `json:"Expression,omitempty"`
+	// Required: true
+	Expression *string `json:"Expression"`
 }
 
 // Validate validates this schedule
 func (m *Schedule) Validate(formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.validateExpression(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *Schedule) validateExpression(formats strfmt.Registry) error {
+
+	if err := validate.Required("Expression", "body", m.Expression); err != nil {
+		return err
+	}
+
 	return nil
 }
 

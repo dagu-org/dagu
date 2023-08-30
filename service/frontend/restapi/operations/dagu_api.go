@@ -42,6 +42,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 
 		JSONProducer: runtime.JSONProducer(),
 
+		GetWorkflowHandler: GetWorkflowHandlerFunc(func(params GetWorkflowParams) middleware.Responder {
+			return middleware.NotImplemented("operation GetWorkflow has not yet been implemented")
+		}),
 		ListWorkflowsHandler: ListWorkflowsHandlerFunc(func(params ListWorkflowsParams) middleware.Responder {
 			return middleware.NotImplemented("operation ListWorkflows has not yet been implemented")
 		}),
@@ -81,6 +84,8 @@ type DaguAPI struct {
 	//   - application/json
 	JSONProducer runtime.Producer
 
+	// GetWorkflowHandler sets the operation handler for the get workflow operation
+	GetWorkflowHandler GetWorkflowHandler
 	// ListWorkflowsHandler sets the operation handler for the list workflows operation
 	ListWorkflowsHandler ListWorkflowsHandler
 
@@ -160,6 +165,9 @@ func (o *DaguAPI) Validate() error {
 		unregistered = append(unregistered, "JSONProducer")
 	}
 
+	if o.GetWorkflowHandler == nil {
+		unregistered = append(unregistered, "GetWorkflowHandler")
+	}
 	if o.ListWorkflowsHandler == nil {
 		unregistered = append(unregistered, "ListWorkflowsHandler")
 	}
@@ -251,6 +259,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers = make(map[string]map[string]http.Handler)
 	}
 
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/workflows/{workflowId}"] = NewGetWorkflow(o.context, o.GetWorkflowHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}

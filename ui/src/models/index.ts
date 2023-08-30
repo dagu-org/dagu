@@ -145,7 +145,7 @@ export function getStatusField(
   return '';
 }
 
-export function getNextSchedule(data: DAGStatus): number {
+export function getNextSchedule(data: WorkflowListItem): number {
   const schedules = data.DAG.Schedule;
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;

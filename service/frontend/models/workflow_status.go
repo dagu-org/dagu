@@ -8,8 +8,10 @@ package models
 import (
 	"context"
 
+	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // WorkflowStatus workflow status
@@ -18,35 +20,166 @@ import (
 type WorkflowStatus struct {
 
 	// finished at
-	FinishedAt string `json:"FinishedAt,omitempty"`
+	// Required: true
+	FinishedAt *string `json:"FinishedAt"`
 
 	// log
-	Log string `json:"Log,omitempty"`
+	// Required: true
+	Log *string `json:"Log"`
 
 	// name
-	Name string `json:"Name,omitempty"`
+	// Required: true
+	Name *string `json:"Name"`
 
 	// params
-	Params string `json:"Params,omitempty"`
+	// Required: true
+	Params *string `json:"Params"`
 
 	// pid
-	Pid int64 `json:"Pid,omitempty"`
+	// Required: true
+	Pid *int64 `json:"Pid"`
 
 	// request Id
-	RequestID string `json:"RequestId,omitempty"`
+	// Required: true
+	RequestID *string `json:"RequestId"`
 
 	// started at
-	StartedAt string `json:"StartedAt,omitempty"`
+	// Required: true
+	StartedAt *string `json:"StartedAt"`
 
 	// status
-	Status int64 `json:"Status,omitempty"`
+	// Required: true
+	Status *int64 `json:"Status"`
 
 	// status text
-	StatusText string `json:"StatusText,omitempty"`
+	// Required: true
+	StatusText *string `json:"StatusText"`
 }
 
 // Validate validates this workflow status
 func (m *WorkflowStatus) Validate(formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.validateFinishedAt(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateLog(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateName(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateParams(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validatePid(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateRequestID(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateStartedAt(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateStatus(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateStatusText(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *WorkflowStatus) validateFinishedAt(formats strfmt.Registry) error {
+
+	if err := validate.Required("FinishedAt", "body", m.FinishedAt); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateLog(formats strfmt.Registry) error {
+
+	if err := validate.Required("Log", "body", m.Log); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateName(formats strfmt.Registry) error {
+
+	if err := validate.Required("Name", "body", m.Name); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateParams(formats strfmt.Registry) error {
+
+	if err := validate.Required("Params", "body", m.Params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validatePid(formats strfmt.Registry) error {
+
+	if err := validate.Required("Pid", "body", m.Pid); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateRequestID(formats strfmt.Registry) error {
+
+	if err := validate.Required("RequestId", "body", m.RequestID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateStartedAt(formats strfmt.Registry) error {
+
+	if err := validate.Required("StartedAt", "body", m.StartedAt); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateStatus(formats strfmt.Registry) error {
+
+	if err := validate.Required("Status", "body", m.Status); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *WorkflowStatus) validateStatusText(formats strfmt.Registry) error {
+
+	if err := validate.Required("StatusText", "body", m.StatusText); err != nil {
+		return err
+	}
+
 	return nil
 }
 

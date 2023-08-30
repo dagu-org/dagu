@@ -22,7 +22,6 @@ func ConfigRoutes(r *chi.Mux) *chi.Mux {
 
 		dagRoute := func(r chi.Router) {
 			r.Use(dagContext)
-			r.Use(tabContext)
 			r.Get("/", handleGetDAG())
 			r.Post("/", handlePostDAG())
 			r.Delete("/", handleDeleteDAG())
@@ -73,21 +72,6 @@ func dagNameFromCtx(ctx context.Context) string {
 }
 
 type ctxKeyTab struct{}
-
-func tabContext(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s := chi.URLParam(r, "tabName")
-		if s == "" {
-			s = dag_TabType_Status
-		}
-		ctx := context.WithValue(r.Context(), ctxKeyTab{}, s)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func tabNameFromCtx(ctx context.Context) string {
-	return ctx.Value(ctxKeyTab{}).(string)
-}
 
 func nameWithExt(name string) string {
 	s := strings.TrimSuffix(name, ".yaml")

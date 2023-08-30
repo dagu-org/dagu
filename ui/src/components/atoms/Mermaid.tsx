@@ -1,4 +1,5 @@
 import React, { CSSProperties } from 'react';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import mermaidAPI, { Mermaid } from 'mermaid';
 
@@ -31,7 +32,7 @@ function Mermaid({ def, style = {} }: Props) {
   };
   const dStyle: CSSProperties = {
     overflowX: 'auto',
-    padding: "2em",
+    padding: '2em',
   };
   function render() {
     if (!ref.current) {
@@ -50,6 +51,7 @@ function Mermaid({ def, style = {} }: Props) {
         }
         setTimeout(() => {
           if (ref.current) {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             bindFunc(ref.current);
           }

@@ -1,10 +1,10 @@
 import { Switch } from '@mui/material';
 import React from 'react';
-import { DAGStatus } from '../../models';
+import { WorkflowListItem } from '../../models/api';
 
 type Props = {
   inputProps?: React.HTMLProps<HTMLInputElement>;
-  DAG: DAGStatus;
+  DAG: WorkflowListItem;
   refresh?: () => void;
 };
 

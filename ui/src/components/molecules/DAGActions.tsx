@@ -9,6 +9,7 @@ import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
 import ConfirmModal from './ConfirmModal';
 import LabeledItem from '../atoms/LabeledItem';
+import { Workflow, WorkflowStatus } from '../../models/api';
 
 type LabelProps = {
   show: boolean;
@@ -16,9 +17,9 @@ type LabelProps = {
 };
 
 type Props = {
-  status?: Status;
+  status?: Status | WorkflowStatus;
   name: string;
-  dag: DAG;
+  dag: DAG | Workflow;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;

@@ -9,11 +9,11 @@ import {
 import React from 'react';
 import { Parameter, parseParams, stringifyParams } from '../../lib/parseParams';
 import { DAG } from '../../models';
-import LabeledItem from '../atoms/LabeledItem';
+import { Workflow } from '../../models/api';
 
 type Props = {
   visible: boolean;
-  dag: DAG;
+  dag: DAG | Workflow;
   dismissModal: () => void;
   onSubmit: (params: string) => void;
 };

@@ -41,3 +41,7 @@ func handleGetSearch() http.HandlerFunc {
 		}
 	}
 }
+
+func isJsonRequest(r *http.Request) bool {
+	return r.Header.Get("Accept") == "application/json"
+}

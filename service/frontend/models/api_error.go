@@ -8,8 +8,10 @@ package models
 import (
 	"context"
 
+	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // APIError Api error
@@ -18,14 +20,47 @@ import (
 type APIError struct {
 
 	// detailed message
-	DetailedMessage string `json:"detailedMessage,omitempty"`
+	// Required: true
+	DetailedMessage *string `json:"detailedMessage"`
 
 	// message
-	Message string `json:"message,omitempty"`
+	// Required: true
+	Message *string `json:"message"`
 }
 
 // Validate validates this Api error
 func (m *APIError) Validate(formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.validateDetailedMessage(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateMessage(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *APIError) validateDetailedMessage(formats strfmt.Registry) error {
+
+	if err := validate.Required("detailedMessage", "body", m.DetailedMessage); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *APIError) validateMessage(formats strfmt.Registry) error {
+
+	if err := validate.Required("message", "body", m.Message); err != nil {
+		return err
+	}
+
 	return nil
 }
 

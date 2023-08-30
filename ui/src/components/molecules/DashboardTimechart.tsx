@@ -14,8 +14,9 @@ import {
 import { statusColorMapping } from '../../consts';
 import { DAGStatus } from '../../models';
 import { SchedulerStatus } from '../../models';
+import { WorkflowListItem } from '../../models/api';
 
-type Props = { data: DAGStatus[] };
+type Props = { data: DAGStatus[] | WorkflowListItem[] };
 
 type DataFrame = {
   name: string;

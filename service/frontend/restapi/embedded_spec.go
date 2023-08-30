@@ -56,11 +56,60 @@ func init() {
           }
         }
       }
+    },
+    "/workflows/{workflowId}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "getWorkflow",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "tab",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "file",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "step",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/getWorkflowDetailResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
     "ApiError": {
       "type": "object",
+      "required": [
+        "message",
+        "detailedMessage"
+      ],
       "properties": {
         "detailedMessage": {
           "type": "string"
@@ -70,25 +119,91 @@ func init() {
         }
       }
     },
+    "condition": {
+      "type": "object",
+      "properties": {
+        "Condition": {
+          "type": "string"
+        },
+        "Expected": {
+          "type": "string"
+        }
+      }
+    },
+    "getWorkflowDetailResponse": {
+      "type": "object",
+      "required": [
+        "Title",
+        "DAG",
+        "Tab",
+        "Graph",
+        "Definition",
+        "LogData",
+        "LogUrl",
+        "StepLog",
+        "ScLog",
+        "Errors"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/workflowStatusWithDetail"
+        },
+        "Definition": {
+          "type": "string"
+        },
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Graph": {
+          "type": "string"
+        },
+        "LogData": {
+          "$ref": "#/definitions/workflowLogResponse"
+        },
+        "LogUrl": {
+          "type": "string"
+        },
+        "ScLog": {
+          "$ref": "#/definitions/workflowSchedulerLogResponse"
+        },
+        "StepLog": {
+          "$ref": "#/definitions/workflowStepLogResponse"
+        },
+        "Tab": {
+          "type": "string"
+        },
+        "Title": {
+          "type": "string"
+        }
+      }
+    },
     "handlerOn": {
       "type": "object",
       "properties": {
         "Cancel": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         },
         "Exit": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         },
         "Failure": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         },
         "Success": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         }
       }
     },
     "listWorkflowsResponse": {
       "type": "object",
+      "required": [
+        "DAGs",
+        "Errors",
+        "HasError"
+      ],
       "properties": {
         "DAGs": {
           "type": "array",
@@ -107,16 +222,161 @@ func init() {
         }
       }
     },
+    "repeatPolicy": {
+      "type": "object",
+      "properties": {
+        "Interval": {
+          "type": "integer"
+        },
+        "Repeat": {
+          "type": "boolean"
+        }
+      }
+    },
     "schedule": {
       "type": "object",
+      "required": [
+        "Expression"
+      ],
       "properties": {
         "Expression": {
           "type": "string"
         }
       }
     },
-    "workflowDef": {
+    "statusNode": {
       "type": "object",
+      "required": [
+        "Step",
+        "Log",
+        "StartedAt",
+        "FinishedAt",
+        "Status",
+        "RetryCount",
+        "DoneCount",
+        "Error",
+        "StatusText"
+      ],
+      "properties": {
+        "DoneCount": {
+          "type": "integer"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "RetryCount": {
+          "type": "integer"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/stepObject"
+        }
+      }
+    },
+    "stepObject": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Description",
+        "Variables",
+        "Dir",
+        "CmdWithArgs",
+        "Command",
+        "Script",
+        "Stdout",
+        "Stderr",
+        "Output",
+        "Args",
+        "Depends",
+        "RepeatPolicy",
+        "MailOnError",
+        "Preconditions"
+      ],
+      "properties": {
+        "Args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "CmdWithArgs": {
+          "type": "string"
+        },
+        "Command": {
+          "type": "string"
+        },
+        "Depends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "MailOnError": {
+          "type": "boolean"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Output": {
+          "type": "string"
+        },
+        "Preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        },
+        "RepeatPolicy": {
+          "$ref": "#/definitions/repeatPolicy"
+        },
+        "Script": {
+          "type": "string"
+        },
+        "Stderr": {
+          "type": "string"
+        },
+        "Stdout": {
+          "type": "string"
+        },
+        "Variables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
       "properties": {
         "DefaultParams": {
           "type": "string"
@@ -150,11 +410,109 @@ func init() {
         }
       }
     },
+    "workflowDetail": {
+      "type": "object",
+      "required": [
+        "Location",
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Env",
+        "LogDir",
+        "HandlerOn",
+        "Steps",
+        "Delay",
+        "HistRetentionDays",
+        "Preconditions",
+        "MaxActiveRuns",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
+      "properties": {
+        "DefaultParams": {
+          "type": "string"
+        },
+        "Delay": {
+          "type": "integer"
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Group": {
+          "type": "string"
+        },
+        "HandlerOn": {
+          "$ref": "#/definitions/handlerOn"
+        },
+        "HistRetentionDays": {
+          "type": "integer"
+        },
+        "Location": {
+          "type": "string"
+        },
+        "LogDir": {
+          "type": "string"
+        },
+        "MaxActiveRuns": {
+          "type": "integer"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        },
+        "Schedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/schedule"
+          }
+        },
+        "Steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepObject"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "workflowListItem": {
       "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/workflowDef"
+          "$ref": "#/definitions/workflow"
         },
         "Dir": {
           "type": "string"
@@ -176,8 +534,73 @@ func init() {
         }
       }
     },
+    "workflowLogGridItem": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Vals"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Vals": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "workflowLogResponse": {
+      "type": "object",
+      "required": [
+        "GridData",
+        "Logs"
+      ],
+      "properties": {
+        "GridData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/workflowLogGridItem"
+          }
+        },
+        "Logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/workflowStatusFile"
+          }
+        }
+      }
+    },
+    "workflowSchedulerLogResponse": {
+      "type": "object",
+      "required": [
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        }
+      }
+    },
     "workflowStatus": {
       "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
       "properties": {
         "FinishedAt": {
           "type": "string"
@@ -205,6 +628,140 @@ func init() {
         },
         "StatusText": {
           "type": "string"
+        }
+      }
+    },
+    "workflowStatusDetail": {
+      "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "Nodes",
+        "OnExit",
+        "OnSuccess",
+        "OnFailure",
+        "OnCancel",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
+      "properties": {
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/statusNode"
+          }
+        },
+        "OnCancel": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnExit": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnFailure": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnSuccess": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "Params": {
+          "type": "string"
+        },
+        "Pid": {
+          "type": "integer"
+        },
+        "RequestId": {
+          "type": "string"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        }
+      }
+    },
+    "workflowStatusFile": {
+      "type": "object",
+      "required": [
+        "File"
+      ],
+      "properties": {
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/workflowStatusDetail"
+        }
+      }
+    },
+    "workflowStatusWithDetail": {
+      "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/workflowDetail"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/workflowStatusDetail"
+        },
+        "Suspended": {
+          "type": "boolean"
+        }
+      }
+    },
+    "workflowStepLogResponse": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/statusNode"
         }
       }
     }
@@ -249,11 +806,60 @@ func init() {
           }
         }
       }
+    },
+    "/workflows/{workflowId}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "getWorkflow",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "tab",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "file",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "step",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/getWorkflowDetailResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
     "ApiError": {
       "type": "object",
+      "required": [
+        "message",
+        "detailedMessage"
+      ],
       "properties": {
         "detailedMessage": {
           "type": "string"
@@ -263,25 +869,91 @@ func init() {
         }
       }
     },
+    "condition": {
+      "type": "object",
+      "properties": {
+        "Condition": {
+          "type": "string"
+        },
+        "Expected": {
+          "type": "string"
+        }
+      }
+    },
+    "getWorkflowDetailResponse": {
+      "type": "object",
+      "required": [
+        "Title",
+        "DAG",
+        "Tab",
+        "Graph",
+        "Definition",
+        "LogData",
+        "LogUrl",
+        "StepLog",
+        "ScLog",
+        "Errors"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/workflowStatusWithDetail"
+        },
+        "Definition": {
+          "type": "string"
+        },
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Graph": {
+          "type": "string"
+        },
+        "LogData": {
+          "$ref": "#/definitions/workflowLogResponse"
+        },
+        "LogUrl": {
+          "type": "string"
+        },
+        "ScLog": {
+          "$ref": "#/definitions/workflowSchedulerLogResponse"
+        },
+        "StepLog": {
+          "$ref": "#/definitions/workflowStepLogResponse"
+        },
+        "Tab": {
+          "type": "string"
+        },
+        "Title": {
+          "type": "string"
+        }
+      }
+    },
     "handlerOn": {
       "type": "object",
       "properties": {
         "Cancel": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         },
         "Exit": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         },
         "Failure": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         },
         "Success": {
-          "type": "string"
+          "$ref": "#/definitions/stepObject"
         }
       }
     },
     "listWorkflowsResponse": {
       "type": "object",
+      "required": [
+        "DAGs",
+        "Errors",
+        "HasError"
+      ],
       "properties": {
         "DAGs": {
           "type": "array",
@@ -300,16 +972,161 @@ func init() {
         }
       }
     },
+    "repeatPolicy": {
+      "type": "object",
+      "properties": {
+        "Interval": {
+          "type": "integer"
+        },
+        "Repeat": {
+          "type": "boolean"
+        }
+      }
+    },
     "schedule": {
       "type": "object",
+      "required": [
+        "Expression"
+      ],
       "properties": {
         "Expression": {
           "type": "string"
         }
       }
     },
-    "workflowDef": {
+    "statusNode": {
       "type": "object",
+      "required": [
+        "Step",
+        "Log",
+        "StartedAt",
+        "FinishedAt",
+        "Status",
+        "RetryCount",
+        "DoneCount",
+        "Error",
+        "StatusText"
+      ],
+      "properties": {
+        "DoneCount": {
+          "type": "integer"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "RetryCount": {
+          "type": "integer"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/stepObject"
+        }
+      }
+    },
+    "stepObject": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Description",
+        "Variables",
+        "Dir",
+        "CmdWithArgs",
+        "Command",
+        "Script",
+        "Stdout",
+        "Stderr",
+        "Output",
+        "Args",
+        "Depends",
+        "RepeatPolicy",
+        "MailOnError",
+        "Preconditions"
+      ],
+      "properties": {
+        "Args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "CmdWithArgs": {
+          "type": "string"
+        },
+        "Command": {
+          "type": "string"
+        },
+        "Depends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "MailOnError": {
+          "type": "boolean"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Output": {
+          "type": "string"
+        },
+        "Preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        },
+        "RepeatPolicy": {
+          "$ref": "#/definitions/repeatPolicy"
+        },
+        "Script": {
+          "type": "string"
+        },
+        "Stderr": {
+          "type": "string"
+        },
+        "Stdout": {
+          "type": "string"
+        },
+        "Variables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
       "properties": {
         "DefaultParams": {
           "type": "string"
@@ -343,11 +1160,109 @@ func init() {
         }
       }
     },
+    "workflowDetail": {
+      "type": "object",
+      "required": [
+        "Location",
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Env",
+        "LogDir",
+        "HandlerOn",
+        "Steps",
+        "Delay",
+        "HistRetentionDays",
+        "Preconditions",
+        "MaxActiveRuns",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
+      "properties": {
+        "DefaultParams": {
+          "type": "string"
+        },
+        "Delay": {
+          "type": "integer"
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Group": {
+          "type": "string"
+        },
+        "HandlerOn": {
+          "$ref": "#/definitions/handlerOn"
+        },
+        "HistRetentionDays": {
+          "type": "integer"
+        },
+        "Location": {
+          "type": "string"
+        },
+        "LogDir": {
+          "type": "string"
+        },
+        "MaxActiveRuns": {
+          "type": "integer"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        },
+        "Schedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/schedule"
+          }
+        },
+        "Steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepObject"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "workflowListItem": {
       "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/workflowDef"
+          "$ref": "#/definitions/workflow"
         },
         "Dir": {
           "type": "string"
@@ -369,8 +1284,73 @@ func init() {
         }
       }
     },
+    "workflowLogGridItem": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Vals"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Vals": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "workflowLogResponse": {
+      "type": "object",
+      "required": [
+        "GridData",
+        "Logs"
+      ],
+      "properties": {
+        "GridData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/workflowLogGridItem"
+          }
+        },
+        "Logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/workflowStatusFile"
+          }
+        }
+      }
+    },
+    "workflowSchedulerLogResponse": {
+      "type": "object",
+      "required": [
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        }
+      }
+    },
     "workflowStatus": {
       "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
       "properties": {
         "FinishedAt": {
           "type": "string"
@@ -398,6 +1378,140 @@ func init() {
         },
         "StatusText": {
           "type": "string"
+        }
+      }
+    },
+    "workflowStatusDetail": {
+      "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "Nodes",
+        "OnExit",
+        "OnSuccess",
+        "OnFailure",
+        "OnCancel",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
+      "properties": {
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/statusNode"
+          }
+        },
+        "OnCancel": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnExit": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnFailure": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnSuccess": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "Params": {
+          "type": "string"
+        },
+        "Pid": {
+          "type": "integer"
+        },
+        "RequestId": {
+          "type": "string"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        }
+      }
+    },
+    "workflowStatusFile": {
+      "type": "object",
+      "required": [
+        "File"
+      ],
+      "properties": {
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/workflowStatusDetail"
+        }
+      }
+    },
+    "workflowStatusWithDetail": {
+      "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/workflowDetail"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/workflowStatusDetail"
+        },
+        "Suspended": {
+          "type": "boolean"
+        }
+      }
+    },
+    "workflowStepLogResponse": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/statusNode"
         }
       }
     }
