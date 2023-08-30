@@ -29,7 +29,7 @@ function DAGDetails() {
     () => `/dags/${encodeURI(params.name!)}`,
     [params.name]
   );
-  const { data, isValidating } = useSWR<GetDAGResponse>(
+  const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
     `/workflows/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
       window.location.search
     ).toString()}`,
@@ -38,10 +38,9 @@ function DAGDetails() {
       refreshInterval: 2000,
     }
   );
-  const { mutate } = useSWRConfig();
 
   const refreshFn = React.useCallback(() => {
-    mutate(`${getConfig().apiURL}/workflows/${params.name}`);
+    setTimeout(() => mutate(), 500);
   }, [mutate, params.name]);
 
   React.useEffect(() => {

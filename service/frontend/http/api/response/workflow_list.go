@@ -4,7 +4,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yohamta/dagu/internal/controller"
 	"github.com/yohamta/dagu/internal/dag"
-	domain "github.com/yohamta/dagu/internal/models"
 	"github.com/yohamta/dagu/service/frontend/models"
 )
 
@@ -51,19 +50,5 @@ func ToDAG(d *dag.DAG) *models.Workflow {
 func ToSchedule(s *dag.Schedule) *models.Schedule {
 	return &models.Schedule{
 		Expression: lo.ToPtr(s.Expression),
-	}
-}
-
-func ToWorkflowStatus(s *domain.Status) *models.WorkflowStatus {
-	return &models.WorkflowStatus{
-		Log:        lo.ToPtr(s.Log),
-		Name:       lo.ToPtr(s.Name),
-		Params:     lo.ToPtr(s.Params),
-		Pid:        lo.ToPtr(int64(s.Pid)),
-		RequestID:  lo.ToPtr(s.RequestId),
-		StartedAt:  lo.ToPtr(s.StartedAt),
-		FinishedAt: lo.ToPtr(s.FinishedAt),
-		Status:     lo.ToPtr(int64(s.Status)),
-		StatusText: lo.ToPtr(s.StatusText),
 	}
 }

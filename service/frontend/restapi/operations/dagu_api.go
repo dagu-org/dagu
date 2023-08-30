@@ -42,14 +42,14 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 
 		JSONProducer: runtime.JSONProducer(),
 
-		GetWorkflowHandler: GetWorkflowHandlerFunc(func(params GetWorkflowParams) middleware.Responder {
-			return middleware.NotImplemented("operation GetWorkflow has not yet been implemented")
+		CreateWorkflowHandler: CreateWorkflowHandlerFunc(func(params CreateWorkflowParams) middleware.Responder {
+			return middleware.NotImplemented("operation CreateWorkflow has not yet been implemented")
+		}),
+		GetWorkflowDetailHandler: GetWorkflowDetailHandlerFunc(func(params GetWorkflowDetailParams) middleware.Responder {
+			return middleware.NotImplemented("operation GetWorkflowDetail has not yet been implemented")
 		}),
 		ListWorkflowsHandler: ListWorkflowsHandlerFunc(func(params ListWorkflowsParams) middleware.Responder {
 			return middleware.NotImplemented("operation ListWorkflows has not yet been implemented")
-		}),
-		OptionsWorkflowHandler: OptionsWorkflowHandlerFunc(func(params OptionsWorkflowParams) middleware.Responder {
-			return middleware.NotImplemented("operation OptionsWorkflow has not yet been implemented")
 		}),
 		PostWorkflowActionHandler: PostWorkflowActionHandlerFunc(func(params PostWorkflowActionParams) middleware.Responder {
 			return middleware.NotImplemented("operation PostWorkflowAction has not yet been implemented")
@@ -90,12 +90,12 @@ type DaguAPI struct {
 	//   - application/json
 	JSONProducer runtime.Producer
 
-	// GetWorkflowHandler sets the operation handler for the get workflow operation
-	GetWorkflowHandler GetWorkflowHandler
+	// CreateWorkflowHandler sets the operation handler for the create workflow operation
+	CreateWorkflowHandler CreateWorkflowHandler
+	// GetWorkflowDetailHandler sets the operation handler for the get workflow detail operation
+	GetWorkflowDetailHandler GetWorkflowDetailHandler
 	// ListWorkflowsHandler sets the operation handler for the list workflows operation
 	ListWorkflowsHandler ListWorkflowsHandler
-	// OptionsWorkflowHandler sets the operation handler for the options workflow operation
-	OptionsWorkflowHandler OptionsWorkflowHandler
 	// PostWorkflowActionHandler sets the operation handler for the post workflow action operation
 	PostWorkflowActionHandler PostWorkflowActionHandler
 
@@ -175,14 +175,14 @@ func (o *DaguAPI) Validate() error {
 		unregistered = append(unregistered, "JSONProducer")
 	}
 
-	if o.GetWorkflowHandler == nil {
-		unregistered = append(unregistered, "GetWorkflowHandler")
+	if o.CreateWorkflowHandler == nil {
+		unregistered = append(unregistered, "CreateWorkflowHandler")
+	}
+	if o.GetWorkflowDetailHandler == nil {
+		unregistered = append(unregistered, "GetWorkflowDetailHandler")
 	}
 	if o.ListWorkflowsHandler == nil {
 		unregistered = append(unregistered, "ListWorkflowsHandler")
-	}
-	if o.OptionsWorkflowHandler == nil {
-		unregistered = append(unregistered, "OptionsWorkflowHandler")
 	}
 	if o.PostWorkflowActionHandler == nil {
 		unregistered = append(unregistered, "PostWorkflowActionHandler")
@@ -275,18 +275,18 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers = make(map[string]map[string]http.Handler)
 	}
 
+	if o.handlers["POST"] == nil {
+		o.handlers["POST"] = make(map[string]http.Handler)
+	}
+	o.handlers["POST"]["/workflows"] = NewCreateWorkflow(o.context, o.CreateWorkflowHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/workflows/{workflowId}"] = NewGetWorkflow(o.context, o.GetWorkflowHandler)
+	o.handlers["GET"]["/workflows/{workflowId}"] = NewGetWorkflowDetail(o.context, o.GetWorkflowDetailHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/workflows"] = NewListWorkflows(o.context, o.ListWorkflowsHandler)
-	if o.handlers["OPTIONS"] == nil {
-		o.handlers["OPTIONS"] = make(map[string]http.Handler)
-	}
-	o.handlers["OPTIONS"]["/workflows/{workflowId}"] = NewOptionsWorkflow(o.context, o.OptionsWorkflowHandler)
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}

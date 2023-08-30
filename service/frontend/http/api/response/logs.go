@@ -59,6 +59,13 @@ func ToWorkflowLogResponse(logs []*domain.StatusFile) *models.WorkflowLogRespons
 	return ret
 }
 
+func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx int, node *domain.Node) {
+	if _, ok := data[node.Name]; !ok {
+		data[node.Name] = make([]scheduler.NodeStatus, logLen)
+	}
+	data[node.Name][logIdx] = node.Status
+}
+
 func ToWorkflowStatusFile(status *domain.StatusFile) *models.WorkflowStatusFile {
 	return &models.WorkflowStatusFile{
 		File:   lo.ToPtr(status.File),
@@ -88,11 +95,4 @@ func ToWorkflowSchedulerLogResponse(logFile, content string) *models.WorkflowSch
 		LogFile: lo.ToPtr(logFile),
 		Content: lo.ToPtr(content),
 	}
-}
-
-func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx int, node *domain.Node) {
-	if _, ok := data[node.Name]; !ok {
-		data[node.Name] = make([]scheduler.NodeStatus, logLen)
-	}
-	data[node.Name][logIdx] = node.Status
 }

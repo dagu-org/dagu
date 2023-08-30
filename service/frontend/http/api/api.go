@@ -16,13 +16,13 @@ func Configure(api *operations.DaguAPI) {
 			return operations.NewListWorkflowsOK().WithPayload(resp)
 		})
 
-	api.GetWorkflowHandler = operations.GetWorkflowHandlerFunc(
-		func(params operations.GetWorkflowParams) middleware.Responder {
+	api.GetWorkflowDetailHandler = operations.GetWorkflowDetailHandlerFunc(
+		func(params operations.GetWorkflowDetailParams) middleware.Responder {
 			resp, err := workflow.GetDetail(params)
 			if err != nil {
-				return operations.NewGetWorkflowDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewGetWorkflowDetailDefault(err.Code).WithPayload(err.APIError)
 			}
-			return operations.NewGetWorkflowOK().WithPayload(resp)
+			return operations.NewGetWorkflowDetailOK().WithPayload(resp)
 		})
 
 	api.PostWorkflowActionHandler = operations.PostWorkflowActionHandlerFunc(
@@ -32,5 +32,14 @@ func Configure(api *operations.DaguAPI) {
 				return operations.NewPostWorkflowActionDefault(err.Code).WithPayload(err.APIError)
 			}
 			return operations.NewPostWorkflowActionOK().WithPayload(resp)
+		})
+
+	api.CreateWorkflowHandler = operations.CreateWorkflowHandlerFunc(
+		func(params operations.CreateWorkflowParams) middleware.Responder {
+			resp, err := workflow.Create(params)
+			if err != nil {
+				return operations.NewCreateWorkflowDefault(err.Code).WithPayload(err.APIError)
+			}
+			return operations.NewCreateWorkflowOK().WithPayload(resp)
 		})
 }

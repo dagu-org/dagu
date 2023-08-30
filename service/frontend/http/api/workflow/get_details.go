@@ -29,7 +29,7 @@ const (
 	dagTabTypeSchedulerLog = "scheduler-log"
 )
 
-func GetDetail(params operations.GetWorkflowParams) (*models.GetWorkflowDetailResponse, *response.CodedError) {
+func GetDetail(params operations.GetWorkflowDetailParams) (*models.GetWorkflowDetailResponse, *response.CodedError) {
 	workflowID := params.WorkflowID
 
 	// TODO: separate API

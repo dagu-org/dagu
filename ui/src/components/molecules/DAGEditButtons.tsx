@@ -44,13 +44,15 @@ function DAGEditButtons({ name }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${name}`;
+          const url = `${getConfig().apiURL}/workflows/${name}`;
           const resp = await fetch(url, {
             method: 'DELETE',
-            headers: { Accept: 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+            },
           });
           if (resp.ok) {
-            window.location.href = '/dags/';
+            window.location.href = '/workflows/';
           } else {
             const e = await resp.text();
             alert(e);

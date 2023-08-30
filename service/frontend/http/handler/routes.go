@@ -14,11 +14,8 @@ import (
 func ConfigRoutes(r *chi.Mux) *chi.Mux {
 	r.Get("/", handleIndex())
 
-	r.Post("/", handlePostList())
-
 	r.Route("/dags", func(r chi.Router) {
 		r.Get("/", handleIndex())
-		r.Post("/", handlePostList())
 
 		dagRoute := func(r chi.Router) {
 			r.Use(dagContext)

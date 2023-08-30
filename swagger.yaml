@@ -27,6 +27,32 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+    post:
+      produces:
+        - application/json
+      operationId: createWorkflow
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              action:
+                type: string
+              value:
+                type: string
+            required:
+              - action
+              - value
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/createWorkflowResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
 
   /workflows/{workflowId}:
     get:
@@ -49,7 +75,7 @@ paths:
           type: string
       produces:
         - application/json
-      operationId: getWorkflow
+      operationId: getWorkflowDetail
       responses:
         200:
           description: A successful response.
@@ -122,6 +148,14 @@ definitions:
       - DAGs
       - Errors
       - HasError
+
+  createWorkflowResponse:
+    type: object
+    properties:
+      WorkflowID:
+        type: string
+    required:
+      - WorkflowID
 
   workflowListItem:
     type: object

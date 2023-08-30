@@ -18,16 +18,14 @@ function CreateDAGButton() {
           alert('File name cannot contain space');
           return;
         }
-        const formData = new FormData();
-        formData.append('action', 'new');
-        formData.append('value', name);
-        const resp = await fetch(getConfig().apiURL, {
+        const resp = await fetch(`${getConfig().apiURL}/workflows`, {
           method: 'POST',
           mode: 'cors',
-          headers: {
-            Accept: 'application/json',
-          },
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'new',
+            value: name,
+          }),
         });
         if (resp.ok) {
           window.location.href = `/dags/${name.replace(/.yaml$/, '')}/spec`;

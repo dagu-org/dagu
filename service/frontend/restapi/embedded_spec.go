@@ -55,6 +55,47 @@ func init() {
             }
           }
         }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "createWorkflow",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "required": [
+                "action",
+                "value"
+              ],
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/createWorkflowResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
       }
     },
     "/workflows/{workflowId}": {
@@ -62,7 +103,7 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "getWorkflow",
+        "operationId": "getWorkflowDetail",
         "parameters": [
           {
             "type": "string",
@@ -152,25 +193,6 @@ func init() {
             }
           }
         }
-      },
-      "options": {
-        "produces": [
-          "application/json"
-        ],
-        "operationId": "optionsWorkflow",
-        "parameters": [
-          {
-            "type": "string",
-            "name": "workflowId",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "CORS header information or other options supported."
-          }
-        }
       }
     }
   },
@@ -197,6 +219,17 @@ func init() {
           "type": "string"
         },
         "Expected": {
+          "type": "string"
+        }
+      }
+    },
+    "createWorkflowResponse": {
+      "type": "object",
+      "required": [
+        "WorkflowID"
+      ],
+      "properties": {
+        "WorkflowID": {
           "type": "string"
         }
       }
@@ -884,6 +917,47 @@ func init() {
             }
           }
         }
+      },
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "createWorkflow",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "required": [
+                "action",
+                "value"
+              ],
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/createWorkflowResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
       }
     },
     "/workflows/{workflowId}": {
@@ -891,7 +965,7 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "getWorkflow",
+        "operationId": "getWorkflowDetail",
         "parameters": [
           {
             "type": "string",
@@ -981,25 +1055,6 @@ func init() {
             }
           }
         }
-      },
-      "options": {
-        "produces": [
-          "application/json"
-        ],
-        "operationId": "optionsWorkflow",
-        "parameters": [
-          {
-            "type": "string",
-            "name": "workflowId",
-            "in": "path",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "CORS header information or other options supported."
-          }
-        }
       }
     }
   },
@@ -1026,6 +1081,17 @@ func init() {
           "type": "string"
         },
         "Expected": {
+          "type": "string"
+        }
+      }
+    },
+    "createWorkflowResponse": {
+      "type": "object",
+      "required": [
+        "WorkflowID"
+      ],
+      "properties": {
+        "WorkflowID": {
           "type": "string"
         }
       }
