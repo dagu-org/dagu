@@ -52,7 +52,7 @@ function DAGEditButtons({ name }: Props) {
             },
           });
           if (resp.ok) {
-            window.location.href = '/workflows/';
+            window.location.href = '/dags/';
           } else {
             const e = await resp.text();
             alert(e);

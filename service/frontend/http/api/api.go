@@ -42,4 +42,13 @@ func Configure(api *operations.DaguAPI) {
 			}
 			return operations.NewCreateWorkflowOK().WithPayload(resp)
 		})
+
+	api.DeleteWorkflowHandler = operations.DeleteWorkflowHandlerFunc(
+		func(params operations.DeleteWorkflowParams) middleware.Responder {
+			err := workflow.Delete(params)
+			if err != nil {
+				return operations.NewDeleteWorkflowDefault(err.Code).WithPayload(err.APIError)
+			}
+			return operations.NewDeleteWorkflowOK()
+		})
 }

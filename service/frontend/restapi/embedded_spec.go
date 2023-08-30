@@ -193,6 +193,31 @@ func init() {
             }
           }
         }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "deleteWorkflow",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response."
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
       }
     }
   },
@@ -1047,6 +1072,31 @@ func init() {
             "schema": {
               "$ref": "#/definitions/postWorkflowActionResponse"
             }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      },
+      "delete": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "deleteWorkflow",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "workflowId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response."
           },
           "default": {
             "description": "Generic error response.",

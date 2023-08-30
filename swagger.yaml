@@ -119,6 +119,23 @@ paths:
           schema:
             $ref: "#/definitions/ApiError"
 
+    delete:
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          type: string
+      produces:
+        - application/json
+      operationId: deleteWorkflow
+      responses:
+        200:
+          description: A successful response.
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+
 definitions:
   ApiError:
     type: object

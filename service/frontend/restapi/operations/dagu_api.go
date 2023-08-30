@@ -45,6 +45,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		CreateWorkflowHandler: CreateWorkflowHandlerFunc(func(params CreateWorkflowParams) middleware.Responder {
 			return middleware.NotImplemented("operation CreateWorkflow has not yet been implemented")
 		}),
+		DeleteWorkflowHandler: DeleteWorkflowHandlerFunc(func(params DeleteWorkflowParams) middleware.Responder {
+			return middleware.NotImplemented("operation DeleteWorkflow has not yet been implemented")
+		}),
 		GetWorkflowDetailHandler: GetWorkflowDetailHandlerFunc(func(params GetWorkflowDetailParams) middleware.Responder {
 			return middleware.NotImplemented("operation GetWorkflowDetail has not yet been implemented")
 		}),
@@ -92,6 +95,8 @@ type DaguAPI struct {
 
 	// CreateWorkflowHandler sets the operation handler for the create workflow operation
 	CreateWorkflowHandler CreateWorkflowHandler
+	// DeleteWorkflowHandler sets the operation handler for the delete workflow operation
+	DeleteWorkflowHandler DeleteWorkflowHandler
 	// GetWorkflowDetailHandler sets the operation handler for the get workflow detail operation
 	GetWorkflowDetailHandler GetWorkflowDetailHandler
 	// ListWorkflowsHandler sets the operation handler for the list workflows operation
@@ -177,6 +182,9 @@ func (o *DaguAPI) Validate() error {
 
 	if o.CreateWorkflowHandler == nil {
 		unregistered = append(unregistered, "CreateWorkflowHandler")
+	}
+	if o.DeleteWorkflowHandler == nil {
+		unregistered = append(unregistered, "DeleteWorkflowHandler")
 	}
 	if o.GetWorkflowDetailHandler == nil {
 		unregistered = append(unregistered, "GetWorkflowDetailHandler")
@@ -279,6 +287,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
 	o.handlers["POST"]["/workflows"] = NewCreateWorkflow(o.context, o.CreateWorkflowHandler)
+	if o.handlers["DELETE"] == nil {
+		o.handlers["DELETE"] = make(map[string]http.Handler)
+	}
+	o.handlers["DELETE"]["/workflows/{workflowId}"] = NewDeleteWorkflow(o.context, o.DeleteWorkflowHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
