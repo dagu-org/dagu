@@ -318,19 +318,12 @@ Dagu is a single command line tool that uses the local file system to store data
 
 ## **Roadmap**
 
-- Writing dags in the Starlark Language
-- Writing dags in Cue
-- AWS Lambda Execution
-- Slack Integration
-- User Defined Function
-- Observability
-- Project concept for grouping dags
-- Simple User management and RBAC
-- Keycloak Integration Option
-- HA Cluster Mode
-- Database Option
-- DAG Versioning
-- Built-in TLS
+- Refactor to worker architecture
+- Database support
+- Allow saving DAGs in database
+- Allow embedding in other applications
+- Allow custom executors
+- Allow calling DAGs from other DAGs
 
 ## **Contributors**
 <a href="https://github.com/yohamta/dagu/graphs/contributors">
