@@ -1,4 +1,4 @@
-package entry
+package entry_reader
 
 import (
 	"github.com/dagu-dev/dagu/internal/dag"

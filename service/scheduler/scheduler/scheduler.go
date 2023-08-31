@@ -141,7 +141,7 @@ func (s *Scheduler) run(now time.Time) {
 		go func(e *Entry) {
 			err := e.Invoke()
 			if err != nil {
-				s.logger.Error("failed to invoke entry", "entry", e.Job, "error", err)
+				s.logger.Error("failed to invoke entry_reader", "entry_reader", e.Job, "error", err)
 			}
 		}(e)
 	}

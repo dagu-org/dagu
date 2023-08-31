@@ -1,4 +1,4 @@
-package entry
+package entry_reader
 
 import (
 	"github.com/dagu-dev/dagu/internal/logger"
@@ -35,7 +35,7 @@ func NewEntryReader(dagsDir string, jf JobFactory, logger logger.Logger) *EntryR
 		logger:   logger,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entry dags", tag.Error(err))
+		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
 	}
 	go er.watchDags()
 	return er
@@ -131,19 +131,19 @@ func (er *EntryReader) watchDags() {
 					er.logger.Error("failed to read workflow cfg", tag.Error(err))
 				} else {
 					er.dags[filepath.Base(event.Name)] = workflow
-					er.logger.Info("reload workflow entry", "file", event.Name)
+					er.logger.Info("reload workflow entry_reader", "file", event.Name)
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("remove workflow entry", "file", event.Name)
+				er.logger.Info("remove workflow entry_reader", "file", event.Name)
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entry dags error", tag.Error(err))
+			er.logger.Error("watch entry_reader dags error", tag.Error(err))
 		}
 	}
 
