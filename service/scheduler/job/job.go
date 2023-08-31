@@ -5,7 +5,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -14,9 +13,10 @@ import (
 
 // TODO: write tests
 type Job struct {
-	DAG    *dag.DAG
-	Config *config.Config
-	Next   time.Time
+	DAG     *dag.DAG
+	Command string
+	WorkDir string
+	Next    time.Time
 }
 
 var (
@@ -51,7 +51,7 @@ func (j *Job) Start() error {
 		}
 		// should not be here
 	}
-	return c.Start(j.Config.Command, j.Config.WorkDir, "")
+	return c.Start(j.Command, j.WorkDir, "")
 }
 
 func (j *Job) Stop() error {
@@ -68,7 +68,7 @@ func (j *Job) Stop() error {
 
 func (j *Job) Restart() error {
 	c := controller.New(j.DAG, jsondb.New())
-	return c.Restart(j.Config.Command, j.Config.WorkDir)
+	return c.Restart(j.Command, j.WorkDir)
 }
 
 func (j *Job) String() string {

@@ -98,7 +98,7 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
-	r := New(Params{EntryReader: &mockEntryReader{}})
+	r := New(Params{EntryReader: &mockEntryReader{}, Config: &config.Config{}})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }

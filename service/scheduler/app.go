@@ -29,20 +29,20 @@ type EntryReader interface {
 }
 
 func EntryReaderProvider(cfg *config.Config, jf entry.JobFactory) EntryReader {
-	// TODO: fix this
-	return entry.NewEntryReader(cfg.DAGs, cfg, jf)
+	return entry.NewEntryReader(cfg.DAGs, jf)
 }
 
 func JobFactoryProvider(cfg *config.Config) entry.JobFactory {
 	return &jobFactory{
-		cfg: cfg,
+		Command: cfg.Command,
+		WorkDir: cfg.WorkDir,
 	}
 }
 
 func New(params Params) *Scheduler {
 	return &Scheduler{
 		entryReader: params.EntryReader,
-		cfg:         params.Config,
+		logDir:      params.Config.LogDir,
 		stop:        make(chan struct{}),
 		running:     false,
 	}

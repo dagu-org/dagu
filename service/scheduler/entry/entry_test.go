@@ -35,14 +35,12 @@ func changeHomeDir(homeDir string) {
 func TestReadEntries(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	r := NewEntryReader(path.Join(testdataDir, "invalid_directory"), &config.Config{
-		DAGs: path.Join(testdataDir, "invalid_directory"),
-	}, &mockJobFactory{})
+	r := NewEntryReader(path.Join(testdataDir, "invalid_directory"), &mockJobFactory{})
 	entries, err := r.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	r = NewEntryReader(testdataDir, &config.Config{DAGs: testdataDir}, &mockJobFactory{})
+	r = NewEntryReader(testdataDir, &mockJobFactory{})
 
 	entries, err = r.Read(now)
 	require.NoError(t, err)

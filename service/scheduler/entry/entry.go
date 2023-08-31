@@ -61,10 +61,9 @@ func (e *Entry) Invoke() error {
 	return nil
 }
 
-func NewEntryReader(dagsDir string, cfg *config.Config, jf JobFactory) *EntryReader {
+func NewEntryReader(dagsDir string, jf JobFactory) *EntryReader {
 	er := &EntryReader{
 		dagsDir: dagsDir,
-		Admin:   cfg,
 		suspendChecker: suspend.NewSuspendChecker(
 			storage.NewStorage(config.Get().SuspendFlagsDir),
 		),
@@ -81,7 +80,6 @@ func NewEntryReader(dagsDir string, cfg *config.Config, jf JobFactory) *EntryRea
 
 type EntryReader struct {
 	dagsDir        string
-	Admin          *config.Config
 	suspendChecker *suspend.SuspendChecker
 	dagsLock       sync.Mutex
 	dags           map[string]*dag.DAG
@@ -121,14 +119,14 @@ func (er *EntryReader) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 	cl := dag.Loader{}
-	fis, err := os.ReadDir(er.Admin.DAGs)
+	fis, err := os.ReadDir(er.dagsDir)
 	if err != nil {
 		return err
 	}
 	fileNames := []string{}
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			workflow, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, fi.Name()))
+			workflow, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				log.Printf("init dags failed to read workflow cfg: %s", err)
 				continue
@@ -150,7 +148,7 @@ func (er *EntryReader) watchDags() {
 	defer func() {
 		_ = watcher.Close()
 	}()
-	_ = watcher.Add(er.Admin.DAGs)
+	_ = watcher.Add(er.dagsDir)
 	for {
 		select {
 		case event, ok := <-watcher.Events():
@@ -162,7 +160,7 @@ func (er *EntryReader) watchDags() {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				workflow, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, filepath.Base(event.Name)))
+				workflow, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					log.Printf("failed to read workflow cfg: %s", err)
 				} else {
