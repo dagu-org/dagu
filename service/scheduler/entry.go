@@ -1,6 +1,7 @@
-package runner
+package scheduler
 
 import (
+	"github.com/dagu-dev/dagu/service/scheduler/filenotify"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/runner/filenotify"
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
@@ -53,7 +53,7 @@ type EntryReader interface {
 	Read(now time.Time) ([]*Entry, error)
 }
 
-func newEntryReader(cfg *config.Config) *entryReader {
+func NewEntryReader(cfg *config.Config) EntryReader {
 	er := &entryReader{
 		Admin: cfg,
 		suspendChecker: suspend.NewSuspendChecker(
@@ -123,14 +123,14 @@ func (er *entryReader) initDags() error {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			dag, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, fi.Name()))
 			if err != nil {
-				log.Printf("init dags failed to read dag config: %s", err)
+				log.Printf("init dags failed to read dag cfg: %s", err)
 				continue
 			}
 			er.dags[fi.Name()] = dag
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
-	log.Printf("init scheduler dags: %s", strings.Join(fileNames, ","))
+	log.Printf("init backend dags: %s", strings.Join(fileNames, ","))
 	return nil
 }
 
@@ -157,7 +157,7 @@ func (er *entryReader) watchDags() {
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
 				dag, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, filepath.Base(event.Name)))
 				if err != nil {
-					log.Printf("failed to read dag config: %s", err)
+					log.Printf("failed to read dag cfg: %s", err)
 				} else {
 					er.dags[filepath.Base(event.Name)] = dag
 					log.Printf("reload dag entry %s", event.Name)

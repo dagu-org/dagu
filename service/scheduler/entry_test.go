@@ -1,4 +1,4 @@
-package runner
+package scheduler
 
 import (
 	"path"
@@ -15,14 +15,14 @@ import (
 func TestReadEntries(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	r := newEntryReader(&config.Config{
+	r := NewEntryReader(&config.Config{
 		DAGs: path.Join(testdataDir, "invalid_directory"),
 	})
 	entries, err := r.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	r = newEntryReader(&config.Config{DAGs: testdataDir})
+	r = NewEntryReader(&config.Config{DAGs: testdataDir})
 
 	entries, err = r.Read(now)
 	require.NoError(t, err)

@@ -1,4 +1,4 @@
-package runner
+package scheduler
 
 import (
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
