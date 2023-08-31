@@ -23,22 +23,10 @@ type JobFactory interface {
 	NewJob(dag *dag.DAG, next time.Time) scheduler.Job
 }
 
-func NewEntryReader(dagsDir string, jf JobFactory, logger logger.Logger) *EntryReader {
-	er := &EntryReader{
-		dagsDir: dagsDir,
-		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(config.Get().SuspendFlagsDir),
-		),
-		dagsLock: sync.Mutex{},
-		dags:     map[string]*dag.DAG{},
-		jf:       jf,
-		logger:   logger,
-	}
-	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
-	}
-	go er.watchDags()
-	return er
+type Params struct {
+	DagsDir    string
+	JobFactory JobFactory
+	Logger     logger.Logger
 }
 
 type EntryReader struct {
@@ -48,6 +36,24 @@ type EntryReader struct {
 	dags           map[string]*dag.DAG
 	jf             JobFactory
 	logger         logger.Logger
+}
+
+func NewEntryReader(params Params) *EntryReader {
+	er := &EntryReader{
+		dagsDir: params.DagsDir,
+		suspendChecker: suspend.NewSuspendChecker(
+			storage.NewStorage(config.Get().SuspendFlagsDir),
+		),
+		dagsLock: sync.Mutex{},
+		dags:     map[string]*dag.DAG{},
+		jf:       params.JobFactory,
+		logger:   params.Logger,
+	}
+	if err := er.initDags(); err != nil {
+		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
+	}
+	go er.watchDags()
+	return er
 }
 
 func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {

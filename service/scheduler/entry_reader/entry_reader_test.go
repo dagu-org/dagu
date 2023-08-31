@@ -2,6 +2,7 @@ package entry_reader
 
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
@@ -36,13 +37,20 @@ func changeHomeDir(homeDir string) {
 func TestReadEntries(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	r := NewEntryReader(path.Join(testdataDir, "invalid_directory"), &mockJobFactory{})
+	r := NewEntryReader(Params{
+		DagsDir:    path.Join(testdataDir, "invalid_directory"),
+		JobFactory: &mockJobFactory{},
+		Logger:     logger.NewSlogLogger(),
+	})
 	entries, err := r.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	r = NewEntryReader(testdataDir, &mockJobFactory{})
-
+	r = NewEntryReader(Params{
+		DagsDir:    testdataDir,
+		JobFactory: &mockJobFactory{},
+		Logger:     logger.NewSlogLogger(),
+	})
 	entries, err = r.Read(now)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(entries), 1)

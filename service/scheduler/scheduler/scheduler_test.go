@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"os"
 	"testing"
 	"time"
@@ -37,12 +38,14 @@ func TestRun(t *testing.T) {
 	er := &mockEntryReader{
 		Entries: []*Entry{
 			{
-				Job:  &mockJob{},
-				Next: now,
+				Job:    &mockJob{},
+				Next:   now,
+				Logger: logger.NewSlogLogger(),
 			},
 			{
-				Job:  &mockJob{},
-				Next: now.Add(time.Minute),
+				Job:    &mockJob{},
+				Next:   now.Add(time.Minute),
+				Logger: logger.NewSlogLogger(),
 			},
 		},
 	}
@@ -50,6 +53,7 @@ func TestRun(t *testing.T) {
 	r := New(Params{
 		EntryReader: er,
 		LogDir:      testHomeDir,
+		Logger:      logger.NewSlogLogger(),
 	})
 
 	go func() {
@@ -73,6 +77,7 @@ func TestRestart(t *testing.T) {
 				EntryType: Restart,
 				Job:       &mockJob{},
 				Next:      now,
+				Logger:    logger.NewSlogLogger(),
 			},
 		},
 	}
@@ -80,6 +85,7 @@ func TestRestart(t *testing.T) {
 	r := New(Params{
 		EntryReader: er,
 		LogDir:      testHomeDir,
+		Logger:      logger.NewSlogLogger(),
 	})
 
 	go func() {
@@ -93,7 +99,11 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
-	r := New(Params{EntryReader: &mockEntryReader{}})
+	r := New(Params{
+		EntryReader: &mockEntryReader{},
+		LogDir:      testHomeDir,
+		Logger:      logger.NewSlogLogger(),
+	})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }

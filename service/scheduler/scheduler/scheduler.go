@@ -101,7 +101,7 @@ func (s *Scheduler) Start() error {
 }
 
 func (s *Scheduler) setupLogFile() (err error) {
-	filename := path.Join(s.logDir, "Scheduler.log")
+	filename := path.Join(s.logDir, "scheduler.log")
 	dir := path.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err

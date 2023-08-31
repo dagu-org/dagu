@@ -24,7 +24,11 @@ type Params struct {
 }
 
 func EntryReaderProvider(cfg *config.Config, jf entry_reader.JobFactory, logger logger.Logger) scheduler.EntryReader {
-	return entry_reader.NewEntryReader(cfg.DAGs, jf, logger)
+	return entry_reader.NewEntryReader(entry_reader.Params{
+		DagsDir:    cfg.DAGs,
+		JobFactory: jf,
+		Logger:     logger,
+	})
 }
 
 func JobFactoryProvider(cfg *config.Config) entry_reader.JobFactory {
