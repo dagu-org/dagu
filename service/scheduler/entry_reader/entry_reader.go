@@ -38,7 +38,7 @@ type EntryReader struct {
 	logger         logger.Logger
 }
 
-func NewEntryReader(params Params) *EntryReader {
+func New(params Params) *EntryReader {
 	er := &EntryReader{
 		dagsDir: params.DagsDir,
 		suspendChecker: suspend.NewSuspendChecker(
