@@ -7,10 +7,10 @@ import (
 	"os"
 	"path"
 
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (

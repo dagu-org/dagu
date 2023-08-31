@@ -1,4 +1,4 @@
-package scheduler
+package job
 
 import (
 	"errors"
@@ -12,20 +12,12 @@ import (
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
-type Job interface {
-	Start() error
-	Stop() error
-	Restart() error
-	String() string
-}
-
-type job struct {
+// TODO: write tests
+type Job struct {
 	DAG    *dag.DAG
 	Config *config.Config
 	Next   time.Time
 }
-
-var _ Job = (*job)(nil)
 
 var (
 	ErrJobRunning      = errors.New("job already running")
@@ -33,7 +25,11 @@ var (
 	ErrJobFinished     = errors.New("job already finished")
 )
 
-func (j *job) Start() error {
+func (j *Job) GetDAG() *dag.DAG {
+	return j.DAG
+}
+
+func (j *Job) Start() error {
 	c := controller.New(j.DAG, jsondb.New())
 	s, err := c.GetLastStatus()
 	if err != nil {
@@ -58,7 +54,7 @@ func (j *job) Start() error {
 	return c.Start(j.Config.Command, j.Config.WorkDir, "")
 }
 
-func (j *job) Stop() error {
+func (j *Job) Stop() error {
 	c := controller.New(j.DAG, jsondb.New())
 	s, err := c.GetLastStatus()
 	if err != nil {
@@ -70,11 +66,11 @@ func (j *job) Stop() error {
 	return c.Stop()
 }
 
-func (j *job) Restart() error {
+func (j *Job) Restart() error {
 	c := controller.New(j.DAG, jsondb.New())
 	return c.Restart(j.Config.Command, j.Config.WorkDir)
 }
 
-func (j *job) String() string {
+func (j *Job) String() string {
 	return j.DAG.Name
 }

@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 

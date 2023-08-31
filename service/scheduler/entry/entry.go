@@ -1,4 +1,4 @@
-package scheduler
+package entry
 
 import (
 	"github.com/dagu-dev/dagu/service/scheduler/filenotify"
@@ -25,6 +25,18 @@ const (
 	EntryTypeRestart
 )
 
+type Job interface {
+	GetDAG() *dag.DAG
+	Start() error
+	Stop() error
+	Restart() error
+	String() string
+}
+
+type JobFactory interface {
+	NewJob(dag *dag.DAG, next time.Time) Job
+}
+
 type Entry struct {
 	Next      time.Time
 	Job       Job
@@ -49,11 +61,7 @@ func (e *Entry) Invoke() error {
 	return nil
 }
 
-type EntryReader interface {
-	Read(now time.Time) ([]*Entry, error)
-}
-
-func NewEntryReader(dagsDir string, cfg *config.Config) *entryReader {
+func NewEntryReader(dagsDir string, cfg *config.Config, jf JobFactory) *entryReader {
 	er := &entryReader{
 		dagsDir: dagsDir,
 		Admin:   cfg,
@@ -62,6 +70,7 @@ func NewEntryReader(dagsDir string, cfg *config.Config) *entryReader {
 		),
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},
+		jf:       jf,
 	}
 	if err := er.initDags(); err != nil {
 		log.Printf("failed to init entry dags %v", err)
@@ -76,9 +85,8 @@ type entryReader struct {
 	suspendChecker *suspend.SuspendChecker
 	dagsLock       sync.Mutex
 	dags           map[string]*dag.DAG
+	jf             JobFactory
 }
-
-var _ EntryReader = (*entryReader)(nil)
 
 func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 	entries := []*Entry{}
@@ -90,11 +98,8 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &Entry{
 				Next: ss.Parsed.Next(now),
-				Job: &job{
-					DAG:    d,
-					Config: er.Admin,
-					Next:   next,
-				},
+				// TODO: fix this
+				Job:       er.jf.NewJob(d, next),
 				EntryType: e,
 			})
 		}

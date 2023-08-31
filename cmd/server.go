@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"github.com/dagu-dev/dagu/app"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/dagu-dev/dagu/app"
 )
 
 func serverCmd() *cobra.Command {

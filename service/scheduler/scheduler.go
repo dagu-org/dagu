@@ -3,6 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/service/scheduler/entry"
 	"log"
 	"os"
 	"os/signal"
@@ -79,7 +80,7 @@ func (r *Scheduler) run(now time.Time) {
 		if t.After(now) {
 			break
 		}
-		go func(e *Entry) {
+		go func(e *entry.Entry) {
 			err := e.Invoke()
 			if err != nil {
 				log.Printf("backend: entry failed %s: %v", e.Job, err)

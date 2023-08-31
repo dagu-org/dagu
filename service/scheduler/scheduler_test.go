@@ -1,8 +1,9 @@
 package scheduler
 
 import (
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/service/scheduler/entry"
 	"os"
-	"path"
 	"testing"
 	"time"
 
@@ -13,9 +14,6 @@ import (
 )
 
 var (
-	testdataDir = path.Join(utils.MustGetwd(), "testdata")
-	testBin     = path.Join(utils.MustGetwd(), "../../bin/dagu")
-	testConfig  = &config.Config{Command: testBin}
 	testHomeDir string
 )
 
@@ -38,7 +36,7 @@ func TestRun(t *testing.T) {
 	utils.FixedTime = now
 
 	er := &mockEntryReader{
-		Entries: []*Entry{
+		Entries: []*entry.Entry{
 			{
 				Job:  &mockJob{},
 				Next: now,
@@ -73,9 +71,9 @@ func TestRestart(t *testing.T) {
 	utils.FixedTime = now
 
 	er := &mockEntryReader{
-		Entries: []*Entry{
+		Entries: []*entry.Entry{
 			{
-				EntryType: EntryTypeRestart,
+				EntryType: entry.EntryTypeRestart,
 				Job:       &mockJob{},
 				Next:      now,
 			},
@@ -106,15 +104,16 @@ func TestNextTick(t *testing.T) {
 }
 
 type mockEntryReader struct {
-	Entries []*Entry
+	Entries []*entry.Entry
 }
 
 var _ EntryReader = (*mockEntryReader)(nil)
 
-func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
+func (er *mockEntryReader) Read(_ time.Time) ([]*entry.Entry, error) {
 	return er.Entries, nil
 }
 
+// TODO: fix to use mock library
 type mockJob struct {
 	Name         string
 	RunCount     int
@@ -123,7 +122,11 @@ type mockJob struct {
 	Panic        error
 }
 
-var _ Job = (*mockJob)(nil)
+var _ entry.Job = (*mockJob)(nil)
+
+func (j *mockJob) GetDAG() *dag.DAG {
+	return nil
+}
 
 func (j *mockJob) String() string {
 	return j.Name
