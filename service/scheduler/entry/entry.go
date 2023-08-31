@@ -2,6 +2,7 @@ package entry
 
 import (
 	"github.com/dagu-dev/dagu/service/scheduler/filenotify"
+	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,48 +18,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type Type int
-
-const (
-	Start Type = iota
-	Stop
-	Restart
-)
-
-type Job interface {
-	GetDAG() *dag.DAG
-	Start() error
-	Stop() error
-	Restart() error
-	String() string
-}
-
 type JobFactory interface {
-	NewJob(dag *dag.DAG, next time.Time) Job
-}
-
-type Entry struct {
-	Next      time.Time
-	Job       Job
-	EntryType Type
-}
-
-func (e *Entry) Invoke() error {
-	if e.Job == nil {
-		return nil
-	}
-	switch e.EntryType {
-	case Start:
-		log.Printf("[%s] start %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
-		return e.Job.Start()
-	case Stop:
-		log.Printf("[%s] stop %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
-		return e.Job.Stop()
-	case Restart:
-		log.Printf("[%s] restart %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
-		return e.Job.Restart()
-	}
-	return nil
+	NewJob(dag *dag.DAG, next time.Time) scheduler.Job
 }
 
 func NewEntryReader(dagsDir string, jf JobFactory) *EntryReader {
@@ -86,15 +47,15 @@ type EntryReader struct {
 	jf             JobFactory
 }
 
-func (er *EntryReader) Read(now time.Time) ([]*Entry, error) {
-	var entries []*Entry
+func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
+	var entries []*scheduler.Entry
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
-	f := func(d *dag.DAG, s []*dag.Schedule, e Type) {
+	f := func(d *dag.DAG, s []*dag.Schedule, e scheduler.Type) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
-			entries = append(entries, &Entry{
+			entries = append(entries, &scheduler.Entry{
 				Next: ss.Parsed.Next(now),
 				// TODO: fix this
 				Job:       er.jf.NewJob(d, next),
@@ -107,9 +68,9 @@ func (er *EntryReader) Read(now time.Time) ([]*Entry, error) {
 		if er.suspendChecker.IsSuspended(d) {
 			continue
 		}
-		f(d, d.Schedule, Start)
-		f(d, d.StopSchedule, Stop)
-		f(d, d.RestartSchedule, Restart)
+		f(d, d.Schedule, scheduler.Start)
+		f(d, d.StopSchedule, scheduler.Stop)
+		f(d, d.RestartSchedule, scheduler.Restart)
 	}
 
 	return entries, nil

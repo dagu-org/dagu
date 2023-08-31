@@ -5,6 +5,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
 	"os"
 	"path"
 	"testing"
@@ -50,7 +51,7 @@ func TestReadEntries(t *testing.T) {
 	require.Equal(t, now.Add(time.Second), next)
 
 	// suspend
-	var j Job
+	var j scheduler.Job
 	for _, e := range entries {
 		jj := e.Job
 		if jj.GetDAG().Name == "scheduled_job" {
@@ -72,7 +73,7 @@ func TestReadEntries(t *testing.T) {
 type mockJobFactory struct {
 }
 
-func (f *mockJobFactory) NewJob(d *dag.DAG, next time.Time) Job {
+func (f *mockJobFactory) NewJob(d *dag.DAG, next time.Time) scheduler.Job {
 	return &mockJob{
 		DAG: d,
 	}
@@ -88,7 +89,7 @@ type mockJob struct {
 	Panic        error
 }
 
-var _ Job = (*mockJob)(nil)
+var _ scheduler.Job = (*mockJob)(nil)
 
 func (j *mockJob) GetDAG() *dag.DAG {
 	return j.DAG

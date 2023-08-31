@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/service/scheduler/entry"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"log"
 	"os"
 	"os/signal"
@@ -19,6 +19,64 @@ type Scheduler struct {
 	logDir      string
 	stop        chan struct{}
 	running     bool
+}
+
+type EntryReader interface {
+	Read(now time.Time) ([]*Entry, error)
+}
+
+type Entry struct {
+	Next      time.Time
+	Job       Job
+	EntryType Type
+}
+
+type Job interface {
+	GetDAG() *dag.DAG
+	Start() error
+	Stop() error
+	Restart() error
+	String() string
+}
+
+type Type int
+
+const (
+	Start Type = iota
+	Stop
+	Restart
+)
+
+func (e *Entry) Invoke() error {
+	if e.Job == nil {
+		return nil
+	}
+	switch e.EntryType {
+	case Start:
+		log.Printf("[%s] start %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		return e.Job.Start()
+	case Stop:
+		log.Printf("[%s] stop %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		return e.Job.Stop()
+	case Restart:
+		log.Printf("[%s] restart %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		return e.Job.Restart()
+	}
+	return nil
+}
+
+type Params struct {
+	EntryReader EntryReader
+	LogDir      string
+}
+
+func New(params Params) *Scheduler {
+	return &Scheduler{
+		entryReader: params.EntryReader,
+		logDir:      params.LogDir,
+		stop:        make(chan struct{}),
+		running:     false,
+	}
 }
 
 func (s *Scheduler) Start() error {
@@ -79,7 +137,7 @@ func (s *Scheduler) run(now time.Time) {
 		if t.After(now) {
 			break
 		}
-		go func(e *entry.Entry) {
+		go func(e *Entry) {
 			err := e.Invoke()
 			if err != nil {
 				log.Printf("backend: entry failed %s: %v", e.Job, err)

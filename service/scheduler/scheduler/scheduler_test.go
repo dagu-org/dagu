@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/service/scheduler/entry"
 	"os"
 	"testing"
 	"time"
@@ -36,7 +35,7 @@ func TestRun(t *testing.T) {
 	utils.FixedTime = now
 
 	er := &mockEntryReader{
-		Entries: []*entry.Entry{
+		Entries: []*Entry{
 			{
 				Job:  &mockJob{},
 				Next: now,
@@ -50,9 +49,7 @@ func TestRun(t *testing.T) {
 
 	r := New(Params{
 		EntryReader: er,
-		Config: &config.Config{
-			LogDir: testHomeDir,
-		},
+		LogDir:      testHomeDir,
 	})
 
 	go func() {
@@ -71,9 +68,9 @@ func TestRestart(t *testing.T) {
 	utils.FixedTime = now
 
 	er := &mockEntryReader{
-		Entries: []*entry.Entry{
+		Entries: []*Entry{
 			{
-				EntryType: entry.Restart,
+				EntryType: Restart,
 				Job:       &mockJob{},
 				Next:      now,
 			},
@@ -82,9 +79,7 @@ func TestRestart(t *testing.T) {
 
 	r := New(Params{
 		EntryReader: er,
-		Config: &config.Config{
-			LogDir: testHomeDir,
-		},
+		LogDir:      testHomeDir,
 	})
 
 	go func() {
@@ -98,18 +93,18 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
-	r := New(Params{EntryReader: &mockEntryReader{}, Config: &config.Config{}})
+	r := New(Params{EntryReader: &mockEntryReader{}})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }
 
 type mockEntryReader struct {
-	Entries []*entry.Entry
+	Entries []*Entry
 }
 
 var _ EntryReader = (*mockEntryReader)(nil)
 
-func (er *mockEntryReader) Read(_ time.Time) ([]*entry.Entry, error) {
+func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 	return er.Entries, nil
 }
 
@@ -122,7 +117,7 @@ type mockJob struct {
 	Panic        error
 }
 
-var _ entry.Job = (*mockJob)(nil)
+var _ Job = (*mockJob)(nil)
 
 func (j *mockJob) GetDAG() *dag.DAG {
 	return nil

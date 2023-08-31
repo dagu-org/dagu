@@ -5,8 +5,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/scheduler/entry"
+	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
 	"go.uber.org/fx"
-	"time"
 )
 
 var Module = fx.Options(
@@ -18,17 +18,12 @@ var Module = fx.Options(
 type Params struct {
 	fx.In
 
-	Config *config.Config
-	Logger logger.Logger
-
-	EntryReader EntryReader
+	Config      *config.Config
+	Logger      logger.Logger
+	EntryReader scheduler.EntryReader
 }
 
-type EntryReader interface {
-	Read(now time.Time) ([]*entry.Entry, error)
-}
-
-func EntryReaderProvider(cfg *config.Config, jf entry.JobFactory) EntryReader {
+func EntryReaderProvider(cfg *config.Config, jf entry.JobFactory) scheduler.EntryReader {
 	return entry.NewEntryReader(cfg.DAGs, jf)
 }
 
@@ -39,16 +34,14 @@ func JobFactoryProvider(cfg *config.Config) entry.JobFactory {
 	}
 }
 
-func New(params Params) *Scheduler {
-	return &Scheduler{
-		entryReader: params.EntryReader,
-		logDir:      params.Config.LogDir,
-		stop:        make(chan struct{}),
-		running:     false,
-	}
+func New(params Params) *scheduler.Scheduler {
+	return scheduler.New(scheduler.Params{
+		EntryReader: params.EntryReader,
+		LogDir:      params.Config.LogDir,
+	})
 }
 
-func LifetimeHooks(lc fx.Lifecycle, a *Scheduler) {
+func LifetimeHooks(lc fx.Lifecycle, a *scheduler.Scheduler) {
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) (err error) {
