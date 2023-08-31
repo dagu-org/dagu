@@ -17,12 +17,12 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type EntryType int
+type Type int
 
 const (
-	EntryTypeStart EntryType = iota
-	EntryTypeStop
-	EntryTypeRestart
+	Start Type = iota
+	Stop
+	Restart
 )
 
 type Job interface {
@@ -40,7 +40,7 @@ type JobFactory interface {
 type Entry struct {
 	Next      time.Time
 	Job       Job
-	EntryType EntryType
+	EntryType Type
 }
 
 func (e *Entry) Invoke() error {
@@ -48,21 +48,21 @@ func (e *Entry) Invoke() error {
 		return nil
 	}
 	switch e.EntryType {
-	case EntryTypeStart:
+	case Start:
 		log.Printf("[%s] start %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
 		return e.Job.Start()
-	case EntryTypeStop:
+	case Stop:
 		log.Printf("[%s] stop %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
 		return e.Job.Stop()
-	case EntryTypeRestart:
+	case Restart:
 		log.Printf("[%s] restart %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
 		return e.Job.Restart()
 	}
 	return nil
 }
 
-func NewEntryReader(dagsDir string, cfg *config.Config, jf JobFactory) *entryReader {
-	er := &entryReader{
+func NewEntryReader(dagsDir string, cfg *config.Config, jf JobFactory) *EntryReader {
+	er := &EntryReader{
 		dagsDir: dagsDir,
 		Admin:   cfg,
 		suspendChecker: suspend.NewSuspendChecker(
@@ -79,7 +79,7 @@ func NewEntryReader(dagsDir string, cfg *config.Config, jf JobFactory) *entryRea
 	return er
 }
 
-type entryReader struct {
+type EntryReader struct {
 	dagsDir        string
 	Admin          *config.Config
 	suspendChecker *suspend.SuspendChecker
@@ -88,12 +88,12 @@ type entryReader struct {
 	jf             JobFactory
 }
 
-func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
-	entries := []*Entry{}
+func (er *EntryReader) Read(now time.Time) ([]*Entry, error) {
+	var entries []*Entry
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
-	f := func(d *dag.DAG, s []*dag.Schedule, e EntryType) {
+	f := func(d *dag.DAG, s []*dag.Schedule, e Type) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &Entry{
@@ -109,15 +109,15 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 		if er.suspendChecker.IsSuspended(d) {
 			continue
 		}
-		f(d, d.Schedule, EntryTypeStart)
-		f(d, d.StopSchedule, EntryTypeStop)
-		f(d, d.RestartSchedule, EntryTypeRestart)
+		f(d, d.Schedule, Start)
+		f(d, d.StopSchedule, Stop)
+		f(d, d.RestartSchedule, Restart)
 	}
 
 	return entries, nil
 }
 
-func (er *entryReader) initDags() error {
+func (er *EntryReader) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 	cl := dag.Loader{}
@@ -128,12 +128,12 @@ func (er *entryReader) initDags() error {
 	fileNames := []string{}
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dag, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, fi.Name()))
+			workflow, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, fi.Name()))
 			if err != nil {
-				log.Printf("init dags failed to read dag cfg: %s", err)
+				log.Printf("init dags failed to read workflow cfg: %s", err)
 				continue
 			}
-			er.dags[fi.Name()] = dag
+			er.dags[fi.Name()] = workflow
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
@@ -141,7 +141,7 @@ func (er *entryReader) initDags() error {
 	return nil
 }
 
-func (er *entryReader) watchDags() {
+func (er *EntryReader) watchDags() {
 	cl := dag.Loader{}
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
@@ -162,12 +162,12 @@ func (er *entryReader) watchDags() {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dag, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, filepath.Base(event.Name)))
+				workflow, err := cl.LoadMetadataOnly(filepath.Join(er.Admin.DAGs, filepath.Base(event.Name)))
 				if err != nil {
-					log.Printf("failed to read dag cfg: %s", err)
+					log.Printf("failed to read workflow cfg: %s", err)
 				} else {
-					er.dags[filepath.Base(event.Name)] = dag
-					log.Printf("reload dag entry %s", event.Name)
+					er.dags[filepath.Base(event.Name)] = workflow
+					log.Printf("reload workflow entry %s", event.Name)
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {

@@ -73,7 +73,7 @@ func TestRestart(t *testing.T) {
 	er := &mockEntryReader{
 		Entries: []*entry.Entry{
 			{
-				EntryType: entry.EntryTypeRestart,
+				EntryType: entry.Restart,
 				Job:       &mockJob{},
 				Next:      now,
 			},
