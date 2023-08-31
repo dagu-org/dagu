@@ -14,23 +14,14 @@ import (
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
-type Ticker struct {
+type Scheduler struct {
 	cfg         *config.Config
 	entryReader EntryReader
 	stop        chan struct{}
 	running     bool
 }
 
-func NewTicker(params Params) *Ticker {
-	return &Ticker{
-		entryReader: params.EntryReader,
-		cfg:         params.Config,
-		stop:        make(chan struct{}),
-		running:     false,
-	}
-}
-
-func (r *Ticker) Start() error {
+func (r *Scheduler) Start() error {
 	if err := r.setupLogFile(); err != nil {
 		return fmt.Errorf("setup log file: %w", err)
 	}
@@ -42,14 +33,14 @@ func (r *Ticker) Start() error {
 		r.Stop()
 	}()
 
-	log.Printf("start scheduler")
+	log.Printf("start Scheduler")
 	r.start()
 
 	return nil
 }
 
-func (a *Ticker) setupLogFile() (err error) {
-	filename := path.Join(a.cfg.LogDir, "scheduler.log")
+func (a *Scheduler) setupLogFile() (err error) {
+	filename := path.Join(a.cfg.LogDir, "Scheduler.log")
 	dir := path.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -60,7 +51,7 @@ func (a *Ticker) setupLogFile() (err error) {
 	return
 }
 
-func (r *Ticker) start() {
+func (r *Scheduler) start() {
 	t := utils.Now().Truncate(time.Second * 60)
 	timer := time.NewTimer(0)
 	r.running = true
@@ -77,7 +68,7 @@ func (r *Ticker) start() {
 	}
 }
 
-func (r *Ticker) run(now time.Time) {
+func (r *Scheduler) run(now time.Time) {
 	entries, err := r.entryReader.Read(now.Add(-time.Second))
 	utils.LogErr("failed to read entries", err)
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -97,11 +88,11 @@ func (r *Ticker) run(now time.Time) {
 	}
 }
 
-func (r *Ticker) nextTick(now time.Time) time.Time {
+func (r *Scheduler) nextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
 }
 
-func (r *Ticker) Stop() {
+func (r *Scheduler) Stop() {
 	if !r.running {
 		return
 	}

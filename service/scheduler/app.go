@@ -18,15 +18,24 @@ type Params struct {
 
 var Module = fx.Options(
 	fx.Provide(EntryReaderProvider),
-	fx.Provide(NewTicker),
+	fx.Provide(New),
 )
 
 func EntryReaderProvider(cfg *config.Config) EntryReader {
 	// TODO: fix this
-	return NewEntryReader(cfg)
+	return NewEntryReader(cfg.DAGs, cfg)
 }
 
-func LifetimeHooks(lc fx.Lifecycle, a *Ticker) {
+func New(params Params) *Scheduler {
+	return &Scheduler{
+		entryReader: params.EntryReader,
+		cfg:         params.Config,
+		stop:        make(chan struct{}),
+		running:     false,
+	}
+}
+
+func LifetimeHooks(lc fx.Lifecycle, a *Scheduler) {
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) (err error) {

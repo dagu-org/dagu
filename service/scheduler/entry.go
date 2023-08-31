@@ -53,9 +53,10 @@ type EntryReader interface {
 	Read(now time.Time) ([]*Entry, error)
 }
 
-func NewEntryReader(cfg *config.Config) EntryReader {
+func NewEntryReader(dagsDir string, cfg *config.Config) *entryReader {
 	er := &entryReader{
-		Admin: cfg,
+		dagsDir: dagsDir,
+		Admin:   cfg,
 		suspendChecker: suspend.NewSuspendChecker(
 			storage.NewStorage(config.Get().SuspendFlagsDir),
 		),
@@ -70,6 +71,7 @@ func NewEntryReader(cfg *config.Config) EntryReader {
 }
 
 type entryReader struct {
+	dagsDir        string
 	Admin          *config.Config
 	suspendChecker *suspend.SuspendChecker
 	dagsLock       sync.Mutex

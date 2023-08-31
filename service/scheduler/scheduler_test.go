@@ -50,7 +50,7 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	r := NewTicker(er)
+	r := new(er)
 
 	go func() {
 		r.Start()
@@ -77,7 +77,7 @@ func TestRestart(t *testing.T) {
 		},
 	}
 
-	r := NewTicker(er)
+	r := new(er)
 
 	go func() {
 		r.Start()
@@ -90,7 +90,7 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
-	r := NewTicker(&entryReader{})
+	r := new(&entryReader{})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }
