@@ -3,15 +3,14 @@ package scheduler
 import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"log"
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/signal"
 	"path"
 	"sort"
 	"syscall"
 	"time"
-
-	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 type Scheduler struct {
@@ -19,6 +18,7 @@ type Scheduler struct {
 	logDir      string
 	stop        chan struct{}
 	running     bool
+	logger      logger.Logger
 }
 
 type EntryReader interface {
@@ -29,6 +29,7 @@ type Entry struct {
 	Next      time.Time
 	Job       Job
 	EntryType Type
+	Logger    logger.Logger
 }
 
 type Job interface {
@@ -53,13 +54,13 @@ func (e *Entry) Invoke() error {
 	}
 	switch e.EntryType {
 	case Start:
-		log.Printf("[%s] start %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		e.Logger.Info("start job", "job", e.Job.String(), "time", e.Next.Format("2006-01-02 15:04:05"))
 		return e.Job.Start()
 	case Stop:
-		log.Printf("[%s] stop %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		e.Logger.Info("stop job", "job", e.Job.String(), "time", e.Next.Format("2006-01-02 15:04:05"))
 		return e.Job.Stop()
 	case Restart:
-		log.Printf("[%s] restart %s", e.Next.Format("2006-01-02 15:04:05"), e.Job.String())
+		e.Logger.Info("restart job", "job", e.Job.String(), "time", e.Next.Format("2006-01-02 15:04:05"))
 		return e.Job.Restart()
 	}
 	return nil
@@ -67,6 +68,7 @@ func (e *Entry) Invoke() error {
 
 type Params struct {
 	EntryReader EntryReader
+	Logger      logger.Logger
 	LogDir      string
 }
 
@@ -76,6 +78,7 @@ func New(params Params) *Scheduler {
 		logDir:      params.LogDir,
 		stop:        make(chan struct{}),
 		running:     false,
+		logger:      params.Logger,
 	}
 }
 
@@ -91,7 +94,7 @@ func (s *Scheduler) Start() error {
 		s.Stop()
 	}()
 
-	log.Printf("starting dagu scheduler")
+	s.logger.Info("starting scheduler")
 	s.start()
 
 	return nil
@@ -103,9 +106,7 @@ func (s *Scheduler) setupLogFile() (err error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	// TODO: fix this to use logger
-	log.Printf("setup log file: %s", filename)
-	log.Print("log file is ready")
+	s.logger.Info("setup log", "filename", filename)
 	return
 }
 
@@ -140,7 +141,7 @@ func (s *Scheduler) run(now time.Time) {
 		go func(e *Entry) {
 			err := e.Invoke()
 			if err != nil {
-				log.Printf("backend: entry failed %s: %v", e.Job, err)
+				s.logger.Error("failed to invoke entry", "entry", e.Job, "error", err)
 			}
 		}(e)
 	}

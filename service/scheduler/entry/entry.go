@@ -1,9 +1,10 @@
 package entry
 
 import (
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/service/scheduler/filenotify"
 	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ type JobFactory interface {
 	NewJob(dag *dag.DAG, next time.Time) scheduler.Job
 }
 
-func NewEntryReader(dagsDir string, jf JobFactory) *EntryReader {
+func NewEntryReader(dagsDir string, jf JobFactory, logger logger.Logger) *EntryReader {
 	er := &EntryReader{
 		dagsDir: dagsDir,
 		suspendChecker: suspend.NewSuspendChecker(
@@ -31,9 +32,10 @@ func NewEntryReader(dagsDir string, jf JobFactory) *EntryReader {
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},
 		jf:       jf,
+		logger:   logger,
 	}
 	if err := er.initDags(); err != nil {
-		log.Printf("failed to init entry dags %v", err)
+		er.logger.Error("failed to init entry dags", tag.Error(err))
 	}
 	go er.watchDags()
 	return er
@@ -45,6 +47,7 @@ type EntryReader struct {
 	dagsLock       sync.Mutex
 	dags           map[string]*dag.DAG
 	jf             JobFactory
+	logger         logger.Logger
 }
 
 func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
@@ -60,6 +63,7 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 				// TODO: fix this
 				Job:       er.jf.NewJob(d, next),
 				EntryType: e,
+				Logger:    er.logger,
 			})
 		}
 	}
@@ -84,19 +88,19 @@ func (er *EntryReader) initDags() error {
 	if err != nil {
 		return err
 	}
-	fileNames := []string{}
+	var fileNames []string
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			workflow, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
-				log.Printf("init dags failed to read workflow cfg: %s", err)
+				er.logger.Error("failed to read workflow cfg", tag.Error(err))
 				continue
 			}
 			er.dags[fi.Name()] = workflow
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
-	log.Printf("init backend dags: %s", strings.Join(fileNames, ","))
+	er.logger.Info("init backend dags", "files", strings.Join(fileNames, ","))
 	return nil
 }
 
@@ -104,7 +108,8 @@ func (er *EntryReader) watchDags() {
 	cl := dag.Loader{}
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		log.Fatal(err)
+		er.logger.Error("failed to init file watcher", tag.Error(err))
+		return
 	}
 	defer func() {
 		_ = watcher.Close()
@@ -123,22 +128,22 @@ func (er *EntryReader) watchDags() {
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
 				workflow, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
-					log.Printf("failed to read workflow cfg: %s", err)
+					er.logger.Error("failed to read workflow cfg", tag.Error(err))
 				} else {
 					er.dags[filepath.Base(event.Name)] = workflow
-					log.Printf("reload workflow entry %s", event.Name)
+					er.logger.Info("reload workflow entry", "file", event.Name)
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				log.Printf("remove dag entry %s", event.Name)
+				er.logger.Info("remove workflow entry", "file", event.Name)
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			log.Println("watch entry dags error:", err)
+			er.logger.Error("watch entry dags error", tag.Error(err))
 		}
 	}
 

@@ -23,8 +23,8 @@ type Params struct {
 	EntryReader scheduler.EntryReader
 }
 
-func EntryReaderProvider(cfg *config.Config, jf entry.JobFactory) scheduler.EntryReader {
-	return entry.NewEntryReader(cfg.DAGs, jf)
+func EntryReaderProvider(cfg *config.Config, jf entry.JobFactory, logger logger.Logger) scheduler.EntryReader {
+	return entry.NewEntryReader(cfg.DAGs, jf, logger)
 }
 
 func JobFactoryProvider(cfg *config.Config) entry.JobFactory {
@@ -37,7 +37,9 @@ func JobFactoryProvider(cfg *config.Config) entry.JobFactory {
 func New(params Params) *scheduler.Scheduler {
 	return scheduler.New(scheduler.Params{
 		EntryReader: params.EntryReader,
-		LogDir:      params.Config.LogDir,
+		Logger:      params.Logger,
+		// TODO: check this is used
+		LogDir: params.Config.LogDir,
 	})
 }
 
