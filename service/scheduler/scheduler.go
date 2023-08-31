@@ -33,7 +33,7 @@ func (r *Scheduler) Start() error {
 		r.Stop()
 	}()
 
-	log.Printf("start Scheduler")
+	log.Printf("starting dagu scheduler")
 	r.start()
 
 	return nil

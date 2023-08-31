@@ -50,10 +50,15 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	r := new(er)
+	r := New(Params{
+		EntryReader: er,
+		Config: &config.Config{
+			LogDir: testHomeDir,
+		},
+	})
 
 	go func() {
-		r.Start()
+		_ = r.Start()
 	}()
 
 	time.Sleep(time.Second + time.Millisecond*100)
@@ -77,10 +82,15 @@ func TestRestart(t *testing.T) {
 		},
 	}
 
-	r := new(er)
+	r := New(Params{
+		EntryReader: er,
+		Config: &config.Config{
+			LogDir: testHomeDir,
+		},
+	})
 
 	go func() {
-		r.Start()
+		_ = r.Start()
 	}()
 
 	time.Sleep(time.Second + time.Millisecond*100)
@@ -90,7 +100,7 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
-	r := new(&entryReader{})
+	r := New(Params{EntryReader: &mockEntryReader{}})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }
@@ -101,7 +111,7 @@ type mockEntryReader struct {
 
 var _ EntryReader = (*mockEntryReader)(nil)
 
-func (er *mockEntryReader) Read(now time.Time) ([]*Entry, error) {
+func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 	return er.Entries, nil
 }
 

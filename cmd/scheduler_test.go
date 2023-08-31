@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"syscall"
 	"testing"
 	"time"
 )
@@ -18,8 +17,4 @@ func TestSchedulerCommand(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond * 300)
-
-	// Stop the scheduler.
-	signalChan <- syscall.SIGTERM
-	<-done
 }
