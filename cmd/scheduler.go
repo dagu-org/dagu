@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"github.com/dagu-dev/dagu/app"
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/runner"
 )
 
 func createSchedulerCommand() *cobra.Command {
@@ -13,10 +13,12 @@ func createSchedulerCommand() *cobra.Command {
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// TODO: fixme
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
-			agent := runner.NewAgent(config.Get())
-			listenSignals(cmd.Context(), agent)
-			checkError(agent.Start())
+
+			service := app.NewSchedulerService()
+			err := service.Start(cmd.Context())
+			checkError(err)
 		},
 	}
 	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")

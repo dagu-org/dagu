@@ -4,6 +4,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/frontend"
+	"github.com/dagu-dev/dagu/service/scheduler"
 	"go.uber.org/fx"
 	"os"
 )
@@ -40,5 +41,13 @@ func NewFrontendService() *fx.App {
 		CommonModule,
 		frontend.Module,
 		fx.Invoke(frontend.LifetimeHooks),
+	)
+}
+
+func NewSchedulerService() *fx.App {
+	return fx.New(
+		CommonModule,
+		scheduler.Module,
+		fx.Invoke(scheduler.LifetimeHooks),
 	)
 }

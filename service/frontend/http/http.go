@@ -3,14 +3,14 @@ package http
 import (
 	"context"
 	"errors"
-	"github.com/go-openapi/loads"
-	flags "github.com/jessevdk/go-flags"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
 	pkgapi "github.com/dagu-dev/dagu/service/frontend/http/api"
 	"github.com/dagu-dev/dagu/service/frontend/http/handler"
 	"github.com/dagu-dev/dagu/service/frontend/restapi"
+	"github.com/go-openapi/loads"
+	flags "github.com/jessevdk/go-flags"
 	"net/http"
 	"os"
 	"os/signal"
@@ -42,15 +42,10 @@ type Server struct {
 	tls       *config.TLS
 	logger    logger.Logger
 	server    *restapi.Server
-	//server    *http.Server
-	//addr            string
-	//idleConnsClosed chan struct{}
 }
 
 func NewServer(params ServerParams) *Server {
 	return &Server{
-		//addr: net.JoinHostPort(params.Host, strconv.Itoa(params.Port)),
-		//idleConnsClosed: nil,
 		host:      params.Host,
 		port:      params.Port,
 		basicAuth: params.BasicAuth,
@@ -69,62 +64,7 @@ func (svr *Server) Shutdown() {
 	}
 }
 
-//func (svr *Server) Shutdown(_ context.Context) error {
-//	err := svr.server.Shutdown(context.Background())
-//	if err != nil {
-//		svr.logger.Warn("Server shutdown", tag.Error(err))
-//	}
-//	if svr.idleConnsClosed != nil {
-//		close(svr.idleConnsClosed)
-//		svr.idleConnsClosed = nil
-//	}
-//	return nil
-//}
-
-//	func (svr *Server) Signal(_ os.Signal) {
-//		_ = svr.Shutdown(context.Background())
-//	}
 func (svr *Server) Serve(ctx context.Context) (err error) {
-
-	//var (
-	//	certFile = ""
-	//	keyFile  = ""
-	//	scheme   = "http"
-	//)
-	//
-	//if svr.tls != nil {
-	//	certFile = svr.tls.CertFile
-	//	keyFile = svr.tls.KeyFile
-	//}
-	//
-	//if svr.tls != nil && certFile != "" && keyFile != "" {
-	//	scheme = "https"
-	//}
-	//
-	//svr.setupServer()
-	//svr.setupHandler()
-	//
-	//svr.idleConnsClosed = make(chan struct{})
-	//host := utils.StringWithFallback(svr.host, "localhost")
-	//
-	//svr.logger.Info("Server is running", "URL",
-	//	fmt.Sprintf("%s://%s:%d", scheme, host, svr.port))
-	//
-	//switch {
-	//case svr.tls != nil && certFile != "" && keyFile != "":
-	//	err = svr.server.ListenAndServeTLS(certFile, keyFile)
-	//default:
-	//	err = svr.server.ListenAndServe()
-	//}
-	//if errors.Is(err, http.ErrServerClosed) {
-	//	err = nil
-	//}
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//<-svr.idleConnsClosed
-
 	middlewareOptions := &pkgmiddleware.Options{
 		Handler: handlers.ConfigRoutes(chi.NewRouter()),
 	}
@@ -187,46 +127,3 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 
 	return nil
 }
-
-//func (svr *Server) setupServer() {
-//	svr.server = &http.Server{Addr: svr.addr}
-//}
-//
-//func (svr *Server) setupHandler() {
-//	r := chi.NewRouter()
-//
-//	r.Use(middleware.RequestID)
-//	r.Use(middleware.Logger)
-//	r.Use(middleware.Recoverer)
-//
-//	r.Use(func(h http.Handler) http.Handler {
-//		return http.HandlerFunc(
-//			func(w http.ResponseWriter, r *http.Request) {
-//				w.Header().Add("Access-Control-Allow-Origin", "*")
-//				w.Header().Add("Access-Control-Allow-Methods", "*")
-//				w.Header().Add("Access-Control-Allow-Headers", "*")
-//				h.ServeHTTP(w, r)
-//			})
-//	})
-//
-//	if svr.basicAuth != nil {
-//		r.Use(middleware.BasicAuth(
-//			"restricted",
-//			map[string]string{svr.basicAuth.Username: svr.basicAuth.Password},
-//		))
-//	}
-//
-//	handlers.ConfigRoutes(r)
-//
-//	//r.Post("/shutdown", svr.handleShutdown)
-//
-//	svr.server.Handler = r
-//}
-
-//func (svr *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
-//	svr.logger.Info("received shutdown request")
-//	_, _ = w.Write([]byte("shutting down the Server...\n"))
-//	go func() {
-//		_ = svr.Shutdown(r.Context())
-//	}()
-//}

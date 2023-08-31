@@ -1,8 +1,9 @@
-package runner
+package scheduler
 
 import (
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"os"
-	"path"
 	"testing"
 	"time"
 
@@ -13,9 +14,6 @@ import (
 )
 
 var (
-	testdataDir = path.Join(utils.MustGetwd(), "testdata")
-	testBin     = path.Join(utils.MustGetwd(), "../../bin/dagu")
-	testConfig  = &config.Config{Command: testBin}
 	testHomeDir string
 )
 
@@ -40,20 +38,26 @@ func TestRun(t *testing.T) {
 	er := &mockEntryReader{
 		Entries: []*Entry{
 			{
-				Job:  &mockJob{},
-				Next: now,
+				Job:    &mockJob{},
+				Next:   now,
+				Logger: logger.NewSlogLogger(),
 			},
 			{
-				Job:  &mockJob{},
-				Next: now.Add(time.Minute),
+				Job:    &mockJob{},
+				Next:   now.Add(time.Minute),
+				Logger: logger.NewSlogLogger(),
 			},
 		},
 	}
 
-	r := New(er)
+	r := New(Params{
+		EntryReader: er,
+		LogDir:      testHomeDir,
+		Logger:      logger.NewSlogLogger(),
+	})
 
 	go func() {
-		r.Start()
+		_ = r.Start()
 	}()
 
 	time.Sleep(time.Second + time.Millisecond*100)
@@ -70,17 +74,22 @@ func TestRestart(t *testing.T) {
 	er := &mockEntryReader{
 		Entries: []*Entry{
 			{
-				EntryType: EntryTypeRestart,
+				EntryType: Restart,
 				Job:       &mockJob{},
 				Next:      now,
+				Logger:    logger.NewSlogLogger(),
 			},
 		},
 	}
 
-	r := New(er)
+	r := New(Params{
+		EntryReader: er,
+		LogDir:      testHomeDir,
+		Logger:      logger.NewSlogLogger(),
+	})
 
 	go func() {
-		r.Start()
+		_ = r.Start()
 	}()
 
 	time.Sleep(time.Second + time.Millisecond*100)
@@ -90,7 +99,11 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	utils.FixedTime = n
-	r := New(&entryReader{})
+	r := New(Params{
+		EntryReader: &mockEntryReader{},
+		LogDir:      testHomeDir,
+		Logger:      logger.NewSlogLogger(),
+	})
 	next := r.nextTick(n)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }
@@ -101,10 +114,11 @@ type mockEntryReader struct {
 
 var _ EntryReader = (*mockEntryReader)(nil)
 
-func (er *mockEntryReader) Read(now time.Time) ([]*Entry, error) {
+func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 	return er.Entries, nil
 }
 
+// TODO: fix to use mock library
 type mockJob struct {
 	Name         string
 	RunCount     int
@@ -114,6 +128,10 @@ type mockJob struct {
 }
 
 var _ Job = (*mockJob)(nil)
+
+func (j *mockJob) GetDAG() *dag.DAG {
+	return nil
+}
 
 func (j *mockJob) String() string {
 	return j.Name

@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"context"
-	"github.com/spf13/cobra"
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"os/signal"
