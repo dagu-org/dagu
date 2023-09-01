@@ -49,12 +49,12 @@ type AgentConfig struct {
 	Dry bool
 }
 
-// RetryConfig contains the configuration for retrying a workflow.
+// RetryConfig contains the configuration for retrying a dags.
 type RetryConfig struct {
 	Status *models.Status
 }
 
-// Run starts the workflow execution.
+// Run starts the dags execution.
 func (a *Agent) Run(ctx context.Context) error {
 	if err := a.setupRequestId(); err != nil {
 		return err
@@ -84,7 +84,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	return a.run(ctx)
 }
 
-// Status returns the current status of the workflow.
+// Status returns the current status of the dags.
 func (a *Agent) Status() *models.Status {
 	scStatus := a.scheduler.Status(a.graph)
 	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {

@@ -1,4 +1,4 @@
-package workflow
+package dags
 
 import (
 	"github.com/dagu-dev/dagu/internal/config"
