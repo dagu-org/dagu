@@ -30,7 +30,7 @@ function DAGDetails() {
     [params.name]
   );
   const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
-    `/workflows/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
+    `/dags/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
       window.location.search
     ).toString()}`,
     null,

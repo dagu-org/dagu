@@ -12,7 +12,7 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
   const [checked, setChecked] = React.useState(!DAG.Suspended);
   const onSubmit = React.useCallback(
     async (params: { name: string; action: string; value: string }) => {
-      const url = `${getConfig().apiURL}/workflows/${params.name}`;
+      const url = `${getConfig().apiURL}/dags/${params.name}`;
       const ret = await fetch(url, {
         method: 'POST',
         mode: 'cors',

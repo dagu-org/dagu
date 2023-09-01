@@ -35,47 +35,17 @@ func init() {
   "host": "localhost:8080",
   "basePath": "/api/v1",
   "paths": {
-    "/search": {
+    "/dags": {
       "get": {
         "produces": [
           "application/json"
         ],
-        "operationId": "searchWorkflows",
-        "parameters": [
-          {
-            "type": "string",
-            "name": "q",
-            "in": "query",
-            "required": true
-          }
-        ],
+        "operationId": "listDags",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/searchWorkflowsResponse"
-            }
-          },
-          "default": {
-            "description": "Generic error response.",
-            "schema": {
-              "$ref": "#/definitions/ApiError"
-            }
-          }
-        }
-      }
-    },
-    "/workflows": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "operationId": "listWorkflows",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/listWorkflowsResponse"
+              "$ref": "#/definitions/listDagsResponse"
             }
           },
           "default": {
@@ -90,7 +60,7 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "createWorkflow",
+        "operationId": "createDag",
         "parameters": [
           {
             "name": "body",
@@ -116,7 +86,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/createWorkflowResponse"
+              "$ref": "#/definitions/createDagResponse"
             }
           },
           "default": {
@@ -128,16 +98,16 @@ func init() {
         }
       }
     },
-    "/workflows/{workflowId}": {
+    "/dags/{dagId}": {
       "get": {
         "produces": [
           "application/json"
         ],
-        "operationId": "getWorkflowDetail",
+        "operationId": "getDagDetails",
         "parameters": [
           {
             "type": "string",
-            "name": "workflowId",
+            "name": "dagId",
             "in": "path",
             "required": true
           },
@@ -161,7 +131,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/getWorkflowDetailResponse"
+              "$ref": "#/definitions/getDagDetailsResponse"
             }
           },
           "default": {
@@ -176,11 +146,11 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "postWorkflowAction",
+        "operationId": "postDagAction",
         "parameters": [
           {
             "type": "string",
-            "name": "workflowId",
+            "name": "dagId",
             "in": "path",
             "required": true
           },
@@ -213,7 +183,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/postWorkflowActionResponse"
+              "$ref": "#/definitions/postDagActionResponse"
             }
           },
           "default": {
@@ -228,11 +198,11 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "deleteWorkflow",
+        "operationId": "deleteDag",
         "parameters": [
           {
             "type": "string",
-            "name": "workflowId",
+            "name": "dagId",
             "in": "path",
             "required": true
           }
@@ -240,6 +210,36 @@ func init() {
         "responses": {
           "200": {
             "description": "A successful response."
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "searchDags",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "q",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/searchDagsResponse"
+            }
           },
           "default": {
             "description": "Generic error response.",
@@ -278,18 +278,417 @@ func init() {
         }
       }
     },
-    "createWorkflowResponse": {
+    "createDagResponse": {
       "type": "object",
       "required": [
-        "WorkflowID"
+        "DagID"
       ],
       "properties": {
-        "WorkflowID": {
+        "DagID": {
           "type": "string"
         }
       }
     },
-    "getWorkflowDetailResponse": {
+    "dag": {
+      "type": "object",
+      "required": [
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
+      "properties": {
+        "DefaultParams": {
+          "type": "string"
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Group": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Schedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/schedule"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dagDetail": {
+      "type": "object",
+      "required": [
+        "Location",
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Env",
+        "LogDir",
+        "HandlerOn",
+        "Steps",
+        "Delay",
+        "HistRetentionDays",
+        "Preconditions",
+        "MaxActiveRuns",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
+      "properties": {
+        "DefaultParams": {
+          "type": "string"
+        },
+        "Delay": {
+          "type": "integer"
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Group": {
+          "type": "string"
+        },
+        "HandlerOn": {
+          "$ref": "#/definitions/handlerOn"
+        },
+        "HistRetentionDays": {
+          "type": "integer"
+        },
+        "Location": {
+          "type": "string"
+        },
+        "LogDir": {
+          "type": "string"
+        },
+        "MaxActiveRuns": {
+          "type": "integer"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        },
+        "Schedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/schedule"
+          }
+        },
+        "Steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepObject"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dagListItem": {
+      "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/dag"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/dagStatus"
+        },
+        "Suspended": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dagLogGridItem": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Vals"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Vals": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "dagLogResponse": {
+      "type": "object",
+      "required": [
+        "GridData",
+        "Logs"
+      ],
+      "properties": {
+        "GridData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagLogGridItem"
+          }
+        },
+        "Logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagStatusFile"
+          }
+        }
+      }
+    },
+    "dagSchedulerLogResponse": {
+      "type": "object",
+      "required": [
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        }
+      }
+    },
+    "dagStatus": {
+      "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
+      "properties": {
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "string"
+        },
+        "Pid": {
+          "type": "integer"
+        },
+        "RequestId": {
+          "type": "string"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        }
+      }
+    },
+    "dagStatusDetail": {
+      "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "Nodes",
+        "OnExit",
+        "OnSuccess",
+        "OnFailure",
+        "OnCancel",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
+      "properties": {
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/statusNode"
+          }
+        },
+        "OnCancel": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnExit": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnFailure": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnSuccess": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "Params": {
+          "type": "string"
+        },
+        "Pid": {
+          "type": "integer"
+        },
+        "RequestId": {
+          "type": "string"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        }
+      }
+    },
+    "dagStatusFile": {
+      "type": "object",
+      "required": [
+        "File"
+      ],
+      "properties": {
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/dagStatusDetail"
+        }
+      }
+    },
+    "dagStatusWithDetails": {
+      "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/dagDetail"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/dagStatusDetail"
+        },
+        "Suspended": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dagStepLogResponse": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/statusNode"
+        }
+      }
+    },
+    "getDagDetailsResponse": {
       "type": "object",
       "required": [
         "Title",
@@ -305,7 +704,7 @@ func init() {
       ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/workflowStatusWithDetail"
+          "$ref": "#/definitions/dagStatusWithDetails"
         },
         "Definition": {
           "type": "string"
@@ -320,16 +719,16 @@ func init() {
           "type": "string"
         },
         "LogData": {
-          "$ref": "#/definitions/workflowLogResponse"
+          "$ref": "#/definitions/dagLogResponse"
         },
         "LogUrl": {
           "type": "string"
         },
         "ScLog": {
-          "$ref": "#/definitions/workflowSchedulerLogResponse"
+          "$ref": "#/definitions/dagSchedulerLogResponse"
         },
         "StepLog": {
-          "$ref": "#/definitions/workflowStepLogResponse"
+          "$ref": "#/definitions/dagStepLogResponse"
         },
         "Tab": {
           "type": "string"
@@ -356,7 +755,7 @@ func init() {
         }
       }
     },
-    "listWorkflowsResponse": {
+    "listDagsResponse": {
       "type": "object",
       "required": [
         "DAGs",
@@ -367,7 +766,7 @@ func init() {
         "DAGs": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/workflowListItem"
+            "$ref": "#/definitions/dagListItem"
           }
         },
         "Errors": {
@@ -381,10 +780,10 @@ func init() {
         }
       }
     },
-    "postWorkflowActionResponse": {
+    "postDagActionResponse": {
       "type": "object",
       "properties": {
-        "NewWorkflowID": {
+        "NewDagID": {
           "type": "string"
         }
       }
@@ -411,7 +810,7 @@ func init() {
         }
       }
     },
-    "searchWorkflowsMatchItem": {
+    "searchDagsMatchItem": {
       "type": "object",
       "properties": {
         "Line": {
@@ -425,7 +824,7 @@ func init() {
         }
       }
     },
-    "searchWorkflowsResponse": {
+    "searchDagsResponse": {
       "type": "object",
       "required": [
         "Results",
@@ -441,21 +840,21 @@ func init() {
         "Results": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/searchWorkflowsResultItem"
+            "$ref": "#/definitions/searchDagsResultItem"
           }
         }
       }
     },
-    "searchWorkflowsResultItem": {
+    "searchDagsResultItem": {
       "type": "object",
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/workflow"
+          "$ref": "#/definitions/dag"
         },
         "Matches": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/searchWorkflowsMatchItem"
+            "$ref": "#/definitions/searchDagsMatchItem"
           }
         },
         "Name": {
@@ -582,405 +981,6 @@ func init() {
           "items": {
             "type": "string"
           }
-        }
-      }
-    },
-    "workflow": {
-      "type": "object",
-      "required": [
-        "Group",
-        "Name",
-        "Schedule",
-        "Description",
-        "Params",
-        "DefaultParams",
-        "Tags"
-      ],
-      "properties": {
-        "DefaultParams": {
-          "type": "string"
-        },
-        "Description": {
-          "type": "string"
-        },
-        "Group": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Params": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Schedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/schedule"
-          }
-        },
-        "Tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "workflowDetail": {
-      "type": "object",
-      "required": [
-        "Location",
-        "Group",
-        "Name",
-        "Schedule",
-        "Description",
-        "Env",
-        "LogDir",
-        "HandlerOn",
-        "Steps",
-        "Delay",
-        "HistRetentionDays",
-        "Preconditions",
-        "MaxActiveRuns",
-        "Params",
-        "DefaultParams",
-        "Tags"
-      ],
-      "properties": {
-        "DefaultParams": {
-          "type": "string"
-        },
-        "Delay": {
-          "type": "integer"
-        },
-        "Description": {
-          "type": "string"
-        },
-        "Env": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Group": {
-          "type": "string"
-        },
-        "HandlerOn": {
-          "$ref": "#/definitions/handlerOn"
-        },
-        "HistRetentionDays": {
-          "type": "integer"
-        },
-        "Location": {
-          "type": "string"
-        },
-        "LogDir": {
-          "type": "string"
-        },
-        "MaxActiveRuns": {
-          "type": "integer"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Params": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Preconditions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/condition"
-          }
-        },
-        "Schedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/schedule"
-          }
-        },
-        "Steps": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/stepObject"
-          }
-        },
-        "Tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "workflowListItem": {
-      "type": "object",
-      "required": [
-        "File",
-        "Dir",
-        "DAG",
-        "Status",
-        "Suspended",
-        "Error",
-        "ErrorT"
-      ],
-      "properties": {
-        "DAG": {
-          "$ref": "#/definitions/workflow"
-        },
-        "Dir": {
-          "type": "string"
-        },
-        "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
-          "type": "string"
-        },
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/workflowStatus"
-        },
-        "Suspended": {
-          "type": "boolean"
-        }
-      }
-    },
-    "workflowLogGridItem": {
-      "type": "object",
-      "required": [
-        "Name",
-        "Vals"
-      ],
-      "properties": {
-        "Name": {
-          "type": "string"
-        },
-        "Vals": {
-          "type": "array",
-          "items": {
-            "type": "integer"
-          }
-        }
-      }
-    },
-    "workflowLogResponse": {
-      "type": "object",
-      "required": [
-        "GridData",
-        "Logs"
-      ],
-      "properties": {
-        "GridData": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/workflowLogGridItem"
-          }
-        },
-        "Logs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/workflowStatusFile"
-          }
-        }
-      }
-    },
-    "workflowSchedulerLogResponse": {
-      "type": "object",
-      "required": [
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        }
-      }
-    },
-    "workflowStatus": {
-      "type": "object",
-      "required": [
-        "RequestId",
-        "Name",
-        "Status",
-        "StatusText",
-        "Pid",
-        "StartedAt",
-        "FinishedAt",
-        "Log",
-        "Params"
-      ],
-      "properties": {
-        "FinishedAt": {
-          "type": "string"
-        },
-        "Log": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Params": {
-          "type": "string"
-        },
-        "Pid": {
-          "type": "integer"
-        },
-        "RequestId": {
-          "type": "string"
-        },
-        "StartedAt": {
-          "type": "string"
-        },
-        "Status": {
-          "type": "integer"
-        },
-        "StatusText": {
-          "type": "string"
-        }
-      }
-    },
-    "workflowStatusDetail": {
-      "type": "object",
-      "required": [
-        "RequestId",
-        "Name",
-        "Status",
-        "StatusText",
-        "Pid",
-        "Nodes",
-        "OnExit",
-        "OnSuccess",
-        "OnFailure",
-        "OnCancel",
-        "StartedAt",
-        "FinishedAt",
-        "Log",
-        "Params"
-      ],
-      "properties": {
-        "FinishedAt": {
-          "type": "string"
-        },
-        "Log": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Nodes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/statusNode"
-          }
-        },
-        "OnCancel": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "OnExit": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "OnFailure": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "OnSuccess": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "Params": {
-          "type": "string"
-        },
-        "Pid": {
-          "type": "integer"
-        },
-        "RequestId": {
-          "type": "string"
-        },
-        "StartedAt": {
-          "type": "string"
-        },
-        "Status": {
-          "type": "integer"
-        },
-        "StatusText": {
-          "type": "string"
-        }
-      }
-    },
-    "workflowStatusFile": {
-      "type": "object",
-      "required": [
-        "File"
-      ],
-      "properties": {
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/workflowStatusDetail"
-        }
-      }
-    },
-    "workflowStatusWithDetail": {
-      "type": "object",
-      "required": [
-        "File",
-        "Dir",
-        "DAG",
-        "Status",
-        "Suspended",
-        "Error",
-        "ErrorT"
-      ],
-      "properties": {
-        "DAG": {
-          "$ref": "#/definitions/workflowDetail"
-        },
-        "Dir": {
-          "type": "string"
-        },
-        "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
-          "type": "string"
-        },
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/workflowStatusDetail"
-        },
-        "Suspended": {
-          "type": "boolean"
-        }
-      }
-    },
-    "workflowStepLogResponse": {
-      "type": "object",
-      "required": [
-        "Step",
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        },
-        "Step": {
-          "$ref": "#/definitions/statusNode"
         }
       }
     }
@@ -1004,47 +1004,17 @@ func init() {
   "host": "localhost:8080",
   "basePath": "/api/v1",
   "paths": {
-    "/search": {
+    "/dags": {
       "get": {
         "produces": [
           "application/json"
         ],
-        "operationId": "searchWorkflows",
-        "parameters": [
-          {
-            "type": "string",
-            "name": "q",
-            "in": "query",
-            "required": true
-          }
-        ],
+        "operationId": "listDags",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/searchWorkflowsResponse"
-            }
-          },
-          "default": {
-            "description": "Generic error response.",
-            "schema": {
-              "$ref": "#/definitions/ApiError"
-            }
-          }
-        }
-      }
-    },
-    "/workflows": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "operationId": "listWorkflows",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/listWorkflowsResponse"
+              "$ref": "#/definitions/listDagsResponse"
             }
           },
           "default": {
@@ -1059,7 +1029,7 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "createWorkflow",
+        "operationId": "createDag",
         "parameters": [
           {
             "name": "body",
@@ -1085,7 +1055,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/createWorkflowResponse"
+              "$ref": "#/definitions/createDagResponse"
             }
           },
           "default": {
@@ -1097,16 +1067,16 @@ func init() {
         }
       }
     },
-    "/workflows/{workflowId}": {
+    "/dags/{dagId}": {
       "get": {
         "produces": [
           "application/json"
         ],
-        "operationId": "getWorkflowDetail",
+        "operationId": "getDagDetails",
         "parameters": [
           {
             "type": "string",
-            "name": "workflowId",
+            "name": "dagId",
             "in": "path",
             "required": true
           },
@@ -1130,7 +1100,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/getWorkflowDetailResponse"
+              "$ref": "#/definitions/getDagDetailsResponse"
             }
           },
           "default": {
@@ -1145,11 +1115,11 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "postWorkflowAction",
+        "operationId": "postDagAction",
         "parameters": [
           {
             "type": "string",
-            "name": "workflowId",
+            "name": "dagId",
             "in": "path",
             "required": true
           },
@@ -1182,7 +1152,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/postWorkflowActionResponse"
+              "$ref": "#/definitions/postDagActionResponse"
             }
           },
           "default": {
@@ -1197,11 +1167,11 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "deleteWorkflow",
+        "operationId": "deleteDag",
         "parameters": [
           {
             "type": "string",
-            "name": "workflowId",
+            "name": "dagId",
             "in": "path",
             "required": true
           }
@@ -1209,6 +1179,36 @@ func init() {
         "responses": {
           "200": {
             "description": "A successful response."
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "searchDags",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "q",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/searchDagsResponse"
+            }
           },
           "default": {
             "description": "Generic error response.",
@@ -1247,18 +1247,417 @@ func init() {
         }
       }
     },
-    "createWorkflowResponse": {
+    "createDagResponse": {
       "type": "object",
       "required": [
-        "WorkflowID"
+        "DagID"
       ],
       "properties": {
-        "WorkflowID": {
+        "DagID": {
           "type": "string"
         }
       }
     },
-    "getWorkflowDetailResponse": {
+    "dag": {
+      "type": "object",
+      "required": [
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
+      "properties": {
+        "DefaultParams": {
+          "type": "string"
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Group": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Schedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/schedule"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dagDetail": {
+      "type": "object",
+      "required": [
+        "Location",
+        "Group",
+        "Name",
+        "Schedule",
+        "Description",
+        "Env",
+        "LogDir",
+        "HandlerOn",
+        "Steps",
+        "Delay",
+        "HistRetentionDays",
+        "Preconditions",
+        "MaxActiveRuns",
+        "Params",
+        "DefaultParams",
+        "Tags"
+      ],
+      "properties": {
+        "DefaultParams": {
+          "type": "string"
+        },
+        "Delay": {
+          "type": "integer"
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Env": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Group": {
+          "type": "string"
+        },
+        "HandlerOn": {
+          "$ref": "#/definitions/handlerOn"
+        },
+        "HistRetentionDays": {
+          "type": "integer"
+        },
+        "Location": {
+          "type": "string"
+        },
+        "LogDir": {
+          "type": "string"
+        },
+        "MaxActiveRuns": {
+          "type": "integer"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        },
+        "Schedule": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/schedule"
+          }
+        },
+        "Steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/stepObject"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dagListItem": {
+      "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/dag"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/dagStatus"
+        },
+        "Suspended": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dagLogGridItem": {
+      "type": "object",
+      "required": [
+        "Name",
+        "Vals"
+      ],
+      "properties": {
+        "Name": {
+          "type": "string"
+        },
+        "Vals": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "dagLogResponse": {
+      "type": "object",
+      "required": [
+        "GridData",
+        "Logs"
+      ],
+      "properties": {
+        "GridData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagLogGridItem"
+          }
+        },
+        "Logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagStatusFile"
+          }
+        }
+      }
+    },
+    "dagSchedulerLogResponse": {
+      "type": "object",
+      "required": [
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        }
+      }
+    },
+    "dagStatus": {
+      "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
+      "properties": {
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Params": {
+          "type": "string"
+        },
+        "Pid": {
+          "type": "integer"
+        },
+        "RequestId": {
+          "type": "string"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        }
+      }
+    },
+    "dagStatusDetail": {
+      "type": "object",
+      "required": [
+        "RequestId",
+        "Name",
+        "Status",
+        "StatusText",
+        "Pid",
+        "Nodes",
+        "OnExit",
+        "OnSuccess",
+        "OnFailure",
+        "OnCancel",
+        "StartedAt",
+        "FinishedAt",
+        "Log",
+        "Params"
+      ],
+      "properties": {
+        "FinishedAt": {
+          "type": "string"
+        },
+        "Log": {
+          "type": "string"
+        },
+        "Name": {
+          "type": "string"
+        },
+        "Nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/statusNode"
+          }
+        },
+        "OnCancel": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnExit": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnFailure": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "OnSuccess": {
+          "$ref": "#/definitions/statusNode"
+        },
+        "Params": {
+          "type": "string"
+        },
+        "Pid": {
+          "type": "integer"
+        },
+        "RequestId": {
+          "type": "string"
+        },
+        "StartedAt": {
+          "type": "string"
+        },
+        "Status": {
+          "type": "integer"
+        },
+        "StatusText": {
+          "type": "string"
+        }
+      }
+    },
+    "dagStatusFile": {
+      "type": "object",
+      "required": [
+        "File"
+      ],
+      "properties": {
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/dagStatusDetail"
+        }
+      }
+    },
+    "dagStatusWithDetails": {
+      "type": "object",
+      "required": [
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
+      ],
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/dagDetail"
+        },
+        "Dir": {
+          "type": "string"
+        },
+        "Error": {
+          "type": "string"
+        },
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/dagStatusDetail"
+        },
+        "Suspended": {
+          "type": "boolean"
+        }
+      }
+    },
+    "dagStepLogResponse": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/statusNode"
+        }
+      }
+    },
+    "getDagDetailsResponse": {
       "type": "object",
       "required": [
         "Title",
@@ -1274,7 +1673,7 @@ func init() {
       ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/workflowStatusWithDetail"
+          "$ref": "#/definitions/dagStatusWithDetails"
         },
         "Definition": {
           "type": "string"
@@ -1289,16 +1688,16 @@ func init() {
           "type": "string"
         },
         "LogData": {
-          "$ref": "#/definitions/workflowLogResponse"
+          "$ref": "#/definitions/dagLogResponse"
         },
         "LogUrl": {
           "type": "string"
         },
         "ScLog": {
-          "$ref": "#/definitions/workflowSchedulerLogResponse"
+          "$ref": "#/definitions/dagSchedulerLogResponse"
         },
         "StepLog": {
-          "$ref": "#/definitions/workflowStepLogResponse"
+          "$ref": "#/definitions/dagStepLogResponse"
         },
         "Tab": {
           "type": "string"
@@ -1325,7 +1724,7 @@ func init() {
         }
       }
     },
-    "listWorkflowsResponse": {
+    "listDagsResponse": {
       "type": "object",
       "required": [
         "DAGs",
@@ -1336,7 +1735,7 @@ func init() {
         "DAGs": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/workflowListItem"
+            "$ref": "#/definitions/dagListItem"
           }
         },
         "Errors": {
@@ -1350,10 +1749,10 @@ func init() {
         }
       }
     },
-    "postWorkflowActionResponse": {
+    "postDagActionResponse": {
       "type": "object",
       "properties": {
-        "NewWorkflowID": {
+        "NewDagID": {
           "type": "string"
         }
       }
@@ -1380,7 +1779,7 @@ func init() {
         }
       }
     },
-    "searchWorkflowsMatchItem": {
+    "searchDagsMatchItem": {
       "type": "object",
       "properties": {
         "Line": {
@@ -1394,7 +1793,7 @@ func init() {
         }
       }
     },
-    "searchWorkflowsResponse": {
+    "searchDagsResponse": {
       "type": "object",
       "required": [
         "Results",
@@ -1410,21 +1809,21 @@ func init() {
         "Results": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/searchWorkflowsResultItem"
+            "$ref": "#/definitions/searchDagsResultItem"
           }
         }
       }
     },
-    "searchWorkflowsResultItem": {
+    "searchDagsResultItem": {
       "type": "object",
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/workflow"
+          "$ref": "#/definitions/dag"
         },
         "Matches": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/searchWorkflowsMatchItem"
+            "$ref": "#/definitions/searchDagsMatchItem"
           }
         },
         "Name": {
@@ -1551,405 +1950,6 @@ func init() {
           "items": {
             "type": "string"
           }
-        }
-      }
-    },
-    "workflow": {
-      "type": "object",
-      "required": [
-        "Group",
-        "Name",
-        "Schedule",
-        "Description",
-        "Params",
-        "DefaultParams",
-        "Tags"
-      ],
-      "properties": {
-        "DefaultParams": {
-          "type": "string"
-        },
-        "Description": {
-          "type": "string"
-        },
-        "Group": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Params": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Schedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/schedule"
-          }
-        },
-        "Tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "workflowDetail": {
-      "type": "object",
-      "required": [
-        "Location",
-        "Group",
-        "Name",
-        "Schedule",
-        "Description",
-        "Env",
-        "LogDir",
-        "HandlerOn",
-        "Steps",
-        "Delay",
-        "HistRetentionDays",
-        "Preconditions",
-        "MaxActiveRuns",
-        "Params",
-        "DefaultParams",
-        "Tags"
-      ],
-      "properties": {
-        "DefaultParams": {
-          "type": "string"
-        },
-        "Delay": {
-          "type": "integer"
-        },
-        "Description": {
-          "type": "string"
-        },
-        "Env": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Group": {
-          "type": "string"
-        },
-        "HandlerOn": {
-          "$ref": "#/definitions/handlerOn"
-        },
-        "HistRetentionDays": {
-          "type": "integer"
-        },
-        "Location": {
-          "type": "string"
-        },
-        "LogDir": {
-          "type": "string"
-        },
-        "MaxActiveRuns": {
-          "type": "integer"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Params": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Preconditions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/condition"
-          }
-        },
-        "Schedule": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/schedule"
-          }
-        },
-        "Steps": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/stepObject"
-          }
-        },
-        "Tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "workflowListItem": {
-      "type": "object",
-      "required": [
-        "File",
-        "Dir",
-        "DAG",
-        "Status",
-        "Suspended",
-        "Error",
-        "ErrorT"
-      ],
-      "properties": {
-        "DAG": {
-          "$ref": "#/definitions/workflow"
-        },
-        "Dir": {
-          "type": "string"
-        },
-        "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
-          "type": "string"
-        },
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/workflowStatus"
-        },
-        "Suspended": {
-          "type": "boolean"
-        }
-      }
-    },
-    "workflowLogGridItem": {
-      "type": "object",
-      "required": [
-        "Name",
-        "Vals"
-      ],
-      "properties": {
-        "Name": {
-          "type": "string"
-        },
-        "Vals": {
-          "type": "array",
-          "items": {
-            "type": "integer"
-          }
-        }
-      }
-    },
-    "workflowLogResponse": {
-      "type": "object",
-      "required": [
-        "GridData",
-        "Logs"
-      ],
-      "properties": {
-        "GridData": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/workflowLogGridItem"
-          }
-        },
-        "Logs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/workflowStatusFile"
-          }
-        }
-      }
-    },
-    "workflowSchedulerLogResponse": {
-      "type": "object",
-      "required": [
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        }
-      }
-    },
-    "workflowStatus": {
-      "type": "object",
-      "required": [
-        "RequestId",
-        "Name",
-        "Status",
-        "StatusText",
-        "Pid",
-        "StartedAt",
-        "FinishedAt",
-        "Log",
-        "Params"
-      ],
-      "properties": {
-        "FinishedAt": {
-          "type": "string"
-        },
-        "Log": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Params": {
-          "type": "string"
-        },
-        "Pid": {
-          "type": "integer"
-        },
-        "RequestId": {
-          "type": "string"
-        },
-        "StartedAt": {
-          "type": "string"
-        },
-        "Status": {
-          "type": "integer"
-        },
-        "StatusText": {
-          "type": "string"
-        }
-      }
-    },
-    "workflowStatusDetail": {
-      "type": "object",
-      "required": [
-        "RequestId",
-        "Name",
-        "Status",
-        "StatusText",
-        "Pid",
-        "Nodes",
-        "OnExit",
-        "OnSuccess",
-        "OnFailure",
-        "OnCancel",
-        "StartedAt",
-        "FinishedAt",
-        "Log",
-        "Params"
-      ],
-      "properties": {
-        "FinishedAt": {
-          "type": "string"
-        },
-        "Log": {
-          "type": "string"
-        },
-        "Name": {
-          "type": "string"
-        },
-        "Nodes": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/statusNode"
-          }
-        },
-        "OnCancel": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "OnExit": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "OnFailure": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "OnSuccess": {
-          "$ref": "#/definitions/statusNode"
-        },
-        "Params": {
-          "type": "string"
-        },
-        "Pid": {
-          "type": "integer"
-        },
-        "RequestId": {
-          "type": "string"
-        },
-        "StartedAt": {
-          "type": "string"
-        },
-        "Status": {
-          "type": "integer"
-        },
-        "StatusText": {
-          "type": "string"
-        }
-      }
-    },
-    "workflowStatusFile": {
-      "type": "object",
-      "required": [
-        "File"
-      ],
-      "properties": {
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/workflowStatusDetail"
-        }
-      }
-    },
-    "workflowStatusWithDetail": {
-      "type": "object",
-      "required": [
-        "File",
-        "Dir",
-        "DAG",
-        "Status",
-        "Suspended",
-        "Error",
-        "ErrorT"
-      ],
-      "properties": {
-        "DAG": {
-          "$ref": "#/definitions/workflowDetail"
-        },
-        "Dir": {
-          "type": "string"
-        },
-        "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
-          "type": "string"
-        },
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/workflowStatusDetail"
-        },
-        "Suspended": {
-          "type": "boolean"
-        }
-      }
-    },
-    "workflowStepLogResponse": {
-      "type": "object",
-      "required": [
-        "Step",
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        },
-        "Step": {
-          "$ref": "#/definitions/statusNode"
         }
       }
     }

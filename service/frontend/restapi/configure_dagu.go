@@ -38,9 +38,9 @@ func configureAPI(api *operations.DaguAPI) http.Handler {
 
 	api.JSONProducer = runtime.JSONProducer()
 
-	if api.ListWorkflowsHandler == nil {
-		api.ListWorkflowsHandler = operations.ListWorkflowsHandlerFunc(func(params operations.ListWorkflowsParams) middleware.Responder {
-			return middleware.NotImplemented("operation operations.ListWorkflows has not yet been implemented")
+	if api.ListDagsHandler == nil {
+		api.ListDagsHandler = operations.ListDagsHandlerFunc(func(params operations.ListDagsParams) middleware.Responder {
+			return middleware.NotImplemented("operation operations.ListDags has not yet been implemented")
 		})
 	}
 

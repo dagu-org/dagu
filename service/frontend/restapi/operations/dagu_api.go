@@ -42,23 +42,23 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 
 		JSONProducer: runtime.JSONProducer(),
 
-		CreateWorkflowHandler: CreateWorkflowHandlerFunc(func(params CreateWorkflowParams) middleware.Responder {
-			return middleware.NotImplemented("operation CreateWorkflow has not yet been implemented")
+		CreateDagHandler: CreateDagHandlerFunc(func(params CreateDagParams) middleware.Responder {
+			return middleware.NotImplemented("operation CreateDag has not yet been implemented")
 		}),
-		DeleteWorkflowHandler: DeleteWorkflowHandlerFunc(func(params DeleteWorkflowParams) middleware.Responder {
-			return middleware.NotImplemented("operation DeleteWorkflow has not yet been implemented")
+		DeleteDagHandler: DeleteDagHandlerFunc(func(params DeleteDagParams) middleware.Responder {
+			return middleware.NotImplemented("operation DeleteDag has not yet been implemented")
 		}),
-		GetWorkflowDetailHandler: GetWorkflowDetailHandlerFunc(func(params GetWorkflowDetailParams) middleware.Responder {
-			return middleware.NotImplemented("operation GetWorkflowDetail has not yet been implemented")
+		GetDagDetailsHandler: GetDagDetailsHandlerFunc(func(params GetDagDetailsParams) middleware.Responder {
+			return middleware.NotImplemented("operation GetDagDetails has not yet been implemented")
 		}),
-		ListWorkflowsHandler: ListWorkflowsHandlerFunc(func(params ListWorkflowsParams) middleware.Responder {
-			return middleware.NotImplemented("operation ListWorkflows has not yet been implemented")
+		ListDagsHandler: ListDagsHandlerFunc(func(params ListDagsParams) middleware.Responder {
+			return middleware.NotImplemented("operation ListDags has not yet been implemented")
 		}),
-		PostWorkflowActionHandler: PostWorkflowActionHandlerFunc(func(params PostWorkflowActionParams) middleware.Responder {
-			return middleware.NotImplemented("operation PostWorkflowAction has not yet been implemented")
+		PostDagActionHandler: PostDagActionHandlerFunc(func(params PostDagActionParams) middleware.Responder {
+			return middleware.NotImplemented("operation PostDagAction has not yet been implemented")
 		}),
-		SearchWorkflowsHandler: SearchWorkflowsHandlerFunc(func(params SearchWorkflowsParams) middleware.Responder {
-			return middleware.NotImplemented("operation SearchWorkflows has not yet been implemented")
+		SearchDagsHandler: SearchDagsHandlerFunc(func(params SearchDagsParams) middleware.Responder {
+			return middleware.NotImplemented("operation SearchDags has not yet been implemented")
 		}),
 	}
 }
@@ -96,18 +96,18 @@ type DaguAPI struct {
 	//   - application/json
 	JSONProducer runtime.Producer
 
-	// CreateWorkflowHandler sets the operation handler for the create workflow operation
-	CreateWorkflowHandler CreateWorkflowHandler
-	// DeleteWorkflowHandler sets the operation handler for the delete workflow operation
-	DeleteWorkflowHandler DeleteWorkflowHandler
-	// GetWorkflowDetailHandler sets the operation handler for the get workflow detail operation
-	GetWorkflowDetailHandler GetWorkflowDetailHandler
-	// ListWorkflowsHandler sets the operation handler for the list workflows operation
-	ListWorkflowsHandler ListWorkflowsHandler
-	// PostWorkflowActionHandler sets the operation handler for the post workflow action operation
-	PostWorkflowActionHandler PostWorkflowActionHandler
-	// SearchWorkflowsHandler sets the operation handler for the search workflows operation
-	SearchWorkflowsHandler SearchWorkflowsHandler
+	// CreateDagHandler sets the operation handler for the create dag operation
+	CreateDagHandler CreateDagHandler
+	// DeleteDagHandler sets the operation handler for the delete dag operation
+	DeleteDagHandler DeleteDagHandler
+	// GetDagDetailsHandler sets the operation handler for the get dag details operation
+	GetDagDetailsHandler GetDagDetailsHandler
+	// ListDagsHandler sets the operation handler for the list dags operation
+	ListDagsHandler ListDagsHandler
+	// PostDagActionHandler sets the operation handler for the post dag action operation
+	PostDagActionHandler PostDagActionHandler
+	// SearchDagsHandler sets the operation handler for the search dags operation
+	SearchDagsHandler SearchDagsHandler
 
 	// ServeError is called when an error is received, there is a default handler
 	// but you can set your own with this
@@ -185,23 +185,23 @@ func (o *DaguAPI) Validate() error {
 		unregistered = append(unregistered, "JSONProducer")
 	}
 
-	if o.CreateWorkflowHandler == nil {
-		unregistered = append(unregistered, "CreateWorkflowHandler")
+	if o.CreateDagHandler == nil {
+		unregistered = append(unregistered, "CreateDagHandler")
 	}
-	if o.DeleteWorkflowHandler == nil {
-		unregistered = append(unregistered, "DeleteWorkflowHandler")
+	if o.DeleteDagHandler == nil {
+		unregistered = append(unregistered, "DeleteDagHandler")
 	}
-	if o.GetWorkflowDetailHandler == nil {
-		unregistered = append(unregistered, "GetWorkflowDetailHandler")
+	if o.GetDagDetailsHandler == nil {
+		unregistered = append(unregistered, "GetDagDetailsHandler")
 	}
-	if o.ListWorkflowsHandler == nil {
-		unregistered = append(unregistered, "ListWorkflowsHandler")
+	if o.ListDagsHandler == nil {
+		unregistered = append(unregistered, "ListDagsHandler")
 	}
-	if o.PostWorkflowActionHandler == nil {
-		unregistered = append(unregistered, "PostWorkflowActionHandler")
+	if o.PostDagActionHandler == nil {
+		unregistered = append(unregistered, "PostDagActionHandler")
 	}
-	if o.SearchWorkflowsHandler == nil {
-		unregistered = append(unregistered, "SearchWorkflowsHandler")
+	if o.SearchDagsHandler == nil {
+		unregistered = append(unregistered, "SearchDagsHandler")
 	}
 
 	if len(unregistered) > 0 {
@@ -294,27 +294,27 @@ func (o *DaguAPI) initHandlerCache() {
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
-	o.handlers["POST"]["/workflows"] = NewCreateWorkflow(o.context, o.CreateWorkflowHandler)
+	o.handlers["POST"]["/dags"] = NewCreateDag(o.context, o.CreateDagHandler)
 	if o.handlers["DELETE"] == nil {
 		o.handlers["DELETE"] = make(map[string]http.Handler)
 	}
-	o.handlers["DELETE"]["/workflows/{workflowId}"] = NewDeleteWorkflow(o.context, o.DeleteWorkflowHandler)
+	o.handlers["DELETE"]["/dags/{dagId}"] = NewDeleteDag(o.context, o.DeleteDagHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/workflows/{workflowId}"] = NewGetWorkflowDetail(o.context, o.GetWorkflowDetailHandler)
+	o.handlers["GET"]["/dags/{dagId}"] = NewGetDagDetails(o.context, o.GetDagDetailsHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/workflows"] = NewListWorkflows(o.context, o.ListWorkflowsHandler)
+	o.handlers["GET"]["/dags"] = NewListDags(o.context, o.ListDagsHandler)
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
-	o.handlers["POST"]["/workflows/{workflowId}"] = NewPostWorkflowAction(o.context, o.PostWorkflowActionHandler)
+	o.handlers["POST"]["/dags/{dagId}"] = NewPostDagAction(o.context, o.PostDagActionHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/search"] = NewSearchWorkflows(o.context, o.SearchWorkflowsHandler)
+	o.handlers["GET"]["/search"] = NewSearchDags(o.context, o.SearchDagsHandler)
 }
 
 // Serve creates a http handler to serve the API over HTTP

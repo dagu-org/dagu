@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
-// Store is the interfact to store workflow status in local.
+// Store is the interfact to store dags status in local.
 // It stores status in JSON format in a directory as per each dagFile.
 // Multiple JSON data can be stored in a single file and each data
 // is separated by newline.

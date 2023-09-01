@@ -13,16 +13,16 @@ schemes:
 host: "localhost:8080"
 
 paths:
-  /workflows:
+  /dags:
     get:
       produces:
         - application/json
-      operationId: listWorkflows
+      operationId: listDags
       responses:
         200:
           description: A successful response.
           schema:
-            $ref: "#/definitions/listWorkflowsResponse"
+            $ref: "#/definitions/listDagsResponse"
         default:
           description: Generic error response.
           schema:
@@ -30,7 +30,7 @@ paths:
     post:
       produces:
         - application/json
-      operationId: createWorkflow
+      operationId: createDag
       parameters:
         - in: body
           name: body
@@ -48,16 +48,16 @@ paths:
         200:
           description: A successful response.
           schema:
-            $ref: "#/definitions/createWorkflowResponse"
+            $ref: "#/definitions/createDagResponse"
         default:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
 
-  /workflows/{workflowId}:
+  /dags/{dagId}:
     get:
       parameters:
-        - name: workflowId
+        - name: dagId
           in: path
           required: true
           type: string
@@ -75,19 +75,19 @@ paths:
           type: string
       produces:
         - application/json
-      operationId: getWorkflowDetail
+      operationId: getDagDetails
       responses:
         200:
           description: A successful response.
           schema:
-            $ref: "#/definitions/getWorkflowDetailResponse"
+            $ref: "#/definitions/getDagDetailsResponse"
         default:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
     post:
       parameters:
-        - name: workflowId
+        - name: dagId
           in: path
           required: true
           type: string
@@ -108,12 +108,12 @@ paths:
                 type: string
       produces:
         - application/json
-      operationId: postWorkflowAction
+      operationId: postDagAction
       responses:
         200:
           description: A successful response.
           schema:
-            $ref: '#/definitions/postWorkflowActionResponse'
+            $ref: '#/definitions/postDagActionResponse'
         default:
           description: Generic error response.
           schema:
@@ -121,13 +121,13 @@ paths:
 
     delete:
       parameters:
-        - name: workflowId
+        - name: dagId
           in: path
           required: true
           type: string
       produces:
         - application/json
-      operationId: deleteWorkflow
+      operationId: deleteDag
       responses:
         200:
           description: A successful response.
@@ -140,7 +140,7 @@ paths:
     get:
       produces:
         - application/json
-      operationId: searchWorkflows
+      operationId: searchDags
       parameters:
         - name: q
           in: query
@@ -150,7 +150,7 @@ paths:
         200:
           description: A successful response.
           schema:
-            $ref: "#/definitions/searchWorkflowsResponse"
+            $ref: "#/definitions/searchDagsResponse"
         default:
           description: Generic error response.
           schema:
@@ -168,13 +168,13 @@ definitions:
       - message
       - detailedMessage
 
-  listWorkflowsResponse:
+  listDagsResponse:
     type: object
     properties:
       DAGs:
         type: array
         items:
-          $ref: '#/definitions/workflowListItem'
+          $ref: '#/definitions/dagListItem'
       Errors:
         type: array
         items:
@@ -186,15 +186,15 @@ definitions:
       - Errors
       - HasError
 
-  createWorkflowResponse:
+  createDagResponse:
     type: object
     properties:
-      WorkflowID:
+      DagID:
         type: string
     required:
-      - WorkflowID
+      - DagID
 
-  workflowListItem:
+  dagListItem:
     type: object
     properties:
       File:
@@ -202,9 +202,9 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: '#/definitions/workflow'
+        $ref: '#/definitions/dag'
       Status:
-        $ref: '#/definitions/workflowStatus'
+        $ref: '#/definitions/dagStatus'
       Suspended:
         type: boolean
       Error:
@@ -220,7 +220,7 @@ definitions:
       - Error
       - ErrorT
 
-  workflow:
+  dag:
     type: object
     properties:
       Group:
@@ -260,7 +260,7 @@ definitions:
     required:
       - Expression
 
-  workflowStatus:
+  dagStatus:
     type: object
     properties:
       RequestId:
@@ -292,13 +292,13 @@ definitions:
       - Log
       - Params
 
-  getWorkflowDetailResponse:
+  getDagDetailsResponse:
     type: object
     properties:
       Title:
         type: string
       DAG:
-        $ref: '#/definitions/workflowStatusWithDetail'
+        $ref: '#/definitions/dagStatusWithDetails'
       Tab:
         type: string
       Graph:
@@ -306,13 +306,13 @@ definitions:
       Definition:
         type: string
       LogData:
-        $ref: '#/definitions/workflowLogResponse'
+        $ref: '#/definitions/dagLogResponse'
       LogUrl:
         type: string
       StepLog:
-        $ref: '#/definitions/workflowStepLogResponse'
+        $ref: '#/definitions/dagStepLogResponse'
       ScLog:
-        $ref: '#/definitions/workflowSchedulerLogResponse'
+        $ref: '#/definitions/dagSchedulerLogResponse'
       Errors:
         type: array
         items:
@@ -329,13 +329,13 @@ definitions:
       - ScLog
       - Errors
 
-  postWorkflowActionResponse:
+  postDagActionResponse:
     type: object
     properties:
-      NewWorkflowID:
+      NewDagID:
         type: string
 
-  workflowStepLogResponse:
+  dagStepLogResponse:
     type: object
     properties:
       Step:
@@ -349,7 +349,7 @@ definitions:
       - LogFile
       - Content
 
-  workflowSchedulerLogResponse:
+  dagSchedulerLogResponse:
     type: object
     properties:
       LogFile:
@@ -360,22 +360,22 @@ definitions:
       - LogFile
       - Content
 
-  workflowLogResponse:
+  dagLogResponse:
     type: object
     properties:
       GridData:
         type: array
         items:
-          $ref: '#/definitions/workflowLogGridItem'
+          $ref: '#/definitions/dagLogGridItem'
       Logs:
         type: array
         items:
-          $ref: '#/definitions/workflowStatusFile'
+          $ref: '#/definitions/dagStatusFile'
     required:
       - GridData
       - Logs
 
-  workflowLogGridItem:
+  dagLogGridItem:
     type: object
     properties:
       Name:
@@ -388,17 +388,17 @@ definitions:
       - Name
       - Vals
 
-  workflowStatusFile:
+  dagStatusFile:
     type: object
     properties:
       File:
         type: string
       Status:
-        $ref: '#/definitions/workflowStatusDetail'
+        $ref: '#/definitions/dagStatusDetail'
     required:
       - File
 
-  workflowStatusWithDetail:
+  dagStatusWithDetails:
     type: object
     properties:
       File:
@@ -406,9 +406,9 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: '#/definitions/workflowDetail'
+        $ref: '#/definitions/dagDetail'
       Status:
-        $ref: '#/definitions/workflowStatusDetail'
+        $ref: '#/definitions/dagStatusDetail'
       Suspended:
         type: boolean
       Error:
@@ -424,7 +424,7 @@ definitions:
       - Error
       - ErrorT
 
-  workflowDetail:
+  dagDetail:
     type: object
     properties:
       Location:
@@ -501,7 +501,7 @@ definitions:
       Exit:
         $ref: '#/definitions/stepObject'
 
-  workflowStatusDetail:
+  dagStatusDetail:
     type: object
     properties:
       RequestId:
@@ -640,13 +640,13 @@ definitions:
       - MailOnError
       - Preconditions
 
-  searchWorkflowsResponse:
+  searchDagsResponse:
     type: object
     properties:
       Results:
         type: array
         items:
-          $ref: '#/definitions/searchWorkflowsResultItem'
+          $ref: '#/definitions/searchDagsResultItem'
       Errors:
         type: array
         items:
@@ -655,19 +655,19 @@ definitions:
       - Results
       - Errors
 
-  searchWorkflowsResultItem:
+  searchDagsResultItem:
     type: object
     properties:
       Name:
         type: string
       DAG:
-        $ref: '#/definitions/workflow'
+        $ref: '#/definitions/dag'
       Matches:
         type: array
         items:
-          $ref: '#/definitions/searchWorkflowsMatchItem'
+          $ref: '#/definitions/searchDagsMatchItem'
 
-  searchWorkflowsMatchItem:
+  searchDagsMatchItem:
     type: object
     properties:
       Line:
