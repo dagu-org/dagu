@@ -48,8 +48,8 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		DeleteDagHandler: DeleteDagHandlerFunc(func(params DeleteDagParams) middleware.Responder {
 			return middleware.NotImplemented("operation DeleteDag has not yet been implemented")
 		}),
-		GetDagDetailHandler: GetDagDetailHandlerFunc(func(params GetDagDetailParams) middleware.Responder {
-			return middleware.NotImplemented("operation GetDagDetail has not yet been implemented")
+		GetDagDetailsHandler: GetDagDetailsHandlerFunc(func(params GetDagDetailsParams) middleware.Responder {
+			return middleware.NotImplemented("operation GetDagDetails has not yet been implemented")
 		}),
 		ListDagsHandler: ListDagsHandlerFunc(func(params ListDagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation ListDags has not yet been implemented")
@@ -100,8 +100,8 @@ type DaguAPI struct {
 	CreateDagHandler CreateDagHandler
 	// DeleteDagHandler sets the operation handler for the delete dag operation
 	DeleteDagHandler DeleteDagHandler
-	// GetDagDetailHandler sets the operation handler for the get dag detail operation
-	GetDagDetailHandler GetDagDetailHandler
+	// GetDagDetailsHandler sets the operation handler for the get dag details operation
+	GetDagDetailsHandler GetDagDetailsHandler
 	// ListDagsHandler sets the operation handler for the list dags operation
 	ListDagsHandler ListDagsHandler
 	// PostDagActionHandler sets the operation handler for the post dag action operation
@@ -191,8 +191,8 @@ func (o *DaguAPI) Validate() error {
 	if o.DeleteDagHandler == nil {
 		unregistered = append(unregistered, "DeleteDagHandler")
 	}
-	if o.GetDagDetailHandler == nil {
-		unregistered = append(unregistered, "GetDagDetailHandler")
+	if o.GetDagDetailsHandler == nil {
+		unregistered = append(unregistered, "GetDagDetailsHandler")
 	}
 	if o.ListDagsHandler == nil {
 		unregistered = append(unregistered, "ListDagsHandler")
@@ -302,7 +302,7 @@ func (o *DaguAPI) initHandlerCache() {
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/dags/{dagId}"] = NewGetDagDetail(o.context, o.GetDagDetailHandler)
+	o.handlers["GET"]["/dags/{dagId}"] = NewGetDagDetails(o.context, o.GetDagDetailsHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}

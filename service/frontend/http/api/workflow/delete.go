@@ -16,12 +16,12 @@ func Delete(params operations.DeleteDagParams) *response.CodedError {
 
 	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	dr := controller.NewDAGStatusReader(jsondb.New())
-	workflow, err := dr.ReadStatus(filename, false)
+	dagStatus, err := dr.ReadStatus(filename, false)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
 
-	ctrl := controller.New(workflow.DAG, jsondb.New())
+	ctrl := controller.New(dagStatus.DAG, jsondb.New())
 	if err := ctrl.DeleteDAG(); err != nil {
 		return response.NewInternalError(err)
 	}

@@ -31,5 +31,5 @@ func GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.C
 		hasErr = true
 	}
 
-	return response.ToListWorkflowResponse(dags, errs, hasErr), nil
+	return response.ToListDagResponse(dags, errs, hasErr), nil
 }

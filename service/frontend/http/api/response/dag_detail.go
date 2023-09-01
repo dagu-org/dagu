@@ -8,13 +8,13 @@ import (
 	"github.com/samber/lo"
 )
 
-func ToGetWorkflowDetailResponse(
+func ToGetDagDetailResponse(
 	workflowStatus *controller.DAGStatus,
 	tab string,
-) *models.GetDagDetailResponse {
-	return &models.GetDagDetailResponse{
+) *models.GetDagDetailsResponse {
+	return &models.GetDagDetailsResponse{
 		Title:      lo.ToPtr(workflowStatus.DAG.Name),
-		DAG:        ToWorkflowStatusWithDetail(workflowStatus),
+		DAG:        ToDagStatusWithDetails(workflowStatus),
 		Tab:        lo.ToPtr(tab),
 		Definition: lo.ToPtr(""),
 		LogData:    nil,
@@ -22,42 +22,42 @@ func ToGetWorkflowDetailResponse(
 	}
 }
 
-func ToWorkflowStatusWithDetail(workflowStatus *controller.DAGStatus) *models.DagStatusWithDetails {
+func ToDagStatusWithDetails(dagStatus *controller.DAGStatus) *models.DagStatusWithDetails {
 	return &models.DagStatusWithDetails{
-		DAG:       ToWorkflowDetail(workflowStatus.DAG),
-		Dir:       lo.ToPtr(workflowStatus.Dir),
-		Error:     lo.ToPtr(toErrorText(workflowStatus.Error)),
-		ErrorT:    workflowStatus.ErrorT,
-		File:      lo.ToPtr(workflowStatus.File),
-		Status:    ToWorkflowStatusDetail(workflowStatus.Status),
-		Suspended: lo.ToPtr(workflowStatus.Suspended),
+		DAG:       ToDagDetail(dagStatus.DAG),
+		Dir:       lo.ToPtr(dagStatus.Dir),
+		Error:     lo.ToPtr(toErrorText(dagStatus.Error)),
+		ErrorT:    dagStatus.ErrorT,
+		File:      lo.ToPtr(dagStatus.File),
+		Status:    ToDagStatusDetail(dagStatus.Status),
+		Suspended: lo.ToPtr(dagStatus.Suspended),
 	}
 }
 
-func ToWorkflowDetail(workflow *dag.DAG) *models.DagDetail {
+func ToDagDetail(d *dag.DAG) *models.DagDetail {
 	return &models.DagDetail{
-		DefaultParams:     lo.ToPtr(workflow.DefaultParams),
-		Delay:             lo.ToPtr(int64(workflow.Delay)),
-		Description:       lo.ToPtr(workflow.Description),
-		Env:               workflow.Env,
-		Group:             lo.ToPtr(workflow.Group),
-		HandlerOn:         ToHandlerOn(workflow.HandlerOn),
-		HistRetentionDays: lo.ToPtr(int64(workflow.HistRetentionDays)),
-		Location:          lo.ToPtr(workflow.Location),
-		LogDir:            lo.ToPtr(workflow.LogDir),
-		MaxActiveRuns:     lo.ToPtr(int64(workflow.MaxActiveRuns)),
-		Name:              lo.ToPtr(workflow.Name),
-		Params:            workflow.Params,
-		Preconditions: lo.Map(workflow.Preconditions, func(item *dag.Condition, _ int) *models.Condition {
+		DefaultParams:     lo.ToPtr(d.DefaultParams),
+		Delay:             lo.ToPtr(int64(d.Delay)),
+		Description:       lo.ToPtr(d.Description),
+		Env:               d.Env,
+		Group:             lo.ToPtr(d.Group),
+		HandlerOn:         ToHandlerOn(d.HandlerOn),
+		HistRetentionDays: lo.ToPtr(int64(d.HistRetentionDays)),
+		Location:          lo.ToPtr(d.Location),
+		LogDir:            lo.ToPtr(d.LogDir),
+		MaxActiveRuns:     lo.ToPtr(int64(d.MaxActiveRuns)),
+		Name:              lo.ToPtr(d.Name),
+		Params:            d.Params,
+		Preconditions: lo.Map(d.Preconditions, func(item *dag.Condition, _ int) *models.Condition {
 			return ToCondition(item)
 		}),
-		Schedule: lo.Map(workflow.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
+		Schedule: lo.Map(d.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
-		Steps: lo.Map(workflow.Steps, func(item *dag.Step, _ int) *models.StepObject {
+		Steps: lo.Map(d.Steps, func(item *dag.Step, _ int) *models.StepObject {
 			return ToStepObject(item)
 		}),
-		Tags: workflow.Tags,
+		Tags: d.Tags,
 	}
 }
 
@@ -78,7 +78,7 @@ func ToHandlerOn(handlerOn dag.HandlerOn) *models.HandlerOn {
 	return ret
 }
 
-func ToWorkflowStatusDetail(s *domain.Status) *models.DagStatusDetail {
+func ToDagStatusDetail(s *domain.Status) *models.DagStatusDetail {
 	return &models.DagStatusDetail{
 		Log:        lo.ToPtr(s.Log),
 		Name:       lo.ToPtr(s.Name),

@@ -7,27 +7,27 @@ import (
 	"github.com/samber/lo"
 )
 
-func ToListWorkflowResponse(
+func ToListDagResponse(
 	workflows []*controller.DAGStatus,
 	errs []string,
 	hasError bool,
 ) *models.ListDagsResponse {
 	return &models.ListDagsResponse{
 		DAGs: lo.Map(workflows, func(item *controller.DAGStatus, _ int) *models.DagListItem {
-			return ToWorkflowListItem(item)
+			return ToDagListItem(item)
 		}),
 		Errors:   errs,
 		HasError: lo.ToPtr(hasError),
 	}
 }
 
-func ToWorkflowListItem(s *controller.DAGStatus) *models.DagListItem {
+func ToDagListItem(s *controller.DAGStatus) *models.DagListItem {
 	return &models.DagListItem{
 		Dir:       lo.ToPtr(s.Dir),
 		Error:     lo.ToPtr(toErrorText(s.Error)),
 		ErrorT:    s.ErrorT,
 		File:      lo.ToPtr(s.File),
-		Status:    ToWorkflowStatus(s.Status),
+		Status:    ToDagStatus(s.Status),
 		Suspended: lo.ToPtr(s.Suspended),
 		DAG:       ToWorkflow(s.DAG),
 	}

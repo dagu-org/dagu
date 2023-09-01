@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// GetDagDetailURL generates an URL for the get dag detail operation
-type GetDagDetailURL struct {
+// GetDagDetailsURL generates an URL for the get dag details operation
+type GetDagDetailsURL struct {
 	DagID string
 
 	File *string
@@ -28,7 +28,7 @@ type GetDagDetailURL struct {
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *GetDagDetailURL) WithBasePath(bp string) *GetDagDetailURL {
+func (o *GetDagDetailsURL) WithBasePath(bp string) *GetDagDetailsURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -36,12 +36,12 @@ func (o *GetDagDetailURL) WithBasePath(bp string) *GetDagDetailURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *GetDagDetailURL) SetBasePath(bp string) {
+func (o *GetDagDetailsURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *GetDagDetailURL) Build() (*url.URL, error) {
+func (o *GetDagDetailsURL) Build() (*url.URL, error) {
 	var _result url.URL
 
 	var _path = "/dags/{dagId}"
@@ -50,7 +50,7 @@ func (o *GetDagDetailURL) Build() (*url.URL, error) {
 	if dagID != "" {
 		_path = strings.Replace(_path, "{dagId}", dagID, -1)
 	} else {
-		return nil, errors.New("dagId is required on GetDagDetailURL")
+		return nil, errors.New("dagId is required on GetDagDetailsURL")
 	}
 
 	_basePath := o._basePath
@@ -91,7 +91,7 @@ func (o *GetDagDetailURL) Build() (*url.URL, error) {
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *GetDagDetailURL) Must(u *url.URL, err error) *url.URL {
+func (o *GetDagDetailsURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -102,17 +102,17 @@ func (o *GetDagDetailURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *GetDagDetailURL) String() string {
+func (o *GetDagDetailsURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *GetDagDetailURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *GetDagDetailsURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on GetDagDetailURL")
+		return nil, errors.New("scheme is required for a full url on GetDagDetailsURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on GetDagDetailURL")
+		return nil, errors.New("host is required for a full url on GetDagDetailsURL")
 	}
 
 	base, err := o.Build()
@@ -126,6 +126,6 @@ func (o *GetDagDetailURL) BuildFull(scheme, host string) (*url.URL, error) {
 }
 
 // StringFull returns the string representation of a complete url
-func (o *GetDagDetailURL) StringFull(scheme, host string) string {
+func (o *GetDagDetailsURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

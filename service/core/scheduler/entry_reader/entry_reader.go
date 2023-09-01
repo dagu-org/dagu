@@ -97,12 +97,12 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			workflow, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, fi.Name()))
+			dag, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
-				er.logger.Error("failed to read workflow cfg", tag.Error(err))
+				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
 			}
-			er.dags[fi.Name()] = workflow
+			er.dags[fi.Name()] = dag
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
@@ -132,24 +132,24 @@ func (er *EntryReader) watchDags() {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				workflow, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dag, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
-					er.logger.Error("failed to read workflow cfg", tag.Error(err))
+					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {
-					er.dags[filepath.Base(event.Name)] = workflow
-					er.logger.Info("reload workflow entry_reader", "file", event.Name)
+					er.dags[filepath.Base(event.Name)] = dag
+					er.logger.Info("reload DAG entry_reader", "file", event.Name)
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("remove workflow entry_reader", "file", event.Name)
+				er.logger.Info("remove DAG entry_reader", "file", event.Name)
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entry_reader dags error", tag.Error(err))
+			er.logger.Error("watch entry_reader DAGs error", tag.Error(err))
 		}
 	}
 

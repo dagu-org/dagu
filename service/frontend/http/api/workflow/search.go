@@ -22,5 +22,5 @@ func Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *re
 		return nil, response.NewInternalError(err)
 	}
 
-	return response.ToSearchWorkflowsResponse(ret, errs), nil
+	return response.ToSearchDAGsResponse(ret, errs), nil
 }

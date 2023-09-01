@@ -16,13 +16,13 @@ func Configure(api *operations.DaguAPI) {
 			return operations.NewListDagsOK().WithPayload(resp)
 		})
 
-	api.GetDagDetailHandler = operations.GetDagDetailHandlerFunc(
-		func(params operations.GetDagDetailParams) middleware.Responder {
+	api.GetDagDetailsHandler = operations.GetDagDetailsHandlerFunc(
+		func(params operations.GetDagDetailsParams) middleware.Responder {
 			resp, err := workflow.GetDetail(params)
 			if err != nil {
-				return operations.NewGetDagDetailDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewGetDagDetailsDefault(err.Code).WithPayload(err.APIError)
 			}
-			return operations.NewGetDagDetailOK().WithPayload(resp)
+			return operations.NewGetDagDetailsOK().WithPayload(resp)
 		})
 
 	api.PostDagActionHandler = operations.PostDagActionHandlerFunc(

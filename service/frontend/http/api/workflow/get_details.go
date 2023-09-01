@@ -29,7 +29,7 @@ const (
 	dagTabTypeSchedulerLog = "scheduler-log"
 )
 
-func GetDetail(params operations.GetDagDetailParams) (*models.GetDagDetailResponse, *response.CodedError) {
+func GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDetailsResponse, *response.CodedError) {
 	dagID := params.DagID
 
 	// TODO: separate API
@@ -53,7 +53,7 @@ func GetDetail(params operations.GetDagDetailParams) (*models.GetDagDetailRespon
 	}
 
 	ctrl := controller.New(dagStatus.DAG, jsondb.New())
-	resp := response.ToGetWorkflowDetailResponse(
+	resp := response.ToGetDagDetailResponse(
 		dagStatus,
 		tab,
 	)
@@ -73,7 +73,7 @@ func GetDetail(params operations.GetDagDetailParams) (*models.GetDagDetailRespon
 
 	case dagTabTypeHistory:
 		logs := controller.New(dagStatus.DAG, jsondb.New()).GetRecentStatuses(30)
-		resp.LogData = response.ToWorkflowLogResponse(logs)
+		resp.LogData = response.ToDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
 		stepLog, err := getStepLog(ctrl, lo.FromPtr(logFile), lo.FromPtr(stepName))
@@ -135,7 +135,7 @@ func getStepLog(c *controller.DAGController, logFile, stepName string) (*models.
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
-	return response.ToWorkflowStepLogResponse(node.Log, logContent, node), nil
+	return response.ToDagStepLogResponse(node.Log, logContent, node), nil
 }
 
 func getLogFileContent(fileName string) (string, error) {
@@ -189,5 +189,5 @@ func readSchedulerLog(ctrl *controller.DAGController, statusFile string) (*model
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
-	return response.ToWorkflowSchedulerLogResponse(logFile, string(content)), nil
+	return response.ToDagSchedulerLogResponse(logFile, string(content)), nil
 }

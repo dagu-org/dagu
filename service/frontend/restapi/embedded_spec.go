@@ -103,7 +103,7 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "getDagDetail",
+        "operationId": "getDagDetails",
         "parameters": [
           {
             "type": "string",
@@ -131,7 +131,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/getDagDetailResponse"
+              "$ref": "#/definitions/getDagDetailsResponse"
             }
           },
           "default": {
@@ -688,7 +688,7 @@ func init() {
         }
       }
     },
-    "getDagDetailResponse": {
+    "getDagDetailsResponse": {
       "type": "object",
       "required": [
         "Title",
@@ -1072,7 +1072,7 @@ func init() {
         "produces": [
           "application/json"
         ],
-        "operationId": "getDagDetail",
+        "operationId": "getDagDetails",
         "parameters": [
           {
             "type": "string",
@@ -1100,7 +1100,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/getDagDetailResponse"
+              "$ref": "#/definitions/getDagDetailsResponse"
             }
           },
           "default": {
@@ -1657,7 +1657,7 @@ func init() {
         }
       }
     },
-    "getDagDetailResponse": {
+    "getDagDetailsResponse": {
       "type": "object",
       "required": [
         "Title",

@@ -6,7 +6,7 @@ import (
 	"github.com/samber/lo"
 )
 
-func ToWorkflowStatus(s *domain.Status) *models.DagStatus {
+func ToDagStatus(s *domain.Status) *models.DagStatus {
 	return &models.DagStatus{
 		Log:        lo.ToPtr(s.Log),
 		Name:       lo.ToPtr(s.Name),

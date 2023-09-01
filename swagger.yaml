@@ -75,12 +75,12 @@ paths:
           type: string
       produces:
         - application/json
-      operationId: getDagDetail
+      operationId: getDagDetails
       responses:
         200:
           description: A successful response.
           schema:
-            $ref: "#/definitions/getDagDetailResponse"
+            $ref: "#/definitions/getDagDetailsResponse"
         default:
           description: Generic error response.
           schema:
@@ -292,7 +292,7 @@ definitions:
       - Log
       - Params
 
-  getDagDetailResponse:
+  getDagDetailsResponse:
     type: object
     properties:
       Title:
