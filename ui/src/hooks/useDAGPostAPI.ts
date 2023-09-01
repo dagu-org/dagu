@@ -10,7 +10,7 @@ type Options = {
 export function useDAGPostAPI(opts: Options) {
   const doPost = React.useCallback(
     async (action: string, step?: string) => {
-      const url = `${getConfig().apiURL}/workflows/${opts.name}`;
+      const url = `${getConfig().apiURL}/dags/${opts.name}`;
       const ret = await fetch(url, {
         method: 'POST',
         mode: 'cors',

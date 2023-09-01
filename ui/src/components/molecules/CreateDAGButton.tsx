@@ -18,7 +18,7 @@ function CreateDAGButton() {
           alert('File name cannot contain space');
           return;
         }
-        const resp = await fetch(`${getConfig().apiURL}/workflows`, {
+        const resp = await fetch(`${getConfig().apiURL}/dags`, {
           method: 'POST',
           mode: 'cors',
           headers: { 'Content-Type': 'application/json' },

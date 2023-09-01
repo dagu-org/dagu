@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 )
 
-func Delete(params operations.DeleteWorkflowParams) *response.CodedError {
+func Delete(params operations.DeleteDagParams) *response.CodedError {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
-	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.WorkflowID))
+	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	dr := controller.NewDAGStatusReader(jsondb.New())
 	workflow, err := dr.ReadStatus(filename, false)
 	if err != nil {

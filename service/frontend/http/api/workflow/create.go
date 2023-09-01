@@ -1,16 +1,16 @@
 package workflow
 
 import (
-	"github.com/samber/lo"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
+	"github.com/samber/lo"
 	"path"
 )
 
-func Create(params operations.CreateWorkflowParams) (*models.CreateWorkflowResponse, *response.CodedError) {
+func Create(params operations.CreateDagParams) (*models.CreateDagResponse, *response.CodedError) {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
@@ -22,7 +22,7 @@ func Create(params operations.CreateWorkflowParams) (*models.CreateWorkflowRespo
 			return nil, response.NewInternalError(err)
 		}
 
-		return &models.CreateWorkflowResponse{WorkflowID: params.Body.Value}, nil
+		return &models.CreateDagResponse{DagID: params.Body.Value}, nil
 	default:
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}

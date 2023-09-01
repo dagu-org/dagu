@@ -1,16 +1,16 @@
 package response
 
 import (
-	"github.com/samber/lo"
 	"github.com/dagu-dev/dagu/internal/constants"
 	domain "github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/samber/lo"
 	"sort"
 	"strings"
 )
 
-func ToWorkflowLogResponse(logs []*domain.StatusFile) *models.WorkflowLogResponse {
+func ToWorkflowLogResponse(logs []*domain.StatusFile) *models.DagLogResponse {
 	statusByName := map[string][]scheduler.NodeStatus{}
 	for i, l := range logs {
 		for _, node := range l.Status.Nodes {
@@ -18,7 +18,7 @@ func ToWorkflowLogResponse(logs []*domain.StatusFile) *models.WorkflowLogRespons
 		}
 	}
 
-	grid := lo.MapToSlice(statusByName, func(k string, v []scheduler.NodeStatus) *models.WorkflowLogGridItem {
+	grid := lo.MapToSlice(statusByName, func(k string, v []scheduler.NodeStatus) *models.DagLogGridItem {
 		return ToWorkflowLogGridItem(k, v)
 	})
 
@@ -47,11 +47,11 @@ func ToWorkflowLogResponse(logs []*domain.StatusFile) *models.WorkflowLogRespons
 		}
 	}
 
-	converted := lo.Map(logs, func(item *domain.StatusFile, _ int) *models.WorkflowStatusFile {
+	converted := lo.Map(logs, func(item *domain.StatusFile, _ int) *models.DagStatusFile {
 		return ToWorkflowStatusFile(item)
 	})
 
-	ret := &models.WorkflowLogResponse{
+	ret := &models.DagLogResponse{
 		Logs:     lo.Reverse(converted),
 		GridData: grid,
 	}
@@ -66,15 +66,15 @@ func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx in
 	data[node.Name][logIdx] = node.Status
 }
 
-func ToWorkflowStatusFile(status *domain.StatusFile) *models.WorkflowStatusFile {
-	return &models.WorkflowStatusFile{
+func ToWorkflowStatusFile(status *domain.StatusFile) *models.DagStatusFile {
+	return &models.DagStatusFile{
 		File:   lo.ToPtr(status.File),
 		Status: ToWorkflowStatusDetail(status.Status),
 	}
 }
 
-func ToWorkflowLogGridItem(name string, vals []scheduler.NodeStatus) *models.WorkflowLogGridItem {
-	return &models.WorkflowLogGridItem{
+func ToWorkflowLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGridItem {
+	return &models.DagLogGridItem{
 		Name: lo.ToPtr(name),
 		Vals: lo.Map(vals, func(item scheduler.NodeStatus, _ int) int64 {
 			return int64(item)
@@ -82,16 +82,16 @@ func ToWorkflowLogGridItem(name string, vals []scheduler.NodeStatus) *models.Wor
 	}
 }
 
-func ToWorkflowStepLogResponse(logFile, content string, step *domain.Node) *models.WorkflowStepLogResponse {
-	return &models.WorkflowStepLogResponse{
+func ToWorkflowStepLogResponse(logFile, content string, step *domain.Node) *models.DagStepLogResponse {
+	return &models.DagStepLogResponse{
 		LogFile: lo.ToPtr(logFile),
 		Step:    ToNode(step),
 		Content: lo.ToPtr(content),
 	}
 }
 
-func ToWorkflowSchedulerLogResponse(logFile, content string) *models.WorkflowSchedulerLogResponse {
-	return &models.WorkflowSchedulerLogResponse{
+func ToWorkflowSchedulerLogResponse(logFile, content string) *models.DagSchedulerLogResponse {
+	return &models.DagSchedulerLogResponse{
 		LogFile: lo.ToPtr(logFile),
 		Content: lo.ToPtr(content),
 	}

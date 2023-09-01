@@ -51,7 +51,7 @@ function DAGActions({
       requestId?: string;
       params?: string;
     }) => {
-      const url = `${getConfig().apiURL}/workflows/${params.name}`;
+      const url = `${getConfig().apiURL}/dags/${params.name}`;
       const ret = await fetch(url, {
         method: 'POST',
         headers: {

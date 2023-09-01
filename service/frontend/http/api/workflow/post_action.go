@@ -23,11 +23,11 @@ var (
 	errInvalidArgs = errors.New("invalid argument")
 )
 
-func PostAction(params operations.PostWorkflowActionParams) (*models.PostWorkflowActionResponse, *response.CodedError) {
+func PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
-	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.WorkflowID))
+	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	dr := controller.NewDAGStatusReader(jsondb.New())
 	d, err := dr.ReadStatus(file, false)
 
@@ -111,13 +111,13 @@ func PostAction(params operations.PostWorkflowActionParams) (*models.PostWorkflo
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
-		return &models.PostWorkflowActionResponse{NewWorkflowID: params.Body.Value}, nil
+		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
 
 	default:
 		return nil, response.NewBadRequestError(fmt.Errorf("invalid action: %s", params.Body.Action))
 	}
 
-	return &models.PostWorkflowActionResponse{}, nil
+	return &models.PostDagActionResponse{}, nil
 }
 
 func nameWithExt(name string) string {

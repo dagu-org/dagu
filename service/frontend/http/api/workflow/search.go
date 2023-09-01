@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 )
 
-func Search(params operations.SearchWorkflowsParams) (*models.SearchWorkflowsResponse, *response.CodedError) {
+func Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 

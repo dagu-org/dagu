@@ -18,7 +18,7 @@ function DAGEditButtons({ name }: Props) {
             alert('DAG name cannot contain space');
             return;
           }
-          const url = `${getConfig().apiURL}/workflows/${name}`;
+          const url = `${getConfig().apiURL}/dags/${name}`;
           const resp = await fetch(url, {
             method: 'POST',
             headers: {
@@ -44,7 +44,7 @@ function DAGEditButtons({ name }: Props) {
           if (!confirm('Are you sure to delete the DAG?')) {
             return;
           }
-          const url = `${getConfig().apiURL}/workflows/${name}`;
+          const url = `${getConfig().apiURL}/dags/${name}`;
           const resp = await fetch(url, {
             method: 'DELETE',
             headers: {

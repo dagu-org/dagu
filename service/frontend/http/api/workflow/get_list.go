@@ -1,17 +1,17 @@
 package workflow
 
 import (
-	"github.com/samber/lo"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
+	"github.com/samber/lo"
 	"path/filepath"
 )
 
-func GetList(_ operations.ListWorkflowsParams) (*models.ListWorkflowsResponse, *response.CodedError) {
+func GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
 	cfg := config.Get()
 
 	// TODO: fix this to use workflow store & history store

@@ -131,7 +131,7 @@ function DAGSpec({ data }: Props) {
                           </span>
                         }
                         onClick={async () => {
-                          const url = `${getConfig().apiURL}/workflows/${
+                          const url = `${getConfig().apiURL}/dags/${
                             props.name
                           }`;
                           const resp = await fetch(url, {

@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"fmt"
-	"github.com/samber/lo"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/controller"
@@ -11,6 +10,7 @@ import (
 	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
+	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
@@ -29,8 +29,8 @@ const (
 	dagTabTypeSchedulerLog = "scheduler-log"
 )
 
-func GetDetail(params operations.GetWorkflowDetailParams) (*models.GetWorkflowDetailResponse, *response.CodedError) {
-	workflowID := params.WorkflowID
+func GetDetail(params operations.GetDagDetailParams) (*models.GetDagDetailResponse, *response.CodedError) {
+	dagID := params.DagID
 
 	// TODO: separate API
 	// optional params
@@ -45,16 +45,16 @@ func GetDetail(params operations.GetWorkflowDetailParams) (*models.GetWorkflowDe
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
-	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", workflowID))
+	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dagID))
 	dr := controller.NewDAGStatusReader(jsondb.New())
-	workflowStatus, err := dr.ReadStatus(file, false)
-	if workflowStatus == nil {
+	dagStatus, err := dr.ReadStatus(file, false)
+	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
 
-	ctrl := controller.New(workflowStatus.DAG, jsondb.New())
+	ctrl := controller.New(dagStatus.DAG, jsondb.New())
 	resp := response.ToGetWorkflowDetailResponse(
-		workflowStatus,
+		dagStatus,
 		tab,
 	)
 
@@ -72,7 +72,7 @@ func GetDetail(params operations.GetWorkflowDetailParams) (*models.GetWorkflowDe
 		resp.Definition = lo.ToPtr(string(dagContent))
 
 	case dagTabTypeHistory:
-		logs := controller.New(workflowStatus.DAG, jsondb.New()).GetRecentStatuses(30)
+		logs := controller.New(dagStatus.DAG, jsondb.New()).GetRecentStatuses(30)
 		resp.LogData = response.ToWorkflowLogResponse(logs)
 
 	case dagTabTypeStepLog:
@@ -95,7 +95,7 @@ func GetDetail(params operations.GetWorkflowDetailParams) (*models.GetWorkflowDe
 	return resp, nil
 }
 
-func getStepLog(c *controller.DAGController, logFile, stepName string) (*models.WorkflowStepLogResponse, error) {
+func getStepLog(c *controller.DAGController, logFile, stepName string) (*models.DagStepLogResponse, error) {
 	var stepByName = map[string]*domain.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
@@ -168,7 +168,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func readSchedulerLog(ctrl *controller.DAGController, statusFile string) (*models.WorkflowSchedulerLogResponse, error) {
+func readSchedulerLog(ctrl *controller.DAGController, statusFile string) (*models.DagSchedulerLogResponse, error) {
 	var (
 		logFile string
 	)
