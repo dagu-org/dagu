@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/service/scheduler/entry_reader"
-	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/service/core/scheduler/entry_reader"
+	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 	"go.uber.org/fx"
 )
 

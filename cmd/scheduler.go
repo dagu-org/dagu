@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/dagu-dev/dagu/app"
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/service/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -16,7 +17,7 @@ func createSchedulerCommand() *cobra.Command {
 			// TODO: fixme
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 
-			service := app.NewSchedulerService()
+			service := core.NewScheduler(app.TopLevelModule)
 			err := service.Start(cmd.Context())
 			checkError(err)
 		},

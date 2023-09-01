@@ -3,8 +3,8 @@ package entry_reader
 import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	"github.com/dagu-dev/dagu/service/scheduler/filenotify"
-	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/service/core/scheduler/filenotify"
+	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 	"os"
 	"path/filepath"
 	"strings"

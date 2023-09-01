@@ -6,7 +6,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
-	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 	"os"
 	"path"
 	"testing"

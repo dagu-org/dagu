@@ -4,13 +4,12 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/frontend"
-	"github.com/dagu-dev/dagu/service/scheduler"
 	"go.uber.org/fx"
 	"os"
 )
 
 var (
-	CommonModule = fx.Options(
+	TopLevelModule = fx.Options(
 		fx.Provide(ConfigProvider),
 		fx.Provide(logger.NewSlogLogger),
 	)
@@ -38,16 +37,8 @@ func ConfigProvider() *config.Config {
 
 func NewFrontendService() *fx.App {
 	return fx.New(
-		CommonModule,
+		TopLevelModule,
 		frontend.Module,
 		fx.Invoke(frontend.LifetimeHooks),
-	)
-}
-
-func NewSchedulerService() *fx.App {
-	return fx.New(
-		CommonModule,
-		scheduler.Module,
-		fx.Invoke(scheduler.LifetimeHooks),
 	)
 }
