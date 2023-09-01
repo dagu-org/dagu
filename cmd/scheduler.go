@@ -17,8 +17,7 @@ func createSchedulerCommand() *cobra.Command {
 			// TODO: fixme
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 
-			service := core.NewScheduler(app.TopLevelModule)
-			err := service.Start(cmd.Context())
+			err := core.NewScheduler(app.TopLevelModule).Start(cmd.Context())
 			checkError(err)
 		},
 	}
