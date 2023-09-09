@@ -31,7 +31,7 @@ import (
 
 // Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
-	*AgentConfig
+	*Config
 
 	// TODO: Do not use the persistence package directly.
 	dataStoreFactory persistence.DataStoreFactory
@@ -46,16 +46,16 @@ type Agent struct {
 	finished         uint32
 }
 
-func New(config *AgentConfig, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
+func New(config *Config, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
 	return &Agent{
-		AgentConfig:      config,
+		Config:           config,
 		engine:           e,
 		dataStoreFactory: ds,
 	}
 }
 
-// AgentConfig contains the configuration for an Agent.
-type AgentConfig struct {
+// Config contains the configuration for an Agent.
+type Config struct {
 	DAG *dag.DAG
 	Dry bool
 
@@ -261,7 +261,7 @@ func (a *Agent) setupSocketServer() (err error) {
 	a.socketServer, err = sock.NewServer(
 		&sock.Config{
 			Addr:        a.DAG.SockAddr(),
-			HandlerFunc: a.handleHTTP,
+			HandlerFunc: a.HandleHTTP,
 		})
 	return
 }
@@ -397,7 +397,7 @@ var (
 	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
 )
 
-func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
+func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	switch {
 	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):

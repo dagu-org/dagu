@@ -1,7 +1,8 @@
-package agent
+package agent_test
 
 import (
 	"context"
+	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"net/http"
@@ -46,7 +47,7 @@ func TestRunDAG(t *testing.T) {
 	}()
 
 	d := testLoadDAG(t, "run.yaml")
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 
 	status, _ := e.GetLastStatus(d)
 	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
@@ -66,7 +67,7 @@ func TestRunDAG(t *testing.T) {
 
 	// check deletion of expired history files
 	d.HistRetentionDays = 0
-	a = New(&AgentConfig{DAG: d}, e, df)
+	a = agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.NoError(t, err)
 	statusList := e.GetRecentStatuses(d, 100)
@@ -80,7 +81,7 @@ func TestCheckRunning(t *testing.T) {
 	}()
 
 	d := testLoadDAG(t, "is_running.yaml")
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 
 	go func() {
 		_ = a.Run(context.Background())
@@ -92,7 +93,7 @@ func TestCheckRunning(t *testing.T) {
 	require.NotNil(t, status)
 	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
 
-	a = New(&AgentConfig{DAG: d}, e, df)
+	a = agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "is already running")
@@ -105,7 +106,7 @@ func TestDryRun(t *testing.T) {
 	}()
 
 	d := testLoadDAG(t, "dry.yaml")
-	a := New(&AgentConfig{DAG: d, Dry: true}, e, df)
+	a := agent.New(&agent.Config{DAG: d, Dry: true}, e, df)
 
 	err := a.Run(context.Background())
 	require.NoError(t, err)
@@ -122,11 +123,11 @@ func TestCancelDAG(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	for _, abort := range []func(*Agent){
-		func(a *Agent) { a.Signal(syscall.SIGTERM) },
+	for _, abort := range []func(*agent.Agent){
+		func(a *agent.Agent) { a.Signal(syscall.SIGTERM) },
 	} {
 		d := testLoadDAG(t, "sleep.yaml")
-		a := New(&AgentConfig{DAG: d}, e, df)
+		a := agent.New(&agent.Config{DAG: d}, e, df)
 
 		go func() {
 			_ = a.Run(context.Background())
@@ -155,7 +156,7 @@ func TestPreConditionInvalid(t *testing.T) {
 		},
 	}
 
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.Error(t, err)
 
@@ -180,7 +181,7 @@ func TestPreConditionValid(t *testing.T) {
 		},
 	}
 
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.NoError(t, err)
 
@@ -198,7 +199,7 @@ func TestStartError(t *testing.T) {
 	}()
 	d := testLoadDAG(t, "error.yaml")
 
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.Error(t, err)
 
@@ -213,7 +214,7 @@ func TestOnExit(t *testing.T) {
 	}()
 
 	d := testLoadDAG(t, "on_exit.yaml")
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.NoError(t, err)
 
@@ -233,7 +234,7 @@ func TestRetry(t *testing.T) {
 
 	d := testLoadDAG(t, "retry.yaml")
 
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
 	require.Error(t, err)
 
@@ -244,7 +245,7 @@ func TestRetry(t *testing.T) {
 		n.CmdWithArgs = "true"
 	}
 
-	a = New(&AgentConfig{DAG: d, RetryTarget: status}, e, df)
+	a = agent.New(&agent.Config{DAG: d, RetryTarget: status}, e, df)
 	err = a.Run(context.Background())
 	require.NoError(t, err)
 
@@ -266,7 +267,7 @@ func TestHandleHTTP(t *testing.T) {
 	}()
 
 	d := testLoadDAG(t, "handle_http.yaml")
-	a := New(&AgentConfig{DAG: d}, e, df)
+	a := agent.New(&agent.Config{DAG: d}, e, df)
 
 	go func() {
 		err := a.Run(context.Background())
@@ -285,7 +286,7 @@ func TestHandleHTTP(t *testing.T) {
 		},
 	}
 
-	a.handleHTTP(&mockResponseWriter, req)
+	a.HandleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 	status, err := model.StatusFromJson(mockResponseWriter.body)
@@ -299,7 +300,7 @@ func TestHandleHTTP(t *testing.T) {
 			Path: "/invalid-path",
 		},
 	}
-	a.handleHTTP(&mockResponseWriter, req)
+	a.HandleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
 
 	// cancel
@@ -309,7 +310,7 @@ func TestHandleHTTP(t *testing.T) {
 			Path: "/stop",
 		},
 	}
-	a.handleHTTP(&mockResponseWriter, req)
+	a.HandleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 	require.Equal(t, "OK", mockResponseWriter.body)
 

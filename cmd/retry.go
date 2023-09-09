@@ -32,7 +32,7 @@ func retryCmd() *cobra.Command {
 			loadedDAG, err := loadDAG(args[0], status.Status.Params)
 			checkError(err)
 
-			a := agent.New(&agent.AgentConfig{DAG: loadedDAG, RetryTarget: status.Status}, e, df)
+			a := agent.New(&agent.Config{DAG: loadedDAG, RetryTarget: status.Status}, e, df)
 			ctx := cmd.Context()
 			listenSignals(ctx, a)
 			checkError(a.Run(ctx))

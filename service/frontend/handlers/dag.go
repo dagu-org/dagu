@@ -251,6 +251,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 		}
 		status = s
 	} else {
+		// TODO: fix not to use json db directly
 		s, err := jsondb.ParseFile(logFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", logFile, err)
@@ -322,6 +323,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 		}
 		logFile = s.Log
 	} else {
+		// TODO: fix not to use json db directly
 		s, err := jsondb.ParseFile(statusFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", statusFile, err)

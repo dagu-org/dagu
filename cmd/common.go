@@ -31,7 +31,7 @@ func start(ctx context.Context, e engine.Engine, d *dag.DAG, dry bool) error {
 	// TODO: remove this
 	ds := client.NewDataStoreFactory(config.Get())
 
-	a := agent.New(&agent.AgentConfig{DAG: d, Dry: dry}, e, ds)
+	a := agent.New(&agent.Config{DAG: d, Dry: dry}, e, ds)
 	listenSignals(ctx, a)
 	return a.Run(ctx)
 }
