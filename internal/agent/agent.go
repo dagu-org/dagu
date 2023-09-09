@@ -20,8 +20,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/mailer"
-	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/pb"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/reporter"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
@@ -52,7 +52,7 @@ type AgentConfig struct {
 
 // RetryConfig contains the configuration for retrying a dags.
 type RetryConfig struct {
-	Status *models.Status
+	Status *model.Status
 }
 
 // Run starts the dags execution.
@@ -86,13 +86,13 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // Status returns the current status of the dags.
-func (a *Agent) Status() *models.Status {
+func (a *Agent) Status() *model.Status {
 	scStatus := a.scheduler.Status(a.graph)
 	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {
 		scStatus = scheduler.SchedulerStatus_Running
 	}
 
-	status := models.NewStatus(
+	status := model.NewStatus(
 		a.DAG,
 		a.graph.Nodes(),
 		scStatus,
@@ -103,16 +103,16 @@ func (a *Agent) Status() *models.Status {
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
-		status.OnExit = models.FromNode(node)
+		status.OnExit = model.FromNode(node)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
-		status.OnSuccess = models.FromNode(node)
+		status.OnSuccess = model.FromNode(node)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
-		status.OnFailure = models.FromNode(node)
+		status.OnFailure = model.FromNode(node)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
-		status.OnCancel = models.FromNode(node)
+		status.OnCancel = model.FromNode(node)
 	}
 	return status
 }

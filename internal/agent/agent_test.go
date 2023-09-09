@@ -15,7 +15,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/stretchr/testify/require"
@@ -222,7 +222,7 @@ func TestHandleHTTP(t *testing.T) {
 	a.handleHTTP(&mockResponseWriter, req)
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
-	status, err := models.StatusFromJson(mockResponseWriter.body)
+	status, err := model.StatusFromJson(mockResponseWriter.body)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Running, status.Status)
 
@@ -277,7 +277,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
 }
 
-func testDAG(t *testing.T, d *dag.DAG) (*models.Status, error) {
+func testDAG(t *testing.T, d *dag.DAG) (*model.Status, error) {
 	t.Helper()
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 	err := a.Run(context.Background())

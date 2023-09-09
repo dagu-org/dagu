@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -29,7 +29,7 @@ type Mailer interface {
 }
 
 // ReportStep is a function that reports the status of a step.
-func (rp *Reporter) ReportStep(d *dag.DAG, status *models.Status, node *scheduler.Node) error {
+func (rp *Reporter) ReportStep(d *dag.DAG, status *model.Status, node *scheduler.Node) error {
 	st := node.ReadStatus()
 	if st != scheduler.NodeStatus_None {
 		log.Printf("%s %s", node.Name, status.StatusText)
@@ -46,7 +46,7 @@ func (rp *Reporter) ReportStep(d *dag.DAG, status *models.Status, node *schedule
 }
 
 // ReportSummary is a function that reports the status of the scheduler.
-func (rp *Reporter) ReportSummary(status *models.Status, err error) {
+func (rp *Reporter) ReportSummary(status *model.Status, err error) {
 	var buf bytes.Buffer
 	buf.Write([]byte("\n"))
 	buf.Write([]byte("Summary ->\n"))
@@ -58,7 +58,7 @@ func (rp *Reporter) ReportSummary(status *models.Status, err error) {
 }
 
 // SendMail is a function that sends a report mail.
-func (rp *Reporter) SendMail(d *dag.DAG, status *models.Status, err error) error {
+func (rp *Reporter) SendMail(d *dag.DAG, status *model.Status, err error) error {
 	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
 		if d.MailOn != nil && d.MailOn.Failure {
 			return rp.Mailer.SendMail(
@@ -81,7 +81,7 @@ func (rp *Reporter) SendMail(d *dag.DAG, status *models.Status, err error) error
 	return nil
 }
 
-func renderSummary(status *models.Status, err error) string {
+func renderSummary(status *model.Status, err error) string {
 	t := table.NewWriter()
 	var errText = ""
 	if err != nil {
@@ -100,7 +100,7 @@ func renderSummary(status *models.Status, err error) string {
 	return t.Render()
 }
 
-func renderTable(nodes []*models.Node) string {
+func renderTable(nodes []*model.Node) string {
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"})
 	for i, n := range nodes {
@@ -121,7 +121,7 @@ func renderTable(nodes []*models.Node) string {
 	return t.Render()
 }
 
-func renderHTML(nodes []*models.Node) string {
+func renderHTML(nodes []*model.Node) string {
 	var buffer bytes.Buffer
 	addValFunc := func(val string) {
 		buffer.WriteString(

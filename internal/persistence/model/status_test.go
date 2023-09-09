@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"encoding/json"
@@ -8,8 +8,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPid(t *testing.T) {

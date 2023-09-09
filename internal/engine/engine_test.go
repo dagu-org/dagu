@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/utils"
@@ -49,7 +49,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 		&sock.Config{
 			Addr: ds.DAG.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				status := models.NewStatus(
+				status := model.NewStatus(
 					ds.DAG, []*scheduler.Node{},
 					scheduler.SchedulerStatus_Running, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
@@ -417,9 +417,9 @@ func testDAG(name string) string {
 	return path.Join(testdataDir, name)
 }
 
-func testNewStatus(d *dag.DAG, reqId string, status scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
+func testNewStatus(d *dag.DAG, reqId string, status scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *model.Status {
 	now := time.Now()
-	ret := models.NewStatus(
+	ret := model.NewStatus(
 		d, []*scheduler.Node{{NodeState: scheduler.NodeState{Status: nodeStatus}}},
 		status, 0, &now, nil)
 	ret.RequestId = reqId

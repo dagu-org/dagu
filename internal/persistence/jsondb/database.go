@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"io"
 	"log"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
@@ -48,7 +48,7 @@ func New() *Store {
 	return &Store{Config: defaultConfig()}
 }
 
-func (store *Store) Update(dagFile, requestId string, s *models.Status) error {
+func (store *Store) Update(dagFile, requestId string, s *model.Status) error {
 	f, err := store.FindByRequestId(dagFile, requestId)
 	if err != nil {
 		return err
@@ -75,7 +75,7 @@ func (store *Store) Open(dagFile string, t time.Time, requestId string) error {
 	return nil
 }
 
-func (store *Store) Write(s *models.Status) error {
+func (store *Store) Write(s *model.Status) error {
 	return store.writer.write(s)
 }
 
@@ -93,7 +93,7 @@ func (store *Store) Close() error {
 }
 
 // ParseFile parses a status file.
-func ParseFile(file string) (*models.Status, error) {
+func ParseFile(file string) (*model.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Printf("failed to open file. err: %v", err)
@@ -103,7 +103,7 @@ func ParseFile(file string) (*models.Status, error) {
 		_ = f.Close()
 	}()
 	var offset int64 = 0
-	var ret *models.Status
+	var ret *model.Status
 	for {
 		line, err := readLineFrom(f, offset)
 		if err == io.EOF {
@@ -116,8 +116,8 @@ func ParseFile(file string) (*models.Status, error) {
 		}
 		offset += int64(len(line)) + 1 // +1 for newline
 		if len(line) > 0 {
-			var m *models.Status
-			m, err = models.StatusFromJson(string(line))
+			var m *model.Status
+			m, err = model.StatusFromJson(string(line))
 			if err == nil {
 				ret = m
 				continue
@@ -137,13 +137,13 @@ func (store *Store) newWriter(dagFile string, t time.Time, requestId string) (*w
 }
 
 // ReadStatusHist returns a list of status files.
-func (store *Store) ReadStatusHist(dagFile string, n int) []*models.StatusFile {
-	ret := make([]*models.StatusFile, 0)
+func (store *Store) ReadStatusHist(dagFile string, n int) []*model.StatusFile {
+	ret := make([]*model.StatusFile, 0)
 	files := store.latest(store.pattern(dagFile)+"*.dat", n)
 	for _, file := range files {
 		status, err := ParseFile(file)
 		if err == nil {
-			ret = append(ret, &models.StatusFile{
+			ret = append(ret, &model.StatusFile{
 				File:   file,
 				Status: status,
 			})
@@ -153,7 +153,7 @@ func (store *Store) ReadStatusHist(dagFile string, n int) []*models.StatusFile {
 }
 
 // ReadStatusToday returns a list of status files.
-func (store *Store) ReadStatusToday(dagFile string) (*models.Status, error) {
+func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 	file, err := store.latestToday(dagFile, time.Now())
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (store *Store) ReadStatusToday(dagFile string) (*models.Status, error) {
 }
 
 // FindByRequestId finds a status file by requestId.
-func (store *Store) FindByRequestId(dagFile string, requestId string) (*models.StatusFile, error) {
+func (store *Store) FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error) {
 	if requestId == "" {
 		return nil, fmt.Errorf("requestId is empty")
 	}
@@ -179,7 +179,7 @@ func (store *Store) FindByRequestId(dagFile string, requestId string) (*models.S
 				continue
 			}
 			if status != nil && status.RequestId == requestId {
-				return &models.StatusFile{
+				return &model.StatusFile{
 					File:   f,
 					Status: status,
 				}, nil
