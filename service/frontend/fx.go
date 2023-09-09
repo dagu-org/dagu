@@ -10,7 +10,6 @@ import (
 
 var Module = fx.Options(
 	fx.Provide(New),
-	fx.Invoke(LifetimeHooks),
 )
 
 type Params struct {

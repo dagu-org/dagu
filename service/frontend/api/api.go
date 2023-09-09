@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/dagu-dev/dagu/service/frontend/http/api/dags"
+	"github.com/dagu-dev/dagu/service/frontend/api/dags"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"github.com/go-openapi/runtime/middleware"
 )

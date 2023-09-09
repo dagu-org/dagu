@@ -10,7 +10,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
-	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
+	"github.com/dagu-dev/dagu/service/frontend/api/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"github.com/samber/lo"

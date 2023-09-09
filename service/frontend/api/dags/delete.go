@@ -5,7 +5,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
-	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
+	"github.com/dagu-dev/dagu/service/frontend/api/response"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"path/filepath"
 )

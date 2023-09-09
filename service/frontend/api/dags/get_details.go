@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/controller"
 	domain "github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
-	"github.com/dagu-dev/dagu/service/frontend/http/api/response"
+	"github.com/dagu-dev/dagu/service/frontend/api/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"github.com/samber/lo"

@@ -6,7 +6,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	pkgapi "github.com/dagu-dev/dagu/service/frontend/http/api"
+	pkgapi "github.com/dagu-dev/dagu/service/frontend/api"
 	"github.com/dagu-dev/dagu/service/frontend/http/handler"
 	"github.com/dagu-dev/dagu/service/frontend/restapi"
 	"github.com/go-openapi/loads"
