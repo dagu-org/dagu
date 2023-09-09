@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -20,8 +20,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/mailer"
-	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/pb"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/reporter"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
@@ -31,28 +31,36 @@ import (
 
 // Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
-	*AgentConfig
-	*RetryConfig
+	*Config
 
-	engineFactory engine.Factory
-	scheduler     *scheduler.Scheduler
-	graph         *scheduler.ExecutionGraph
-	logManager    *logManager
-	reporter      *reporter.Reporter
-	historyStore  persistence.HistoryStore
-	socketServer  *sock.Server
-	requestId     string
+	// TODO: Do not use the persistence package directly.
+	dataStoreFactory persistence.DataStoreFactory
+	engine           engine.Engine
+	scheduler        *scheduler.Scheduler
+	graph            *scheduler.ExecutionGraph
+	logManager       *logManager
+	reporter         *reporter.Reporter
+	historyStore     persistence.HistoryStore
+	socketServer     *sock.Server
+	requestId        string
+	finished         uint32
 }
 
-// AgentConfig contains the configuration for an Agent.
-type AgentConfig struct {
+func New(config *Config, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
+	return &Agent{
+		Config:           config,
+		engine:           e,
+		dataStoreFactory: ds,
+	}
+}
+
+// Config contains the configuration for an Agent.
+type Config struct {
 	DAG *dag.DAG
 	Dry bool
-}
 
-// RetryConfig contains the configuration for retrying a dags.
-type RetryConfig struct {
-	Status *models.Status
+	// RetryTarget is the status to retry.
+	RetryTarget *model.Status
 }
 
 // Run starts the dags execution.
@@ -86,13 +94,13 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // Status returns the current status of the dags.
-func (a *Agent) Status() *models.Status {
+func (a *Agent) Status() *model.Status {
 	scStatus := a.scheduler.Status(a.graph)
 	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {
 		scStatus = scheduler.SchedulerStatus_Running
 	}
 
-	status := models.NewStatus(
+	status := model.NewStatus(
 		a.DAG,
 		a.graph.Nodes(),
 		scStatus,
@@ -103,16 +111,16 @@ func (a *Agent) Status() *models.Status {
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
-		status.OnExit = models.FromNode(node)
+		status.OnExit = model.FromNode(node)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
-		status.OnSuccess = models.FromNode(node)
+		status.OnSuccess = model.FromNode(node)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
-		status.OnFailure = models.FromNode(node)
+		status.OnFailure = model.FromNode(node)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
-		status.OnCancel = models.FromNode(node)
+		status.OnCancel = model.FromNode(node)
 	}
 	return status
 }
@@ -167,9 +175,6 @@ func (a *Agent) init() {
 		RequestId:     a.requestId,
 	}
 
-	// TODO: inject engine factory
-	a.engineFactory = engine.NewFactory()
-
 	if a.DAG.HandlerOn.Exit != nil {
 		onExit, _ := pb.ToPbStep(a.DAG.HandlerOn.Exit)
 		config.OnExit = onExit
@@ -214,7 +219,7 @@ func (a *Agent) init() {
 }
 
 func (a *Agent) setupGraph() (err error) {
-	if a.RetryConfig != nil && a.RetryConfig.Status != nil {
+	if a.RetryTarget != nil {
 		log.Printf("setup for retry")
 		return a.setupRetry()
 	}
@@ -223,8 +228,8 @@ func (a *Agent) setupGraph() (err error) {
 }
 
 func (a *Agent) setupRetry() (err error) {
-	nodes := []*scheduler.Node{}
-	for _, n := range a.RetryConfig.Status.Nodes {
+	nodes := make([]*scheduler.Node, 0, len(a.RetryTarget.Nodes))
+	for _, n := range a.RetryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
 	a.graph, err = scheduler.NewExecutionGraphForRetry(nodes...)
@@ -241,8 +246,8 @@ func (a *Agent) setupRequestId() error {
 }
 
 func (a *Agent) setupDatabase() error {
-	// TODO: use engine instead of directly using jsondb
-	a.historyStore = jsondb.New()
+	// TODO: do not use the persistence package directly.
+	a.historyStore = a.dataStoreFactory.NewHistoryStore()
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
 		utils.LogErr("clean old history data", err)
 	}
@@ -256,7 +261,7 @@ func (a *Agent) setupSocketServer() (err error) {
 	a.socketServer, err = sock.NewServer(
 		&sock.Config{
 			Addr:        a.DAG.SockAddr(),
-			HandlerFunc: a.handleHTTP,
+			HandlerFunc: a.HandleHTTP,
 		})
 	return
 }
@@ -319,6 +324,9 @@ func (a *Agent) run(ctx context.Context) error {
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
+		if a.finished == 1 {
+			return
+		}
 		utils.LogErr("write status", a.historyStore.Write(a.Status()))
 	}()
 
@@ -332,6 +340,8 @@ func (a *Agent) run(ctx context.Context) error {
 
 	a.reporter.ReportSummary(status, lastErr)
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
+
+	atomic.CompareAndSwapUint32(&a.finished, 0, 1)
 	utils.LogErr("close data file", a.historyStore.Close())
 
 	return lastErr
@@ -364,8 +374,7 @@ func (a *Agent) dryRun() error {
 }
 
 func (a *Agent) checkIsRunning() error {
-	e := a.engineFactory.Create()
-	status, err := e.GetStatus(a.DAG)
+	status, err := a.engine.GetStatus(a.DAG)
 	if err != nil {
 		return err
 	}
@@ -388,7 +397,7 @@ var (
 	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
 )
 
-func (a *Agent) handleHTTP(w http.ResponseWriter, r *http.Request) {
+func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	switch {
 	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):

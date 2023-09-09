@@ -55,31 +55,31 @@ func LoadConfig(userHomeDir string) error {
 	viper.SetEnvPrefix("dagu")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
-	viper.BindEnv("command", "DAGU_EXECUTABLE")
-	viper.BindEnv("dags", "DAGU_DAGS_DIR")
-	viper.BindEnv("workDir", "DAGU_WORK_DIR")
-	viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
-	viper.BindEnv("basicAuthUsername", "DAGU_BASICAUTH_USERNAME")
-	viper.BindEnv("basicAuthPassword", "DAGU_BASICAUTH_PASSWORD")
-	viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
-	viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
-	viper.BindEnv("logDir", "DAGU_LOG_DIR")
-	viper.BindEnv("dataDir", "DAGU_DATA_DIR")
-	viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
-	viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
-	viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
-	viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
-	viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
-	viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
+	_ = viper.BindEnv("command", "DAGU_EXECUTABLE")
+	_ = viper.BindEnv("dags", "DAGU_DAGS_DIR")
+	_ = viper.BindEnv("workDir", "DAGU_WORK_DIR")
+	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
+	_ = viper.BindEnv("basicAuthUsername", "DAGU_BASICAUTH_USERNAME")
+	_ = viper.BindEnv("basicAuthPassword", "DAGU_BASICAUTH_PASSWORD")
+	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
+	_ = viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
+	_ = viper.BindEnv("logDir", "DAGU_LOG_DIR")
+	_ = viper.BindEnv("dataDir", "DAGU_DATA_DIR")
+	_ = viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
+	_ = viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
+	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
+	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
+	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
 
-	exectable := "dagu"
+	command := "dagu"
 	if ex, err := os.Executable(); err == nil {
-		exectable = ex
+		command = ex
 	}
 
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
-	viper.SetDefault("command", exectable)
+	viper.SetDefault("command", command)
 	viper.SetDefault("dags", path.Join(appHome, "dags"))
 	viper.SetDefault("workDir", "")
 	viper.SetDefault("isBasicAuth", "0")
@@ -150,7 +150,7 @@ func loadLegacyEnvs() {
 }
 
 func getEnv(env, def string) string {
-	v := os.Getenv("env")
+	v := os.Getenv(env)
 	if v == "" {
 		return def
 	}
@@ -163,7 +163,7 @@ func parseInt(s string) int {
 }
 
 func getEnvI(env string, def int) int {
-	v := os.Getenv("env")
+	v := os.Getenv(env)
 	if v == "" {
 		return def
 	}

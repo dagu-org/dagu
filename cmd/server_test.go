@@ -4,22 +4,25 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/require"
 	"net"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestServerCommand(t *testing.T) {
-	port := findPort(t)
+	tmpDir, _, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
-	// Start the frontend.
 	go func() {
 		testRunCommand(t, serverCmd(), cmdTest{
-			args:        []string{"server", fmt.Sprintf("--port=%s", port)},
+			args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
 			expectedOut: []string{"server is running"},
 		})
 	}()
 
-	time.Sleep(time.Millisecond * 300)
+	time.Sleep(time.Millisecond * 500)
 }
 
 func findPort(t *testing.T) string {

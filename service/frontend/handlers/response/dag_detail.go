@@ -3,7 +3,7 @@ package response
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	domain "github.com/dagu-dev/dagu/internal/models"
+	domain "github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )

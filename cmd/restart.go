@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"log"
@@ -20,9 +22,8 @@ func restartCmd() *cobra.Command {
 			loadedDAG, err := loadDAG(dagFile, "")
 			checkError(err)
 
-			// TODO: inject this
-			ef := engine.NewFactory()
-			e := ef.Create()
+			df := client.NewDataStoreFactory(config.Get())
+			e := engine.NewFactory(df).Create()
 
 			// Check the current status and stop the DAG if it is running.
 			stopDAGIfRunning(e, loadedDAG)
@@ -37,7 +38,7 @@ func restartCmd() *cobra.Command {
 			// Start the DAG with the same parameter.
 			loadedDAG, err = loadDAG(dagFile, params)
 			checkError(err)
-			cobra.CheckErr(start(cmd.Context(), loadedDAG, false))
+			cobra.CheckErr(start(cmd.Context(), e, loadedDAG, false))
 		},
 	}
 }
@@ -61,8 +62,6 @@ func stopRunningDAG(e engine.Engine, dag *dag.DAG) error {
 		if st.Status != scheduler.SchedulerStatus_Running {
 			return nil
 		}
-		// TODO: fix this
-		e := engine.NewFactory().Create()
 		checkError(e.Stop(dag))
 		time.Sleep(time.Millisecond * 100)
 	}

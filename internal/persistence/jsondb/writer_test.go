@@ -2,12 +2,12 @@ package jsondb
 
 import (
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ func testWriteStatusToFile(t *testing.T, db *Store) {
 		_ = db.RemoveOld(d.Location, 0)
 	}()
 
-	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
+	status := model.NewStatus(d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)
 	status.RequestId = fmt.Sprintf("request-id-%d", time.Now().Unix())
 	require.NoError(t, dw.write(status))
 	require.Regexp(t, ".*test_write_status.*", file)
@@ -33,7 +33,7 @@ func testWriteStatusToFile(t *testing.T, db *Store) {
 	dat, err := os.ReadFile(file)
 	require.NoError(t, err)
 
-	r, err := models.StatusFromJson(string(dat))
+	r, err := model.StatusFromJson(string(dat))
 	require.NoError(t, err)
 
 	require.Equal(t, d.Name, r.Name)
@@ -44,8 +44,8 @@ func testWriteStatusToFile(t *testing.T, db *Store) {
 	old := d.Location
 	new := "text_write_status_new.yaml"
 
-	oldDir := db.dir(old, prefix(old))
-	newDir := db.dir(new, prefix(new))
+	oldDir := db.directory(old, prefix(old))
+	newDir := db.directory(new, prefix(new))
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 
@@ -68,7 +68,7 @@ func testWriteStatusToExistingFile(t *testing.T, db *Store) {
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 
-	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)
+	status := model.NewStatus(d, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)
 	status.RequestId = "request-id-test-write-status-to-existing-file"
 	require.NoError(t, dw.write(status))
 	dw.close()

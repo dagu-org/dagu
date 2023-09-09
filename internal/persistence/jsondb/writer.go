@@ -2,12 +2,12 @@ package jsondb
 
 import (
 	"bufio"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"os"
 	"path"
 	"strings"
 	"sync"
 
-	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
@@ -32,7 +32,7 @@ func (w *writer) open() (err error) {
 }
 
 // Writer appends the status to the local file.
-func (w *writer) write(st *models.Status) error {
+func (w *writer) write(st *model.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	jsonb, _ := st.ToJson()

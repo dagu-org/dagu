@@ -105,32 +105,28 @@ func ToPbStep(dagStep *dag.Step) (*Step, error) {
 		SignalOnStop: dagStep.SignalOnStop,
 	}
 
-	if &dagStep.ExecutorConfig != nil {
-		config := make(map[string]*anypb.Any, len(dagStep.ExecutorConfig.Config))
-		for k, v := range dagStep.ExecutorConfig.Config {
-			pMsg, err := convertToProtoMessage(v)
-			if err != nil {
-				return nil, err
-			}
-
-			any, err := anypb.New(pMsg)
-			if err != nil {
-				return nil, err
-			}
-
-			config[k] = any
+	config := make(map[string]*anypb.Any, len(dagStep.ExecutorConfig.Config))
+	for k, v := range dagStep.ExecutorConfig.Config {
+		pMsg, err := convertToProtoMessage(v)
+		if err != nil {
+			return nil, err
 		}
-		step.ExecutorConfig = &ExecutorConfig{
-			Type:   dagStep.ExecutorConfig.Type,
-			Config: config,
+
+		any, err := anypb.New(pMsg)
+		if err != nil {
+			return nil, err
 		}
+
+		config[k] = any
+	}
+	step.ExecutorConfig = &ExecutorConfig{
+		Type:   dagStep.ExecutorConfig.Type,
+		Config: config,
 	}
 
-	if &dagStep.ContinueOn != nil {
-		step.ContinueOn = &ContinueOn{
-			Failure: dagStep.ContinueOn.Failure,
-			Skipped: dagStep.ContinueOn.Skipped,
-		}
+	step.ContinueOn = &ContinueOn{
+		Failure: dagStep.ContinueOn.Failure,
+		Skipped: dagStep.ContinueOn.Skipped,
 	}
 
 	if dagStep.RetryPolicy != nil {
@@ -140,11 +136,9 @@ func ToPbStep(dagStep *dag.Step) (*Step, error) {
 		}
 	}
 
-	if &dagStep.RepeatPolicy != nil {
-		step.RepeatPolicy = &RepeatPolicy{
-			Repeat:   dagStep.RepeatPolicy.Repeat,
-			Interval: durationpb.New(dagStep.RepeatPolicy.Interval),
-		}
+	step.RepeatPolicy = &RepeatPolicy{
+		Repeat:   dagStep.RepeatPolicy.Repeat,
+		Interval: durationpb.New(dagStep.RepeatPolicy.Interval),
 	}
 
 	if dagStep.Preconditions != nil {

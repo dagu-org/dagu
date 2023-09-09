@@ -2,6 +2,7 @@ package jsondb
 
 import (
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"io"
 	"os"
 	"path"
@@ -10,11 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDatabase(t *testing.T) {
@@ -35,11 +35,7 @@ func TestDatabase(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, err := os.MkdirTemp("", "test-persistence")
-			db := &Store{
-				Config: &Config{
-					Dir: dir,
-				},
-			}
+			db := New(dir)
 			require.NoError(t, err)
 			defer func() {
 				_ = os.RemoveAll(dir)
@@ -75,22 +71,22 @@ func testWriteAndFindFiles(t *testing.T, db *Store) {
 	}()
 
 	for _, data := range []struct {
-		Status    *models.Status
+		Status    *model.Status
 		RequestId string
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
@@ -114,22 +110,22 @@ func testWriteAndFindByRequestId(t *testing.T, db *Store) {
 	}()
 
 	for _, data := range []struct {
-		Status    *models.Status
+		Status    *model.Status
 		RequestId string
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
@@ -154,22 +150,22 @@ func testRemoveOldFiles(t *testing.T, db *Store) {
 	}
 
 	for _, data := range []struct {
-		Status    *models.Status
+		Status    *model.Status
 		RequestId string
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
@@ -205,7 +201,7 @@ func testReadLatestStatus(t *testing.T, db *Store) {
 		_ = dw.close()
 	}()
 
-	status := models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil)
+	status := model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil)
 	err = dw.write(status)
 	require.NoError(t, err)
 
@@ -229,22 +225,22 @@ func testReadStatusN(t *testing.T, db *Store) {
 	}
 
 	for _, data := range []struct {
-		Status    *models.Status
+		Status    *model.Status
 		RequestId string
 		Timestamp time.Time
 	}{
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-1",
 			time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-2",
 			time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local),
 		},
 		{
-			models.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
+			model.NewStatus(d, nil, scheduler.SchedulerStatus_None, 10000, nil, nil),
 			"request-id-3",
 			time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local),
 		},
@@ -275,13 +271,13 @@ func testCompactFile(t *testing.T, db *Store) {
 	require.NoError(t, dw.open())
 
 	for _, data := range []struct {
-		Status *models.Status
+		Status *model.Status
 	}{
-		{models.NewStatus(
+		{model.NewStatus(
 			d, nil, scheduler.SchedulerStatus_Running, 10000, nil, nil)},
-		{models.NewStatus(
+		{model.NewStatus(
 			d, nil, scheduler.SchedulerStatus_Cancel, 10000, nil, nil)},
-		{models.NewStatus(
+		{model.NewStatus(
 			d, nil, scheduler.SchedulerStatus_Success, 10000, nil, nil)},
 	} {
 		require.NoError(t, dw.write(data.Status))
@@ -289,20 +285,18 @@ func testCompactFile(t *testing.T, db *Store) {
 
 	_ = dw.close()
 
-	var s *models.StatusFile = nil
+	var s *model.StatusFile = nil
 	if h := db.ReadStatusHist(d.Location, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
 
-	db2 := &Store{
-		Config: db.Config,
-	}
+	db2 := New(db.dir)
 	err = db2.Compact(d.Location, s.File)
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)
 
-	var s2 *models.StatusFile = nil
+	var s2 *model.StatusFile = nil
 	if h := db2.ReadStatusHist(d.Location, 1); len(h) > 0 {
 		s2 = h[0]
 	}
@@ -355,7 +349,7 @@ func testErrorParseFile(t *testing.T, _ *Store) {
 	require.NoError(t, err)
 }
 
-func testWriteStatus(t *testing.T, db *Store, d *dag.DAG, status *models.Status, tm time.Time) {
+func testWriteStatus(t *testing.T, db *Store, d *dag.DAG, status *model.Status, tm time.Time) {
 	t.Helper()
 	dw, _, err := db.newWriter(d.Location, tm, status.RequestId)
 	require.NoError(t, err)

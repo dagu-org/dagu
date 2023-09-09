@@ -7,8 +7,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	domain "github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	domain "github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
@@ -251,6 +251,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 		}
 		status = s
 	} else {
+		// TODO: fix not to use json db directly
 		s, err := jsondb.ParseFile(logFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", logFile, err)
@@ -322,6 +323,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 		}
 		logFile = s.Log
 	} else {
+		// TODO: fix not to use json db directly
 		s, err := jsondb.ParseFile(statusFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", statusFile, err)

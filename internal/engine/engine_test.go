@@ -1,7 +1,8 @@
 package engine_test
 
 import (
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"io"
 	"net/http"
 	"os"
@@ -13,7 +14,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/models"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/utils"
@@ -24,23 +25,28 @@ var (
 	testdataDir = path.Join(utils.MustGetwd(), "./testdata")
 )
 
-func TestMain(m *testing.M) {
-	tempDir := utils.MustTempDir("controller_test")
-	changeHomeDir(tempDir)
-	code := m.Run()
-	_ = os.RemoveAll(tempDir)
-	os.Exit(code)
-}
+func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
+	t.Helper()
 
-func changeHomeDir(homeDir string) {
-	_ = os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig(homeDir)
+	tmpDir := utils.MustTempDir("dagu_test")
+	_ = os.Setenv("HOME", tmpDir)
+	_ = config.LoadConfig(tmpDir)
+
+	ds := client.NewDataStoreFactory(&config.Config{
+		DataDir: path.Join(tmpDir, ".dagu", "data"),
+	})
+
+	e := engine.NewFactory(ds).Create()
+
+	return tmpDir, e, ds
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 	file := testDAG("get_status.yaml")
-
-	e := engine.NewFactory().Create()
 
 	ds, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
@@ -49,7 +55,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 		&sock.Config{
 			Addr: ds.DAG.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				status := models.NewStatus(
+				status := model.NewStatus(
 					ds.DAG, []*scheduler.Node{},
 					scheduler.SchedulerStatus_Running, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
@@ -76,7 +82,11 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 }
 
 func TestGrepDAGs(t *testing.T) {
-	e := engine.NewFactory().Create()
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	ret, _, err := e.GrepDAG(testdataDir, "aabbcc")
 	require.NoError(t, err)
 	require.Equal(t, 1, len(ret))
@@ -87,17 +97,21 @@ func TestGrepDAGs(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
+	tmpDir, e, hf := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	var (
 		file      = testDAG("update_status.yaml")
 		requestId = "test-update-status"
 		now       = time.Now()
 	)
 
-	e := engine.NewFactory().Create()
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	hs := jsondb.New()
+	hs := hf.NewHistoryStore()
 
 	err = hs.Open(d.DAG.Location, now, requestId)
 	require.NoError(t, err)
@@ -129,12 +143,16 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestUpdateStatusError(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	var (
 		file      = testDAG("update_status_failed.yaml")
 		requestId = "test-update-status-failure"
 	)
 
-	e := engine.NewFactory().Create()
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
 
@@ -151,8 +169,11 @@ func TestUpdateStatusError(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 	file := testDAG("start.yaml")
-	e := engine.NewFactory().Create()
 
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
@@ -166,8 +187,12 @@ func TestStart(t *testing.T) {
 }
 
 func TestStop(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	file := testDAG("stop.yaml")
-	e := engine.NewFactory().Create()
 
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
@@ -188,8 +213,12 @@ func TestStop(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	file := testDAG("restart.yaml")
-	e := engine.NewFactory().Create()
 
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
@@ -203,8 +232,12 @@ func TestRestart(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	file := testDAG("retry.yaml")
-	e := engine.NewFactory().Create()
 
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
@@ -236,7 +269,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	tmpDir := utils.MustTempDir("engine-test-save")
+	tmpDir, e, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -246,7 +279,6 @@ func TestUpdate(t *testing.T) {
 		Name:     "test",
 		Location: loc,
 	}
-	e := engine.NewFactory().Create()
 
 	// invalid DAG
 	invalidDAG := `name: test DAG`
@@ -284,7 +316,7 @@ steps:
 }
 
 func TestRemove(t *testing.T) {
-	tmpDir := utils.MustTempDir("engine-test-remove")
+	tmpDir, e, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -306,7 +338,6 @@ steps:
 		_ = newFile.Close()
 	}()
 
-	e := engine.NewFactory().Create()
 	err := e.UpdateDAGSpec(d, dagSpec)
 	require.NoError(t, err)
 
@@ -326,14 +357,13 @@ steps:
 }
 
 func TestCreateNewDAG(t *testing.T) {
-	tmpDir := utils.MustTempDir("engine-test-save")
+	tmpDir, e, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
 	// invalid filename
 	filename := path.Join(tmpDir, "test")
-	e := engine.NewFactory().Create()
 	err := e.CreateDAG(filename)
 	require.Error(t, err)
 
@@ -356,7 +386,7 @@ func TestCreateNewDAG(t *testing.T) {
 }
 
 func TestRenameDAG(t *testing.T) {
-	tmpDir := utils.MustTempDir("engine-test-rename")
+	tmpDir, e, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -364,7 +394,6 @@ func TestRenameDAG(t *testing.T) {
 	oldName := path.Join(tmpDir, "rename_dag.yaml")
 	newName := path.Join(tmpDir, "rename_dag_renamed.yaml")
 
-	e := engine.NewFactory().Create()
 	err := e.CreateDAG(oldName)
 	require.NoError(t, err)
 
@@ -380,8 +409,12 @@ func TestRenameDAG(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	file := testDAG("invalid_dag.yaml")
-	e := engine.NewFactory().Create()
 
 	d, err := e.ReadStatus(file, false)
 	require.Error(t, err)
@@ -392,7 +425,11 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestReadAll(t *testing.T) {
-	e := engine.NewFactory().Create()
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	dags, _, err := e.ReadAllStatus(testdataDir)
 	require.NoError(t, err)
 	require.Greater(t, len(dags), 0)
@@ -406,8 +443,12 @@ func TestReadAll(t *testing.T) {
 }
 
 func TestReadDAGStatus(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	file := testDAG("read_status.yaml")
-	e := engine.NewFactory().Create()
 
 	_, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
@@ -417,9 +458,9 @@ func testDAG(name string) string {
 	return path.Join(testdataDir, name)
 }
 
-func testNewStatus(d *dag.DAG, reqId string, status scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *models.Status {
+func testNewStatus(d *dag.DAG, reqId string, status scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *model.Status {
 	now := time.Now()
-	ret := models.NewStatus(
+	ret := model.NewStatus(
 		d, []*scheduler.Node{{NodeState: scheduler.NodeState{Status: nodeStatus}}},
 		status, 0, &now, nil)
 	ret.RequestId = reqId

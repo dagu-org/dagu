@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/itchyny/gojq"
 	"github.com/mitchellh/mapstructure"
-	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 type JqExecutor struct {
@@ -49,19 +49,19 @@ func (e *JqExecutor) Run() error {
 			break
 		}
 		if err, ok := v.(error); ok {
-			e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
+			_, _ = e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
 			continue
 		}
 		val, err := json.MarshalIndent(v, "", "    ")
 		if err != nil {
-			e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
+			_, _ = e.stderr.Write([]byte(fmt.Sprintf("%#v", err)))
 			continue
 		}
 		if e.cfg.Raw {
 			s := string(val)
-			e.stdout.Write([]byte(strings.Trim(s, `"`)))
+			_, _ = e.stdout.Write([]byte(strings.Trim(s, `"`)))
 		} else {
-			e.stdout.Write(val)
+			_, _ = e.stdout.Write(val)
 		}
 	}
 	return nil

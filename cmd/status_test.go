@@ -2,11 +2,17 @@ package cmd
 
 import (
 	"github.com/dagu-dev/dagu/internal/scheduler"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestStatusCommand(t *testing.T) {
+	tmpDir, _, df := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	dagFile := testDAGFile("status.yaml")
 
 	// Start the DAG.
@@ -18,8 +24,8 @@ func TestStatusCommand(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 50)
 
-	// Wait for the DAG running.
-	testLastStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
+	// TODO: do not use history store directly.
+	testLastStatusEventual(t, df.NewHistoryStore(), dagFile, scheduler.SchedulerStatus_Running)
 
 	// Check the current status.
 	testRunCommand(t, createStatusCommand(), cmdTest{

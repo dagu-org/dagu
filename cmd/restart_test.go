@@ -1,14 +1,22 @@
 package cmd
 
 import (
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestRestartCommand(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	dagFile := testDAGFile("restart.yaml")
 
 	// Start the DAG.
@@ -19,7 +27,7 @@ func TestRestartCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG running.
-	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
+	testStatusEventual(t, e, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Restart the DAG.
 	done := make(chan struct{})
@@ -31,7 +39,7 @@ func TestRestartCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG running again.
-	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_Running)
+	testStatusEventual(t, e, dagFile, scheduler.SchedulerStatus_Running)
 
 	// Stop the restarted DAG.
 	testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
@@ -39,13 +47,15 @@ func TestRestartCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG is stopped.
-	testStatusEventual(t, dagFile, scheduler.SchedulerStatus_None)
+	testStatusEventual(t, e, dagFile, scheduler.SchedulerStatus_None)
 
 	// Check parameter was the same as the first execution
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
 
-	e := engine.NewFactory().Create()
+	df := client.NewDataStoreFactory(config.Get())
+	e = engine.NewFactory(df).Create()
+
 	sts := e.GetRecentStatuses(d, 2)
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
