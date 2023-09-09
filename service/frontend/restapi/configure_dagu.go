@@ -4,7 +4,7 @@ package restapi
 
 import (
 	"crypto/tls"
-	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/http/middleware"
+	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/middleware"
 	"net/http"
 
 	"github.com/go-openapi/errors"

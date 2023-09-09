@@ -12,9 +12,9 @@ import (
 	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/service/frontend/handlers/response"
-	"github.com/dagu-dev/dagu/service/frontend/http"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
+	"github.com/dagu-dev/dagu/service/frontend/server"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
@@ -42,7 +42,7 @@ var (
 
 type DAG struct{}
 
-func NewDAG() http.Handler {
+func NewDAG() server.New {
 	return &DAG{}
 }
 

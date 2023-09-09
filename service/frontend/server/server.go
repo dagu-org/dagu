@@ -1,4 +1,4 @@
-package http
+package server
 
 import (
 	"context"
@@ -6,16 +6,16 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	"github.com/dagu-dev/dagu/service/frontend/http/handler"
 	"github.com/dagu-dev/dagu/service/frontend/restapi"
 	"github.com/go-openapi/loads"
 	flags "github.com/jessevdk/go-flags"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/http/middleware"
+	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/middleware"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 
 	"github.com/go-chi/chi/v5"
@@ -26,13 +26,14 @@ type BasicAuth struct {
 	Password string
 }
 
-type ServerParams struct {
+type Params struct {
 	Host      string
 	Port      int
 	BasicAuth *BasicAuth
 	TLS       *config.TLS
 	Logger    logger.Logger
-	Handlers  []Handler
+	Handlers  []New
+	AssetsFS  fs.FS
 }
 
 type Server struct {
@@ -42,10 +43,15 @@ type Server struct {
 	tls       *config.TLS
 	logger    logger.Logger
 	server    *restapi.Server
-	handlers  []Handler
+	handlers  []New
+	assets    fs.FS
 }
 
-func NewServer(params ServerParams) *Server {
+type New interface {
+	Configure(api *operations.DaguAPI)
+}
+
+func NewServer(params Params) *Server {
 	return &Server{
 		host:      params.Host,
 		port:      params.Port,
@@ -53,6 +59,7 @@ func NewServer(params ServerParams) *Server {
 		tls:       params.TLS,
 		logger:    params.Logger,
 		handlers:  params.Handlers,
+		assets:    params.AssetsFS,
 	}
 }
 
@@ -68,7 +75,7 @@ func (svr *Server) Shutdown() {
 
 func (svr *Server) Serve(ctx context.Context) (err error) {
 	middlewareOptions := &pkgmiddleware.Options{
-		Handler: handlers.ConfigRoutes(chi.NewRouter()),
+		Handler: svr.defaultRoutes(chi.NewRouter()),
 	}
 	if svr.basicAuth != nil {
 		middlewareOptions.BasicAuth = &pkgmiddleware.BasicAuth{
