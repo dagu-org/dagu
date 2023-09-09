@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
@@ -59,10 +58,6 @@ func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 		err := root.Execute()
 		require.NoError(t, err)
 	})
-
-	ctx := root.Context()
-	ctx, fn := context.WithCancel(ctx)
-	fn()
 
 	// Check outputs.
 	for _, s := range test.expectedOut {

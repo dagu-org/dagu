@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/mailer"
+	"github.com/mitchellh/mapstructure"
 )
 
 type MailExecutor struct {
@@ -47,12 +47,12 @@ message: %s
 `
 
 func (e *MailExecutor) Run() error {
-	e.stdout.Write([]byte(fmt.Sprintf(mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)))
+	_, _ = e.stdout.Write([]byte(fmt.Sprintf(mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)))
 	err := e.mailer.SendMail(e.cfg.From, []string{e.cfg.To}, e.cfg.Subject, e.cfg.Message)
 	if err != nil {
-		e.stdout.Write([]byte("error occurred."))
+		_, _ = e.stdout.Write([]byte("error occurred."))
 	} else {
-		e.stdout.Write([]byte("sending email succeed."))
+		_, _ = e.stdout.Write([]byte("sending email succeed."))
 	}
 	return err
 }
