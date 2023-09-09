@@ -7,18 +7,24 @@ import (
 )
 
 type dataStoreFactoryImpl struct {
-	dir string
+	dataDir string
+	dagsDir string
 }
 
 var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
 
 func NewDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
 	return &dataStoreFactoryImpl{
-		dir: cfg.DataDir,
+		dataDir: cfg.DataDir,
+		dagsDir: cfg.DAGs,
 	}
 }
 
 func (f dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
-	return jsondb.New(f.dir)
+	return jsondb.New(f.dataDir)
+}
+
+func (f dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
+	panic("implement me")
 }

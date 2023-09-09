@@ -2,6 +2,8 @@ package persistence
 
 import (
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"time"
 )
@@ -15,6 +17,7 @@ var (
 type (
 	DataStoreFactory interface {
 		NewHistoryStore() HistoryStore
+		NewDAGStore() DAGStore
 	}
 
 	HistoryStore interface {
@@ -28,5 +31,19 @@ type (
 		RemoveAll(dagFile string) error
 		RemoveOld(dagFile string, retentionDays int) error
 		Rename(oldDAGFile, newDAGFile string) error
+	}
+
+	DAGStore interface {
+		List() ([]dag.DAG, error)
+		Grep() (ret []*GrepResult, errs []string, err error)
+		Load(name string) (*dag.DAG, error)
+		MoveDAG(oldDAGPath, newDAGPath string) error
+	}
+
+	// GrepResult is a result of grep.
+	GrepResult struct {
+		Name    string
+		DAG     *dag.DAG
+		Matches []*grep.Match
 	}
 )
