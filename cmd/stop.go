@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/controller"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/spf13/cobra"
 	"log"
 )
@@ -18,7 +17,10 @@ func stopCmd() *cobra.Command {
 			checkError(err)
 
 			log.Printf("Stopping...")
-			checkError(controller.New(loadedDAG, jsondb.New()).Stop())
+
+			// TODO: fix this
+			e := engine.NewFactory().Create()
+			checkError(e.Stop(loadedDAG))
 		},
 	}
 }

@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/controller"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -45,8 +44,9 @@ func TestRestartCommand(t *testing.T) {
 	// Check parameter was the same as the first execution
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
-	ctrl := controller.New(d, jsondb.New())
-	sts := ctrl.GetRecentStatuses(2)
+
+	e := engine.NewFactory().Create()
+	sts := e.GetRecentStatuses(d, 2)
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
 

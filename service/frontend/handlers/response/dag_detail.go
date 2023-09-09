@@ -1,15 +1,15 @@
 package response
 
 import (
-	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	domain "github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
 func ToGetDagDetailResponse(
-	workflowStatus *controller.DAGStatus,
+	workflowStatus *engine.DAGStatus,
 	tab string,
 ) *models.GetDagDetailsResponse {
 	return &models.GetDagDetailsResponse{
@@ -22,7 +22,7 @@ func ToGetDagDetailResponse(
 	}
 }
 
-func ToDagStatusWithDetails(dagStatus *controller.DAGStatus) *models.DagStatusWithDetails {
+func ToDagStatusWithDetails(dagStatus *engine.DAGStatus) *models.DagStatusWithDetails {
 	return &models.DagStatusWithDetails{
 		DAG:       ToDagDetail(dagStatus.DAG),
 		Dir:       lo.ToPtr(dagStatus.Dir),

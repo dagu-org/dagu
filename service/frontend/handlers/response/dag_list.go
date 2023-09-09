@@ -1,19 +1,19 @@
 package response
 
 import (
-	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
 func ToListDagResponse(
-	workflows []*controller.DAGStatus,
+	dagStatusList []*engine.DAGStatus,
 	errs []string,
 	hasError bool,
 ) *models.ListDagsResponse {
 	return &models.ListDagsResponse{
-		DAGs: lo.Map(workflows, func(item *controller.DAGStatus, _ int) *models.DagListItem {
+		DAGs: lo.Map(dagStatusList, func(item *engine.DAGStatus, _ int) *models.DagListItem {
 			return ToDagListItem(item)
 		}),
 		Errors:   errs,
@@ -21,7 +21,7 @@ func ToListDagResponse(
 	}
 }
 
-func ToDagListItem(s *controller.DAGStatus) *models.DagListItem {
+func ToDagListItem(s *engine.DAGStatus) *models.DagListItem {
 	return &models.DagListItem{
 		Dir:       lo.ToPtr(s.Dir),
 		Error:     lo.ToPtr(toErrorText(s.Error)),
@@ -29,11 +29,11 @@ func ToDagListItem(s *controller.DAGStatus) *models.DagListItem {
 		File:      lo.ToPtr(s.File),
 		Status:    ToDagStatus(s.Status),
 		Suspended: lo.ToPtr(s.Suspended),
-		DAG:       ToWorkflow(s.DAG),
+		DAG:       ToDAG(s.DAG),
 	}
 }
 
-func ToWorkflow(d *dag.DAG) *models.Dag {
+func ToDAG(d *dag.DAG) *models.Dag {
 	return &models.Dag{
 		Name:          lo.ToPtr(d.Name),
 		Group:         lo.ToPtr(d.Group),

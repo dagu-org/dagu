@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
-	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -101,10 +101,10 @@ func testStatusEventual(t *testing.T, dagFile string, expected scheduler.Schedul
 
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
-	ctrl := controller.New(d, jsondb.New())
+	e := engine.NewFactory().Create()
 
 	require.Eventually(t, func() bool {
-		status, err := ctrl.GetStatus()
+		status, err := e.GetStatus(d)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, time.Millisecond*5000, time.Millisecond*50)
@@ -113,6 +113,7 @@ func testStatusEventual(t *testing.T, dagFile string, expected scheduler.Schedul
 func testLastStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
 	t.Helper()
 	require.Eventually(t, func() bool {
+		// TODO: use engine to get status
 		hs := jsondb.New()
 		status := hs.ReadStatusHist(dagFile, 1)
 		if len(status) < 1 {

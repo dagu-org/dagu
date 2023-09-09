@@ -2,21 +2,21 @@ package job
 
 import (
 	"errors"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 // TODO: write tests
 type Job struct {
-	DAG     *dag.DAG
-	Command string
-	WorkDir string
-	Next    time.Time
+	DAG           *dag.DAG
+	Command       string
+	WorkDir       string
+	Next          time.Time
+	EngineFactory engine.Factory
 }
 
 var (
@@ -30,8 +30,8 @@ func (j *Job) GetDAG() *dag.DAG {
 }
 
 func (j *Job) Start() error {
-	c := controller.New(j.DAG, jsondb.New())
-	s, err := c.GetLastStatus()
+	e := j.EngineFactory.Create()
+	s, err := e.GetLastStatus(j.DAG)
 	if err != nil {
 		return err
 	}
@@ -51,24 +51,24 @@ func (j *Job) Start() error {
 		}
 		// should not be here
 	}
-	return c.Start(j.Command, j.WorkDir, "")
+	return e.Start(j.DAG, j.Command, j.WorkDir, "")
 }
 
 func (j *Job) Stop() error {
-	c := controller.New(j.DAG, jsondb.New())
-	s, err := c.GetLastStatus()
+	e := j.EngineFactory.Create()
+	s, err := e.GetLastStatus(j.DAG)
 	if err != nil {
 		return err
 	}
 	if s.Status != scheduler.SchedulerStatus_Running {
 		return ErrJobIsNotRunning
 	}
-	return c.Stop()
+	return e.Stop(j.DAG)
 }
 
 func (j *Job) Restart() error {
-	c := controller.New(j.DAG, jsondb.New())
-	return c.Restart(j.Command, j.WorkDir)
+	e := j.EngineFactory.Create()
+	return e.Restart(j.DAG, j.Command, j.WorkDir)
 }
 
 func (j *Job) String() string {

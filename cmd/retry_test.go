@@ -2,8 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/controller"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -16,7 +15,8 @@ func TestRetryCommand(t *testing.T) {
 	testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 	// Find the request ID.
-	s, err := controller.NewDAGStatusReader(jsondb.New()).ReadStatus(dagFile, false)
+	e := engine.NewFactory().Create()
+	s, err := e.ReadStatus(dagFile, false)
 	require.NoError(t, err)
 	require.Equal(t, s.Status.Status, scheduler.SchedulerStatus_Success)
 	require.NotNil(t, s.Status)

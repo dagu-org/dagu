@@ -1,5 +1,0 @@
-host: ${HOST}
-port: 8081
-dags: "${HOME}/dagu/dags"
-command: "${HOME}/dagu/bin/dagu"
-workDir: "${HOME}/dagu/dags"
