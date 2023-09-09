@@ -17,22 +17,22 @@ import (
 //go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal interface{} --exclude-main
 
 func configureFlags(api *operations.DaguAPI) {
-	// api.CommandLineOptionsGroups = []swag.CommandLineOptionsGroup{ ... }
+	// handlers.CommandLineOptionsGroups = []swag.CommandLineOptionsGroup{ ... }
 }
 
 func configureAPI(api *operations.DaguAPI) http.Handler {
-	// configure the api here
+	// configure the handlers here
 	api.ServeError = errors.ServeError
 
 	// Set your custom logger if needed. Default one is log.Printf
 	// Expected interface func(string, ...interface{})
 	//
 	// Example:
-	// api.Logger = log.Printf
+	// handlers.Logger = log.Printf
 
 	api.UseSwaggerUI()
 	// To continue using redoc as your UI, uncomment the following line
-	// api.UseRedoc()
+	// handlers.UseRedoc()
 
 	api.JSONConsumer = runtime.JSONConsumer()
 

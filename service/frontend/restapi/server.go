@@ -41,7 +41,7 @@ func init() {
 	}
 }
 
-// NewServer creates a new api dagu server but does not configure it
+// NewServer creates a new handlers dagu server but does not configure it
 func NewServer(api *operations.DaguAPI) *Server {
 	s := new(Server)
 
@@ -149,7 +149,7 @@ func (s *Server) hasScheme(scheme string) bool {
 	return false
 }
 
-// Serve the api
+// Serve the handlers
 func (s *Server) Serve() (err error) {
 	if !s.hasListeners {
 		if err = s.Listen(); err != nil {
@@ -160,7 +160,7 @@ func (s *Server) Serve() (err error) {
 	// set default handler, if none is set
 	if s.handler == nil {
 		if s.api == nil {
-			return errors.New("can't create the default handler, as no api is set")
+			return errors.New("can't create the default handler, as no handlers is set")
 		}
 
 		s.SetHandler(s.api.Serve(nil))
@@ -405,7 +405,7 @@ func (s *Server) Shutdown() error {
 }
 
 func (s *Server) handleShutdown(wg *sync.WaitGroup, serversPtr *[]*http.Server) {
-	// wg.Done must occur last, after s.api.ServerShutdown()
+	// wg.Done must occur last, after s.handlers.ServerShutdown()
 	// (to preserve old behaviour)
 	defer wg.Done()
 

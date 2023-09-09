@@ -318,7 +318,7 @@ func (o *DaguAPI) initHandlerCache() {
 }
 
 // Serve creates a http handler to serve the API over HTTP
-// can be used directly in http.ListenAndServe(":8000", api.Serve(nil))
+// can be used directly in http.ListenAndServe(":8000", handlers.Serve(nil))
 func (o *DaguAPI) Serve(builder middleware.Builder) http.Handler {
 	o.Init()
 

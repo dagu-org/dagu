@@ -19,7 +19,7 @@ func ToSearchDAGsResponse(ret []*controller.GrepResult, errs []string) *models.S
 func ToSearchDAGsResultItem(workflow *controller.GrepResult) *models.SearchDagsResultItem {
 	return &models.SearchDagsResultItem{
 		Name: workflow.Name,
-		DAG:  ToWorkflow(workflow.DAG),
+		DAG:  ToDAG(workflow.DAG),
 		Matches: lo.Map(workflow.Matches, func(item *grep.Match, _ int) *models.SearchDagsMatchItem {
 			return ToSearchDAGsMatchItem(item)
 		}),

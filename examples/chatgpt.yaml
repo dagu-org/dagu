@@ -16,7 +16,7 @@ steps:
               {"role": "user", "content": "$QUESTION"}
             ] 
           }
-    command: POST https://api.openai.com/v1/chat/completions
+    command: POST https://handlers.openai.com/v1/chat/completions
     output: API_RESPONSE
 
   - name: get result

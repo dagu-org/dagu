@@ -8,12 +8,12 @@ import (
 )
 
 func ToListDagResponse(
-	workflows []*controller.DAGStatus,
+	dagStatusList []*controller.DAGStatus,
 	errs []string,
 	hasError bool,
 ) *models.ListDagsResponse {
 	return &models.ListDagsResponse{
-		DAGs: lo.Map(workflows, func(item *controller.DAGStatus, _ int) *models.DagListItem {
+		DAGs: lo.Map(dagStatusList, func(item *controller.DAGStatus, _ int) *models.DagListItem {
 			return ToDagListItem(item)
 		}),
 		Errors:   errs,
@@ -29,11 +29,11 @@ func ToDagListItem(s *controller.DAGStatus) *models.DagListItem {
 		File:      lo.ToPtr(s.File),
 		Status:    ToDagStatus(s.Status),
 		Suspended: lo.ToPtr(s.Suspended),
-		DAG:       ToWorkflow(s.DAG),
+		DAG:       ToDAG(s.DAG),
 	}
 }
 
-func ToWorkflow(d *dag.DAG) *models.Dag {
+func ToDAG(d *dag.DAG) *models.Dag {
 	return &models.Dag{
 		Name:          lo.ToPtr(d.Name),
 		Group:         lo.ToPtr(d.Group),

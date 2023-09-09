@@ -5,7 +5,7 @@
 //	Schemes:
 //	  http
 //	Host: localhost:8080
-//	BasePath: /api/v1
+//	BasePath: /handlers/v1
 //	Version: 0.0.1
 //
 //	Consumes:
