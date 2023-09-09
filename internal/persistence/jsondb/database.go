@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/utils"
 )
 
@@ -30,22 +29,13 @@ import (
 // When Compact is called, it removes old data.
 // Compact must be called only once per file.
 type Store struct {
-	*Config
+	dir    string
 	writer *writer
 }
 
-type Config struct {
-	Dir string
-}
-
-// defaultConfig is the default configuration for Store.
-func defaultConfig() *Config {
-	return &Config{Dir: config.Get().DataDir}
-}
-
 // New creates a new Store with default configuration.
-func New() *Store {
-	return &Store{Config: defaultConfig()}
+func New(dir string) *Store {
+	return &Store{dir: dir}
 }
 
 func (store *Store) Update(dagFile, requestId string, s *model.Status) error {
@@ -85,6 +75,7 @@ func (store *Store) Close() error {
 	}
 	defer func() {
 		_ = store.writer.close()
+		store.writer = nil
 	}()
 	if err := store.Compact(store.writer.dagFile, store.writer.target); err != nil {
 		return err
@@ -247,8 +238,8 @@ func (store *Store) Compact(_, original string) error {
 
 // MoveData moves data from one directory to another.
 func (store *Store) Rename(oldPath, newPath string) error {
-	oldDir := store.dir(oldPath, prefix(oldPath))
-	newDir := store.dir(newPath, prefix(newPath))
+	oldDir := store.directory(oldPath, prefix(oldPath))
+	newDir := store.directory(newPath, prefix(newPath))
 	if !utils.FileExists(oldDir) {
 		// No need to move data
 		return nil
@@ -275,11 +266,11 @@ func (store *Store) Rename(oldPath, newPath string) error {
 	return nil
 }
 
-func (store *Store) dir(dagFile string, prefix string) string {
+func (store *Store) directory(dagFile string, prefix string) string {
 	h := md5.New()
 	h.Write([]byte(dagFile))
 	v := hex.EncodeToString(h.Sum(nil))
-	return filepath.Join(store.Dir, fmt.Sprintf("%s-%s", prefix, v))
+	return filepath.Join(store.dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
 func (store *Store) newFile(dagFile string, t time.Time, requestId string) (string, error) {
@@ -292,7 +283,7 @@ func (store *Store) newFile(dagFile string, t time.Time, requestId string) (stri
 
 func (store *Store) pattern(dagFile string) string {
 	p := prefix(dagFile)
-	dir := store.dir(dagFile, p)
+	dir := store.directory(dagFile, p)
 	return filepath.Join(dir, p)
 }
 

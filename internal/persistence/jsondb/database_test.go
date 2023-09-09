@@ -35,11 +35,7 @@ func TestDatabase(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			dir, err := os.MkdirTemp("", "test-persistence")
-			db := &Store{
-				Config: &Config{
-					Dir: dir,
-				},
-			}
+			db := New(dir)
 			require.NoError(t, err)
 			defer func() {
 				_ = os.RemoveAll(dir)
@@ -295,9 +291,7 @@ func testCompactFile(t *testing.T, db *Store) {
 	}
 	require.NotNil(t, s)
 
-	db2 := &Store{
-		Config: db.Config,
-	}
+	db2 := New(db.dir)
 	err = db2.Compact(d.Location, s.File)
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)

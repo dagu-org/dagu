@@ -1,8 +1,16 @@
 package cmd
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestStartCommand(t *testing.T) {
+	tmpDir, _, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	tests := []cmdTest{
 		{
 			args:        []string{"start", testDAGFile("start.yaml")},

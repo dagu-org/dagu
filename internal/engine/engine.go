@@ -7,7 +7,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
@@ -48,16 +47,14 @@ type Engine interface {
 }
 
 type engineImpl struct {
-	// TODO: fix this to use factory
-	historyStore persistence.HistoryStore
+	dataStoreFactory persistence.DataStoreFactory
 	// TODO: fix this to inject
 	suspendChecker *suspend.SuspendChecker
 }
 
-func New() Engine {
+func New(ds persistence.DataStoreFactory) Engine {
 	return &engineImpl{
-		// TODO: fix this to use factory
-		historyStore: jsondb.New(),
+		dataStoreFactory: ds,
 		// TODO: fix this to inject
 		suspendChecker: suspend.NewSuspendChecker(
 			storage.NewStorage(config.Get().SuspendFlagsDir),
@@ -152,7 +149,7 @@ func (e *engineImpl) MoveDAG(oldDAGPath, newDAGPath string) error {
 		return err
 	}
 	// TODO: fix this to use DAG Manager not History Store
-	return e.historyStore.Rename(oldDAGPath, newDAGPath)
+	return e.dataStoreFactory.NewHistoryStore().Rename(oldDAGPath, newDAGPath)
 }
 
 func validateLocation(dagLocation string) error {
@@ -251,7 +248,7 @@ func defaultStatus(d *dag.DAG) *model.Status {
 }
 
 func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error) {
-	ret, err := e.historyStore.FindByRequestId(dag.Location, requestId)
+	ret, err := e.dataStoreFactory.NewHistoryStore().FindByRequestId(dag.Location, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +268,7 @@ func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
 	}
 
 	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		status, err := e.historyStore.ReadStatusToday(dag.Location)
+		status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
 		if err != nil {
 			var readErr error = nil
 			if !errors.Is(err, persistence.ErrNoStatusDataToday) && !errors.Is(err, persistence.ErrNoStatusData) {
@@ -288,8 +285,7 @@ func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
 }
 
 func (e *engineImpl) GetRecentStatuses(dag *dag.DAG, n int) []*model.StatusFile {
-	// TODO: fix this
-	ret := e.historyStore.ReadStatusHist(dag.Location, n)
+	ret := e.dataStoreFactory.NewHistoryStore().ReadStatusHist(dag.Location, n)
 	return ret
 }
 
@@ -307,26 +303,27 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 			return fmt.Errorf("the DAG is running")
 		}
 	}
-	return e.historyStore.Update(dag.Location, status.RequestId, status)
+	return e.dataStoreFactory.NewHistoryStore().Update(dag.Location, status.RequestId, status)
 }
 
 func (e *engineImpl) UpdateDAGSpec(d *dag.DAG, spec string) error {
-	// validate
+	// validation
 	cl := dag.Loader{}
 	_, err := cl.LoadData([]byte(spec))
 	if err != nil {
 		return err
 	}
+
 	if !utils.FileExists(d.Location) {
 		return fmt.Errorf("the config file %s does not exist", d.Location)
 	}
 	err = os.WriteFile(d.Location, []byte(spec), 0755)
+
 	return err
 }
 
 func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
-	// TODO: fixme
-	err := e.historyStore.RemoveAll(dag.Location)
+	err := e.dataStoreFactory.NewHistoryStore().RemoveAll(dag.Location)
 	if err != nil {
 		return err
 	}

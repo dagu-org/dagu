@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"github.com/dagu-dev/dagu/internal/agent"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 	"path/filepath"
 )
@@ -18,14 +20,19 @@ func retryCmd() *cobra.Command {
 			reqID, err := cmd.Flags().GetString("req")
 			checkError(err)
 
-			status, err := jsondb.New().FindByRequestId(f, reqID)
+			// TODO: use engine.Engine instead of client.DataStoreFactory
+			df := client.NewDataStoreFactory(config.Get())
+			e := engine.NewFactory(df).Create()
+
+			hs := df.NewHistoryStore()
+
+			status, err := hs.FindByRequestId(f, reqID)
 			checkError(err)
 
 			loadedDAG, err := loadDAG(args[0], status.Status.Params)
 			checkError(err)
 
-			a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: loadedDAG},
-				RetryConfig: &agent.RetryConfig{Status: status.Status}}
+			a := agent.New(&agent.AgentConfig{DAG: loadedDAG, RetryTarget: status.Status}, e, df)
 			ctx := cmd.Context()
 			listenSignals(ctx, a)
 			checkError(a.Run(ctx))

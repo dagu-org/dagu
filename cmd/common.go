@@ -3,7 +3,10 @@ package cmd
 import (
 	"context"
 	"github.com/dagu-dev/dagu/internal/agent"
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -11,21 +14,24 @@ import (
 	"syscall"
 )
 
-func execDAG(ctx context.Context, cmd *cobra.Command, args []string, dry bool) {
+func execDAG(ctx context.Context, e engine.Engine, cmd *cobra.Command, args []string, dry bool) {
 	params, err := cmd.Flags().GetString("params")
 	checkError(err)
 
 	loadedDAG, err := loadDAG(args[0], removeQuotes(params))
 	checkError(err)
 
-	err = start(ctx, loadedDAG, dry)
+	err = start(ctx, e, loadedDAG, dry)
 	if err != nil {
 		log.Fatalf("Failed to start DAG: %v", err)
 	}
 }
 
-func start(ctx context.Context, d *dag.DAG, dry bool) error {
-	a := &agent.Agent{AgentConfig: &agent.AgentConfig{DAG: d, Dry: dry}}
+func start(ctx context.Context, e engine.Engine, d *dag.DAG, dry bool) error {
+	// TODO: remove this
+	ds := client.NewDataStoreFactory(config.Get())
+
+	a := agent.New(&agent.AgentConfig{DAG: d, Dry: dry}, e, ds)
 	listenSignals(ctx, a)
 	return a.Run(ctx)
 }

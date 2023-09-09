@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"io"
 	"log"
 	"os"
@@ -19,12 +20,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMain(m *testing.M) {
+func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
+	t.Helper()
+
 	tmpDir := utils.MustTempDir("dagu_test")
 	changeHomeDir(tmpDir)
-	code := m.Run()
-	_ = os.RemoveAll(tmpDir)
-	os.Exit(code)
+
+	ds := client.NewDataStoreFactory(&config.Config{
+		DataDir: path.Join(tmpDir, ".dagu", "data"),
+	})
+
+	e := engine.NewFactory(ds).Create()
+
+	return tmpDir, e, ds
 }
 
 func changeHomeDir(homeDir string) {
@@ -82,7 +90,7 @@ func withSpool(t *testing.T, f func()) string {
 	f()
 
 	os.Stdout = origStdout
-	w.Close()
+	_ = w.Close()
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
@@ -96,12 +104,11 @@ func testDAGFile(name string) string {
 	return path.Join(d, name)
 }
 
-func testStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
+func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.SchedulerStatus) {
 	t.Helper()
 
 	d, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
-	e := engine.NewFactory().Create()
 
 	require.Eventually(t, func() bool {
 		status, err := e.GetStatus(d)
@@ -110,12 +117,11 @@ func testStatusEventual(t *testing.T, dagFile string, expected scheduler.Schedul
 	}, time.Millisecond*5000, time.Millisecond*50)
 }
 
-func testLastStatusEventual(t *testing.T, dagFile string, expected scheduler.SchedulerStatus) {
+func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag string, expected scheduler.SchedulerStatus) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		// TODO: use engine to get status
-		hs := jsondb.New()
-		status := hs.ReadStatusHist(dagFile, 1)
+		// TODO: do not use history store directly.
+		status := hs.ReadStatusHist(dag, 1)
 		if len(status) < 1 {
 			return false
 		}

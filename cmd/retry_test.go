@@ -2,20 +2,24 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 )
 
 func TestRetryCommand(t *testing.T) {
+	tmpDir, e, _ := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	dagFile := testDAGFile("retry.yaml")
 
 	// Run a DAG.
 	testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 	// Find the request ID.
-	e := engine.NewFactory().Create()
 	s, err := e.ReadStatus(dagFile, false)
 	require.NoError(t, err)
 	require.Equal(t, s.Status.Status, scheduler.SchedulerStatus_Success)

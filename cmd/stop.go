@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 	"log"
 )
@@ -18,8 +20,8 @@ func stopCmd() *cobra.Command {
 
 			log.Printf("Stopping...")
 
-			// TODO: fix this
-			e := engine.NewFactory().Create()
+			df := client.NewDataStoreFactory(config.Get())
+			e := engine.NewFactory(df).Create()
 			checkError(e.Stop(loadedDAG))
 		},
 	}

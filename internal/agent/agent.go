@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,27 +32,35 @@ import (
 // Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
 	*AgentConfig
-	*RetryConfig
 
-	engineFactory engine.Factory
-	scheduler     *scheduler.Scheduler
-	graph         *scheduler.ExecutionGraph
-	logManager    *logManager
-	reporter      *reporter.Reporter
-	historyStore  persistence.HistoryStore
-	socketServer  *sock.Server
-	requestId     string
+	// TODO: Do not use the persistence package directly.
+	dataStoreFactory persistence.DataStoreFactory
+	engine           engine.Engine
+	scheduler        *scheduler.Scheduler
+	graph            *scheduler.ExecutionGraph
+	logManager       *logManager
+	reporter         *reporter.Reporter
+	historyStore     persistence.HistoryStore
+	socketServer     *sock.Server
+	requestId        string
+	finished         uint32
+}
+
+func New(config *AgentConfig, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
+	return &Agent{
+		AgentConfig:      config,
+		engine:           e,
+		dataStoreFactory: ds,
+	}
 }
 
 // AgentConfig contains the configuration for an Agent.
 type AgentConfig struct {
 	DAG *dag.DAG
 	Dry bool
-}
 
-// RetryConfig contains the configuration for retrying a dags.
-type RetryConfig struct {
-	Status *model.Status
+	// RetryTarget is the status to retry.
+	RetryTarget *model.Status
 }
 
 // Run starts the dags execution.
@@ -167,9 +175,6 @@ func (a *Agent) init() {
 		RequestId:     a.requestId,
 	}
 
-	// TODO: inject engine factory
-	a.engineFactory = engine.NewFactory()
-
 	if a.DAG.HandlerOn.Exit != nil {
 		onExit, _ := pb.ToPbStep(a.DAG.HandlerOn.Exit)
 		config.OnExit = onExit
@@ -214,7 +219,7 @@ func (a *Agent) init() {
 }
 
 func (a *Agent) setupGraph() (err error) {
-	if a.RetryConfig != nil && a.RetryConfig.Status != nil {
+	if a.RetryTarget != nil {
 		log.Printf("setup for retry")
 		return a.setupRetry()
 	}
@@ -223,8 +228,8 @@ func (a *Agent) setupGraph() (err error) {
 }
 
 func (a *Agent) setupRetry() (err error) {
-	nodes := []*scheduler.Node{}
-	for _, n := range a.RetryConfig.Status.Nodes {
+	nodes := make([]*scheduler.Node, 0, len(a.RetryTarget.Nodes))
+	for _, n := range a.RetryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
 	a.graph, err = scheduler.NewExecutionGraphForRetry(nodes...)
@@ -241,8 +246,8 @@ func (a *Agent) setupRequestId() error {
 }
 
 func (a *Agent) setupDatabase() error {
-	// TODO: use engine instead of directly using jsondb
-	a.historyStore = jsondb.New()
+	// TODO: do not use the persistence package directly.
+	a.historyStore = a.dataStoreFactory.NewHistoryStore()
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
 		utils.LogErr("clean old history data", err)
 	}
@@ -319,6 +324,9 @@ func (a *Agent) run(ctx context.Context) error {
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
+		if a.finished == 1 {
+			return
+		}
 		utils.LogErr("write status", a.historyStore.Write(a.Status()))
 	}()
 
@@ -332,6 +340,8 @@ func (a *Agent) run(ctx context.Context) error {
 
 	a.reporter.ReportSummary(status, lastErr)
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
+
+	atomic.CompareAndSwapUint32(&a.finished, 0, 1)
 	utils.LogErr("close data file", a.historyStore.Close())
 
 	return lastErr
@@ -364,8 +374,7 @@ func (a *Agent) dryRun() error {
 }
 
 func (a *Agent) checkIsRunning() error {
-	e := a.engineFactory.Create()
-	status, err := e.GetStatus(a.DAG)
+	status, err := a.engine.GetStatus(a.DAG)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,11 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
+	"github.com/spf13/cobra"
+)
 
 func startCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -9,7 +14,9 @@ func startCmd() *cobra.Command {
 		Long:  `dagu start [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			execDAG(cmd.Context(), cmd, args, false)
+			ds := client.NewDataStoreFactory(config.Get())
+			e := engine.NewFactory(ds).Create()
+			execDAG(cmd.Context(), e, cmd, args, false)
 		},
 	}
 	cmd.Flags().StringP("params", "p", "", "parameters")
