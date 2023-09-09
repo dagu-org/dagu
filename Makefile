@@ -70,9 +70,14 @@ build-dir:
 build-ui:
 	@cd ui; \
 		yarn && yarn build
-	@cp ui/dist/*.js ./service/frontend/http/handler/assets/
-	@cp ui/dist/*.woff ./service/frontend/http/handler/assets/
-	@cp ui/dist/*.woff2 ./service/frontend/http/handler/assets/
+
+	@rm ./service/frontend/assets/*.js
+	@rm ./service/frontend/assets/*.woff
+	@rm ./service/frontend/assets/*.woff2
+
+	@cp ui/dist/*.js ./service/frontend/assets/
+	@cp ui/dist/*.woff ./service/frontend/assets/
+	@cp ui/dist/*.woff2 ./service/frontend/assets/
 
 go-lint:
 	@golangci-lint run ./...
