@@ -6,7 +6,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	pkgapi "github.com/dagu-dev/dagu/service/frontend/handlers"
 	"github.com/dagu-dev/dagu/service/frontend/http/handler"
 	"github.com/dagu-dev/dagu/service/frontend/restapi"
 	"github.com/go-openapi/loads"
@@ -33,6 +32,7 @@ type ServerParams struct {
 	BasicAuth *BasicAuth
 	TLS       *config.TLS
 	Logger    logger.Logger
+	Handlers  []Handler
 }
 
 type Server struct {
@@ -42,6 +42,7 @@ type Server struct {
 	tls       *config.TLS
 	logger    logger.Logger
 	server    *restapi.Server
+	handlers  []Handler
 }
 
 func NewServer(params ServerParams) *Server {
@@ -51,6 +52,7 @@ func NewServer(params ServerParams) *Server {
 		basicAuth: params.BasicAuth,
 		tls:       params.TLS,
 		logger:    params.Logger,
+		handlers:  params.Handlers,
 	}
 }
 
@@ -83,7 +85,9 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	}
 
 	api := operations.NewDaguAPI(swaggerSpec)
-	pkgapi.Configure(api)
+	for _, h := range svr.handlers {
+		h.Configure(api)
+	}
 
 	svr.server = restapi.NewServer(api)
 	defer svr.Shutdown()
