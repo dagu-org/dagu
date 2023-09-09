@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/controller"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"log"
@@ -20,17 +20,19 @@ func restartCmd() *cobra.Command {
 			loadedDAG, err := loadDAG(dagFile, "")
 			checkError(err)
 
-			ctrl := controller.New(loadedDAG, jsondb.New())
+			// TODO: inject this
+			ef := engine.NewFactory()
+			e := ef.Create()
 
 			// Check the current status and stop the DAG if it is running.
-			stopDAGIfRunning(ctrl)
+			stopDAGIfRunning(e, loadedDAG)
 
 			// Wait for the specified amount of time before restarting.
 			waitForRestart(loadedDAG.RestartWait)
 
 			// Retrieve the parameter of the previous execution.
 			log.Printf("Restarting %s...", loadedDAG.Name)
-			params := getPreviousExecutionParams(ctrl)
+			params := getPreviousExecutionParams(e, loadedDAG)
 
 			// Start the DAG with the same parameter.
 			loadedDAG, err = loadDAG(dagFile, params)
@@ -40,26 +42,28 @@ func restartCmd() *cobra.Command {
 	}
 }
 
-func stopDAGIfRunning(ctrl *controller.DAGController) {
-	st, err := ctrl.GetStatus()
+func stopDAGIfRunning(e engine.Engine, dag *dag.DAG) {
+	st, err := e.GetStatus(dag)
 	checkError(err)
 
 	// Stop the DAG if it is running.
 	if st.Status == scheduler.SchedulerStatus_Running {
-		log.Printf("Stopping %s for restart...", ctrl.DAG.Name)
-		cobra.CheckErr(stopRunningDAG(ctrl))
+		log.Printf("Stopping %s for restart...", dag.Name)
+		cobra.CheckErr(stopRunningDAG(e, dag))
 	}
 }
 
-func stopRunningDAG(ctrl *controller.DAGController) error {
+func stopRunningDAG(e engine.Engine, dag *dag.DAG) error {
 	for {
-		st, err := ctrl.GetStatus()
+		st, err := e.GetStatus(dag)
 		checkError(err)
 
 		if st.Status != scheduler.SchedulerStatus_Running {
 			return nil
 		}
-		checkError(ctrl.Stop())
+		// TODO: fix this
+		e := engine.NewFactory().Create()
+		checkError(e.Stop(dag))
 		time.Sleep(time.Millisecond * 100)
 	}
 }
@@ -71,8 +75,8 @@ func waitForRestart(restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionParams(ctrl *controller.DAGController) string {
-	st, err := ctrl.GetLastStatus()
+func getPreviousExecutionParams(e engine.Engine, dag *dag.DAG) string {
+	st, err := e.GetLastStatus(dag)
 	checkError(err)
 
 	return st.Params

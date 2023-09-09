@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/core/scheduler/entry_reader"
 	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
@@ -31,10 +32,11 @@ func EntryReaderProvider(cfg *config.Config, jf entry_reader.JobFactory, logger 
 	})
 }
 
-func JobFactoryProvider(cfg *config.Config) entry_reader.JobFactory {
+func JobFactoryProvider(cfg *config.Config, engineFactory engine.Factory) entry_reader.JobFactory {
 	return &jobFactory{
-		Command: cfg.Command,
-		WorkDir: cfg.WorkDir,
+		Command:       cfg.Command,
+		WorkDir:       cfg.WorkDir,
+		EngineFactory: engineFactory,
 	}
 }
 

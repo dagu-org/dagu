@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
-	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	domain "github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -40,16 +41,20 @@ var (
 	errInvalidArgs = errors.New("invalid argument")
 )
 
-type DAG struct{}
-
-func NewDAG() server.New {
-	return &DAG{}
+type DAGHandler struct {
+	engineFactory engine.Factory
 }
 
-func (d *DAG) Configure(api *operations.DaguAPI) {
+func NewDAG(engineFactory engine.Factory) server.New {
+	return &DAGHandler{
+		engineFactory: engineFactory,
+	}
+}
+
+func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 	api.ListDagsHandler = operations.ListDagsHandlerFunc(
 		func(params operations.ListDagsParams) middleware.Responder {
-			resp, err := d.GetList(params)
+			resp, err := h.GetList(params)
 			if err != nil {
 				return operations.NewListDagsDefault(err.Code).WithPayload(err.APIError)
 			}
@@ -58,7 +63,7 @@ func (d *DAG) Configure(api *operations.DaguAPI) {
 
 	api.GetDagDetailsHandler = operations.GetDagDetailsHandlerFunc(
 		func(params operations.GetDagDetailsParams) middleware.Responder {
-			resp, err := d.GetDetail(params)
+			resp, err := h.GetDetail(params)
 			if err != nil {
 				return operations.NewGetDagDetailsDefault(err.Code).WithPayload(err.APIError)
 			}
@@ -67,7 +72,7 @@ func (d *DAG) Configure(api *operations.DaguAPI) {
 
 	api.PostDagActionHandler = operations.PostDagActionHandlerFunc(
 		func(params operations.PostDagActionParams) middleware.Responder {
-			resp, err := d.PostAction(params)
+			resp, err := h.PostAction(params)
 			if err != nil {
 				return operations.NewPostDagActionDefault(err.Code).WithPayload(err.APIError)
 			}
@@ -76,7 +81,7 @@ func (d *DAG) Configure(api *operations.DaguAPI) {
 
 	api.CreateDagHandler = operations.CreateDagHandlerFunc(
 		func(params operations.CreateDagParams) middleware.Responder {
-			resp, err := d.Create(params)
+			resp, err := h.Create(params)
 			if err != nil {
 				return operations.NewCreateDagDefault(err.Code).WithPayload(err.APIError)
 			}
@@ -85,7 +90,7 @@ func (d *DAG) Configure(api *operations.DaguAPI) {
 
 	api.DeleteDagHandler = operations.DeleteDagHandlerFunc(
 		func(params operations.DeleteDagParams) middleware.Responder {
-			err := d.Delete(params)
+			err := h.Delete(params)
 			if err != nil {
 				return operations.NewDeleteDagDefault(err.Code).WithPayload(err.APIError)
 			}
@@ -94,7 +99,7 @@ func (d *DAG) Configure(api *operations.DaguAPI) {
 
 	api.SearchDagsHandler = operations.SearchDagsHandlerFunc(
 		func(params operations.SearchDagsParams) middleware.Responder {
-			resp, err := d.Search(params)
+			resp, err := h.Search(params)
 			if err != nil {
 				return operations.NewSearchDagsDefault(err.Code).WithPayload(err.APIError)
 			}
@@ -102,15 +107,17 @@ func (d *DAG) Configure(api *operations.DaguAPI) {
 		})
 }
 
-func (*DAG) Create(params operations.CreateDagParams) (*models.CreateDagResponse, *response.CodedError) {
+func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDagResponse, *response.CodedError) {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
 	switch lo.FromPtr(params.Body.Action) {
 	case "new":
+		// TODO: fix here not to use file name
 		filename := nameWithExt(path.Join(cfg.DAGs, lo.FromPtr(params.Body.Value)))
-		err := controller.CreateDAG(filename)
-		if err != nil {
+
+		e := h.engineFactory.Create()
+		if err := e.CreateDAG(filename); err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
@@ -119,37 +126,36 @@ func (*DAG) Create(params operations.CreateDagParams) (*models.CreateDagResponse
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 }
-func (*DAG) Delete(params operations.DeleteDagParams) *response.CodedError {
+func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedError {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
 	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
-	dr := controller.NewDAGStatusReader(jsondb.New())
-	dagStatus, err := dr.ReadStatus(filename, false)
+	e := h.engineFactory.Create()
+	dagStatus, err := e.ReadStatus(filename, false)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
 
-	ctrl := controller.New(dagStatus.DAG, jsondb.New())
-	if err := ctrl.DeleteDAG(); err != nil {
+	if err := e.DeleteDAG(dagStatus.DAG); err != nil {
 		return response.NewInternalError(err)
 	}
 	return nil
 }
 
-func (*DAG) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
+func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
 	cfg := config.Get()
 
 	// TODO: fix this to use dags store & history store
 	dir := filepath.Join(cfg.DAGs)
-	dr := controller.NewDAGStatusReader(jsondb.New())
-	dags, errs, err := dr.ReadAllStatus(dir)
+	e := h.engineFactory.Create()
+	dags, errs, err := e.ReadAllStatus(dir)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}
 
 	// TODO: remove this if it's not needed
-	_, _, hasErr := lo.FindIndexOf(dags, func(d *controller.DAGStatus) bool {
+	_, _, hasErr := lo.FindIndexOf(dags, func(d *engine.DAGStatus) bool {
 		return d.Error != nil
 	})
 
@@ -160,7 +166,7 @@ func (*DAG) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *res
 	return response.ToListDagResponse(dags, errs, hasErr), nil
 }
 
-func (*DAG) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDetailsResponse, *response.CodedError) {
+func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDetailsResponse, *response.CodedError) {
 	dagID := params.DagID
 
 	// TODO: separate API
@@ -177,13 +183,12 @@ func (*DAG) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDeta
 	cfg := config.Get()
 
 	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dagID))
-	dr := controller.NewDAGStatusReader(jsondb.New())
-	dagStatus, err := dr.ReadStatus(file, false)
+	e := h.engineFactory.Create()
+	dagStatus, err := e.ReadStatus(file, false)
 	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
 
-	ctrl := controller.New(dagStatus.DAG, jsondb.New())
 	resp := response.ToGetDagDetailResponse(
 		dagStatus,
 		tab,
@@ -203,18 +208,19 @@ func (*DAG) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDeta
 		resp.Definition = lo.ToPtr(string(dagContent))
 
 	case dagTabTypeHistory:
-		logs := controller.New(dagStatus.DAG, jsondb.New()).GetRecentStatuses(30)
+		e := h.engineFactory.Create()
+		logs := e.GetRecentStatuses(dagStatus.DAG, 30)
 		resp.LogData = response.ToDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
-		stepLog, err := getStepLog(ctrl, lo.FromPtr(logFile), lo.FromPtr(stepName))
+		stepLog, err := h.getStepLog(dagStatus.DAG, lo.FromPtr(logFile), lo.FromPtr(stepName))
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
 		resp.StepLog = stepLog
 
 	case dagTabTypeSchedulerLog:
-		schedulerLog, err := readSchedulerLog(ctrl, lo.FromPtr(logFile))
+		schedulerLog, err := h.readSchedulerLog(dagStatus.DAG, lo.FromPtr(logFile))
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
@@ -226,7 +232,7 @@ func (*DAG) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDeta
 	return resp, nil
 }
 
-func getStepLog(c *controller.DAGController, logFile, stepName string) (*models.DagStepLogResponse, error) {
+func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
 	var stepByName = map[string]*domain.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
@@ -235,8 +241,11 @@ func getStepLog(c *controller.DAGController, logFile, stepName string) (*models.
 	}
 
 	var status *domain.Status
+
+	e := h.engineFactory.Create()
+
 	if logFile == "" {
-		s, err := c.GetLastStatus()
+		s, err := e.GetLastStatus(dag)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status")
 		}
@@ -299,12 +308,15 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func readSchedulerLog(ctrl *controller.DAGController, statusFile string) (*models.DagSchedulerLogResponse, error) {
+func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
 	var (
 		logFile string
 	)
+
+	e := h.engineFactory.Create()
+
 	if statusFile == "" {
-		s, err := ctrl.GetLastStatus()
+		s, err := e.GetLastStatus(dag)
 		if err != nil {
 			return nil, fmt.Errorf("error reading the last status")
 		}
@@ -323,26 +335,25 @@ func readSchedulerLog(ctrl *controller.DAGController, statusFile string) (*model
 	return response.ToDagSchedulerLogResponse(logFile, string(content)), nil
 }
 
-func (*DAG) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
+func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
 	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
-	dr := controller.NewDAGStatusReader(jsondb.New())
-	d, err := dr.ReadStatus(file, false)
+	e := h.engineFactory.Create()
+	d, err := e.ReadStatus(file, false)
 
 	if err != nil && params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
 	}
-
-	ctrl := controller.New(d.DAG, jsondb.New())
 
 	switch params.Body.Action {
 	case "start":
 		if d.Status.Status == scheduler.SchedulerStatus_Running {
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
-		ctrl.StartAsync(cfg.Command, cfg.WorkDir, params.Body.Params)
+		e := h.engineFactory.Create()
+		e.StartAsync(d.DAG, cfg.Command, cfg.WorkDir, params.Body.Params)
 
 	case "suspend":
 		sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
@@ -352,8 +363,8 @@ func (*DAG) PostAction(params operations.PostDagActionParams) (*models.PostDagAc
 		if d.Status.Status != scheduler.SchedulerStatus_Running {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 		}
-		err = ctrl.Stop()
-		if err != nil {
+		e := h.engineFactory.Create()
+		if err := e.Stop(d.DAG); err != nil {
 			return nil, response.NewBadRequestError(fmt.Errorf("error trying to stop the DAG: %w", err))
 		}
 
@@ -361,7 +372,8 @@ func (*DAG) PostAction(params operations.PostDagActionParams) (*models.PostDagAc
 		if params.Body.RequestID == "" {
 			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 		}
-		err = ctrl.Retry(cfg.Command, cfg.WorkDir, params.Body.RequestID)
+		e := h.engineFactory.Create()
+		err = e.Retry(d.DAG, cfg.Command, cfg.WorkDir, params.Body.RequestID)
 		if err != nil {
 			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
 		}
@@ -377,7 +389,7 @@ func (*DAG) PostAction(params operations.PostDagActionParams) (*models.PostDagAc
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = updateStatus(ctrl, params.Body.RequestID, params.Body.Step, scheduler.NodeStatus_Success)
+		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatus_Success)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
@@ -393,22 +405,22 @@ func (*DAG) PostAction(params operations.PostDagActionParams) (*models.PostDagAc
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = updateStatus(ctrl, params.Body.RequestID, params.Body.Step, scheduler.NodeStatus_Error)
+		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatus_Error)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
 	case "save":
-		err := ctrl.UpdateDAGSpec(params.Body.Value)
+		e := h.engineFactory.Create()
+		err := e.UpdateDAGSpec(d.DAG, params.Body.Value)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
 	case "rename":
 		newFile := nameWithExt(path.Join(cfg.DAGs, params.Body.Value))
-		c := controller.New(d.DAG, jsondb.New())
-		err := c.MoveDAG(file, newFile)
-		if err != nil {
+		e := h.engineFactory.Create()
+		if err := e.MoveDAG(file, newFile); err != nil {
 			return nil, response.NewInternalError(err)
 		}
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
@@ -425,8 +437,9 @@ func nameWithExt(name string) string {
 	return fmt.Sprintf("%s.yaml", s)
 }
 
-func updateStatus(ctrl *controller.DAGController, reqId, step string, to scheduler.NodeStatus) error {
-	status, err := ctrl.GetStatusByRequestId(reqId)
+func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
+	e := h.engineFactory.Create()
+	status, err := e.GetStatusByRequestId(dag, reqId)
 	if err != nil {
 		return err
 	}
@@ -441,10 +454,10 @@ func updateStatus(ctrl *controller.DAGController, reqId, step string, to schedul
 	status.Nodes[idx].Status = to
 	status.Nodes[idx].StatusText = to.String()
 
-	return ctrl.UpdateStatus(status)
+	return e.UpdateStatus(dag, status)
 }
 
-func (*DAG) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
+func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
 	// TODO: change this to dependency injection
 	cfg := config.Get()
 
@@ -453,7 +466,8 @@ func (*DAG) Search(params operations.SearchDagsParams) (*models.SearchDagsRespon
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 
-	ret, errs, err := controller.GrepDAG(cfg.DAGs, query)
+	e := h.engineFactory.Create()
+	ret, errs, err := e.GrepDAG(cfg.DAGs, query)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}

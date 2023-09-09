@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/constants"
-	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/mailer"
 	"github.com/dagu-dev/dagu/internal/models"
@@ -34,13 +34,14 @@ type Agent struct {
 	*AgentConfig
 	*RetryConfig
 
-	scheduler    *scheduler.Scheduler
-	graph        *scheduler.ExecutionGraph
-	logManager   *logManager
-	reporter     *reporter.Reporter
-	historyStore persistence.HistoryStore
-	socketServer *sock.Server
-	requestId    string
+	engineFactory engine.Factory
+	scheduler     *scheduler.Scheduler
+	graph         *scheduler.ExecutionGraph
+	logManager    *logManager
+	reporter      *reporter.Reporter
+	historyStore  persistence.HistoryStore
+	socketServer  *sock.Server
+	requestId     string
 }
 
 // AgentConfig contains the configuration for an Agent.
@@ -166,6 +167,9 @@ func (a *Agent) init() {
 		RequestId:     a.requestId,
 	}
 
+	// TODO: inject engine factory
+	a.engineFactory = engine.NewFactory()
+
 	if a.DAG.HandlerOn.Exit != nil {
 		onExit, _ := pb.ToPbStep(a.DAG.HandlerOn.Exit)
 		config.OnExit = onExit
@@ -237,6 +241,7 @@ func (a *Agent) setupRequestId() error {
 }
 
 func (a *Agent) setupDatabase() error {
+	// TODO: use engine instead of directly using jsondb
 	a.historyStore = jsondb.New()
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
 		utils.LogErr("clean old history data", err)
@@ -359,7 +364,8 @@ func (a *Agent) dryRun() error {
 }
 
 func (a *Agent) checkIsRunning() error {
-	status, err := controller.New(a.DAG, jsondb.New()).GetStatus()
+	e := a.engineFactory.Create()
+	status, err := e.GetStatus(a.DAG)
 	if err != nil {
 		return err
 	}

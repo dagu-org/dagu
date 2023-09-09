@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/controller"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/models"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 var testdataDir = path.Join(utils.MustGetwd(), "testdata")
@@ -44,7 +44,8 @@ func TestRunDAG(t *testing.T) {
 	d := testLoadDAG(t, "run.yaml")
 	a := &Agent{AgentConfig: &AgentConfig{DAG: d}}
 
-	status, _ := controller.New(d, defaultHistoryStore()).GetLastStatus()
+	e := engine.NewFactory().Create()
+	status, _ := e.GetLastStatus(d)
 	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
 
 	go func() {
@@ -55,7 +56,7 @@ func TestRunDAG(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	require.Eventually(t, func() bool {
-		status, err := controller.New(d, defaultHistoryStore()).GetLastStatus()
+		status, err := e.GetLastStatus(d)
 		require.NoError(t, err)
 		return status.Status == scheduler.SchedulerStatus_Success
 	}, time.Second*2, time.Millisecond*100)
@@ -65,7 +66,7 @@ func TestRunDAG(t *testing.T) {
 	a = &Agent{AgentConfig: &AgentConfig{DAG: d}}
 	err := a.Run(context.Background())
 	require.NoError(t, err)
-	statusList := controller.New(d, defaultHistoryStore()).GetRecentStatuses(100)
+	statusList := e.GetRecentStatuses(d, 100)
 	require.Equal(t, 1, len(statusList))
 }
 
@@ -100,6 +101,7 @@ func TestDryRun(t *testing.T) {
 }
 
 func TestCancelDAG(t *testing.T) {
+	e := engine.NewFactory().Create()
 	for _, abort := range []func(*Agent){
 		func(a *Agent) { a.Signal(syscall.SIGTERM) },
 	} {
@@ -107,7 +109,7 @@ func TestCancelDAG(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
-		status, err := controller.New(d, defaultHistoryStore()).GetLastStatus()
+		status, err := e.GetLastStatus(d)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
 	}

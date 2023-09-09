@@ -1,9 +1,8 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/controller"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/models"
-	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/spf13/cobra"
 	"log"
 )
@@ -18,7 +17,11 @@ func createStatusCommand() *cobra.Command {
 			loadedDAG, err := loadDAG(args[0], "")
 			checkError(err)
 
-			status, err := controller.New(loadedDAG, jsondb.New()).GetStatus()
+			// TODO: inject this
+			ef := engine.NewFactory()
+			e := ef.Create()
+
+			status, err := e.GetStatus(loadedDAG)
 			checkError(err)
 
 			res := &models.StatusResponse{Status: status}
