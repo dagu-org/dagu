@@ -8,7 +8,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/exec"
@@ -35,11 +34,12 @@ type Engine interface {
 	DeleteDAG(name, loc string) error
 	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
 	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
+	IsSuspended(id string) bool
+	ToggleSuspend(id string, suspend bool) error
 }
 
 type engineImpl struct {
 	dataStoreFactory persistence.DataStoreFactory
-	suspendChecker   *suspend.SuspendChecker
 	executable       string
 	workDir          string
 }
@@ -275,12 +275,17 @@ func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
 		_, err = scheduler.NewExecutionGraph(d.Steps...)
 	}
 	status, _ := e.GetLatestStatus(d)
-	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
+	return persistence.NewDAGStatus(d, status, e.IsSuspended(d.Name), err), err
+}
+
+func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
+	fs := e.dataStoreFactory.NewFlagStore()
+	return fs.ToggleSuspend(id, suspend)
 }
 
 func (e *engineImpl) readStatus(d *dag.DAG) (*persistence.DAGStatus, error) {
 	status, err := e.GetLatestStatus(d)
-	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
+	return persistence.NewDAGStatus(d, status, e.IsSuspended(d.Name), err), err
 }
 
 func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
@@ -290,6 +295,7 @@ func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
 	return &dag.DAG{Location: dagLocation}
 }
 
-func (e *engineImpl) isSuspended(d *dag.DAG) bool {
-	return e.suspendChecker.IsSuspended(d)
+func (e *engineImpl) IsSuspended(id string) bool {
+	fs := e.dataStoreFactory.NewFlagStore()
+	return fs.IsSuspended(id)
 }

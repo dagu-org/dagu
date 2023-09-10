@@ -3,7 +3,7 @@ package persistence
 import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/grep"
+	"github.com/dagu-dev/dagu/internal/persistence/local/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"path/filepath"
 	"time"

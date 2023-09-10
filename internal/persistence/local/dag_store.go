@@ -3,8 +3,8 @@ package local
 import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/local/grep"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"path"
@@ -17,9 +17,7 @@ type dagStoreImpl struct {
 }
 
 func NewDAGStore(dir string) persistence.DAGStore {
-	return &dagStoreImpl{
-		dir: dir,
-	}
+	return &dagStoreImpl{dir: dir}
 }
 
 func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {

@@ -5,6 +5,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/local"
+	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
 )
 
 type dataStoreFactoryImpl struct {
@@ -29,5 +30,6 @@ func (f dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
 }
 
 func (f dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
-	return local.NewFlagStore(f.cfg.SuspendFlagsDir)
+	s := storage.NewStorage(f.cfg.SuspendFlagsDir)
+	return local.NewFlagStore(s)
 }

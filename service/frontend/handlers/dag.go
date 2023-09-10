@@ -11,8 +11,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	domain "github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/storage"
-	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/service/frontend/handlers/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
@@ -335,8 +333,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		e.StartAsync(d.DAG, params.Body.Params)
 
 	case "suspend":
-		sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
-		_ = sc.ToggleSuspend(d.DAG, params.Body.Value == "true")
+		_ = e.ToggleSuspend(params.DagID, params.Body.Value == "true")
 
 	case "stop":
 		if d.Status.Status != scheduler.SchedulerStatus_Running {
