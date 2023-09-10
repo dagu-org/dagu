@@ -29,7 +29,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	e := engine.NewFactory(ds).Create()
+	e := engine.NewFactory(ds, nil).Create()
 
 	return tmpDir, e, ds
 }

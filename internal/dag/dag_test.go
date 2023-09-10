@@ -1,7 +1,6 @@
 package dag
 
 import (
-	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -14,15 +13,10 @@ import (
 var (
 	testdataDir = path.Join(utils.MustGetwd(), "testdata")
 	testHomeDir = path.Join(utils.MustGetwd(), "testdata/home")
-	testEnv     = []string{}
 )
 
 func TestMain(m *testing.M) {
 	changeHomeDir(testHomeDir)
-	testEnv = []string{
-		fmt.Sprintf("LOG_DIR=%s", path.Join(testHomeDir, "/logs")),
-		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
-	}
 	code := m.Run()
 	os.Exit(code)
 }

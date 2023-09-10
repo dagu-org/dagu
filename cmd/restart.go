@@ -23,7 +23,7 @@ func restartCmd() *cobra.Command {
 			checkError(err)
 
 			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df).Create()
+			e := engine.NewFactory(df, config.Get()).Create()
 
 			// Check the current status and stop the DAG if it is running.
 			stopDAGIfRunning(e, loadedDAG)

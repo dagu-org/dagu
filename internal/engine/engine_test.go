@@ -38,7 +38,9 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
 	})
 
-	e := engine.NewFactory(ds).Create()
+	e := engine.NewFactory(ds, &config.Config{
+		Command: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+	}).Create()
 
 	return tmpDir, e, ds
 }
@@ -165,7 +167,7 @@ func TestStart(t *testing.T) {
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	err = e.Start(d.DAG, path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
+	err = e.Start(d.DAG, "")
 	require.Error(t, err)
 
 	status, err := e.GetLastStatus(d.DAG)
@@ -184,7 +186,7 @@ func TestStop(t *testing.T) {
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	e.StartAsync(d.DAG, path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "")
+	e.StartAsync(d.DAG, "")
 
 	require.Eventually(t, func() bool {
 		st, _ := e.GetStatus(d.DAG)
@@ -210,7 +212,7 @@ func TestRestart(t *testing.T) {
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	err = e.Restart(d.DAG, path.Join(utils.MustGetwd(), "../../bin/dagu"), "")
+	err = e.Restart(d.DAG)
 	require.NoError(t, err)
 
 	status, err := e.GetLastStatus(d.DAG)
@@ -229,7 +231,7 @@ func TestRetry(t *testing.T) {
 	d, err := e.ReadStatus(file, false)
 	require.NoError(t, err)
 
-	err = e.Start(d.DAG, path.Join(utils.MustGetwd(), "../../bin/dagu"), "", "x y z")
+	err = e.Start(d.DAG, "x y z")
 	require.NoError(t, err)
 
 	status, err := e.GetLastStatus(d.DAG)
@@ -239,7 +241,7 @@ func TestRetry(t *testing.T) {
 	requestId := status.RequestId
 	params := status.Params
 
-	err = e.Retry(d.DAG, path.Join(utils.MustGetwd(), "../../bin/dagu"), "", requestId)
+	err = e.Retry(d.DAG, requestId)
 	require.NoError(t, err)
 	status, err = e.GetLastStatus(d.DAG)
 	require.NoError(t, err)
@@ -262,10 +264,7 @@ func TestUpdate(t *testing.T) {
 	}()
 
 	loc := path.Join(tmpDir, "test.yaml")
-	d := &dag.DAG{
-		Name:     "test",
-		Location: loc,
-	}
+	d := &dag.DAG{Name: "test", Location: loc}
 
 	// invalid DAG
 	invalidDAG := `name: test DAG`

@@ -3,13 +3,11 @@ package engine
 import (
 	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
@@ -20,21 +18,14 @@ import (
 )
 
 type Engine interface {
-	// CreateDAG creates a new DAG and returns the ID of the DAG.
 	CreateDAG(name string) (string, error)
-	// Grep greps DAGs by the pattern.
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
-	// Rename renames DAG.
 	Rename(oldDAGPath, newDAGPath string) error
 	Stop(dag *dag.DAG) error
-	// TODO: fix params
-	StartAsync(dag *dag.DAG, binPath string, workDir string, params string)
-	// TODO: fix params
-	Start(dag *dag.DAG, binPath string, workDir string, params string) error
-	// TODO: fix params
-	Restart(dag *dag.DAG, bin string, workDir string) error
-	// TODO: fix params
-	Retry(dag *dag.DAG, binPath string, workDir string, reqId string) error
+	StartAsync(dag *dag.DAG, params string)
+	Start(dag *dag.DAG, params string) error
+	Restart(dag *dag.DAG) error
+	Retry(dag *dag.DAG, reqId string) error
 	GetStatus(dag *dag.DAG) (*model.Status, error)
 	GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error)
 	GetLastStatus(dag *dag.DAG) (*model.Status, error)
@@ -48,22 +39,12 @@ type Engine interface {
 
 type engineImpl struct {
 	dataStoreFactory persistence.DataStoreFactory
-	// TODO: fix this to inject
-	suspendChecker *suspend.SuspendChecker
-}
-
-func New(ds persistence.DataStoreFactory) Engine {
-	return &engineImpl{
-		dataStoreFactory: ds,
-		// TODO: fix this to inject
-		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(config.Get().SuspendFlagsDir),
-		),
-	}
+	suspendChecker   *suspend.SuspendChecker
+	executable       string
+	workDir          string
 }
 
 // TODO: this should not be here.
-// DAGStatus is the struct to contain DAGStatus spec and status.
 type DAGStatus struct {
 	File      string
 	Dir       string
@@ -115,25 +96,23 @@ func (e *engineImpl) Stop(dag *dag.DAG) error {
 	return err
 }
 
-// TODO: fix params
-func (e *engineImpl) StartAsync(dag *dag.DAG, binPath string, workDir string, params string) {
+func (e *engineImpl) StartAsync(dag *dag.DAG, params string) {
 	go func() {
-		err := e.Start(dag, binPath, workDir, params)
+		err := e.Start(dag, params)
 		utils.LogErr("starting a DAG", err)
 	}()
 }
 
-// TODO: fix params
-func (e *engineImpl) Start(dag *dag.DAG, binPath string, workDir string, params string) error {
+func (e *engineImpl) Start(dag *dag.DAG, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, "-p")
 		args = append(args, fmt.Sprintf(`"%s"`, utils.EscapeArg(params, false)))
 	}
 	args = append(args, dag.Location)
-	cmd := exec.Command(binPath, args...)
+	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = workDir
+	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -146,11 +125,11 @@ func (e *engineImpl) Start(dag *dag.DAG, binPath string, workDir string, params 
 }
 
 // TODO: fix params
-func (e *engineImpl) Restart(dag *dag.DAG, bin string, workDir string) error {
+func (e *engineImpl) Restart(dag *dag.DAG) error {
 	args := []string{"restart", dag.Location}
-	cmd := exec.Command(bin, args...)
+	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = workDir
+	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
 	err := cmd.Start()
 	if err != nil {
@@ -160,14 +139,14 @@ func (e *engineImpl) Restart(dag *dag.DAG, bin string, workDir string) error {
 }
 
 // TODO: fix params
-func (e *engineImpl) Retry(dag *dag.DAG, binPath string, workDir string, reqId string) (err error) {
+func (e *engineImpl) Retry(dag *dag.DAG, reqId string) (err error) {
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
 		args = append(args, dag.Location)
-		cmd := exec.Command(binPath, args...)
+		cmd := exec.Command(e.executable, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-		cmd.Dir = workDir
+		cmd.Dir = e.workDir
 		cmd.Env = os.Environ()
 		defer func() {
 			_ = cmd.Wait()

@@ -15,7 +15,7 @@ func dryCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df).Create()
+			e := engine.NewFactory(df, config.Get()).Create()
 			execDAG(cmd.Context(), e, cmd, args, true)
 		},
 	}

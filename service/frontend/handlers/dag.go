@@ -350,7 +350,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
 		e := h.engineFactory.Create()
-		e.StartAsync(d.DAG, cfg.Command, cfg.WorkDir, params.Body.Params)
+		e.StartAsync(d.DAG, params.Body.Params)
 
 	case "suspend":
 		sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
@@ -370,7 +370,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 		}
 		e := h.engineFactory.Create()
-		err = e.Retry(d.DAG, cfg.Command, cfg.WorkDir, params.Body.RequestID)
+		err = e.Retry(d.DAG, params.Body.RequestID)
 		if err != nil {
 			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
 		}
