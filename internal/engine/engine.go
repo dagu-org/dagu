@@ -3,38 +3,29 @@ package engine
 import (
 	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/storage"
 	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 )
 
 type Engine interface {
-	CreateDAG(file string) error
-	GrepDAG(dir string, pattern string) ([]*GrepResult, []string, error)
-	MoveDAG(oldDAGPath, newDAGPath string) error
+	CreateDAG(name string) (string, error)
+	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
+	Rename(oldDAGPath, newDAGPath string) error
 	Stop(dag *dag.DAG) error
-	// TODO: fix params
-	StartAsync(dag *dag.DAG, binPath string, workDir string, params string)
-	// TODO: fix params
-	Start(dag *dag.DAG, binPath string, workDir string, params string) error
-	// TODO: fix params
-	Restart(dag *dag.DAG, bin string, workDir string) error
-	// TODO: fix params
-	Retry(dag *dag.DAG, binPath string, workDir string, reqId string) error
+	StartAsync(dag *dag.DAG, params string)
+	Start(dag *dag.DAG, params string) error
+	Restart(dag *dag.DAG) error
+	Retry(dag *dag.DAG, reqId string) error
 	GetStatus(dag *dag.DAG) (*model.Status, error)
 	GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error)
 	GetLastStatus(dag *dag.DAG) (*model.Status, error)
@@ -42,119 +33,47 @@ type Engine interface {
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
 	UpdateDAGSpec(d *dag.DAG, spec string) error
 	DeleteDAG(dag *dag.DAG) error
-	ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs []string, err error)
-	ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAGStatus, error)
+	ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error)
+	ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error)
 }
 
 type engineImpl struct {
 	dataStoreFactory persistence.DataStoreFactory
-	// TODO: fix this to inject
-	suspendChecker *suspend.SuspendChecker
+	suspendChecker   *suspend.SuspendChecker
+	executable       string
+	workDir          string
 }
 
-func New(ds persistence.DataStoreFactory) Engine {
-	return &engineImpl{
-		dataStoreFactory: ds,
-		// TODO: fix this to inject
-		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(config.Get().SuspendFlagsDir),
-		),
-	}
-}
-
-// TODO: this should not be here.
-// DAGStatus is the struct to contain DAGStatus spec and status.
-type DAGStatus struct {
-	File      string
-	Dir       string
-	DAG       *dag.DAG
-	Status    *model.Status
-	Suspended bool
-	Error     error
-	ErrorT    *string
-}
-
-const (
-	_DAGTemplate = `steps:
+var (
+	_DAGTemplate = []byte(`steps:
   - name: step1
     command: echo hello
-`
+`)
 )
 
 // CreateDAG creates a new DAG.
-func (e *engineImpl) CreateDAG(file string) error {
-	if err := validateLocation(file); err != nil {
-		return err
+func (e *engineImpl) CreateDAG(name string) (string, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	id, err := ds.Create(name, _DAGTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to create DAG file: %s", err)
 	}
-	if utils.FileExists(file) {
-		return fmt.Errorf("the config file %s already exists", file)
-	}
-	return os.WriteFile(file, []byte(_DAGTemplate), 0644)
+	return id, nil
 }
 
-// GrepResult is a result of grep.
-type GrepResult struct {
-	Name    string
-	DAG     *dag.DAG
-	Matches []*grep.Match
+func (e *engineImpl) Grep(pattern string) ([]*persistence.GrepResult, []string, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.Grep(pattern)
 }
 
-// GrepDAG returns all DAGs that contain the given string.
-func (e *engineImpl) GrepDAG(dir string, pattern string) (ret []*GrepResult, errs []string, err error) {
-	ret = []*GrepResult{}
-	errs = []string{}
-	if !utils.FileExists(dir) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
-			errs = append(errs, err.Error())
-			return
-		}
+func (e *engineImpl) Rename(oldName, newName string) error {
+	ds := e.dataStoreFactory.NewDAGStore()
+	if err := ds.Rename(oldName, newName); err != nil {
+		return fmt.Errorf("failed to rename DAG: %s", err)
 	}
-	fis, err := os.ReadDir(dir)
-	dl := &dag.Loader{}
-	opts := &grep.Options{
-		IsRegexp: true,
-		Before:   2,
-		After:    2,
-	}
-	utils.LogErr("read DAGs directory", err)
-	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			fn := filepath.Join(dir, fi.Name())
-			utils.LogErr("read DAG file", err)
-			m, err := grep.Grep(fn, fmt.Sprintf("(?i)%s", pattern), opts)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
-				continue
-			}
-			d, err := dl.LoadMetadataOnly(fn)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
-				continue
-			}
-			ret = append(ret, &GrepResult{
-				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
-				DAG:     d,
-				Matches: m,
-			})
-		}
-	}
-	return ret, errs, nil
-}
-
-func (e *engineImpl) MoveDAG(oldDAGPath, newDAGPath string) error {
-	if err := validateLocation(newDAGPath); err != nil {
-		return err
-	}
-	if err := os.Rename(oldDAGPath, newDAGPath); err != nil {
-		return err
-	}
-	// TODO: fix this to use DAG Manager not History Store
-	return e.dataStoreFactory.NewHistoryStore().Rename(oldDAGPath, newDAGPath)
-}
-
-func validateLocation(dagLocation string) error {
-	if path.Ext(dagLocation) != ".yaml" {
-		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
+	hs := e.dataStoreFactory.NewHistoryStore()
+	if err := hs.Rename(oldName, newName); err != nil {
+		return fmt.Errorf("failed to rename DAG: %s", err)
 	}
 	return nil
 }
@@ -166,25 +85,23 @@ func (e *engineImpl) Stop(dag *dag.DAG) error {
 	return err
 }
 
-// TODO: fix params
-func (e *engineImpl) StartAsync(dag *dag.DAG, binPath string, workDir string, params string) {
+func (e *engineImpl) StartAsync(dag *dag.DAG, params string) {
 	go func() {
-		err := e.Start(dag, binPath, workDir, params)
+		err := e.Start(dag, params)
 		utils.LogErr("starting a DAG", err)
 	}()
 }
 
-// TODO: fix params
-func (e *engineImpl) Start(dag *dag.DAG, binPath string, workDir string, params string) error {
+func (e *engineImpl) Start(dag *dag.DAG, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, "-p")
 		args = append(args, fmt.Sprintf(`"%s"`, utils.EscapeArg(params, false)))
 	}
 	args = append(args, dag.Location)
-	cmd := exec.Command(binPath, args...)
+	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = workDir
+	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -197,11 +114,11 @@ func (e *engineImpl) Start(dag *dag.DAG, binPath string, workDir string, params 
 }
 
 // TODO: fix params
-func (e *engineImpl) Restart(dag *dag.DAG, bin string, workDir string) error {
+func (e *engineImpl) Restart(dag *dag.DAG) error {
 	args := []string{"restart", dag.Location}
-	cmd := exec.Command(bin, args...)
+	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-	cmd.Dir = workDir
+	cmd.Dir = e.workDir
 	cmd.Env = os.Environ()
 	err := cmd.Start()
 	if err != nil {
@@ -211,14 +128,14 @@ func (e *engineImpl) Restart(dag *dag.DAG, bin string, workDir string) error {
 }
 
 // TODO: fix params
-func (e *engineImpl) Retry(dag *dag.DAG, binPath string, workDir string, reqId string) (err error) {
+func (e *engineImpl) Retry(dag *dag.DAG, reqId string) (err error) {
 	go func() {
 		args := []string{"retry"}
 		args = append(args, fmt.Sprintf("--req=%s", reqId))
 		args = append(args, dag.Location)
-		cmd := exec.Command(binPath, args...)
+		cmd := exec.Command(e.executable, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-		cmd.Dir = workDir
+		cmd.Dir = e.workDir
 		cmd.Env = os.Environ()
 		defer func() {
 			_ = cmd.Wait()
@@ -330,9 +247,8 @@ func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
 	return os.Remove(dag.Location)
 }
 
-// ReadAllStatus reads all DAGStatus
-func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs []string, err error) {
-	statuses = []*DAGStatus{}
+func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
+	statuses = []*persistence.DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(DAGsDir) {
 		if err = os.MkdirAll(DAGsDir, 0755); err != nil {
@@ -356,24 +272,24 @@ func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs 
 	return statuses, errs, nil
 }
 
-// ReadStatus loads DAG from config file.
-func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAGStatus, error) {
-	var (
-		cl  = dag.Loader{}
-		d   *dag.DAG
-		err error
-	)
-
+func (e *engineImpl) getDAG(name string, loadMetadataOnly bool) (*dag.DAG, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
 	if loadMetadataOnly {
-		d, err = cl.LoadMetadataOnly(dagLocation)
+		return ds.GetMetadata(name)
 	} else {
-		d, err = cl.LoadWithoutEval(dagLocation)
+		return ds.GetDetails(name)
+	}
+}
+
+// ReadStatus loads DAG from config file.
+func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error) {
+	d, err := e.getDAG(dagLocation, loadMetadataOnly)
+
+	if err != nil && d != nil {
+		return e.newDAGStatus(d, defaultStatus(d), err), err
 	}
 
 	if err != nil {
-		if d != nil {
-			return e.newDAGStatus(d, defaultStatus(d), err), err
-		}
 		d := &dag.DAG{Location: dagLocation}
 		return e.newDAGStatus(d, defaultStatus(d), err), err
 	}
@@ -389,8 +305,8 @@ func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAG
 	return e.newDAGStatus(d, status, err), err
 }
 
-func (e *engineImpl) newDAGStatus(d *dag.DAG, s *model.Status, err error) *DAGStatus {
-	ret := &DAGStatus{
+func (e *engineImpl) newDAGStatus(d *dag.DAG, s *model.Status, err error) *persistence.DAGStatus {
+	ret := &persistence.DAGStatus{
 		File:      filepath.Base(d.Location),
 		Dir:       filepath.Dir(d.Location),
 		DAG:       d,

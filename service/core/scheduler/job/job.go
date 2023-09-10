@@ -51,7 +51,7 @@ func (j *Job) Start() error {
 		}
 		// should not be here
 	}
-	return e.Start(j.DAG, j.Command, j.WorkDir, "")
+	return e.Start(j.DAG, "")
 }
 
 func (j *Job) Stop() error {
@@ -68,7 +68,7 @@ func (j *Job) Stop() error {
 
 func (j *Job) Restart() error {
 	e := j.EngineFactory.Create()
-	return e.Restart(j.DAG, j.Command, j.WorkDir)
+	return e.Restart(j.DAG)
 }
 
 func (j *Job) String() string {

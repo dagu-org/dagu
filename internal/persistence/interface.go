@@ -30,20 +30,32 @@ type (
 		FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error)
 		RemoveAll(dagFile string) error
 		RemoveOld(dagFile string, retentionDays int) error
-		Rename(oldDAGFile, newDAGFile string) error
+		Rename(oldName, newName string) error
 	}
 
 	DAGStore interface {
-		List() ([]dag.DAG, error)
-		Grep() (ret []*GrepResult, errs []string, err error)
+		Create(name string, tmpl []byte) (string, error)
+		List() (ret []*dag.DAG, errs []string, err error)
+		GetMetadata(name string) (*dag.DAG, error)
+		GetDetails(name string) (*dag.DAG, error)
+		Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 		Load(name string) (*dag.DAG, error)
-		MoveDAG(oldDAGPath, newDAGPath string) error
+		Rename(oldName, newName string) error
 	}
 
-	// GrepResult is a result of grep.
 	GrepResult struct {
 		Name    string
 		DAG     *dag.DAG
 		Matches []*grep.Match
+	}
+
+	DAGStatus struct {
+		File      string
+		Dir       string
+		DAG       *dag.DAG
+		Status    *model.Status
+		Suspended bool
+		Error     error
+		ErrorT    *string
 	}
 )

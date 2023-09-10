@@ -7,6 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	domain "github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -17,13 +18,13 @@ import (
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"github.com/dagu-dev/dagu/service/frontend/server"
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -108,20 +109,15 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 }
 
 func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDagResponse, *response.CodedError) {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
 	switch lo.FromPtr(params.Body.Action) {
 	case "new":
-		// TODO: fix here not to use file name
-		filename := nameWithExt(path.Join(cfg.DAGs, lo.FromPtr(params.Body.Value)))
-
+		name := *params.Body.Value
 		e := h.engineFactory.Create()
-		if err := e.CreateDAG(filename); err != nil {
+		id, err := e.CreateDAG(name)
+		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
-
-		return &models.CreateDagResponse{DagID: params.Body.Value}, nil
+		return &models.CreateDagResponse{DagID: swag.String(id)}, nil
 	default:
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
@@ -146,7 +142,6 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
 	cfg := config.Get()
 
-	// TODO: fix this to use dags store & history store
 	dir := filepath.Join(cfg.DAGs)
 	e := h.engineFactory.Create()
 	dags, errs, err := e.ReadAllStatus(dir)
@@ -155,7 +150,7 @@ func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsRespo
 	}
 
 	// TODO: remove this if it's not needed
-	_, _, hasErr := lo.FindIndexOf(dags, func(d *engine.DAGStatus) bool {
+	_, _, hasErr := lo.FindIndexOf(dags, func(d *persistence.DAGStatus) bool {
 		return d.Error != nil
 	})
 
@@ -355,7 +350,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
 		e := h.engineFactory.Create()
-		e.StartAsync(d.DAG, cfg.Command, cfg.WorkDir, params.Body.Params)
+		e.StartAsync(d.DAG, params.Body.Params)
 
 	case "suspend":
 		sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
@@ -375,7 +370,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 		}
 		e := h.engineFactory.Create()
-		err = e.Retry(d.DAG, cfg.Command, cfg.WorkDir, params.Body.RequestID)
+		err = e.Retry(d.DAG, params.Body.RequestID)
 		if err != nil {
 			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
 		}
@@ -420,9 +415,12 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		}
 
 	case "rename":
-		newFile := nameWithExt(path.Join(cfg.DAGs, params.Body.Value))
+		newName := params.Body.Value
+		if newName == "" {
+			return nil, response.NewBadRequestError(fmt.Errorf("new name is required: %w", errInvalidArgs))
+		}
 		e := h.engineFactory.Create()
-		if err := e.MoveDAG(file, newFile); err != nil {
+		if err := e.Rename(params.DagID, newName); err != nil {
 			return nil, response.NewInternalError(err)
 		}
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
@@ -432,11 +430,6 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	}
 
 	return &models.PostDagActionResponse{}, nil
-}
-
-func nameWithExt(name string) string {
-	s := strings.TrimSuffix(name, ".yaml")
-	return fmt.Sprintf("%s.yaml", s)
 }
 
 func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
@@ -460,16 +453,13 @@ func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler
 }
 
 func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
 	query := params.Q
 	if query == "" {
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 
 	e := h.engineFactory.Create()
-	ret, errs, err := e.GrepDAG(cfg.DAGs, query)
+	ret, errs, err := e.Grep(query)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}

@@ -1,22 +1,22 @@
 package response
 
 import (
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/grep"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
-func ToSearchDAGsResponse(ret []*engine.GrepResult, errs []string) *models.SearchDagsResponse {
+func ToSearchDAGsResponse(ret []*persistence.GrepResult, errs []string) *models.SearchDagsResponse {
 	return &models.SearchDagsResponse{
-		Results: lo.Map(ret, func(item *engine.GrepResult, _ int) *models.SearchDagsResultItem {
+		Results: lo.Map(ret, func(item *persistence.GrepResult, _ int) *models.SearchDagsResultItem {
 			return ToSearchDAGsResultItem(item)
 		}),
 		Errors: errs,
 	}
 }
 
-func ToSearchDAGsResultItem(workflow *engine.GrepResult) *models.SearchDagsResultItem {
+func ToSearchDAGsResultItem(workflow *persistence.GrepResult) *models.SearchDagsResultItem {
 	return &models.SearchDagsResultItem{
 		Name: workflow.Name,
 		DAG:  ToDAG(workflow.DAG),

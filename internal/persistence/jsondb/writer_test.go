@@ -12,7 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testWriteStatusToFile(t *testing.T, db *Store) {
+func TestWriteStatusToFile(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	d := &dag.DAG{
 		Name:     "test_write_status",
 		Location: "test_write_status.yaml",
@@ -41,29 +46,32 @@ func testWriteStatusToFile(t *testing.T, db *Store) {
 	err = dw.close()
 	require.NoError(t, err)
 
-	old := d.Location
-	new := "text_write_status_new.yaml"
+	// TODO: fixme
+	oldS := d.Location
+	newS := "text_write_status_new.yaml"
 
-	oldDir := db.directory(old, prefix(old))
-	newDir := db.directory(new, prefix(new))
+	oldDir := db.directory(oldS, prefix(oldS))
+	newDir := db.directory(newS, prefix(newS))
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 
-	err = db.Rename(old, new)
+	err = db.Rename(oldS, newS)
 	require.NoError(t, err)
 	require.NoDirExists(t, oldDir)
 	require.DirExists(t, newDir)
 
-	ret := db.ReadStatusHist(new, 1)
+	ret := db.ReadStatusHist(newS, 1)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, status.RequestId, ret[0].Status.RequestId)
 }
 
-func testWriteStatusToExistingFile(t *testing.T, db *Store) {
-	d := &dag.DAG{
-		Name:     "test_append_to_existing",
-		Location: "test_append_to_existing.yaml",
-	}
+func TestWriteStatusToExistingFile(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
 	dw, file, err := db.newWriter(d.Location, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.open())

@@ -21,7 +21,7 @@ func stopCmd() *cobra.Command {
 			log.Printf("Stopping...")
 
 			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df).Create()
+			e := engine.NewFactory(df, config.Get()).Create()
 			checkError(e.Stop(loadedDAG))
 		},
 	}

@@ -29,13 +29,15 @@ import (
 // When Compact is called, it removes old data.
 // Compact must be called only once per file.
 type Store struct {
-	dir    string
-	writer *writer
+	dir     string
+	dagsDir string
+	writer  *writer
 }
 
 // New creates a new Store with default configuration.
-func New(dir string) *Store {
-	return &Store{dir: dir}
+func New(dir, dagsDir string) *Store {
+	// dagsDir is used to calculate the directory that is compatible with the old version.
+	return &Store{dir: dir, dagsDir: dagsDir}
 }
 
 func (store *Store) Update(dagFile, requestId string, s *model.Status) error {
@@ -83,7 +85,6 @@ func (store *Store) Close() error {
 	return store.writer.close()
 }
 
-// ParseFile parses a status file.
 func ParseFile(file string) (*model.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -236,25 +237,40 @@ func (store *Store) Compact(_, original string) error {
 	return nil
 }
 
-// MoveData moves data from one directory to another.
-func (store *Store) Rename(oldPath, newPath string) error {
-	oldDir := store.directory(oldPath, prefix(oldPath))
-	newDir := store.directory(newPath, prefix(newPath))
-	if !utils.FileExists(oldDir) {
-		// No need to move data
+func (store *Store) normalizeInternalName(name string) string {
+	a := strings.TrimSuffix(name, ".yaml")
+	a = strings.TrimSuffix(a, ".yml")
+	a = path.Join(store.dagsDir, a)
+	return fmt.Sprintf("%s.yaml", a)
+}
+
+func (store *Store) exists(file string) bool {
+	_, err := os.Stat(file)
+	return !os.IsNotExist(err)
+}
+
+func (store *Store) Rename(oldName, newName string) error {
+	// This is needed to ensure backward compatibility.
+	on := store.normalizeInternalName(oldName)
+	nn := store.normalizeInternalName(newName)
+
+	oldDir := store.directory(on, prefix(on))
+	newDir := store.directory(nn, prefix(nn))
+	if !store.exists(oldDir) {
+		// Nothing to do
 		return nil
 	}
-	if !utils.FileExists(newDir) {
+	if !store.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return err
+			return fmt.Errorf("failed to create new directory %s : %s", newDir, err.Error())
 		}
 	}
-	matches, err := filepath.Glob(store.pattern(oldPath) + "*.dat")
+	matches, err := filepath.Glob(store.pattern(on) + "*.dat")
 	if err != nil {
 		return err
 	}
-	oldPattern := path.Base(store.pattern(oldPath))
-	newPattern := path.Base(store.pattern(newPath))
+	oldPattern := path.Base(store.pattern(on))
+	newPattern := path.Base(store.pattern(nn))
 	for _, m := range matches {
 		base := path.Base(m)
 		f := strings.Replace(base, oldPattern, newPattern, 1)
@@ -266,9 +282,9 @@ func (store *Store) Rename(oldPath, newPath string) error {
 	return nil
 }
 
-func (store *Store) directory(dagFile string, prefix string) string {
+func (store *Store) directory(name string, prefix string) string {
 	h := md5.New()
-	h.Write([]byte(dagFile))
+	h.Write([]byte(name))
 	v := hex.EncodeToString(h.Sum(nil))
 	return filepath.Join(store.dir, fmt.Sprintf("%s-%s", prefix, v))
 }

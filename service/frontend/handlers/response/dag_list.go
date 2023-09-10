@@ -2,18 +2,18 @@ package response
 
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
 func ToListDagResponse(
-	dagStatusList []*engine.DAGStatus,
+	dagStatusList []*persistence.DAGStatus,
 	errs []string,
 	hasError bool,
 ) *models.ListDagsResponse {
 	return &models.ListDagsResponse{
-		DAGs: lo.Map(dagStatusList, func(item *engine.DAGStatus, _ int) *models.DagListItem {
+		DAGs: lo.Map(dagStatusList, func(item *persistence.DAGStatus, _ int) *models.DagListItem {
 			return ToDagListItem(item)
 		}),
 		Errors:   errs,
@@ -21,7 +21,7 @@ func ToListDagResponse(
 	}
 }
 
-func ToDagListItem(s *engine.DAGStatus) *models.DagListItem {
+func ToDagListItem(s *persistence.DAGStatus) *models.DagListItem {
 	return &models.DagListItem{
 		Dir:       lo.ToPtr(s.Dir),
 		Error:     lo.ToPtr(toErrorText(s.Error)),
