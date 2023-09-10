@@ -140,11 +140,8 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 }
 
 func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
-	cfg := config.Get()
-
-	dir := filepath.Join(cfg.DAGs)
 	e := h.engineFactory.Create()
-	dags, errs, err := e.ReadStatusAll(dir)
+	dags, errs, err := e.ReadStatusAll()
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}

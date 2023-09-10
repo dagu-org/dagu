@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -33,7 +32,7 @@ type Engine interface {
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
 	UpdateDAGSpec(d *dag.DAG, spec string) error
 	DeleteDAG(dag *dag.DAG) error
-	ReadStatusAll(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error)
+	ReadStatusAll() (statuses []*persistence.DAGStatus, errs []string, err error)
 	ReadStatus(dagLocation string) (*persistence.DAGStatus, error)
 }
 
@@ -243,57 +242,56 @@ func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
 	return os.Remove(dag.Location)
 }
 
-func (e *engineImpl) ReadStatusAll(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
-	statuses = []*persistence.DAGStatus{}
-	errs = []string{}
-	if !utils.FileExists(DAGsDir) {
-		if err = os.MkdirAll(DAGsDir, 0755); err != nil {
+func (e *engineImpl) ReadStatusAll() (statuses []*persistence.DAGStatus, errs []string, err error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	dags, errs, err := ds.List()
+
+	ret := make([]*persistence.DAGStatus, 0)
+	for _, d := range dags {
+		status, err := e.readStatus(d)
+		if err != nil {
 			errs = append(errs, err.Error())
-			return
 		}
+		ret = append(ret, status)
 	}
-	fis, err := os.ReadDir(DAGsDir)
-	utils.LogErr("read DAGs directory", err)
-	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			d, err := e.readStatus(filepath.Join(DAGsDir, fi.Name()), true)
-			utils.LogErr("read DAG config", err)
-			if d != nil {
-				statuses = append(statuses, d)
-			} else {
-				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
-			}
-		}
-	}
-	return statuses, errs, nil
+
+	return ret, errs, err
 }
 
 func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	if metadataOnly {
-		return ds.GetMetadata(name)
+		d, err := ds.GetMetadata(name)
+		return e.emptyDAGIfNil(d, name), err
 	} else {
-		return ds.GetDetails(name)
+		d, err := ds.GetDetails(name)
+		return e.emptyDAGIfNil(d, name), err
 	}
 }
 
 func (e *engineImpl) ReadStatus(dagLocation string) (*persistence.DAGStatus, error) {
-	return e.readStatus(dagLocation, false)
-}
-
-func (e *engineImpl) readStatus(dagLocation string, metadataOnly bool) (*persistence.DAGStatus, error) {
-	d, err := e.getDAG(dagLocation, metadataOnly)
+	d, err := e.getDAG(dagLocation, false)
 	if d == nil {
 		d = &dag.DAG{Location: dagLocation}
 	}
-	if err != nil {
-		return persistence.NewDAGStatus(d, model.NewStatusDefault(d), e.isSuspended(d), err), err
-	}
-	if !metadataOnly {
+	if err == nil {
+		// check the dag is correct in terms of graph
 		_, err = scheduler.NewExecutionGraph(d.Steps...)
 	}
+	status, _ := e.GetLastStatus(d)
+	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
+}
+
+func (e *engineImpl) readStatus(d *dag.DAG) (*persistence.DAGStatus, error) {
 	status, err := e.GetLastStatus(d)
 	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
+}
+
+func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
+	if d != nil {
+		return d
+	}
+	return &dag.DAG{Location: dagLocation}
 }
 
 func (e *engineImpl) isSuspended(d *dag.DAG) bool {

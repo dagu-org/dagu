@@ -35,6 +35,25 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 
 	ds := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
+		DAGs:    testdataDir,
+	})
+
+	e := engine.NewFactory(ds, &config.Config{
+		Command: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+	}).Create()
+
+	return tmpDir, e, ds
+}
+
+func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
+	t.Helper()
+
+	tmpDir := utils.MustTempDir("dagu_test")
+	_ = os.Setenv("HOME", tmpDir)
+	_ = config.LoadConfig(tmpDir)
+
+	ds := client.NewDataStoreFactory(&config.Config{
+		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
 	})
 
@@ -302,7 +321,7 @@ steps:
 }
 
 func TestRemove(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
+	tmpDir, e, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -343,7 +362,7 @@ steps:
 }
 
 func TestCreateNewDAG(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
+	tmpDir, e, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -366,7 +385,7 @@ func TestCreateNewDAG(t *testing.T) {
 }
 
 func TestRenameDAG(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
+	tmpDir, e, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -410,7 +429,7 @@ func TestReadAll(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	dags, _, err := e.ReadStatusAll(testdataDir)
+	dags, _, err := e.ReadStatusAll()
 	require.NoError(t, err)
 	require.Greater(t, len(dags), 0)
 
