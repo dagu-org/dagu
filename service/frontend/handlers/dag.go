@@ -17,6 +17,7 @@ import (
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 	"github.com/dagu-dev/dagu/service/frontend/server"
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
@@ -108,20 +109,15 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 }
 
 func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDagResponse, *response.CodedError) {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
 	switch lo.FromPtr(params.Body.Action) {
 	case "new":
-		// TODO: fix here not to use file name
-		filename := nameWithExt(path.Join(cfg.DAGs, lo.FromPtr(params.Body.Value)))
-
+		name := *params.Body.Value
 		e := h.engineFactory.Create()
-		if err := e.CreateDAG(filename); err != nil {
+		id, err := e.CreateDAG(name)
+		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
-
-		return &models.CreateDagResponse{DagID: params.Body.Value}, nil
+		return &models.CreateDagResponse{DagID: swag.String(id)}, nil
 	default:
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
@@ -460,16 +456,13 @@ func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler
 }
 
 func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
 	query := params.Q
 	if query == "" {
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 
 	e := h.engineFactory.Create()
-	ret, errs, err := e.GrepDAG(cfg.DAGs, query)
+	ret, errs, err := e.GrepDAG(query)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}

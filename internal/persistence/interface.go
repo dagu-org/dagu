@@ -34,13 +34,13 @@ type (
 	}
 
 	DAGStore interface {
+		Create(name string, tmpl []byte) (string, error)
 		List() ([]dag.DAG, error)
-		Grep() (ret []*GrepResult, errs []string, err error)
+		Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 		Load(name string) (*dag.DAG, error)
 		MoveDAG(oldDAGPath, newDAGPath string) error
 	}
 
-	// GrepResult is a result of grep.
 	GrepResult struct {
 		Name    string
 		DAG     *dag.DAG

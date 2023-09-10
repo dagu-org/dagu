@@ -25,6 +25,7 @@ var (
 	testdataDir = path.Join(utils.MustGetwd(), "./testdata")
 )
 
+// TODO: fix this tests to use mock
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
@@ -34,6 +35,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 
 	ds := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
+		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
 	})
 
 	e := engine.NewFactory(ds).Create()
@@ -79,21 +81,6 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	st, err = e.GetStatus(ds.DAG)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
-}
-
-func TestGrepDAGs(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
-
-	ret, _, err := e.GrepDAG(testdataDir, "aabbcc")
-	require.NoError(t, err)
-	require.Equal(t, 1, len(ret))
-
-	ret, _, err = e.GrepDAG(testdataDir, "steps")
-	require.NoError(t, err)
-	require.Greater(t, len(ret), 1)
 }
 
 func TestUpdateStatus(t *testing.T) {
@@ -362,22 +349,16 @@ func TestCreateNewDAG(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	// invalid filename
-	filename := path.Join(tmpDir, "test")
-	err := e.CreateDAG(filename)
-	require.Error(t, err)
-
-	// valid filename
-	filename = path.Join(tmpDir, "test.yaml")
-	err = e.CreateDAG(filename)
+	id, err := e.CreateDAG("test-dag")
 	require.NoError(t, err)
 
 	// check file is created
 	cl := &dag.Loader{}
 
-	d, err := cl.Load(filename, "")
+	// TODO: fixme to use mock
+	d, err := cl.Load(path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 	require.NoError(t, err)
-	require.Equal(t, "test", d.Name)
+	require.Equal(t, "test-dag", d.Name)
 
 	steps := d.Steps[0]
 	require.Equal(t, "step1", steps.Name)
@@ -391,21 +372,24 @@ func TestRenameDAG(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	oldName := path.Join(tmpDir, "rename_dag.yaml")
-	newName := path.Join(tmpDir, "rename_dag_renamed.yaml")
-
-	err := e.CreateDAG(oldName)
+	id, err := e.CreateDAG("old_name")
 	require.NoError(t, err)
 
-	_, err = e.ReadStatus(oldName, false)
+	// TODO: fixme to use mock
+	loc := path.Join(tmpDir, ".dagu", "dags", id+".yaml")
+
+	_, err = e.ReadStatus(loc, false)
 	require.NoError(t, err)
 
-	err = e.MoveDAG(oldName, "invalid-config-name")
+	err = e.MoveDAG(id, "invalid-config-name")
 	require.Error(t, err)
 
-	err = e.MoveDAG(oldName, newName)
+	// TODO: fixme
+	loc2 := path.Join(tmpDir, ".dagu", "dags", id+"_renamed.yaml")
+
+	err = e.MoveDAG(loc, loc2)
 	require.NoError(t, err)
-	require.FileExists(t, newName)
+	require.FileExists(t, loc2)
 }
 
 func TestLoadConfig(t *testing.T) {

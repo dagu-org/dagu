@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -17,14 +16,14 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 )
 
 type Engine interface {
-	CreateDAG(file string) error
-	GrepDAG(dir string, pattern string) ([]*GrepResult, []string, error)
+	// CreateDAG creates a new DAG and returns the ID of the DAG.
+	CreateDAG(name string) (string, error)
+	GrepDAG(pattern string) ([]*persistence.GrepResult, []string, error)
 	MoveDAG(oldDAGPath, newDAGPath string) error
 	Stop(dag *dag.DAG) error
 	// TODO: fix params
@@ -74,71 +73,27 @@ type DAGStatus struct {
 	ErrorT    *string
 }
 
-const (
-	_DAGTemplate = `steps:
+var (
+	_DAGTemplate = []byte(`steps:
   - name: step1
     command: echo hello
-`
+`)
 )
 
 // CreateDAG creates a new DAG.
-func (e *engineImpl) CreateDAG(file string) error {
-	if err := validateLocation(file); err != nil {
-		return err
+func (e *engineImpl) CreateDAG(name string) (string, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	id, err := ds.Create(name, _DAGTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to create DAG file: %s", err)
 	}
-	if utils.FileExists(file) {
-		return fmt.Errorf("the config file %s already exists", file)
-	}
-	return os.WriteFile(file, []byte(_DAGTemplate), 0644)
-}
-
-// GrepResult is a result of grep.
-type GrepResult struct {
-	Name    string
-	DAG     *dag.DAG
-	Matches []*grep.Match
+	return id, nil
 }
 
 // GrepDAG returns all DAGs that contain the given string.
-func (e *engineImpl) GrepDAG(dir string, pattern string) (ret []*GrepResult, errs []string, err error) {
-	ret = []*GrepResult{}
-	errs = []string{}
-	if !utils.FileExists(dir) {
-		if err = os.MkdirAll(dir, 0755); err != nil {
-			errs = append(errs, err.Error())
-			return
-		}
-	}
-	fis, err := os.ReadDir(dir)
-	dl := &dag.Loader{}
-	opts := &grep.Options{
-		IsRegexp: true,
-		Before:   2,
-		After:    2,
-	}
-	utils.LogErr("read DAGs directory", err)
-	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			fn := filepath.Join(dir, fi.Name())
-			utils.LogErr("read DAG file", err)
-			m, err := grep.Grep(fn, fmt.Sprintf("(?i)%s", pattern), opts)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
-				continue
-			}
-			d, err := dl.LoadMetadataOnly(fn)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
-				continue
-			}
-			ret = append(ret, &GrepResult{
-				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
-				DAG:     d,
-				Matches: m,
-			})
-		}
-	}
-	return ret, errs, nil
+func (e *engineImpl) GrepDAG(pattern string) ([]*persistence.GrepResult, []string, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.Grep(pattern)
 }
 
 func (e *engineImpl) MoveDAG(oldDAGPath, newDAGPath string) error {
