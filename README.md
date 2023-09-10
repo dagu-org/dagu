@@ -317,13 +317,27 @@ There are many existing tools such as Airflow, but many of these require you to 
 Dagu is a single command line tool that uses the local file system to store data, so no database management system or cloud service is required. DAGs are defined in a declarative YAML format, and existing programs can be used without modification.
 
 ## **Roadmap**
+### 1. Refactoring and Scalability Improvements:
+- Move to a worker architecture to support distributed processing.
+- Integrate with popular cloud providers for seamless scaling and deployment of Dagu workers.
+- Develop a centralized dashboard for users to manage, monitor, and scale multiple Dagu workers.
 
-- Refactor to worker architecture
-- Database support
-- Allow saving DAGs in database
-- Allow embedding in other applications
-- Allow custom executors
-- Allow calling DAGs from other DAGs
+### 2. Database and Persistence Enhancements:
+- Introduce sql database support for improved data persistence and backup.
+- Allow option to integrate with cloud object storage for logging.
+
+### 3. Integration and Extensibility:
+- Allow Dagu to be easily embedded within other applications.
+
+### 4. Advanced Executor Features:
+- Introduce custom executor ability, allowing users to define their own execution logic.
+- Allow DAGs to trigger or be triggered by other DAGs, facilitating modular and reusable pipelines.
+
+### 5. Security and Compliance:
+- Implement role-based access control for finer-grained permissions.
+
+### 6. Community and Ecosystem Development:
+- Build a SaaS application for users to easily deploy and manage multiple Dagu workers in the cloud.
 
 ## **Contributors**
 <a href="https://github.com/dagu-dev/dagu/graphs/contributors">
