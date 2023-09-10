@@ -5,6 +5,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"path/filepath"
 	"time"
 )
 
@@ -59,3 +60,19 @@ type (
 		ErrorT    *string
 	}
 )
+
+func NewDAGStatus(d *dag.DAG, s *model.Status, suspended bool, err error) *DAGStatus {
+	ret := &DAGStatus{
+		File:      filepath.Base(d.Location),
+		Dir:       filepath.Dir(d.Location),
+		DAG:       d,
+		Status:    s,
+		Suspended: suspended,
+		Error:     err,
+	}
+	if err != nil {
+		errT := err.Error()
+		ret.ErrorT = &errT
+	}
+	return ret
+}

@@ -20,7 +20,7 @@ func TestRetryCommand(t *testing.T) {
 	testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 	// Find the request ID.
-	s, err := e.ReadStatus(dagFile, false)
+	s, err := e.ReadStatus(dagFile)
 	require.NoError(t, err)
 	require.Equal(t, s.Status.Status, scheduler.SchedulerStatus_Success)
 	require.NotNil(t, s.Status)

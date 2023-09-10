@@ -128,7 +128,7 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 
 	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.ReadStatus(filename, false)
+	dagStatus, err := e.ReadStatus(filename)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
@@ -144,7 +144,7 @@ func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsRespo
 
 	dir := filepath.Join(cfg.DAGs)
 	e := h.engineFactory.Create()
-	dags, errs, err := e.ReadAllStatus(dir)
+	dags, errs, err := e.ReadStatusAll(dir)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}
@@ -179,7 +179,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 
 	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.ReadStatus(file, false)
+	dagStatus, err := e.ReadStatus(file)
 	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
@@ -338,7 +338,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 
 	if err != nil && params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)

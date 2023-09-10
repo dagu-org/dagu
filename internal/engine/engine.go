@@ -33,8 +33,8 @@ type Engine interface {
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
 	UpdateDAGSpec(d *dag.DAG, spec string) error
 	DeleteDAG(dag *dag.DAG) error
-	ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error)
-	ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error)
+	ReadStatusAll(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error)
+	ReadStatus(dagLocation string) (*persistence.DAGStatus, error)
 }
 
 type engineImpl struct {
@@ -154,14 +154,10 @@ func (e *engineImpl) GetStatus(dag *dag.DAG) (*model.Status, error) {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		} else {
-			return defaultStatus(dag), nil
+			return model.NewStatusDefault(dag), nil
 		}
 	}
 	return model.StatusFromJson(ret)
-}
-
-func defaultStatus(d *dag.DAG) *model.Status {
-	return model.NewStatus(d, nil, scheduler.SchedulerStatus_None, int(model.PidNotRunning), nil, nil)
 }
 
 func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error) {
@@ -177,33 +173,33 @@ func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*mode
 	return ret.Status, err
 }
 
-func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
+func (e *engineImpl) getCurrentStatus(dag *dag.DAG) (*model.Status, error) {
 	client := sock.Client{Addr: dag.SockAddr()}
 	ret, err := client.Request("GET", "/status")
-	if err == nil {
-		return model.StatusFromJson(ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %s", err)
 	}
+	return model.StatusFromJson(ret)
+}
 
-	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
-		if err != nil {
-			var readErr error = nil
-			if !errors.Is(err, persistence.ErrNoStatusDataToday) && !errors.Is(err, persistence.ErrNoStatusData) {
-				fmt.Printf("read status failed : %s", err)
-				readErr = err
-			}
-			return defaultStatus(dag), readErr
-		}
-		// it is wrong status if the status is running
-		status.CorrectRunningStatus()
-		return status, nil
+func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
+	currStatus, _ := e.getCurrentStatus(dag)
+	if currStatus != nil {
+		return currStatus, nil
 	}
-	return nil, err
+	status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
+	if errors.Is(err, persistence.ErrNoStatusDataToday) || errors.Is(err, persistence.ErrNoStatusData) {
+		return model.NewStatusDefault(dag), nil
+	}
+	if err != nil {
+		return model.NewStatusDefault(dag), err
+	}
+	status.CorrectRunningStatus()
+	return status, nil
 }
 
 func (e *engineImpl) GetRecentStatuses(dag *dag.DAG, n int) []*model.StatusFile {
-	ret := e.dataStoreFactory.NewHistoryStore().ReadStatusHist(dag.Location, n)
-	return ret
+	return e.dataStoreFactory.NewHistoryStore().ReadStatusHist(dag.Location, n)
 }
 
 func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
@@ -247,7 +243,7 @@ func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
 	return os.Remove(dag.Location)
 }
 
-func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
+func (e *engineImpl) ReadStatusAll(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
 	statuses = []*persistence.DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(DAGsDir) {
@@ -260,7 +256,7 @@ func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGS
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			d, err := e.ReadStatus(filepath.Join(DAGsDir, fi.Name()), true)
+			d, err := e.readStatus(filepath.Join(DAGsDir, fi.Name()), true)
 			utils.LogErr("read DAG config", err)
 			if d != nil {
 				statuses = append(statuses, d)
@@ -272,51 +268,34 @@ func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGS
 	return statuses, errs, nil
 }
 
-func (e *engineImpl) getDAG(name string, loadMetadataOnly bool) (*dag.DAG, error) {
+func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
-	if loadMetadataOnly {
+	if metadataOnly {
 		return ds.GetMetadata(name)
 	} else {
 		return ds.GetDetails(name)
 	}
 }
 
-// ReadStatus loads DAG from config file.
-func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error) {
-	d, err := e.getDAG(dagLocation, loadMetadataOnly)
-
-	if err != nil && d != nil {
-		return e.newDAGStatus(d, defaultStatus(d), err), err
-	}
-
-	if err != nil {
-		d := &dag.DAG{Location: dagLocation}
-		return e.newDAGStatus(d, defaultStatus(d), err), err
-	}
-
-	if !loadMetadataOnly {
-		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
-			return e.newDAGStatus(d, nil, err), err
-		}
-	}
-
-	status, err := e.GetLastStatus(d)
-
-	return e.newDAGStatus(d, status, err), err
+func (e *engineImpl) ReadStatus(dagLocation string) (*persistence.DAGStatus, error) {
+	return e.readStatus(dagLocation, false)
 }
 
-func (e *engineImpl) newDAGStatus(d *dag.DAG, s *model.Status, err error) *persistence.DAGStatus {
-	ret := &persistence.DAGStatus{
-		File:      filepath.Base(d.Location),
-		Dir:       filepath.Dir(d.Location),
-		DAG:       d,
-		Status:    s,
-		Suspended: e.suspendChecker.IsSuspended(d),
-		Error:     err,
+func (e *engineImpl) readStatus(dagLocation string, metadataOnly bool) (*persistence.DAGStatus, error) {
+	d, err := e.getDAG(dagLocation, metadataOnly)
+	if d == nil {
+		d = &dag.DAG{Location: dagLocation}
 	}
 	if err != nil {
-		errT := err.Error()
-		ret.ErrorT = &errT
+		return persistence.NewDAGStatus(d, model.NewStatusDefault(d), e.isSuspended(d), err), err
 	}
-	return ret
+	if !metadataOnly {
+		_, err = scheduler.NewExecutionGraph(d.Steps...)
+	}
+	status, err := e.GetLastStatus(d)
+	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
+}
+
+func (e *engineImpl) isSuspended(d *dag.DAG) bool {
+	return e.suspendChecker.IsSuspended(d)
 }

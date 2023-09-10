@@ -52,7 +52,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	}()
 	file := testDAG("get_status.yaml")
 
-	ds, err := e.ReadStatus(file, false)
+	ds, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	socketServer, _ := sock.NewServer(
@@ -97,7 +97,7 @@ func TestUpdateStatus(t *testing.T) {
 		now       = time.Now()
 	)
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	hs := hf.NewHistoryStore()
@@ -142,7 +142,7 @@ func TestUpdateStatusError(t *testing.T) {
 		requestId = "test-update-status-failure"
 	)
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	status := testNewStatus(d.DAG, requestId,
@@ -164,7 +164,7 @@ func TestStart(t *testing.T) {
 	}()
 	file := testDAG("start.yaml")
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	err = e.Start(d.DAG, "")
@@ -183,7 +183,7 @@ func TestStop(t *testing.T) {
 
 	file := testDAG("stop.yaml")
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	e.StartAsync(d.DAG, "")
@@ -209,7 +209,7 @@ func TestRestart(t *testing.T) {
 
 	file := testDAG("restart.yaml")
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	err = e.Restart(d.DAG)
@@ -228,7 +228,7 @@ func TestRetry(t *testing.T) {
 
 	file := testDAG("retry.yaml")
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.NoError(t, err)
 
 	err = e.Start(d.DAG, "x y z")
@@ -377,7 +377,7 @@ func TestRenameDAG(t *testing.T) {
 	// TODO: fixme to use mock
 	loc := path.Join(tmpDir, ".dagu", "dags", id+".yaml")
 
-	_, err = e.ReadStatus(loc, false)
+	_, err = e.ReadStatus(loc)
 	require.NoError(t, err)
 
 	// TODO: fixme
@@ -396,7 +396,7 @@ func TestLoadConfig(t *testing.T) {
 
 	file := testDAG("invalid_dag.yaml")
 
-	d, err := e.ReadStatus(file, false)
+	d, err := e.ReadStatus(file)
 	require.Error(t, err)
 	require.NotNil(t, d)
 
@@ -410,7 +410,7 @@ func TestReadAll(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	dags, _, err := e.ReadAllStatus(testdataDir)
+	dags, _, err := e.ReadStatusAll(testdataDir)
 	require.NoError(t, err)
 	require.Greater(t, len(dags), 0)
 
@@ -430,7 +430,7 @@ func TestReadDAGStatus(t *testing.T) {
 
 	file := testDAG("read_status.yaml")
 
-	_, err := e.ReadStatus(file, false)
+	_, err := e.ReadStatus(file)
 	require.NoError(t, err)
 }
 
