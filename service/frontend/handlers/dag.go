@@ -162,7 +162,6 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	dagID := params.DagID
 
 	// TODO: separate API
-	// optional params
 	tab := dagTabTypeStatus
 	if params.Tab != nil {
 		tab = *params.Tab
@@ -171,12 +170,8 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	logFile := params.File
 	stepName := params.Step
 
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
-	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.GetStatus(file)
+	dagStatus, err := e.GetStatus(dagID)
 	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
@@ -193,11 +188,11 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	switch tab {
 	case dagTabTypeStatus:
 	case dagTabTypeSpec:
-		dagContent, err := readFileContent(file, nil)
+		dagContent, err := e.GetDAGSpec(dagID)
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
-		resp.Definition = lo.ToPtr(string(dagContent))
+		resp.Definition = lo.ToPtr(dagContent)
 
 	case dagTabTypeHistory:
 		e := h.engineFactory.Create()
@@ -330,12 +325,8 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 }
 
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
-	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	d, err := e.GetStatus(file)
+	d, err := e.GetStatus(params.DagID)
 
 	if err != nil && params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
@@ -406,7 +397,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	case "save":
 		e := h.engineFactory.Create()
-		err := e.UpdateDAG(d.DAG, params.Body.Value)
+		err := e.UpdateDAG(params.DagID, params.Body.Value)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}

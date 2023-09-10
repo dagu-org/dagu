@@ -18,6 +18,7 @@ import (
 
 type Engine interface {
 	CreateDAG(name string) (string, error)
+	GetDAGSpec(id string) (string, error)
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
 	Rename(oldDAGPath, newDAGPath string) error
 	Stop(dag *dag.DAG) error
@@ -30,7 +31,7 @@ type Engine interface {
 	GetLatestStatus(dag *dag.DAG) (*model.Status, error)
 	GetRecentHistory(dag *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
-	UpdateDAG(d *dag.DAG, spec string) error
+	UpdateDAG(id string, spec string) error
 	DeleteDAG(dag *dag.DAG) error
 	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
 	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
@@ -50,7 +51,11 @@ var (
 `)
 )
 
-// CreateDAG creates a new DAG.
+func (e *engineImpl) GetDAGSpec(id string) (string, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.GetSpec(id)
+}
+
 func (e *engineImpl) CreateDAG(name string) (string, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	id, err := ds.Create(name, _DAGTemplate)
@@ -218,20 +223,9 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 	return e.dataStoreFactory.NewHistoryStore().Update(dag.Location, status.RequestId, status)
 }
 
-func (e *engineImpl) UpdateDAG(d *dag.DAG, spec string) error {
-	// validation
-	cl := dag.Loader{}
-	_, err := cl.LoadData([]byte(spec))
-	if err != nil {
-		return err
-	}
-
-	if !utils.FileExists(d.Location) {
-		return fmt.Errorf("the config file %s does not exist", d.Location)
-	}
-	err = os.WriteFile(d.Location, []byte(spec), 0755)
-
-	return err
+func (e *engineImpl) UpdateDAG(id string, spec string) error {
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.UpdateSpec(id, spec)
 }
 
 func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
@@ -269,10 +263,11 @@ func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
 	}
 }
 
-func (e *engineImpl) GetStatus(dagLocation string) (*persistence.DAGStatus, error) {
-	d, err := e.getDAG(dagLocation, false)
+func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
+	d, err := e.getDAG(id, false)
 	if d == nil {
-		d = &dag.DAG{Location: dagLocation}
+		// TODO: fix not to use location
+		d = &dag.DAG{Name: id, Location: id}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph

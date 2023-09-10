@@ -48,6 +48,39 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	return dat, nil
 }
 
+func (d *dagStoreImpl) GetSpec(name string) (string, error) {
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return "", fmt.Errorf("invalid name: %s", name)
+	}
+	dat, err := os.ReadFile(loc)
+	if err != nil {
+		return "", fmt.Errorf("failed to read DAG file: %s", err)
+	}
+	return string(dat), nil
+}
+
+func (d *dagStoreImpl) UpdateSpec(name, spec string) error {
+	// validation
+	cl := dag.Loader{}
+	_, err := cl.LoadData([]byte(spec))
+	if err != nil {
+		return err
+	}
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return fmt.Errorf("invalid name: %s", name)
+	}
+	if !exists(loc) {
+		return fmt.Errorf("the DAG file %s does not exist", loc)
+	}
+	err = os.WriteFile(loc, []byte(spec), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to update DAG file: %s", err)
+	}
+	return nil
+}
+
 func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
 		return "", fmt.Errorf("failed to create DAGs directory %s", d.dir)
@@ -56,13 +89,13 @@ func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create DAG file: %s", err)
 	}
-	if d.exists(loc) {
+	if exists(loc) {
 		return "", fmt.Errorf("the DAG file %s already exists", loc)
 	}
 	return name, os.WriteFile(loc, tmpl, 0644)
 }
 
-func (d *dagStoreImpl) exists(file string) bool {
+func exists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
@@ -83,7 +116,7 @@ func (d *dagStoreImpl) normalizeFilename(file string) (string, error) {
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {
-	if !d.exists(d.dir) {
+	if !exists(d.dir) {
 		if err := os.MkdirAll(d.dir, 0755); err != nil {
 			return err
 		}

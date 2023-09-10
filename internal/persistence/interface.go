@@ -42,6 +42,8 @@ type (
 		Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 		Load(name string) (*dag.DAG, error)
 		Rename(oldName, newName string) error
+		GetSpec(name string) (string, error)
+		UpdateSpec(name, spec string) error
 	}
 
 	GrepResult struct {
