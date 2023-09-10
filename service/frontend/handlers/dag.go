@@ -142,7 +142,6 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
 	cfg := config.Get()
 
-	// TODO: fix this to use dags store & history store
 	dir := filepath.Join(cfg.DAGs)
 	e := h.engineFactory.Create()
 	dags, errs, err := e.ReadAllStatus(dir)
@@ -431,11 +430,6 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	}
 
 	return &models.PostDagActionResponse{}, nil
-}
-
-func nameWithExt(name string) string {
-	s := strings.TrimSuffix(name, ".yaml")
-	return fmt.Sprintf("%s.yaml", s)
 }
 
 func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {

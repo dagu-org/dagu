@@ -22,6 +22,32 @@ func NewDAGStore(dir string) persistence.DAGStore {
 	}
 }
 
+func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return nil, fmt.Errorf("invalid name: %s", name)
+	}
+	cl := dag.Loader{}
+	dat, err := cl.LoadMetadataOnly(loc)
+	if err != nil {
+		return nil, err
+	}
+	return dat, nil
+}
+
+func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return nil, fmt.Errorf("invalid name: %s", name)
+	}
+	cl := dag.Loader{}
+	dat, err := cl.LoadWithoutEval(loc)
+	if err != nil {
+		return nil, err
+	}
+	return dat, nil
+}
+
 func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
 		return "", fmt.Errorf("failed to create DAGs directory %s", d.dir)
@@ -42,17 +68,17 @@ func (d *dagStoreImpl) exists(file string) bool {
 }
 
 func (d *dagStoreImpl) fileLocation(name string) (string, error) {
+	if strings.Contains(name, "/") {
+		// this is for backward compatibility
+		return name, nil
+	}
 	loc := path.Join(d.dir, name)
 	return d.normalizeFilename(loc)
 }
 
 func (d *dagStoreImpl) normalizeFilename(file string) (string, error) {
-	f, err := filepath.Abs(file)
-	if err != nil {
-		return "", err
-	}
-	a := strings.TrimSuffix(f, ".yaml")
-	a = strings.TrimSuffix(f, ".yml")
+	a := strings.TrimSuffix(file, ".yaml")
+	a = strings.TrimSuffix(a, ".yml")
 	return fmt.Sprintf("%s.yaml", a), nil
 }
 
@@ -65,9 +91,39 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
-func (d *dagStoreImpl) List() ([]dag.DAG, error) {
-	//TODO implement me
-	panic("implement me")
+func (d *dagStoreImpl) List() (ret []*dag.DAG, errs []string, err error) {
+	if err = d.ensureDirExist(); err != nil {
+		errs = append(errs, err.Error())
+		return
+	}
+	fis, err := os.ReadDir(d.dir)
+	if err != nil {
+		errs = append(errs, err.Error())
+		return
+	}
+	for _, fi := range fis {
+		if checkExtension(fi.Name()) {
+			dat, err := d.GetMetadata(fi.Name())
+			if err == nil {
+				ret = append(ret, dat)
+			} else {
+				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
+			}
+		}
+	}
+	return ret, errs, nil
+}
+
+var extensions = []string{".yaml", ".yml"}
+
+func checkExtension(file string) bool {
+	ext := filepath.Ext(file)
+	for _, e := range extensions {
+		if e == ext {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs []string, err error) {

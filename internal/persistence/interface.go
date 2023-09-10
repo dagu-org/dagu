@@ -35,7 +35,9 @@ type (
 
 	DAGStore interface {
 		Create(name string, tmpl []byte) (string, error)
-		List() ([]dag.DAG, error)
+		List() (ret []*dag.DAG, errs []string, err error)
+		GetMetadata(name string) (*dag.DAG, error)
+		GetDetails(name string) (*dag.DAG, error)
 		Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 		Load(name string) (*dag.DAG, error)
 		Rename(oldName, newName string) error

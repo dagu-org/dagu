@@ -247,7 +247,6 @@ func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
 	return os.Remove(dag.Location)
 }
 
-// ReadAllStatus reads all DAGStatus
 func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
 	statuses = []*persistence.DAGStatus{}
 	errs = []string{}
@@ -273,24 +272,24 @@ func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGS
 	return statuses, errs, nil
 }
 
+func (e *engineImpl) getDAG(name string, loadMetadataOnly bool) (*dag.DAG, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	if loadMetadataOnly {
+		return ds.GetMetadata(name)
+	} else {
+		return ds.GetDetails(name)
+	}
+}
+
 // ReadStatus loads DAG from config file.
 func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error) {
-	var (
-		cl  = dag.Loader{}
-		d   *dag.DAG
-		err error
-	)
+	d, err := e.getDAG(dagLocation, loadMetadataOnly)
 
-	if loadMetadataOnly {
-		d, err = cl.LoadMetadataOnly(dagLocation)
-	} else {
-		d, err = cl.LoadWithoutEval(dagLocation)
+	if err != nil && d != nil {
+		return e.newDAGStatus(d, defaultStatus(d), err), err
 	}
 
 	if err != nil {
-		if d != nil {
-			return e.newDAGStatus(d, defaultStatus(d), err), err
-		}
 		d := &dag.DAG{Location: dagLocation}
 		return e.newDAGStatus(d, defaultStatus(d), err), err
 	}
