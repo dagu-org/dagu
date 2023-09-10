@@ -46,7 +46,7 @@ func Setup(opts *Options) {
 func prefixChecker(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/handlers") {
+			if strings.HasPrefix(r.URL.Path, "/api") {
 				next.ServeHTTP(w, r)
 			} else {
 				defaultHandler.ServeHTTP(w, r)

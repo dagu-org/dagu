@@ -33,7 +33,7 @@ func init() {
     "version": "0.0.1"
   },
   "host": "localhost:8080",
-  "basePath": "/handlers/v1",
+  "basePath": "/api/v1",
   "paths": {
     "/dags": {
       "get": {
@@ -1002,7 +1002,7 @@ func init() {
     "version": "0.0.1"
   },
   "host": "localhost:8080",
-  "basePath": "/handlers/v1",
+  "basePath": "/api/v1",
   "paths": {
     "/dags": {
       "get": {
