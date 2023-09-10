@@ -3,8 +3,8 @@ package local
 import (
 	"fmt"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/local/grep"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"path"
@@ -26,7 +26,7 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 		return nil, fmt.Errorf("invalid name: %s", name)
 	}
 	cl := dag.Loader{}
-	dat, err := cl.LoadMetadataOnly(loc)
+	dat, err := cl.LoadMetadata(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -186,14 +186,18 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			fn := filepath.Join(d.dir, fi.Name())
-			utils.LogErr("read DAG file", err)
-			m, err := grep.Grep(fn, fmt.Sprintf("(?i)%s", pattern), opts)
+			file := filepath.Join(d.dir, fi.Name())
+			dat, err := os.ReadFile(file)
+			if err != nil {
+				utils.LogErr("read DAG file", err)
+				continue
+			}
+			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
-			d, err := dl.LoadMetadataOnly(fn)
+			d, err := dl.LoadMetadata(file)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue

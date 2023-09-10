@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"os"
 	"regexp"
 	"strings"
 
@@ -43,11 +42,7 @@ type Match struct {
 
 // Grep read file and return matched lines.
 // If opts is nil, default options will be used.
-func Grep(file string, pattern string, opts *Options) ([]*Match, error) {
-	b, err := os.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
+func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
@@ -56,14 +51,15 @@ func Grep(file string, pattern string, opts *Options) ([]*Match, error) {
 	}
 	matcher := opts.Matcher
 	if matcher == nil {
+		var err error
 		if matcher, err = defaultMatcher(pattern, opts); err != nil {
 			return nil, err
 		}
 	}
-	scanner := bufio.NewScanner(bytes.NewReader(b))
-	ret := []*Match{}
-	lines := []string{}
-	matches := []int{}
+	scanner := bufio.NewScanner(bytes.NewReader(dat))
+	ret := make([]*Match, 0)
+	lines := make([]string, 0)
+	matches := make([]int, 0)
 	i := 0
 	for scanner.Scan() {
 		t := scanner.Text()

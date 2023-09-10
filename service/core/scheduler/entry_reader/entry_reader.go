@@ -95,7 +95,7 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dag, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, fi.Name()))
+			dag, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
@@ -130,7 +130,7 @@ func (er *EntryReader) watchDags() {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dag, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dag, err := cl.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {

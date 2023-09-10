@@ -1,8 +1,8 @@
 package response
 
 import (
+	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/local/grep"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )

@@ -22,21 +22,21 @@ type Loader struct {
 
 // Load loads config from file.
 func (cl *Loader) Load(f, params string) (*DAG, error) {
-	return cl.loadDAGWithOptions(f, params, false, false, false)
+	return cl.loadWithOptions(f, params, false, false, false)
 }
 
-// LoadwIithoutEval loads config from file without evaluating env variables.
+// LoadWithoutEval loads config from file without evaluating env variables.
 func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
-	return cl.loadDAGWithOptions(f, "", false, true, true)
+	return cl.loadWithOptions(f, "", false, true, true)
 }
 
-// LoadMetadataOnly loads config from file and returns only the headline data.
-func (cl *Loader) LoadMetadataOnly(f string) (*DAG, error) {
-	return cl.loadDAGWithOptions(f, "", true, true, true)
+// LoadMetadata loads config from file and returns only the headline data.
+func (cl *Loader) LoadMetadata(f string) (*DAG, error) {
+	return cl.loadWithOptions(f, "", true, true, true)
 }
 
-// loadDAGWithOptions loads the config file with the provided options.
-func (cl *Loader) loadDAGWithOptions(f, params string, loadMetadataOnly, skipEnvEval, skipEnvSetup bool) (*DAG, error) {
+// loadWithOptions loads the config file with the provided options.
+func (cl *Loader) loadWithOptions(f, params string, loadMetadataOnly, skipEnvEval, skipEnvSetup bool) (*DAG, error) {
 	return cl.loadDAG(f,
 		&BuildDAGOptions{
 			parameters:       params,
@@ -159,11 +159,11 @@ func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (
 	return &DAG{Name: strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))}, nil
 }
 
-type mergeTranformer struct{}
+type mergeTransformer struct{}
 
-var _ mergo.Transformers = (*mergeTranformer)(nil)
+var _ mergo.Transformers = (*mergeTransformer)(nil)
 
-func (mt *mergeTranformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
 	if typ == reflect.TypeOf(MailOn{}) {
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {
@@ -196,7 +196,7 @@ func (fl *fileLoader) readFile(file string) (config map[string]interface{}, err 
 	return fl.unmarshalData(data)
 }
 
-// unmarshalData unmarshals the data from a byte slice into a map.
+// unmarshalData unmarshals the data into a map.
 func (fl *fileLoader) unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
@@ -221,6 +221,6 @@ func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDef
 // merge merges the source DAG into the destination DAG.
 func (cdl *configDefinitionLoader) merge(dst, src *DAG) error {
 	err := mergo.Merge(dst, src, mergo.WithOverride,
-		mergo.WithTransformers(&mergeTranformer{}))
+		mergo.WithTransformers(&mergeTransformer{}))
 	return err
 }

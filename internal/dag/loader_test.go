@@ -57,7 +57,7 @@ func TestLoaingErrors(t *testing.T) {
 func TestLoadingHeadlineOnly(t *testing.T) {
 	l := &Loader{}
 
-	d, err := l.LoadMetadataOnly(path.Join(testdataDir, "default.yaml"))
+	d, err := l.LoadMetadata(path.Join(testdataDir, "default.yaml"))
 	require.NoError(t, err)
 
 	require.Equal(t, d.Name, "default")
