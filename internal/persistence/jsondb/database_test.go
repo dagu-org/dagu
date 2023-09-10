@@ -17,38 +17,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDatabase(t *testing.T) {
-	for scenario, fn := range map[string]func(
-		t *testing.T, db *Store,
-	){
-		"create new datafile":                 testNewDataFile,
-		"write status to file and rename":     testWriteStatusToFile,
-		"append status to existing file":      testWriteStatusToExistingFile,
-		"write status and find files":         testWriteAndFindFiles,
-		"write status and find by request id": testWriteAndFindByRequestId,
-		"remove old files":                    testRemoveOldFiles,
-		"test read latest status":             testReadLatestStatus,
-		"test read latest n status":           testReadStatusN,
-		"test compaction":                     testCompactFile,
-		"test error read file":                testErrorReadFile,
-		"test error parse file":               testErrorParseFile,
-	} {
-		t.Run(scenario, func(t *testing.T) {
-			dir, err := os.MkdirTemp("", "test-persistence")
-			db := New(dir)
-			require.NoError(t, err)
-			defer func() {
-				_ = os.RemoveAll(dir)
-			}()
-			fn(t, db)
-		})
-	}
+func setupTest(t *testing.T) (string, *Store) {
+	tmpDir, err := os.MkdirTemp("", "test-persistence")
+	require.NoError(t, err)
+	db := New(tmpDir, "")
+	return tmpDir, db
 }
 
-func testNewDataFile(t *testing.T, db *Store) {
-	d := &dag.DAG{
-		Location: "test_new_data_file.yaml",
-	}
+func TestNewDataFile(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	d := &dag.DAG{Location: "test_new_data_file.yaml"}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
 	requestId := "request-id-1"
 	f, err := db.newFile(d.Location, timestamp, requestId)
@@ -61,14 +43,16 @@ func testNewDataFile(t *testing.T, db *Store) {
 	require.Error(t, err)
 }
 
-func testWriteAndFindFiles(t *testing.T, db *Store) {
+func TestWriteAndFindFiles(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	d := &dag.DAG{
 		Name:     "test_read_status_n",
 		Location: "test_data_files_n.yaml",
 	}
-	defer func() {
-		_ = db.RemoveAll(d.Location)
-	}()
 
 	for _, data := range []struct {
 		Status    *model.Status
@@ -100,11 +84,17 @@ func testWriteAndFindFiles(t *testing.T, db *Store) {
 	require.Equal(t, 2, len(files))
 }
 
-func testWriteAndFindByRequestId(t *testing.T, db *Store) {
+func TestWriteAndFindByRequestId(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	d := &dag.DAG{
 		Name:     "test_find_by_request_id",
 		Location: "test_find_by_request_id.yaml",
 	}
+
 	defer func() {
 		_ = db.RemoveAll(d.Location)
 	}()
@@ -144,10 +134,13 @@ func testWriteAndFindByRequestId(t *testing.T, db *Store) {
 	require.Nil(t, status)
 }
 
-func testRemoveOldFiles(t *testing.T, db *Store) {
-	d := &dag.DAG{
-		Location: "test_remove_old.yaml",
-	}
+func TestRemoveOldFiles(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	d := &dag.DAG{Location: "test_remove_old.yaml"}
 
 	for _, data := range []struct {
 		Status    *model.Status
@@ -187,10 +180,13 @@ func testRemoveOldFiles(t *testing.T, db *Store) {
 	require.Equal(t, 0, len(m))
 }
 
-func testReadLatestStatus(t *testing.T, db *Store) {
-	d := &dag.DAG{
-		Location: "test_config_status_reader.yaml",
-	}
+func TestReadLatestStatus(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	d := &dag.DAG{Location: "test_config_status_reader.yaml"}
 	requestId := "request-id-1"
 
 	dw, _, err := db.newWriter(d.Location, time.Now(), requestId)
@@ -218,11 +214,13 @@ func testReadLatestStatus(t *testing.T, db *Store) {
 
 }
 
-func testReadStatusN(t *testing.T, db *Store) {
-	d := &dag.DAG{
-		Name:     "test_read_status_n",
-		Location: "test_config_status_reader_hist.yaml",
-	}
+func TestReadStatusN(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	d := &dag.DAG{Name: "test_read_status_n", Location: "test_config_status_reader_hist.yaml"}
 
 	for _, data := range []struct {
 		Status    *model.Status
@@ -259,11 +257,13 @@ func testReadStatusN(t *testing.T, db *Store) {
 	require.Equal(t, d.Name, ret[1].Status.Name)
 }
 
-func testCompactFile(t *testing.T, db *Store) {
-	d := &dag.DAG{
-		Name:     "test_compact_file",
-		Location: "test_compact_file.yaml",
-	}
+func TestCompactFile(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	d := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
 	requestId := "request-id-1"
 
 	dw, _, err := db.newWriter(d.Location, time.Now(), requestId)
@@ -291,7 +291,7 @@ func testCompactFile(t *testing.T, db *Store) {
 	}
 	require.NotNil(t, s)
 
-	db2 := New(db.dir)
+	db2 := New(db.dir, "")
 	err = db2.Compact(d.Location, s.File)
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)
@@ -309,7 +309,12 @@ func testCompactFile(t *testing.T, db *Store) {
 	require.Error(t, err)
 }
 
-func testErrorReadFile(t *testing.T, db *Store) {
+func TestErrorReadFile(t *testing.T) {
+	tmpDir, db := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	_, err := ParseFile("invalid_file.dat")
 	require.Error(t, err)
 
@@ -323,7 +328,7 @@ func testErrorReadFile(t *testing.T, db *Store) {
 	require.Error(t, err)
 }
 
-func testErrorParseFile(t *testing.T, _ *Store) {
+func TestErrorParseFile(t *testing.T) {
 	tmpDir := utils.MustTempDir("test_error_parse_file")
 	tmpFile := filepath.Join(tmpDir, "test_error_parse_file.dat")
 

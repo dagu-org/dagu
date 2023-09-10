@@ -381,13 +381,10 @@ func TestRenameDAG(t *testing.T) {
 	_, err = e.ReadStatus(loc, false)
 	require.NoError(t, err)
 
-	err = e.MoveDAG(id, "invalid-config-name")
-	require.Error(t, err)
-
 	// TODO: fixme
 	loc2 := path.Join(tmpDir, ".dagu", "dags", id+"_renamed.yaml")
 
-	err = e.MoveDAG(loc, loc2)
+	err = e.Rename(id, id+"_renamed")
 	require.NoError(t, err)
 	require.FileExists(t, loc2)
 }

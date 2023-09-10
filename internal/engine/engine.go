@@ -14,7 +14,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -23,8 +22,10 @@ import (
 type Engine interface {
 	// CreateDAG creates a new DAG and returns the ID of the DAG.
 	CreateDAG(name string) (string, error)
-	GrepDAG(pattern string) ([]*persistence.GrepResult, []string, error)
-	MoveDAG(oldDAGPath, newDAGPath string) error
+	// Grep greps DAGs by the pattern.
+	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
+	// Rename renames DAG.
+	Rename(oldDAGPath, newDAGPath string) error
 	Stop(dag *dag.DAG) error
 	// TODO: fix params
 	StartAsync(dag *dag.DAG, binPath string, workDir string, params string)
@@ -90,26 +91,19 @@ func (e *engineImpl) CreateDAG(name string) (string, error) {
 	return id, nil
 }
 
-// GrepDAG returns all DAGs that contain the given string.
-func (e *engineImpl) GrepDAG(pattern string) ([]*persistence.GrepResult, []string, error) {
+func (e *engineImpl) Grep(pattern string) ([]*persistence.GrepResult, []string, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	return ds.Grep(pattern)
 }
 
-func (e *engineImpl) MoveDAG(oldDAGPath, newDAGPath string) error {
-	if err := validateLocation(newDAGPath); err != nil {
-		return err
+func (e *engineImpl) Rename(oldName, newName string) error {
+	ds := e.dataStoreFactory.NewDAGStore()
+	if err := ds.Rename(oldName, newName); err != nil {
+		return fmt.Errorf("failed to rename DAG: %s", err)
 	}
-	if err := os.Rename(oldDAGPath, newDAGPath); err != nil {
-		return err
-	}
-	// TODO: fix this to use DAG Manager not History Store
-	return e.dataStoreFactory.NewHistoryStore().Rename(oldDAGPath, newDAGPath)
-}
-
-func validateLocation(dagLocation string) error {
-	if path.Ext(dagLocation) != ".yaml" {
-		return fmt.Errorf("the config file must be a yaml file with .yaml extension")
+	hs := e.dataStoreFactory.NewHistoryStore()
+	if err := hs.Rename(oldName, newName); err != nil {
+		return fmt.Errorf("failed to rename DAG: %s", err)
 	}
 	return nil
 }

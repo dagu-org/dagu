@@ -24,7 +24,6 @@ import (
 	"golang.org/x/text/transform"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -416,9 +415,12 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		}
 
 	case "rename":
-		newFile := nameWithExt(path.Join(cfg.DAGs, params.Body.Value))
+		newName := params.Body.Value
+		if newName == "" {
+			return nil, response.NewBadRequestError(fmt.Errorf("new name is required: %w", errInvalidArgs))
+		}
 		e := h.engineFactory.Create()
-		if err := e.MoveDAG(file, newFile); err != nil {
+		if err := e.Rename(params.DagID, newName); err != nil {
 			return nil, response.NewInternalError(err)
 		}
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
@@ -462,7 +464,7 @@ func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchD
 	}
 
 	e := h.engineFactory.Create()
-	ret, errs, err := e.GrepDAG(query)
+	ret, errs, err := e.Grep(query)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}

@@ -114,7 +114,17 @@ func (d *dagStoreImpl) Load(name string) (*dag.DAG, error) {
 	panic("implement me")
 }
 
-func (d *dagStoreImpl) MoveDAG(oldDAGPath, newDAGPath string) error {
-	//TODO implement me
-	panic("implement me")
+func (d *dagStoreImpl) Rename(oldDAGPath, newDAGPath string) error {
+	oldLoc, err := d.fileLocation(oldDAGPath)
+	if err != nil {
+		return fmt.Errorf("invalid old name: %s", oldDAGPath)
+	}
+	newLoc, err := d.fileLocation(newDAGPath)
+	if err != nil {
+		return fmt.Errorf("invalid new name: %s", newDAGPath)
+	}
+	if err := os.Rename(oldLoc, newLoc); err != nil {
+		return err
+	}
+	return nil
 }

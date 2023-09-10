@@ -30,7 +30,7 @@ type (
 		FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error)
 		RemoveAll(dagFile string) error
 		RemoveOld(dagFile string, retentionDays int) error
-		Rename(oldDAGFile, newDAGFile string) error
+		Rename(oldName, newName string) error
 	}
 
 	DAGStore interface {
@@ -38,7 +38,7 @@ type (
 		List() ([]dag.DAG, error)
 		Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 		Load(name string) (*dag.DAG, error)
-		MoveDAG(oldDAGPath, newDAGPath string) error
+		Rename(oldName, newName string) error
 	}
 
 	GrepResult struct {
