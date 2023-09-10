@@ -27,3 +27,7 @@ func (f dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 func (f dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
 	return local.NewDAGStore(f.cfg.DAGs)
 }
+
+func (f dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
+	return local.NewFlagStore(f.cfg.SuspendFlagsDir)
+}

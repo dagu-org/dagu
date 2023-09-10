@@ -19,6 +19,7 @@ type (
 	DataStoreFactory interface {
 		NewHistoryStore() HistoryStore
 		NewDAGStore() DAGStore
+		NewFlagStore() FlagStore
 	}
 
 	HistoryStore interface {
@@ -45,6 +46,11 @@ type (
 		Rename(oldName, newName string) error
 		GetSpec(name string) (string, error)
 		UpdateSpec(name string, spec []byte) error
+	}
+
+	FlagStore interface {
+		ToggleSuspend(id string, suspend bool) error
+		IsSuspended(id string) bool
 	}
 
 	GrepResult struct {
