@@ -132,7 +132,8 @@ func TestGrep(t *testing.T) {
 		},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			ret, err := Grep(tc.File, tc.Pattern, tc.Opts)
+			dat, _ := os.ReadFile(tc.File)
+			ret, err := Grep(dat, tc.Pattern, tc.Opts)
 			if tc.IsErr {
 				require.Empty(t, ret)
 				require.Error(t, err)

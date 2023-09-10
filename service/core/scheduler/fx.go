@@ -24,8 +24,15 @@ type Params struct {
 	EntryReader scheduler.EntryReader
 }
 
-func EntryReaderProvider(cfg *config.Config, jf entry_reader.JobFactory, logger logger.Logger) scheduler.EntryReader {
+func EntryReaderProvider(
+	cfg *config.Config,
+	engineFactory engine.Factory,
+	jf entry_reader.JobFactory,
+	logger logger.Logger,
+) scheduler.EntryReader {
 	return entry_reader.New(entry_reader.Params{
+		EngineFactory: engineFactory,
+		// TODO: fix this
 		DagsDir:    cfg.DAGs,
 		JobFactory: jf,
 		Logger:     logger,

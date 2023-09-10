@@ -11,8 +11,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	domain "github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/storage"
-	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/service/frontend/handlers/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
@@ -25,7 +23,6 @@ import (
 	"golang.org/x/text/transform"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -123,28 +120,20 @@ func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDa
 	}
 }
 func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedError {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
-	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.ReadStatus(filename, false)
+	dagStatus, err := e.GetStatus(params.DagID)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
-
-	if err := e.DeleteDAG(dagStatus.DAG); err != nil {
+	if err := e.DeleteDAG(params.DagID, dagStatus.DAG.Location); err != nil {
 		return response.NewInternalError(err)
 	}
 	return nil
 }
 
 func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
-	cfg := config.Get()
-
-	dir := filepath.Join(cfg.DAGs)
 	e := h.engineFactory.Create()
-	dags, errs, err := e.ReadAllStatus(dir)
+	dags, errs, err := e.GetAllStatus()
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}
@@ -165,7 +154,6 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	dagID := params.DagID
 
 	// TODO: separate API
-	// optional params
 	tab := dagTabTypeStatus
 	if params.Tab != nil {
 		tab = *params.Tab
@@ -174,12 +162,8 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	logFile := params.File
 	stepName := params.Step
 
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
-	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.ReadStatus(file, false)
+	dagStatus, err := e.GetStatus(dagID)
 	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
@@ -196,15 +180,15 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	switch tab {
 	case dagTabTypeStatus:
 	case dagTabTypeSpec:
-		dagContent, err := readFileContent(file, nil)
+		dagContent, err := e.GetDAGSpec(dagID)
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
-		resp.Definition = lo.ToPtr(string(dagContent))
+		resp.Definition = lo.ToPtr(dagContent)
 
 	case dagTabTypeHistory:
 		e := h.engineFactory.Create()
-		logs := e.GetRecentStatuses(dagStatus.DAG, 30)
+		logs := e.GetRecentHistory(dagStatus.DAG, 30)
 		resp.LogData = response.ToDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
@@ -240,7 +224,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 	e := h.engineFactory.Create()
 
 	if logFile == "" {
-		s, err := e.GetLastStatus(dag)
+		s, err := e.GetLatestStatus(dag)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status")
 		}
@@ -312,7 +296,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 	e := h.engineFactory.Create()
 
 	if statusFile == "" {
-		s, err := e.GetLastStatus(dag)
+		s, err := e.GetLatestStatus(dag)
 		if err != nil {
 			return nil, fmt.Errorf("error reading the last status")
 		}
@@ -333,12 +317,8 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 }
 
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
-	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	d, err := e.ReadStatus(file, false)
+	d, err := e.GetStatus(params.DagID)
 
 	if err != nil && params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
@@ -353,8 +333,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		e.StartAsync(d.DAG, params.Body.Params)
 
 	case "suspend":
-		sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
-		_ = sc.ToggleSuspend(d.DAG, params.Body.Value == "true")
+		_ = e.ToggleSuspend(params.DagID, params.Body.Value == "true")
 
 	case "stop":
 		if d.Status.Status != scheduler.SchedulerStatus_Running {
@@ -409,7 +388,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	case "save":
 		e := h.engineFactory.Create()
-		err := e.UpdateDAGSpec(d.DAG, params.Body.Value)
+		err := e.UpdateDAG(params.DagID, params.Body.Value)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}

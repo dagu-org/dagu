@@ -1,6 +1,7 @@
 package entry_reader
 
 import (
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/service/core/scheduler/filenotify"
@@ -11,10 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/storage"
-	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/fsnotify/fsnotify"
 )
@@ -24,30 +22,29 @@ type JobFactory interface {
 }
 
 type Params struct {
-	DagsDir    string
-	JobFactory JobFactory
-	Logger     logger.Logger
+	DagsDir       string
+	JobFactory    JobFactory
+	Logger        logger.Logger
+	EngineFactory engine.Factory
 }
 
 type EntryReader struct {
-	dagsDir        string
-	suspendChecker *suspend.SuspendChecker
-	dagsLock       sync.Mutex
-	dags           map[string]*dag.DAG
-	jf             JobFactory
-	logger         logger.Logger
+	dagsDir       string
+	dagsLock      sync.Mutex
+	dags          map[string]*dag.DAG
+	jf            JobFactory
+	logger        logger.Logger
+	engineFactory engine.Factory
 }
 
 func New(params Params) *EntryReader {
 	er := &EntryReader{
-		dagsDir: params.DagsDir,
-		suspendChecker: suspend.NewSuspendChecker(
-			storage.NewStorage(config.Get().SuspendFlagsDir),
-		),
-		dagsLock: sync.Mutex{},
-		dags:     map[string]*dag.DAG{},
-		jf:       params.JobFactory,
-		logger:   params.Logger,
+		dagsDir:       params.DagsDir,
+		dagsLock:      sync.Mutex{},
+		dags:          map[string]*dag.DAG{},
+		jf:            params.JobFactory,
+		logger:        params.Logger,
+		engineFactory: params.EngineFactory,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
@@ -74,8 +71,9 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 		}
 	}
 
+	e := er.engineFactory.Create()
 	for _, d := range er.dags {
-		if er.suspendChecker.IsSuspended(d) {
+		if e.IsSuspended(d.Name) {
 			continue
 		}
 		f(d, d.Schedule, scheduler.Start)
@@ -97,7 +95,7 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dag, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, fi.Name()))
+			dag, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
@@ -132,7 +130,7 @@ func (er *EntryReader) watchDags() {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dag, err := cl.LoadMetadataOnly(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dag, err := cl.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {

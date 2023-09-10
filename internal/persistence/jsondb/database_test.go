@@ -250,7 +250,7 @@ func TestReadStatusN(t *testing.T) {
 
 	recordMax := 2
 
-	ret := db.ReadStatusHist(d.Location, recordMax)
+	ret := db.ReadStatusRecent(d.Location, recordMax)
 
 	require.Equal(t, recordMax, len(ret))
 	require.Equal(t, d.Name, ret[0].Status.Name)
@@ -286,7 +286,7 @@ func TestCompactFile(t *testing.T) {
 	_ = dw.close()
 
 	var s *model.StatusFile = nil
-	if h := db.ReadStatusHist(d.Location, 1); len(h) > 0 {
+	if h := db.ReadStatusRecent(d.Location, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
@@ -297,7 +297,7 @@ func TestCompactFile(t *testing.T) {
 	require.NoError(t, err)
 
 	var s2 *model.StatusFile = nil
-	if h := db2.ReadStatusHist(d.Location, 1); len(h) > 0 {
+	if h := db2.ReadStatusRecent(d.Location, 1); len(h) > 0 {
 		s2 = h[0]
 	}
 	require.NotNil(t, s2)

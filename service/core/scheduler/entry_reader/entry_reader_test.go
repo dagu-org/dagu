@@ -2,9 +2,9 @@ package entry_reader
 
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/storage"
-	"github.com/dagu-dev/dagu/internal/suspend"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 	"os"
@@ -21,37 +21,52 @@ var (
 	testdataDir = path.Join(utils.MustGetwd(), "testdata")
 )
 
-func TestMain(m *testing.M) {
-	tempDir := utils.MustTempDir("runner_test")
-	changeHomeDir(tempDir)
-	code := m.Run()
-	_ = os.RemoveAll(tempDir)
-	os.Exit(code)
-}
+// TODO: fix this tests to use mock
+func setupTest(t *testing.T) (string, engine.Factory) {
+	t.Helper()
 
-func changeHomeDir(homeDir string) {
-	_ = os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig(homeDir)
+	tmpDir := utils.MustTempDir("dagu_test")
+	_ = os.Setenv("HOME", tmpDir)
+	_ = config.LoadConfig(tmpDir)
+
+	ds := client.NewDataStoreFactory(&config.Config{
+		DataDir:         path.Join(tmpDir, ".dagu", "data"),
+		DAGs:            testdataDir,
+		SuspendFlagsDir: tmpDir,
+	})
+
+	ef := engine.NewFactory(ds, &config.Config{
+		Command: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+	})
+
+	return tmpDir, ef
 }
 
 func TestReadEntries(t *testing.T) {
+	tmpDir, ef := setupTest(t)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	r := New(Params{
-		DagsDir:    path.Join(testdataDir, "invalid_directory"),
-		JobFactory: &mockJobFactory{},
-		Logger:     logger.NewSlogLogger(),
+	er := New(Params{
+		DagsDir:       path.Join(testdataDir, "invalid_directory"),
+		JobFactory:    &mockJobFactory{},
+		Logger:        logger.NewSlogLogger(),
+		EngineFactory: ef,
 	})
-	entries, err := r.Read(now)
+	entries, err := er.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	r = New(Params{
-		DagsDir:    testdataDir,
-		JobFactory: &mockJobFactory{},
-		Logger:     logger.NewSlogLogger(),
+	er = New(Params{
+		DagsDir:       testdataDir,
+		JobFactory:    &mockJobFactory{},
+		Logger:        logger.NewSlogLogger(),
+		EngineFactory: ef,
 	})
-	entries, err = r.Read(now)
+	entries, err = er.Read(now)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(entries), 1)
 
@@ -67,12 +82,13 @@ func TestReadEntries(t *testing.T) {
 			break
 		}
 	}
-	sc := suspend.NewSuspendChecker(storage.NewStorage(config.Get().SuspendFlagsDir))
-	err = sc.ToggleSuspend(j.GetDAG(), true)
+
+	e := ef.Create()
+	err = e.ToggleSuspend(j.GetDAG().Name, true)
 	require.NoError(t, err)
 
 	// check if the job is suspended
-	lives, err := r.Read(now)
+	lives, err := er.Read(now)
 	require.NoError(t, err)
 	require.Equal(t, len(entries)-1, len(lives))
 }

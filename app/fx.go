@@ -34,7 +34,6 @@ func ConfigProvider() *config.Config {
 	if err := config.LoadConfig(home); err != nil {
 		panic(err)
 	}
-	// TODO: fixme
 	cfgInstance = config.Get()
 	return cfgInstance
 }

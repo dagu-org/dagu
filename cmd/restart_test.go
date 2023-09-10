@@ -56,7 +56,7 @@ func TestRestartCommand(t *testing.T) {
 	df := client.NewDataStoreFactory(config.Get())
 	e = engine.NewFactory(df, nil).Create()
 
-	sts := e.GetRecentStatuses(d, 2)
+	sts := e.GetRecentHistory(d, 2)
 	require.Len(t, sts, 2)
 	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
 

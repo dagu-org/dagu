@@ -60,7 +60,7 @@ func TestWriteStatusToFile(t *testing.T) {
 	require.NoDirExists(t, oldDir)
 	require.DirExists(t, newDir)
 
-	ret := db.ReadStatusHist(newS, 1)
+	ret := db.ReadStatusRecent(newS, 1)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, status.RequestId, ret[0].Status.RequestId)
 }

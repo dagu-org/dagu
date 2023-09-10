@@ -5,6 +5,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"path/filepath"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type (
 	DataStoreFactory interface {
 		NewHistoryStore() HistoryStore
 		NewDAGStore() DAGStore
+		NewFlagStore() FlagStore
 	}
 
 	HistoryStore interface {
@@ -25,7 +27,7 @@ type (
 		Write(st *model.Status) error
 		Close() error
 		Update(dagFile, requestId string, st *model.Status) error
-		ReadStatusHist(dagFile string, n int) []*model.StatusFile
+		ReadStatusRecent(dagFile string, n int) []*model.StatusFile
 		ReadStatusToday(dagFile string) (*model.Status, error)
 		FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error)
 		RemoveAll(dagFile string) error
@@ -34,13 +36,21 @@ type (
 	}
 
 	DAGStore interface {
-		Create(name string, tmpl []byte) (string, error)
+		Create(name string, spec []byte) (string, error)
+		Delete(name string) error
 		List() (ret []*dag.DAG, errs []string, err error)
 		GetMetadata(name string) (*dag.DAG, error)
 		GetDetails(name string) (*dag.DAG, error)
 		Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 		Load(name string) (*dag.DAG, error)
 		Rename(oldName, newName string) error
+		GetSpec(name string) (string, error)
+		UpdateSpec(name string, spec []byte) error
+	}
+
+	FlagStore interface {
+		ToggleSuspend(id string, suspend bool) error
+		IsSuspended(id string) bool
 	}
 
 	GrepResult struct {
@@ -59,3 +69,19 @@ type (
 		ErrorT    *string
 	}
 )
+
+func NewDAGStatus(d *dag.DAG, s *model.Status, suspended bool, err error) *DAGStatus {
+	ret := &DAGStatus{
+		File:      filepath.Base(d.Location),
+		Dir:       filepath.Dir(d.Location),
+		DAG:       d,
+		Status:    s,
+		Suspended: suspended,
+		Error:     err,
+	}
+	if err != nil {
+		errT := err.Error()
+		ret.ErrorT = &errT
+	}
+	return ret
+}

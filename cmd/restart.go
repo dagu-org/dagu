@@ -44,7 +44,7 @@ func restartCmd() *cobra.Command {
 }
 
 func stopDAGIfRunning(e engine.Engine, dag *dag.DAG) {
-	st, err := e.GetStatus(dag)
+	st, err := e.GetCurrentStatus(dag)
 	checkError(err)
 
 	// Stop the DAG if it is running.
@@ -56,7 +56,7 @@ func stopDAGIfRunning(e engine.Engine, dag *dag.DAG) {
 
 func stopRunningDAG(e engine.Engine, dag *dag.DAG) error {
 	for {
-		st, err := e.GetStatus(dag)
+		st, err := e.GetCurrentStatus(dag)
 		checkError(err)
 
 		if st.Status != scheduler.SchedulerStatus_Running {
@@ -75,7 +75,7 @@ func waitForRestart(restartWait time.Duration) {
 }
 
 func getPreviousExecutionParams(e engine.Engine, dag *dag.DAG) string {
-	st, err := e.GetLastStatus(dag)
+	st, err := e.GetLatestStatus(dag)
 	checkError(err)
 
 	return st.Params

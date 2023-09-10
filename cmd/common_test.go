@@ -106,7 +106,7 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		status, err := e.GetStatus(d)
+		status, err := e.GetCurrentStatus(d)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, time.Millisecond*5000, time.Millisecond*50)
@@ -116,7 +116,7 @@ func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag strin
 	t.Helper()
 	require.Eventually(t, func() bool {
 		// TODO: do not use history store directly.
-		status := hs.ReadStatusHist(dag, 1)
+		status := hs.ReadStatusRecent(dag, 1)
 		if len(status) < 1 {
 			return false
 		}

@@ -31,7 +31,7 @@ func (j *Job) GetDAG() *dag.DAG {
 
 func (j *Job) Start() error {
 	e := j.EngineFactory.Create()
-	s, err := e.GetLastStatus(j.DAG)
+	s, err := e.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (j *Job) Start() error {
 
 func (j *Job) Stop() error {
 	e := j.EngineFactory.Create()
-	s, err := e.GetLastStatus(j.DAG)
+	s, err := e.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}

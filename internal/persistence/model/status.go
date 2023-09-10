@@ -61,14 +61,23 @@ func StatusFromJson(s string) (*Status, error) {
 	return status, err
 }
 
-func NewStatus(d *dag.DAG, nodes []*scheduler.Node, status scheduler.SchedulerStatus,
-	pid int, s, e *time.Time) *Status {
+func NewStatusDefault(d *dag.DAG) *Status {
+	return NewStatus(d, nil, scheduler.SchedulerStatus_None, int(PidNotRunning), nil, nil)
+}
+
+func NewStatus(
+	d *dag.DAG,
+	nodes []*scheduler.Node,
+	status scheduler.SchedulerStatus,
+	pid int,
+	startTime, endTIme *time.Time,
+) *Status {
 	finish, start := time.Time{}, time.Time{}
-	if s != nil {
-		start = *s
+	if startTime != nil {
+		start = *startTime
 	}
-	if e != nil {
-		finish = *e
+	if endTIme != nil {
+		finish = *endTIme
 	}
 	var models []*Node
 	if len(nodes) != 0 {

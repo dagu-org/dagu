@@ -17,9 +17,7 @@ type dagStoreImpl struct {
 }
 
 func NewDAGStore(dir string) persistence.DAGStore {
-	return &dagStoreImpl{
-		dir: dir,
-	}
+	return &dagStoreImpl{dir: dir}
 }
 
 func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
@@ -28,7 +26,7 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 		return nil, fmt.Errorf("invalid name: %s", name)
 	}
 	cl := dag.Loader{}
-	dat, err := cl.LoadMetadataOnly(loc)
+	dat, err := cl.LoadMetadata(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +46,40 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	return dat, nil
 }
 
-func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
+func (d *dagStoreImpl) GetSpec(name string) (string, error) {
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return "", fmt.Errorf("invalid name: %s", name)
+	}
+	dat, err := os.ReadFile(loc)
+	if err != nil {
+		return "", fmt.Errorf("failed to read DAG file: %s", err)
+	}
+	return string(dat), nil
+}
+
+func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
+	// validation
+	cl := dag.Loader{}
+	_, err := cl.LoadData(spec)
+	if err != nil {
+		return err
+	}
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return fmt.Errorf("invalid name: %s", name)
+	}
+	if !exists(loc) {
+		return fmt.Errorf("the DAG file %s does not exist", loc)
+	}
+	err = os.WriteFile(loc, spec, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to update DAG file: %s", err)
+	}
+	return nil
+}
+
+func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
 		return "", fmt.Errorf("failed to create DAGs directory %s", d.dir)
 	}
@@ -56,13 +87,25 @@ func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create DAG file: %s", err)
 	}
-	if d.exists(loc) {
+	if exists(loc) {
 		return "", fmt.Errorf("the DAG file %s already exists", loc)
 	}
-	return name, os.WriteFile(loc, tmpl, 0644)
+	return name, os.WriteFile(loc, spec, 0644)
 }
 
-func (d *dagStoreImpl) exists(file string) bool {
+func (d *dagStoreImpl) Delete(name string) error {
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return fmt.Errorf("failed to create DAG file: %s", err)
+	}
+	err = os.Remove(loc)
+	if err != nil {
+		return fmt.Errorf("failed to delete DAG file: %s", err)
+	}
+	return nil
+}
+
+func exists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
@@ -83,7 +126,7 @@ func (d *dagStoreImpl) normalizeFilename(file string) (string, error) {
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {
-	if !d.exists(d.dir) {
+	if !exists(d.dir) {
 		if err := os.MkdirAll(d.dir, 0755); err != nil {
 			return err
 		}
@@ -143,14 +186,18 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 	utils.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			fn := filepath.Join(d.dir, fi.Name())
-			utils.LogErr("read DAG file", err)
-			m, err := grep.Grep(fn, fmt.Sprintf("(?i)%s", pattern), opts)
+			file := filepath.Join(d.dir, fi.Name())
+			dat, err := os.ReadFile(file)
+			if err != nil {
+				utils.LogErr("read DAG file", err)
+				continue
+			}
+			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
-			d, err := dl.LoadMetadataOnly(fn)
+			d, err := dl.LoadMetadata(file)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue

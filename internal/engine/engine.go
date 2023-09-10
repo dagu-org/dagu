@@ -8,17 +8,16 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/suspend"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"syscall"
 	"time"
 )
 
 type Engine interface {
 	CreateDAG(name string) (string, error)
+	GetDAGSpec(id string) (string, error)
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
 	Rename(oldDAGPath, newDAGPath string) error
 	Stop(dag *dag.DAG) error
@@ -26,20 +25,21 @@ type Engine interface {
 	Start(dag *dag.DAG, params string) error
 	Restart(dag *dag.DAG) error
 	Retry(dag *dag.DAG, reqId string) error
-	GetStatus(dag *dag.DAG) (*model.Status, error)
+	GetCurrentStatus(dag *dag.DAG) (*model.Status, error)
 	GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error)
-	GetLastStatus(dag *dag.DAG) (*model.Status, error)
-	GetRecentStatuses(dag *dag.DAG, n int) []*model.StatusFile
+	GetLatestStatus(dag *dag.DAG) (*model.Status, error)
+	GetRecentHistory(dag *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
-	UpdateDAGSpec(d *dag.DAG, spec string) error
-	DeleteDAG(dag *dag.DAG) error
-	ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error)
-	ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error)
+	UpdateDAG(id string, spec string) error
+	DeleteDAG(name, loc string) error
+	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
+	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
+	IsSuspended(id string) bool
+	ToggleSuspend(id string, suspend bool) error
 }
 
 type engineImpl struct {
 	dataStoreFactory persistence.DataStoreFactory
-	suspendChecker   *suspend.SuspendChecker
 	executable       string
 	workDir          string
 }
@@ -51,7 +51,11 @@ var (
 `)
 )
 
-// CreateDAG creates a new DAG.
+func (e *engineImpl) GetDAGSpec(id string) (string, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.GetSpec(id)
+}
+
 func (e *engineImpl) CreateDAG(name string) (string, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	id, err := ds.Create(name, _DAGTemplate)
@@ -147,21 +151,17 @@ func (e *engineImpl) Retry(dag *dag.DAG, reqId string) (err error) {
 	return
 }
 
-func (e *engineImpl) GetStatus(dag *dag.DAG) (*model.Status, error) {
+func (e *engineImpl) GetCurrentStatus(dag *dag.DAG) (*model.Status, error) {
 	client := sock.Client{Addr: dag.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		} else {
-			return defaultStatus(dag), nil
+			return model.NewStatusDefault(dag), nil
 		}
 	}
 	return model.StatusFromJson(ret)
-}
-
-func defaultStatus(d *dag.DAG) *model.Status {
-	return model.NewStatus(d, nil, scheduler.SchedulerStatus_None, int(model.PidNotRunning), nil, nil)
 }
 
 func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error) {
@@ -169,7 +169,7 @@ func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*mode
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetStatus(dag)
+	status, _ := e.GetCurrentStatus(dag)
 	if status != nil && status.RequestId != requestId {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -177,33 +177,33 @@ func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*mode
 	return ret.Status, err
 }
 
-func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
+func (e *engineImpl) getCurrentStatus(dag *dag.DAG) (*model.Status, error) {
 	client := sock.Client{Addr: dag.SockAddr()}
 	ret, err := client.Request("GET", "/status")
-	if err == nil {
-		return model.StatusFromJson(ret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %s", err)
 	}
-
-	if err == nil || !errors.Is(err, sock.ErrTimeout) {
-		status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
-		if err != nil {
-			var readErr error = nil
-			if !errors.Is(err, persistence.ErrNoStatusDataToday) && !errors.Is(err, persistence.ErrNoStatusData) {
-				fmt.Printf("read status failed : %s", err)
-				readErr = err
-			}
-			return defaultStatus(dag), readErr
-		}
-		// it is wrong status if the status is running
-		status.CorrectRunningStatus()
-		return status, nil
-	}
-	return nil, err
+	return model.StatusFromJson(ret)
 }
 
-func (e *engineImpl) GetRecentStatuses(dag *dag.DAG, n int) []*model.StatusFile {
-	ret := e.dataStoreFactory.NewHistoryStore().ReadStatusHist(dag.Location, n)
-	return ret
+func (e *engineImpl) GetLatestStatus(dag *dag.DAG) (*model.Status, error) {
+	currStatus, _ := e.getCurrentStatus(dag)
+	if currStatus != nil {
+		return currStatus, nil
+	}
+	status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
+	if errors.Is(err, persistence.ErrNoStatusDataToday) || errors.Is(err, persistence.ErrNoStatusData) {
+		return model.NewStatusDefault(dag), nil
+	}
+	if err != nil {
+		return model.NewStatusDefault(dag), err
+	}
+	status.CorrectRunningStatus()
+	return status, nil
+}
+
+func (e *engineImpl) GetRecentHistory(dag *dag.DAG, n int) []*model.StatusFile {
+	return e.dataStoreFactory.NewHistoryStore().ReadStatusRecent(dag.Location, n)
 }
 
 func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
@@ -223,100 +223,79 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 	return e.dataStoreFactory.NewHistoryStore().Update(dag.Location, status.RequestId, status)
 }
 
-func (e *engineImpl) UpdateDAGSpec(d *dag.DAG, spec string) error {
-	// validation
-	cl := dag.Loader{}
-	_, err := cl.LoadData([]byte(spec))
-	if err != nil {
-		return err
-	}
-
-	if !utils.FileExists(d.Location) {
-		return fmt.Errorf("the config file %s does not exist", d.Location)
-	}
-	err = os.WriteFile(d.Location, []byte(spec), 0755)
-
-	return err
-}
-
-func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
-	err := e.dataStoreFactory.NewHistoryStore().RemoveAll(dag.Location)
-	if err != nil {
-		return err
-	}
-	return os.Remove(dag.Location)
-}
-
-func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
-	statuses = []*persistence.DAGStatus{}
-	errs = []string{}
-	if !utils.FileExists(DAGsDir) {
-		if err = os.MkdirAll(DAGsDir, 0755); err != nil {
-			errs = append(errs, err.Error())
-			return
-		}
-	}
-	fis, err := os.ReadDir(DAGsDir)
-	utils.LogErr("read DAGs directory", err)
-	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			d, err := e.ReadStatus(filepath.Join(DAGsDir, fi.Name()), true)
-			utils.LogErr("read DAG config", err)
-			if d != nil {
-				statuses = append(statuses, d)
-			} else {
-				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
-			}
-		}
-	}
-	return statuses, errs, nil
-}
-
-func (e *engineImpl) getDAG(name string, loadMetadataOnly bool) (*dag.DAG, error) {
+func (e *engineImpl) UpdateDAG(id string, spec string) error {
 	ds := e.dataStoreFactory.NewDAGStore()
-	if loadMetadataOnly {
-		return ds.GetMetadata(name)
-	} else {
-		return ds.GetDetails(name)
-	}
+	return ds.UpdateSpec(id, []byte(spec))
 }
 
-// ReadStatus loads DAG from config file.
-func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error) {
-	d, err := e.getDAG(dagLocation, loadMetadataOnly)
-
-	if err != nil && d != nil {
-		return e.newDAGStatus(d, defaultStatus(d), err), err
-	}
-
+func (e *engineImpl) DeleteDAG(name, loc string) error {
+	err := e.dataStoreFactory.NewHistoryStore().RemoveAll(loc)
 	if err != nil {
-		d := &dag.DAG{Location: dagLocation}
-		return e.newDAGStatus(d, defaultStatus(d), err), err
+		return err
 	}
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.Delete(name)
+}
 
-	if !loadMetadataOnly {
-		if _, err := scheduler.NewExecutionGraph(d.Steps...); err != nil {
-			return e.newDAGStatus(d, nil, err), err
+func (e *engineImpl) GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	dags, errs, err := ds.List()
+
+	ret := make([]*persistence.DAGStatus, 0)
+	for _, d := range dags {
+		status, err := e.readStatus(d)
+		if err != nil {
+			errs = append(errs, err.Error())
 		}
+		ret = append(ret, status)
 	}
 
-	status, err := e.GetLastStatus(d)
-
-	return e.newDAGStatus(d, status, err), err
+	return ret, errs, err
 }
 
-func (e *engineImpl) newDAGStatus(d *dag.DAG, s *model.Status, err error) *persistence.DAGStatus {
-	ret := &persistence.DAGStatus{
-		File:      filepath.Base(d.Location),
-		Dir:       filepath.Dir(d.Location),
-		DAG:       d,
-		Status:    s,
-		Suspended: e.suspendChecker.IsSuspended(d),
-		Error:     err,
+func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
+	ds := e.dataStoreFactory.NewDAGStore()
+	if metadataOnly {
+		d, err := ds.GetMetadata(name)
+		return e.emptyDAGIfNil(d, name), err
+	} else {
+		d, err := ds.GetDetails(name)
+		return e.emptyDAGIfNil(d, name), err
 	}
-	if err != nil {
-		errT := err.Error()
-		ret.ErrorT = &errT
+}
+
+func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
+	d, err := e.getDAG(id, false)
+	if d == nil {
+		// TODO: fix not to use location
+		d = &dag.DAG{Name: id, Location: id}
 	}
-	return ret
+	if err == nil {
+		// check the dag is correct in terms of graph
+		_, err = scheduler.NewExecutionGraph(d.Steps...)
+	}
+	status, _ := e.GetLatestStatus(d)
+	return persistence.NewDAGStatus(d, status, e.IsSuspended(d.Name), err), err
+}
+
+func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
+	fs := e.dataStoreFactory.NewFlagStore()
+	return fs.ToggleSuspend(id, suspend)
+}
+
+func (e *engineImpl) readStatus(d *dag.DAG) (*persistence.DAGStatus, error) {
+	status, err := e.GetLatestStatus(d)
+	return persistence.NewDAGStatus(d, status, e.IsSuspended(d.Name), err), err
+}
+
+func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
+	if d != nil {
+		return d
+	}
+	return &dag.DAG{Location: dagLocation}
+}
+
+func (e *engineImpl) IsSuspended(id string) bool {
+	fs := e.dataStoreFactory.NewFlagStore()
+	return fs.IsSuspended(id)
 }
