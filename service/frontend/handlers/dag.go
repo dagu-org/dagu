@@ -128,7 +128,7 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 
 	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.ReadStatus(filename)
+	dagStatus, err := e.GetStatus(filename)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
@@ -141,7 +141,7 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 
 func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
 	e := h.engineFactory.Create()
-	dags, errs, err := e.ReadStatusAll()
+	dags, errs, err := e.GetAllStatus()
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}
@@ -176,7 +176,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 
 	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", dagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.ReadStatus(file)
+	dagStatus, err := e.GetStatus(file)
 	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
@@ -201,7 +201,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 
 	case dagTabTypeHistory:
 		e := h.engineFactory.Create()
-		logs := e.GetRecentStatuses(dagStatus.DAG, 30)
+		logs := e.GetRecentHistory(dagStatus.DAG, 30)
 		resp.LogData = response.ToDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
@@ -237,7 +237,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 	e := h.engineFactory.Create()
 
 	if logFile == "" {
-		s, err := e.GetLastStatus(dag)
+		s, err := e.GetLatestStatus(dag)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read status")
 		}
@@ -309,7 +309,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 	e := h.engineFactory.Create()
 
 	if statusFile == "" {
-		s, err := e.GetLastStatus(dag)
+		s, err := e.GetLatestStatus(dag)
 		if err != nil {
 			return nil, fmt.Errorf("error reading the last status")
 		}
@@ -335,7 +335,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	file := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 
 	if err != nil && params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
@@ -406,7 +406,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	case "save":
 		e := h.engineFactory.Create()
-		err := e.UpdateDAGSpec(d.DAG, params.Body.Value)
+		err := e.UpdateDAG(d.DAG, params.Body.Value)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}

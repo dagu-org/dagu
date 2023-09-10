@@ -129,7 +129,7 @@ func (store *Store) newWriter(dagFile string, t time.Time, requestId string) (*w
 }
 
 // ReadStatusHist returns a list of status files.
-func (store *Store) ReadStatusHist(dagFile string, n int) []*model.StatusFile {
+func (store *Store) ReadStatusRecent(dagFile string, n int) []*model.StatusFile {
 	ret := make([]*model.StatusFile, 0)
 	files := store.latest(store.pattern(dagFile)+"*.dat", n)
 	for _, file := range files {

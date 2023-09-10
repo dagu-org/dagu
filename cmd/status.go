@@ -22,7 +22,7 @@ func createStatusCommand() *cobra.Command {
 			df := client.NewDataStoreFactory(config.Get())
 			e := engine.NewFactory(df, config.Get()).Create()
 
-			status, err := e.GetStatus(loadedDAG)
+			status, err := e.GetCurrentStatus(loadedDAG)
 			checkError(err)
 
 			res := &model.StatusResponse{Status: status}

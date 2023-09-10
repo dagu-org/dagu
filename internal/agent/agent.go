@@ -374,7 +374,7 @@ func (a *Agent) dryRun() error {
 }
 
 func (a *Agent) checkIsRunning() error {
-	status, err := a.engine.GetStatus(a.DAG)
+	status, err := a.engine.GetCurrentStatus(a.DAG)
 	if err != nil {
 		return err
 	}

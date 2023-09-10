@@ -25,15 +25,15 @@ type Engine interface {
 	Start(dag *dag.DAG, params string) error
 	Restart(dag *dag.DAG) error
 	Retry(dag *dag.DAG, reqId string) error
-	GetStatus(dag *dag.DAG) (*model.Status, error)
+	GetCurrentStatus(dag *dag.DAG) (*model.Status, error)
 	GetStatusByRequestId(dag *dag.DAG, requestId string) (*model.Status, error)
-	GetLastStatus(dag *dag.DAG) (*model.Status, error)
-	GetRecentStatuses(dag *dag.DAG, n int) []*model.StatusFile
+	GetLatestStatus(dag *dag.DAG) (*model.Status, error)
+	GetRecentHistory(dag *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
-	UpdateDAGSpec(d *dag.DAG, spec string) error
+	UpdateDAG(d *dag.DAG, spec string) error
 	DeleteDAG(dag *dag.DAG) error
-	ReadStatusAll() (statuses []*persistence.DAGStatus, errs []string, err error)
-	ReadStatus(dagLocation string) (*persistence.DAGStatus, error)
+	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
+	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
 }
 
 type engineImpl struct {
@@ -146,7 +146,7 @@ func (e *engineImpl) Retry(dag *dag.DAG, reqId string) (err error) {
 	return
 }
 
-func (e *engineImpl) GetStatus(dag *dag.DAG) (*model.Status, error) {
+func (e *engineImpl) GetCurrentStatus(dag *dag.DAG) (*model.Status, error) {
 	client := sock.Client{Addr: dag.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -164,7 +164,7 @@ func (e *engineImpl) GetStatusByRequestId(dag *dag.DAG, requestId string) (*mode
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetStatus(dag)
+	status, _ := e.GetCurrentStatus(dag)
 	if status != nil && status.RequestId != requestId {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -181,7 +181,7 @@ func (e *engineImpl) getCurrentStatus(dag *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJson(ret)
 }
 
-func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
+func (e *engineImpl) GetLatestStatus(dag *dag.DAG) (*model.Status, error) {
 	currStatus, _ := e.getCurrentStatus(dag)
 	if currStatus != nil {
 		return currStatus, nil
@@ -197,8 +197,8 @@ func (e *engineImpl) GetLastStatus(dag *dag.DAG) (*model.Status, error) {
 	return status, nil
 }
 
-func (e *engineImpl) GetRecentStatuses(dag *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStoreFactory.NewHistoryStore().ReadStatusHist(dag.Location, n)
+func (e *engineImpl) GetRecentHistory(dag *dag.DAG, n int) []*model.StatusFile {
+	return e.dataStoreFactory.NewHistoryStore().ReadStatusRecent(dag.Location, n)
 }
 
 func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
@@ -218,7 +218,7 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 	return e.dataStoreFactory.NewHistoryStore().Update(dag.Location, status.RequestId, status)
 }
 
-func (e *engineImpl) UpdateDAGSpec(d *dag.DAG, spec string) error {
+func (e *engineImpl) UpdateDAG(d *dag.DAG, spec string) error {
 	// validation
 	cl := dag.Loader{}
 	_, err := cl.LoadData([]byte(spec))
@@ -242,7 +242,7 @@ func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
 	return os.Remove(dag.Location)
 }
 
-func (e *engineImpl) ReadStatusAll() (statuses []*persistence.DAGStatus, errs []string, err error) {
+func (e *engineImpl) GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	dags, errs, err := ds.List()
 
@@ -269,7 +269,7 @@ func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
 	}
 }
 
-func (e *engineImpl) ReadStatus(dagLocation string) (*persistence.DAGStatus, error) {
+func (e *engineImpl) GetStatus(dagLocation string) (*persistence.DAGStatus, error) {
 	d, err := e.getDAG(dagLocation, false)
 	if d == nil {
 		d = &dag.DAG{Location: dagLocation}
@@ -278,12 +278,12 @@ func (e *engineImpl) ReadStatus(dagLocation string) (*persistence.DAGStatus, err
 		// check the dag is correct in terms of graph
 		_, err = scheduler.NewExecutionGraph(d.Steps...)
 	}
-	status, _ := e.GetLastStatus(d)
+	status, _ := e.GetLatestStatus(d)
 	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
 }
 
 func (e *engineImpl) readStatus(d *dag.DAG) (*persistence.DAGStatus, error) {
-	status, err := e.GetLastStatus(d)
+	status, err := e.GetLatestStatus(d)
 	return persistence.NewDAGStatus(d, status, e.isSuspended(d), err), err
 }
 

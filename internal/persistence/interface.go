@@ -26,7 +26,7 @@ type (
 		Write(st *model.Status) error
 		Close() error
 		Update(dagFile, requestId string, st *model.Status) error
-		ReadStatusHist(dagFile string, n int) []*model.StatusFile
+		ReadStatusRecent(dagFile string, n int) []*model.StatusFile
 		ReadStatusToday(dagFile string) (*model.Status, error)
 		FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error)
 		RemoveAll(dagFile string) error

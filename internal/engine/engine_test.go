@@ -71,7 +71,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	}()
 	file := testDAG("get_status.yaml")
 
-	ds, err := e.ReadStatus(file)
+	ds, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	socketServer, _ := sock.NewServer(
@@ -93,13 +93,13 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond * 100)
-	st, err := e.GetStatus(ds.DAG)
+	st, err := e.GetCurrentStatus(ds.DAG)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
 
 	_ = socketServer.Shutdown()
 
-	st, err = e.GetStatus(ds.DAG)
+	st, err = e.GetCurrentStatus(ds.DAG)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
 }
@@ -116,7 +116,7 @@ func TestUpdateStatus(t *testing.T) {
 		now       = time.Now()
 	)
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	hs := hf.NewHistoryStore()
@@ -161,7 +161,7 @@ func TestUpdateStatusError(t *testing.T) {
 		requestId = "test-update-status-failure"
 	)
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	status := testNewStatus(d.DAG, requestId,
@@ -183,13 +183,13 @@ func TestStart(t *testing.T) {
 	}()
 	file := testDAG("start.yaml")
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	err = e.Start(d.DAG, "")
 	require.Error(t, err)
 
-	status, err := e.GetLastStatus(d.DAG)
+	status, err := e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
 }
@@ -202,20 +202,20 @@ func TestStop(t *testing.T) {
 
 	file := testDAG("stop.yaml")
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	e.StartAsync(d.DAG, "")
 
 	require.Eventually(t, func() bool {
-		st, _ := e.GetStatus(d.DAG)
+		st, _ := e.GetCurrentStatus(d.DAG)
 		return st.Status == scheduler.SchedulerStatus_Running
 	}, time.Millisecond*1500, time.Millisecond*100)
 
 	_ = e.Stop(d.DAG)
 
 	require.Eventually(t, func() bool {
-		st, _ := e.GetLastStatus(d.DAG)
+		st, _ := e.GetLatestStatus(d.DAG)
 		return st.Status == scheduler.SchedulerStatus_Cancel
 	}, time.Millisecond*1500, time.Millisecond*100)
 }
@@ -228,13 +228,13 @@ func TestRestart(t *testing.T) {
 
 	file := testDAG("restart.yaml")
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	err = e.Restart(d.DAG)
 	require.NoError(t, err)
 
-	status, err := e.GetLastStatus(d.DAG)
+	status, err := e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 }
@@ -247,13 +247,13 @@ func TestRetry(t *testing.T) {
 
 	file := testDAG("retry.yaml")
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
 	err = e.Start(d.DAG, "x y z")
 	require.NoError(t, err)
 
-	status, err := e.GetLastStatus(d.DAG)
+	status, err := e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
 
@@ -262,7 +262,7 @@ func TestRetry(t *testing.T) {
 
 	err = e.Retry(d.DAG, requestId)
 	require.NoError(t, err)
-	status, err = e.GetLastStatus(d.DAG)
+	status, err = e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
 
 	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
@@ -272,7 +272,7 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, status, statusByRequestId)
 
-	recentStatuses := e.GetRecentStatuses(d.DAG, 1)
+	recentStatuses := e.GetRecentHistory(d.DAG, 1)
 	require.Equal(t, status, recentStatuses[0].Status)
 }
 
@@ -287,7 +287,7 @@ func TestUpdate(t *testing.T) {
 
 	// invalid DAG
 	invalidDAG := `name: test DAG`
-	err := e.UpdateDAGSpec(d, invalidDAG)
+	err := e.UpdateDAG(d, invalidDAG)
 	require.Error(t, err)
 
 	// valid DAG
@@ -297,7 +297,7 @@ steps:
     command: "true"
 `
 	// Update Error: the DAG does not exist
-	err = e.UpdateDAGSpec(d, validDAG)
+	err = e.UpdateDAG(d, validDAG)
 	require.Error(t, err)
 
 	// create a new DAG file
@@ -307,7 +307,7 @@ steps:
 	}()
 
 	// Update the DAG
-	err = e.UpdateDAGSpec(d, validDAG)
+	err = e.UpdateDAG(d, validDAG)
 	require.NoError(t, err)
 
 	// Check the content of the DAG file
@@ -343,7 +343,7 @@ steps:
 		_ = newFile.Close()
 	}()
 
-	err := e.UpdateDAGSpec(d, dagSpec)
+	err := e.UpdateDAG(d, dagSpec)
 	require.NoError(t, err)
 
 	// check file
@@ -396,7 +396,7 @@ func TestRenameDAG(t *testing.T) {
 	// TODO: fixme to use mock
 	loc := path.Join(tmpDir, ".dagu", "dags", id+".yaml")
 
-	_, err = e.ReadStatus(loc)
+	_, err = e.GetStatus(loc)
 	require.NoError(t, err)
 
 	// TODO: fixme
@@ -415,7 +415,7 @@ func TestLoadConfig(t *testing.T) {
 
 	file := testDAG("invalid_dag.yaml")
 
-	d, err := e.ReadStatus(file)
+	d, err := e.GetStatus(file)
 	require.Error(t, err)
 	require.NotNil(t, d)
 
@@ -429,7 +429,7 @@ func TestReadAll(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	dags, _, err := e.ReadStatusAll()
+	dags, _, err := e.GetAllStatus()
 	require.NoError(t, err)
 	require.Greater(t, len(dags), 0)
 
@@ -449,7 +449,7 @@ func TestReadDAGStatus(t *testing.T) {
 
 	file := testDAG("read_status.yaml")
 
-	_, err := e.ReadStatus(file)
+	_, err := e.GetStatus(file)
 	require.NoError(t, err)
 }
 
