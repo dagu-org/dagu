@@ -35,7 +35,8 @@ type (
 	}
 
 	DAGStore interface {
-		Create(name string, tmpl []byte) (string, error)
+		Create(name string, spec []byte) (string, error)
+		Delete(name string) error
 		List() (ret []*dag.DAG, errs []string, err error)
 		GetMetadata(name string) (*dag.DAG, error)
 		GetDetails(name string) (*dag.DAG, error)
@@ -43,7 +44,7 @@ type (
 		Load(name string) (*dag.DAG, error)
 		Rename(oldName, newName string) error
 		GetSpec(name string) (string, error)
-		UpdateSpec(name, spec string) error
+		UpdateSpec(name string, spec []byte) error
 	}
 
 	GrepResult struct {

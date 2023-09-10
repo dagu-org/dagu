@@ -3,7 +3,6 @@ package engine_test
 import (
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"io"
 	"net/http"
 	"os"
 	"path"
@@ -277,18 +276,10 @@ func TestRetry(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
+	tmpDir, e, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
-
-	loc := path.Join(tmpDir, "test.yaml")
-	d := &dag.DAG{Name: "test", Location: loc}
-
-	// invalid DAG
-	invalidDAG := `name: test DAG`
-	err := e.UpdateDAG(d, invalidDAG)
-	require.Error(t, err)
 
 	// valid DAG
 	validDAG := `name: test DAG
@@ -297,27 +288,21 @@ steps:
     command: "true"
 `
 	// Update Error: the DAG does not exist
-	err = e.UpdateDAG(d, validDAG)
+	err := e.UpdateDAG("non-existing-dag", validDAG)
 	require.Error(t, err)
 
 	// create a new DAG file
-	newFile, _ := utils.CreateFile(loc)
-	defer func() {
-		_ = newFile.Close()
-	}()
+	id, err := e.CreateDAG("new-dag-file")
+	require.NoError(t, err)
 
 	// Update the DAG
-	err = e.UpdateDAG(d, validDAG)
+	err = e.UpdateDAG(id, validDAG)
 	require.NoError(t, err)
 
 	// Check the content of the DAG file
-	updatedFile, _ := os.Open(loc)
-	defer func() {
-		_ = updatedFile.Close()
-	}()
-	b, err := io.ReadAll(updatedFile)
+	spec, err := e.GetDAGSpec(id)
 	require.NoError(t, err)
-	require.Equal(t, validDAG, string(b))
+	require.Equal(t, validDAG, spec)
 }
 
 func TestRemove(t *testing.T) {
@@ -326,39 +311,26 @@ func TestRemove(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	loc := path.Join(tmpDir, "test.yaml")
-	d := &dag.DAG{
-		Name:     "test",
-		Location: loc,
-	}
-
-	dagSpec := `name: test DAG
+	spec := `name: test DAG
 steps:
   - name: "1"
     command: "true"
 `
-	// create file
-	newFile, _ := utils.CreateFile(loc)
-	defer func() {
-		_ = newFile.Close()
-	}()
-
-	err := e.UpdateDAG(d, dagSpec)
+	id, err := e.CreateDAG("test")
+	require.NoError(t, err)
+	err = e.UpdateDAG(id, spec)
 	require.NoError(t, err)
 
 	// check file
-	saved, _ := os.Open(loc)
-	defer func() {
-		_ = saved.Close()
-	}()
-	b, err := io.ReadAll(saved)
+	newSpec, err := e.GetDAGSpec(id)
 	require.NoError(t, err)
-	require.Equal(t, dagSpec, string(b))
+	require.Equal(t, spec, newSpec)
 
-	// remove file
-	err = e.DeleteDAG(d)
+	status, _ := e.GetStatus(id)
+
+	// delete
+	err = e.DeleteDAG(id, status.DAG.Location)
 	require.NoError(t, err)
-	require.NoFileExists(t, loc)
 }
 
 func TestCreateNewDAG(t *testing.T) {

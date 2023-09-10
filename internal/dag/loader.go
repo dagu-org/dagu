@@ -2,7 +2,6 @@ package dag
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,8 +14,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
-
-var ErrDAGNotFound = errors.New("DAG was not found")
 
 // Loader is a config loader.
 type Loader struct {

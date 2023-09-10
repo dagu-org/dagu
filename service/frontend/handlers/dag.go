@@ -25,7 +25,6 @@ import (
 	"golang.org/x/text/transform"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -123,17 +122,12 @@ func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDa
 	}
 }
 func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedError {
-	// TODO: change this to dependency injection
-	cfg := config.Get()
-
-	filename := filepath.Join(cfg.DAGs, fmt.Sprintf("%s.yaml", params.DagID))
 	e := h.engineFactory.Create()
-	dagStatus, err := e.GetStatus(filename)
+	dagStatus, err := e.GetStatus(params.DagID)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
-
-	if err := e.DeleteDAG(dagStatus.DAG); err != nil {
+	if err := e.DeleteDAG(params.DagID, dagStatus.DAG.Location); err != nil {
 		return response.NewInternalError(err)
 	}
 	return nil

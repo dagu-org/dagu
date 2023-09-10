@@ -60,10 +60,10 @@ func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 	return string(dat), nil
 }
 
-func (d *dagStoreImpl) UpdateSpec(name, spec string) error {
+func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
 	cl := dag.Loader{}
-	_, err := cl.LoadData([]byte(spec))
+	_, err := cl.LoadData(spec)
 	if err != nil {
 		return err
 	}
@@ -74,14 +74,14 @@ func (d *dagStoreImpl) UpdateSpec(name, spec string) error {
 	if !exists(loc) {
 		return fmt.Errorf("the DAG file %s does not exist", loc)
 	}
-	err = os.WriteFile(loc, []byte(spec), 0755)
+	err = os.WriteFile(loc, spec, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to update DAG file: %s", err)
 	}
 	return nil
 }
 
-func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
+func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
 		return "", fmt.Errorf("failed to create DAGs directory %s", d.dir)
 	}
@@ -92,7 +92,19 @@ func (d *dagStoreImpl) Create(name string, tmpl []byte) (string, error) {
 	if exists(loc) {
 		return "", fmt.Errorf("the DAG file %s already exists", loc)
 	}
-	return name, os.WriteFile(loc, tmpl, 0644)
+	return name, os.WriteFile(loc, spec, 0644)
+}
+
+func (d *dagStoreImpl) Delete(name string) error {
+	loc, err := d.fileLocation(name)
+	if err != nil {
+		return fmt.Errorf("failed to create DAG file: %s", err)
+	}
+	err = os.Remove(loc)
+	if err != nil {
+		return fmt.Errorf("failed to delete DAG file: %s", err)
+	}
+	return nil
 }
 
 func exists(file string) bool {

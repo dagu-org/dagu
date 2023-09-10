@@ -32,7 +32,7 @@ type Engine interface {
 	GetRecentHistory(dag *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
 	UpdateDAG(id string, spec string) error
-	DeleteDAG(dag *dag.DAG) error
+	DeleteDAG(name, loc string) error
 	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
 	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
 }
@@ -225,15 +225,16 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 
 func (e *engineImpl) UpdateDAG(id string, spec string) error {
 	ds := e.dataStoreFactory.NewDAGStore()
-	return ds.UpdateSpec(id, spec)
+	return ds.UpdateSpec(id, []byte(spec))
 }
 
-func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
-	err := e.dataStoreFactory.NewHistoryStore().RemoveAll(dag.Location)
+func (e *engineImpl) DeleteDAG(name, loc string) error {
+	err := e.dataStoreFactory.NewHistoryStore().RemoveAll(loc)
 	if err != nil {
 		return err
 	}
-	return os.Remove(dag.Location)
+	ds := e.dataStoreFactory.NewDAGStore()
+	return ds.Delete(name)
 }
 
 func (e *engineImpl) GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error) {
