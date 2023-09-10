@@ -33,8 +33,8 @@ type Engine interface {
 	UpdateStatus(dag *dag.DAG, status *model.Status) error
 	UpdateDAGSpec(d *dag.DAG, spec string) error
 	DeleteDAG(dag *dag.DAG) error
-	ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs []string, err error)
-	ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAGStatus, error)
+	ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error)
+	ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error)
 }
 
 type engineImpl struct {
@@ -42,17 +42,6 @@ type engineImpl struct {
 	suspendChecker   *suspend.SuspendChecker
 	executable       string
 	workDir          string
-}
-
-// TODO: this should not be here.
-type DAGStatus struct {
-	File      string
-	Dir       string
-	DAG       *dag.DAG
-	Status    *model.Status
-	Suspended bool
-	Error     error
-	ErrorT    *string
 }
 
 var (
@@ -259,8 +248,8 @@ func (e *engineImpl) DeleteDAG(dag *dag.DAG) error {
 }
 
 // ReadAllStatus reads all DAGStatus
-func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs []string, err error) {
-	statuses = []*DAGStatus{}
+func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*persistence.DAGStatus, errs []string, err error) {
+	statuses = []*persistence.DAGStatus{}
 	errs = []string{}
 	if !utils.FileExists(DAGsDir) {
 		if err = os.MkdirAll(DAGsDir, 0755); err != nil {
@@ -285,7 +274,7 @@ func (e *engineImpl) ReadAllStatus(DAGsDir string) (statuses []*DAGStatus, errs 
 }
 
 // ReadStatus loads DAG from config file.
-func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAGStatus, error) {
+func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*persistence.DAGStatus, error) {
 	var (
 		cl  = dag.Loader{}
 		d   *dag.DAG
@@ -317,8 +306,8 @@ func (e *engineImpl) ReadStatus(dagLocation string, loadMetadataOnly bool) (*DAG
 	return e.newDAGStatus(d, status, err), err
 }
 
-func (e *engineImpl) newDAGStatus(d *dag.DAG, s *model.Status, err error) *DAGStatus {
-	ret := &DAGStatus{
+func (e *engineImpl) newDAGStatus(d *dag.DAG, s *model.Status, err error) *persistence.DAGStatus {
+	ret := &persistence.DAGStatus{
 		File:      filepath.Base(d.Location),
 		Dir:       filepath.Dir(d.Location),
 		DAG:       d,

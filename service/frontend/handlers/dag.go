@@ -7,6 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	domain "github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -150,7 +151,7 @@ func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsRespo
 	}
 
 	// TODO: remove this if it's not needed
-	_, _, hasErr := lo.FindIndexOf(dags, func(d *engine.DAGStatus) bool {
+	_, _, hasErr := lo.FindIndexOf(dags, func(d *persistence.DAGStatus) bool {
 		return d.Error != nil
 	})
 

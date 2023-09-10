@@ -46,4 +46,14 @@ type (
 		DAG     *dag.DAG
 		Matches []*grep.Match
 	}
+
+	DAGStatus struct {
+		File      string
+		Dir       string
+		DAG       *dag.DAG
+		Status    *model.Status
+		Suspended bool
+		Error     error
+		ErrorT    *string
+	}
 )
