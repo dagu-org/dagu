@@ -119,7 +119,7 @@ func (cfg *Config) GetAPIBaseURL() string {
 	if isHTTPS {
 		schema = "https"
 	}
-	return fmt.Sprintf("%s://%s:%d%s", schema, cfg.Host, cfg.Port, "/api/v1/")
+	return fmt.Sprintf("%s://%s:%d%s", schema, cfg.Host, cfg.Port, "/api/v1")
 }
 
 func loadEnvs() {
