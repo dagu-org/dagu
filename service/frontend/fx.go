@@ -56,7 +56,7 @@ func New(params Params) *server.Server {
 	if params.Config.IsBasicAuth {
 		serverParams.BasicAuth = &server.BasicAuth{
 			Username: params.Config.BasicAuthUsername,
-			Password: params.Config.BasicAuthUsername,
+			Password: params.Config.BasicAuthPassword,
 		}
 	}
 
