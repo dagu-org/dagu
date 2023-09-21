@@ -111,15 +111,7 @@ func LoadConfig(userHomeDir string) error {
 }
 
 func (cfg *Config) GetAPIBaseURL() string {
-	isHTTPS := false
-	if cfg.TLS != nil && cfg.TLS.CertFile != "" && cfg.TLS.KeyFile != "" {
-		isHTTPS = true
-	}
-	schema := "http"
-	if isHTTPS {
-		schema = "https"
-	}
-	return fmt.Sprintf("%s://%s:%d%s", schema, cfg.Host, cfg.Port, "/api/v1")
+	return "/api/v1"
 }
 
 func loadEnvs() {
