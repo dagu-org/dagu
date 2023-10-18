@@ -4,7 +4,6 @@ dist/
 service/frontend/assets/fonts/*
 service/frontend/assets/*
 !service/frontend/assets/.gitkeep
-internal/**/*.pb.go
 
 # NVM
 .nvmrc
