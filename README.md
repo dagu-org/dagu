@@ -236,6 +236,7 @@ You can execute the example by pressing the `Start` button. You can see "Hello D
 - [Configurations](https://dagu.readthedocs.io/en/latest/config.html)
 - [Scheduler](https://dagu.readthedocs.io/en/latest/scheduler.html)
 - [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
+- [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)
 
 ## **Example Workflow**
 
