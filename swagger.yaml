@@ -15,6 +15,7 @@ host: "localhost:8080"
 paths:
   /dags:
     get:
+      description: Returns a list of DAGs.
       produces:
         - application/json
       operationId: listDags
@@ -28,6 +29,7 @@ paths:
           schema:
             $ref: "#/definitions/ApiError"
     post:
+      description: Creates a new DAG.
       produces:
         - application/json
       operationId: createDag
@@ -56,6 +58,7 @@ paths:
 
   /dags/{dagId}:
     get:
+      description: Returns details of a DAG.
       parameters:
         - name: dagId
           in: path
@@ -86,6 +89,7 @@ paths:
           schema:
             $ref: "#/definitions/ApiError"
     post:
+      description: Performs an action on a DAG.
       parameters:
         - name: dagId
           in: path
@@ -98,6 +102,15 @@ paths:
             properties:
               action:
                 type: string
+                enum:
+                  - start
+                  - suspend
+                  - stop
+                  - retry
+                  - mark-success
+                  - mark-failed
+                  - save
+                  - rename
               value:
                 type: string
               requestId:
@@ -106,6 +119,8 @@ paths:
                 type: string
               params:
                 type: string
+            required:
+              - action
       produces:
         - application/json
       operationId: postDagAction
@@ -120,6 +135,7 @@ paths:
             $ref: "#/definitions/ApiError"
 
     delete:
+      description: Deletes a DAG.
       parameters:
         - name: dagId
           in: path
@@ -138,6 +154,7 @@ paths:
 
   /search:
     get:
+      description: Searches for DAGs.
       produces:
         - application/json
       operationId: searchDags
