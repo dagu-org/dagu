@@ -172,6 +172,8 @@ You can also install Dagu using `go install`:
 go install github.com/dagu-dev/dagu@latest
 ```
 
+**This method will install only dagu command and not the web UI. We recommend other methods for installation.**
+
 ## ️**Quick Start Guide**
 
 ### 1. Launch the Web UI
