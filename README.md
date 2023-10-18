@@ -51,6 +51,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [Via Bash script](#via-bash-script)
   - [Via Docker](#via-docker)
   - [Via GitHub Release Page](#via-github-release-page)
+  - [Via Go Install](#via-go-install)
 - [️**Quick Start Guide**](#️quick-start-guide)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
   - [2. Create a New DAG](#2-create-a-new-dag)
@@ -162,6 +163,14 @@ yohamta/dagu:latest
 ### Via GitHub Release Page 
 
 Download the latest binary from the [Releases page](https://github.com/dagu-dev/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
+
+### Via Go Install
+
+You can also install Dagu using `go install`:
+
+```sh
+go install github.com/dagu-dev/dagu@latest
+```
 
 ## ️**Quick Start Guide**
 
