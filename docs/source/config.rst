@@ -16,9 +16,9 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_HOST`` (``127.0.0.1``): The host to bind the server to.
 - ``DAGU_PORT`` (``8080``): The port to bind the server to.
 - ``DAGU_DAGS`` (``$DAGU_HOME/dags``): The directory containing the DAGs.
-- ``DAGU_IS_BASIC_AUTH`` (``0``): Set to 1 to enable basic authentication.
-- ``DAGU_BASIC_AUTH_USERNAME`` (``""``): The username to use for basic authentication.
-- ``DAGU_BASIC_AUTH_PASSWORD`` (``""``): The password to use for basic authentication.
+- ``DAGU_IS_BASICAUTH`` (``0``): Set to 1 to enable basic authentication.
+- ``DAGU_BASICAUTH_USERNAME`` (``""``): The username to use for basic authentication.
+- ``DAGU_BASICAUTH_PASSWORD`` (``""``): The password to use for basic authentication.
 - ``DAGU_LOG_DIR`` (``$DAGU_HOME/logs``): The directory where logs will be stored.
 - ``DAGU_DATA_DIR`` (``$DAGU_HOME/data``): The directory where application data will be stored.
 - ``DAGU_SUSPEND_FLAGS_DIR`` (``$DAGU_HOME/suspend``): The directory containing DAG suspend flags.
