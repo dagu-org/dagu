@@ -221,7 +221,7 @@ type mockMailer struct {
 
 var _ Mailer = (*mockMailer)(nil)
 
-func (m *mockMailer) SendMail(from string, to []string, subject, body string) error {
+func (m *mockMailer) SendMail(from string, to []string, subject, body string, _ []string) error {
 	m.count += 1
 	m.from = from
 	m.to = to
