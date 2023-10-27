@@ -8,7 +8,8 @@ type SmtpConfig struct {
 }
 
 type MailConfig struct {
-	From   string
-	To     string
-	Prefix string
+	From       string
+	To         string
+	Prefix     string
+	AttachLogs bool
 }

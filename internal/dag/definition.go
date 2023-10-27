@@ -91,9 +91,10 @@ type smtpConfigDef struct {
 }
 
 type mailConfigDef struct {
-	From   string
-	To     string
-	Prefix string
+	From       string
+	To         string
+	Prefix     string
+	AttachLogs bool
 }
 
 type mailOnDef struct {

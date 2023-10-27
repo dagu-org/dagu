@@ -25,7 +25,7 @@ type Config struct {
 
 // Mailer is a mailer interface.
 type Mailer interface {
-	SendMail(from string, to []string, subject, body string) error
+	SendMail(from string, to []string, subject, body string, attachments []string) error
 }
 
 // ReportStep is a function that reports the status of a step.
@@ -40,6 +40,7 @@ func (rp *Reporter) ReportStep(d *dag.DAG, status *model.Status, node *scheduler
 			[]string{d.ErrorMail.To},
 			fmt.Sprintf("%s %s (%s)", d.ErrorMail.Prefix, d.Name, status.Status),
 			renderHTML(status.Nodes),
+			addAttachmentList(d.ErrorMail.AttachLogs, status.Nodes),
 		)
 	}
 	return nil
@@ -66,6 +67,7 @@ func (rp *Reporter) SendMail(d *dag.DAG, status *model.Status, err error) error 
 				[]string{d.ErrorMail.To},
 				fmt.Sprintf("%s %s (%s)", d.ErrorMail.Prefix, d.Name, status.Status),
 				renderHTML(status.Nodes),
+				addAttachmentList(d.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.SchedulerStatus_Success {
@@ -75,6 +77,7 @@ func (rp *Reporter) SendMail(d *dag.DAG, status *model.Status, err error) error 
 				[]string{d.InfoMail.To},
 				fmt.Sprintf("%s %s (%s)", d.InfoMail.Prefix, d.Name, status.Status),
 				renderHTML(status.Nodes),
+				addAttachmentList(d.InfoMail.AttachLogs, status.Nodes),
 			)
 		}
 	}
@@ -162,4 +165,13 @@ func renderHTML(nodes []*model.Node) string {
 	}
 	buffer.WriteString("</table>")
 	return buffer.String()
+}
+
+func addAttachmentList(trigger bool, nodes []*model.Node) (attachments []string) {
+	if trigger {
+		for _, n := range nodes {
+			attachments = append(attachments, n.Log)
+		}
+	}
+	return
 }
