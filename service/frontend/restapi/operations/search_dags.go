@@ -32,7 +32,7 @@ func NewSearchDags(ctx *middleware.Context, handler SearchDagsHandler) *SearchDa
 /*
 	SearchDags swagger:route GET /search searchDags
 
-SearchDags search dags API
+Searches for DAGs.
 */
 type SearchDags struct {
 	Context *middleware.Context

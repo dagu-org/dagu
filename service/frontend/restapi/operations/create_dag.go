@@ -37,7 +37,7 @@ func NewCreateDag(ctx *middleware.Context, handler CreateDagHandler) *CreateDag 
 /*
 	CreateDag swagger:route POST /dags createDag
 
-CreateDag create dag API
+Creates a new DAG.
 */
 type CreateDag struct {
 	Context *middleware.Context

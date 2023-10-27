@@ -198,10 +198,12 @@ Sending Email Notifications
     from: "foo@bar.com"
     to: "foo@bar.com"
     prefix: "[Error]"
+    attachLogs: true
   infoMail:
     from: "foo@bar.com"
     to: "foo@bar.com"
     prefix: "[Info]"
+    attachLogs: true
 
 
 Sending Email
