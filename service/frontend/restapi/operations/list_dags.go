@@ -32,7 +32,7 @@ func NewListDags(ctx *middleware.Context, handler ListDagsHandler) *ListDags {
 /*
 	ListDags swagger:route GET /dags listDags
 
-ListDags list dags API
+Returns a list of DAGs.
 */
 type ListDags struct {
 	Context *middleware.Context

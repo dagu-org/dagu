@@ -37,6 +37,7 @@ func init() {
   "paths": {
     "/dags": {
       "get": {
+        "description": "Returns a list of DAGs.",
         "produces": [
           "application/json"
         ],
@@ -57,6 +58,7 @@ func init() {
         }
       },
       "post": {
+        "description": "Creates a new DAG.",
         "produces": [
           "application/json"
         ],
@@ -100,6 +102,7 @@ func init() {
     },
     "/dags/{dagId}": {
       "get": {
+        "description": "Returns details of a DAG.",
         "produces": [
           "application/json"
         ],
@@ -143,6 +146,7 @@ func init() {
         }
       },
       "post": {
+        "description": "Performs an action on a DAG.",
         "produces": [
           "application/json"
         ],
@@ -159,9 +163,22 @@ func init() {
             "in": "body",
             "schema": {
               "type": "object",
+              "required": [
+                "action"
+              ],
               "properties": {
                 "action": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "start",
+                    "suspend",
+                    "stop",
+                    "retry",
+                    "mark-success",
+                    "mark-failed",
+                    "save",
+                    "rename"
+                  ]
                 },
                 "params": {
                   "type": "string"
@@ -195,6 +212,7 @@ func init() {
         }
       },
       "delete": {
+        "description": "Deletes a DAG.",
         "produces": [
           "application/json"
         ],
@@ -222,6 +240,7 @@ func init() {
     },
     "/search": {
       "get": {
+        "description": "Searches for DAGs.",
         "produces": [
           "application/json"
         ],
@@ -1006,6 +1025,7 @@ func init() {
   "paths": {
     "/dags": {
       "get": {
+        "description": "Returns a list of DAGs.",
         "produces": [
           "application/json"
         ],
@@ -1026,6 +1046,7 @@ func init() {
         }
       },
       "post": {
+        "description": "Creates a new DAG.",
         "produces": [
           "application/json"
         ],
@@ -1069,6 +1090,7 @@ func init() {
     },
     "/dags/{dagId}": {
       "get": {
+        "description": "Returns details of a DAG.",
         "produces": [
           "application/json"
         ],
@@ -1112,6 +1134,7 @@ func init() {
         }
       },
       "post": {
+        "description": "Performs an action on a DAG.",
         "produces": [
           "application/json"
         ],
@@ -1128,9 +1151,22 @@ func init() {
             "in": "body",
             "schema": {
               "type": "object",
+              "required": [
+                "action"
+              ],
               "properties": {
                 "action": {
-                  "type": "string"
+                  "type": "string",
+                  "enum": [
+                    "start",
+                    "suspend",
+                    "stop",
+                    "retry",
+                    "mark-success",
+                    "mark-failed",
+                    "save",
+                    "rename"
+                  ]
                 },
                 "params": {
                   "type": "string"
@@ -1164,6 +1200,7 @@ func init() {
         }
       },
       "delete": {
+        "description": "Deletes a DAG.",
         "produces": [
           "application/json"
         ],
@@ -1191,6 +1228,7 @@ func init() {
     },
     "/search": {
       "get": {
+        "description": "Searches for DAGs.",
         "produces": [
           "application/json"
         ],
