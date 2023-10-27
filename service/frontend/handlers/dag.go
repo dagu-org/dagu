@@ -406,7 +406,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
 
 	default:
-		return nil, response.NewBadRequestError(fmt.Errorf("invalid action: %s", params.Body.Action))
+		return nil, response.NewBadRequestError(fmt.Errorf("invalid action: %s", *params.Body.Action))
 	}
 
 	return &models.PostDagActionResponse{}, nil
