@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robfig/cron/v3"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/errors"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/robfig/cron/v3"
 	"golang.org/x/sys/unix"
 )
 
@@ -525,6 +525,7 @@ func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
 	d.From = def.From
 	d.To = def.To
 	d.Prefix = def.Prefix
+	d.AttachLogs = def.AttachLogs
 	return d, nil
 }
 

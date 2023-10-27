@@ -1,9 +1,14 @@
 package mailer
 
 import (
+	"bytes"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"log"
 	"net/smtp"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -22,18 +27,19 @@ type Config struct {
 
 var (
 	replacer = strings.NewReplacer("\r\n", "", "\r", "", "\n", "", "%0a", "", "%0d", "")
+	boundary = "==simple-boundary-dagu-mailer"
 )
 
 // SendMail sends an email.
-func (m *Mailer) SendMail(from string, to []string, subject, body string) error {
+func (m *Mailer) SendMail(from string, to []string, subject, body string, attachments []string) error {
 	log.Printf("Sending an email to %s, subject is \"%s\"", strings.Join(to, ","), subject)
 	if m.Username == "" && m.Password == "" {
-		return m.sendWithNoAuth(from, to, subject, body)
+		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}
-	return m.sendWithAuth(from, to, subject, body)
+	return m.sendWithAuth(from, to, subject, body, attachments)
 }
 
-func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string) error {
+func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string, attachments []string) error {
 	c, err := smtp.Dial(m.Host + ":" + m.Port)
 	if err != nil {
 		return err
@@ -55,13 +61,12 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string) 
 		return err
 	}
 	body = newlineToBrTag(body)
-	msg := "To: " + strings.Join(to, ",") + "\r\n" +
-		"From: " + from + "\r\n" +
-		"Subject: " + subject + "\r\n" +
-		"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
-		"Content-Transfer-Encoding: base64\r\n" +
+	msg := m.composeHeader(to, from, subject) +
 		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
 	_, err = wc.Write([]byte(msg))
+	wc.Write([]byte(addAttachments(attachments)))
+	wc.Write([]byte("\r\n\r\n--" + boundary + "--\r\n\r\n"))
+	wc.Write([]byte("\r\n\r\n"))
 	if err != nil {
 		return err
 	}
@@ -71,17 +76,57 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string) 
 	return c.Quit()
 }
 
-func (m *Mailer) sendWithAuth(from string, to []string, subject, body string) error {
+func (m *Mailer) sendWithAuth(from string, to []string, subject, body string, attachments []string) error {
 	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
 	body = newlineToBrTag(body)
-	return smtp.SendMail(m.Host+":"+m.Port, auth, from, to, []byte("To: "+strings.Join(to, ",")+"\r\n"+
-		"From: "+from+"\r\n"+
-		"Subject: "+subject+"\r\n"+
-		"Content-Type: text/html; charset=\"UTF-8\"\r\n"+
-		"Content-Transfer-Encoding: base64\r\n"+
-		"\r\n"+base64.StdEncoding.EncodeToString([]byte(body))))
+	return smtp.SendMail(m.Host+":"+m.Port, auth, from, to, []byte(
+		m.composeHeader(to, from, subject)+
+			"\r\n"+base64.StdEncoding.EncodeToString([]byte(body))),
+	)
+}
+
+func (m *Mailer) composeHeader(to []string, from string, subject string) string {
+	return "To: " + strings.Join(to, ",") + "\r\n" +
+		"From: " + from + "\r\n" +
+		"Subject: " + subject + "\r\n" +
+		"Content-Type: multipart/mixed;\r\n" +
+		"  boundary=\"" + boundary + "\"\r\n\r\n" +
+		"\r\n\r\n" +
+		"--" + boundary + "\r\n" +
+		"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
+		"Content-Transfer-Encoding: base64\r\n"
 }
 
 func newlineToBrTag(body string) string {
 	return strings.NewReplacer(`\r\n`, "<br />", `\r`, "<br />", `\n`, "<br />").Replace(body)
+}
+
+func addAttachments(attachments []string) []byte {
+	var buf bytes.Buffer
+	for _, fileName := range attachments {
+		data, err := readFile(fileName)
+		if err == nil {
+			buf.WriteString(fmt.Sprintf("\r\n\n--%s\r\n", boundary))
+			buf.WriteString("Content-Type: text/plain;" + "\r\n")
+			buf.WriteString("Content-Transfer-Encoding: base64" + "\r\n")
+			buf.WriteString("Content-Disposition: attachment; filename=" + filepath.Base(fileName) + "\r\n")
+			buf.WriteString("Content-Transfer-Encoding: base64\r\n\n")
+			b := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
+			base64.StdEncoding.Encode(b, data)
+			buf.Write(b)
+		}
+	}
+	return buf.Bytes()
+}
+
+func readFile(fileName string) (data []byte, err error) {
+	data, err = os.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	} else {
+		if len(data) == 0 {
+			err = errors.New("file is empty")
+		}
+	}
+	return
 }
