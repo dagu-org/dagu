@@ -22,11 +22,13 @@ Email notifications can be sent when a DAG finished with an error or successfull
       from: "foo@bar.com"
       to: "foo@bar.com"
       prefix: "[Error]"
+      attachLogs: true
 
     # Info mail configuration
     infoMail:
       from: "foo@bar.com"
       to: "foo@bar.com"
       prefix: "[Info]"
+      attachLogs: true
 
 If you want to use the same settings for all DAGs, set them to the :ref:`base configuration`.

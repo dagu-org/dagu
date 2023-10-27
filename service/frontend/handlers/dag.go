@@ -3,6 +3,10 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -21,9 +25,6 @@ import (
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/transform"
-	"io"
-	"os"
-	"strings"
 )
 
 const (
@@ -320,11 +321,11 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	e := h.engineFactory.Create()
 	d, err := e.GetStatus(params.DagID)
 
-	if err != nil && params.Body.Action != "save" {
+	if err != nil && *params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
 	}
 
-	switch params.Body.Action {
+	switch *params.Body.Action {
 	case "start":
 		if d.Status.Status == scheduler.SchedulerStatus_Running {
 			return nil, response.NewBadRequestError(errInvalidArgs)

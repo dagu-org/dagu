@@ -7,11 +7,14 @@ package operations
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
+	"github.com/go-openapi/errors"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+	"github.com/go-openapi/validate"
 )
 
 // PostDagActionHandlerFunc turns a function with the right signature into a post dag action handler
@@ -35,7 +38,7 @@ func NewPostDagAction(ctx *middleware.Context, handler PostDagActionHandler) *Po
 /*
 	PostDagAction swagger:route POST /dags/{dagId} postDagAction
 
-PostDagAction post dag action API
+Performs an action on a DAG.
 */
 type PostDagAction struct {
 	Context *middleware.Context
@@ -64,7 +67,9 @@ func (o *PostDagAction) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 type PostDagActionBody struct {
 
 	// action
-	Action string `json:"action,omitempty"`
+	// Required: true
+	// Enum: [start suspend stop retry mark-success mark-failed save rename]
+	Action *string `json:"action"`
 
 	// params
 	Params string `json:"params,omitempty"`
@@ -81,6 +86,76 @@ type PostDagActionBody struct {
 
 // Validate validates this post dag action body
 func (o *PostDagActionBody) Validate(formats strfmt.Registry) error {
+	var res []error
+
+	if err := o.validateAction(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+var postDagActionBodyTypeActionPropEnum []interface{}
+
+func init() {
+	var res []string
+	if err := json.Unmarshal([]byte(`["start","suspend","stop","retry","mark-success","mark-failed","save","rename"]`), &res); err != nil {
+		panic(err)
+	}
+	for _, v := range res {
+		postDagActionBodyTypeActionPropEnum = append(postDagActionBodyTypeActionPropEnum, v)
+	}
+}
+
+const (
+
+	// PostDagActionBodyActionStart captures enum value "start"
+	PostDagActionBodyActionStart string = "start"
+
+	// PostDagActionBodyActionSuspend captures enum value "suspend"
+	PostDagActionBodyActionSuspend string = "suspend"
+
+	// PostDagActionBodyActionStop captures enum value "stop"
+	PostDagActionBodyActionStop string = "stop"
+
+	// PostDagActionBodyActionRetry captures enum value "retry"
+	PostDagActionBodyActionRetry string = "retry"
+
+	// PostDagActionBodyActionMarkDashSuccess captures enum value "mark-success"
+	PostDagActionBodyActionMarkDashSuccess string = "mark-success"
+
+	// PostDagActionBodyActionMarkDashFailed captures enum value "mark-failed"
+	PostDagActionBodyActionMarkDashFailed string = "mark-failed"
+
+	// PostDagActionBodyActionSave captures enum value "save"
+	PostDagActionBodyActionSave string = "save"
+
+	// PostDagActionBodyActionRename captures enum value "rename"
+	PostDagActionBodyActionRename string = "rename"
+)
+
+// prop value enum
+func (o *PostDagActionBody) validateActionEnum(path, location string, value string) error {
+	if err := validate.EnumCase(path, location, value, postDagActionBodyTypeActionPropEnum, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *PostDagActionBody) validateAction(formats strfmt.Registry) error {
+
+	if err := validate.Required("body"+"."+"action", "body", o.Action); err != nil {
+		return err
+	}
+
+	// value enum
+	if err := o.validateActionEnum("body"+"."+"action", "body", *o.Action); err != nil {
+		return err
+	}
+
 	return nil
 }
 
