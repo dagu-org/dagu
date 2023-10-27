@@ -61,12 +61,9 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string, 
 		return err
 	}
 	body = newlineToBrTag(body)
-	msg := m.composeHeader(to, from, subject) +
-		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
-	_, err = wc.Write([]byte(msg))
-	wc.Write([]byte(addAttachments(attachments)))
-	wc.Write([]byte("\r\n\r\n--" + boundary + "--\r\n\r\n"))
-	wc.Write([]byte("\r\n\r\n"))
+	_, err = wc.Write(
+		m.composeMail(to, from, subject, body, attachments),
+	)
 	if err != nil {
 		return err
 	}
@@ -79,9 +76,9 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string, 
 func (m *Mailer) sendWithAuth(from string, to []string, subject, body string, attachments []string) error {
 	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
 	body = newlineToBrTag(body)
-	return smtp.SendMail(m.Host+":"+m.Port, auth, from, to, []byte(
-		m.composeHeader(to, from, subject)+
-			"\r\n"+base64.StdEncoding.EncodeToString([]byte(body))),
+	return smtp.SendMail(
+		m.Host+":"+m.Port, auth, from, to,
+		m.composeMail(to, from, subject, body, attachments),
 	)
 }
 
@@ -95,6 +92,28 @@ func (m *Mailer) composeHeader(to []string, from string, subject string) string 
 		"--" + boundary + "\r\n" +
 		"Content-Type: text/html; charset=\"UTF-8\"\r\n" +
 		"Content-Transfer-Encoding: base64\r\n"
+}
+
+func (m *Mailer) composeMail(to []string, from, subject, body string, attachments []string) (b []byte) {
+	msg := m.composeHeader(to, from, subject) +
+		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
+	b = joinBytes([]byte(msg), addAttachments(attachments))
+	b = joinBytes(b, []byte("\r\n\r\n--"+boundary+"--\r\n\r\n"))
+	b = joinBytes(b, []byte("\r\n\r\n"))
+	return
+}
+
+func joinBytes(s ...[]byte) []byte {
+	n := 0
+	for _, v := range s {
+		n += len(v)
+	}
+
+	b, i := make([]byte, n), 0
+	for _, v := range s {
+		i += copy(b[i:], v)
+	}
+	return b
 }
 
 func newlineToBrTag(body string) string {
