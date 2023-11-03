@@ -64,7 +64,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 	* [4. Execute the DAG](#ExecutetheDAG)
 * [**CLI**](#CLI)
 * [**Documentation**](#Documentation)
-* [Running as a daemon](#Runningasadaemon)
+* [**Running as a daemon**](#Runningasadaemon)
 * [**Example Workflow**](#ExampleWorkflow)
 * [**Motivation**](#Motivation)
 * [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#WhyNotUseanExistingWorkflowSchedulerLikeAirflow)
@@ -83,7 +83,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - Web User Interface
 - Command Line Interface (CLI) with several commands for running and managing DAGs
 - YAML format for defining DAGs, with support for various features including:
-  - Execution of custom code snippetts
+  - Execution of custom code snippets
   - Parameters
   - Command substitution
   - Conditional logic
@@ -285,7 +285,7 @@ dagu version
 
 ## <a name='Runningasadaemon'></a>**Running as a daemon**
 
-The easiest way to make sure the process is always running is to use the script like the following:
+The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
 
 ```bash
 #!/bin/bash
@@ -316,6 +316,7 @@ env:
   - DATA_DIR: /data
   - SCRIPT_DIR: /scripts
   - LOG_DIR: /log
+  # ... other variables can be added here
 
 # Handlers to manage errors and cleanup after execution
 handlerOn:
