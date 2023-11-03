@@ -86,4 +86,5 @@ func registerCommands(root *cobra.Command) {
 	rootCmd.AddCommand(serverCmd())
 	rootCmd.AddCommand(createSchedulerCommand())
 	rootCmd.AddCommand(retryCmd())
+	rootCmd.AddCommand(startAllCmd())
 }

@@ -188,7 +188,7 @@ Download the latest binary from the [Releases page](https://github.com/dagu-dev/
 
 ### <a name='LaunchtheWebUI'></a>1. Launch the Web UI
 
-Start the server with the command `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
+Start the server and scheduler with the command `dagu start-all` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
 ### <a name='CreateaNewDAG'></a>2. Create a New DAG
 
@@ -236,11 +236,14 @@ dagu restart <file>
 # Dry-runs the DAG
 dagu dry [--params=<params>] <file>
 
+# Launches both the web UI server and scheduler process
+dagu start-all [--host=<host>] [--port=<port>] [--dags=<path to directory>]
+
 # Launches the Dagu web UI server
-dagu server
+dagu server [--host=<host>] [--port=<port>] [--dags=<path to directory>]
 
 # Starts the scheduler process
-dagu scheduler
+dagu scheduler [--dags=<path to directory>]
 
 # Shows the current binary version
 dagu version
