@@ -14,7 +14,6 @@ func createSchedulerCommand() *cobra.Command {
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// TODO: fixme
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 
 			err := core.NewScheduler(app.TopLevelModule).Start(cmd.Context())
