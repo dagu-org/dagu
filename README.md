@@ -283,7 +283,7 @@ dagu version
 - [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
 - [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)
 
-## <a name='Runningasadaemon'></a>Running as a daemon
+## <a name='Runningasadaemon'></a>**Running as a daemon**
 
 The easiest way to make sure the process is always running is to use the script like the following:
 
