@@ -203,6 +203,7 @@ Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste the following examp
 
 Example:
 ```yaml
+schedule: "* * * * *" # Run the DAG every minute
 steps:
   - name: s1
     command: echo Hello Dagu
