@@ -32,42 +32,52 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - [Documentation](https://dagu.readthedocs.io) 
 - [Discord Community](https://discord.gg/gpahPUjGRk)
 
-## **Highlights**
+## <a name='Highlights'></a>**Highlights**
 - Single binary file installation
 - Declarative YAML format for defining DAGs
 - Web UI for visually managing, rerunning, and monitoring pipelines
 - Use existing programs without any modification
 - Self-contained, with no need for a DBMS
 
-## **Contents**
+## <a name='Contents'></a>**Contents**
 
-- [**Highlights**](#highlights)
-- [**Contents**](#contents)
-- [**Features**](#features)
-- [**Usecase**](#usecase)
-- [**Web User Interface**](#web-user-interface)
-- [**Installation**](#installation)
-  - [Via Homebrew](#via-homebrew)
-  - [Via Bash script](#via-bash-script)
-  - [Via Docker](#via-docker)
-  - [Via GitHub Release Page](#via-github-release-page)
-  - [Via Go Install](#via-go-install)
-- [️**Quick Start Guide**](#️quick-start-guide)
-  - [1. Launch the Web UI](#1-launch-the-web-ui)
-  - [2. Create a New DAG](#2-create-a-new-dag)
-  - [3. Edit the DAG](#3-edit-the-dag)
-  - [4. Execute the DAG](#4-execute-the-dag)
-- [**Documentation**](#documentation)
-- [**Example Workflow**](#example-workflow)
-- [**Motivation**](#motivation)
-- [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#why-not-use-an-existing-workflow-scheduler-like-airflow)
-- [**How It Works**](#how-it-works)
-- [**Roadmap**](#roadmap)
-- [**Contributors**](#contributors)
-- [**License**](#license)
-- [**Support and Community**](#support-and-community)
+<!-- vscode-markdown-toc -->
+* [**Highlights**](#Highlights)
+* [**Contents**](#Contents)
+* [**Features**](#Features)
+* [**Usecase**](#Usecase)
+* [**Web UI**](#WebUI)
+	* [DAG Details](#DAGDetails)
+	* [DAGs List](#DAGsList)
+	* [Search DAGs](#SearchDAGs)
+	* [Execution History](#ExecutionHistory)
+	* [DAG Execution Log](#DAGExecutionLog)
+* [**Installation**](#Installation)
+	* [Via Homebrew](#ViaHomebrew)
+	* [Via Bash script](#ViaBashscript)
+	* [Via Docker](#ViaDocker)
+	* [Via GitHub Release Page](#ViaGitHubReleasePage)
+* [️**Quick Start Guide**](#QuickStartGuide)
+	* [1. Launch the Web UI](#LaunchtheWebUI)
+	* [2. Create a New DAG](#CreateaNewDAG)
+	* [3. Edit the DAG](#EdittheDAG)
+	* [4. Execute the DAG](#ExecutetheDAG)
+* [**CLI**](#CLI)
+* [**Documentation**](#Documentation)
+* [**Example Workflow**](#ExampleWorkflow)
+* [**Motivation**](#Motivation)
+* [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#WhyNotUseanExistingWorkflowSchedulerLikeAirflow)
+* [**How It Works**](#HowItWorks)
+* [**License**](#License)
+* [**Support and Community**](#SupportandCommunity)
 
-## **Features**
+<!-- vscode-markdown-toc-config
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+
+## <a name='Features'></a>**Features**
 
 - Web User Interface
 - Command Line Interface (CLI) with several commands for running and managing DAGs
@@ -91,7 +101,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - REST API Interface
 - Basic Authentication over HTTPS
 
-## **Usecase**
+## <a name='Usecase'></a>**Usecase**
 
 - **Data Pipeline Automation:** Schedule ETL tasks for data processing and centralization.
 - **Infrastructure Monitoring:** Periodically check infrastructure components with HTTP requests or SSH commands.
@@ -103,9 +113,11 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - **Alerting System:** Create notifications based on specific triggers or conditions.
 - **Custom Task Automation:** Define and schedule custom tasks using code snippets.
 
-## **Web User Interface**
+## <a name='WebUI'></a>**Web UI**
 
-- **DAG Details**: It shows the real-time status, logs, and DAG configurations. You can edit DAG configurations on a browser.
+### <a name='DAGDetails'></a>DAG Details
+
+It shows the real-time status, logs, and DAG configurations. You can edit DAG configurations on a browser.
 
   ![example](assets/images/demo.gif?raw=true)
 
@@ -113,26 +125,34 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
   ![Details-TD](assets/images/ui-details2.webp?raw=true)
 
-- **DAGs**: It shows all DAGs and the real-time status.
+### <a name='DAGsList'></a>DAGs List
+
+It shows all DAGs and the real-time status.
 
   ![DAGs](assets/images/ui-dags.webp?raw=true)
 
-- **Search DAGs**: It greps given text across all DAGs.
+### <a name='SearchDAGs'></a>Search DAGs
+
+It greps given text across all DAGs.
   ![History](assets/images/ui-search.webp?raw=true)
 
-- **Execution History**: It shows past execution results and logs.
+### <a name='ExecutionHistory'></a>Execution History
+
+It shows past execution results and logs.
 
   ![History](assets/images/ui-history.webp?raw=true)
 
-- **DAG Execution Log**: It shows the detail log and standard output of each execution and step.
+### <a name='DAGExecutionLog'></a>DAG Execution Log
+
+It shows the detail log and standard output of each execution and step.
 
   ![DAG Log](assets/images/ui-logoutput.webp?raw=true)
 
-## **Installation**
+## <a name='Installation'></a>**Installation**
 
 You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
 
-### Via Homebrew
+### <a name='ViaHomebrew'></a>Via Homebrew
 ```sh
 brew install yohamta/tap/dagu
 ```
@@ -142,13 +162,13 @@ Upgrade to the latest version:
 brew upgrade yohamta/tap/dagu
 ```
 
-### Via Bash script
+### <a name='ViaBashscript'></a>Via Bash script
 
 ```sh
 curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
 ```
 
-### Via Docker
+### <a name='ViaDocker'></a>Via Docker
 
 ```sh
 docker run \
@@ -160,23 +180,23 @@ docker run \
 yohamta/dagu:latest
 ```
 
-### Via GitHub Release Page 
+### <a name='ViaGitHubReleasePage'></a>Via GitHub Release Page 
 
 Download the latest binary from the [Releases page](https://github.com/dagu-dev/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 
-## ️**Quick Start Guide**
+## <a name='QuickStartGuide'></a>️**Quick Start Guide**
 
-### 1. Launch the Web UI
+### <a name='LaunchtheWebUI'></a>1. Launch the Web UI
 
 Start the server with the command `dagu server` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-### 2. Create a New DAG
+### <a name='CreateaNewDAG'></a>2. Create a New DAG
 
 Navigate to the DAG List page by clicking the menu in the left panel of the Web UI. Then create a DAG by clicking the `New DAG` button at the top of the page. Enter `example` in the dialog.
 
 *Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Configuration Options](https://dagu.readthedocs.io/en/latest/config.html) for more details.*
 
-### 3. Edit the DAG
+### <a name='EdittheDAG'></a>3. Edit the DAG
 
 Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste the following example and click the `Save` button.
 
@@ -191,11 +211,42 @@ steps:
       - s1
 ```
 
-### 4. Execute the DAG
+### <a name='ExecutetheDAG'></a>4. Execute the DAG
 
 You can execute the example by pressing the `Start` button. You can see "Hello Dagu" in the log page in the Web UI.
 
-## **Documentation**
+## <a name='CLI'></a>**CLI**
+
+```sh
+# Runs the DAG
+dagu start [--params=<params>] <file>
+
+# Displays the current status of the DAG
+dagu status <file>
+
+# Re-runs the specified DAG run
+dagu retry --req=<request-id> <file>
+
+# Stops the DAG execution
+dagu stop <file>
+
+# Restarts the current running DAG
+dagu restart <file>
+
+# Dry-runs the DAG
+dagu dry [--params=<params>] <file>
+
+# Launches the Dagu web UI server
+dagu server
+
+# Starts the scheduler process
+dagu scheduler
+
+# Shows the current binary version
+dagu version
+```
+
+## <a name='Documentation'></a>**Documentation**
 
 - [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
 - ️[Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
@@ -228,7 +279,7 @@ You can execute the example by pressing the `Start` button. You can see "Hello D
 - [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
 - [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)
 
-## **Example Workflow**
+## <a name='ExampleWorkflow'></a>**Example Workflow**
 
 This example workflow showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
 
@@ -306,45 +357,17 @@ steps:
       - send_report
 ```
 
-## **Motivation**
+## <a name='Motivation'></a>**Motivation**
 
 Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
 
-## **Why Not Use an Existing Workflow Scheduler Like Airflow?**
+## <a name='WhyNotUseanExistingWorkflowSchedulerLikeAirflow'></a>**Why Not Use an Existing Workflow Scheduler Like Airflow?**
 
 There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
-## **How It Works**
+## <a name='HowItWorks'></a>**How It Works**
 
 Dagu is a single command line tool that uses the local file system to store data, so no database management system or cloud service is required. DAGs are defined in a declarative YAML format, and existing programs can be used without modification.
-
-## **Roadmap**
-### 1. Refactoring and Scalability Improvements:
-- Move to a worker architecture to support distributed processing.
-- Integrate with popular cloud providers for seamless scaling and deployment of Dagu workers.
-- Develop a centralized dashboard for users to manage, monitor, and scale multiple Dagu workers.
-
-### 2. Database and Persistence Enhancements:
-- Introduce sql database support for improved data persistence and backup.
-- Allow option to integrate with cloud object storage for logging.
-
-### 3. Integration and Extensibility:
-- Allow Dagu to be easily embedded within other applications.
-
-### 4. Advanced Executor Features:
-- Introduce custom executor ability, allowing users to define their own execution logic.
-- Allow DAGs to trigger or be triggered by other DAGs, facilitating modular and reusable pipelines.
-
-### 5. Security and Compliance:
-- Implement role-based access control for finer-grained permissions.
-
-### 6. Community and Ecosystem Development:
-- Build a SaaS application for users to easily deploy and manage multiple Dagu workers in the cloud.
-
-## **Contributors**
-<a href="https://github.com/dagu-dev/dagu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yohamta/dagu" />
-</a>
 
 ----
 
@@ -352,10 +375,10 @@ Feel free to contribute in any way you want! Share ideas, questions, submit issu
 
 We welcome any and all contributions!
 
-## **License**
+## <a name='License'></a>**License**
 
 This project is licensed under the GNU GPLv3.
 
-## **Support and Community**
+## <a name='SupportandCommunity'></a>**Support and Community**
 
 Join our [Discord community](https://discord.gg/gpahPUjGRk) to ask questions, request features, and share your ideas.
