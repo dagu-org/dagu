@@ -64,6 +64,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 	* [4. Execute the DAG](#ExecutetheDAG)
 * [**CLI**](#CLI)
 * [**Documentation**](#Documentation)
+* [Running as a daemon](#Runningasadaemon)
 * [**Example Workflow**](#ExampleWorkflow)
 * [**Motivation**](#Motivation)
 * [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#WhyNotUseanExistingWorkflowSchedulerLikeAirflow)
@@ -281,6 +282,25 @@ dagu version
 - [Scheduler](https://dagu.readthedocs.io/en/latest/scheduler.html)
 - [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
 - [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)
+
+## <a name='Runningasadaemon'></a>Running as a daemon
+
+The easiest way to make sure the process is always running is to use the script like the following:
+
+```bash
+#!/bin/bash
+process="dagu start-all"
+command="/usr/bin/dagu start-all"
+
+if ps ax | grep -v grep | grep "$process" > /dev/null
+then
+    exit
+else
+    $command &
+fi
+
+exit
+```
 
 ## <a name='ExampleWorkflow'></a>**Example Workflow**
 
