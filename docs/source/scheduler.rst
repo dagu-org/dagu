@@ -3,7 +3,7 @@
 Scheduler
 ==========
 
-To run DAGs automatically, you need to run the ``dagu scheduler`` process on your system.
+To run DAGs automatically, you need to run the ``dagu scheduler`` process on your system. Also, you can use `cron expression generator <https://crontab.cronhub.io/>`_ for your scheduler calculation. 
 
 Cron Expression
 ----------------
