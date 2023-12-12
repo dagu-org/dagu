@@ -309,6 +309,7 @@ Each step can have its own set of configurations, including:
 - ``retryPolicy``: The retry policy for the step.
 - ``repeatPolicy``: The repeat policy for the step.
 - ``preconditions``: The conditions that must be met before a step can run.
+- ``depends``: The step depends on the other step.
 
 Example:
 
@@ -338,4 +339,6 @@ Example:
           intervalSec: 60                
         preconditions:                   
           - condition: "`echo $1`"       
-            expected: "param1"           
+            expected: "param1"
+        depends:
+          -  some task name step          
