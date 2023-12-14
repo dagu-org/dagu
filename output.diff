@@ -1,0 +1,138 @@
+diff --git a/internal/config/config.go b/internal/config/config.go
+index 73106fb..3c10a94 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -30,6 +30,8 @@ type Config struct {
+ 	NavbarTitle        string
+ 	Env                map[string]string
+ 	TLS                *TLS
++	IsAuthToken        bool
++	AuthToken          string
+ }
+ 
+ type TLS struct {
+@@ -71,7 +73,8 @@ func LoadConfig(userHomeDir string) error {
+ 	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+ 	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
+ 	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
+-
++	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
++	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
+ 	command := "dagu"
+ 	if ex, err := os.Executable(); err == nil {
+ 		command = ex
+@@ -93,6 +96,8 @@ func LoadConfig(userHomeDir string) error {
+ 	viper.SetDefault("adminLogsDir", path.Join(appHome, "logs", "admin"))
+ 	viper.SetDefault("navbarColor", "")
+ 	viper.SetDefault("navbarTitle", "Dagu")
++	viper.SetDefault("isAuthToken", "0")
++	viper.SetDefault("authToken", "")
+ 
+ 	viper.AutomaticEnv()
+ 
+diff --git a/service/frontend/fx.go b/service/frontend/fx.go
+index 8be9f69..fce5449 100644
+--- a/service/frontend/fx.go
++++ b/service/frontend/fx.go
+@@ -3,6 +3,7 @@ package frontend
+ import (
+ 	"context"
+ 	"embed"
++
+ 	"github.com/dagu-dev/dagu/internal/config"
+ 	"github.com/dagu-dev/dagu/internal/logger"
+ 	"github.com/dagu-dev/dagu/service/frontend/handlers"
+@@ -53,6 +54,13 @@ func New(params Params) *server.Server {
+ 		AssetsFS: assetsFS,
+ 	}
+ 
++	if params.Config.IsAuthToken {
++
++		serverParams.AuthToken = &server.AuthToken{
++			Token: params.Config.AuthToken,
++		}
++	}
++
+ 	if params.Config.IsBasicAuth {
+ 		serverParams.BasicAuth = &server.BasicAuth{
+ 			Username: params.Config.BasicAuthUsername,
+diff --git a/service/frontend/server/server.go b/service/frontend/server/server.go
+index eca1b3c..d6eb8bc 100644
+--- a/service/frontend/server/server.go
++++ b/service/frontend/server/server.go
+@@ -3,17 +3,18 @@ package server
+ import (
+ 	"context"
+ 	"errors"
++	"io/fs"
++	"net/http"
++	"os"
++	"os/signal"
++	"syscall"
++
+ 	"github.com/dagu-dev/dagu/internal/config"
+ 	"github.com/dagu-dev/dagu/internal/logger"
+ 	"github.com/dagu-dev/dagu/internal/logger/tag"
+ 	"github.com/dagu-dev/dagu/service/frontend/restapi"
+ 	"github.com/go-openapi/loads"
+ 	flags "github.com/jessevdk/go-flags"
+-	"io/fs"
+-	"net/http"
+-	"os"
+-	"os/signal"
+-	"syscall"
+ 
+ 	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/middleware"
+ 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
+@@ -26,10 +27,15 @@ type BasicAuth struct {
+ 	Password string
+ }
+ 
++type AuthToken struct {
++	Token string
++}
++
+ type Params struct {
+ 	Host      string
+ 	Port      int
+ 	BasicAuth *BasicAuth
++	AuthToken *AuthToken
+ 	TLS       *config.TLS
+ 	Logger    logger.Logger
+ 	Handlers  []New
+@@ -40,6 +46,7 @@ type Server struct {
+ 	host      string
+ 	port      int
+ 	basicAuth *BasicAuth
++	authToken *AuthToken
+ 	tls       *config.TLS
+ 	logger    logger.Logger
+ 	server    *restapi.Server
+@@ -56,6 +63,7 @@ func NewServer(params Params) *Server {
+ 		host:      params.Host,
+ 		port:      params.Port,
+ 		basicAuth: params.BasicAuth,
++		authToken: params.AuthToken,
+ 		tls:       params.TLS,
+ 		logger:    params.Logger,
+ 		handlers:  params.Handlers,
+@@ -77,6 +85,11 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
+ 	middlewareOptions := &pkgmiddleware.Options{
+ 		Handler: svr.defaultRoutes(chi.NewRouter()),
+ 	}
++	if svr.authToken != nil {
++		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
++			Token: svr.authToken.Token,
++		}
++	}
+ 	if svr.basicAuth != nil {
+ 		middlewareOptions.BasicAuth = &pkgmiddleware.BasicAuth{
+ 			Username: svr.basicAuth.Username,
+@@ -90,7 +103,6 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
+ 		svr.logger.Error("failed to load API spec", tag.Error(err))
+ 		return err
+ 	}
+-
+ 	api := operations.NewDaguAPI(swaggerSpec)
+ 	for _, h := range svr.handlers {
+ 		h.Configure(api)

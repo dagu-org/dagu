@@ -3,17 +3,18 @@ package server
 import (
 	"context"
 	"errors"
+	"io/fs"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/service/frontend/restapi"
 	"github.com/go-openapi/loads"
 	flags "github.com/jessevdk/go-flags"
-	"io/fs"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/middleware"
 	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
@@ -26,10 +27,15 @@ type BasicAuth struct {
 	Password string
 }
 
+type AuthToken struct {
+	Token string
+}
+
 type Params struct {
 	Host      string
 	Port      int
 	BasicAuth *BasicAuth
+	AuthToken *AuthToken
 	TLS       *config.TLS
 	Logger    logger.Logger
 	Handlers  []New
@@ -40,6 +46,7 @@ type Server struct {
 	host      string
 	port      int
 	basicAuth *BasicAuth
+	authToken *AuthToken
 	tls       *config.TLS
 	logger    logger.Logger
 	server    *restapi.Server
@@ -56,6 +63,7 @@ func NewServer(params Params) *Server {
 		host:      params.Host,
 		port:      params.Port,
 		basicAuth: params.BasicAuth,
+		authToken: params.AuthToken,
 		tls:       params.TLS,
 		logger:    params.Logger,
 		handlers:  params.Handlers,
@@ -77,6 +85,11 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	middlewareOptions := &pkgmiddleware.Options{
 		Handler: svr.defaultRoutes(chi.NewRouter()),
 	}
+	if svr.authToken != nil {
+		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
+			Token: svr.authToken.Token,
+		}
+	}
 	if svr.basicAuth != nil {
 		middlewareOptions.BasicAuth = &pkgmiddleware.BasicAuth{
 			Username: svr.basicAuth.Username,
@@ -90,7 +103,6 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		svr.logger.Error("failed to load API spec", tag.Error(err))
 		return err
 	}
-
 	api := operations.NewDaguAPI(swaggerSpec)
 	for _, h := range svr.handlers {
 		h.Configure(api)
