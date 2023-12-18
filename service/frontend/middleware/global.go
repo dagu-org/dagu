@@ -14,8 +14,7 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 	next = middleware.Recoverer(next)
 
 	if authToken != nil {
-		next = TokenAuth("bearer", authToken.Token)(next)
-		basicAuth = nil
+		next = TokenAuth("restricted", authToken.Token)(next)
 	}
 
 	if basicAuth != nil {
