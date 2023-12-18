@@ -96,8 +96,8 @@ func LoadConfig(userHomeDir string) error {
 	viper.SetDefault("adminLogsDir", path.Join(appHome, "logs", "admin"))
 	viper.SetDefault("navbarColor", "")
 	viper.SetDefault("navbarTitle", "Dagu")
-	viper.SetDefault("isAuthToken", "1")
-	viper.SetDefault("authToken", "TESTAUTHTOKEN")
+	viper.SetDefault("isAuthToken", "0")
+	viper.SetDefault("authToken", "0")
 
 	viper.AutomaticEnv()
 
