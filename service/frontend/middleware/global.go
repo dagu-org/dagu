@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 	"strings"
+
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 func SetupGlobalMiddleware(handler http.Handler) http.Handler {
@@ -12,12 +13,15 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 	next = middleware.Logger(next)
 	next = middleware.Recoverer(next)
 
+	if authToken != nil {
+		next = TokenAuth("restricted", authToken.Token)(next)
+	}
+
 	if basicAuth != nil {
 		next = middleware.BasicAuth(
 			"restricted", map[string]string{basicAuth.Username: basicAuth.Password},
 		)(next)
 	}
-
 	next = prefixChecker(next)
 
 	return next
@@ -26,11 +30,13 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 var (
 	defaultHandler http.Handler
 	basicAuth      *BasicAuth
+	authToken      *AuthToken
 )
 
 type Options struct {
 	Handler   http.Handler
 	BasicAuth *BasicAuth
+	AuthToken *AuthToken
 }
 
 type BasicAuth struct {
@@ -38,9 +44,14 @@ type BasicAuth struct {
 	Password string
 }
 
+type AuthToken struct {
+	Token string
+}
+
 func Setup(opts *Options) {
 	defaultHandler = opts.Handler
 	basicAuth = opts.BasicAuth
+	authToken = opts.AuthToken
 }
 
 func prefixChecker(next http.Handler) http.Handler {

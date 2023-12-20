@@ -30,6 +30,8 @@ type Config struct {
 	NavbarTitle        string
 	Env                map[string]string
 	TLS                *TLS
+	IsAuthToken        bool
+	AuthToken          string
 }
 
 type TLS struct {
@@ -71,7 +73,8 @@ func LoadConfig(userHomeDir string) error {
 	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
 	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
 	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
-
+	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
+	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
 	command := "dagu"
 	if ex, err := os.Executable(); err == nil {
 		command = ex
@@ -93,6 +96,8 @@ func LoadConfig(userHomeDir string) error {
 	viper.SetDefault("adminLogsDir", path.Join(appHome, "logs", "admin"))
 	viper.SetDefault("navbarColor", "")
 	viper.SetDefault("navbarTitle", "Dagu")
+	viper.SetDefault("isAuthToken", "0")
+	viper.SetDefault("authToken", "0")
 
 	viper.AutomaticEnv()
 

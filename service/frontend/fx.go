@@ -3,6 +3,7 @@ package frontend
 import (
 	"context"
 	"embed"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/frontend/handlers"
@@ -51,6 +52,13 @@ func New(params Params) *server.Server {
 		Logger:   params.Logger,
 		Handlers: params.Handlers,
 		AssetsFS: assetsFS,
+	}
+
+	if params.Config.IsAuthToken {
+
+		serverParams.AuthToken = &server.AuthToken{
+			Token: params.Config.AuthToken,
+		}
 	}
 
 	if params.Config.IsBasicAuth {
