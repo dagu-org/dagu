@@ -8,11 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicAuthFn(t *testing.T) {
+func TestBasicAuth(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
+	fakeAuthHeader := "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva"
 	fakeAuthToken := AuthToken{
 		Token: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva",
 	}
@@ -24,13 +25,13 @@ func TestBasicAuthFn(t *testing.T) {
 	}{
 		{
 			name:       "auth header set, auth token set",
-			authHeader: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva",
+			authHeader: fakeAuthHeader,
 			authToken:  &fakeAuthToken,
 			httpStatus: http.StatusOK,
 		},
 		{
 			name:       "auth header set, auth token unset",
-			authHeader: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva",
+			authHeader: fakeAuthHeader,
 			authToken:  nil,
 			httpStatus: http.StatusUnauthorized,
 		},
