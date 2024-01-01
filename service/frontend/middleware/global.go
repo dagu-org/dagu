@@ -17,9 +17,10 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 		next = TokenAuth("restricted", authToken.Token)(next)
 	}
 
-	if basicAuth != nil {
-		next = middleware.BasicAuth(
-			"restricted", map[string]string{basicAuth.Username: basicAuth.Password},
+	if authBasic != nil {
+		next = BasicAuth(
+			"restricted",
+			map[string]string{authBasic.Username: authBasic.Password},
 		)(next)
 	}
 	next = prefixChecker(next)
@@ -29,17 +30,17 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 
 var (
 	defaultHandler http.Handler
-	basicAuth      *BasicAuth
+	authBasic      *AuthBasic
 	authToken      *AuthToken
 )
 
 type Options struct {
 	Handler   http.Handler
-	BasicAuth *BasicAuth
+	AuthBasic *AuthBasic
 	AuthToken *AuthToken
 }
 
-type BasicAuth struct {
+type AuthBasic struct {
 	Username string
 	Password string
 }
@@ -50,7 +51,7 @@ type AuthToken struct {
 
 func Setup(opts *Options) {
 	defaultHandler = opts.Handler
-	basicAuth = opts.BasicAuth
+	authBasic = opts.AuthBasic
 	authToken = opts.AuthToken
 }
 

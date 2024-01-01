@@ -91,7 +91,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		}
 	}
 	if svr.basicAuth != nil {
-		middlewareOptions.BasicAuth = &pkgmiddleware.BasicAuth{
+		middlewareOptions.AuthBasic = &pkgmiddleware.AuthBasic{
 			Username: svr.basicAuth.Username,
 			Password: svr.basicAuth.Password,
 		}
