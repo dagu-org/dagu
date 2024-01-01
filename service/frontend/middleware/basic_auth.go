@@ -1,10 +1,10 @@
 package middleware
 
 import (
+	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 func BasicAuth(realm string, creds map[string]string) func(next http.Handler) http.Handler {
@@ -15,7 +15,19 @@ func BasicAuth(realm string, creds map[string]string) func(next http.Handler) ht
 				next.ServeHTTP(w, r)
 				return
 			}
-			middleware.BasicAuth("restricted", creds)(next).ServeHTTP(w, r)
+			user, pass, ok := r.BasicAuth()
+			if !ok {
+				basicAuthFailed(w, realm)
+				return
+			}
+
+			credPass, credUserOk := creds[user]
+			if !credUserOk || subtle.ConstantTimeCompare([]byte(pass), []byte(credPass)) != 1 {
+				basicAuthFailed(w, realm)
+				return
+			}
+
+			next.ServeHTTP(w, r.WithContext(withAuthenticated(r.Context())))
 		})
 	}
 }
@@ -25,4 +37,9 @@ func skipBasicAuth(authHeader []string) bool {
 	return authToken != nil &&
 		len(authHeader) >= 2 &&
 		authHeader[0] == "Bearer"
+}
+
+func basicAuthFailed(w http.ResponseWriter, realm string) {
+	w.Header().Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, realm))
+	w.WriteHeader(http.StatusUnauthorized)
 }

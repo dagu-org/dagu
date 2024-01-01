@@ -55,6 +55,10 @@ You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$
     basicAuthUsername: <username for basic auth of web UI>       # basic auth user
     basicAuthPassword: <password for basic auth of web UI>       # basic auth password
 
+    # API Token
+    isAuthToken: <true|false>                                    # enables API token
+    authToken: <token for API access>                            # API token
+
     # Base Config
     baseConfig: <base DAG config path>                           # default: ${DAGU_HOME}/config.yaml
 

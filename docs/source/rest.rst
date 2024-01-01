@@ -1,3 +1,5 @@
+.. _REST API:
+
 REST API Docs
 =============
 

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -26,6 +27,24 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 	next = prefixChecker(next)
 
 	return next
+}
+
+type authCtxKey struct{}
+
+type authCtx struct {
+	authenticated bool
+}
+
+func withAuthenticated(ctx context.Context) context.Context {
+	return context.WithValue(ctx, authCtxKey{}, &authCtx{authenticated: true})
+}
+
+func isAuthenticated(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	auth, ok := ctx.Value(authCtxKey{}).(*authCtx)
+	return ok && auth.authenticated
 }
 
 var (
