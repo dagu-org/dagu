@@ -34,6 +34,7 @@ Contents
    examples
    config
    auth
+   api_token
    executors
    email
    scheduler
