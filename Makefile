@@ -71,9 +71,9 @@ build-ui:
 	@cd ui; \
 		yarn && yarn build
 
-	@rm ./service/frontend/assets/*.js
-	@rm ./service/frontend/assets/*.woff
-	@rm ./service/frontend/assets/*.woff2
+	@rm -f ./service/frontend/assets/*.js
+	@rm -f ./service/frontend/assets/*.woff
+	@rm -f ./service/frontend/assets/*.woff2
 
 	@cp ui/dist/*.js ./service/frontend/assets/
 	@cp ui/dist/*.woff ./service/frontend/assets/
