@@ -2,15 +2,16 @@ package cmd
 
 import (
 	"bytes"
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"io"
 	"log"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -34,9 +35,10 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	return tmpDir, e, ds
 }
 
-func changeHomeDir(homeDir string) {
-	_ = os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig(homeDir)
+func changeHomeDir(dir string) {
+	homeDir = dir
+	_ = os.Setenv("HOME", dir)
+	_ = config.LoadConfig(dir)
 }
 
 type cmdTest struct {
