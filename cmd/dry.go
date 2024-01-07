@@ -13,6 +13,9 @@ func dryCmd() *cobra.Command {
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(config.LoadConfig(homeDir))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			df := client.NewDataStoreFactory(config.Get())
 			e := engine.NewFactory(df, config.Get()).Create()

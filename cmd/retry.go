@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"path/filepath"
+
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
-	"path/filepath"
 )
 
 func retryCmd() *cobra.Command {
@@ -15,6 +16,9 @@ func retryCmd() *cobra.Command {
 		Short: "Retry the DAG execution",
 		Long:  `dagu retry --req=<request-id> <DAG file>`,
 		Args:  cobra.ExactArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(config.LoadConfig(homeDir))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			f, _ := filepath.Abs(args[0])
 			reqID, err := cmd.Flags().GetString("req")

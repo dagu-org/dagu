@@ -13,6 +13,9 @@ func startCmd() *cobra.Command {
 		Short: "Runs the DAG",
 		Long:  `dagu start [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(config.LoadConfig(homeDir))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			ds := client.NewDataStoreFactory(config.Get())
 			e := engine.NewFactory(ds, config.Get()).Create()

@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
-	"log"
 )
 
 func createStatusCommand() *cobra.Command {
@@ -15,6 +16,9 @@ func createStatusCommand() *cobra.Command {
 		Short: "Display current status of the DAG",
 		Long:  `dagu status <DAG file>`,
 		Args:  cobra.ExactArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(config.LoadConfig(homeDir))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			loadedDAG, err := loadDAG(args[0], "")
 			checkError(err)
