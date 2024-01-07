@@ -1,14 +1,15 @@
 package cmd
 
 import (
+	"log"
+	"time"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
-	"log"
-	"time"
 )
 
 func restartCmd() *cobra.Command {
@@ -17,6 +18,9 @@ func restartCmd() *cobra.Command {
 		Short: "Restart the DAG",
 		Long:  `dagu restart <DAG file>`,
 		Args:  cobra.ExactArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(config.LoadConfig(homeDir))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			dagFile := args[0]
 			loadedDAG, err := loadDAG(dagFile, "")

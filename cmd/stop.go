@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
-	"log"
 )
 
 func stopCmd() *cobra.Command {
@@ -14,6 +15,9 @@ func stopCmd() *cobra.Command {
 		Short: "Stop the running DAG",
 		Long:  `dagu stop <DAG file>`,
 		Args:  cobra.ExactArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(config.LoadConfig(homeDir))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			loadedDAG, err := loadDAG(args[0], "")
 			checkError(err)

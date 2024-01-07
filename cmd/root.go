@@ -36,18 +36,27 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
+
+	cobra.OnInitialize(initConfig)
 
 	registerCommands(rootCmd)
 }
 
-func initConfig() {
+var (
+	homeDir string
+)
+
+func init() {
 	home, err := os.UserHomeDir()
-	cobra.CheckErr(err)
-	setConfigFile(home)
-	cobra.CheckErr(config.LoadConfig(home))
+	if err != nil {
+		cobra.CheckErr(err)
+	}
+	homeDir = home
+}
+
+func initConfig() {
+	setConfigFile(homeDir)
 }
 
 func setConfigFile(home string) {
