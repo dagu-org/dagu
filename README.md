@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/images/dagu-logo.png" width="300" alt="dagu-logo">
+  <img src="./assets/images/dagu-logo.png" width="500" alt="dagu-logo">
 </p>
 
 <p align="center">
