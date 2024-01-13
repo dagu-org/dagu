@@ -1,6 +1,5 @@
 <p align="center">
-  <img src="./assets/images/dagu-logo-dark.png#gh-dark-mode-only" width="300" alt="dagu-logo">
-  <img src="./assets/images/dagu-logo-light.png#gh-light-mode-only" width="300" alt="dagu-logo">
+  <img src="./assets/images/dagu-logo.png" width="300" alt="dagu-logo">
 </p>
 
 <p align="center">
