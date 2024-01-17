@@ -15,13 +15,20 @@ test -z "$VERSION" && {
 	exit 1
 }
 
+if [ "$( uname -m )" = "x86_64" ]
+then
+	ARCHITECTURE="amd64"
+else
+	ARCHITECTURE="$( uname -m )"
+fi
+
 test -z "$TMPDIR" && TMPDIR="$(mktemp -d)"
-export TAR_FILE="${TMPDIR}${FILE_BASENAME}_$(uname -s)_$(uname -m).tar.gz"
+export TAR_FILE="${TMPDIR}${FILE_BASENAME}_$(uname -s)_$ARCHITECTURE.tar.gz"
 
 (
 	cd "$TMPDIR"
 	echo "Downloading dagu $VERSION..."
-	curl -sfLo "$TAR_FILE" "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_${VERSION:1}_$(uname -s)_$(uname -m).tar.gz"
+	curl -sfLo "$TAR_FILE" "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_${VERSION:1}_$(uname -s)_$ARCHITECTURE.tar.gz"
 )
 
 tar -xf "$TAR_FILE" -C "$TMPDIR"
