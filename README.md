@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <a href="https://goreportcard.com/report/github.com/yohamta/dagu">
-    <img src="https://goreportcard.com/badge/github.com/yohamta/dagu" />
+  <a href="https://goreportcard.com/report/github.com/dagu-dev/dagu">
+    <img src="https://goreportcard.com/badge/github.com/dagu-dev/dagu" />
   </a>
   <a href="https://codecov.io/gh/dagu-dev/dagu">
     <img src="https://codecov.io/gh/dagu-dev/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
@@ -12,8 +12,8 @@
   <a href="https://github.com/dagu-dev/dagu/releases">
     <img src="https://img.shields.io/github/release/yohamta/dagu.svg" />
   </a>
-  <a href="https://godoc.org/github.com/yohamta/dagu">
-    <img src="https://godoc.org/github.com/yohamta/dagu?status.svg" />
+  <a href="https://godoc.org/github.com/dagu-dev/dagu">
+    <img src="https://godoc.org/github.com/dagu-dev/dagu?status.svg" />
   </a>
   <img src="https://github.com/dagu-dev/dagu/actions/workflows/test.yaml/badge.svg" />
 </p>

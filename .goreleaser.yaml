@@ -34,6 +34,6 @@ brews:
       owner: yohamta
       name: homebrew-tap
     folder: Formula
-    homepage: 'https://github.com/yohamta/dagu'
+    homepage: 'https://github.com/dagu-dev/dagu'
     description: 'A No-code workflow executor that runs DAGs defined in a simple YAML format'
     license: "GNU General Public License v3.0"

@@ -15,14 +15,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yohamta/dagu.git"
+    "url": "git+https://github.com/dagu-dev/dagu.git"
   },
   "author": "Yota Hamada",
   "license": "SEE LICENSE.md",
   "bugs": {
     "url": "https://github.com/dagu-dev/dagu/issues"
   },
-  "homepage": "https://github.com/yohamta/dagu#readme",
+  "homepage": "https://github.com/dagu-dev/dagu#readme",
   "devDependencies": {
     "-": "^0.0.1",
     "@babel/core": "^7.18.0",
