@@ -8,7 +8,7 @@ import Toolbar from '@mui/material/Toolbar';
 import List from '@mui/material/List';
 import Typography from '@mui/material/Typography';
 import { mainListItems } from './menu';
-import { Grid } from '@mui/material';
+import { Grid, colors } from '@mui/material';
 import { AppBarContext } from './contexts/AppBarContext';
 
 const drawerWidthClosed = 64;
@@ -62,6 +62,17 @@ const Drawer = styled(MuiDrawer, {
 }));
 
 const mdTheme = createTheme({
+  palette: {
+    mode: 'dark', // Set the theme mode to dark
+    background: {
+      default: '#121212', // Dark background for most surfaces
+      paper: '#1e1e1e', // Dark background for components like Drawer and AppBar
+    },
+    text: {
+      primary: '#45B8AC', // Light text color for readability
+      secondary: '#45B8AC', // Slightly dimmer text color for less emphasis
+    },
+  },
   typography: {
     fontFamily: 'Inter',
   },
@@ -77,7 +88,7 @@ type DashboardContentProps = {
 function Content({ title, navbarColor, children }: DashboardContentProps) {
   const [scrolled, setScrolled] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const gradientColor = navbarColor || '#485fc7';
+  const gradientColor = navbarColor || '#293152';
 
   return (
     <ThemeProvider theme={mdTheme}>
@@ -86,7 +97,8 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
         <Drawer variant="permanent" open={false}>
           <Box
             sx={{
-              background: `linear-gradient(0deg, #fff 0%, ${gradientColor} 70%, ${gradientColor} 100%);`,
+              background: `linear-gradient(0deg, ${mdTheme.palette.background.default} 0%, ${gradientColor} 70%, ${gradientColor} 100%)`, // Adjust gradientColor accordingly
+              /**background: `linear-gradient(0deg, #fff 0%, ${gradientColor} 70%, ${gradientColor} 100%);`, **/
               height: '100%',
             }}
           >
@@ -112,7 +124,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
             elevation={0}
             sx={{
               width: '100%',
-              backgroundColor: '#F2F4F8',
+              backgroundColor: '#293152',
               borderBottom: scrolled ? 1 : 0,
               borderColor: 'grey.300',
               pr: 3,
@@ -137,7 +149,7 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
                   </NavBarTitleText>
                 )}
               </AppBarContext.Consumer>
-              <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
+              <NavBarTitleText>{title || 'Black Dagger'}</NavBarTitleText>
             </Toolbar>
           </AppBar>
           <Grid
@@ -147,7 +159,8 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
               flex: 1,
               pb: 4,
               overflow: 'auto',
-              backgroundColor: '#F2F4F8',
+              backgroundColor: '#293152', /*Dashboard background color */
+
             }}
             onScroll={() => {
               const curr = containerRef.current;
@@ -179,7 +192,8 @@ const NavBarTitleText = ({
     gutterBottom
     sx={{
       fontWeight: '800',
-      color: '#404040',
+      color: '#45B8AC',
+      /**backgroundColor : 'red',**/
       opacity: visible ? 1 : 0,
       transition: 'opacity 0.2s',
     }}

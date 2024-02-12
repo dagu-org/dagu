@@ -14,6 +14,17 @@ export const statusColorMapping: statusColorMapping = {
   [SchedulerStatus.Skipped_Unused]: { backgroundColor: 'gray', color: 'white' },
 };
 
+
+// export const nodeStatusColorMapping = {
+//   [NodeStatus.None]: statusColorMapping[SchedulerStatus.None],
+//   [NodeStatus.Running]: statusColorMapping[SchedulerStatus.Running],
+//   [NodeStatus.Error]: statusColorMapping[SchedulerStatus.Error],
+//   [NodeStatus.Cancel]: statusColorMapping[SchedulerStatus.Cancel],
+//   [NodeStatus.Success]: statusColorMapping[SchedulerStatus.Success],
+//   [NodeStatus.Skipped]: statusColorMapping[SchedulerStatus.Skipped_Unused],
+// };
+
+
 export const nodeStatusColorMapping = {
   [NodeStatus.None]: statusColorMapping[SchedulerStatus.None],
   [NodeStatus.Running]: statusColorMapping[SchedulerStatus.Running],

@@ -6,6 +6,7 @@ function LoadingIndicator() {
     <Container sx={{ width: '100%', textAlign: 'center', margin: 'auto' }}>
       <CircularProgress />
     </Container>
+    
   );
 }
 

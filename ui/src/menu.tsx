@@ -23,7 +23,7 @@ function Icon({ icon }: { icon: IconProp }) {
       }}
     >
       <FontAwesomeIcon
-        style={{ height: 20, width: 20 }}
+        style={{ height: 20, width: 20, color:'#45B8AC' }}
         icon={icon}
       ></FontAwesomeIcon>
     </span>
@@ -41,6 +41,7 @@ export const mainListItems = (
     <Link to="/search">
       <ListItem text="Search" icon={<Icon icon={faMagnifyingGlass}></Icon>} />
     </Link>
+
   </React.Fragment>
 );
 
@@ -52,12 +53,12 @@ type ListItemProps = {
 function ListItem({ icon, text }: ListItemProps) {
   return (
     <ListItemButton>
-      <ListItemIcon sx={{ color: 'white' }}>{icon}</ListItemIcon>
+      <ListItemIcon sx={{ color: 'black' }}>{icon}</ListItemIcon>
       <ListItemText
         primary={
           <Typography
             sx={{
-              color: 'white',
+              color: 'black',
               fontWeight: '400',
             }}
           >
