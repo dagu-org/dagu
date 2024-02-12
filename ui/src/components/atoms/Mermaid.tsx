@@ -24,11 +24,13 @@ mermaidAPI.initialize({
   },
   logLevel: 4, // ERROR
 });
-
+//
 function Mermaid({ def, style = {} }: Props) {
   const ref = React.useRef<HTMLDivElement>(null);
   const mStyle = {
     ...style,
+    //backgroundColor: '#293152' ,
+    //<Mermaid def={graph} style={{ backgroundColor: 'yellow' }} />
   };
   const dStyle: CSSProperties = {
     overflowX: 'auto',

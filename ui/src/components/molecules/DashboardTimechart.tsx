@@ -69,12 +69,13 @@ function DashboardTimechart({ data: input }: Props) {
             dataKey="values"
             tickCount={96}
             domain={[now.startOf('day').unix(), now.endOf('day').unix()]}
+            
           />
           <YAxis dataKey="name" type="category" hide />
           <Bar background dataKey="values" fill="lightblue" minPointSize={2}>
             {data.map((_, index) => {
               const color = statusColorMapping[data[index].status];
-              return <Cell key={index} fill={color.backgroundColor} />;
+              return <Cell key={index} fill={'color.backgroundColor'} />;
             })}
             <LabelList
               dataKey="name"
