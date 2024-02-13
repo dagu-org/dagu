@@ -10,6 +10,10 @@ import Typography from '@mui/material/Typography';
 import { mainListItems } from './menu';
 import { Grid, colors } from '@mui/material';
 import { AppBarContext } from './contexts/AppBarContext';
+import { Link } from 'react-router-dom';
+
+import blackdaggerImage from './assets/images/blackdagger.png';
+
 
 const drawerWidthClosed = 64;
 const drawerWidth = 240;
@@ -132,25 +136,34 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
               display: 'block',
             }}
           >
-            <Toolbar
-              sx={{
-                width: '100%',
-                display: 'flex',
-                direction: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flex: 1,
-              }}
-            >
-              <AppBarContext.Consumer>
-                {(context) => (
-                  <NavBarTitleText visible={scrolled}>
-                    {context.title}
-                  </NavBarTitleText>
-                )}
-              </AppBarContext.Consumer>
-              <NavBarTitleText>{title || 'Black Dagger'}</NavBarTitleText>
-            </Toolbar>
+           <Toolbar
+  sx={{
+    width: '100%',
+    display: 'flex',
+    direction: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flex: 1,
+  }}
+>
+  <AppBarContext.Consumer>
+    {(context) => (
+      <NavBarTitleText visible={scrolled}>
+        {context.title}
+      </NavBarTitleText>
+    )}
+  </AppBarContext.Consumer>
+  <Link to="/dashboard">
+
+  <NavBarTitleText>{title || 'Black Dagger'}</NavBarTitleText> {/* Title */}
+  </Link>
+  <Link to="/dashboard">
+ 
+  <img src={blackdaggerImage} alt="Black Dagger" />
+  
+  </Link>
+</Toolbar>
+
           </AppBar>
           <Grid
             container
