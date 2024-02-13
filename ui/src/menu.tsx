@@ -9,6 +9,8 @@ import {
   faChartGantt,
   faMagnifyingGlass,
   faTableList,
+  faTerminal,
+  faUserNinja,
 } from '@fortawesome/free-solid-svg-icons';
 import { IconProp } from '@fortawesome/fontawesome-svg-core';
 
@@ -40,6 +42,12 @@ export const mainListItems = (
     </Link>
     <Link to="/search">
       <ListItem text="Search" icon={<Icon icon={faMagnifyingGlass}></Icon>} />
+    </Link>
+    <Link to="http://localhost:8090">
+      <ListItem text="Terminal" icon={<Icon icon={faTerminal}></Icon>} />
+    </Link>
+    <Link to="https://localhost:8090">
+      <ListItem text="Terminal" icon={<Icon icon={faUserNinja}></Icon>} />
     </Link>
 
   </React.Fragment>
