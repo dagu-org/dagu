@@ -36,6 +36,7 @@ function Graph({
     padding: '2em',
     borderRadius: '0.5em',
     backgroundSize: '20px 20px',
+    border: '2px solid ',
   };
   const graph = React.useMemo(() => {
     if (!steps) {
@@ -65,14 +66,14 @@ function Graph({
       (steps as Step[]).forEach((s) => addNodeFn(s, NodeStatus.None));
     }
     dat.push(
-      'linkStyle default stroke:#999,stroke-width:1px,fill:none,color:#333'
+      'linkStyle default stroke:#999,stroke-width:3px,fill:none,color:#333'
     );
-    dat.push('classDef none color:#333,fill:white,stroke:lightblue,stroke-width:1.2px');
-    dat.push('classDef running color:#333,fill:white,stroke:lime,stroke-width:1.2px');
-    dat.push('classDef error color:#333,fill:white,stroke:red,stroke-width:1.2px');
-    dat.push('classDef cancel color:#333,fill:white,stroke:pink,stroke-width:1.2px');
-    dat.push('classDef done color:#333,fill:white,stroke:green,stroke-width:1.2px');
-    dat.push('classDef skipped color:#333,fill:white,stroke:gray,stroke-width:1.2px');
+    dat.push('classDef none color:#333,fill:white,stroke:lightblue,stroke-width:3px');
+    dat.push('classDef running color:#333,fill:white,stroke:lime,stroke-width:3px');
+    dat.push('classDef error color:#333,fill:white,stroke:red,stroke-width:3px');
+    dat.push('classDef cancel color:#333,fill:white,stroke:pink,stroke-width:3px');
+    dat.push('classDef done color:#333,fill:white,stroke:green,stroke-width:3px');
+    dat.push('classDef skipped color:#333,fill:white,stroke:gray,stroke-width:3px');
     return dat.join('\n');
   }, [steps, onClickNode, flowchart]);
   return <Mermaid style={mermaidStyle} def={graph} />;
