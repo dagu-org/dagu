@@ -2,8 +2,9 @@
 FROM --platform=$BUILDPLATFORM alpine:latest
 
 ARG TARGETARCH
-ARG VERSION=1.10.5 
+ARG VERSION=1.12.9 
 ARG RELEASES_URL="https://github.com/dagu-dev/dagu/releases"
+ARG TARGET_FILE="dagu_${VERSION}_linux_${TARGETARCH}.tar.gz"
 
 ARG USER="dagu"
 ARG USER_UID=1000
@@ -24,7 +25,6 @@ EOF
 USER dagu
 WORKDIR /home/dagu
 RUN <<EOF
-    export TARGET_FILE="dagu_${VERSION}_Linux_${TARGETARCH}.tar.gz"
     wget ${RELEASES_URL}/download/v${VERSION}/${TARGET_FILE}
     tar -xf ${TARGET_FILE} && rm *.tar.gz 
     sudo mv dagu /usr/local/bin/ 
