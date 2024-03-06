@@ -321,7 +321,7 @@ Example:
         dir: ${HOME}/logs                
         command: bash                    
         stdout: /tmp/outfile
-        ouptut: RESULT_VARIABLE
+        output: RESULT_VARIABLE
         script: |
           echo "any script"
         signalOnStop: "SIGINT"           

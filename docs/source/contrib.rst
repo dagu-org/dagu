@@ -57,7 +57,7 @@ Code Structure
 - ``internal``: Contains the internal code for the project.
 
   - ``web``: Contains the backend code for the Web UI.
-  - ``agent``: Contains the code for runnning the workflows.
+  - ``agent``: Contains the code for running the workflows.
   - ``config``: Contains the code for loading the configuration.
   - ``controller``: Contains the code for managing the workflows.
   - ``dag``: Contains the code for parsing the workflow definition.
