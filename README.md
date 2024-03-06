@@ -94,7 +94,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - REST API Interface
 - Basic Authentication over HTTPS
 
-##**Usecase**
+## **Usecase**
 
 - **Data Pipeline Automation:** Schedule ETL tasks for data processing and centralization.
 - **Infrastructure Monitoring:** Periodically check infrastructure components with HTTP requests or SSH commands.
