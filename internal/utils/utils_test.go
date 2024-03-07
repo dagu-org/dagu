@@ -36,10 +36,10 @@ func TestMustGetwd(t *testing.T) {
 
 func TestFormatTime(t *testing.T) {
 	tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location())
-	fomatted := utils.FormatTime(tm)
-	require.Equal(t, "2022-02-01 02:02:02", fomatted)
+	formatted := utils.FormatTime(tm)
+	require.Equal(t, "2022-02-01 02:02:02", formatted)
 
-	parsed, err := utils.ParseTime(fomatted)
+	parsed, err := utils.ParseTime(formatted)
 	require.NoError(t, err)
 	require.Equal(t, tm, parsed)
 

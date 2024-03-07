@@ -1,0 +1,7 @@
+[codespell]
+# Ref: https://github.com/codespell-project/codespell#using-a-config-file
+skip = .git,*.svg,go.sum,*.lock,*.css,.codespellrc
+check-hidden = true
+# ignore-regex = 
+# short variables close to typos are often used
+ignore-words-list = ot
