@@ -54,7 +54,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [Via Homebrew](#via-homebrew)
   - [Via Bash script](#via-bash-script)
   - [Via Docker](#via-docker)
-  - [Via GitHub Release Page](#via-github-release-page)
+  - [Via GitHub Releases Page](#via-github-releases-page)
 - [Quick Start Guide](#quick-start-guide)
   - [Launch the Web UI](#launch-the-web-ui)
   - [Create a New DAG](#create-a-new-dag)
@@ -94,7 +94,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - REST API Interface
 - Basic Authentication over HTTPS
 
-##**Usecase**
+## **Usecase**
 
 - **Data Pipeline Automation:** Schedule ETL tasks for data processing and centralization.
 - **Infrastructure Monitoring:** Periodically check infrastructure components with HTTP requests or SSH commands.
@@ -173,7 +173,7 @@ docker run \
 yohamta/dagu:latest
 ```
 
-### ViaGitHubReleasePage'></a>Via GitHub Release Page 
+### Via GitHub Releases Page
 
 Download the latest binary from the [Releases page](https://github.com/dagu-dev/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 
