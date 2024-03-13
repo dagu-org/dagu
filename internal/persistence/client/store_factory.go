@@ -1,6 +1,8 @@
 package client
 
 import (
+	"os"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
@@ -15,9 +17,22 @@ type dataStoreFactoryImpl struct {
 var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
 
 func NewDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
-	return &dataStoreFactoryImpl{
+	ds := &dataStoreFactoryImpl{
 		cfg: cfg,
 	}
+	_ = ds.InitDagDir()
+	return ds
+}
+
+func (f dataStoreFactoryImpl) InitDagDir() error {
+	_, err := os.Stat(f.cfg.DAGs)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(f.cfg.DAGs, 0755); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (f dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
