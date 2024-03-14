@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/spf13/viper"
@@ -51,7 +52,14 @@ func Get() *Config {
 	return instance
 }
 
+var (
+	mu sync.Mutex
+)
+
 func LoadConfig(userHomeDir string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	appHome := appHomeDir(userHomeDir)
 
 	viper.SetEnvPrefix("dagu")
