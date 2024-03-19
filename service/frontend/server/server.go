@@ -135,6 +135,9 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	if svr.tls != nil {
 		svr.server.TLSCertificate = flags.Filename(svr.tls.CertFile)
 		svr.server.TLSCertificateKey = flags.Filename(svr.tls.KeyFile)
+		svr.server.EnabledListeners = []string{"https"}
+		svr.server.TLSHost = svr.host
+		svr.server.TLSPort = svr.port
 	}
 
 	// Run the server
