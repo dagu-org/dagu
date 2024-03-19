@@ -83,7 +83,7 @@ go-lint:
 	@golangci-lint run ./...
 
 cert-dir:
-	@mkdir ./cert
+	@mkdir -p ./cert
 
 gencerts-ca:
 	@openssl req -x509 -newkey rsa:4096 \
