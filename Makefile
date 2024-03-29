@@ -28,7 +28,7 @@ test-clean:
 	@go clean -testcache
 	@go test ./...
 
-install-tools: install-protobuf install-nodemon install-swagger
+install-tools: install-nodemon install-swagger
 
 swagger: clean-swagger gen-swagger
 
@@ -119,12 +119,6 @@ gen-swagger:
 	@swagger generate server -t service/frontend --server-package=restapi --exclude-main -f ./swagger.yaml
 	@echo "Running go mod tidy"
 	@go mod tidy
-
-install-protobuf:
-	brew install protobuf
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 install-nodemon:
 	npm install -g nodemon
