@@ -17,7 +17,7 @@ import (
 
 func TestExecute(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "true",
 			OutputVariables: &utils.SyncMap{},
 		}}
@@ -27,7 +27,7 @@ func TestExecute(t *testing.T) {
 
 func TestError(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "false",
 			OutputVariables: &utils.SyncMap{},
 		}}
@@ -38,7 +38,7 @@ func TestError(t *testing.T) {
 
 func TestSignal(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &utils.SyncMap{},
@@ -58,7 +58,7 @@ func TestSignal(t *testing.T) {
 
 func TestSignalSpecified(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &utils.SyncMap{},
@@ -79,7 +79,7 @@ func TestSignalSpecified(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
@@ -95,7 +95,7 @@ func TestLog(t *testing.T) {
 
 func TestStdout(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
@@ -113,7 +113,7 @@ func TestStdout(t *testing.T) {
 
 func TestStderr(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command: "sh",
 			Script: `
 echo Stdout message >&1
@@ -139,7 +139,7 @@ echo Stderr message >&2
 
 func TestNode(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
 			OutputVariables: &utils.SyncMap{},
@@ -162,7 +162,7 @@ func TestNode(t *testing.T) {
 
 func TestOutput(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
 			OutputVariables: &utils.SyncMap{},
@@ -182,7 +182,7 @@ func TestOutput(t *testing.T) {
 
 	// Use the previous output in the subsequent step
 	n2 := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
 			OutputVariables: &utils.SyncMap{},
@@ -194,7 +194,7 @@ func TestOutput(t *testing.T) {
 
 	// Use the previous output in the subsequent step inside a script
 	n3 := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
@@ -225,7 +225,7 @@ func TestOutputJson(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			n := &Node{
-				Step: &dag.Step{
+				Step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
 					OutputVariables: &utils.SyncMap{},
@@ -287,7 +287,7 @@ func TestOutputSpecialchar(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			n := &Node{
-				Step: &dag.Step{
+				Step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_SPECIALCHAR_TEST",
 					OutputVariables: &utils.SyncMap{},
@@ -312,7 +312,7 @@ func TestOutputSpecialchar(t *testing.T) {
 
 func TestRunScript(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command: "sh",
 			Args:    []string{},
 			Script: `
@@ -343,7 +343,7 @@ func TestRunScript(t *testing.T) {
 
 func TestTeardown(t *testing.T) {
 	n := &Node{
-		Step: &dag.Step{
+		Step: dag.Step{
 			Command:         testCommand,
 			Args:            []string{},
 			OutputVariables: &utils.SyncMap{},

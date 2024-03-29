@@ -100,7 +100,7 @@ func TestSchedulerFailPartially(t *testing.T) {
 func TestSchedulerContinueOnFailure(t *testing.T) {
 	g, sc, err := testSchedule(t,
 		step("1", testCommand),
-		&dag.Step{
+		dag.Step{
 			Name:    "2",
 			Command: testCommandFail,
 			Depends: []string{"1"},
@@ -122,7 +122,7 @@ func TestSchedulerContinueOnFailure(t *testing.T) {
 func TestSchedulerAllowSkipped(t *testing.T) {
 	g, sc, err := testSchedule(t,
 		step("1", testCommand),
-		&dag.Step{
+		dag.Step{
 			Name:    "2",
 			Command: testCommand,
 			Depends: []string{"1"},
@@ -174,13 +174,13 @@ func TestSchedulerCancel(t *testing.T) {
 func TestSchedulerRetryFail(t *testing.T) {
 	cmd := path.Join(utils.MustGetwd(), "testdata/testfile.sh")
 	g, sc, err := testSchedule(t,
-		&dag.Step{
+		dag.Step{
 			Name:        "1",
 			Command:     cmd,
 			ContinueOn:  dag.ContinueOn{Failure: true},
 			RetryPolicy: &dag.RetryPolicy{Limit: 1},
 		},
-		&dag.Step{
+		dag.Step{
 			Name:        "2",
 			Command:     cmd,
 			Args:        []string{"flag"},
@@ -188,7 +188,7 @@ func TestSchedulerRetryFail(t *testing.T) {
 			RetryPolicy: &dag.RetryPolicy{Limit: 1},
 			Depends:     []string{"1"},
 		},
-		&dag.Step{
+		dag.Step{
 			Name:    "3",
 			Command: cmd,
 			Depends: []string{"2"},
@@ -219,7 +219,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	g, sc := newTestSchedule(
 		t, &Config{MaxActiveRuns: 2},
 		step("1", testCommand),
-		&dag.Step{
+		dag.Step{
 			Name:    "2",
 			Command: cmd,
 			Args:    []string{tmpFile},
@@ -275,7 +275,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 func TestStepPreCondition(t *testing.T) {
 	g, sc, err := testSchedule(t,
 		step("1", testCommand),
-		&dag.Step{
+		dag.Step{
 			Name:    "2",
 			Command: testCommand,
 			Depends: []string{"1"},
@@ -287,7 +287,7 @@ func TestStepPreCondition(t *testing.T) {
 			},
 		},
 		step("3", testCommand, "2"),
-		&dag.Step{
+		dag.Step{
 			Name:    "4",
 			Command: testCommand,
 			Preconditions: []*dag.Condition{
@@ -357,13 +357,11 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
-	g, _ := NewExecutionGraph(
-		&dag.Step{
-			Name:    "1",
-			Command: "sleep",
-			Args:    []string{"10"},
-		},
-	)
+	g, _ := NewExecutionGraph(dag.Step{
+		Name:    "1",
+		Command: "sleep",
+		Args:    []string{"10"},
+	})
 	sc := &Scheduler{Config: &Config{}}
 
 	go func() {
@@ -464,7 +462,7 @@ func TestSchedulerOnFailure(t *testing.T) {
 
 func TestRepeat(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&dag.Step{
+		dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
@@ -493,7 +491,7 @@ func TestRepeat(t *testing.T) {
 
 func TestRepeatFail(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&dag.Step{
+		dag.Step{
 			Name:    "1",
 			Command: testCommandFail,
 			RepeatPolicy: dag.RepeatPolicy{
@@ -514,7 +512,7 @@ func TestRepeatFail(t *testing.T) {
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&dag.Step{
+		dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
@@ -568,7 +566,7 @@ func TestSchedulerStatusText(t *testing.T) {
 
 func TestNodeSetupFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&dag.Step{
+		dag.Step{
 			Name:    "1",
 			Command: "sh",
 			Dir:     "~/",
@@ -587,7 +585,7 @@ func TestNodeSetupFailure(t *testing.T) {
 
 func TestNodeTeardownFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
-		&dag.Step{
+		dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
@@ -629,9 +627,9 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	require.Equal(t, "take-output", os.ExpandEnv("$TOOK_PREV_OUT"))
 }
 
-func step(name, command string, depends ...string) *dag.Step {
+func step(name, command string, depends ...string) dag.Step {
 	cmd, args := utils.SplitCommand(command, false)
-	return &dag.Step{
+	return dag.Step{
 		Name:    name,
 		Command: cmd,
 		Args:    args,
@@ -639,7 +637,7 @@ func step(name, command string, depends ...string) *dag.Step {
 	}
 }
 
-func testSchedule(t *testing.T, steps ...*dag.Step) (
+func testSchedule(t *testing.T, steps ...dag.Step) (
 	*ExecutionGraph, *Scheduler, error,
 ) {
 	t.Helper()
@@ -648,7 +646,7 @@ func testSchedule(t *testing.T, steps ...*dag.Step) (
 	return g, sc, sc.Schedule(context.Background(), g, nil)
 }
 
-func newTestSchedule(t *testing.T, cfg *Config, steps ...*dag.Step) (
+func newTestSchedule(t *testing.T, cfg *Config, steps ...dag.Step) (
 	*ExecutionGraph, *Scheduler,
 ) {
 	t.Helper()

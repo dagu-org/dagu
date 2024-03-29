@@ -51,7 +51,7 @@ func (s NodeStatus) String() string {
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {
-	*dag.Step
+	dag.Step
 	NodeState
 
 	id           int

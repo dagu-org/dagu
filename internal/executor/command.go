@@ -33,7 +33,7 @@ func (e *CommandExecutor) Kill(sig os.Signal) error {
 	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 
-func CreateCommandExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, step.Variables...)

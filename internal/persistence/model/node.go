@@ -9,7 +9,7 @@ import (
 )
 
 type Node struct {
-	*dag.Step  `json:"Step"`
+	dag.Step   `json:"Step"`
 	Log        string               `json:"Log"`
 	StartedAt  string               `json:"StartedAt"`
 	FinishedAt string               `json:"FinishedAt"`
@@ -37,7 +37,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	}
 }
 
-func FromNode(n scheduler.NodeState, step *dag.Step) *Node {
+func FromNode(n scheduler.NodeState, step dag.Step) *Node {
 	return &Node{
 		Step:       step,
 		Log:        n.Log,
@@ -73,15 +73,15 @@ func FromNodes(nodes []NodeStepPair) []*Node {
 	return ret
 }
 
-func FromSteps(steps []*dag.Step) []*Node {
+func FromSteps(steps []dag.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
-		ret = append(ret, nodeOrNil(s))
+		ret = append(ret, NewNode(s))
 	}
 	return ret
 }
 
-func NewNode(step *dag.Step) *Node {
+func NewNode(step dag.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",
@@ -89,11 +89,4 @@ func NewNode(step *dag.Step) *Node {
 		Status:     scheduler.NodeStatusNone,
 		StatusText: scheduler.NodeStatusNone.String(),
 	}
-}
-
-func nodeOrNil(s *dag.Step) *Node {
-	if s == nil {
-		return nil
-	}
-	return NewNode(s)
 }

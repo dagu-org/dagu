@@ -20,7 +20,7 @@ import (
 type DockerExecutor struct {
 	image           string
 	autoRemove      bool
-	step            *dag.Step
+	step            dag.Step
 	containerConfig *container.Config
 	hostConfig      *container.HostConfig
 	stdout          io.Writer
@@ -103,7 +103,7 @@ func (e *DockerExecutor) Run() error {
 	return nil
 }
 
-func CreateDockerExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateDockerExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
 	execCfg := step.ExecutorConfig

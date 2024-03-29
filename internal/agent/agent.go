@@ -177,22 +177,22 @@ func (a *Agent) init() {
 	}
 
 	if a.DAG.HandlerOn.Exit != nil {
-		onExit, _ := pb.ToPbStep(a.DAG.HandlerOn.Exit)
+		onExit, _ := pb.ToPbStep(*a.DAG.HandlerOn.Exit)
 		config.OnExit = onExit
 	}
 
 	if a.DAG.HandlerOn.Success != nil {
-		onSuccess, _ := pb.ToPbStep(a.DAG.HandlerOn.Success)
+		onSuccess, _ := pb.ToPbStep(*a.DAG.HandlerOn.Success)
 		config.OnSuccess = onSuccess
 	}
 
 	if a.DAG.HandlerOn.Failure != nil {
-		onFailure, _ := pb.ToPbStep(a.DAG.HandlerOn.Failure)
+		onFailure, _ := pb.ToPbStep(*a.DAG.HandlerOn.Failure)
 		config.OnFailure = onFailure
 	}
 
 	if a.DAG.HandlerOn.Cancel != nil {
-		onCancel, _ := pb.ToPbStep(a.DAG.HandlerOn.Cancel)
+		onCancel, _ := pb.ToPbStep(*a.DAG.HandlerOn.Cancel)
 		config.OnCancel = onCancel
 	}
 

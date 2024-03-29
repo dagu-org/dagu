@@ -366,19 +366,19 @@ func (sc *Scheduler) setup() (err error) {
 	sc.handlers = map[string]*Node{}
 	if sc.OnExit != nil {
 		onExit, _ := pb.ToDagStep(sc.OnExit)
-		sc.handlers[constants.OnExit] = &Node{Step: onExit}
+		sc.handlers[constants.OnExit] = &Node{Step: *onExit}
 	}
 	if sc.OnSuccess != nil {
 		onSuccess, _ := pb.ToDagStep(sc.OnSuccess)
-		sc.handlers[constants.OnSuccess] = &Node{Step: onSuccess}
+		sc.handlers[constants.OnSuccess] = &Node{Step: *onSuccess}
 	}
 	if sc.OnFailure != nil {
 		onFailure, _ := pb.ToDagStep(sc.OnFailure)
-		sc.handlers[constants.OnFailure] = &Node{Step: onFailure}
+		sc.handlers[constants.OnFailure] = &Node{Step: *onFailure}
 	}
 	if sc.OnCancel != nil {
 		onCancel, _ := pb.ToDagStep(sc.OnCancel)
-		sc.handlers[constants.OnCancel] = &Node{Step: onCancel}
+		sc.handlers[constants.OnCancel] = &Node{Step: *onCancel}
 	}
 	return
 }

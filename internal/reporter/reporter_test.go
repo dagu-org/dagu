@@ -47,7 +47,7 @@ func TestReporter(t *testing.T) {
 					From:   "from@mailer.com",
 					To:     "to@mailer.com",
 				},
-				Steps: []*dag.Step{
+				Steps: []dag.Step{
 					{
 						Name:    "test-step",
 						Command: "true",
@@ -57,7 +57,7 @@ func TestReporter(t *testing.T) {
 
 			nodes := []*model.Node{
 				{
-					Step: &dag.Step{
+					Step: dag.Step{
 						Name:    "test-step",
 						Command: "true",
 						Args:    []string{"param-x"},

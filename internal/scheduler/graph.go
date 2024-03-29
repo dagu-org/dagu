@@ -24,7 +24,7 @@ type ExecutionGraph struct {
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
-func NewExecutionGraph(steps ...*dag.Step) (*ExecutionGraph, error) {
+func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		outputVariables: &utils.SyncMap{},
 		dict:            make(map[int]*Node),

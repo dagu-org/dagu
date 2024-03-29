@@ -322,13 +322,13 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 }
 
 func buildSteps(def *configDefinition, d *DAG, options BuildDAGOptions) error {
-	ret := []*Step{}
+	var ret []Step
 	for _, stepDef := range def.Steps {
 		step, err := buildStep(d.Env, stepDef, def.Functions, options)
 		if err != nil {
 			return err
 		}
-		ret = append(ret, step)
+		ret = append(ret, *step)
 	}
 	d.Steps = ret
 

@@ -84,10 +84,7 @@ func ToDagStep(pbStep *Step) (*dag.Step, error) {
 	return dagStep, nil
 }
 
-func ToPbStep(dagStep *dag.Step) (*Step, error) {
-	if dagStep == nil {
-		return nil, fmt.Errorf("dagStep must not be nil")
-	}
+func ToPbStep(dagStep dag.Step) (*Step, error) {
 	step := &Step{
 		Name:         dagStep.Name,
 		Description:  dagStep.Description,

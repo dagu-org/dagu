@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/go-resty/resty/v2"
 	"github.com/mitchellh/mapstructure"
-	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 type HTTPExecutor struct {
@@ -69,7 +69,7 @@ func (e *HTTPExecutor) Run() error {
 	return nil
 }
 
-func CreateHTTPExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	var reqCfg HTTPConfig
 	if len(step.Script) > 0 {
 		if err := decodeHTTPConfigFromString(step.Script, &reqCfg); err != nil {

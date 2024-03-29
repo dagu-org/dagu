@@ -57,7 +57,7 @@ func (e *MailExecutor) Run() error {
 	return err
 }
 
-func CreateMailExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	var cfg MailConfig
 	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
 		return nil, err

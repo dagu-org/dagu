@@ -67,7 +67,7 @@ func (e *JqExecutor) Run() error {
 	return nil
 }
 
-func CreateJqExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateJqExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	var jqCfg JqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(step.ExecutorConfig.Config, &jqCfg); err != nil {

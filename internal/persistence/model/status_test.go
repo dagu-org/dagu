@@ -27,7 +27,7 @@ func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
 	d := &dag.DAG{
 		HandlerOn: dag.HandlerOn{},
-		Steps: []*dag.Step{
+		Steps: []dag.Step{
 			{
 				Name: "1", Description: "", Variables: []string{},
 				Dir: "dir", Command: "echo 1", Args: []string{},
