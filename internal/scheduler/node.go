@@ -104,7 +104,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	if n.scriptFile != nil {
-		args := []string{}
+		var args []string
 		args = append(args, n.Args...)
 		n.Args = append(args, n.scriptFile.Name())
 	}
@@ -236,6 +236,8 @@ func (n *Node) cancel() {
 }
 
 func (n *Node) setup(logDir string, requestId string) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	n.StartedAt = time.Now()
 	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		utils.ValidFilename(n.Name, "_"),
@@ -363,7 +365,7 @@ func (n *Node) incDoneCount() {
 	n.DoneCount++
 }
 
-var nextNodeId int = 1
+var nextNodeId = 1
 
 func (n *Node) init() {
 	if n.id != 0 {

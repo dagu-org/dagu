@@ -97,7 +97,7 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) Status() *model.Status {
 	scStatus := a.scheduler.Status(a.graph)
 	// TODO: fix this weird logic.
-	if scStatus == scheduler.StatusNone && !a.graph.StartedAt.IsZero() {
+	if scStatus == scheduler.StatusNone && a.graph.IsStarted() {
 		scStatus = scheduler.StatusRunning
 	}
 	status := model.NewStatus(
@@ -105,8 +105,8 @@ func (a *Agent) Status() *model.Status {
 		a.graph.Nodes(),
 		scStatus,
 		os.Getpid(),
-		&a.graph.StartedAt,
-		&a.graph.FinishedAt,
+		model.Time(a.graph.StartAt()),
+		model.Time(a.graph.FinishAt()),
 	)
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename

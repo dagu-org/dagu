@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -45,6 +46,7 @@ type Status struct {
 	FinishedAt string           `json:"FinishedAt"`
 	Log        string           `json:"Log"`
 	Params     string           `json:"Params"`
+	mu         sync.RWMutex
 }
 
 type StatusFile struct {
@@ -63,6 +65,10 @@ func StatusFromJson(s string) (*Status, error) {
 
 func NewStatusDefault(d *dag.DAG) *Status {
 	return NewStatus(d, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
+}
+
+func Time(t time.Time) *time.Time {
+	return &t
 }
 
 func NewStatus(
@@ -101,7 +107,7 @@ func nodesOrSteps(nodes []*scheduler.Node, steps []*dag.Step) []*Node {
 }
 
 func formatTime(val *time.Time) string {
-	if val == nil {
+	if val == nil || val.IsZero() {
 		return ""
 	}
 	return utils.FormatTime(*val)
@@ -115,6 +121,8 @@ func (st *Status) CorrectRunningStatus() {
 }
 
 func (st *Status) ToJson() ([]byte, error) {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
 	js, err := json.Marshal(st)
 	if err != nil {
 		return []byte{}, err

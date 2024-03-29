@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -12,13 +13,14 @@ import (
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	StartedAt       time.Time
-	FinishedAt      time.Time
+	startedAt       time.Time
+	finishedAt      time.Time
 	outputVariables *utils.SyncMap
 	dict            map[int]*Node
 	nodes           []*Node
 	from            map[int][]int
 	to              map[int][]int
+	mu              sync.RWMutex
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
@@ -81,10 +83,59 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 
 // Duration returns the duration of the execution.
 func (g *ExecutionGraph) Duration() time.Duration {
-	if g.FinishedAt.IsZero() {
-		return time.Since(g.StartedAt)
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if g.finishedAt.IsZero() {
+		return time.Since(g.startedAt)
 	}
-	return g.FinishedAt.Sub(g.StartedAt)
+	return g.finishedAt.Sub(g.startedAt)
+}
+
+func (g *ExecutionGraph) IsStarted() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return !g.startedAt.IsZero()
+}
+
+func (g *ExecutionGraph) IsFinished() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return !g.finishedAt.IsZero()
+}
+
+func (g *ExecutionGraph) StartAt() time.Time {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.startedAt
+}
+
+func (g *ExecutionGraph) IsRunning() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, node := range g.Nodes() {
+		if node.GetStatus() == NodeStatusRunning {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *ExecutionGraph) FinishAt() time.Time {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.finishedAt
+}
+
+func (g *ExecutionGraph) Finish() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.finishedAt = time.Now()
+}
+
+func (g *ExecutionGraph) Start() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.startedAt = time.Now()
 }
 
 // Nodes returns the nodes of the execution graph.

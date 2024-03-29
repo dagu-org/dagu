@@ -69,11 +69,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	if err := sc.setup(); err != nil {
 		return err
 	}
-	g.StartedAt = time.Now()
-
-	defer func() {
-		g.FinishedAt = time.Now()
-	}()
+	g.Start()
+	defer g.Finish()
 
 	var wg = sync.WaitGroup{}
 
@@ -246,7 +243,7 @@ func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool, al
 		defer func() {
 			done <- true
 		}()
-		for sc.isRunning(g) {
+		for g.IsRunning() {
 			time.Sleep(sc.pause)
 		}
 	}
@@ -265,16 +262,22 @@ func (sc *Scheduler) Status(g *ExecutionGraph) Status {
 	if sc.isCanceled() && !sc.isSucceed(g) {
 		return StatusCancel
 	}
-	if g.StartedAt.IsZero() {
+	if !g.IsStarted() {
 		return StatusNone
 	}
-	if sc.isRunning(g) {
+	if g.IsRunning() {
 		return StatusRunning
 	}
-	if sc.lastError != nil {
+	if sc.isError() {
 		return StatusError
 	}
 	return StatusSuccess
+}
+
+func (sc *Scheduler) isError() bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
+	return sc.lastError != nil
 }
 
 // HandlerNode returns the handler node with the given name.
@@ -402,15 +405,6 @@ func (sc *Scheduler) setCanceled() {
 	sc.canceled = 1
 }
 
-func (sc *Scheduler) isRunning(g *ExecutionGraph) bool {
-	for _, node := range g.Nodes() {
-		if node.GetStatus() == NodeStatusRunning {
-			return true
-		}
-	}
-	return false
-}
-
 func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
 	count := 0
 	for _, node := range g.Nodes() {
@@ -433,6 +427,8 @@ func (sc *Scheduler) isFinished(g *ExecutionGraph) bool {
 }
 
 func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
+	sc.mu.RLock()
+	defer sc.mu.RUnlock()
 	for _, node := range g.Nodes() {
 		if st := node.GetStatus(); st == NodeStatusSuccess || st == NodeStatusSkipped {
 			continue
