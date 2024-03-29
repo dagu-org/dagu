@@ -378,22 +378,6 @@ func (sc *Scheduler) setup() (err error) {
 	return
 }
 
-func handleError(node *Node) {
-	status := node.GetStatus()
-	if status != NodeStatusCancel && status != NodeStatusSuccess {
-		if node.step.RetryPolicy != nil && node.step.RetryPolicy.Limit > node.getRetryCount() {
-			log.Printf("%s failed but scheduled for retry", node.step.Name)
-			node.incRetryCount()
-			log.Printf("sleep %s for retry", node.step.RetryPolicy.Interval)
-			time.Sleep(node.step.RetryPolicy.Interval)
-			node.setRetriedAt(time.Now())
-			node.setStatus(NodeStatusNone)
-		} else {
-			node.setStatus(NodeStatusError)
-		}
-	}
-}
-
 func (sc *Scheduler) setCanceled() {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
