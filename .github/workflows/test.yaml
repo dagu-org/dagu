@@ -49,7 +49,7 @@ jobs:
 
       - name: Build
         run: |
-          mkdir ./bin && protoc -I=./ --go_out=./internal ./internal/proto/*.proto  && go build -o ./bin/dagu .
+          mkdir ./bin && go build -o ./bin/dagu .
 
       - name: Test
         run: |
