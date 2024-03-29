@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/pb"
 )
 
 type Status int
@@ -57,10 +56,10 @@ type Config struct {
 	MaxActiveRuns int
 	Delay         time.Duration
 	Dry           bool
-	OnExit        *pb.Step
-	OnSuccess     *pb.Step
-	OnFailure     *pb.Step
-	OnCancel      *pb.Step
+	OnExit        *dag.Step
+	OnSuccess     *dag.Step
+	OnFailure     *dag.Step
+	OnCancel      *dag.Step
 	RequestId     string
 }
 
@@ -365,20 +364,16 @@ func (sc *Scheduler) setup() (err error) {
 	}
 	sc.handlers = map[string]*Node{}
 	if sc.OnExit != nil {
-		onExit, _ := pb.ToDagStep(sc.OnExit)
-		sc.handlers[constants.OnExit] = &Node{Step: *onExit}
+		sc.handlers[constants.OnExit] = &Node{Step: *sc.OnExit}
 	}
 	if sc.OnSuccess != nil {
-		onSuccess, _ := pb.ToDagStep(sc.OnSuccess)
-		sc.handlers[constants.OnSuccess] = &Node{Step: *onSuccess}
+		sc.handlers[constants.OnSuccess] = &Node{Step: *sc.OnSuccess}
 	}
 	if sc.OnFailure != nil {
-		onFailure, _ := pb.ToDagStep(sc.OnFailure)
-		sc.handlers[constants.OnFailure] = &Node{Step: *onFailure}
+		sc.handlers[constants.OnFailure] = &Node{Step: *sc.OnFailure}
 	}
 	if sc.OnCancel != nil {
-		onCancel, _ := pb.ToDagStep(sc.OnCancel)
-		sc.handlers[constants.OnCancel] = &Node{Step: *onCancel}
+		sc.handlers[constants.OnCancel] = &Node{Step: *sc.OnCancel}
 	}
 	return
 }

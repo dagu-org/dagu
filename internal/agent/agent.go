@@ -20,7 +20,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/mailer"
-	"github.com/dagu-dev/dagu/internal/pb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/reporter"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -177,28 +176,21 @@ func (a *Agent) init() {
 	}
 
 	if a.DAG.HandlerOn.Exit != nil {
-		onExit, _ := pb.ToPbStep(*a.DAG.HandlerOn.Exit)
-		config.OnExit = onExit
+		config.OnExit = a.DAG.HandlerOn.Exit
 	}
 
 	if a.DAG.HandlerOn.Success != nil {
-		onSuccess, _ := pb.ToPbStep(*a.DAG.HandlerOn.Success)
-		config.OnSuccess = onSuccess
+		config.OnSuccess = a.DAG.HandlerOn.Success
 	}
 
 	if a.DAG.HandlerOn.Failure != nil {
-		onFailure, _ := pb.ToPbStep(*a.DAG.HandlerOn.Failure)
-		config.OnFailure = onFailure
+		config.OnFailure = a.DAG.HandlerOn.Failure
 	}
 
 	if a.DAG.HandlerOn.Cancel != nil {
-		onCancel, _ := pb.ToPbStep(*a.DAG.HandlerOn.Cancel)
-		config.OnCancel = onCancel
+		config.OnCancel = a.DAG.HandlerOn.Cancel
 	}
-
-	a.scheduler = &scheduler.Scheduler{
-		Config: config,
-	}
+	a.scheduler = &scheduler.Scheduler{Config: config}
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{

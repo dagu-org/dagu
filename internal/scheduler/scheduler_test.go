@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/pb"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/stretchr/testify/require"
 )
@@ -311,11 +310,9 @@ func TestStepPreCondition(t *testing.T) {
 }
 
 func TestSchedulerOnExit(t *testing.T) {
-	pbOnExit, _ := pb.ToPbStep(step("onExit", testCommand))
+	onExitStep := step("onExit", testCommand)
 	g, sc := newTestSchedule(t,
-		&Config{
-			OnExit: pbOnExit,
-		},
+		&Config{OnExit: &onExitStep},
 		step("1", testCommand),
 		step("2", testCommand, "1"),
 		step("3", testCommand),
@@ -329,16 +326,16 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.Equal(t, NodeStatusSuccess, nodes[1].GetStatus())
 	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 
-	onExit := sc.HandlerNode(constants.OnExit)
-	require.NotNil(t, onExit)
-	require.Equal(t, NodeStatusSuccess, onExit.GetStatus())
+	onExitNode := sc.HandlerNode(constants.OnExit)
+	require.NotNil(t, onExitNode)
+	require.Equal(t, NodeStatusSuccess, onExitNode.GetStatus())
 }
 
 func TestSchedulerOnExitOnFail(t *testing.T) {
-	pbOnExit, _ := pb.ToPbStep(step("onExit", testCommand))
+	onExitStep := step("onExit", testCommand)
 	g, sc := newTestSchedule(t,
 		&Config{
-			OnExit: pbOnExit,
+			OnExit: &onExitStep,
 		},
 		step("1", testCommandFail),
 		step("2", testCommand, "1"),
@@ -379,14 +376,14 @@ func TestSchedulerOnSignal(t *testing.T) {
 }
 
 func TestSchedulerOnCancel(t *testing.T) {
-	pbOnSuccess, _ := pb.ToPbStep(step("onSuccess", testCommand))
-	pbOnFailure, _ := pb.ToPbStep(step("onFailure", testCommand))
-	pbOnCancel, _ := pb.ToPbStep(step("onCancel", testCommand))
+	onSuccessStep := step("onSuccess", testCommand)
+	onFailureStep := step("onFailure", testCommand)
+	onCancelStep := step("onCancel", testCommand)
 	g, sc := newTestSchedule(t,
 		&Config{
-			OnSuccess: pbOnSuccess,
-			OnFailure: pbOnFailure,
-			OnCancel:  pbOnCancel,
+			OnSuccess: &onSuccessStep,
+			OnFailure: &onFailureStep,
+			OnCancel:  &onCancelStep,
 		},
 		step("1", testCommand),
 		step("2", "sleep 60", "1"),
@@ -412,14 +409,14 @@ func TestSchedulerOnCancel(t *testing.T) {
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
-	pbOnExit, _ := pb.ToPbStep(step("onExit", testCommand))
-	pbOnSuccess, _ := pb.ToPbStep(step("onSuccess", testCommand))
-	pbOnFailure, _ := pb.ToPbStep(step("onFailure", testCommand))
+	onExit := step("onExit", testCommand)
+	onSuccess := step("onSuccess", testCommand)
+	onFailure := step("onFailure", testCommand)
 	g, sc := newTestSchedule(t,
 		&Config{
-			OnExit:    pbOnExit,
-			OnSuccess: pbOnSuccess,
-			OnFailure: pbOnFailure,
+			OnExit:    &onExit,
+			OnSuccess: &onSuccess,
+			OnFailure: &onFailure,
 		},
 		step("1", testCommand),
 	)
@@ -435,16 +432,16 @@ func TestSchedulerOnSuccess(t *testing.T) {
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
-	pbOnExit, _ := pb.ToPbStep(step("onExit", testCommand))
-	pbOnSuccess, _ := pb.ToPbStep(step("onSuccess", testCommand))
-	pbOnFailure, _ := pb.ToPbStep(step("onFailure", testCommand))
-	pbOnCancel, _ := pb.ToPbStep(step("onCancel", testCommand))
+	onExit := step("onExit", testCommand)
+	onSuccess := step("onSuccess", testCommand)
+	onFailure := step("onFailure", testCommand)
+	onCancel := step("onCancel", testCommand)
 	g, sc := newTestSchedule(t,
 		&Config{
-			OnExit:    pbOnExit,
-			OnSuccess: pbOnSuccess,
-			OnFailure: pbOnFailure,
-			OnCancel:  pbOnCancel,
+			OnExit:    &onExit,
+			OnSuccess: &onSuccess,
+			OnFailure: &onFailure,
+			OnCancel:  &onCancel,
 		},
 		step("1", testCommandFail),
 	)

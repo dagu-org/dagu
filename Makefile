@@ -30,13 +30,11 @@ test-clean:
 
 install-tools: install-protobuf install-nodemon install-swagger
 
-proto: gen-pb
-
 swagger: clean-swagger gen-swagger
 
 certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
 
-build: build-ui build-dir gen-pb go-lint build-bin
+build: build-ui build-dir go-lint build-bin
 
 build-image:
 ifeq ($(VERSION),)
@@ -57,9 +55,6 @@ scheduler: go-lint build-dir build-bin
 	./bin/dagu scheduler
 
 ########## Tools ##########
-
-gen-pb:
-	protoc -I=$(SRC_DIR) --go_out=$(DST_DIR) $(SRC_DIR)/internal/proto/*.proto
 
 build-bin:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
