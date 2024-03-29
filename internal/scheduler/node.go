@@ -82,6 +82,12 @@ type NodeState struct {
 	Error      error
 }
 
+func (n *Node) finish() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.FinishedAt = time.Now()
+}
+
 func (n *Node) State() NodeState {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -140,42 +146,43 @@ func (n *Node) Execute(ctx context.Context) error {
 	if n.outputReader != nil && n.Output != "" {
 		utils.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
+		// TODO: Error handling
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
-		os.Setenv(n.Output, ret)
+		_ = os.Setenv(n.Output, ret)
 		n.OutputVariables.Store(n.Output, fmt.Sprintf("%s=%s", n.Output, ret))
 	}
 
 	return n.Error
 }
 
-// ReadStatus reads the status of a node.
-func (n *Node) ReadStatus() NodeStatus {
+// GetStatus reads the status of a node.
+func (n *Node) GetStatus() NodeStatus {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	ret := n.Status
 	return ret
 }
 
-func (n *Node) ReadRetryCount() int {
+func (n *Node) getRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.RetryCount
 }
 
-func (n *Node) SetRetriedAt(retriedAt time.Time) {
+func (n *Node) setRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.RetriedAt = retriedAt
 }
 
-func (n *Node) ReadRetriedAt() time.Time {
+func (n *Node) getRetriedAt() time.Time {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.RetriedAt
 }
 
-func (n *Node) ReadDoneCount() int {
+func (n *Node) getDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.DoneCount
@@ -185,10 +192,17 @@ func (n *Node) clearState() {
 	n.NodeState = NodeState{}
 }
 
-func (n *Node) updateStatus(status NodeStatus) {
+func (n *Node) setStatus(status NodeStatus) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.Status = status
+}
+
+func (n *Node) setErr(err error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.Error = err
+	n.Status = NodeStatus_Error
 }
 
 func (n *Node) signal(sig os.Signal, allowOverride bool) {

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExecute(t *testing.T) {
@@ -49,7 +49,7 @@ func TestSignal(t *testing.T) {
 		n.signal(syscall.SIGTERM, false)
 	}()
 
-	n.updateStatus(NodeStatus_Running)
+	n.setStatus(NodeStatus_Running)
 	err := n.Execute(context.Background())
 
 	require.Error(t, err)
@@ -70,7 +70,7 @@ func TestSignalSpecified(t *testing.T) {
 		n.signal(syscall.SIGTERM, true)
 	}()
 
-	n.updateStatus(NodeStatus_Running)
+	n.setStatus(NodeStatus_Running)
 	err := n.Execute(context.Background())
 
 	require.Error(t, err)
@@ -146,10 +146,10 @@ func TestNode(t *testing.T) {
 		},
 	}
 	n.incDoneCount()
-	require.Equal(t, 1, n.ReadDoneCount())
+	require.Equal(t, 1, n.getDoneCount())
 
 	n.incRetryCount()
-	require.Equal(t, 1, n.ReadRetryCount())
+	require.Equal(t, 1, n.getRetryCount())
 
 	n.id = 1
 	n.init()
