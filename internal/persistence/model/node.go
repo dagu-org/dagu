@@ -23,11 +23,7 @@ type Node struct {
 func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := utils.ParseTime(n.StartedAt)
 	finishedAt, _ := utils.ParseTime(n.FinishedAt)
-	var err error = nil
-	if n.Error != "" {
-		err = fmt.Errorf(n.Error)
-	}
-	ret := &scheduler.Node{
+	return &scheduler.Node{
 		Step: n.Step,
 		NodeState: scheduler.NodeState{
 			Status:     n.Status,
@@ -36,57 +32,68 @@ func (n *Node) ToNode() *scheduler.Node {
 			FinishedAt: finishedAt,
 			RetryCount: n.RetryCount,
 			DoneCount:  n.DoneCount,
-			Error:      err,
+			Error:      errFromText(n.Error),
 		},
 	}
-	return ret
 }
 
-func FromNode(n *scheduler.Node) *Node {
-	node := &Node{
-		Step:       n.Step,
+func FromNode(n scheduler.NodeState, step *dag.Step) *Node {
+	return &Node{
+		Step:       step,
 		Log:        n.Log,
 		StartedAt:  utils.FormatTime(n.StartedAt),
 		FinishedAt: utils.FormatTime(n.FinishedAt),
-		Status:     n.ReadStatus(),
-		StatusText: n.ReadStatus().String(),
-		RetryCount: n.ReadRetryCount(),
-		DoneCount:  n.ReadDoneCount(),
+		Status:     n.Status,
+		StatusText: n.Status.String(),
+		RetryCount: n.RetryCount,
+		DoneCount:  n.DoneCount,
+		Error:      errText(n.Error),
 	}
-	if n.Error != nil {
-		node.Error = n.Error.Error()
+}
+
+func errFromText(err string) error {
+	if err == "" {
+		return nil
 	}
-	return node
+	return fmt.Errorf(err)
+}
+
+func errText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func FromNodes(nodes []*scheduler.Node) []*Node {
-	ret := []*Node{}
+	var ret []*Node
 	for _, n := range nodes {
-		ret = append(ret, FromNode(n))
+		ret = append(ret, FromNode(n.State(), n.Step))
 	}
 	return ret
 }
 
 func FromSteps(steps []*dag.Step) []*Node {
-	ret := []*Node{}
+	var ret []*Node
 	for _, s := range steps {
-		ret = append(ret, fromStepWithDefValues(s))
+		ret = append(ret, nodeOrNil(s))
 	}
 	return ret
 }
 
-func fromStepWithDefValues(s *dag.Step) *Node {
-	if s == nil {
-		return nil
-	}
-	step := &Node{
-		Step:       s,
-		Log:        "",
+func NewNode(step *dag.Step) *Node {
+	return &Node{
+		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
 		Status:     scheduler.NodeStatus_None,
 		StatusText: scheduler.NodeStatus_None.String(),
-		RetryCount: 0,
 	}
-	return step
+}
+
+func nodeOrNil(s *dag.Step) *Node {
+	if s == nil {
+		return nil
+	}
+	return NewNode(s)
 }

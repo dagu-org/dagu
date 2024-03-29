@@ -17,9 +17,6 @@ var (
 		fx.Provide(logger.NewSlogLogger),
 		fx.Provide(client.NewDataStoreFactory),
 	)
-)
-
-var (
 	cfgInstance *config.Config = nil
 )
 

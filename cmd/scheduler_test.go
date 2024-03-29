@@ -13,7 +13,7 @@ func TestSchedulerCommand(t *testing.T) {
 	}()
 
 	go func() {
-		testRunCommand(t, createSchedulerCommand(), cmdTest{
+		testRunCommand(t, schedulerCmd(), cmdTest{
 			args:        []string{"scheduler"},
 			expectedOut: []string{"starting dagu scheduler"},
 		})

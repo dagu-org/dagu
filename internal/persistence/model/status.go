@@ -70,52 +70,52 @@ func NewStatus(
 	nodes []*scheduler.Node,
 	status scheduler.SchedulerStatus,
 	pid int,
-	startTime, endTIme *time.Time,
+	startTime, endTime *time.Time,
 ) *Status {
-	finish, start := time.Time{}, time.Time{}
-	if startTime != nil {
-		start = *startTime
-	}
-	if endTIme != nil {
-		finish = *endTIme
-	}
-	var models []*Node
-	if len(nodes) != 0 {
-		models = FromNodes(nodes)
-	} else {
-		models = FromSteps(d.Steps)
-	}
 	var onExit, onSuccess, onFailure, onCancel *Node
-	onExit = fromStepWithDefValues(d.HandlerOn.Exit)
-	onSuccess = fromStepWithDefValues(d.HandlerOn.Success)
-	onFailure = fromStepWithDefValues(d.HandlerOn.Failure)
-	onCancel = fromStepWithDefValues(d.HandlerOn.Cancel)
+	onExit = nodeOrNil(d.HandlerOn.Exit)
+	onSuccess = nodeOrNil(d.HandlerOn.Success)
+	onFailure = nodeOrNil(d.HandlerOn.Failure)
+	onCancel = nodeOrNil(d.HandlerOn.Cancel)
 	return &Status{
-		RequestId:  "",
 		Name:       d.Name,
 		Status:     status,
 		StatusText: status.String(),
 		Pid:        Pid(pid),
-		Nodes:      models,
+		Nodes:      nodesOrSteps(nodes, d.Steps),
 		OnExit:     onExit,
 		OnSuccess:  onSuccess,
 		OnFailure:  onFailure,
 		OnCancel:   onCancel,
-		StartedAt:  utils.FormatTime(start),
-		FinishedAt: utils.FormatTime(finish),
+		StartedAt:  formatTime(startTime),
+		FinishedAt: formatTime(endTime),
 		Params:     strings.Join(d.Params, " "),
 	}
 }
 
-func (sts *Status) CorrectRunningStatus() {
-	if sts.Status == scheduler.SchedulerStatus_Running {
-		sts.Status = scheduler.SchedulerStatus_Error
-		sts.StatusText = sts.Status.String()
+func nodesOrSteps(nodes []*scheduler.Node, steps []*dag.Step) []*Node {
+	if len(nodes) != 0 {
+		return FromNodes(nodes)
+	}
+	return FromSteps(steps)
+}
+
+func formatTime(val *time.Time) string {
+	if val == nil {
+		return ""
+	}
+	return utils.FormatTime(*val)
+}
+
+func (st *Status) CorrectRunningStatus() {
+	if st.Status == scheduler.SchedulerStatus_Running {
+		st.Status = scheduler.SchedulerStatus_Error
+		st.StatusText = st.Status.String()
 	}
 }
 
-func (sts *Status) ToJson() ([]byte, error) {
-	js, err := json.Marshal(sts)
+func (st *Status) ToJson() ([]byte, error) {
+	js, err := json.Marshal(st)
 	if err != nil {
 		return []byte{}, err
 	}

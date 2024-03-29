@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func createStatusCommand() *cobra.Command {
+func statusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status <DAG file>",
 		Short: "Display current status of the DAG",

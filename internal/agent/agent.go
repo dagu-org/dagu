@@ -93,13 +93,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	return a.run(ctx)
 }
 
-// Status returns the current status of the dags.
+// Status returns the current status of the DAG.
 func (a *Agent) Status() *model.Status {
 	scStatus := a.scheduler.Status(a.graph)
+	// TODO: fix this weird logic.
 	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {
 		scStatus = scheduler.SchedulerStatus_Running
 	}
-
 	status := model.NewStatus(
 		a.DAG,
 		a.graph.Nodes(),
@@ -111,16 +111,16 @@ func (a *Agent) Status() *model.Status {
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
-		status.OnExit = model.FromNode(node)
+		status.OnExit = model.FromNode(node.State(), node.Step)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node)
+		status.OnSuccess = model.FromNode(node.State(), node.Step)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
-		status.OnFailure = model.FromNode(node)
+		status.OnFailure = model.FromNode(node.State(), node.Step)
 	}
 	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
-		status.OnCancel = model.FromNode(node)
+		status.OnCancel = model.FromNode(node.State(), node.Step)
 	}
 	return status
 }

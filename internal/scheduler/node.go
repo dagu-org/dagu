@@ -82,6 +82,12 @@ type NodeState struct {
 	Error      error
 }
 
+func (n *Node) State() NodeState {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.NodeState
+}
+
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
 	ctx, fn := context.WithCancel(ctx)
