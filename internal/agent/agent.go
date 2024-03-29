@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -43,6 +44,7 @@ type Agent struct {
 	socketServer     *sock.Server
 	requestId        string
 	finished         uint32
+	lock             sync.RWMutex
 }
 
 func New(config *Config, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
@@ -64,11 +66,15 @@ type Config struct {
 
 // Run starts the dags execution.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := a.setupRequestId(); err != nil {
-		return err
-	}
-	a.init()
-	if err := a.setupGraph(); err != nil {
+	if err := func() error {
+		a.lock.Lock()
+		defer a.lock.Unlock()
+		if err := a.setupRequestId(); err != nil {
+			return err
+		}
+		a.init()
+		return a.setupGraph()
+	}(); err != nil {
 		return err
 	}
 	if err := a.checkPreconditions(); err != nil {
@@ -94,6 +100,9 @@ func (a *Agent) Run(ctx context.Context) error {
 
 // Status returns the current status of the DAG.
 func (a *Agent) Status() *model.Status {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
 	scStatus := a.scheduler.Status(a.graph)
 	// TODO: fix this weird logic.
 	if scStatus == scheduler.StatusNone && a.graph.IsStarted() {
