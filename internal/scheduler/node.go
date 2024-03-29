@@ -100,7 +100,29 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
+	cmd, err := n.setupExec(ctx)
+	if err != nil {
+		return err
+	}
+	n.Error = cmd.Run()
+
+	if n.outputReader != nil && n.step.Output != "" {
+		utils.LogErr("close pipe writer", n.outputWriter.Close())
+		var buf bytes.Buffer
+		// TODO: Error handling
+		_, _ = io.Copy(&buf, n.outputReader)
+		ret := strings.TrimSpace(buf.String())
+		_ = os.Setenv(n.step.Output, ret)
+		n.step.OutputVariables.Store(n.step.Output, fmt.Sprintf("%s=%s", n.step.Output, ret))
+	}
+
+	return n.Error
+}
+
+func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
+	defer n.mu.Unlock()
+
 	ctx, fn := context.WithCancel(ctx)
 	n.cancelFunc = fn
 
@@ -113,11 +135,10 @@ func (n *Node) Execute(ctx context.Context) error {
 		args = append(args, n.step.Args...)
 		n.step.Args = append(args, n.scriptFile.Name())
 	}
-	n.mu.Unlock()
 
 	cmd, err := executor.CreateExecutor(ctx, n.step)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	n.cmd = cmd
 
@@ -135,7 +156,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	if n.step.Output != "" {
 		var err error
 		if n.outputReader, n.outputWriter, err = os.Pipe(); err != nil {
-			return err
+			return nil, err
 		}
 		stdout = io.MultiWriter(stdout, n.outputWriter)
 	}
@@ -147,19 +168,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		cmd.SetStderr(stdout)
 	}
 
-	n.Error = cmd.Run()
-
-	if n.outputReader != nil && n.step.Output != "" {
-		utils.LogErr("close pipe writer", n.outputWriter.Close())
-		var buf bytes.Buffer
-		// TODO: Error handling
-		_, _ = io.Copy(&buf, n.outputReader)
-		ret := strings.TrimSpace(buf.String())
-		_ = os.Setenv(n.step.Output, ret)
-		n.step.OutputVariables.Store(n.step.Output, fmt.Sprintf("%s=%s", n.step.Output, ret))
-	}
-
-	return n.Error
+	return cmd, nil
 }
 
 func (n *Node) Step() dag.Step {
@@ -250,21 +259,20 @@ func (n *Node) cancel() {
 func (n *Node) setup(logDir string, requestId string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
 	n.StartedAt = time.Now()
 	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		utils.ValidFilename(n.step.Name, "_"),
 		n.StartedAt.Format("20060102.15:04:05.000"),
 		utils.TruncString(requestId, 8),
 	))
-	setup := []func() error{
+	for _, fn := range []func() error{
 		n.setupLog,
 		n.setupStdout,
 		n.setupStderr,
 		n.setupScript,
-	}
-	for _, fn := range setup {
-		err := fn()
-		if err != nil {
+	} {
+		if err := fn(); err != nil {
 			n.Error = err
 			return err
 		}
