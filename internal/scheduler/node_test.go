@@ -17,7 +17,7 @@ import (
 
 func TestExecute(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "true",
 			OutputVariables: &utils.SyncMap{},
 		}}
@@ -27,7 +27,7 @@ func TestExecute(t *testing.T) {
 
 func TestError(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "false",
 			OutputVariables: &utils.SyncMap{},
 		}}
@@ -38,7 +38,7 @@ func TestError(t *testing.T) {
 
 func TestSignal(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &utils.SyncMap{},
@@ -58,7 +58,7 @@ func TestSignal(t *testing.T) {
 
 func TestSignalSpecified(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &utils.SyncMap{},
@@ -79,7 +79,7 @@ func TestSignalSpecified(t *testing.T) {
 
 func TestLog(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
@@ -95,7 +95,7 @@ func TestLog(t *testing.T) {
 
 func TestStdout(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
@@ -106,14 +106,14 @@ func TestStdout(t *testing.T) {
 
 	runTestNode(t, n)
 
-	f := path.Join(os.Getenv("HOME"), n.Step.Stdout)
+	f := path.Join(os.Getenv("HOME"), n.step.Stdout)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "done\n", string(dat))
 }
 
 func TestStderr(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command: "sh",
 			Script: `
 echo Stdout message >&1
@@ -128,18 +128,18 @@ echo Stderr message >&2
 
 	runTestNode(t, n)
 
-	f := path.Join(os.Getenv("HOME"), n.Step.Stderr)
+	f := path.Join(os.Getenv("HOME"), n.step.Stderr)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "Stderr message\n", string(dat))
 
-	f = path.Join(os.Getenv("HOME"), n.Step.Stdout)
+	f = path.Join(os.Getenv("HOME"), n.step.Stdout)
 	dat, _ = os.ReadFile(f)
 	require.Equal(t, "Stdout message\n", string(dat))
 }
 
 func TestNode(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
 			OutputVariables: &utils.SyncMap{},
@@ -153,16 +153,16 @@ func TestNode(t *testing.T) {
 
 	n.id = 1
 	n.init()
-	require.Nil(t, n.Variables)
+	require.Nil(t, n.step.Variables)
 
 	n.id = 0
 	n.init()
-	require.Equal(t, n.Variables, []string{})
+	require.Equal(t, n.step.Variables, []string{})
 }
 
 func TestOutput(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
 			OutputVariables: &utils.SyncMap{},
@@ -182,7 +182,7 @@ func TestOutput(t *testing.T) {
 
 	// Use the previous output in the subsequent step
 	n2 := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
 			OutputVariables: &utils.SyncMap{},
@@ -194,7 +194,7 @@ func TestOutput(t *testing.T) {
 
 	// Use the previous output in the subsequent step inside a script
 	n3 := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
@@ -225,7 +225,7 @@ func TestOutputJson(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			n := &Node{
-				Step: dag.Step{
+				step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
 					OutputVariables: &utils.SyncMap{},
@@ -239,9 +239,9 @@ func TestOutputJson(t *testing.T) {
 
 			runTestNode(t, n)
 
-			require.Equal(t, test.WantArgs, len(n.Args))
+			require.Equal(t, test.WantArgs, len(n.step.Args))
 
-			v, _ := n.OutputVariables.Load("OUTPUT_JSON_TEST")
+			v, _ := n.step.OutputVariables.Load("OUTPUT_JSON_TEST")
 			require.Equal(t, fmt.Sprintf("OUTPUT_JSON_TEST=%s", test.Want), v)
 			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_JSON_TEST"))
 		})
@@ -287,7 +287,7 @@ func TestOutputSpecialchar(t *testing.T) {
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			n := &Node{
-				Step: dag.Step{
+				step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_SPECIALCHAR_TEST",
 					OutputVariables: &utils.SyncMap{},
@@ -301,9 +301,9 @@ func TestOutputSpecialchar(t *testing.T) {
 
 			runTestNode(t, n)
 
-			require.Equal(t, test.WantArgs, len(n.Args))
+			require.Equal(t, test.WantArgs, len(n.step.Args))
 
-			v, _ := n.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
+			v, _ := n.step.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
 			require.Equal(t, fmt.Sprintf("OUTPUT_SPECIALCHAR_TEST=%s", test.Want), v)
 			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_SPECIALCHAR_TEST"))
 		})
@@ -312,7 +312,7 @@ func TestOutputSpecialchar(t *testing.T) {
 
 func TestRunScript(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command: "sh",
 			Args:    []string{},
 			Script: `
@@ -329,7 +329,7 @@ func TestRunScript(t *testing.T) {
 
 	require.FileExists(t, n.logFile.Name())
 	b, _ := os.ReadFile(n.scriptFile.Name())
-	require.Equal(t, n.Script, string(b))
+	require.Equal(t, n.step.Script, string(b))
 
 	require.NoError(t, err)
 	err = n.Execute(context.Background())
@@ -343,7 +343,7 @@ func TestRunScript(t *testing.T) {
 
 func TestTeardown(t *testing.T) {
 	n := &Node{
-		Step: dag.Step{
+		step: dag.Step{
 			Command:         testCommand,
 			Args:            []string{},
 			OutputVariables: &utils.SyncMap{},

@@ -34,7 +34,7 @@ func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	}
 	for _, step := range steps {
 		step.OutputVariables = graph.outputVariables
-		node := &Node{Step: step}
+		node := &Node{step: step}
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -55,8 +55,8 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 		nodes:           []*Node{},
 	}
 	for _, node := range nodes {
-		if node.OutputVariables != nil {
-			node.OutputVariables.Range(func(key, value interface{}) bool {
+		if node.step.OutputVariables != nil {
+			node.step.OutputVariables.Range(func(key, value interface{}) bool {
 				k := key.(string)
 				v := value.(string)
 				graph.outputVariables.Store(key, value)
@@ -67,7 +67,7 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 				return true
 			})
 		}
-		node.OutputVariables = graph.outputVariables
+		node.step.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -154,17 +154,17 @@ func (g *ExecutionGraph) setupRetry() error {
 		dict[node.id] = node.Status
 		retry[node.id] = false
 	}
-	frontier := []int{}
+	var frontier []int
 	for _, node := range g.nodes {
-		if len(node.Depends) == 0 {
+		if len(node.step.Depends) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
 	for len(frontier) > 0 {
-		next := []int{}
+		var next []int
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError || dict[u] == NodeStatusCancel {
-				log.Printf("clear node state: %s", g.dict[u].Name)
+				log.Printf("clear node state: %s", g.dict[u].step.Name)
 				g.dict[u].clearState()
 				retry[u] = true
 			}
@@ -182,7 +182,7 @@ func (g *ExecutionGraph) setupRetry() error {
 
 func (g *ExecutionGraph) setup() error {
 	for _, node := range g.nodes {
-		for _, dep := range node.Depends {
+		for _, dep := range node.step.Depends {
 			depStep, err := g.findStep(dep)
 			if err != nil {
 				return err
@@ -241,7 +241,7 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	for _, n := range g.dict {
-		if n.Name == name {
+		if n.step.Name == name {
 			return n, nil
 		}
 	}

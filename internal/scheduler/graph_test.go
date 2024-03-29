@@ -26,49 +26,49 @@ func TestCycleDetection(t *testing.T) {
 func TestRetryExecution(t *testing.T) {
 	nodes := []*Node{
 		{
-			Step: dag.Step{Name: "1", Command: "true"},
+			step: dag.Step{Name: "1", Command: "true"},
 			NodeState: NodeState{
 				Status: NodeStatusSuccess,
 			},
 		},
 		{
-			Step: dag.Step{Name: "2", Command: "true", Depends: []string{"1"}},
+			step: dag.Step{Name: "2", Command: "true", Depends: []string{"1"}},
 			NodeState: NodeState{
 				Status: NodeStatusError,
 			},
 		},
 		{
-			Step: dag.Step{Name: "3", Command: "true", Depends: []string{"2"}},
+			step: dag.Step{Name: "3", Command: "true", Depends: []string{"2"}},
 			NodeState: NodeState{
 				Status: NodeStatusCancel,
 			},
 		},
 		{
-			Step: dag.Step{Name: "4", Command: "true", Depends: []string{}},
+			step: dag.Step{Name: "4", Command: "true", Depends: []string{}},
 			NodeState: NodeState{
 				Status: NodeStatusSkipped,
 			},
 		},
 		{
-			Step: dag.Step{Name: "5", Command: "true", Depends: []string{"4"}},
+			step: dag.Step{Name: "5", Command: "true", Depends: []string{"4"}},
 			NodeState: NodeState{
 				Status: NodeStatusError,
 			},
 		},
 		{
-			Step: dag.Step{Name: "6", Command: "true", Depends: []string{"5"}},
+			step: dag.Step{Name: "6", Command: "true", Depends: []string{"5"}},
 			NodeState: NodeState{
 				Status: NodeStatusSuccess,
 			},
 		},
 		{
-			Step: dag.Step{Name: "7", Command: "true", Depends: []string{"6"}},
+			step: dag.Step{Name: "7", Command: "true", Depends: []string{"6"}},
 			NodeState: NodeState{
 				Status: NodeStatusSkipped,
 			},
 		},
 		{
-			Step: dag.Step{Name: "8", Command: "true", Depends: []string{}},
+			step: dag.Step{Name: "8", Command: "true", Depends: []string{}},
 			NodeState: NodeState{
 				Status: NodeStatusSkipped,
 			},

@@ -103,7 +103,7 @@ func (a *Agent) Status() *model.Status {
 	for _, n := range a.graph.Nodes() {
 		ns = append(ns, model.NodeStepPair{
 			Node: n.State(),
-			Step: n.Step,
+			Step: n.Step(),
 		})
 	}
 	st, et := model.Time(a.graph.StartAt()), model.Time(a.graph.FinishAt())
@@ -111,16 +111,16 @@ func (a *Agent) Status() *model.Status {
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
-		status.OnExit = model.FromNode(node.State(), node.Step)
+		status.OnExit = model.FromNode(node.State(), node.Step())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node.State(), node.Step)
+		status.OnSuccess = model.FromNode(node.State(), node.Step())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
-		status.OnFailure = model.FromNode(node.State(), node.Step)
+		status.OnFailure = model.FromNode(node.State(), node.Step())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
-		status.OnCancel = model.FromNode(node.State(), node.Step)
+		status.OnCancel = model.FromNode(node.State(), node.Step())
 	}
 	return status
 }

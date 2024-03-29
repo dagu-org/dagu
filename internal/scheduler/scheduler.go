@@ -89,9 +89,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 				continue NodesIteration
 			}
 			// Check preconditions
-			if len(node.Preconditions) > 0 {
-				log.Printf("checking pre conditions for \"%s\"", node.Name)
-				if err := dag.EvalConditions(node.Preconditions); err != nil {
+			if len(node.step.Preconditions) > 0 {
+				log.Printf("checking pre conditions for \"%s\"", node.step.Name)
+				if err := dag.EvalConditions(node.step.Preconditions); err != nil {
 					log.Printf("%s", err.Error())
 					node.setStatus(NodeStatusSkipped)
 					node.Error = err
@@ -100,7 +100,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			}
 			wg.Add(1)
 
-			log.Printf("start running: %s", node.Name)
+			log.Printf("start running: %s", node.step.Name)
 			node.setStatus(NodeStatusRunning)
 			go func(node *Node) {
 				defer func() {
@@ -128,12 +128,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 							// do nothing
 						case sc.isCanceled():
 							sc.lastError = execErr
-						case node.RetryPolicy != nil && node.RetryPolicy.Limit > node.getRetryCount():
+						case node.step.RetryPolicy != nil && node.step.RetryPolicy.Limit > node.getRetryCount():
 							// retry
-							log.Printf("%s failed but scheduled for retry", node.Name)
+							log.Printf("%s failed but scheduled for retry", node.step.Name)
 							node.incRetryCount()
-							log.Printf("sleep %s for retry", node.RetryPolicy.Interval)
-							time.Sleep(node.RetryPolicy.Interval)
+							log.Printf("sleep %s for retry", node.step.RetryPolicy.Interval)
+							time.Sleep(node.step.RetryPolicy.Interval)
 							node.setRetriedAt(time.Now())
 							node.setStatus(NodeStatusNone)
 						default:
@@ -145,10 +145,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 					if node.GetStatus() != NodeStatusCancel {
 						node.incDoneCount()
 					}
-					if node.RepeatPolicy.Repeat {
-						if execErr == nil || node.ContinueOn.Failure {
+					if node.step.RepeatPolicy.Repeat {
+						if execErr == nil || node.step.ContinueOn.Failure {
 							if !sc.isCanceled() {
-								time.Sleep(node.RepeatPolicy.Interval)
+								time.Sleep(node.step.RepeatPolicy.Interval)
 								continue ExecRepeat
 							}
 						}
@@ -189,8 +189,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	handlers = append(handlers, constants.OnExit)
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
-			log.Printf("%s started", n.Name)
-			n.OutputVariables = g.outputVariables
+			log.Printf("%s started", n.step.Name)
+			n.step.OutputVariables = g.outputVariables
 			if err := sc.runHandlerNode(ctx, n); err != nil {
 				sc.lastError = err
 			}
@@ -231,7 +231,7 @@ func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool, al
 		sc.setCanceled()
 	}
 	for _, node := range g.Nodes() {
-		if node.RepeatPolicy.Repeat {
+		if node.step.RepeatPolicy.Repeat {
 			// for a repetitive task, we'll wait for the job to finish
 			// until time reaches max wait time
 		} else {
@@ -302,13 +302,13 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 		case NodeStatusSuccess:
 			continue
 		case NodeStatusError:
-			if !n.ContinueOn.Failure {
+			if !n.step.ContinueOn.Failure {
 				ready = false
 				node.setStatus(NodeStatusCancel)
 				node.Error = fmt.Errorf("upstream failed")
 			}
 		case NodeStatusSkipped:
-			if !n.ContinueOn.Skipped {
+			if !n.step.ContinueOn.Skipped {
 				ready = false
 				node.setStatus(NodeStatusSkipped)
 				node.Error = fmt.Errorf("upstream skipped")
@@ -364,16 +364,16 @@ func (sc *Scheduler) setup() (err error) {
 	}
 	sc.handlers = map[string]*Node{}
 	if sc.OnExit != nil {
-		sc.handlers[constants.OnExit] = &Node{Step: *sc.OnExit}
+		sc.handlers[constants.OnExit] = &Node{step: *sc.OnExit}
 	}
 	if sc.OnSuccess != nil {
-		sc.handlers[constants.OnSuccess] = &Node{Step: *sc.OnSuccess}
+		sc.handlers[constants.OnSuccess] = &Node{step: *sc.OnSuccess}
 	}
 	if sc.OnFailure != nil {
-		sc.handlers[constants.OnFailure] = &Node{Step: *sc.OnFailure}
+		sc.handlers[constants.OnFailure] = &Node{step: *sc.OnFailure}
 	}
 	if sc.OnCancel != nil {
-		sc.handlers[constants.OnCancel] = &Node{Step: *sc.OnCancel}
+		sc.handlers[constants.OnCancel] = &Node{step: *sc.OnCancel}
 	}
 	return
 }
@@ -381,11 +381,11 @@ func (sc *Scheduler) setup() (err error) {
 func handleError(node *Node) {
 	status := node.GetStatus()
 	if status != NodeStatusCancel && status != NodeStatusSuccess {
-		if node.RetryPolicy != nil && node.RetryPolicy.Limit > node.getRetryCount() {
-			log.Printf("%s failed but scheduled for retry", node.Name)
+		if node.step.RetryPolicy != nil && node.step.RetryPolicy.Limit > node.getRetryCount() {
+			log.Printf("%s failed but scheduled for retry", node.step.Name)
 			node.incRetryCount()
-			log.Printf("sleep %s for retry", node.RetryPolicy.Interval)
-			time.Sleep(node.RetryPolicy.Interval)
+			log.Printf("sleep %s for retry", node.step.RetryPolicy.Interval)
+			time.Sleep(node.step.RetryPolicy.Interval)
 			node.setRetriedAt(time.Now())
 			node.setStatus(NodeStatusNone)
 		} else {

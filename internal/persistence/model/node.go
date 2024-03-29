@@ -23,18 +23,15 @@ type Node struct {
 func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := utils.ParseTime(n.StartedAt)
 	finishedAt, _ := utils.ParseTime(n.FinishedAt)
-	return &scheduler.Node{
-		Step: n.Step,
-		NodeState: scheduler.NodeState{
-			Status:     n.Status,
-			Log:        n.Log,
-			StartedAt:  startedAt,
-			FinishedAt: finishedAt,
-			RetryCount: n.RetryCount,
-			DoneCount:  n.DoneCount,
-			Error:      errFromText(n.Error),
-		},
-	}
+	return scheduler.NewNode(n.Step, scheduler.NodeState{
+		Status:     n.Status,
+		Log:        n.Log,
+		StartedAt:  startedAt,
+		FinishedAt: finishedAt,
+		RetryCount: n.RetryCount,
+		DoneCount:  n.DoneCount,
+		Error:      errFromText(n.Error),
+	})
 }
 
 func FromNode(n scheduler.NodeState, step dag.Step) *Node {

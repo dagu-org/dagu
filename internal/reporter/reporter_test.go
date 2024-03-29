@@ -18,17 +18,16 @@ import (
 )
 
 func TestReporter(t *testing.T) {
-
 	for scenario, fn := range map[string]func(
 		t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node,
 	){
-		"create errormail":   testErrorMail,
-		"no errormail":       testNoErrorMail,
-		"create successmail": testSuccessMail,
-		"create summary":     testRenderSummary,
-		"create node list":   testRenderTable,
-		"report summary":     testReportSummary,
-		"report step":        testReportStep,
+		"create error mail":   testErrorMail,
+		"no error mail":       testNoErrorMail,
+		"create success mail": testSuccessMail,
+		"create summary":      testRenderSummary,
+		"create node list":    testRenderTable,
+		"report summary":      testReportSummary,
+		"report step":         testReportStep,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
@@ -171,16 +170,11 @@ func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node)
 			Status: scheduler.StatusRunning,
 			Nodes:  nodes,
 		},
-		&scheduler.Node{
-			Step: d.Steps[0],
-			NodeState: scheduler.NodeState{
-				Status: scheduler.NodeStatusError,
-			},
-		},
+		scheduler.NewNode(d.Steps[0], scheduler.NodeState{Status: scheduler.NodeStatusError}),
 	)
 	require.NoError(t, err)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
 
 	var buf bytes.Buffer

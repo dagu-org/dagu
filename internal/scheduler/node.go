@@ -49,9 +49,13 @@ func (s NodeStatus) String() string {
 	}
 }
 
+func NewNode(step dag.Step, state NodeState) *Node {
+	return &Node{step: step, NodeState: state}
+}
+
 // Node is a node in a DAG. It executes a command.
 type Node struct {
-	dag.Step
+	step dag.Step
 	NodeState
 
 	id           int
@@ -96,20 +100,22 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
+	n.mu.Lock()
 	ctx, fn := context.WithCancel(ctx)
 	n.cancelFunc = fn
 
-	if n.CmdWithArgs != "" {
-		n.Command, n.Args = utils.SplitCommand(n.CmdWithArgs, true)
+	if n.step.CmdWithArgs != "" {
+		n.step.Command, n.step.Args = utils.SplitCommand(n.step.CmdWithArgs, true)
 	}
 
 	if n.scriptFile != nil {
 		var args []string
-		args = append(args, n.Args...)
-		n.Args = append(args, n.scriptFile.Name())
+		args = append(args, n.step.Args...)
+		n.step.Args = append(args, n.scriptFile.Name())
 	}
+	n.mu.Unlock()
 
-	cmd, err := executor.CreateExecutor(ctx, n.Step)
+	cmd, err := executor.CreateExecutor(ctx, n.step)
 	if err != nil {
 		return err
 	}
@@ -126,7 +132,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
 	}
 
-	if n.Output != "" {
+	if n.step.Output != "" {
 		var err error
 		if n.outputReader, n.outputWriter, err = os.Pipe(); err != nil {
 			return err
@@ -143,17 +149,23 @@ func (n *Node) Execute(ctx context.Context) error {
 
 	n.Error = cmd.Run()
 
-	if n.outputReader != nil && n.Output != "" {
+	if n.outputReader != nil && n.step.Output != "" {
 		utils.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
 		// TODO: Error handling
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
-		_ = os.Setenv(n.Output, ret)
-		n.OutputVariables.Store(n.Output, fmt.Sprintf("%s=%s", n.Output, ret))
+		_ = os.Setenv(n.step.Output, ret)
+		n.step.OutputVariables.Store(n.step.Output, fmt.Sprintf("%s=%s", n.step.Output, ret))
 	}
 
 	return n.Error
+}
+
+func (n *Node) Step() dag.Step {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.step
 }
 
 // GetStatus reads the status of a node.
@@ -211,10 +223,10 @@ func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	status := n.Status
 	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
-		if allowOverride && n.Step.SignalOnStop != "" {
-			sigsig = unix.SignalNum(n.Step.SignalOnStop)
+		if allowOverride && n.step.SignalOnStop != "" {
+			sigsig = unix.SignalNum(n.step.SignalOnStop)
 		}
-		log.Printf("Sending %s signal to %s", sigsig, n.Name)
+		log.Printf("Sending %s signal to %s", sigsig, n.step.Name)
 		utils.LogErr("sending signal", n.cmd.Kill(sigsig))
 	}
 	if status == NodeStatusRunning {
@@ -230,7 +242,7 @@ func (n *Node) cancel() {
 		n.Status = NodeStatusCancel
 	}
 	if n.cancelFunc != nil {
-		log.Printf("canceling node: %s", n.Step.Name)
+		log.Printf("canceling node: %s", n.step.Name)
 		n.cancelFunc()
 	}
 }
@@ -240,7 +252,7 @@ func (n *Node) setup(logDir string, requestId string) error {
 	defer n.mu.Unlock()
 	n.StartedAt = time.Now()
 	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
-		utils.ValidFilename(n.Name, "_"),
+		utils.ValidFilename(n.step.Name, "_"),
 		n.StartedAt.Format("20060102.15:04:05.000"),
 		utils.TruncString(requestId, 8),
 	))
@@ -261,9 +273,9 @@ func (n *Node) setup(logDir string, requestId string) error {
 }
 
 func (n *Node) setupScript() (err error) {
-	if n.Script != "" {
-		n.scriptFile, _ = os.CreateTemp(n.Dir, "dagu_script-")
-		if _, err = n.scriptFile.WriteString(n.Script); err != nil {
+	if n.step.Script != "" {
+		n.scriptFile, _ = os.CreateTemp(n.step.Dir, "dagu_script-")
+		if _, err = n.scriptFile.WriteString(n.step.Script); err != nil {
 			return
 		}
 		defer func() {
@@ -275,10 +287,10 @@ func (n *Node) setupScript() (err error) {
 }
 
 func (n *Node) setupStdout() error {
-	if n.Stdout != "" {
-		f := n.Stdout
+	if n.step.Stdout != "" {
+		f := n.step.Stdout
 		if !filepath.IsAbs(f) {
-			f = filepath.Join(n.Dir, f)
+			f = filepath.Join(n.step.Dir, f)
 		}
 		var err error
 		n.stdoutFile, err = utils.OpenOrCreateFile(f)
@@ -292,10 +304,10 @@ func (n *Node) setupStdout() error {
 }
 
 func (n *Node) setupStderr() error {
-	if n.Stderr != "" {
-		f := n.Stderr
+	if n.step.Stderr != "" {
+		f := n.step.Stderr
 		if !filepath.IsAbs(f) {
-			f = filepath.Join(n.Dir, f)
+			f = filepath.Join(n.step.Dir, f)
 		}
 		var err error
 		n.stderrFile, err = utils.OpenOrCreateFile(f)
@@ -373,13 +385,13 @@ func (n *Node) init() {
 	}
 	n.id = nextNodeId
 	nextNodeId++
-	if n.Variables == nil {
-		n.Variables = []string{}
+	if n.step.Variables == nil {
+		n.step.Variables = []string{}
 	}
-	if n.Variables == nil {
-		n.Variables = []string{}
+	if n.step.Variables == nil {
+		n.step.Variables = []string{}
 	}
-	if n.Preconditions == nil {
-		n.Preconditions = []*dag.Condition{}
+	if n.step.Preconditions == nil {
+		n.step.Preconditions = []*dag.Condition{}
 	}
 }

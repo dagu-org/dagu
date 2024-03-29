@@ -32,9 +32,9 @@ type Mailer interface {
 func (rp *Reporter) ReportStep(d *dag.DAG, status *model.Status, node *scheduler.Node) error {
 	st := node.GetStatus()
 	if st != scheduler.NodeStatusNone {
-		log.Printf("%s %s", node.Name, status.StatusText)
+		log.Printf("%s %s", node.Step().Name, status.StatusText)
 	}
-	if st == scheduler.NodeStatusError && node.MailOnError {
+	if st == scheduler.NodeStatusError && node.Step().MailOnError {
 		return rp.Mailer.SendMail(
 			d.ErrorMail.From,
 			[]string{d.ErrorMail.To},
