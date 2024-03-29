@@ -216,7 +216,7 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 	} else {
 		ss, _ := model.StatusFromJson(res)
 		if ss != nil && ss.RequestId == status.RequestId &&
-			ss.Status == scheduler.SchedulerStatus_Running {
+			ss.Status == scheduler.StatusRunning {
 			return fmt.Errorf("the DAG is running")
 		}
 	}

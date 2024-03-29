@@ -79,7 +79,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
 				status := model.NewStatus(
 					ds.DAG, []*scheduler.Node{},
-					scheduler.SchedulerStatus_Running, 0, nil, nil)
+					scheduler.StatusRunning, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJson()
 				_, _ = w.Write(b)
@@ -94,13 +94,13 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 	st, err := e.GetCurrentStatus(ds.DAG)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Running, st.Status)
+	require.Equal(t, scheduler.StatusRunning, st.Status)
 
 	_ = socketServer.Shutdown()
 
 	st, err = e.GetCurrentStatus(ds.DAG)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_None, st.Status)
+	require.Equal(t, scheduler.StatusNone, st.Status)
 }
 
 func TestUpdateStatus(t *testing.T) {
@@ -124,7 +124,7 @@ func TestUpdateStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	st := testNewStatus(d.DAG, requestId,
-		scheduler.SchedulerStatus_Success, scheduler.NodeStatus_Success)
+		scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
 	err = hs.Write(st)
 	require.NoError(t, err)
@@ -134,9 +134,9 @@ func TestUpdateStatus(t *testing.T) {
 
 	st, err = e.GetStatusByRequestId(d.DAG, requestId)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.NodeStatus_Success, st.Nodes[0].Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, st.Nodes[0].Status)
 
-	newStatus := scheduler.NodeStatus_Error
+	newStatus := scheduler.NodeStatusError
 	st.Nodes[0].Status = newStatus
 
 	err = e.UpdateStatus(d.DAG, st)
@@ -164,7 +164,7 @@ func TestUpdateStatusError(t *testing.T) {
 	require.NoError(t, err)
 
 	status := testNewStatus(d.DAG, requestId,
-		scheduler.SchedulerStatus_Error, scheduler.NodeStatus_Error)
+		scheduler.StatusError, scheduler.NodeStatusError)
 
 	err = e.UpdateStatus(d.DAG, status)
 	require.Error(t, err)
@@ -190,7 +190,7 @@ func TestStart(t *testing.T) {
 
 	status, err := e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.StatusError, status.Status)
 }
 
 func TestStop(t *testing.T) {
@@ -208,14 +208,14 @@ func TestStop(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		st, _ := e.GetCurrentStatus(d.DAG)
-		return st.Status == scheduler.SchedulerStatus_Running
+		return st.Status == scheduler.StatusRunning
 	}, time.Millisecond*1500, time.Millisecond*100)
 
 	_ = e.Stop(d.DAG)
 
 	require.Eventually(t, func() bool {
 		st, _ := e.GetLatestStatus(d.DAG)
-		return st.Status == scheduler.SchedulerStatus_Cancel
+		return st.Status == scheduler.StatusCancel
 	}, time.Millisecond*1500, time.Millisecond*100)
 }
 
@@ -235,7 +235,7 @@ func TestRestart(t *testing.T) {
 
 	status, err := e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 }
 
 func TestRetry(t *testing.T) {
@@ -254,7 +254,7 @@ func TestRetry(t *testing.T) {
 
 	status, err := e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 
 	requestId := status.RequestId
 	params := status.Params
@@ -264,7 +264,7 @@ func TestRetry(t *testing.T) {
 	status, err = e.GetLatestStatus(d.DAG)
 	require.NoError(t, err)
 
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 	require.Equal(t, params, status.Params)
 
 	statusByRequestId, err := e.GetStatusByRequestId(d.DAG, status.RequestId)
@@ -429,7 +429,7 @@ func testDAG(name string) string {
 	return path.Join(testdataDir, name)
 }
 
-func testNewStatus(d *dag.DAG, reqId string, status scheduler.SchedulerStatus, nodeStatus scheduler.NodeStatus) *model.Status {
+func testNewStatus(d *dag.DAG, reqId string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
 	now := time.Now()
 	ret := model.NewStatus(
 		d, []*scheduler.Node{{NodeState: scheduler.NodeState{Status: nodeStatus}}},

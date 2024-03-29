@@ -101,7 +101,7 @@ func testDAGFile(name string) string {
 	return path.Join(d, name)
 }
 
-func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.SchedulerStatus) {
+func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.Status) {
 	t.Helper()
 
 	d, err := loadDAG(dagFile, "")
@@ -114,7 +114,7 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 	}, time.Millisecond*5000, time.Millisecond*50)
 }
 
-func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag string, expected scheduler.SchedulerStatus) {
+func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag string, expected scheduler.Status) {
 	t.Helper()
 	require.Eventually(t, func() bool {
 		// TODO: do not use history store directly.

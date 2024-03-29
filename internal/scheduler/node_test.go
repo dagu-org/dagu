@@ -49,11 +49,11 @@ func TestSignal(t *testing.T) {
 		n.signal(syscall.SIGTERM, false)
 	}()
 
-	n.setStatus(NodeStatus_Running)
+	n.setStatus(NodeStatusRunning)
 	err := n.Execute(context.Background())
 
 	require.Error(t, err)
-	require.Equal(t, n.Status, NodeStatus_Cancel)
+	require.Equal(t, n.Status, NodeStatusCancel)
 }
 
 func TestSignalSpecified(t *testing.T) {
@@ -70,11 +70,11 @@ func TestSignalSpecified(t *testing.T) {
 		n.signal(syscall.SIGTERM, true)
 	}()
 
-	n.setStatus(NodeStatus_Running)
+	n.setStatus(NodeStatusRunning)
 	err := n.Execute(context.Background())
 
 	require.Error(t, err)
-	require.Equal(t, n.Status, NodeStatus_Cancel)
+	require.Equal(t, n.Status, NodeStatusCancel)
 }
 
 func TestLog(t *testing.T) {

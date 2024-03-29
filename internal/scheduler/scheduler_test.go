@@ -54,11 +54,11 @@ func TestScheduler(t *testing.T) {
 	}()
 	require.Error(t, sc.Schedule(context.Background(), g, done))
 	require.Equal(t, counter, 3)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Error, nodes[2].GetStatus())
-	require.Equal(t, NodeStatus_Cancel, nodes[3].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusCancel, nodes[3].GetStatus())
 }
 
 func TestSchedulerParallel(t *testing.T) {
@@ -72,12 +72,12 @@ func TestSchedulerParallel(t *testing.T) {
 	)
 	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), StatusSuccess)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 }
 
 func TestSchedulerFailPartially(t *testing.T) {
@@ -88,13 +88,13 @@ func TestSchedulerFailPartially(t *testing.T) {
 		step("4", testCommand, "3"),
 	)
 	require.Error(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Error, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[3].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[3].GetStatus())
 }
 
 func TestSchedulerContinueOnFailure(t *testing.T) {
@@ -111,12 +111,12 @@ func TestSchedulerContinueOnFailure(t *testing.T) {
 		step("3", testCommand, "2"),
 	)
 	require.Error(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Error, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 }
 
 func TestSchedulerAllowSkipped(t *testing.T) {
@@ -137,12 +137,12 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 		step("3", testCommand, "2"),
 	)
 	require.NoError(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), StatusSuccess)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Skipped, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSkipped, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 }
 
 func TestSchedulerCancel(t *testing.T) {
@@ -162,13 +162,13 @@ func TestSchedulerCancel(t *testing.T) {
 	_ = sc.Schedule(context.Background(), g, nil)
 
 	require.Eventually(t, func() bool {
-		return sc.Status(g) == SchedulerStatus_Cancel
+		return sc.Status(g) == StatusCancel
 	}, time.Second, time.Millisecond*10)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].Status)
-	require.Equal(t, NodeStatus_Cancel, nodes[1].Status)
-	require.Equal(t, NodeStatus_None, nodes[2].Status)
+	require.Equal(t, NodeStatusSuccess, nodes[0].Status)
+	require.Equal(t, NodeStatusCancel, nodes[1].Status)
+	require.Equal(t, NodeStatusNone, nodes[2].Status)
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
@@ -196,13 +196,13 @@ func TestSchedulerRetryFail(t *testing.T) {
 		step("4", cmd, "3"),
 	)
 	require.True(t, err != nil)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Error, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Error, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Error, nodes[2].GetStatus())
-	require.Equal(t, NodeStatus_Cancel, nodes[3].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusCancel, nodes[3].GetStatus())
 
 	require.Equal(t, nodes[0].getRetryCount(), 1)
 	require.Equal(t, nodes[1].getRetryCount(), 1)
@@ -246,7 +246,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 
 		// scheduled for retry
 		require.Equal(t, 1, nodes[1].getRetryCount())
-		require.Equal(t, NodeStatus_Running, nodes[1].GetStatus())
+		require.Equal(t, NodeStatusRunning, nodes[1].GetStatus())
 		startedAt := nodes[1].StartedAt
 
 		// wait for retry
@@ -260,12 +260,12 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	err = sc.Schedule(context.Background(), g, nil)
 
 	require.NoError(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), StatusSuccess)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 
 	if nodes[1].getRetryCount() == 0 {
 		t.Error("step 2 Should be retried")
@@ -300,14 +300,14 @@ func TestStepPreCondition(t *testing.T) {
 		step("5", testCommand, "4"),
 	)
 	require.NoError(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
+	require.Equal(t, sc.Status(g), StatusSuccess)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Skipped, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Skipped, nodes[2].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[3].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[4].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSkipped, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSkipped, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[3].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[4].GetStatus())
 }
 
 func TestSchedulerOnExit(t *testing.T) {
@@ -325,13 +325,13 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 
 	onExit := sc.HandlerNode(constants.OnExit)
 	require.NotNil(t, onExit)
-	require.Equal(t, NodeStatus_Success, onExit.GetStatus())
+	require.Equal(t, NodeStatusSuccess, onExit.GetStatus())
 }
 
 func TestSchedulerOnExitOnFail(t *testing.T) {
@@ -349,11 +349,11 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Error, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Cancel, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[2].GetStatus())
+	require.Equal(t, NodeStatusError, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusCancel, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[2].GetStatus())
 
-	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).GetStatus())
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).GetStatus())
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
@@ -376,8 +376,8 @@ func TestSchedulerOnSignal(t *testing.T) {
 
 	nodes := g.Nodes()
 
-	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
-	require.Equal(t, NodeStatus_Cancel, nodes[0].Status)
+	require.Equal(t, sc.Status(g), StatusCancel)
+	require.Equal(t, NodeStatusCancel, nodes[0].Status)
 }
 
 func TestSchedulerOnCancel(t *testing.T) {
@@ -403,14 +403,14 @@ func TestSchedulerOnCancel(t *testing.T) {
 	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 	<-done // Wait for canceling finished
-	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
+	require.Equal(t, sc.Status(g), StatusCancel)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Cancel, nodes[1].GetStatus())
-	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnSuccess).GetStatus())
-	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnFailure).GetStatus())
-	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnCancel).GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusCancel, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnSuccess).GetStatus())
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnFailure).GetStatus())
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnCancel).GetStatus())
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
@@ -430,10 +430,10 @@ func TestSchedulerOnSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).GetStatus())
-	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnSuccess).GetStatus())
-	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnFailure).GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).GetStatus())
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnSuccess).GetStatus())
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnFailure).GetStatus())
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
@@ -455,11 +455,11 @@ func TestSchedulerOnFailure(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Error, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnExit).GetStatus())
-	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnSuccess).GetStatus())
-	require.Equal(t, NodeStatus_Success, sc.HandlerNode(constants.OnFailure).GetStatus())
-	require.Equal(t, NodeStatus_None, sc.HandlerNode(constants.OnCancel).GetStatus())
+	require.Equal(t, NodeStatusError, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).GetStatus())
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnSuccess).GetStatus())
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnFailure).GetStatus())
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnCancel).GetStatus())
 }
 
 func TestRepeat(t *testing.T) {
@@ -486,8 +486,8 @@ func TestRepeat(t *testing.T) {
 
 	nodes := g.Nodes()
 
-	require.Equal(t, sc.Status(g), SchedulerStatus_Cancel)
-	require.Equal(t, NodeStatus_Cancel, nodes[0].Status)
+	require.Equal(t, sc.Status(g), StatusCancel)
+	require.Equal(t, NodeStatusCancel, nodes[0].Status)
 	require.Equal(t, nodes[0].DoneCount, 2)
 }
 
@@ -507,8 +507,8 @@ func TestRepeatFail(t *testing.T) {
 	require.Error(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
-	require.Equal(t, NodeStatus_Error, nodes[0].Status)
+	require.Equal(t, sc.Status(g), StatusError)
+	require.Equal(t, NodeStatusError, nodes[0].Status)
 	require.Equal(t, nodes[0].DoneCount, 1)
 }
 
@@ -538,29 +538,29 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 
 	nodes := g.Nodes()
 
-	require.Equal(t, sc.Status(g), SchedulerStatus_Success)
-	require.Equal(t, NodeStatus_Success, nodes[0].Status)
+	require.Equal(t, sc.Status(g), StatusSuccess)
+	require.Equal(t, NodeStatusSuccess, nodes[0].Status)
 	require.Equal(t, nodes[0].DoneCount, 1)
 }
 
 func TestSchedulerStatusText(t *testing.T) {
-	for k, v := range map[SchedulerStatus]string{
-		SchedulerStatus_None:    "not started",
-		SchedulerStatus_Running: "running",
-		SchedulerStatus_Error:   "failed",
-		SchedulerStatus_Cancel:  "canceled",
-		SchedulerStatus_Success: "finished",
+	for k, v := range map[Status]string{
+		StatusNone:    "not started",
+		StatusRunning: "running",
+		StatusError:   "failed",
+		StatusCancel:  "canceled",
+		StatusSuccess: "finished",
 	} {
 		require.Equal(t, k.String(), v)
 	}
 
 	for k, v := range map[NodeStatus]string{
-		NodeStatus_None:    "not started",
-		NodeStatus_Running: "running",
-		NodeStatus_Error:   "failed",
-		NodeStatus_Cancel:  "canceled",
-		NodeStatus_Success: "finished",
-		NodeStatus_Skipped: "skipped",
+		NodeStatusNone:    "not started",
+		NodeStatusRunning: "running",
+		NodeStatusError:   "failed",
+		NodeStatusCancel:  "canceled",
+		NodeStatusSuccess: "finished",
+		NodeStatusSkipped: "skipped",
 	} {
 		require.Equal(t, k.String(), v)
 	}
@@ -578,10 +578,10 @@ func TestNodeSetupFailure(t *testing.T) {
 	sc := &Scheduler{Config: &Config{}}
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
+	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Error, nodes[0].Status)
+	require.Equal(t, NodeStatusError, nodes[0].Status)
 	require.Equal(t, nodes[0].DoneCount, 0)
 }
 
@@ -605,8 +605,8 @@ func TestNodeTeardownFailure(t *testing.T) {
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
-	require.Equal(t, sc.Status(g), SchedulerStatus_Error)
-	require.Equal(t, NodeStatus_Error, nodes[0].Status)
+	require.Equal(t, sc.Status(g), StatusError)
+	require.Equal(t, NodeStatusError, nodes[0].Status)
 	require.Error(t, nodes[0].Error)
 }
 
@@ -623,8 +623,8 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatus_Success, nodes[0].GetStatus())
-	require.Equal(t, NodeStatus_Success, nodes[1].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[0].GetStatus())
+	require.Equal(t, NodeStatusSuccess, nodes[1].GetStatus())
 
 	require.Equal(t, "take-output", os.ExpandEnv("$TOOK_PREV_OUT"))
 }

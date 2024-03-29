@@ -22,27 +22,27 @@ import (
 type NodeStatus int
 
 const (
-	NodeStatus_None NodeStatus = iota
-	NodeStatus_Running
-	NodeStatus_Error
-	NodeStatus_Cancel
-	NodeStatus_Success
-	NodeStatus_Skipped
+	NodeStatusNone NodeStatus = iota
+	NodeStatusRunning
+	NodeStatusError
+	NodeStatusCancel
+	NodeStatusSuccess
+	NodeStatusSkipped
 )
 
 func (s NodeStatus) String() string {
 	switch s {
-	case NodeStatus_Running:
+	case NodeStatusRunning:
 		return "running"
-	case NodeStatus_Error:
+	case NodeStatusError:
 		return "failed"
-	case NodeStatus_Cancel:
+	case NodeStatusCancel:
 		return "canceled"
-	case NodeStatus_Success:
+	case NodeStatusSuccess:
 		return "finished"
-	case NodeStatus_Skipped:
+	case NodeStatusSkipped:
 		return "skipped"
-	case NodeStatus_None:
+	case NodeStatusNone:
 		fallthrough
 	default:
 		return "not started"
@@ -202,14 +202,14 @@ func (n *Node) setErr(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.Error = err
-	n.Status = NodeStatus_Error
+	n.Status = NodeStatusError
 }
 
 func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.Status
-	if status == NodeStatus_Running && n.cmd != nil {
+	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.Step.SignalOnStop != "" {
 			sigsig = unix.SignalNum(n.Step.SignalOnStop)
@@ -217,8 +217,8 @@ func (n *Node) signal(sig os.Signal, allowOverride bool) {
 		log.Printf("Sending %s signal to %s", sigsig, n.Name)
 		utils.LogErr("sending signal", n.cmd.Kill(sigsig))
 	}
-	if status == NodeStatus_Running {
-		n.Status = NodeStatus_Cancel
+	if status == NodeStatusRunning {
+		n.Status = NodeStatusCancel
 	}
 }
 
@@ -226,8 +226,8 @@ func (n *Node) cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.Status
-	if status == NodeStatus_Running {
-		n.Status = NodeStatus_Cancel
+	if status == NodeStatusRunning {
+		n.Status = NodeStatusCancel
 	}
 	if n.cancelFunc != nil {
 		log.Printf("canceling node: %s", n.Step.Name)

@@ -52,7 +52,7 @@ func TestStatusSerialization(t *testing.T) {
 		Params:            []string{},
 		DefaultParams:     "",
 	}
-	st := NewStatus(d, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
+	st := NewStatus(d, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
 	js, err := st.ToJson()
 	require.NoError(t, err)
@@ -67,10 +67,10 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	d := &dag.DAG{Name: "test"}
-	status := NewStatus(d, nil, scheduler.SchedulerStatus_Running,
+	status := NewStatus(d, nil, scheduler.StatusRunning,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
-	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.StatusError, status.Status)
 }
 
 func TestJsonMarshal(t *testing.T) {

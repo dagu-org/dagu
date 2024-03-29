@@ -31,10 +31,10 @@ type Mailer interface {
 // ReportStep is a function that reports the status of a step.
 func (rp *Reporter) ReportStep(d *dag.DAG, status *model.Status, node *scheduler.Node) error {
 	st := node.GetStatus()
-	if st != scheduler.NodeStatus_None {
+	if st != scheduler.NodeStatusNone {
 		log.Printf("%s %s", node.Name, status.StatusText)
 	}
-	if st == scheduler.NodeStatus_Error && node.MailOnError {
+	if st == scheduler.NodeStatusError && node.MailOnError {
 		return rp.Mailer.SendMail(
 			d.ErrorMail.From,
 			[]string{d.ErrorMail.To},
@@ -60,7 +60,7 @@ func (rp *Reporter) ReportSummary(status *model.Status, err error) {
 
 // SendMail is a function that sends a report mail.
 func (rp *Reporter) SendMail(d *dag.DAG, status *model.Status, err error) error {
-	if err != nil || status.Status == scheduler.SchedulerStatus_Error {
+	if err != nil || status.Status == scheduler.StatusError {
 		if d.MailOn != nil && d.MailOn.Failure {
 			return rp.Mailer.SendMail(
 				d.ErrorMail.From,
@@ -70,7 +70,7 @@ func (rp *Reporter) SendMail(d *dag.DAG, status *model.Status, err error) error 
 				addAttachmentList(d.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
-	} else if status.Status == scheduler.SchedulerStatus_Success {
+	} else if status.Status == scheduler.StatusSuccess {
 		if d.MailOn != nil && d.MailOn.Success {
 			_ = rp.Mailer.SendMail(
 				d.InfoMail.From,
@@ -147,7 +147,7 @@ func renderHTML(nodes []*model.Node) string {
 	addStatusFunc := func(status scheduler.NodeStatus) {
 		style := ""
 		switch status {
-		case scheduler.NodeStatus_Error:
+		case scheduler.NodeStatusError:
 			style = "color: #D01117;font-weight:bold;"
 		}
 		buffer.WriteString(

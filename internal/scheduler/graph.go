@@ -112,7 +112,7 @@ func (g *ExecutionGraph) setupRetry() error {
 	for len(frontier) > 0 {
 		next := []int{}
 		for _, u := range frontier {
-			if retry[u] || dict[u] == NodeStatus_Error || dict[u] == NodeStatus_Cancel {
+			if retry[u] || dict[u] == NodeStatusError || dict[u] == NodeStatusCancel {
 				log.Printf("clear node state: %s", g.dict[u].Name)
 				g.dict[u].clearState()
 				retry[u] = true

@@ -31,20 +31,20 @@ func (p Pid) IsRunning() bool {
 }
 
 type Status struct {
-	RequestId  string                    `json:"RequestId"`
-	Name       string                    `json:"Name"`
-	Status     scheduler.SchedulerStatus `json:"Status"`
-	StatusText string                    `json:"StatusText"`
-	Pid        Pid                       `json:"Pid"`
-	Nodes      []*Node                   `json:"Nodes"`
-	OnExit     *Node                     `json:"OnExit"`
-	OnSuccess  *Node                     `json:"OnSuccess"`
-	OnFailure  *Node                     `json:"OnFailure"`
-	OnCancel   *Node                     `json:"OnCancel"`
-	StartedAt  string                    `json:"StartedAt"`
-	FinishedAt string                    `json:"FinishedAt"`
-	Log        string                    `json:"Log"`
-	Params     string                    `json:"Params"`
+	RequestId  string           `json:"RequestId"`
+	Name       string           `json:"Name"`
+	Status     scheduler.Status `json:"Status"`
+	StatusText string           `json:"StatusText"`
+	Pid        Pid              `json:"Pid"`
+	Nodes      []*Node          `json:"Nodes"`
+	OnExit     *Node            `json:"OnExit"`
+	OnSuccess  *Node            `json:"OnSuccess"`
+	OnFailure  *Node            `json:"OnFailure"`
+	OnCancel   *Node            `json:"OnCancel"`
+	StartedAt  string           `json:"StartedAt"`
+	FinishedAt string           `json:"FinishedAt"`
+	Log        string           `json:"Log"`
+	Params     string           `json:"Params"`
 }
 
 type StatusFile struct {
@@ -62,13 +62,13 @@ func StatusFromJson(s string) (*Status, error) {
 }
 
 func NewStatusDefault(d *dag.DAG) *Status {
-	return NewStatus(d, nil, scheduler.SchedulerStatus_None, int(PidNotRunning), nil, nil)
+	return NewStatus(d, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
 }
 
 func NewStatus(
 	d *dag.DAG,
 	nodes []*scheduler.Node,
-	status scheduler.SchedulerStatus,
+	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
@@ -108,8 +108,8 @@ func formatTime(val *time.Time) string {
 }
 
 func (st *Status) CorrectRunningStatus() {
-	if st.Status == scheduler.SchedulerStatus_Running {
-		st.Status = scheduler.SchedulerStatus_Error
+	if st.Status == scheduler.StatusRunning {
+		st.Status = scheduler.StatusError
 		st.StatusText = st.Status.String()
 	}
 }

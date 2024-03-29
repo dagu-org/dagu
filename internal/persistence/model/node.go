@@ -86,8 +86,8 @@ func NewNode(step *dag.Step) *Node {
 		Step:       step,
 		StartedAt:  "-",
 		FinishedAt: "-",
-		Status:     scheduler.NodeStatus_None,
-		StatusText: scheduler.NodeStatus_None.String(),
+		Status:     scheduler.NodeStatusNone,
+		StatusText: scheduler.NodeStatusNone.String(),
 	}
 }
 

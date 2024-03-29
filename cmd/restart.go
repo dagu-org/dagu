@@ -52,7 +52,7 @@ func stopDAGIfRunning(e engine.Engine, dag *dag.DAG) {
 	checkError(err)
 
 	// Stop the DAG if it is running.
-	if st.Status == scheduler.SchedulerStatus_Running {
+	if st.Status == scheduler.StatusRunning {
 		log.Printf("Stopping %s for restart...", dag.Name)
 		cobra.CheckErr(stopRunningDAG(e, dag))
 	}
@@ -63,7 +63,7 @@ func stopRunningDAG(e engine.Engine, dag *dag.DAG) error {
 		st, err := e.GetCurrentStatus(dag)
 		checkError(err)
 
-		if st.Status != scheduler.SchedulerStatus_Running {
+		if st.Status != scheduler.StatusRunning {
 			return nil
 		}
 		checkError(e.Stop(dag))

@@ -97,8 +97,8 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) Status() *model.Status {
 	scStatus := a.scheduler.Status(a.graph)
 	// TODO: fix this weird logic.
-	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {
-		scStatus = scheduler.SchedulerStatus_Running
+	if scStatus == scheduler.StatusNone && !a.graph.StartedAt.IsZero() {
+		scStatus = scheduler.StatusRunning
 	}
 	status := model.NewStatus(
 		a.DAG,
@@ -378,7 +378,7 @@ func (a *Agent) checkIsRunning() error {
 	if err != nil {
 		return err
 	}
-	if status.Status != scheduler.SchedulerStatus_None {
+	if status.Status != scheduler.StatusNone {
 		return fmt.Errorf("the DAG is already running. socket=%s",
 			a.DAG.SockAddr())
 	}
@@ -402,7 +402,7 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 		status := a.Status()
-		status.Status = scheduler.SchedulerStatus_Running
+		status.Status = scheduler.StatusRunning
 		b, err := status.ToJson()
 		if err != nil {
 			encodeError(w, err)

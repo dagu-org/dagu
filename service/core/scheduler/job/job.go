@@ -36,10 +36,10 @@ func (j *Job) Start() error {
 		return err
 	}
 	switch s.Status {
-	case scheduler.SchedulerStatus_Running:
+	case scheduler.StatusRunning:
 		// already running
 		return ErrJobRunning
-	case scheduler.SchedulerStatus_None:
+	case scheduler.StatusNone:
 	default:
 		// check the last execution time
 		t, err := utils.ParseTime(s.StartedAt)
@@ -60,7 +60,7 @@ func (j *Job) Stop() error {
 	if err != nil {
 		return err
 	}
-	if s.Status != scheduler.SchedulerStatus_Running {
+	if s.Status != scheduler.StatusRunning {
 		return ErrJobIsNotRunning
 	}
 	return e.Stop(j.DAG)

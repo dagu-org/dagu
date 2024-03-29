@@ -39,7 +39,7 @@ func TestToNode(t *testing.T) {
 	)
 	orig := g.Nodes()
 	for _, n := range orig {
-		require.Equal(t, scheduler.NodeStatus_Success, n.Status)
+		require.Equal(t, scheduler.NodeStatusSuccess, n.Status)
 	}
 	nodes := FromNodes(orig)
 	for i := range nodes {
@@ -54,9 +54,9 @@ func testRunSteps(t *testing.T, steps ...*dag.Step) *scheduler.ExecutionGraph {
 	require.NoError(t, err)
 	for _, n := range g.Nodes() {
 		if err := n.Execute(context.Background()); err != nil {
-			n.Status = scheduler.NodeStatus_Error
+			n.Status = scheduler.NodeStatusError
 		} else {
-			n.Status = scheduler.NodeStatus_Success
+			n.Status = scheduler.NodeStatusSuccess
 		}
 	}
 	return g

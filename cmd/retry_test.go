@@ -22,7 +22,7 @@ func TestRetryCommand(t *testing.T) {
 	// Find the request ID.
 	s, err := e.GetStatus(dagFile)
 	require.NoError(t, err)
-	require.Equal(t, s.Status.Status, scheduler.SchedulerStatus_Success)
+	require.Equal(t, s.Status.Status, scheduler.StatusSuccess)
 	require.NotNil(t, s.Status)
 
 	reqID := s.Status.RequestId
