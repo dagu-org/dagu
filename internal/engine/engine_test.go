@@ -77,9 +77,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 		&sock.Config{
 			Addr: ds.DAG.SockAddr(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				status := model.NewStatus(
-					ds.DAG, []*scheduler.Node{},
-					scheduler.StatusRunning, 0, nil, nil)
+				status := model.NewStatus(ds.DAG, nil, scheduler.StatusRunning, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJson()
 				_, _ = w.Write(b)
@@ -163,8 +161,7 @@ func TestUpdateStatusError(t *testing.T) {
 	d, err := e.GetStatus(file)
 	require.NoError(t, err)
 
-	status := testNewStatus(d.DAG, requestId,
-		scheduler.StatusError, scheduler.NodeStatusError)
+	status := testNewStatus(d.DAG, requestId, scheduler.StatusError, scheduler.NodeStatusError)
 
 	err = e.UpdateStatus(d.DAG, status)
 	require.Error(t, err)
@@ -429,10 +426,14 @@ func testDAG(name string) string {
 	return path.Join(testdataDir, name)
 }
 
-func testNewStatus(d *dag.DAG, reqId string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
+func testNewStatus(dg *dag.DAG, reqId string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
 	now := time.Now()
 	ret := model.NewStatus(
-		d, []*scheduler.Node{{NodeState: scheduler.NodeState{Status: nodeStatus}}},
+		dg, []model.NodeStepPair{
+			{
+				Node: scheduler.NodeState{Status: nodeStatus},
+			},
+		},
 		status, 0, &now, nil)
 	ret.RequestId = reqId
 	return ret

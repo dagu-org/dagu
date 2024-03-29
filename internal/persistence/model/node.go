@@ -65,10 +65,10 @@ func errText(err error) string {
 	return err.Error()
 }
 
-func FromNodes(nodes []*scheduler.Node) []*Node {
+func FromNodes(nodes []NodeStepPair) []*Node {
 	var ret []*Node
 	for _, n := range nodes {
-		ret = append(ret, FromNode(n.State(), n.Step))
+		ret = append(ret, FromNode(n.Node, n.Step))
 	}
 	return ret
 }

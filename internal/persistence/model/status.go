@@ -71,9 +71,14 @@ func Time(t time.Time) *time.Time {
 	return &t
 }
 
+type NodeStepPair struct {
+	Node scheduler.NodeState
+	Step *dag.Step
+}
+
 func NewStatus(
 	d *dag.DAG,
-	nodes []*scheduler.Node,
+	nodes []NodeStepPair,
 	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
@@ -99,7 +104,7 @@ func NewStatus(
 	}
 }
 
-func nodesOrSteps(nodes []*scheduler.Node, steps []*dag.Step) []*Node {
+func nodesOrSteps(nodes []NodeStepPair, steps []*dag.Step) []*Node {
 	if len(nodes) != 0 {
 		return FromNodes(nodes)
 	}

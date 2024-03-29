@@ -100,14 +100,15 @@ func (a *Agent) Status() *model.Status {
 	if scStatus == scheduler.StatusNone && a.graph.IsStarted() {
 		scStatus = scheduler.StatusRunning
 	}
-	status := model.NewStatus(
-		a.DAG,
-		a.graph.Nodes(),
-		scStatus,
-		os.Getpid(),
-		model.Time(a.graph.StartAt()),
-		model.Time(a.graph.FinishAt()),
-	)
+	var ns []model.NodeStepPair
+	for _, n := range a.graph.Nodes() {
+		ns = append(ns, model.NodeStepPair{
+			Node: n.State(),
+			Step: n.Step,
+		})
+	}
+	st, et := model.Time(a.graph.StartAt()), model.Time(a.graph.FinishAt())
+	status := model.NewStatus(a.DAG, ns, scStatus, os.Getpid(), st, et)
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
