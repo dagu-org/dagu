@@ -182,13 +182,6 @@ func (n *Node) Step() dag.Step {
 	return n.step
 }
 
-// GetStatus reads the status of a node.
-func (n *Node) GetStatus() NodeStatus {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.Status
-}
-
 func (n *Node) getRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()

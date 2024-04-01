@@ -79,7 +79,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 		}
 	NodesIteration:
 		for _, node := range g.Nodes() {
-			if node.GetStatus() != NodeStatusNone || !isReady(g, node) {
+			if node.State().Status != NodeStatusNone || !isReady(g, node) {
 				continue NodesIteration
 			}
 			if sc.isCanceled() {
@@ -122,7 +122,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 				for setupSucceed && !sc.isCanceled() {
 					execErr := sc.execNode(ctx, node)
 					if execErr != nil {
-						status := node.GetStatus()
+						status := node.State().Status
 						switch {
 						case status == NodeStatusSuccess || status == NodeStatusCancel:
 							// do nothing
@@ -142,7 +142,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 							sc.lastError = execErr
 						}
 					}
-					if node.GetStatus() != NodeStatusCancel {
+					if node.State().Status != NodeStatusCancel {
 						node.incDoneCount()
 					}
 					if node.step.RepeatPolicy.Repeat {
@@ -160,7 +160,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 					break ExecRepeat
 				}
 				// finish the node
-				if node.GetStatus() == NodeStatusRunning {
+				if node.State().Status == NodeStatusRunning {
 					node.setStatus(NodeStatusSuccess)
 				}
 				if err := sc.teardownNode(node); err != nil {
@@ -298,7 +298,7 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 	ready := true
 	for _, dep := range g.to[node.id] {
 		n := g.node(dep)
-		switch n.GetStatus() {
+		switch n.State().Status {
 		case NodeStatusSuccess:
 			continue
 		case NodeStatusError:
@@ -387,7 +387,7 @@ func (sc *Scheduler) setCanceled() {
 func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
 	count := 0
 	for _, node := range g.Nodes() {
-		switch node.GetStatus() {
+		switch node.State().Status {
 		case NodeStatusRunning:
 			count++
 		}
@@ -397,7 +397,7 @@ func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
 
 func (sc *Scheduler) isFinished(g *ExecutionGraph) bool {
 	for _, node := range g.Nodes() {
-		switch node.GetStatus() {
+		switch node.State().Status {
 		case NodeStatusRunning, NodeStatusNone:
 			return false
 		}
@@ -409,7 +409,7 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	for _, node := range g.Nodes() {
-		if st := node.GetStatus(); st == NodeStatusSuccess || st == NodeStatusSkipped {
+		if st := node.State().Status; st == NodeStatusSuccess || st == NodeStatusSkipped {
 			continue
 		}
 		return false

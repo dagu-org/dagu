@@ -113,7 +113,7 @@ func (g *ExecutionGraph) IsRunning() bool {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	for _, node := range g.Nodes() {
-		if node.GetStatus() == NodeStatusRunning {
+		if node.State().Status == NodeStatusRunning {
 			return true
 		}
 	}
