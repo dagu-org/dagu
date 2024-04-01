@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +14,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence"
 
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -43,7 +44,7 @@ type Agent struct {
 	historyStore     persistence.HistoryStore
 	socketServer     *sock.Server
 	requestId        string
-	finished         uint32
+	finished         atomic.Bool
 	lock             sync.RWMutex
 }
 
@@ -83,15 +84,13 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.Dry {
 		return a.dryRun()
 	}
-	setup := []func() error{
+	for _, fn := range []func() error{
 		a.checkIsRunning,
 		a.setupDatabase,
 		a.setupSocketServer,
 		a.logManager.setupLogFile,
-	}
-	for _, fn := range setup {
-		err := fn()
-		if err != nil {
+	} {
+		if err := fn(); err != nil {
 			return err
 		}
 	}
@@ -326,7 +325,7 @@ func (a *Agent) run(ctx context.Context) error {
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
-		if a.finished == 1 {
+		if a.finished.Load() {
 			return
 		}
 		utils.LogErr("write status", a.historyStore.Write(a.Status()))
@@ -343,7 +342,7 @@ func (a *Agent) run(ctx context.Context) error {
 	a.reporter.ReportSummary(status, lastErr)
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
-	atomic.CompareAndSwapUint32(&a.finished, 0, 1)
+	a.finished.Store(true)
 	utils.LogErr("close data file", a.historyStore.Close())
 
 	return lastErr

@@ -594,7 +594,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 	nodes := g.Nodes()
 	go func() {
 		time.Sleep(time.Millisecond * 300)
-		nodes[0].logFile.Close()
+		_ = nodes[0].logFile.Close()
 	}()
 
 	err := sc.Schedule(context.Background(), g, nil)
