@@ -181,8 +181,7 @@ func (n *Node) Step() dag.Step {
 func (n *Node) GetStatus() NodeStatus {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	ret := n.Status
-	return ret
+	return n.Status
 }
 
 func (n *Node) getRetryCount() int {

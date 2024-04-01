@@ -53,7 +53,7 @@ func TestSignal(t *testing.T) {
 	err := n.Execute(context.Background())
 
 	require.Error(t, err)
-	require.Equal(t, n.Status, NodeStatusCancel)
+	require.Equal(t, n.State().Status, NodeStatusCancel)
 }
 
 func TestSignalSpecified(t *testing.T) {
@@ -74,7 +74,7 @@ func TestSignalSpecified(t *testing.T) {
 	err := n.Execute(context.Background())
 
 	require.Error(t, err)
-	require.Equal(t, n.Status, NodeStatusCancel)
+	require.Equal(t, n.State().Status, NodeStatusCancel)
 }
 
 func TestLog(t *testing.T) {
