@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -44,15 +45,15 @@ func TestScheduler(t *testing.T) {
 	require.NoError(t, err)
 	sc := &Scheduler{Config: &Config{MaxActiveRuns: 1}}
 
-	counter := 0
+	var counter atomic.Int64
 	done := make(chan *Node)
 	go func() {
 		for range done {
-			counter += 1
+			counter.Add(1)
 		}
 	}()
 	require.Error(t, sc.Schedule(context.Background(), g, done))
-	require.Equal(t, counter, 3)
+	require.Equal(t, counter.Load(), int64(3))
 	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
@@ -594,7 +595,9 @@ func TestNodeTeardownFailure(t *testing.T) {
 	nodes := g.Nodes()
 	go func() {
 		time.Sleep(time.Millisecond * 300)
+		nodes[0].mu.Lock()
 		_ = nodes[0].logFile.Close()
+		nodes[0].mu.Unlock()
 	}()
 
 	err := sc.Schedule(context.Background(), g, nil)
@@ -602,7 +605,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 
 	require.Equal(t, sc.Status(g), StatusError)
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Error(t, nodes[0].Error)
+	require.Error(t, nodes[0].State().Error)
 }
 
 func TestTakeOutputFromPrevStep(t *testing.T) {

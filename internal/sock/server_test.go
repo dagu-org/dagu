@@ -44,13 +44,14 @@ func TestStartAndShutdownServer(t *testing.T) {
 	}()
 
 	go func() {
-		err = unixServer.Serve(listen)
+		err := unixServer.Serve(listen)
 		require.True(t, errors.Is(ErrServerRequestedShutdown, err))
 	}()
 
 	time.Sleep(time.Millisecond * 50)
 
 	ret, err := client.Request(http.MethodPost, "/")
+	require.NoError(t, err)
 	require.Equal(t, "OK", ret)
 
 	_ = unixServer.Shutdown()
