@@ -22,11 +22,11 @@ watch:
 	nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
 
 test:
-	@go test ./...
+	@go test --race ./...
 
 test-clean:
 	@go clean -testcache
-	@go test ./...
+	@go test --race ./...
 
 install-tools: install-nodemon install-swagger
 

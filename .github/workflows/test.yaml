@@ -53,7 +53,7 @@ jobs:
 
       - name: Test
         run: |
-          go test -v -coverprofile="coverage.txt" -covermode=atomic ./...
+          go test --race -v -coverprofile="coverage.txt" -covermode=atomic ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2
