@@ -272,13 +272,24 @@ func MatchExtension(file string, exts []string) bool {
 	return false
 }
 
-var FixedTime time.Time
+var (
+	fixedTime time.Time
+	lock      sync.RWMutex
+)
+
+func SetFixedTime(t time.Time) {
+	lock.Lock()
+	defer lock.Unlock()
+	fixedTime = t
+}
 
 func Now() time.Time {
-	if FixedTime.IsZero() {
+	lock.RLock()
+	defer lock.RUnlock()
+	if fixedTime.IsZero() {
 		return time.Now()
 	}
-	return FixedTime
+	return fixedTime
 }
 
 type SyncMap struct {

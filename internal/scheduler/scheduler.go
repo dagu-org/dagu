@@ -94,7 +94,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 				if err := dag.EvalConditions(node.step.Preconditions); err != nil {
 					log.Printf("%s", err.Error())
 					node.setStatus(NodeStatusSkipped)
-					node.Error = err
+					node.SetError(err)
 					continue NodesIteration
 				}
 			}
@@ -305,13 +305,13 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			if !n.step.ContinueOn.Failure {
 				ready = false
 				node.setStatus(NodeStatusCancel)
-				node.Error = fmt.Errorf("upstream failed")
+				node.SetError(fmt.Errorf("upstream failed"))
 			}
 		case NodeStatusSkipped:
 			if !n.step.ContinueOn.Skipped {
 				ready = false
 				node.setStatus(NodeStatusSkipped)
-				node.Error = fmt.Errorf("upstream skipped")
+				node.SetError(fmt.Errorf("upstream skipped"))
 			}
 		case NodeStatusCancel:
 			ready = false

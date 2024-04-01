@@ -92,6 +92,12 @@ func (n *Node) finish() {
 	n.FinishedAt = time.Now()
 }
 
+func (n *Node) SetError(err error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.Error = err
+}
+
 func (n *Node) State() NodeState {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -104,8 +110,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	n.Error = cmd.Run()
-
+	n.SetError(cmd.Run())
 	if n.outputReader != nil && n.step.Output != "" {
 		utils.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer

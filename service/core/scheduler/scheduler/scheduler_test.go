@@ -1,11 +1,13 @@
 package scheduler
 
 import (
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/logger"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +35,7 @@ func changeHomeDir(homeDir string) {
 
 func TestRun(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.FixedTime = now
+	utils.SetFixedTime(now)
 
 	er := &mockEntryReader{
 		Entries: []*Entry{
@@ -63,13 +65,13 @@ func TestRun(t *testing.T) {
 	time.Sleep(time.Second + time.Millisecond*100)
 	r.Stop()
 
-	require.Equal(t, 1, er.Entries[0].Job.(*mockJob).RunCount)
-	require.Equal(t, 0, er.Entries[1].Job.(*mockJob).RunCount)
+	require.Equal(t, int32(1), er.Entries[0].Job.(*mockJob).RunCount.Load())
+	require.Equal(t, int32(0), er.Entries[1].Job.(*mockJob).RunCount.Load())
 }
 
 func TestRestart(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.FixedTime = now
+	utils.SetFixedTime(now)
 
 	er := &mockEntryReader{
 		Entries: []*Entry{
@@ -93,12 +95,12 @@ func TestRestart(t *testing.T) {
 	}()
 
 	time.Sleep(time.Second + time.Millisecond*100)
-	require.Equal(t, 1, er.Entries[0].Job.(*mockJob).RestartCount)
+	require.Equal(t, int32(1), er.Entries[0].Job.(*mockJob).RestartCount.Load())
 }
 
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-	utils.FixedTime = n
+	utils.SetFixedTime(n)
 	r := New(Params{
 		EntryReader: &mockEntryReader{},
 		LogDir:      testHomeDir,
@@ -121,9 +123,9 @@ func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 // TODO: fix to use mock library
 type mockJob struct {
 	Name         string
-	RunCount     int
-	StopCount    int
-	RestartCount int
+	RunCount     atomic.Int32
+	StopCount    atomic.Int32
+	RestartCount atomic.Int32
 	Panic        error
 }
 
@@ -138,7 +140,7 @@ func (j *mockJob) String() string {
 }
 
 func (j *mockJob) Start() error {
-	j.RunCount++
+	j.RunCount.Add(1)
 	if j.Panic != nil {
 		panic(j.Panic)
 	}
@@ -146,11 +148,11 @@ func (j *mockJob) Start() error {
 }
 
 func (j *mockJob) Stop() error {
-	j.StopCount++
+	j.StopCount.Add(1)
 	return nil
 }
 
 func (j *mockJob) Restart() error {
-	j.RestartCount++
+	j.RestartCount.Add(1)
 	return nil
 }
