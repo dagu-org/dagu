@@ -60,6 +60,7 @@ type Node struct {
 
 	id           int
 	mu           sync.RWMutex
+	logLock      sync.Mutex
 	cmd          executor.Executor
 	cancelFunc   func()
 	logFile      *os.File
@@ -329,6 +330,8 @@ func (n *Node) setupLog() error {
 	if n.Log == "" {
 		return nil
 	}
+	n.logLock.Lock()
+	defer n.logLock.Unlock()
 	var err error
 	n.logFile, err = utils.OpenOrCreateFile(n.Log)
 	if err != nil {
@@ -343,6 +346,7 @@ func (n *Node) teardown() error {
 	if n.done {
 		return nil
 	}
+	n.logLock.Lock()
 	n.done = true
 	var lastErr error = nil
 	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
@@ -360,6 +364,7 @@ func (n *Node) teardown() error {
 			_ = f.Close()
 		}
 	}
+	n.logLock.Unlock()
 
 	if n.scriptFile != nil {
 		_ = os.Remove(n.scriptFile.Name())
