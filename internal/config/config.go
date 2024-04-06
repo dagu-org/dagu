@@ -30,7 +30,7 @@ type Config struct {
 	BaseConfig         string
 	NavbarColor        string
 	NavbarTitle        string
-	Env                map[string]string
+	Env                sync.Map
 	TLS                *TLS
 	IsAuthToken        bool
 	AuthToken          string
@@ -140,15 +140,13 @@ func (cfg *Config) GetAPIBaseURL() string {
 }
 
 func loadEnvs(cfg *Config) {
-	if cfg.Env == nil {
-		cfg.Env = map[string]string{}
-	}
-	for k, v := range cfg.Env {
-		_ = os.Setenv(k, v)
-	}
+	cfg.Env.Range(func(k, v interface{}) bool {
+		_ = os.Setenv(k.(string), v.(string))
+		return true
+	})
 	for k, v := range utils.DefaultEnv() {
-		if _, ok := cfg.Env[k]; !ok {
-			cfg.Env[k] = v
+		if _, ok := cfg.Env.Load(k); !ok {
+			cfg.Env.Store(k, v)
 		}
 	}
 }
