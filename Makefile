@@ -43,6 +43,12 @@ endif
 	$(DOCKER_CMD) -t yohamta/dagu:$(VERSION) .
 	$(DOCKER_CMD) -t yohamta/dagu:latest .
 
+build-image-version:
+ifeq ($(VERSION),)
+	$(error "VERSION is null")
+endif
+	$(DOCKER_CMD) -t yohamta/dagu:$(VERSION) .
+
 server: go-lint build-dir build-bin
 	./bin/dagu server
 
