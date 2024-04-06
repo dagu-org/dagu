@@ -45,7 +45,17 @@ WORKDIR /home/${USER}
 
 COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 
-RUN mkdir .dagu
+RUN mkdir -p .dagu/dags
+
+# Add the hello_world.yaml file
+COPY <<EOF .dagu/dags/hello_world.yaml
+schedule: "* * * * *"
+steps:
+  - name: hello world
+    command: sh
+    script: |
+      echo "Hello, world!"
+EOF
 
 ENV DAGU_HOST=0.0.0.0
 ENV DAGU_PORT=8080
