@@ -70,7 +70,14 @@ func setConfig(cfg *Config) {
 	instance = cfg
 }
 
+var (
+	loadConfigLock sync.Mutex
+)
+
 func LoadConfig(userHomeDir string) error {
+	loadConfigLock.Lock()
+	defer loadConfigLock.Unlock()
+
 	appHome := appHomeDir(userHomeDir)
 
 	viper.SetEnvPrefix("dagu")
