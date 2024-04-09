@@ -10,5 +10,6 @@ func NewScheduler(topLevelModule fx.Option) *fx.App {
 		topLevelModule,
 		scheduler.Module,
 		fx.Invoke(scheduler.LifetimeHooks),
+		fx.NopLogger,
 	)
 }
