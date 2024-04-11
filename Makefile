@@ -36,18 +36,16 @@ certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
 
 build: build-ui build-dir go-lint build-bin
 
-build-image:
-ifeq ($(VERSION),)
-	$(error "VERSION is null")
-endif
-	$(DOCKER_CMD) -t yohamta/dagu:$(VERSION) .
-	$(DOCKER_CMD) -t yohamta/dagu:latest .
+build-image: build-image-version build-image-latest
 
 build-image-version:
 ifeq ($(VERSION),)
 	$(error "VERSION is null")
 endif
 	$(DOCKER_CMD) -t yohamta/dagu:$(VERSION) .
+
+build-image-latest:
+	$(DOCKER_CMD) -t yohamta/dagu:latest .
 
 server: go-lint build-dir build-bin
 	./bin/dagu server
