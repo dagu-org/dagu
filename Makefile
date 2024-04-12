@@ -28,6 +28,9 @@ test-clean:
 	@go clean -testcache
 	@go test --race ./...
 
+lint:
+	golangci-lint run -v
+
 install-tools: install-nodemon install-swagger
 
 swagger: clean-swagger gen-swagger
