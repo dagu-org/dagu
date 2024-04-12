@@ -42,10 +42,10 @@ build-image-version:
 ifeq ($(VERSION),)
 	$(error "VERSION is null")
 endif
-	$(DOCKER_CMD) -t yohamta/dagu:$(VERSION) .
+	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:$(VERSION) .
 
 build-image-latest:
-	$(DOCKER_CMD) -t yohamta/dagu:latest .
+	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:latest .
 
 server: go-lint build-dir build-bin
 	./bin/dagu server

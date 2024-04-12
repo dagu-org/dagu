@@ -3,7 +3,7 @@ services:
 
   # init container updates permission
   init:
-    image: "yohamta/dagu:latest"
+    image: "ghcr.io/dagu-dev/dagu:latest"
     user: root
     volumes:
       - dagu:/home/dagu/.dagu
@@ -11,7 +11,7 @@ services:
 
   # ui web server process
   server:
-    image: "yohamta/dagu:latest"
+    image: "ghcr.io/dagu-dev/dagu:latest"
     environment:
       - DAGU_PORT=8080
       - DAGU_DAGS=/home/dagu/.dagu/dags
@@ -26,7 +26,7 @@ services:
 
   # scheduler process
   scheduler:
-    image: "yohamta/dagu:latest"
+    image: "ghcr.io/dagu-dev/dagu:latest"
     environment:
       - DAGU_DAGS=/home/dagu/.dagu/dags
     restart: unless-stopped

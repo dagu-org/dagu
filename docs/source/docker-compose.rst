@@ -10,7 +10,7 @@ To automate workflows based on cron expressions, it is necessary to run both the
 
       # init container updates permission
       init:
-        image: "yohamta/dagu:latest"
+        image: "ghcr.io/dagu-dev/dagu:latest"
         user: root
         volumes:
           - dagu:/home/dagu/.dagu
@@ -18,7 +18,7 @@ To automate workflows based on cron expressions, it is necessary to run both the
 
       # ui server process
       server:
-        image: "yohamta/dagu:latest"
+        image: "ghcr.io/dagu-dev/dagu:latest"
         environment:
           - DAGU_PORT=8080
           - DAGU_DAGS=/home/dagu/.dagu/dags
@@ -33,7 +33,7 @@ To automate workflows based on cron expressions, it is necessary to run both the
 
       # scheduler process
       scheduler:
-        image: "yohamta/dagu:latest"
+        image: "ghcr.io/dagu-dev/dagu:latest"
         environment:
           - DAGU_DAGS=/home/dagu/.dagu/dags
         restart: unless-stopped

@@ -37,7 +37,7 @@ Via Docker
    -v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
    -v $HOME/.dagu/data:/home/dagu/.dagu/data \
    -v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
-   yohamta/dagu:latest
+   ghcr.io/dagu-dev/dagu:latest
 
 Via GitHub Release Page
 -----------------------

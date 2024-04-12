@@ -167,10 +167,10 @@ curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.s
 docker run \
 --rm \
 -p 8080:8080 \
--v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
--v $HOME/.dagu/data:/home/dagu/.dagu/data \
--v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
-yohamta/dagu:latest dagu start-all
+-v $(pwd)/dagu/dags:/home/dagu/.dagu/dags \
+-v $(pwd)/dagu/data:/home/dagu/.dagu/data \
+-v $(pwd)/dagu/logs:/home/dagu/.dagu/logs \
+docker pull ghcr.io/dagu-dev/dagu:latest dagu start-all
 ```
 
 ### Via GitHub Releases Page
