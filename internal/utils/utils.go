@@ -54,9 +54,9 @@ func MustGetwd() string {
 func FormatTime(t time.Time) string {
 	if t.IsZero() {
 		return constants.TimeEmpty
-	} else {
-		return t.Format(constants.TimeFormat)
 	}
+
+	return t.Format(constants.TimeFormat)
 }
 
 // ParseTime parses time string.
@@ -71,9 +71,9 @@ func ParseTime(val string) (time.Time, error) {
 func FormatDuration(t time.Duration, defaultVal string) string {
 	if t == 0 {
 		return defaultVal
-	} else {
-		return t.String()
 	}
+
+	return t.String()
 }
 
 // SplitCommand splits command string to program and arguments.

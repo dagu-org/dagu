@@ -260,10 +260,8 @@ func (a *Agent) setupDatabase() error {
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
 		utils.LogErr("clean old history data", err)
 	}
-	if err := a.historyStore.Open(a.DAG.Location, time.Now(), a.requestId); err != nil {
-		return err
-	}
-	return nil
+
+	return a.historyStore.Open(a.DAG.Location, time.Now(), a.requestId)
 }
 
 func (a *Agent) setupSocketServer() (err error) {

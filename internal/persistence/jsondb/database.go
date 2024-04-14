@@ -238,11 +238,7 @@ func (store *Store) Compact(_, original string) error {
 		return err
 	}
 
-	if err := os.Remove(original); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Remove(original)
 }
 
 func (store *Store) normalizeInternalName(name string) string {

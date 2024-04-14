@@ -258,10 +258,9 @@ func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
 	if metadataOnly {
 		d, err := ds.GetMetadata(name)
 		return e.emptyDAGIfNil(d, name), err
-	} else {
-		d, err := ds.GetDetails(name)
-		return e.emptyDAGIfNil(d, name), err
 	}
+	d, err := ds.GetDetails(name)
+	return e.emptyDAGIfNil(d, name), err
 }
 
 func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
