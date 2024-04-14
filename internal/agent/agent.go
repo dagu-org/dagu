@@ -156,21 +156,24 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	go func() {
 		a.scheduler.Signal(a.graph, sig, done, allowOverride)
 	}()
-	timeout := time.After(a.DAG.MaxCleanUpTime)
-	tick := time.After(time.Second * 5)
+	timeout := time.NewTimer(a.DAG.MaxCleanUpTime)
+	tick := time.NewTimer(time.Second * 5)
+	defer timeout.Stop()
+	defer tick.Stop()
+
 	for {
 		select {
 		case <-done:
 			log.Printf("All child processes have been terminated.")
 			return
-		case <-timeout:
+		case <-timeout.C:
 			log.Printf("Time reached to max cleanup time")
 			a.Kill()
 			return
-		case <-tick:
+		case <-tick.C:
 			log.Printf("Sending signal again")
 			a.scheduler.Signal(a.graph, sig, nil, false)
-			tick = time.After(time.Second * 5)
+			tick.Reset(time.Second * 5)
 		default:
 			log.Printf("Waiting for child processes to exit...")
 			time.Sleep(time.Second * 3)

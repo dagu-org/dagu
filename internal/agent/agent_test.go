@@ -275,7 +275,9 @@ func TestHandleHTTP(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	<-time.After(time.Millisecond * 50)
+	timer := time.NewTimer(time.Millisecond * 50)
+	defer timer.Stop()
+	<-timer.C
 
 	var mockResponseWriter = mockResponseWriter{}
 
@@ -315,7 +317,9 @@ func TestHandleHTTP(t *testing.T) {
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 	require.Equal(t, "OK", mockResponseWriter.body)
 
-	<-time.After(time.Millisecond * 50)
+	timer2 := time.NewTimer(time.Millisecond * 50)
+	defer timer2.Stop()
+	<-timer2.C
 
 	status = a.Status()
 	require.Equal(t, status.Status, scheduler.StatusCancel)
