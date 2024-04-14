@@ -69,6 +69,7 @@ type Config struct {
 }
 
 // Schedule runs the graph of steps.
+// nolint // cognitive complexity
 func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan *Node) error {
 	if err := sc.setup(); err != nil {
 		return err

@@ -320,6 +320,7 @@ func (h *DAGHandler) readSchedulerLog(d *dag.DAG, statusFile string) (*models.Da
 	return response.ToDagSchedulerLogResponse(logFile, string(content)), nil
 }
 
+// nolint // cognitive complexity
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
 	e := h.engineFactory.Create()
 	d, err := e.GetStatus(params.DagID)

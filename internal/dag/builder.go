@@ -368,6 +368,7 @@ func buildSteps(def *configDefinition, d *DAG, options BuildDAGOptions) error {
 	return nil
 }
 
+// nolint // cognitive complexity
 func buildStep(variables []string, def *stepDef, funcs []*funcDef, options BuildDAGOptions) (*Step, error) {
 	if err := assertStepDef(def, funcs); err != nil {
 		return nil, err
@@ -675,6 +676,7 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 	return nil
 }
 
+// nolint // cognitive complexity
 func parseScheduleMap(scheduleMap map[interface{}]interface{}, starts, stops, restarts *[]string) error {
 	for k, v := range scheduleMap {
 		if _, ok := k.(string); !ok {
