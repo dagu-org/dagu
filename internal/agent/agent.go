@@ -305,7 +305,7 @@ func (a *Agent) run(ctx context.Context) error {
 	listen := make(chan error)
 	go func() {
 		err := a.socketServer.Serve(listen)
-		if err != nil && err != sock.ErrServerRequestedShutdown {
+		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
 			log.Printf("failed to start socket frontend %v", err)
 		}
 	}()
