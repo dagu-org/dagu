@@ -322,6 +322,8 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 		case NodeStatusCancel:
 			ready = false
 			node.setStatus(NodeStatusCancel)
+		case NodeStatusNone, NodeStatusRunning:
+			ready = false
 		default:
 			ready = false
 		}
@@ -393,8 +395,7 @@ func (sc *Scheduler) setCanceled() {
 func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
 	count := 0
 	for _, node := range g.Nodes() {
-		switch node.State().Status {
-		case NodeStatusRunning:
+		if node.State().Status == NodeStatusRunning {
 			count++
 		}
 	}
@@ -403,8 +404,7 @@ func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
 
 func (sc *Scheduler) isFinished(g *ExecutionGraph) bool {
 	for _, node := range g.Nodes() {
-		switch node.State().Status {
-		case NodeStatusRunning, NodeStatusNone:
+		if node.State().Status == NodeStatusRunning || node.State().Status == NodeStatusNone {
 			return false
 		}
 	}
