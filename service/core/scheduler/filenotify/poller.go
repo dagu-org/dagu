@@ -318,7 +318,7 @@ func checkChange(fi1, fi2 os.FileInfo) fsnotify.Op {
 	if fi1.Mode() != fi2.Mode() {
 		return fsnotify.Chmod
 	}
-	if fi1.ModTime() != fi2.ModTime() || fi1.Size() != fi2.Size() {
+	if !fi1.ModTime().Equal(fi2.ModTime()) || fi1.Size() != fi2.Size() {
 		return fsnotify.Write
 	}
 
