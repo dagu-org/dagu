@@ -311,11 +311,11 @@ func (store *Store) latestToday(dagFile string, day time.Time) (string, error) {
 	var ret []string
 	pattern := fmt.Sprintf("%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"))
 	matches, err := filepath.Glob(pattern)
-	if err == nil || len(matches) > 0 {
-		ret = filterLatest(matches, 1)
-	} else {
+	if err != nil || len(matches) == 0 {
 		return "", persistence.ErrNoStatusDataToday
 	}
+	ret = filterLatest(matches, 1)
+
 	if len(ret) == 0 {
 		return "", persistence.ErrNoStatusData
 	}
