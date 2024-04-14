@@ -28,7 +28,7 @@ func startAllCmd() *cobra.Command {
 				config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 				err := core.NewScheduler(app.TopLevelModule).Start(cmd.Context())
 				if err != nil {
-					log.Fatal(err)
+					log.Fatal(err) // nolint // deep-exit
 				}
 			}()
 

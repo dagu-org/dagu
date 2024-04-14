@@ -24,7 +24,7 @@ func execDAG(ctx context.Context, e engine.Engine, cmd *cobra.Command, args []st
 
 	err = start(ctx, e, loadedDAG, dry)
 	if err != nil {
-		log.Fatalf("Failed to start DAG: %v", err)
+		log.Fatalf("Failed to start DAG: %v", err) // nolint // deep-exit
 	}
 }
 
@@ -58,6 +58,7 @@ func listenSignals(ctx context.Context, a signalListener) {
 	}()
 }
 
+// nolint // deep-exit
 func checkError(err error) {
 	if err != nil {
 		log.Fatal(err)
