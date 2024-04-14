@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -27,6 +28,8 @@ type SSHExecutor struct {
 	stdout    io.Writer
 	session   *ssh.Session
 }
+
+var errStrictHostKey = errors.New("StrictHostKeyChecking is not supported yet")
 
 func (e *SSHExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
@@ -82,7 +85,7 @@ func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}
 
 	if cfg.StrictHostKeyChecking {
-		return nil, fmt.Errorf("StrictHostKeyChecking is not supported yet")
+		return nil, errStrictHostKey
 	}
 
 	// Create the Signer for this private key.

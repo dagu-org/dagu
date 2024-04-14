@@ -37,7 +37,10 @@ const (
 )
 
 var (
-	errInvalidArgs = errors.New("invalid argument")
+	errInvalidArgs        = errors.New("invalid argument")
+	ErrFailedToReadStatus = errors.New("failed to read status")
+	ErrStepNotFound       = errors.New("step was not found")
+	ErrReadingLastStatus  = errors.New("error reading the last status")
 )
 
 type DAGHandler struct {
@@ -227,7 +230,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 	if logFile == "" {
 		s, err := e.GetLatestStatus(dag)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read status")
+			return nil, ErrFailedToReadStatus
 		}
 		status = s
 	} else {
@@ -248,7 +251,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 		return item.Name == stepName
 	})
 	if !ok {
-		return nil, fmt.Errorf("step name was not found %s", stepName)
+		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
 	}
 
 	logContent, err := getLogFileContent(node.Log)
@@ -299,7 +302,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 	if statusFile == "" {
 		s, err := e.GetLatestStatus(dag)
 		if err != nil {
-			return nil, fmt.Errorf("error reading the last status")
+			return nil, ErrReadingLastStatus
 		}
 		logFile = s.Log
 	} else {
@@ -423,7 +426,7 @@ func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler
 		return item.Step.Name == step
 	})
 	if !ok {
-		return fmt.Errorf("step was not found: %s", step)
+		return fmt.Errorf("%w: %s", ErrStepNotFound, step)
 	}
 
 	status.Nodes[idx].Status = to

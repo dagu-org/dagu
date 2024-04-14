@@ -15,6 +15,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/mitchellh/mapstructure"
+	"github.com/pkg/errors"
 )
 
 type DockerExecutor struct {
@@ -27,6 +28,8 @@ type DockerExecutor struct {
 	context         context.Context
 	cancel          func()
 }
+
+var errImageMustBeString = errors.New("image must be string")
 
 func (e *DockerExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
@@ -164,7 +167,7 @@ func CreateDockerExecutor(ctx context.Context, step dag.Step) (Executor, error) 
 			return exec, nil
 		}
 	}
-	return nil, fmt.Errorf("image must be string")
+	return nil, errImageMustBeString
 }
 
 func init() {

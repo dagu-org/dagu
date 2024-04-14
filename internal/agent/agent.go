@@ -30,6 +30,11 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	errFailedStartSocketFrontend = errors.New("failed to start the socket frontend")
+	errDAGAlreadyRunning         = errors.New("the DAG is already running")
+)
+
 // Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
 	*Config
@@ -309,7 +314,7 @@ func (a *Agent) run(ctx context.Context) error {
 	}()
 
 	if err := <-listen; err != nil {
-		return fmt.Errorf("failed to start the socket frontend")
+		return errFailedStartSocketFrontend
 	}
 
 	done := make(chan *scheduler.Node)
@@ -380,8 +385,7 @@ func (a *Agent) checkIsRunning() error {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("the DAG is already running. socket=%s",
-			a.DAG.SockAddr())
+		return fmt.Errorf("%w. socket=%s", errDAGAlreadyRunning, a.DAG.SockAddr())
 	}
 	return nil
 }

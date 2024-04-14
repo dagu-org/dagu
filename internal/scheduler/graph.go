@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -22,6 +23,11 @@ type ExecutionGraph struct {
 	to              map[int][]int
 	mu              sync.RWMutex
 }
+
+var (
+	errCycleDetected = errors.New("cycle detected")
+	errStepNotFound  = errors.New("step not found")
+)
 
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
@@ -199,7 +205,7 @@ func (g *ExecutionGraph) setup() error {
 	}
 
 	if g.hasCycle() {
-		return fmt.Errorf("cycle detected")
+		return errCycleDetected
 	}
 
 	return nil
@@ -252,5 +258,5 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 			return n, nil
 		}
 	}
-	return nil, fmt.Errorf("step not found: %s", name)
+	return nil, fmt.Errorf("%w: %s", errStepNotFound, name)
 }

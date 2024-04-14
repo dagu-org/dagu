@@ -36,6 +36,12 @@ type Store struct {
 	writer  *writer
 }
 
+var (
+	errRequestIdNotFound  = errors.New("requestId not found")
+	errCreateNewDirectory = errors.New("failed to create new directory")
+	errDAGFileEmpty       = errors.New("dagFile is empty")
+)
+
 // New creates a new Store with default configuration.
 func New(dir, dagsDir string) *Store {
 	// dagsDir is used to calculate the directory that is compatible with the old version.
@@ -158,7 +164,7 @@ func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 // FindByRequestId finds a status file by requestId.
 func (store *Store) FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error) {
 	if requestId == "" {
-		return nil, fmt.Errorf("requestId is empty")
+		return nil, errRequestIdNotFound
 	}
 	pattern := store.pattern(dagFile) + "*.dat"
 	matches, err := filepath.Glob(pattern)
@@ -264,7 +270,7 @@ func (store *Store) Rename(oldName, newName string) error {
 	}
 	if !store.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return fmt.Errorf("failed to create new directory %s : %s", newDir, err.Error())
+			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err.Error())
 		}
 	}
 	matches, err := filepath.Glob(store.pattern(on) + "*.dat")
@@ -286,14 +292,14 @@ func (store *Store) Rename(oldName, newName string) error {
 
 func (store *Store) directory(name string, prefix string) string {
 	h := md5.New()
-	h.Write([]byte(name))
+	_, _ = h.Write([]byte(name))
 	v := hex.EncodeToString(h.Sum(nil))
 	return filepath.Join(store.dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
 func (store *Store) newFile(dagFile string, t time.Time, requestId string) (string, error) {
 	if dagFile == "" {
-		return "", fmt.Errorf("dagFile is empty")
+		return "", errDAGFileEmpty
 	}
 	fileName := fmt.Sprintf("%s.%s.%s.dat", store.pattern(dagFile), t.Format("20060102.15:04:05.000"), utils.TruncString(requestId, 8))
 	return fileName, nil

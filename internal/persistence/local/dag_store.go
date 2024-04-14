@@ -22,10 +22,23 @@ func NewDAGStore(dir string) persistence.DAGStore {
 	return &dagStoreImpl{dir: dir}
 }
 
+var (
+	errInvalidName           = errors.New("invalid name")
+	errFailedToReadDAGFile   = errors.New("failed to read DAG file")
+	errDOGFileNotExist       = errors.New("the DAG file does not exist")
+	errFailedToUpdateDAGFile = errors.New("failed to update DAG file")
+	errFailedToCreateDAGFile = errors.New("failed to create DAG file")
+	errFailedToCreateDAGsDir = errors.New("failed to create DAGs directory")
+	errFailedToDeleteDAGFile = errors.New("failed to delete DAG file")
+	errDAGFileAlreadyExists  = errors.New("the DAG file already exists")
+	errInvalidNewName        = errors.New("invalid new name")
+	errInvalidOldName        = errors.New("invalid old name")
+)
+
 func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 	loc, err := d.fileLocation(name)
 	if err != nil {
-		return nil, fmt.Errorf("invalid name: %s", name)
+		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
 	cl := dag.Loader{}
 	dat, err := cl.LoadMetadata(loc)
@@ -38,7 +51,7 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	loc, err := d.fileLocation(name)
 	if err != nil {
-		return nil, fmt.Errorf("invalid name: %s", name)
+		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
 	cl := dag.Loader{}
 	dat, err := cl.LoadWithoutEval(loc)
@@ -51,11 +64,11 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 	loc, err := d.fileLocation(name)
 	if err != nil {
-		return "", fmt.Errorf("invalid name: %s", name)
+		return "", fmt.Errorf("%w: %s", errInvalidName, name)
 	}
 	dat, err := os.ReadFile(loc)
 	if err != nil {
-		return "", fmt.Errorf("failed to read DAG file: %s", err)
+		return "", fmt.Errorf("%w: %s", errFailedToReadDAGFile, err)
 	}
 	return string(dat), nil
 }
@@ -69,28 +82,28 @@ func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	}
 	loc, err := d.fileLocation(name)
 	if err != nil {
-		return fmt.Errorf("invalid name: %s", name)
+		return fmt.Errorf("%w: %s", errInvalidName, name)
 	}
 	if !exists(loc) {
-		return fmt.Errorf("the DAG file %s does not exist", loc)
+		return fmt.Errorf("%w: %s", errDOGFileNotExist, loc)
 	}
 	err = os.WriteFile(loc, spec, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to update DAG file: %s", err)
+		return fmt.Errorf("%w: %s", errFailedToUpdateDAGFile, err)
 	}
 	return nil
 }
 
 func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
-		return "", fmt.Errorf("failed to create DAGs directory %s", d.dir)
+		return "", fmt.Errorf("%w: %s", errFailedToCreateDAGsDir, d.dir)
 	}
 	loc, err := d.fileLocation(name)
 	if err != nil {
-		return "", fmt.Errorf("failed to create DAG file: %s", err)
+		return "", fmt.Errorf("%w: %s", errFailedToCreateDAGFile, name)
 	}
 	if exists(loc) {
-		return "", fmt.Errorf("the DAG file %s already exists", loc)
+		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, loc)
 	}
 	return name, os.WriteFile(loc, spec, 0644)
 }
@@ -98,11 +111,11 @@ func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 func (d *dagStoreImpl) Delete(name string) error {
 	loc, err := d.fileLocation(name)
 	if err != nil {
-		return fmt.Errorf("failed to create DAG file: %s", err)
+		return fmt.Errorf("%w: %s", errFailedToCreateDAGFile, name)
 	}
 	err = os.Remove(loc)
 	if err != nil {
-		return fmt.Errorf("failed to delete DAG file: %s", err)
+		return fmt.Errorf("%w: %s", errFailedToDeleteDAGFile, err)
 	}
 	return nil
 }
@@ -215,21 +228,18 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 }
 
 func (d *dagStoreImpl) Load(name string) (*dag.DAG, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (d *dagStoreImpl) Rename(oldDAGPath, newDAGPath string) error {
 	oldLoc, err := d.fileLocation(oldDAGPath)
 	if err != nil {
-		return fmt.Errorf("invalid old name: %s", oldDAGPath)
+		return fmt.Errorf("%w: %s", errInvalidOldName, oldDAGPath)
 	}
 	newLoc, err := d.fileLocation(newDAGPath)
 	if err != nil {
-		return fmt.Errorf("invalid new name: %s", newDAGPath)
+		return fmt.Errorf("%w: %s", errInvalidNewName, newDAGPath)
 	}
-	if err := os.Rename(oldLoc, newLoc); err != nil {
-		return err
-	}
-	return nil
+	return os.Rename(oldLoc, newLoc)
 }

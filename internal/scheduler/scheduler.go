@@ -23,6 +23,11 @@ const (
 	StatusSuccess
 )
 
+var (
+	errUpstreamFailed  = fmt.Errorf("upstream failed")
+	errUpstreamSkipped = fmt.Errorf("upstream skipped")
+)
+
 func (s Status) String() string {
 	switch s {
 	case StatusRunning:
@@ -305,13 +310,13 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			if !n.step.ContinueOn.Failure {
 				ready = false
 				node.setStatus(NodeStatusCancel)
-				node.SetError(fmt.Errorf("upstream failed"))
+				node.SetError(errUpstreamFailed)
 			}
 		case NodeStatusSkipped:
 			if !n.step.ContinueOn.Skipped {
 				ready = false
 				node.setStatus(NodeStatusSkipped)
-				node.SetError(fmt.Errorf("upstream skipped"))
+				node.SetError(errUpstreamSkipped)
 			}
 		case NodeStatusCancel:
 			ready = false

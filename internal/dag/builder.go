@@ -1,6 +1,7 @@
 package dag
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -8,7 +9,8 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/constants"
-	"github.com/dagu-dev/dagu/internal/errors"
+	// aliasing errors package to avoid conflict with the standard library
+	dagerrors "github.com/dagu-dev/dagu/internal/errors"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/robfig/cron/v3"
 	"golang.org/x/sys/unix"
@@ -30,6 +32,31 @@ type DAGBuilder struct {
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
+var (
+	errInvalidSchedule                    = errors.New("invalid schedule")
+	errScheduleMustBeArray                = errors.New("schedule must be an array of interfaces")
+	errScheduleMustBeStringOrArray        = errors.New("schedule must be a string or an array of strings")
+	errInvalidScheduleType                = errors.New("invalid schedule type")
+	errInvalidKeyType                     = errors.New("invalid key type")
+	errExecutorConfigMustBeString         = errors.New("executor config key must be string")
+	errDuplicateFunction                  = errors.New("duplicate function")
+	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
+	errStepNameRequired                   = errors.New("step name must be specified")
+	errStepCommandOrCallRequired          = errors.New("either step command or step call must be specified if executor is nil")
+	errCallFunctionNotFound               = errors.New("call must specify a functions that exists")
+	errNumberOfParamsMismatch             = errors.New("the number of parameters defined in the function does not match the number of parameters given")
+	errRequiredParameterNotFound          = errors.New("required parameter not found")
+	errScheduleKeyMustBeStartOrStop       = errors.New("schedule key must be start or stop")
+	errScheduleKeyMustBeString            = errors.New("schedule key must be a string")
+	errInvalidSignal                      = errors.New("invalid signal")
+	errInvalidEnvValue                    = errors.New("invalid value for env")
+	errArgsMustBeConvertibleToIntOrString = errors.New("args must be convertible to either int or string")
+	errExecutorTypeMustBeString           = errors.New("executor.type value must be string")
+	errExecutorConfigValueMustBeMap       = errors.New("executor.config value must be a map")
+	errExecutorHasInvalidKey              = errors.New("executor has invalid key")
+	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
+)
+
 func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
 	b.baseConfig = baseConfig
 
@@ -37,7 +64,7 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 
 	setDAGProperties(def, d)
 
-	errList := &errors.ErrorList{}
+	errList := &dagerrors.ErrorList{}
 
 	errList.Add(buildSchedule(def, d))
 	if !b.options.skipEnvEval {
@@ -61,7 +88,7 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 }
 
 func buildAll(def *configDefinition, d *DAG, options BuildDAGOptions) error {
-	errList := &errors.ErrorList{}
+	errList := &dagerrors.ErrorList{}
 
 	errList.Add(buildLogDir(def, d))
 	errList.Add(assertFunctions(def.Functions))
@@ -104,20 +131,25 @@ func setDAGProperties(def *configDefinition, d *DAG) {
 }
 
 func buildSchedule(def *configDefinition, d *DAG) error {
-	starts := []string{}
-	stops := []string{}
-	restarts := []string{}
+	var starts []string
+	var stops []string
+	var restarts []string
 
 	switch (def.Schedule).(type) {
 	case string:
 		starts = append(starts, def.Schedule.(string))
 	case []interface{}:
-		for _, s := range def.Schedule.([]interface{}) {
-			if s, ok := s.(string); ok {
-				starts = append(starts, s)
-			} else {
-				return fmt.Errorf("schedule must be a string or an array of strings")
+		schedules, ok := def.Schedule.([]interface{})
+		if !ok {
+			return fmt.Errorf("%w, got %T: ", errScheduleMustBeArray, def.Schedule)
+		}
+		for _, s := range schedules {
+			s, ok := s.(string)
+			if !ok {
+				return fmt.Errorf("%w, got %T: ", errScheduleMustBeStringOrArray, s)
 			}
+
+			starts = append(starts, s)
 		}
 	case map[interface{}]interface{}:
 		if err := parseScheduleMap(def.Schedule.(map[interface{}]interface{}), &starts, &stops, &restarts); err != nil {
@@ -125,7 +157,7 @@ func buildSchedule(def *configDefinition, d *DAG) error {
 		}
 	case nil:
 	default:
-		return fmt.Errorf("invalid schedule type: %T", def.Schedule)
+		return fmt.Errorf("%w: %T", errInvalidScheduleType, def.Schedule)
 	}
 
 	var err error
@@ -278,7 +310,7 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 				if vv, ok := v.(string); ok {
 					a = append(a, &envVariable{k, vv})
 				} else {
-					return a, fmt.Errorf("invalid value for env %s", v)
+					return a, fmt.Errorf("%w: %s", errInvalidEnvValue, v)
 				}
 			}
 		}
@@ -359,7 +391,7 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 				continue
 			}
 
-			return nil, fmt.Errorf("args must be convertible to either int or string")
+			return nil, errArgsMustBeConvertibleToIntOrString
 		}
 
 		calledFuncDef := &funcDef{}
@@ -394,7 +426,7 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 						if v, ok := v.(string); ok {
 							step.ExecutorConfig.Type = v
 						} else {
-							return nil, fmt.Errorf("executor.type value must be string")
+							return nil, errExecutorTypeMustBeString
 						}
 					case "config":
 						if v, ok := v.(map[interface{}]interface{}); ok {
@@ -402,21 +434,21 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 								if k, ok := k.(string); ok {
 									step.ExecutorConfig.Config[k] = v
 								} else {
-									return nil, fmt.Errorf("executor.config key must be string")
+									return nil, errExecutorConfigMustBeString
 								}
 							}
 						} else {
-							return nil, fmt.Errorf("executor.config value must be a map")
+							return nil, errExecutorConfigValueMustBeMap
 						}
 					default:
-						return nil, fmt.Errorf("executor has invalid key '%s'", k)
+						return nil, fmt.Errorf("%w: %s", errExecutorHasInvalidKey, k)
 					}
 				} else {
-					return nil, fmt.Errorf("executor config map key must be string")
+					return nil, errExecutorConfigMustBeString
 				}
 			}
 		default:
-			return nil, fmt.Errorf("executor config must be string or map")
+			return nil, errExecutorConfigMustBeStringOrMap
 		}
 	}
 
@@ -448,7 +480,7 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 		sigDef := *def.SignalOnStop
 		sig := unix.SignalNum(sigDef)
 		if sig == 0 {
-			return nil, fmt.Errorf("invalid signal: %s", sigDef)
+			return nil, fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
 		}
 		step.SignalOnStop = sigDef
 	}
@@ -470,7 +502,7 @@ func convertMap(m map[string]interface{}) error {
 		case string:
 			return v, nil
 		default:
-			return nil, fmt.Errorf("invalid key type: %t", v)
+			return nil, fmt.Errorf("%w: %t", errInvalidKeyType, v)
 		}
 	}
 
@@ -483,11 +515,11 @@ func convertMap(m map[string]interface{}) error {
 			case map[interface{}]interface{}:
 				ret := map[string]interface{}{}
 				for kk, vv := range v {
-					if kk, err := convertKey(kk); err != nil {
-						return fmt.Errorf("executor config key must be string: %s", err)
-					} else {
-						ret[kk.(string)] = vv
+					kk, err := convertKey(kk)
+					if err != nil {
+						return fmt.Errorf("%w: %s", errExecutorConfigMustBeString, err)
 					}
+					ret[kk.(string)] = vv
 				}
 				delete(curr, k)
 				curr[k] = ret
@@ -565,7 +597,7 @@ func parseSchedule(values []string) ([]*Schedule, error) {
 	for _, v := range values {
 		paresed, err := cronParser.Parse(v)
 		if err != nil {
-			return nil, fmt.Errorf("invalid schedule: %s", err)
+			return nil, fmt.Errorf("%w: %s", errInvalidSchedule, err)
 		}
 		ret = append(ret, &Schedule{
 			Expression: v,
@@ -584,19 +616,19 @@ func assertFunctions(funcs []*funcDef) error {
 	nameMap := make(map[string]bool)
 	for _, funcDef := range funcs {
 		if _, exists := nameMap[funcDef.Name]; exists {
-			return fmt.Errorf("duplicate function")
+			return errDuplicateFunction
 		}
 		nameMap[funcDef.Name] = true
 
 		definedParamNames := strings.Split(funcDef.Params, " ")
 		passedParamNames := utils.ExtractParamNames(funcDef.Command)
 		if len(definedParamNames) != len(passedParamNames) {
-			return fmt.Errorf("func params and args given to func command do not match")
+			return errFuncParamsMismatch
 		}
 
 		for i := 0; i < len(definedParamNames); i++ {
 			if definedParamNames[i] != passedParamNames[i] {
-				return fmt.Errorf("func params and args given to func command do not match")
+				return errFuncParamsMismatch
 			}
 		}
 	}
@@ -606,11 +638,11 @@ func assertFunctions(funcs []*funcDef) error {
 
 func assertStepDef(def *stepDef, funcs []*funcDef) error {
 	if def.Name == "" {
-		return fmt.Errorf("step name must be specified")
+		return errStepNameRequired
 	}
 	// TODO: Refactor the validation check for each executor.
 	if def.Executor == nil && (def.Command == "" && def.Call == nil) {
-		return fmt.Errorf("either step command or step call must be specified if executor is nil")
+		return errStepCommandOrCallRequired
 	}
 
 	if def.Call != nil {
@@ -623,18 +655,18 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 			}
 		}
 		if calledFuncDef.Name == "" {
-			return fmt.Errorf("call must specify a functions that exists")
+			return errCallFunctionNotFound
 		}
 
 		definedParamNames := strings.Split(calledFuncDef.Params, " ")
 		if len(def.Call.Args) != len(definedParamNames) {
-			return fmt.Errorf("the number of parameters defined in the function does not match the number of parameters given")
+			return errNumberOfParamsMismatch
 		}
 
 		for _, paramName := range definedParamNames {
 			_, exists := def.Call.Args[paramName]
 			if !exists {
-				return fmt.Errorf("required parameter not found")
+				return errRequiredParameterNotFound
 			}
 		}
 	}
@@ -645,7 +677,7 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 func parseScheduleMap(scheduleMap map[interface{}]interface{}, starts, stops, restarts *[]string) error {
 	for k, v := range scheduleMap {
 		if _, ok := k.(string); !ok {
-			return fmt.Errorf("schedule key must be a string")
+			return errScheduleKeyMustBeString
 		}
 		switch k.(string) {
 		case scheduleStart, scheduleStop, scheduleRestart:
@@ -671,14 +703,14 @@ func parseScheduleMap(scheduleMap map[interface{}]interface{}, starts, stops, re
 							*restarts = append(*restarts, item)
 						}
 					} else {
-						return fmt.Errorf("schedule must be a string or an array of strings")
+						return errScheduleMustBeStringOrArray
 					}
 				}
 			default:
-				return fmt.Errorf("schedule must be a string or an array of strings")
+				return errScheduleMustBeStringOrArray
 			}
 		default:
-			return fmt.Errorf("schedule key must be start or stop")
+			return errScheduleKeyMustBeStartOrStop
 		}
 	}
 	return nil

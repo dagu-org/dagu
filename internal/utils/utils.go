@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,6 +18,11 @@ import (
 )
 
 var defaultEnv map[string]string
+
+var (
+	ErrUnexpectedEOF         = errors.New("unexpected end of input after escape character")
+	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
+)
 
 func init() {
 	defaultEnv = map[string]string{
@@ -407,7 +413,7 @@ func UnescapeArg(input string) (string, error) {
 		if char == '\\' {
 			i++
 			if i >= length {
-				return "", fmt.Errorf("unexpected end of input after escape character")
+				return "", ErrUnexpectedEOF
 			}
 
 			switch input[i] {
@@ -418,7 +424,7 @@ func UnescapeArg(input string) (string, error) {
 			case '"':
 				escaped.WriteRune('"')
 			default:
-				return "", fmt.Errorf("unknown escape sequence '\\%c'", input[i])
+				return "", fmt.Errorf("%w: '\\%c'", ErrUnknownEscapeSequence, input[i])
 			}
 		} else {
 			escaped.WriteByte(char)

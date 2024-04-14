@@ -51,6 +51,13 @@ var (
 `)
 )
 
+var (
+	errCreateDAGFile = errors.New("failed to create DAG file")
+	errRenameDAG     = errors.New("failed to rename DAG")
+	errGetStatus     = errors.New("failed to get status")
+	errDAGIsRunning  = errors.New("the DAG is running")
+)
+
 func (e *engineImpl) GetDAGSpec(id string) (string, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	return ds.GetSpec(id)
@@ -60,7 +67,7 @@ func (e *engineImpl) CreateDAG(name string) (string, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	id, err := ds.Create(name, _DAGTemplate)
 	if err != nil {
-		return "", fmt.Errorf("failed to create DAG file: %s", err)
+		return "", fmt.Errorf("%w: %s", errCreateDAGFile, err)
 	}
 	return id, nil
 }
@@ -211,7 +218,7 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 		ss, _ := model.StatusFromJson(res)
 		if ss != nil && ss.RequestId == status.RequestId &&
 			ss.Status == scheduler.StatusRunning {
-			return fmt.Errorf("the DAG is running")
+			return errDAGIsRunning
 		}
 	}
 	return e.dataStoreFactory.NewHistoryStore().Update(dag.Location, status.RequestId, status)
