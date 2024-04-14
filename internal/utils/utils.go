@@ -89,7 +89,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		args, err := parser.Parse(a)
 		if err != nil {
 			log.Printf("failed to parse arguments: %s", err)
-			//if parse shell world error use all substing as args
+			// if parse shell world error use all substing as args
 			return program, []string{vals[1]}
 		}
 		ret := []string{}
@@ -106,7 +106,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 	return vals[0], []string{}
 }
 
-// Assign values to command parameters
+// AssignValues Assign values to command parameters
 func AssignValues(command string, params map[string]string) string {
 	updatedCommand := command
 
@@ -117,14 +117,14 @@ func AssignValues(command string, params map[string]string) string {
 	return updatedCommand
 }
 
-// Returns a command with parameters stripped from it.
+// RemoveParams Returns a command with parameters stripped from it.
 func RemoveParams(command string) string {
 	paramRegex := regexp.MustCompile(`\$\w+`)
 
 	return paramRegex.ReplaceAllString(command, "")
 }
 
-// extracts a slice of parameter names by removing the '$' from the command string.
+// ExtractParamNames extracts a slice of parameter names by removing the '$' from the command string.
 func ExtractParamNames(command string) []string {
 	words := strings.Fields(command)
 
@@ -250,7 +250,7 @@ func LogErr(action string, err error) {
 	}
 }
 
-// TrunString returns truncated string.
+// TruncString TurnString returns truncated string.
 func TruncString(val string, max int) string {
 	if len(val) > max {
 		return val[:max]
@@ -258,7 +258,7 @@ func TruncString(val string, max int) string {
 	return val
 }
 
-// StringsWithFallback returns the first non-empty string
+// StringWithFallback StringsWithFallback returns the first non-empty string
 // in the parameter list.
 func StringWithFallback(val, fallback string) string {
 	if val == "" {
