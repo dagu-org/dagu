@@ -18,7 +18,7 @@ var (
 		fx.Provide(logger.NewSlogLogger),
 		fx.Provide(client.NewDataStoreFactory),
 	)
-	cfgInstance *config.Config = nil
+	cfgInstance *config.Config
 )
 
 func ConfigProvider() *config.Config {

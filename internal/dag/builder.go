@@ -296,10 +296,11 @@ type envVariable struct {
 	val string
 }
 
+// nolint // cognitive complexity
 func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 	map[string]string, error,
 ) {
-	var vals []*envVariable = []*envVariable{}
+	var vals []*envVariable
 	for k, v := range options.defaultEnvs {
 		vals = append(vals, &envVariable{k, v})
 	}

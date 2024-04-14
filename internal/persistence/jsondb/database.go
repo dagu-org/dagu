@@ -102,7 +102,7 @@ func ParseFile(file string) (*model.Status, error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	var offset int64 = 0
+	var offset int64
 	var ret *model.Status
 	for {
 		line, err := readLineFrom(f, offset)
@@ -197,7 +197,7 @@ func (store *Store) RemoveAll(dagFile string) error {
 // RemoveOld removes old files.
 func (store *Store) RemoveOld(dagFile string, retentionDays int) error {
 	pattern := store.pattern(dagFile) + "*.dat"
-	var lastErr error = nil
+	var lastErr error
 	if retentionDays >= 0 {
 		matches, _ := filepath.Glob(pattern)
 		ot := time.Now().AddDate(0, 0, -1*retentionDays)
