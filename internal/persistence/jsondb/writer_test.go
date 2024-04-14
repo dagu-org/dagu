@@ -80,7 +80,7 @@ func TestWriteStatusToExistingFile(t *testing.T) {
 	status := model.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
 	status.RequestId = "request-id-test-write-status-to-existing-file"
 	require.NoError(t, dw.write(status))
-	dw.close()
+	_ = dw.close()
 
 	data, err := db.FindByRequestId(d.Location, status.RequestId)
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestWriteStatusToExistingFile(t *testing.T) {
 	require.NoError(t, dw.open())
 	status.Status = scheduler.StatusSuccess
 	require.NoError(t, dw.write(status))
-	dw.close()
+	_ = dw.close()
 
 	data, err = db.FindByRequestId(d.Location, status.RequestId)
 	require.NoError(t, err)

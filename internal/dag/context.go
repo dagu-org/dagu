@@ -11,6 +11,10 @@ func NewContext(ctx context.Context, dag *DAG) context.Context {
 type DAGContextKey struct{}
 
 // GetDAGFromContext returns the DAG from the current context.
-func GetDAGFromContext(ctx context.Context) *DAG {
-	return ctx.Value(DAGContextKey{}).(*DAG)
+func GetDAGFromContext(ctx context.Context) (*DAG, error) {
+	dag, ok := ctx.Value(DAGContextKey{}).(*DAG)
+	if !ok {
+		return nil, errFailedAssertion
+	}
+	return dag, nil
 }

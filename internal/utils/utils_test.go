@@ -87,8 +87,8 @@ func TestOpenFile(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		f.Close()
-		os.Remove(name)
+		_ = f.Close()
+		_ = os.Remove(name)
 	}()
 
 	_, _ = f.WriteString("test")
@@ -108,14 +108,14 @@ func TestOpenOrCreateFile(t *testing.T) {
 	require.NoError(t, err)
 
 	defer func() {
-		f.Close()
-		os.Remove(name)
+		_ = f.Close()
+		_ = os.Remove(name)
 	}()
 
 	require.True(t, utils.FileExists(name))
 
-	f.Close()
-	os.Remove(name)
+	_ = f.Close()
+	_ = os.Remove(name)
 
 	_, err = utils.OpenFile(name)
 	require.Error(t, err)
@@ -178,7 +178,7 @@ func TestIgnoreErr(t *testing.T) {
 
 	utils.LogErr("test action", errors.New("test error"))
 	os.Stdout = origStdout
-	w.Close()
+	_ = w.Close()
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)

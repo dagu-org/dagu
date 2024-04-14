@@ -75,7 +75,7 @@ func (d *DAG) SockAddr() string {
 	s := strings.ReplaceAll(d.Location, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
 	h := md5.New()
-	h.Write([]byte(s))
+	_, _ = h.Write([]byte(s))
 	bs := h.Sum(nil)
 	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
 }
