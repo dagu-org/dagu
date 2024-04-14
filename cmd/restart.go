@@ -47,26 +47,26 @@ func restartCmd() *cobra.Command {
 	}
 }
 
-func stopDAGIfRunning(e engine.Engine, dag *dag.DAG) {
-	st, err := e.GetCurrentStatus(dag)
+func stopDAGIfRunning(e engine.Engine, d *dag.DAG) {
+	st, err := e.GetCurrentStatus(d)
 	checkError(err)
 
 	// Stop the DAG if it is running.
 	if st.Status == scheduler.StatusRunning {
-		log.Printf("Stopping %s for restart...", dag.Name)
-		cobra.CheckErr(stopRunningDAG(e, dag))
+		log.Printf("Stopping %s for restart...", d.Name)
+		cobra.CheckErr(stopRunningDAG(e, d))
 	}
 }
 
-func stopRunningDAG(e engine.Engine, dag *dag.DAG) error {
+func stopRunningDAG(e engine.Engine, d *dag.DAG) error {
 	for {
-		st, err := e.GetCurrentStatus(dag)
+		st, err := e.GetCurrentStatus(d)
 		checkError(err)
 
 		if st.Status != scheduler.StatusRunning {
 			return nil
 		}
-		checkError(e.Stop(dag))
+		checkError(e.Stop(d))
 		time.Sleep(time.Millisecond * 100)
 	}
 }
@@ -78,8 +78,8 @@ func waitForRestart(restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionParams(e engine.Engine, dag *dag.DAG) string {
-	st, err := e.GetLatestStatus(dag)
+func getPreviousExecutionParams(e engine.Engine, d *dag.DAG) string {
+	st, err := e.GetLatestStatus(d)
 	checkError(err)
 
 	return st.Params

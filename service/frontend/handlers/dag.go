@@ -215,7 +215,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	return resp, nil
 }
 
-func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
+func (h *DAGHandler) getStepLog(d *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
 	var stepByName = map[string]*domain.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
@@ -228,7 +228,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 	e := h.engineFactory.Create()
 
 	if logFile == "" {
-		s, err := e.GetLatestStatus(dag)
+		s, err := e.GetLatestStatus(d)
 		if err != nil {
 			return nil, ErrFailedToReadStatus
 		}
@@ -292,7 +292,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
+func (h *DAGHandler) readSchedulerLog(d *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
 	var (
 		logFile string
 	)
@@ -300,7 +300,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 	e := h.engineFactory.Create()
 
 	if statusFile == "" {
-		s, err := e.GetLatestStatus(dag)
+		s, err := e.GetLatestStatus(d)
 		if err != nil {
 			return nil, ErrReadingLastStatus
 		}
@@ -415,9 +415,9 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
+func (h *DAGHandler) updateStatus(d *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
 	e := h.engineFactory.Create()
-	status, err := e.GetStatusByRequestId(dag, reqId)
+	status, err := e.GetStatusByRequestId(d, reqId)
 	if err != nil {
 		return err
 	}
@@ -432,7 +432,7 @@ func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler
 	status.Nodes[idx].Status = to
 	status.Nodes[idx].StatusText = to.String()
 
-	return e.UpdateStatus(dag, status)
+	return e.UpdateStatus(d, status)
 }
 
 func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {

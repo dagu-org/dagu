@@ -19,7 +19,7 @@ import (
 )
 
 type JobFactory interface {
-	NewJob(dag *dag.DAG, next time.Time) scheduler.Job
+	NewJob(d *dag.DAG, next time.Time) scheduler.Job
 }
 
 type Params struct {
@@ -96,12 +96,12 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dag, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
+			d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
 			}
-			er.dags[fi.Name()] = dag
+			er.dags[fi.Name()] = d
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
@@ -131,11 +131,11 @@ func (er *EntryReader) watchDags() {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dag, err := cl.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {
-					er.dags[filepath.Base(event.Name)] = dag
+					er.dags[filepath.Base(event.Name)] = d
 					er.logger.Info("reload DAG entry_reader", "file", event.Name)
 				}
 			}
