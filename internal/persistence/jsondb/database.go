@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"io"
 	"log"
 	"os"
@@ -16,6 +15,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 
 	"github.com/dagu-dev/dagu/internal/utils"
 )

@@ -1,16 +1,17 @@
 package entry_reader
 
 import (
-	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/logger/tag"
-	"github.com/dagu-dev/dagu/service/core/scheduler/filenotify"
-	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/logger/tag"
+	"github.com/dagu-dev/dagu/service/core/scheduler/filenotify"
+	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/utils"

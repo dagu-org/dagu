@@ -2,10 +2,11 @@ package jsondb
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"

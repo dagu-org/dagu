@@ -1,8 +1,8 @@
 package response
 
 import (
-	"github.com/samber/lo"
 	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/samber/lo"
 )
 
 func toErrorText(err error) string {

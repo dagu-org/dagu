@@ -2,16 +2,17 @@ package cmd
 
 import (
 	"context"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func execDAG(ctx context.Context, e engine.Engine, cmd *cobra.Command, args []string, dry bool) {

@@ -8,8 +8,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTeeLogger(t *testing.T) {

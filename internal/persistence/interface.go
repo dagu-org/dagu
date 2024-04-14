@@ -2,11 +2,12 @@ package persistence
 
 import (
 	"fmt"
+	"path/filepath"
+	"time"
+
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
-	"path/filepath"
-	"time"
 )
 
 var (

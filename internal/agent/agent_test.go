@@ -2,9 +2,6 @@ package agent_test
 
 import (
 	"context"
-	"github.com/dagu-dev/dagu/internal/agent"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,6 +9,10 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/agent"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"

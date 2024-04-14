@@ -2,11 +2,12 @@ package jsondb
 
 import (
 	"bufio"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"os"
 	"path"
 	"strings"
 	"sync"
+
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 
 	"github.com/dagu-dev/dagu/internal/utils"
 )
