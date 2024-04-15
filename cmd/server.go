@@ -19,8 +19,7 @@ func serverCmd() *cobra.Command {
 			cobra.CheckErr(config.LoadConfig(homeDir))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			service := app.NewFrontendService()
-			err := service.Start(cmd.Context())
+			err := app.NewFrontendService().Start(cmd.Context())
 			checkError(err)
 		},
 	}

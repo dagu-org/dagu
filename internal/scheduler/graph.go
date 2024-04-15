@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -12,17 +13,18 @@ import (
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	StartedAt       time.Time
-	FinishedAt      time.Time
+	startedAt       time.Time
+	finishedAt      time.Time
 	outputVariables *utils.SyncMap
 	dict            map[int]*Node
 	nodes           []*Node
 	from            map[int][]int
 	to              map[int][]int
+	mu              sync.RWMutex
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
-func NewExecutionGraph(steps ...*dag.Step) (*ExecutionGraph, error) {
+func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		outputVariables: &utils.SyncMap{},
 		dict:            make(map[int]*Node),
@@ -32,7 +34,7 @@ func NewExecutionGraph(steps ...*dag.Step) (*ExecutionGraph, error) {
 	}
 	for _, step := range steps {
 		step.OutputVariables = graph.outputVariables
-		node := &Node{Step: step}
+		node := &Node{step: step}
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -53,8 +55,8 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 		nodes:           []*Node{},
 	}
 	for _, node := range nodes {
-		if node.OutputVariables != nil {
-			node.OutputVariables.Range(func(key, value interface{}) bool {
+		if node.step.OutputVariables != nil {
+			node.step.OutputVariables.Range(func(key, value interface{}) bool {
 				k := key.(string)
 				v := value.(string)
 				graph.outputVariables.Store(key, value)
@@ -65,7 +67,7 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 				return true
 			})
 		}
-		node.OutputVariables = graph.outputVariables
+		node.step.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -81,10 +83,59 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 
 // Duration returns the duration of the execution.
 func (g *ExecutionGraph) Duration() time.Duration {
-	if g.FinishedAt.IsZero() {
-		return time.Since(g.StartedAt)
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if g.finishedAt.IsZero() {
+		return time.Since(g.startedAt)
 	}
-	return g.FinishedAt.Sub(g.StartedAt)
+	return g.finishedAt.Sub(g.startedAt)
+}
+
+func (g *ExecutionGraph) IsStarted() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return !g.startedAt.IsZero()
+}
+
+func (g *ExecutionGraph) IsFinished() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return !g.finishedAt.IsZero()
+}
+
+func (g *ExecutionGraph) StartAt() time.Time {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.startedAt
+}
+
+func (g *ExecutionGraph) IsRunning() bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, node := range g.Nodes() {
+		if node.State().Status == NodeStatusRunning {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *ExecutionGraph) FinishAt() time.Time {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.finishedAt
+}
+
+func (g *ExecutionGraph) Finish() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.finishedAt = time.Now()
+}
+
+func (g *ExecutionGraph) Start() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.startedAt = time.Now()
 }
 
 // Nodes returns the nodes of the execution graph.
@@ -103,17 +154,17 @@ func (g *ExecutionGraph) setupRetry() error {
 		dict[node.id] = node.Status
 		retry[node.id] = false
 	}
-	frontier := []int{}
+	var frontier []int
 	for _, node := range g.nodes {
-		if len(node.Depends) == 0 {
+		if len(node.step.Depends) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
 	for len(frontier) > 0 {
-		next := []int{}
+		var next []int
 		for _, u := range frontier {
-			if retry[u] || dict[u] == NodeStatus_Error || dict[u] == NodeStatus_Cancel {
-				log.Printf("clear node state: %s", g.dict[u].Name)
+			if retry[u] || dict[u] == NodeStatusError || dict[u] == NodeStatusCancel {
+				log.Printf("clear node state: %s", g.dict[u].step.Name)
 				g.dict[u].clearState()
 				retry[u] = true
 			}
@@ -131,7 +182,7 @@ func (g *ExecutionGraph) setupRetry() error {
 
 func (g *ExecutionGraph) setup() error {
 	for _, node := range g.nodes {
-		for _, dep := range node.Depends {
+		for _, dep := range node.step.Depends {
 			depStep, err := g.findStep(dep)
 			if err != nil {
 				return err
@@ -190,7 +241,7 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	for _, n := range g.dict {
-		if n.Name == name {
+		if n.step.Name == name {
 			return n, nil
 		}
 	}

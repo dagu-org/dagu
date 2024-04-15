@@ -1,16 +1,17 @@
 package entry_reader
 
 import (
+	"os"
+	"path"
+	"testing"
+	"time"
+
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
-	"os"
-	"path"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -93,14 +94,10 @@ func TestReadEntries(t *testing.T) {
 	require.Equal(t, len(entries)-1, len(lives))
 }
 
-// TODO: fix to use mock library
-type mockJobFactory struct {
-}
+type mockJobFactory struct{}
 
 func (f *mockJobFactory) NewJob(d *dag.DAG, next time.Time) scheduler.Job {
-	return &mockJob{
-		DAG: d,
-	}
+	return &mockJob{DAG: d}
 }
 
 // TODO: fix to use mock library

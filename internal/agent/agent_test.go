@@ -50,7 +50,7 @@ func TestRunDAG(t *testing.T) {
 	a := agent.New(&agent.Config{DAG: d}, e, df)
 
 	status, _ := e.GetLatestStatus(d)
-	require.Equal(t, scheduler.SchedulerStatus_None, status.Status)
+	require.Equal(t, scheduler.StatusNone, status.Status)
 
 	go func() {
 		err := a.Run(context.Background())
@@ -62,7 +62,7 @@ func TestRunDAG(t *testing.T) {
 	require.Eventually(t, func() bool {
 		status, err := e.GetLatestStatus(d)
 		require.NoError(t, err)
-		return status.Status == scheduler.SchedulerStatus_Success
+		return status.Status == scheduler.StatusSuccess
 	}, time.Second*2, time.Millisecond*100)
 
 	// check deletion of expired history files
@@ -91,7 +91,7 @@ func TestCheckRunning(t *testing.T) {
 
 	status := a.Status()
 	require.NotNil(t, status)
-	require.Equal(t, status.Status, scheduler.SchedulerStatus_Running)
+	require.Equal(t, status.Status, scheduler.StatusRunning)
 
 	a = agent.New(&agent.Config{DAG: d}, e, df)
 	err := a.Run(context.Background())
@@ -114,7 +114,7 @@ func TestDryRun(t *testing.T) {
 	status := a.Status()
 	require.NoError(t, err)
 
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 }
 
 func TestCancelDAG(t *testing.T) {
@@ -138,7 +138,7 @@ func TestCancelDAG(t *testing.T) {
 		time.Sleep(time.Millisecond * 500)
 		status, err := e.GetLatestStatus(d)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
+		require.Equal(t, scheduler.StatusCancel, status.Status)
 	}
 }
 
@@ -162,9 +162,9 @@ func TestPreConditionInvalid(t *testing.T) {
 
 	status := a.Status()
 
-	require.Equal(t, scheduler.SchedulerStatus_Cancel, status.Status)
-	require.Equal(t, scheduler.NodeStatus_None, status.Nodes[0].Status)
-	require.Equal(t, scheduler.NodeStatus_None, status.Nodes[1].Status)
+	require.Equal(t, scheduler.StatusCancel, status.Status)
+	require.Equal(t, scheduler.NodeStatusNone, status.Nodes[0].Status)
+	require.Equal(t, scheduler.NodeStatusNone, status.Nodes[1].Status)
 }
 
 func TestPreConditionValid(t *testing.T) {
@@ -186,9 +186,9 @@ func TestPreConditionValid(t *testing.T) {
 	require.NoError(t, err)
 
 	status := a.Status()
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 	for _, s := range status.Nodes {
-		require.Equal(t, scheduler.NodeStatus_Success, s.Status)
+		require.Equal(t, scheduler.NodeStatusSuccess, s.Status)
 	}
 }
 
@@ -204,7 +204,7 @@ func TestStartError(t *testing.T) {
 	require.Error(t, err)
 
 	status := a.Status()
-	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.StatusError, status.Status)
 }
 
 func TestOnExit(t *testing.T) {
@@ -219,11 +219,11 @@ func TestOnExit(t *testing.T) {
 	require.NoError(t, err)
 
 	status := a.Status()
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 	for _, s := range status.Nodes {
-		require.Equal(t, scheduler.NodeStatus_Success, s.Status)
+		require.Equal(t, scheduler.NodeStatusSuccess, s.Status)
 	}
-	require.Equal(t, scheduler.NodeStatus_Success, status.OnExit.Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, status.OnExit.Status)
 }
 
 func TestRetry(t *testing.T) {
@@ -239,7 +239,7 @@ func TestRetry(t *testing.T) {
 	require.Error(t, err)
 
 	status := a.Status()
-	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.StatusError, status.Status)
 
 	for _, n := range status.Nodes {
 		n.CmdWithArgs = "true"
@@ -250,11 +250,11 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 
 	status = a.Status()
-	require.Equal(t, scheduler.SchedulerStatus_Success, status.Status)
+	require.Equal(t, scheduler.StatusSuccess, status.Status)
 
 	for _, n := range status.Nodes {
-		if n.Status != scheduler.NodeStatus_Success &&
-			n.Status != scheduler.NodeStatus_Skipped {
+		if n.Status != scheduler.NodeStatusSuccess &&
+			n.Status != scheduler.NodeStatusSkipped {
 			t.Errorf("invalid status: %s", n.Status.String())
 		}
 	}
@@ -291,7 +291,7 @@ func TestHandleHTTP(t *testing.T) {
 
 	status, err := model.StatusFromJson(mockResponseWriter.body)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.SchedulerStatus_Running, status.Status)
+	require.Equal(t, scheduler.StatusRunning, status.Status)
 
 	// invalid path
 	req = &http.Request{
@@ -317,7 +317,7 @@ func TestHandleHTTP(t *testing.T) {
 	<-time.After(time.Millisecond * 50)
 
 	status = a.Status()
-	require.Equal(t, status.Status, scheduler.SchedulerStatus_Cancel)
+	require.Equal(t, status.Status, scheduler.StatusCancel)
 }
 
 type mockResponseWriter struct {

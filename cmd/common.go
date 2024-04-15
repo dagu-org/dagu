@@ -41,12 +41,11 @@ type signalListener interface {
 }
 
 var (
-	signalChan chan os.Signal
+	signalChan = make(chan os.Signal, 100)
 )
 
 func listenSignals(ctx context.Context, a signalListener) {
 	go func() {
-		signalChan = make(chan os.Signal, 100)
 		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 		select {

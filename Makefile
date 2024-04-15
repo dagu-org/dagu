@@ -22,28 +22,33 @@ watch:
 	nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
 
 test:
-	@go test ./...
+	@go test --race ./...
 
 test-clean:
 	@go clean -testcache
-	@go test ./...
+	@go test --race ./...
 
-install-tools: install-protobuf install-nodemon install-swagger
+lint:
+	golangci-lint run -v
 
-proto: gen-pb
+install-tools: install-nodemon install-swagger
 
 swagger: clean-swagger gen-swagger
 
 certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
 
-build: build-ui build-dir gen-pb go-lint build-bin
+build: build-ui build-dir go-lint build-bin
 
-build-image:
+build-image: build-image-version build-image-latest
+
+build-image-version:
 ifeq ($(VERSION),)
 	$(error "VERSION is null")
 endif
-	$(DOCKER_CMD) -t yohamta/dagu:$(VERSION) .
-	$(DOCKER_CMD) -t yohamta/dagu:latest .
+	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:$(VERSION) .
+
+build-image-latest:
+	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:latest .
 
 server: go-lint build-dir build-bin
 	./bin/dagu server
@@ -57,9 +62,6 @@ scheduler: go-lint build-dir build-bin
 	./bin/dagu scheduler
 
 ########## Tools ##########
-
-gen-pb:
-	protoc -I=$(SRC_DIR) --go_out=$(DST_DIR) $(SRC_DIR)/internal/proto/*.proto
 
 build-bin:
 	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
@@ -83,7 +85,7 @@ go-lint:
 	@golangci-lint run ./...
 
 cert-dir:
-	@mkdir ./cert
+	@mkdir -p ./cert
 
 gencerts-ca:
 	@openssl req -x509 -newkey rsa:4096 \
@@ -124,12 +126,6 @@ gen-swagger:
 	@swagger generate server -t service/frontend --server-package=restapi --exclude-main -f ./swagger.yaml
 	@echo "Running go mod tidy"
 	@go mod tidy
-
-install-protobuf:
-	brew install protobuf
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 install-nodemon:
 	npm install -g nodemon

@@ -41,8 +41,8 @@ To enable API token for Dagu, follow these steps:
    .. code-block:: bash
   
        export DAGU_IS_BASICAUTH=1
-       export DAGU_USERNAME="<username>"
-       export DAGU_PASSWORD="<password>"
+       export DAGU_BASICAUTH_USERNAME="<username>"
+       export DAGU_BASICAUTH_PASSWORD="<password>"
   
    Replace ``<username>`` and ``<password>`` with your username and password.
 

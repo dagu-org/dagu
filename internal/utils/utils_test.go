@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMustGetUserHomeDir(t *testing.T) {
@@ -36,10 +36,10 @@ func TestMustGetwd(t *testing.T) {
 
 func TestFormatTime(t *testing.T) {
 	tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location())
-	fomatted := utils.FormatTime(tm)
-	require.Equal(t, "2022-02-01 02:02:02", fomatted)
+	formatted := utils.FormatTime(tm)
+	require.Equal(t, "2022-02-01 02:02:02", formatted)
 
-	parsed, err := utils.ParseTime(fomatted)
+	parsed, err := utils.ParseTime(formatted)
 	require.NoError(t, err)
 	require.Equal(t, tm, parsed)
 
@@ -206,9 +206,9 @@ func TestMatchExtension(t *testing.T) {
 
 func TestFixedTIme(t *testing.T) {
 	tm := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.FixedTime = tm
+	utils.SetFixedTime(tm)
 	require.Equal(t, tm, utils.Now())
-	utils.FixedTime = time.Time{}
+	utils.SetFixedTime(time.Time{})
 	require.NotEqual(t, tm, utils.Now())
 }
 

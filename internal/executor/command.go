@@ -5,17 +5,25 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 )
 
 type CommandExecutor struct {
-	cmd *exec.Cmd
+	cmd  *exec.Cmd
+	lock sync.Mutex
 }
 
 func (e *CommandExecutor) Run() error {
-	return e.cmd.Run()
+	e.lock.Lock()
+	err := e.cmd.Start()
+	e.lock.Unlock()
+	if err != nil {
+		return err
+	}
+	return e.cmd.Wait()
 }
 
 func (e *CommandExecutor) SetStdout(out io.Writer) {
@@ -27,13 +35,15 @@ func (e *CommandExecutor) SetStderr(out io.Writer) {
 }
 
 func (e *CommandExecutor) Kill(sig os.Signal) error {
+	e.lock.Lock()
+	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
 		return nil
 	}
 	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 
-func CreateCommandExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, step.Variables...)

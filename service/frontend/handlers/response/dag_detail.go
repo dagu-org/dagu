@@ -54,7 +54,7 @@ func ToDagDetail(d *dag.DAG) *models.DagDetail {
 		Schedule: lo.Map(d.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
-		Steps: lo.Map(d.Steps, func(item *dag.Step, _ int) *models.StepObject {
+		Steps: lo.Map(d.Steps, func(item dag.Step, _ int) *models.StepObject {
 			return ToStepObject(item)
 		}),
 		Tags: d.Tags,
@@ -64,16 +64,16 @@ func ToDagDetail(d *dag.DAG) *models.DagDetail {
 func ToHandlerOn(handlerOn dag.HandlerOn) *models.HandlerOn {
 	ret := &models.HandlerOn{}
 	if handlerOn.Failure != nil {
-		ret.Failure = ToStepObject(handlerOn.Failure)
+		ret.Failure = ToStepObject(*handlerOn.Failure)
 	}
 	if handlerOn.Success != nil {
-		ret.Success = ToStepObject(handlerOn.Success)
+		ret.Success = ToStepObject(*handlerOn.Success)
 	}
 	if handlerOn.Cancel != nil {
-		ret.Cancel = ToStepObject(handlerOn.Cancel)
+		ret.Cancel = ToStepObject(*handlerOn.Cancel)
 	}
 	if handlerOn.Exit != nil {
-		ret.Exit = ToStepObject(handlerOn.Exit)
+		ret.Exit = ToStepObject(*handlerOn.Exit)
 	}
 	return ret
 }

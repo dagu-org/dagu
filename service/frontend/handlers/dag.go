@@ -327,7 +327,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	switch *params.Body.Action {
 	case "start":
-		if d.Status.Status == scheduler.SchedulerStatus_Running {
+		if d.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
 		e := h.engineFactory.Create()
@@ -337,7 +337,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		_ = e.ToggleSuspend(params.DagID, params.Body.Value == "true")
 
 	case "stop":
-		if d.Status.Status != scheduler.SchedulerStatus_Running {
+		if d.Status.Status != scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 		}
 		e := h.engineFactory.Create()
@@ -356,7 +356,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		}
 
 	case "mark-success":
-		if d.Status.Status == scheduler.SchedulerStatus_Running {
+		if d.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 		}
 		if params.Body.RequestID == "" {
@@ -366,13 +366,13 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatus_Success)
+		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusSuccess)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
 	case "mark-failed":
-		if d.Status.Status == scheduler.SchedulerStatus_Running {
+		if d.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 		}
 		if params.Body.RequestID == "" {
@@ -382,7 +382,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatus_Error)
+		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusError)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}

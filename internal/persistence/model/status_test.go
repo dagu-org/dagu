@@ -16,7 +16,7 @@ func TestPid(t *testing.T) {
 	if PidNotRunning.IsRunning() {
 		t.Error()
 	}
-	var pid Pid = Pid(-1)
+	var pid = Pid(-1)
 	require.Equal(t, "", pid.String())
 
 	pid = Pid(12345)
@@ -26,13 +26,8 @@ func TestPid(t *testing.T) {
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
 	d := &dag.DAG{
-		Location:    "",
-		Name:        "",
-		Description: "",
-		Env:         []string{},
-		LogDir:      "",
-		HandlerOn:   dag.HandlerOn{},
-		Steps: []*dag.Step{
+		HandlerOn: dag.HandlerOn{},
+		Steps: []dag.Step{
 			{
 				Name: "1", Description: "", Variables: []string{},
 				Dir: "dir", Command: "echo 1", Args: []string{},
@@ -41,18 +36,12 @@ func TestStatusSerialization(t *testing.T) {
 				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []*dag.Condition{},
 			},
 		},
-		MailOn:            &dag.MailOn{},
-		ErrorMail:         &dag.MailConfig{},
-		InfoMail:          &dag.MailConfig{},
-		Smtp:              &dag.SmtpConfig{},
-		Delay:             0,
-		HistRetentionDays: 0,
-		Preconditions:     []*dag.Condition{},
-		MaxActiveRuns:     0,
-		Params:            []string{},
-		DefaultParams:     "",
+		MailOn:    &dag.MailOn{},
+		ErrorMail: &dag.MailConfig{},
+		InfoMail:  &dag.MailConfig{},
+		Smtp:      &dag.SmtpConfig{},
 	}
-	st := NewStatus(d, nil, scheduler.SchedulerStatus_Success, 10000, &start, &end)
+	st := NewStatus(d, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
 	js, err := st.ToJson()
 	require.NoError(t, err)
@@ -67,10 +56,10 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	d := &dag.DAG{Name: "test"}
-	status := NewStatus(d, nil, scheduler.SchedulerStatus_Running,
+	status := NewStatus(d, nil, scheduler.StatusRunning,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
-	require.Equal(t, scheduler.SchedulerStatus_Error, status.Status)
+	require.Equal(t, scheduler.StatusError, status.Status)
 }
 
 func TestJsonMarshal(t *testing.T) {

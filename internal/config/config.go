@@ -6,6 +6,8 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/spf13/viper"
@@ -28,7 +30,7 @@ type Config struct {
 	BaseConfig         string
 	NavbarColor        string
 	NavbarTitle        string
-	Env                map[string]string
+	Env                sync.Map
 	TLS                *TLS
 	IsAuthToken        bool
 	AuthToken          string
@@ -39,19 +41,43 @@ type TLS struct {
 	KeyFile  string
 }
 
-var instance *Config = nil
+var (
+	instance *Config
+	mu       sync.RWMutex
+	isLoaded atomic.Bool
+)
 
 func Get() *Config {
-	if instance == nil {
+	if !isLoaded.Load() {
 		home, _ := os.UserHomeDir()
 		if err := LoadConfig(home); err != nil {
 			panic(err)
 		}
 	}
+	return getConfig()
+}
+
+func getConfig() *Config {
+	mu.Lock()
+	defer mu.Unlock()
 	return instance
 }
 
+func setConfig(cfg *Config) {
+	mu.Lock()
+	defer mu.Unlock()
+	isLoaded.Swap(true)
+	instance = cfg
+}
+
+var (
+	loadConfigLock sync.Mutex
+)
+
 func LoadConfig(userHomeDir string) error {
+	loadConfigLock.Lock()
+	defer loadConfigLock.Unlock()
+
 	appHome := appHomeDir(userHomeDir)
 
 	viper.SetEnvPrefix("dagu")
@@ -108,9 +134,10 @@ func LoadConfig(userHomeDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal cfg file: %w", err)
 	}
-	instance = cfg
-	loadLegacyEnvs()
-	loadEnvs()
+	loadLegacyEnvs(cfg)
+	loadEnvs(cfg)
+
+	setConfig(cfg)
 
 	return nil
 }
@@ -119,31 +146,29 @@ func (cfg *Config) GetAPIBaseURL() string {
 	return "/api/v1"
 }
 
-func loadEnvs() {
-	if instance.Env == nil {
-		instance.Env = map[string]string{}
-	}
-	for k, v := range instance.Env {
-		_ = os.Setenv(k, v)
-	}
+func loadEnvs(cfg *Config) {
+	cfg.Env.Range(func(k, v interface{}) bool {
+		_ = os.Setenv(k.(string), v.(string))
+		return true
+	})
 	for k, v := range utils.DefaultEnv() {
-		if _, ok := instance.Env[k]; !ok {
-			instance.Env[k] = v
+		if _, ok := cfg.Env.Load(k); !ok {
+			cfg.Env.Store(k, v)
 		}
 	}
 }
 
-func loadLegacyEnvs() {
+func loadLegacyEnvs(cfg *Config) {
 	// For backward compatibility.
-	instance.NavbarColor = getEnv("DAGU__ADMIN_NAVBAR_COLOR", instance.NavbarColor)
-	instance.NavbarTitle = getEnv("DAGU__ADMIN_NAVBAR_TITLE", instance.NavbarTitle)
-	instance.Port = getEnvI("DAGU__ADMIN_PORT", instance.Port)
-	instance.Host = getEnv("DAGU__ADMIN_HOST", instance.Host)
-	instance.DataDir = getEnv("DAGU__DATA", instance.DataDir)
-	instance.LogDir = getEnv("DAGU__DATA", instance.LogDir)
-	instance.SuspendFlagsDir = getEnv("DAGU__SUSPEND_FLAGS_DIR", instance.SuspendFlagsDir)
-	instance.BaseConfig = getEnv("DAGU__SUSPEND_FLAGS_DIR", instance.BaseConfig)
-	instance.AdminLogsDir = getEnv("DAGU__ADMIN_LOGS_DIR", instance.AdminLogsDir)
+	cfg.NavbarColor = getEnv("DAGU__ADMIN_NAVBAR_COLOR", cfg.NavbarColor)
+	cfg.NavbarTitle = getEnv("DAGU__ADMIN_NAVBAR_TITLE", cfg.NavbarTitle)
+	cfg.Port = getEnvI("DAGU__ADMIN_PORT", cfg.Port)
+	cfg.Host = getEnv("DAGU__ADMIN_HOST", cfg.Host)
+	cfg.DataDir = getEnv("DAGU__DATA", cfg.DataDir)
+	cfg.LogDir = getEnv("DAGU__DATA", cfg.LogDir)
+	cfg.SuspendFlagsDir = getEnv("DAGU__SUSPEND_FLAGS_DIR", cfg.SuspendFlagsDir)
+	cfg.BaseConfig = getEnv("DAGU__SUSPEND_FLAGS_DIR", cfg.BaseConfig)
+	cfg.AdminLogsDir = getEnv("DAGU__ADMIN_LOGS_DIR", cfg.AdminLogsDir)
 }
 
 func getEnv(env, def string) string {

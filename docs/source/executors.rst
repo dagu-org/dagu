@@ -69,7 +69,7 @@ Running Containers on the Host's Docker Environment
 
 If you are running `dagu` using a container, you need the setup below.
 
-1. Run a `socat` conainer with the command below.
+1. Run a `socat` container with the command below.
 
 .. code-block:: sh
 

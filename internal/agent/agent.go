@@ -4,23 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence"
 
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/mailer"
-	"github.com/dagu-dev/dagu/internal/pb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/reporter"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -43,7 +44,8 @@ type Agent struct {
 	historyStore     persistence.HistoryStore
 	socketServer     *sock.Server
 	requestId        string
-	finished         uint32
+	finished         atomic.Bool
+	lock             sync.RWMutex
 }
 
 func New(config *Config, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
@@ -65,11 +67,15 @@ type Config struct {
 
 // Run starts the dags execution.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := a.setupRequestId(); err != nil {
-		return err
-	}
-	a.init()
-	if err := a.setupGraph(); err != nil {
+	if err := func() error {
+		a.lock.Lock()
+		defer a.lock.Unlock()
+		if err := a.setupRequestId(); err != nil {
+			return err
+		}
+		a.init()
+		return a.setupGraph()
+	}(); err != nil {
 		return err
 	}
 	if err := a.checkPreconditions(); err != nil {
@@ -78,49 +84,51 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.Dry {
 		return a.dryRun()
 	}
-	setup := []func() error{
+	for _, fn := range []func() error{
 		a.checkIsRunning,
 		a.setupDatabase,
 		a.setupSocketServer,
 		a.logManager.setupLogFile,
-	}
-	for _, fn := range setup {
-		err := fn()
-		if err != nil {
+	} {
+		if err := fn(); err != nil {
 			return err
 		}
 	}
 	return a.run(ctx)
 }
 
-// Status returns the current status of the dags.
+// Status returns the current status of the DAG.
 func (a *Agent) Status() *model.Status {
-	scStatus := a.scheduler.Status(a.graph)
-	if scStatus == scheduler.SchedulerStatus_None && !a.graph.StartedAt.IsZero() {
-		scStatus = scheduler.SchedulerStatus_Running
-	}
+	a.lock.RLock()
+	defer a.lock.RUnlock()
 
-	status := model.NewStatus(
-		a.DAG,
-		a.graph.Nodes(),
-		scStatus,
-		os.Getpid(),
-		&a.graph.StartedAt,
-		&a.graph.FinishedAt,
-	)
+	scStatus := a.scheduler.Status(a.graph)
+	// TODO: fix this weird logic.
+	if scStatus == scheduler.StatusNone && a.graph.IsStarted() {
+		scStatus = scheduler.StatusRunning
+	}
+	var ns []model.NodeStepPair
+	for _, n := range a.graph.Nodes() {
+		ns = append(ns, model.NodeStepPair{
+			Node: n.State(),
+			Step: n.Step(),
+		})
+	}
+	st, et := model.Time(a.graph.StartAt()), model.Time(a.graph.FinishAt())
+	status := model.NewStatus(a.DAG, ns, scStatus, os.Getpid(), st, et)
 	status.RequestId = a.requestId
 	status.Log = a.logManager.logFilename
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
-		status.OnExit = model.FromNode(node)
+		status.OnExit = model.FromNode(node.State(), node.Step())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node)
+		status.OnSuccess = model.FromNode(node.State(), node.Step())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
-		status.OnFailure = model.FromNode(node)
+		status.OnFailure = model.FromNode(node.State(), node.Step())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
-		status.OnCancel = model.FromNode(node)
+		status.OnCancel = model.FromNode(node.State(), node.Step())
 	}
 	return status
 }
@@ -176,28 +184,21 @@ func (a *Agent) init() {
 	}
 
 	if a.DAG.HandlerOn.Exit != nil {
-		onExit, _ := pb.ToPbStep(a.DAG.HandlerOn.Exit)
-		config.OnExit = onExit
+		config.OnExit = a.DAG.HandlerOn.Exit
 	}
 
 	if a.DAG.HandlerOn.Success != nil {
-		onSuccess, _ := pb.ToPbStep(a.DAG.HandlerOn.Success)
-		config.OnSuccess = onSuccess
+		config.OnSuccess = a.DAG.HandlerOn.Success
 	}
 
 	if a.DAG.HandlerOn.Failure != nil {
-		onFailure, _ := pb.ToPbStep(a.DAG.HandlerOn.Failure)
-		config.OnFailure = onFailure
+		config.OnFailure = a.DAG.HandlerOn.Failure
 	}
 
 	if a.DAG.HandlerOn.Cancel != nil {
-		onCancel, _ := pb.ToPbStep(a.DAG.HandlerOn.Cancel)
-		config.OnCancel = onCancel
+		config.OnCancel = a.DAG.HandlerOn.Cancel
 	}
-
-	a.scheduler = &scheduler.Scheduler{
-		Config: config,
-	}
+	a.scheduler = &scheduler.Scheduler{Config: config}
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{
@@ -324,7 +325,7 @@ func (a *Agent) run(ctx context.Context) error {
 
 	go func() {
 		time.Sleep(time.Millisecond * 100)
-		if a.finished == 1 {
+		if a.finished.Load() {
 			return
 		}
 		utils.LogErr("write status", a.historyStore.Write(a.Status()))
@@ -341,7 +342,7 @@ func (a *Agent) run(ctx context.Context) error {
 	a.reporter.ReportSummary(status, lastErr)
 	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
-	atomic.CompareAndSwapUint32(&a.finished, 0, 1)
+	a.finished.Store(true)
 	utils.LogErr("close data file", a.historyStore.Close())
 
 	return lastErr
@@ -378,7 +379,7 @@ func (a *Agent) checkIsRunning() error {
 	if err != nil {
 		return err
 	}
-	if status.Status != scheduler.SchedulerStatus_None {
+	if status.Status != scheduler.StatusNone {
 		return fmt.Errorf("the DAG is already running. socket=%s",
 			a.DAG.SockAddr())
 	}
@@ -402,7 +403,7 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
 		status := a.Status()
-		status.Status = scheduler.SchedulerStatus_Running
+		status.Status = scheduler.StatusRunning
 		b, err := status.ToJson()
 		if err != nil {
 			encodeError(w, err)

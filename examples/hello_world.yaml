@@ -1,0 +1,6 @@
+schedule: "* * * * *"
+steps:
+  - name: hello world
+    command: sh
+    script: |
+      echo "Hello, world!"

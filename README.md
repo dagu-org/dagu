@@ -40,35 +40,35 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
 ## **Table of Contents**
 
-- [Highlights](#highlights)
-- [Contents](#contents)
-- [Features](#features)
-- [Usecase](#usecase)
-- [Web UI](#web-ui)
+- [**Highlights**](#highlights)
+- [**Table of Contents**](#table-of-contents)
+- [**Features**](#features)
+- [**Usecase**](#usecase)
+- [**Web UI**](#web-ui)
   - [DAG Details](#dag-details)
   - [DAGs List](#dags-list)
   - [Search DAGs](#search-dags)
   - [Execution History](#execution-history)
   - [DAG Execution Log](#dag-execution-log)
-- [Installation](#installation)
+- [**Installation**](#installation)
   - [Via Homebrew](#via-homebrew)
   - [Via Bash script](#via-bash-script)
   - [Via Docker](#via-docker)
-  - [Via GitHub Release Page](#via-github-release-page)
-- [Quick Start Guide](#quick-start-guide)
-  - [Launch the Web UI](#launch-the-web-ui)
-  - [Create a New DAG](#create-a-new-dag)
-  - [Edit the DAG](#edit-the-dag)
-  - [Execute the DAG](#execute-the-dag)
-- [CLI](#cli)
-- [Documentation](#documentation)
-- [Running as a daemon](#running-as-a-daemon)
-- [Example Workflow](#example-workflow)
-- [Motivation](#motivation)
-- [Why Not Use an Existing Workflow Scheduler Like Airflow?](#why-not-use-an-existing-workflow-scheduler-like-airflow)
-- [How It Works](#how-it-works)
-- [License](#license)
-- [Support and Community](#support-and-community)
+  - [Via GitHub Releases Page](#via-github-releases-page)
+- [**Quick Start Guide**](#quick-start-guide)
+  - [1. Launch the Web UI](#1-launch-the-web-ui)
+  - [2. Create a New DAG](#2-create-a-new-dag)
+  - [3. Edit the DAG](#3-edit-the-dag)
+  - [4. Execute the DAG](#4-execute-the-dag)
+- [**CLI**](#cli)
+- [**Documentation**](#documentation)
+- [**Running as a daemon**](#running-as-a-daemon)
+- [**Example Workflow**](#example-workflow)
+- [**Motivation**](#motivation)
+- [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#why-not-use-an-existing-workflow-scheduler-like-airflow)
+- [**How It Works**](#how-it-works)
+- [**License**](#license)
+- [**Support and Community**](#support-and-community)
 
 ## **Features**
 
@@ -94,7 +94,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - REST API Interface
 - Basic Authentication over HTTPS
 
-##**Usecase**
+## **Usecase**
 
 - **Data Pipeline Automation:** Schedule ETL tasks for data processing and centralization.
 - **Infrastructure Monitoring:** Periodically check infrastructure components with HTTP requests or SSH commands.
@@ -167,13 +167,13 @@ curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.s
 docker run \
 --rm \
 -p 8080:8080 \
--v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
--v $HOME/.dagu/data:/home/dagu/.dagu/data \
--v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
-yohamta/dagu:latest
+-v $(pwd)/dagu/dags:/home/dagu/.dagu/dags \
+-v $(pwd)/dagu/data:/home/dagu/.dagu/data \
+-v $(pwd)/dagu/logs:/home/dagu/.dagu/logs \
+docker pull ghcr.io/dagu-dev/dagu:latest dagu start-all
 ```
 
-### ViaGitHubReleasePage'></a>Via GitHub Release Page 
+### Via GitHub Releases Page
 
 Download the latest binary from the [Releases page](https://github.com/dagu-dev/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 

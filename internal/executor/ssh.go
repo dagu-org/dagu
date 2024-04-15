@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -21,7 +21,7 @@ type SSHConfig struct {
 }
 
 type SSHExecutor struct {
-	step      *dag.Step
+	step      dag.Step
 	config    *SSHConfig
 	sshConfig *ssh.ClientConfig
 	stdout    io.Writer
@@ -65,7 +65,7 @@ func (e *SSHExecutor) Run() error {
 	return session.Run(command)
 }
 
-func CreateSSHExecutor(ctx context.Context, step *dag.Step) (Executor, error) {
+func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cfg := &SSHConfig{}
 	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{Result: cfg})
 

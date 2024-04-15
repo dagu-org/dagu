@@ -27,7 +27,7 @@ func TestRestartCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG running.
-	testStatusEventual(t, e, dagFile, scheduler.SchedulerStatus_Running)
+	testStatusEventual(t, e, dagFile, scheduler.StatusRunning)
 
 	// Restart the DAG.
 	done := make(chan struct{})
@@ -39,7 +39,7 @@ func TestRestartCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG running again.
-	testStatusEventual(t, e, dagFile, scheduler.SchedulerStatus_Running)
+	testStatusEventual(t, e, dagFile, scheduler.StatusRunning)
 
 	// Stop the restarted DAG.
 	testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
@@ -47,7 +47,7 @@ func TestRestartCommand(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	// Wait for the DAG is stopped.
-	testStatusEventual(t, e, dagFile, scheduler.SchedulerStatus_None)
+	testStatusEventual(t, e, dagFile, scheduler.StatusNone)
 
 	// Check parameter was the same as the first execution
 	d, err := loadDAG(dagFile, "")

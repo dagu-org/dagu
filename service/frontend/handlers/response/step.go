@@ -1,12 +1,12 @@
 package response
 
 import (
-	"github.com/samber/lo"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/samber/lo"
 )
 
-func ToStepObject(step *dag.Step) *models.StepObject {
+func ToStepObject(step dag.Step) *models.StepObject {
 	return &models.StepObject{
 		Args:        step.Args,
 		CmdWithArgs: lo.ToPtr(step.CmdWithArgs),

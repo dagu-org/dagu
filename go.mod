@@ -28,7 +28,6 @@ require (
 	go.uber.org/fx v1.20.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/text v0.12.0
-	google.golang.org/protobuf v1.30.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 

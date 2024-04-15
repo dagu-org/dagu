@@ -10,14 +10,6 @@ jobs:
         with:
           go-version: 1.19.x
 
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v2
-
-      - name: Installing protoc-gen-go
-        run: |
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
       - name: Installing swagger
         run: |
           go install github.com/go-swagger/go-swagger/cmd/swagger@latest
@@ -57,11 +49,11 @@ jobs:
 
       - name: Build
         run: |
-          mkdir ./bin && protoc -I=./ --go_out=./internal ./internal/proto/*.proto  && go build -o ./bin/dagu .
+          mkdir ./bin && go build -o ./bin/dagu .
 
       - name: Test
         run: |
-          go test -v -coverprofile="coverage.txt" -covermode=atomic ./...
+          go test --race -v -coverprofile="coverage.txt" -covermode=atomic ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2

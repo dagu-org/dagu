@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -31,20 +32,21 @@ func (p Pid) IsRunning() bool {
 }
 
 type Status struct {
-	RequestId  string                    `json:"RequestId"`
-	Name       string                    `json:"Name"`
-	Status     scheduler.SchedulerStatus `json:"Status"`
-	StatusText string                    `json:"StatusText"`
-	Pid        Pid                       `json:"Pid"`
-	Nodes      []*Node                   `json:"Nodes"`
-	OnExit     *Node                     `json:"OnExit"`
-	OnSuccess  *Node                     `json:"OnSuccess"`
-	OnFailure  *Node                     `json:"OnFailure"`
-	OnCancel   *Node                     `json:"OnCancel"`
-	StartedAt  string                    `json:"StartedAt"`
-	FinishedAt string                    `json:"FinishedAt"`
-	Log        string                    `json:"Log"`
-	Params     string                    `json:"Params"`
+	RequestId  string           `json:"RequestId"`
+	Name       string           `json:"Name"`
+	Status     scheduler.Status `json:"Status"`
+	StatusText string           `json:"StatusText"`
+	Pid        Pid              `json:"Pid"`
+	Nodes      []*Node          `json:"Nodes"`
+	OnExit     *Node            `json:"OnExit"`
+	OnSuccess  *Node            `json:"OnSuccess"`
+	OnFailure  *Node            `json:"OnFailure"`
+	OnCancel   *Node            `json:"OnCancel"`
+	StartedAt  string           `json:"StartedAt"`
+	FinishedAt string           `json:"FinishedAt"`
+	Log        string           `json:"Log"`
+	Params     string           `json:"Params"`
+	mu         sync.RWMutex
 }
 
 type StatusFile struct {
@@ -62,60 +64,78 @@ func StatusFromJson(s string) (*Status, error) {
 }
 
 func NewStatusDefault(d *dag.DAG) *Status {
-	return NewStatus(d, nil, scheduler.SchedulerStatus_None, int(PidNotRunning), nil, nil)
+	return NewStatus(d, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
+}
+
+func Time(t time.Time) *time.Time {
+	return &t
+}
+
+type NodeStepPair struct {
+	Node scheduler.NodeState
+	Step dag.Step
 }
 
 func NewStatus(
 	d *dag.DAG,
-	nodes []*scheduler.Node,
-	status scheduler.SchedulerStatus,
+	nodes []NodeStepPair,
+	status scheduler.Status,
 	pid int,
-	startTime, endTIme *time.Time,
+	startTime, endTime *time.Time,
 ) *Status {
-	finish, start := time.Time{}, time.Time{}
-	if startTime != nil {
-		start = *startTime
-	}
-	if endTIme != nil {
-		finish = *endTIme
-	}
-	var models []*Node
-	if len(nodes) != 0 {
-		models = FromNodes(nodes)
-	} else {
-		models = FromSteps(d.Steps)
-	}
 	var onExit, onSuccess, onFailure, onCancel *Node
-	onExit = fromStepWithDefValues(d.HandlerOn.Exit)
-	onSuccess = fromStepWithDefValues(d.HandlerOn.Success)
-	onFailure = fromStepWithDefValues(d.HandlerOn.Failure)
-	onCancel = fromStepWithDefValues(d.HandlerOn.Cancel)
+	onExit = nodeOrNil(d.HandlerOn.Exit)
+	onSuccess = nodeOrNil(d.HandlerOn.Success)
+	onFailure = nodeOrNil(d.HandlerOn.Failure)
+	onCancel = nodeOrNil(d.HandlerOn.Cancel)
 	return &Status{
-		RequestId:  "",
 		Name:       d.Name,
 		Status:     status,
 		StatusText: status.String(),
 		Pid:        Pid(pid),
-		Nodes:      models,
+		Nodes:      nodesOrSteps(nodes, d.Steps),
 		OnExit:     onExit,
 		OnSuccess:  onSuccess,
 		OnFailure:  onFailure,
 		OnCancel:   onCancel,
-		StartedAt:  utils.FormatTime(start),
-		FinishedAt: utils.FormatTime(finish),
+		StartedAt:  formatTime(startTime),
+		FinishedAt: formatTime(endTime),
 		Params:     strings.Join(d.Params, " "),
 	}
 }
 
-func (sts *Status) CorrectRunningStatus() {
-	if sts.Status == scheduler.SchedulerStatus_Running {
-		sts.Status = scheduler.SchedulerStatus_Error
-		sts.StatusText = sts.Status.String()
+func nodeOrNil(s *dag.Step) *Node {
+	if s == nil {
+		return nil
+	}
+	return NewNode(*s)
+}
+
+func nodesOrSteps(nodes []NodeStepPair, steps []dag.Step) []*Node {
+	if len(nodes) != 0 {
+		return FromNodes(nodes)
+	}
+	return FromSteps(steps)
+}
+
+func formatTime(val *time.Time) string {
+	if val == nil || val.IsZero() {
+		return ""
+	}
+	return utils.FormatTime(*val)
+}
+
+func (st *Status) CorrectRunningStatus() {
+	if st.Status == scheduler.StatusRunning {
+		st.Status = scheduler.StatusError
+		st.StatusText = st.Status.String()
 	}
 }
 
-func (sts *Status) ToJson() ([]byte, error) {
-	js, err := json.Marshal(sts)
+func (st *Status) ToJson() ([]byte, error) {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+	js, err := json.Marshal(st)
 	if err != nil {
 		return []byte{}, err
 	}

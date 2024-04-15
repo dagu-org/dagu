@@ -3,16 +3,16 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"syscall"
+
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/utils"
-	"os"
-	"os/exec"
-	"syscall"
-	"time"
 )
 
 type Engine interface {
@@ -117,7 +117,6 @@ func (e *engineImpl) Start(dag *dag.DAG, params string) error {
 	return cmd.Wait()
 }
 
-// TODO: fix params
 func (e *engineImpl) Restart(dag *dag.DAG) error {
 	args := []string{"restart", dag.Location}
 	cmd := exec.Command(e.executable, args...)
@@ -131,24 +130,19 @@ func (e *engineImpl) Restart(dag *dag.DAG) error {
 	return cmd.Wait()
 }
 
-// TODO: fix params
-func (e *engineImpl) Retry(dag *dag.DAG, reqId string) (err error) {
-	go func() {
-		args := []string{"retry"}
-		args = append(args, fmt.Sprintf("--req=%s", reqId))
-		args = append(args, dag.Location)
-		cmd := exec.Command(e.executable, args...)
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
-		cmd.Dir = e.workDir
-		cmd.Env = os.Environ()
-		defer func() {
-			_ = cmd.Wait()
-		}()
-		err = cmd.Start()
-		utils.LogErr("retry a DAG", err)
-	}()
-	time.Sleep(time.Millisecond * 500)
-	return
+func (e *engineImpl) Retry(dag *dag.DAG, reqId string) error {
+	args := []string{"retry"}
+	args = append(args, fmt.Sprintf("--req=%s", reqId))
+	args = append(args, dag.Location)
+	cmd := exec.Command(e.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = e.workDir
+	cmd.Env = os.Environ()
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
 }
 
 func (e *engineImpl) GetCurrentStatus(dag *dag.DAG) (*model.Status, error) {
@@ -217,7 +211,7 @@ func (e *engineImpl) UpdateStatus(dag *dag.DAG, status *model.Status) error {
 	} else {
 		ss, _ := model.StatusFromJson(res)
 		if ss != nil && ss.RequestId == status.RequestId &&
-			ss.Status == scheduler.SchedulerStatus_Running {
+			ss.Status == scheduler.StatusRunning {
 			return fmt.Errorf("the DAG is running")
 		}
 	}

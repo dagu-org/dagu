@@ -2,22 +2,24 @@ package scheduler
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/utils"
 	"os"
 	"os/signal"
 	"path"
 	"sort"
+	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/utils"
 )
 
 type Scheduler struct {
 	entryReader EntryReader
 	logDir      string
 	stop        chan struct{}
-	running     bool
+	running     atomic.Bool
 	logger      logger.Logger
 }
 
@@ -77,7 +79,6 @@ func New(params Params) *Scheduler {
 		entryReader: params.EntryReader,
 		logDir:      params.LogDir,
 		stop:        make(chan struct{}),
-		running:     false,
 		logger:      params.Logger,
 	}
 }
@@ -113,7 +114,7 @@ func (s *Scheduler) setupLogFile() (err error) {
 func (s *Scheduler) start() {
 	t := utils.Now().Truncate(time.Second * 60)
 	timer := time.NewTimer(0)
-	s.running = true
+	s.running.Store(true)
 	for {
 		select {
 		case <-timer.C:
@@ -152,11 +153,11 @@ func (s *Scheduler) nextTick(now time.Time) time.Time {
 }
 
 func (s *Scheduler) Stop() {
-	if !s.running {
+	if !s.running.Load() {
 		return
 	}
 	if s.stop != nil {
 		s.stop <- struct{}{}
 	}
-	s.running = false
+	s.running.Store(false)
 }

@@ -55,7 +55,6 @@ func New(params Params) *server.Server {
 	}
 
 	if params.Config.IsAuthToken {
-
 		serverParams.AuthToken = &server.AuthToken{
 			Token: params.Config.AuthToken,
 		}

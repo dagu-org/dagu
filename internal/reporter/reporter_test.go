@@ -18,17 +18,16 @@ import (
 )
 
 func TestReporter(t *testing.T) {
-
 	for scenario, fn := range map[string]func(
 		t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node,
 	){
-		"create errormail":   testErrorMail,
-		"no errormail":       testNoErrorMail,
-		"create successmail": testSuccessMail,
-		"create summary":     testRenderSummary,
-		"create node list":   testRenderTable,
-		"report summary":     testReportSummary,
-		"report step":        testReportStep,
+		"create error mail":   testErrorMail,
+		"no error mail":       testNoErrorMail,
+		"create success mail": testSuccessMail,
+		"create summary":      testRenderSummary,
+		"create node list":    testRenderTable,
+		"report summary":      testReportSummary,
+		"report step":         testReportStep,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
@@ -47,7 +46,7 @@ func TestReporter(t *testing.T) {
 					From:   "from@mailer.com",
 					To:     "to@mailer.com",
 				},
-				Steps: []*dag.Step{
+				Steps: []dag.Step{
 					{
 						Name:    "test-step",
 						Command: "true",
@@ -57,12 +56,12 @@ func TestReporter(t *testing.T) {
 
 			nodes := []*model.Node{
 				{
-					Step: &dag.Step{
+					Step: dag.Step{
 						Name:    "test-step",
 						Command: "true",
 						Args:    []string{"param-x"},
 					},
-					Status:     scheduler.NodeStatus_Running,
+					Status:     scheduler.NodeStatusRunning,
 					StartedAt:  utils.FormatTime(time.Now()),
 					FinishedAt: utils.FormatTime(time.Now().Add(time.Minute * 10)),
 				},
@@ -84,7 +83,7 @@ func testErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node) 
 	d.MailOn.Success = false
 
 	_ = rp.SendMail(d, &model.Status{
-		Status: scheduler.SchedulerStatus_Error,
+		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
 
@@ -99,7 +98,7 @@ func testNoErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node
 	d.MailOn.Success = true
 
 	err := rp.SendMail(d, &model.Status{
-		Status: scheduler.SchedulerStatus_Error,
+		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)
@@ -113,7 +112,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node
 	d.MailOn.Success = true
 
 	err := rp.SendMail(d, &model.Status{
-		Status: scheduler.SchedulerStatus_Success,
+		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)
@@ -137,7 +136,7 @@ func testReportSummary(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.No
 	}()
 
 	rp.ReportSummary(&model.Status{
-		Status: scheduler.SchedulerStatus_Success,
+		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, errors.New("test error"))
 
@@ -168,19 +167,14 @@ func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node)
 	err = rp.ReportStep(
 		d,
 		&model.Status{
-			Status: scheduler.SchedulerStatus_Running,
+			Status: scheduler.StatusRunning,
 			Nodes:  nodes,
 		},
-		&scheduler.Node{
-			Step: d.Steps[0],
-			NodeState: scheduler.NodeState{
-				Status: scheduler.NodeStatus_Error,
-			},
-		},
+		scheduler.NewNode(d.Steps[0], scheduler.NodeState{Status: scheduler.NodeStatusError}),
 	)
 	require.NoError(t, err)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
 
 	var buf bytes.Buffer
@@ -197,7 +191,7 @@ func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node)
 func testRenderSummary(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node) {
 	status := &model.Status{
 		Name:   d.Name,
-		Status: scheduler.SchedulerStatus_Error,
+		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}
 	summary := renderSummary(status, errors.New("test error"))

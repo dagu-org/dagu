@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func createSchedulerCommand() *cobra.Command {
+func schedulerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
 		Short: "Start the scheduler",
