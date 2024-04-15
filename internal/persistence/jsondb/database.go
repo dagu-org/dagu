@@ -153,6 +153,15 @@ func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 	return ParseFile(file)
 }
 
+// ReadStatusOfAll returns the status based on the latest run of the dag
+func (store *Store) ReadStatusOfAll(dagFile string) (*model.Status, error) {
+	file, err := store.latestOfAll(dagFile)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFile(file)
+}
+
 // FindByRequestId finds a status file by requestId.
 func (store *Store) FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error) {
 	if requestId == "" {
@@ -306,6 +315,21 @@ func (store *Store) pattern(dagFile string) string {
 func (store *Store) latestToday(dagFile string, day time.Time) (string, error) {
 	var ret []string
 	pattern := fmt.Sprintf("%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"))
+	matches, err := filepath.Glob(pattern)
+	if err == nil || len(matches) > 0 {
+		ret = filterLatest(matches, 1)
+	} else {
+		return "", persistence.ErrNoStatusDataToday
+	}
+	if len(ret) == 0 {
+		return "", persistence.ErrNoStatusData
+	}
+	return ret[0], err
+}
+
+func (store *Store) latestOfAll(dagFile string, day time.Time) (string, error) {
+	var ret []string
+	pattern := fmt.Sprintf("%s.*.*.dat", store.pattern(dagFile))
 	matches, err := filepath.Glob(pattern)
 	if err == nil || len(matches) > 0 {
 		ret = filterLatest(matches, 1)

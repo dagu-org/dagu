@@ -191,7 +191,8 @@ func (e *engineImpl) GetLatestStatus(dag *dag.DAG) (*model.Status, error) {
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
+	// status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dag.Location)
+	status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusOfAll(dag.Location)
 	if errors.Is(err, persistence.ErrNoStatusDataToday) || errors.Is(err, persistence.ErrNoStatusData) {
 		return model.NewStatusDefault(dag), nil
 	}
