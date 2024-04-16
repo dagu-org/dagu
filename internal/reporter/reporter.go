@@ -146,10 +146,10 @@ func renderHTML(nodes []*model.Node) string {
 	`)
 	addStatusFunc := func(status scheduler.NodeStatus) {
 		style := ""
-		switch status {
-		case scheduler.NodeStatusError:
+		if status == scheduler.NodeStatusError {
 			style = "color: #D01117;font-weight:bold;"
 		}
+
 		buffer.WriteString(
 			fmt.Sprintf("<td align=\"center\" style=\"padding: 10px; %s\">%s</td>",
 				style, status))

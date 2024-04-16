@@ -87,7 +87,8 @@ func testErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node) 
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
 
-	mock := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Mailer.(*mockMailer)
+	require.True(t, ok)
 	require.Contains(t, mock.subject, "Error")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
@@ -103,7 +104,8 @@ func testNoErrorMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node
 	}, nil)
 	require.NoError(t, err)
 
-	mock := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Mailer.(*mockMailer)
+	require.True(t, ok)
 	require.Equal(t, 0, mock.count)
 }
 
@@ -117,7 +119,8 @@ func testSuccessMail(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node
 	}, nil)
 	require.NoError(t, err)
 
-	mock := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Mailer.(*mockMailer)
+	require.True(t, ok)
 	require.Contains(t, mock.subject, "Success")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
@@ -140,7 +143,7 @@ func testReportSummary(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.No
 		Nodes:  nodes,
 	}, errors.New("test error"))
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = origStdout
 
 	var buf bytes.Buffer
@@ -184,7 +187,8 @@ func testReportStep(t *testing.T, rp *Reporter, d *dag.DAG, nodes []*model.Node)
 	s := buf.String()
 	require.Contains(t, s, d.Steps[0].Name)
 
-	mock := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Mailer.(*mockMailer)
+	require.True(t, ok)
 	require.Equal(t, 1, mock.count)
 }
 

@@ -2,9 +2,6 @@ package agent_test
 
 import (
 	"context"
-	"github.com/dagu-dev/dagu/internal/agent"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"net/http"
 	"net/url"
 	"os"
@@ -12,6 +9,10 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/agent"
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/client"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -274,7 +275,9 @@ func TestHandleHTTP(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	<-time.After(time.Millisecond * 50)
+	timer := time.NewTimer(time.Millisecond * 50)
+	defer timer.Stop()
+	<-timer.C
 
 	var mockResponseWriter = mockResponseWriter{}
 
@@ -314,7 +317,9 @@ func TestHandleHTTP(t *testing.T) {
 	require.Equal(t, http.StatusOK, mockResponseWriter.status)
 	require.Equal(t, "OK", mockResponseWriter.body)
 
-	<-time.After(time.Millisecond * 50)
+	timer2 := time.NewTimer(time.Millisecond * 50)
+	defer timer2.Stop()
+	<-timer2.C
 
 	status = a.Status()
 	require.Equal(t, status.Status, scheduler.StatusCancel)

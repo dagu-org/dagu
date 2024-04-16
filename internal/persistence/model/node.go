@@ -1,11 +1,16 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/utils"
+)
+
+var (
+	errNodeProcessing = errors.New("node processing error")
 )
 
 type Node struct {
@@ -52,7 +57,7 @@ func errFromText(err string) error {
 	if err == "" {
 		return nil
 	}
-	return fmt.Errorf(err)
+	return fmt.Errorf("%w: %s", errNodeProcessing, err)
 }
 
 func errText(err error) string {

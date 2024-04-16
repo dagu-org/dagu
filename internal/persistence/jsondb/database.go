@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"io"
 	"log"
 	"os"
@@ -16,6 +15,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 
 	"github.com/dagu-dev/dagu/internal/utils"
 )
@@ -33,6 +35,12 @@ type Store struct {
 	dagsDir string
 	writer  *writer
 }
+
+var (
+	errRequestIdNotFound  = errors.New("requestId not found")
+	errCreateNewDirectory = errors.New("failed to create new directory")
+	errDAGFileEmpty       = errors.New("dagFile is empty")
+)
 
 // New creates a new Store with default configuration.
 func New(dir, dagsDir string) *Store {
@@ -94,7 +102,7 @@ func ParseFile(file string) (*model.Status, error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	var offset int64 = 0
+	var offset int64
 	var ret *model.Status
 	for {
 		line, err := readLineFrom(f, offset)
@@ -156,7 +164,7 @@ func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 // FindByRequestId finds a status file by requestId.
 func (store *Store) FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error) {
 	if requestId == "" {
-		return nil, fmt.Errorf("requestId is empty")
+		return nil, errRequestIdNotFound
 	}
 	pattern := store.pattern(dagFile) + "*.dat"
 	matches, err := filepath.Glob(pattern)
@@ -189,7 +197,7 @@ func (store *Store) RemoveAll(dagFile string) error {
 // RemoveOld removes old files.
 func (store *Store) RemoveOld(dagFile string, retentionDays int) error {
 	pattern := store.pattern(dagFile) + "*.dat"
-	var lastErr error = nil
+	var lastErr error
 	if retentionDays >= 0 {
 		matches, _ := filepath.Glob(pattern)
 		ot := time.Now().AddDate(0, 0, -1*retentionDays)
@@ -230,11 +238,7 @@ func (store *Store) Compact(_, original string) error {
 		return err
 	}
 
-	if err := os.Remove(original); err != nil {
-		return err
-	}
-
-	return nil
+	return os.Remove(original)
 }
 
 func (store *Store) normalizeInternalName(name string) string {
@@ -262,7 +266,7 @@ func (store *Store) Rename(oldName, newName string) error {
 	}
 	if !store.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return fmt.Errorf("failed to create new directory %s : %s", newDir, err.Error())
+			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err.Error())
 		}
 	}
 	matches, err := filepath.Glob(store.pattern(on) + "*.dat")
@@ -284,14 +288,14 @@ func (store *Store) Rename(oldName, newName string) error {
 
 func (store *Store) directory(name string, prefix string) string {
 	h := md5.New()
-	h.Write([]byte(name))
+	_, _ = h.Write([]byte(name))
 	v := hex.EncodeToString(h.Sum(nil))
 	return filepath.Join(store.dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
 func (store *Store) newFile(dagFile string, t time.Time, requestId string) (string, error) {
 	if dagFile == "" {
-		return "", fmt.Errorf("dagFile is empty")
+		return "", errDAGFileEmpty
 	}
 	fileName := fmt.Sprintf("%s.%s.%s.dat", store.pattern(dagFile), t.Format("20060102.15:04:05.000"), utils.TruncString(requestId, 8))
 	return fileName, nil
@@ -307,11 +311,11 @@ func (store *Store) latestToday(dagFile string, day time.Time) (string, error) {
 	var ret []string
 	pattern := fmt.Sprintf("%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"))
 	matches, err := filepath.Glob(pattern)
-	if err == nil || len(matches) > 0 {
-		ret = filterLatest(matches, 1)
-	} else {
+	if err != nil || len(matches) == 0 {
 		return "", persistence.ErrNoStatusDataToday
 	}
+	ret = filterLatest(matches, 1)
+
 	if len(ret) == 0 {
 		return "", persistence.ErrNoStatusData
 	}

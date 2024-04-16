@@ -2,7 +2,6 @@ package jsondb
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"io"
 	"os"
 	"path"
@@ -10,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -285,7 +286,7 @@ func TestCompactFile(t *testing.T) {
 
 	_ = dw.close()
 
-	var s *model.StatusFile = nil
+	var s *model.StatusFile
 	if h := db.ReadStatusRecent(d.Location, 1); len(h) > 0 {
 		s = h[0]
 	}
@@ -296,7 +297,7 @@ func TestCompactFile(t *testing.T) {
 	require.False(t, utils.FileExists(s.File))
 	require.NoError(t, err)
 
-	var s2 *model.StatusFile = nil
+	var s2 *model.StatusFile
 	if h := db2.ReadStatusRecent(d.Location, 1); len(h) > 0 {
 		s2 = h[0]
 	}
@@ -405,7 +406,7 @@ func TestReadLine(t *testing.T) {
 	require.NoError(t, err)
 
 	_, _ = f.Seek(0, 0)
-	var offset int64 = 0
+	var offset int64
 	for _, tt := range []struct {
 		Want []byte
 	}{

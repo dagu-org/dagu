@@ -37,7 +37,10 @@ const (
 )
 
 var (
-	errInvalidArgs = errors.New("invalid argument")
+	errInvalidArgs        = errors.New("invalid argument")
+	ErrFailedToReadStatus = errors.New("failed to read status")
+	ErrStepNotFound       = errors.New("step was not found")
+	ErrReadingLastStatus  = errors.New("error reading the last status")
 )
 
 type DAGHandler struct {
@@ -212,7 +215,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	return resp, nil
 }
 
-func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
+func (h *DAGHandler) getStepLog(d *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
 	var stepByName = map[string]*domain.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
@@ -225,9 +228,9 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 	e := h.engineFactory.Create()
 
 	if logFile == "" {
-		s, err := e.GetLatestStatus(dag)
+		s, err := e.GetLatestStatus(d)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read status")
+			return nil, ErrFailedToReadStatus
 		}
 		status = s
 	} else {
@@ -248,7 +251,7 @@ func (h *DAGHandler) getStepLog(dag *dag.DAG, logFile, stepName string) (*models
 		return item.Name == stepName
 	})
 	if !ok {
-		return nil, fmt.Errorf("step name was not found %s", stepName)
+		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
 	}
 
 	logContent, err := getLogFileContent(node.Log)
@@ -289,7 +292,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
+func (h *DAGHandler) readSchedulerLog(d *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
 	var (
 		logFile string
 	)
@@ -297,9 +300,9 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 	e := h.engineFactory.Create()
 
 	if statusFile == "" {
-		s, err := e.GetLatestStatus(dag)
+		s, err := e.GetLatestStatus(d)
 		if err != nil {
-			return nil, fmt.Errorf("error reading the last status")
+			return nil, ErrReadingLastStatus
 		}
 		logFile = s.Log
 	} else {
@@ -317,6 +320,7 @@ func (h *DAGHandler) readSchedulerLog(dag *dag.DAG, statusFile string) (*models.
 	return response.ToDagSchedulerLogResponse(logFile, string(content)), nil
 }
 
+// nolint // cognitive complexity
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
 	e := h.engineFactory.Create()
 	d, err := e.GetStatus(params.DagID)
@@ -412,9 +416,9 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
+func (h *DAGHandler) updateStatus(d *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
 	e := h.engineFactory.Create()
-	status, err := e.GetStatusByRequestId(dag, reqId)
+	status, err := e.GetStatusByRequestId(d, reqId)
 	if err != nil {
 		return err
 	}
@@ -423,13 +427,13 @@ func (h *DAGHandler) updateStatus(dag *dag.DAG, reqId, step string, to scheduler
 		return item.Step.Name == step
 	})
 	if !ok {
-		return fmt.Errorf("step was not found: %s", step)
+		return fmt.Errorf("%w: %s", ErrStepNotFound, step)
 	}
 
 	status.Nodes[idx].Status = to
 	status.Nodes[idx].StatusText = to.String()
 
-	return e.UpdateStatus(dag, status)
+	return e.UpdateStatus(d, status)
 }
 
 func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {

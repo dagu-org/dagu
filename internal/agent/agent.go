@@ -30,6 +30,11 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	errFailedStartSocketFrontend = errors.New("failed to start the socket frontend")
+	errDAGAlreadyRunning         = errors.New("the DAG is already running")
+)
+
 // Agent is the interface to run / cancel / signal / status / etc.
 type Agent struct {
 	*Config
@@ -151,21 +156,24 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	go func() {
 		a.scheduler.Signal(a.graph, sig, done, allowOverride)
 	}()
-	timeout := time.After(a.DAG.MaxCleanUpTime)
-	tick := time.After(time.Second * 5)
+	timeout := time.NewTimer(a.DAG.MaxCleanUpTime)
+	tick := time.NewTimer(time.Second * 5)
+	defer timeout.Stop()
+	defer tick.Stop()
+
 	for {
 		select {
 		case <-done:
 			log.Printf("All child processes have been terminated.")
 			return
-		case <-timeout:
+		case <-timeout.C:
 			log.Printf("Time reached to max cleanup time")
 			a.Kill()
 			return
-		case <-tick:
+		case <-tick.C:
 			log.Printf("Sending signal again")
 			a.scheduler.Signal(a.graph, sig, nil, false)
-			tick = time.After(time.Second * 5)
+			tick.Reset(time.Second * 5)
 		default:
 			log.Printf("Waiting for child processes to exit...")
 			time.Sleep(time.Second * 3)
@@ -252,10 +260,8 @@ func (a *Agent) setupDatabase() error {
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
 		utils.LogErr("clean old history data", err)
 	}
-	if err := a.historyStore.Open(a.DAG.Location, time.Now(), a.requestId); err != nil {
-		return err
-	}
-	return nil
+
+	return a.historyStore.Open(a.DAG.Location, time.Now(), a.requestId)
 }
 
 func (a *Agent) setupSocketServer() (err error) {
@@ -299,7 +305,7 @@ func (a *Agent) run(ctx context.Context) error {
 	listen := make(chan error)
 	go func() {
 		err := a.socketServer.Serve(listen)
-		if err != nil && err != sock.ErrServerRequestedShutdown {
+		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
 			log.Printf("failed to start socket frontend %v", err)
 		}
 	}()
@@ -309,7 +315,7 @@ func (a *Agent) run(ctx context.Context) error {
 	}()
 
 	if err := <-listen; err != nil {
-		return fmt.Errorf("failed to start the socket frontend")
+		return errFailedStartSocketFrontend
 	}
 
 	done := make(chan *scheduler.Node)
@@ -380,8 +386,7 @@ func (a *Agent) checkIsRunning() error {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("the DAG is already running. socket=%s",
-			a.DAG.SockAddr())
+		return fmt.Errorf("%w. socket=%s", errDAGAlreadyRunning, a.DAG.SockAddr())
 	}
 	return nil
 }

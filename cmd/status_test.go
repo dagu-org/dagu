@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/scheduler"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/scheduler"
 )
 
 func TestStatusCommand(t *testing.T) {

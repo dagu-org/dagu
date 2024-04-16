@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestServerCommand(t *testing.T) {

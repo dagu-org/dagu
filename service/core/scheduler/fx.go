@@ -2,9 +2,10 @@ package scheduler
 
 import (
 	"context"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/logger"
+	dagulogger "github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/core/scheduler/entry_reader"
 	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
 	"go.uber.org/fx"
@@ -20,7 +21,7 @@ type Params struct {
 	fx.In
 
 	Config      *config.Config
-	Logger      logger.Logger
+	Logger      dagulogger.Logger
 	EntryReader scheduler.EntryReader
 }
 
@@ -28,7 +29,7 @@ func EntryReaderProvider(
 	cfg *config.Config,
 	engineFactory engine.Factory,
 	jf entry_reader.JobFactory,
-	logger logger.Logger,
+	logger dagulogger.Logger,
 ) scheduler.EntryReader {
 	return entry_reader.New(entry_reader.Params{
 		EngineFactory: engineFactory,

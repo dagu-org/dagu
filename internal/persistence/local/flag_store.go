@@ -2,10 +2,11 @@ package local
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
 	"regexp"
 	"strings"
+
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
 )
 
 type flagStoreImpl struct {

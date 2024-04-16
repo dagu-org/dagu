@@ -4,7 +4,6 @@ package filenotify
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,6 +17,7 @@ var (
 	errPollerClosed = errors.New("poller is closed")
 	// errNoSuchWatch is returned when trying to remove a watch that doesn't exist
 	errNoSuchWatch = errors.New("watch does not exist")
+	errWatchExists = errors.New("watch exists")
 )
 
 // filePoller is used to poll files for changes, especially in cases where fsnotify
@@ -62,7 +62,7 @@ func (w *filePoller) Add(name string) error {
 		w.watches = make(map[string]struct{})
 	}
 	if _, exists := w.watches[name]; exists {
-		return fmt.Errorf("watch exists")
+		return errWatchExists
 	}
 	w.watches[name] = struct{}{}
 
@@ -125,7 +125,7 @@ func (w *filePoller) sendEvent(e fsnotify.Event) error {
 	select {
 	case w.events <- e:
 	case <-w.done:
-		return fmt.Errorf("closed")
+		return errPollerClosed
 	}
 	return nil
 }
@@ -135,7 +135,7 @@ func (w *filePoller) sendErr(e error) error {
 	select {
 	case w.errors <- e:
 	case <-w.done:
-		return fmt.Errorf("closed")
+		return errPollerClosed
 	}
 	return nil
 }
@@ -318,7 +318,7 @@ func checkChange(fi1, fi2 os.FileInfo) fsnotify.Op {
 	if fi1.Mode() != fi2.Mode() {
 		return fsnotify.Chmod
 	}
-	if fi1.ModTime() != fi2.ModTime() || fi1.Size() != fi2.Size() {
+	if !fi1.ModTime().Equal(fi2.ModTime()) || fi1.Size() != fi2.Size() {
 		return fsnotify.Write
 	}
 
