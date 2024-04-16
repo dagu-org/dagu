@@ -5,8 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"io"
 	"log"
 	"os"
@@ -16,6 +14,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 
 	"github.com/dagu-dev/dagu/internal/utils"
 )
@@ -327,7 +328,7 @@ func (store *Store) latestToday(dagFile string, day time.Time) (string, error) {
 	return ret[0], err
 }
 
-func (store *Store) latestOfAll(dagFile string, day time.Time) (string, error) {
+func (store *Store) latestOfAll(dagFile string) (string, error) {
 	var ret []string
 	pattern := fmt.Sprintf("%s.*.*.dat", store.pattern(dagFile))
 	matches, err := filepath.Glob(pattern)
