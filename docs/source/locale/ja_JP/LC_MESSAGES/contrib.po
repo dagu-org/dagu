@@ -1,0 +1,171 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-04-17 15:18+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja_JP\n"
+"Language-Team: ja_JP <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../source/contrib.rst:2
+msgid "Contribution Guide"
+msgstr ""
+
+#: ../../source/contrib.rst:4
+msgid ""
+"We welcome contributions of any size and skill level. If you have an idea"
+" for a new feature or have found a bug, please open an issue on the "
+"GitHub repository."
+msgstr ""
+
+#: ../../source/contrib.rst:7
+msgid "Prerequisite"
+msgstr ""
+
+#: ../../source/contrib.rst:9
+msgid "`Go version 1.19 or later. <https://go.dev/doc/install>`_"
+msgstr ""
+
+#: ../../source/contrib.rst:10
+msgid "Latest version of `Node.js <https://nodejs.org/en/download/>`_."
+msgstr ""
+
+#: ../../source/contrib.rst:11
+msgid "`yarn <https://yarnpkg.com/>`_ package manager."
+msgstr ""
+
+#: ../../source/contrib.rst:14
+msgid "Setting up your local environment"
+msgstr ""
+
+#: ../../source/contrib.rst:16 ../../source/contrib.rst:72
+msgid "Clone the repository to your local machine."
+msgstr ""
+
+#: ../../source/contrib.rst:17 ../../source/contrib.rst:73
+msgid ""
+"Navigate to the root directory of the cloned repository and build the "
+"frontend project by running the following command:"
+msgstr ""
+
+#: ../../source/contrib.rst:23 ../../source/contrib.rst:35
+#: ../../source/contrib.rst:79
+msgid "Run the following command to start the `Dagu` application:"
+msgstr ""
+
+#: ../../source/contrib.rst:29
+msgid ""
+"Now you can change the source code and build the binary by running the "
+"following command:"
+msgstr ""
+
+#: ../../source/contrib.rst:42
+msgid "Running Tests"
+msgstr ""
+
+#: ../../source/contrib.rst:44
+msgid "Run the following command to run the tests:"
+msgstr ""
+
+#: ../../source/contrib.rst:51
+msgid "Code Structure"
+msgstr ""
+
+#: ../../source/contrib.rst:53
+msgid "``ui``: Frontend code for the Web UI."
+msgstr ""
+
+#: ../../source/contrib.rst:54
+msgid "``cmd``: Contains the main application entry point."
+msgstr ""
+
+#: ../../source/contrib.rst:55
+msgid "``docs``: Contains the documentation for the project."
+msgstr ""
+
+#: ../../source/contrib.rst:56
+msgid "``examples``: Contains the example workflows."
+msgstr ""
+
+#: ../../source/contrib.rst:57
+msgid "``internal``: Contains the internal code for the project."
+msgstr ""
+
+#: ../../source/contrib.rst:59
+msgid "``web``: Contains the backend code for the Web UI."
+msgstr ""
+
+#: ../../source/contrib.rst:60
+msgid "``agent``: Contains the code for running the workflows."
+msgstr ""
+
+#: ../../source/contrib.rst:61
+msgid "``config``: Contains the code for loading the configuration."
+msgstr ""
+
+#: ../../source/contrib.rst:62
+msgid "``controller``: Contains the code for managing the workflows."
+msgstr ""
+
+#: ../../source/contrib.rst:63
+msgid "``dag``: Contains the code for parsing the workflow definition."
+msgstr ""
+
+#: ../../source/contrib.rst:64
+msgid "``database``: Contains the code for interacting with the database."
+msgstr ""
+
+#: ../../source/contrib.rst:65
+msgid "``executor``: Contains the code for different types of executors."
+msgstr ""
+
+#: ../../source/contrib.rst:66
+msgid "``runner``: Contains the code for scheduler."
+msgstr ""
+
+#: ../../source/contrib.rst:67
+msgid "``sock``: Contains the code for interacting with the socket."
+msgstr ""
+
+#: ../../source/contrib.rst:70
+msgid "Setting up your local environment for front end development"
+msgstr ""
+
+#: ../../source/contrib.rst:85
+msgid ""
+"Navigate to ``ui`` directory and run the following command to install the"
+" dependencies:"
+msgstr ""
+
+#: ../../source/contrib.rst:92
+msgid "Open the browser and navigate to http://localhost:8081."
+msgstr ""
+
+#: ../../source/contrib.rst:94
+msgid ""
+"Make changes to the source code and refresh the browser to see the "
+"changes."
+msgstr ""
+
+#: ../../source/contrib.rst:97
+msgid "Branches"
+msgstr ""
+
+#: ../../source/contrib.rst:99
+msgid ""
+"``main``: The main branch where the source code always reflects a "
+"production-ready state."
+msgstr ""
+

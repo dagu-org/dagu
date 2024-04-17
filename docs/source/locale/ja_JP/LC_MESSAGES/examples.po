@@ -1,0 +1,82 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-04-17 15:18+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja_JP\n"
+"Language-Team: ja_JP <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../source/examples.rst:2
+msgid "Examples"
+msgstr ""
+
+#: ../../source/examples.rst:8
+msgid "Hello World"
+msgstr ""
+
+#: ../../source/examples.rst:23
+msgid "Conditional Steps"
+msgstr ""
+
+#: ../../source/examples.rst:50
+msgid "File Output"
+msgstr ""
+
+#: ../../source/examples.rst:60
+msgid "Passing Output to Next Step"
+msgstr ""
+
+#: ../../source/examples.rst:76
+msgid "Running a Docker Container"
+msgstr ""
+
+#: ../../source/examples.rst:90
+msgid "See :ref:`docker executor` for more details."
+msgstr ""
+
+#: ../../source/examples.rst:93
+msgid "Sending HTTP Requests"
+msgstr ""
+
+#: ../../source/examples.rst:112
+msgid "Querying JSON Data with jq"
+msgstr ""
+
+#: ../../source/examples.rst:123 ../../source/examples.rst:143
+#: ../../source/examples.rst:170
+msgid "Expected Output:"
+msgstr ""
+
+#: ../../source/examples.rst:133
+msgid "Formatting JSON Data with jq"
+msgstr ""
+
+#: ../../source/examples.rst:156
+msgid "Outputting Raw Values with jq"
+msgstr ""
+
+#: ../../source/examples.rst:178
+msgid "Sending Email Notifications"
+msgstr ""
+
+#: ../../source/examples.rst:210
+msgid "Sending Email"
+msgstr ""
+
+#: ../../source/examples.rst:233
+msgid "Customizing Signal Handling on Stop"
+msgstr ""
+

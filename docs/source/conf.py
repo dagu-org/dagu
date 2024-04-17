@@ -32,6 +32,7 @@ html_theme_options = {}
 # -- Options for Localization ------------------------------------------------
 locale_dirs = ['locale/']  
 gettext_compact = False  
+languages = ['ja_JP']
 
 
 # layout
