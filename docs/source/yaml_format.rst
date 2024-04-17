@@ -1,7 +1,7 @@
 .. _Yaml Format:
 
-YAML Format
-============
+Workflow Language (YAML)
+==========================
 
 .. contents::
     :local:
