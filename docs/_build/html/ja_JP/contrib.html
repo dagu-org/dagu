@@ -1,0 +1,229 @@
+
+<!DOCTYPE html>
+
+<html lang="ja-JP">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+    <title>Contribution Guide &#8212; Dagu 1.10 ドキュメント</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="検索" href="search.html" />
+    <link rel="prev" title="FAQ" href="faq.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="contribution-guide">
+<h1>Contribution Guide<a class="headerlink" href="#contribution-guide" title="この見出しへのパーマリンク">¶</a></h1>
+<p>We welcome contributions of any size and skill level. If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository.</p>
+<section id="prerequisite">
+<h2>Prerequisite<a class="headerlink" href="#prerequisite" title="この見出しへのパーマリンク">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://go.dev/doc/install">Go version 1.19 or later.</a></p></li>
+<li><p>Latest version of <a class="reference external" href="https://nodejs.org/en/download/">Node.js</a>.</p></li>
+<li><p><a class="reference external" href="https://yarnpkg.com/">yarn</a> package manager.</p></li>
+</ul>
+</section>
+<section id="setting-up-your-local-environment">
+<h2>Setting up your local environment<a class="headerlink" href="#setting-up-your-local-environment" title="この見出しへのパーマリンク">¶</a></h2>
+<ol class="arabic">
+<li><p>Clone the repository to your local machine.</p></li>
+<li><p>Navigate to the root directory of the cloned repository and build the frontend project by running the following command:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>build-ui
+</pre></div>
+</div>
+</li>
+<li><p>Run the following command to start the <cite>Dagu</cite> application:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>go<span class="w"> </span>run<span class="w"> </span>main.go
+</pre></div>
+</div>
+</li>
+<li><p>Now you can change the source code and build the binary by running the following command:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>build
+</pre></div>
+</div>
+</li>
+<li><p>Run the following command to start the <cite>Dagu</cite> application:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>./bin/dagu
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="running-tests">
+<h2>Running Tests<a class="headerlink" href="#running-tests" title="この見出しへのパーマリンク">¶</a></h2>
+<blockquote>
+<div><p>Run the following command to run the tests:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span><span class="nb">test</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="code-structure">
+<h2>Code Structure<a class="headerlink" href="#code-structure" title="この見出しへのパーマリンク">¶</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ui</span></code>: Frontend code for the Web UI.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cmd</span></code>: Contains the main application entry point.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs</span></code>: Contains the documentation for the project.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">examples</span></code>: Contains the example workflows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">internal</span></code>: Contains the internal code for the project.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">web</span></code>: Contains the backend code for the Web UI.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">agent</span></code>: Contains the code for running the workflows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">config</span></code>: Contains the code for loading the configuration.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">controller</span></code>: Contains the code for managing the workflows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dag</span></code>: Contains the code for parsing the workflow definition.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">database</span></code>: Contains the code for interacting with the database.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">executor</span></code>: Contains the code for different types of executors.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">runner</span></code>: Contains the code for scheduler.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sock</span></code>: Contains the code for interacting with the socket.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="setting-up-your-local-environment-for-front-end-development">
+<h2>Setting up your local environment for front end development<a class="headerlink" href="#setting-up-your-local-environment-for-front-end-development" title="この見出しへのパーマリンク">¶</a></h2>
+<ol class="arabic">
+<li><p>Clone the repository to your local machine.</p></li>
+<li><p>Navigate to the root directory of the cloned repository and build the frontend project by running the following command:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>build-ui
+</pre></div>
+</div>
+</li>
+<li><p>Run the following command to start the <cite>Dagu</cite> application:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>go<span class="w"> </span>run<span class="w"> </span>main.go<span class="w"> </span>server
+</pre></div>
+</div>
+</li>
+<li><p>Navigate to <code class="docutils literal notranslate"><span class="pre">ui</span></code> directory and run the following command to install the dependencies:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>yarn<span class="w"> </span>install
+yarn<span class="w"> </span>start
+</pre></div>
+</div>
+</li>
+<li><p>Open the browser and navigate to <a class="reference external" href="http://localhost:8081">http://localhost:8081</a>.</p></li>
+<li><p>Make changes to the source code and refresh the browser to see the changes.</p></li>
+</ol>
+</section>
+<section id="branches">
+<h2>Branches<a class="headerlink" href="#branches" title="この見出しへのパーマリンク">¶</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">main</span></code>: The main branch where the source code always reflects a production-ready state.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Dagu</a></h1>
+
+
+
+
+
+
+
+
+<h3>ナビゲーション</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="web_interface.html">Web Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_format.html">YAML Format</a></li>
+<li class="toctree-l1"><a class="reference internal" href="base_config.html">Base Configuration for all DAGs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration Options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auth.html">Basic Authentication</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_token.html">API Token</a></li>
+<li class="toctree-l1"><a class="reference internal" href="executors.html">Executors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="email.html">Sending Email Notifications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduler.html">Scheduler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker-compose.html">Using Docker Compose</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest.html">REST API Docs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docker.html">Building Docker Image</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Contribution Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisite">Prerequisite</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-your-local-environment">Setting up your local environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-tests">Running Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#code-structure">Code Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-your-local-environment-for-front-end-development">Setting up your local environment for front end development</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#branches">Branches</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="faq.html" title="前の章へ">FAQ</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">クイック検索</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="検索" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Dagu Developers.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
+      
+      |
+      <a href="_sources/contrib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
