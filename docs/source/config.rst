@@ -1,7 +1,7 @@
 .. _Configuration Options:
 
-Configuration Options
-=====================
+Configurations
+==============
 
 .. contents::
     :local:
@@ -11,7 +11,7 @@ Configuration Options
 Environment Variables
 ----------------------
 
-The following environment variables can be used to configure the Dagu. Default values are provided in the parentheses:
+The following environment variables can be used to configure the DAGU. Default values are provided in the parentheses:
 
 - ``DAGU_HOST`` (``127.0.0.1``): The host to bind the server to.
 - ``DAGU_PORT`` (``8080``): The port to bind the server to.
@@ -25,7 +25,7 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_ADMIN_LOG_DIR`` (``$DAGU_HOME/logs/admin``): The directory where admin logs will be stored.
 - ``DAGU_BASE_CONFIG`` (``$DAGU_HOME/config.yaml``): The path to the base configuration file.
 - ``DAGU_NAVBAR_COLOR`` (``""``): The color to use for the navigation bar. E.g., ``red`` or ``#ff0000``.
-- ``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``
+- ``DAGU_NAVBAR_TITLE`` (``DAGU``): The title to display in the navigation bar. E.g., ``DAGU - PROD`` or ``DAGU - DEV``
 - ``DAGU_WORK_DIR``: The working directory for DAGs. If not set, the default value is DAG location. Also you can set the working directory for each DAG steps in the DAG configuration file. For more information, see :ref:`specifying working dir`.
 - ``DAGU_CERT_FILE``: The path to the SSL certificate file.
 - ``DAGU_KEY_FILE`` : The path to the SSL key file.
@@ -74,7 +74,7 @@ You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$
 Server's Host and Port Configuration
 -------------------------------------
 
-To specify the host and port for running the Dagu server, there are a couple of ways to do it.
+To specify the host and port for running the DAGU server, there are a couple of ways to do it.
 
 The first way is to specify the ``DAGU_HOST`` and ``DAGU_PORT`` environment variables. For example, you could run the following command:
 

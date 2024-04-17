@@ -1,12 +1,12 @@
 # SOME DESCRIPTIVE TITLE.
-# Copyright (C) 2023, Dagu Developers
-# This file is distributed under the same license as the Dagu package.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dagu \n"
+"Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-04-17 15:18+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -29,7 +29,7 @@ msgstr ""
 
 #: ../../source/config.rst:14
 msgid ""
-"The following environment variables can be used to configure the Dagu. "
+"The following environment variables can be used to configure the DAGU. "
 "Default values are provided in the parentheses:"
 msgstr ""
 
@@ -99,8 +99,8 @@ msgstr ""
 
 #: ../../source/config.rst:28
 msgid ""
-"``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation "
-"bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``"
+"``DAGU_NAVBAR_TITLE`` (``DAGU``): The title to display in the navigation "
+"bar. E.g., ``DAGU - PROD`` or ``DAGU - DEV``"
 msgstr ""
 
 #: ../../source/config.rst:29
@@ -142,7 +142,7 @@ msgstr ""
 
 #: ../../source/config.rst:77
 msgid ""
-"To specify the host and port for running the Dagu server, there are a "
+"To specify the host and port for running the DAGU server, there are a "
 "couple of ways to do it."
 msgstr ""
 

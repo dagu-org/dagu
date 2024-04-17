@@ -6,10 +6,13 @@ YAML Format
 .. contents::
     :local:
 
-Minimal DAG Definition
------------------------
+Basics
+--------
 
-The minimal DAG definition is as simple as follows.
+Minimal Example
+~~~~~~~~~~~~~~~~
+
+The minimal example of a DAG file is as follows:
 
 .. code-block:: yaml
 
@@ -23,8 +26,10 @@ The minimal DAG definition is as simple as follows.
 
 .. _specifying working dir:
 
-Specifying Working Directory
-------------------------------
+Working Directory
+~~~~~~~~~~~~~~~~~~
+
+You can specify the working directory for each step using the ``dir`` field.
 
 .. code-block:: yaml
 
@@ -33,8 +38,8 @@ Specifying Working Directory
       dir: /path/to/working/directory
       command: some command
 
-Running Arbitrary Code Snippets
--------------------------------
+Code Snippet
+~~~~~~~~~~~~~
 
 ``script`` field provides a way to run arbitrary snippets of code in any language.
 
@@ -53,10 +58,11 @@ Running Arbitrary Code Snippets
       depends:
         - step 1
 
-Defining Environment Variables
--------------------------------
+Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~
 
-You can define environment variables and refer to them using the ``env`` field.
+You can define environment variables using the ``env`` field. The environment variables can be accessed by the DAG and its steps.
+
 
 .. code-block:: yaml
 
@@ -68,10 +74,10 @@ You can define environment variables and refer to them using the ``env`` field.
       dir: ${SOME_DIR}
       command: python main.py ${SOME_FILE}
 
-Defining and Using Parameters
-------------------------------
+Parameters
+~~~~~~~~~~~
 
-You can define parameters using the ``params`` field and refer to each parameter as $1, $2, etc. Parameters can also be command substitutions or environment variables. It can be overridden by the ``--params=`` parameter of the ``start`` command.
+You can pass parameters to the DAG and its steps using the ``params`` field. The parameters can be accessed by the steps using ``$1``, ``$2``, and so on.
 
 .. code-block:: yaml
 
@@ -80,30 +86,20 @@ You can define parameters using the ``params`` field and refer to each parameter
     - name: some task with parameters
       command: python main.py $1 $2
 
-Named parameters are also available as follows.
+Named Parameters
+~~~~~~~~~~~~~~~~
+
+You can also use named parameters in the ``params`` field. The named parameters can be accessed by the steps using ``${FOO}``, ``${BAR}``, and so on.
 
 .. code-block:: yaml
 
-  params: ONE=1 TWO=`echo 2`
+  params: FOO=1 BAR=`echo 2`
   steps:
     - name: some task with parameters
-      command: python main.py $ONE $TWO
+      command: python main.py ${FOO} ${BAR}
 
-Using Command Substitution
---------------------------
-
-You can use command substitution in field values. I.e., a string enclosed in backquotes (`) is evaluated as a command and replaced with the result of standard output.
-
-.. code-block:: yaml
-
-  env:
-    TODAY: "`date '+%Y%m%d'`"
-  steps:
-    - name: hello
-      command: "echo hello, today is ${TODAY}"
-
-Adding Conditional Logic
-------------------------
+Conditional Logic
+~~~~~~~~~~~~~~~~~~
 
 Sometimes you have parts of a DAG that you only want to run under certain conditions. You can use the ``preconditions`` field to add conditional branches to your DAG.
 
@@ -131,28 +127,8 @@ If you want the DAG to continue to the next step regardless of the step's condit
       continueOn:
         skipped: true
 
-User Defined Functions
------------------------
-
-You can define functions in the DAG file and call them in steps. The ``params`` field is required for functions. The ``args`` field is used to pass arguments to functions. The arguments can be command substitutions or environment variables.
-
-.. code-block:: yaml
-
-  functions:
-    - name: my_function
-      params: param1 param2
-      command: python main.py $param1 $param2
-
-  steps:
-    - name: step 1
-      call:
-        function: my_function
-        args:
-          param1: 1
-          param2: 2
-
-Setting Environment Variables with Standard Output
----------------------------------------------------
+Capture Output
+~~~~~~~~~~~~~~
 
 The ``output`` field can be used to set an environment variable with standard output. Leading and trailing space will be trimmed automatically. The environment variables can be used in subsequent steps.
 
@@ -163,8 +139,8 @@ The ``output`` field can be used to set an environment variable with standard ou
       command: "echo foo"
       output: FOO # will contain "foo"
 
-Redirecting Stdout and Stderr
------------------------------
+Redirect Standard Output and Error
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The `stdout` field can be used to write standard output to a file.
 
@@ -185,8 +161,201 @@ The `stderr` field allows to redirect stderr to other file without writing to th
       stderr: "/tmp/error.txt"
 
 
-Adding Lifecycle Hooks
-----------------------
+Schedule
+~~~~~~~~~~
+
+You can use the `schedule` field to schedule a DAG with Cron expression.
+
+.. code-block:: yaml
+
+  schedule: "5 4 * * *" # Run at 04:05.
+  steps:
+    - name: scheduled job
+      command: job.sh
+
+See :ref:`scheduler configuration` for more details.
+
+.. _docker executor:
+
+Docker Image
+----------------
+
+Execute an Image
+~~~~~~~~~~~~~~~~~
+
+*Note: It requires Docker daemon running on the host.*
+
+The `docker` executor allows us to run Docker containers instead of bare commands. This can be useful for running commands in isolated environments or for reproducibility purposes.
+
+In the example below, it pulls and runs `Deno's docker image <https://hub.docker.com/r/denoland/deno>`_ and prints 'Hello World'.
+
+.. code-block:: yaml
+
+   steps:
+     - name: deno_hello_world
+       executor:
+         type: docker
+         config:
+           image: "denoland/deno:1.10.3"
+           autoRemove: true
+       command: run https://examples.deno.land/hello-world.ts
+
+Example Log output:
+
+.. image:: https://raw.githubusercontent.com/yohamta/dagu/main/examples/images/docker.png
+
+
+You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
+
+For example:
+
+.. code-block:: yaml
+
+    steps:
+      - name: deno_hello_world
+        executor:
+          type: docker
+          config:
+            image: "denoland/deno:1.10.3"
+            container:
+              volumes:
+                /app:/app:
+              env:
+                - FOO=BAR
+            host:
+              autoRemove: true
+        command: run https://examples.deno.land/hello-world.ts
+
+See the Docker's API documentation for all available options.
+
+- For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
+- For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.
+
+
+Use Host's Docker Environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you are running `dagu` using a container, you need the setup below.
+
+1. Run a `socat` container with the command below.
+
+.. code-block:: sh
+
+    docker run -v /var/run/docker.sock:/var/run/docker.sock -p 2376:2375 bobrik/socat TCP4-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
+
+2. Then you can set the `DOCKER_HOST` environment as follows.
+
+.. code-block:: yaml
+
+    env:
+      - DOCKER_HOST : "tcp://host.docker.internal:2376"
+    steps:
+      - name: deno_hello_world
+        executor:
+          type: docker
+          config:
+            image: "denoland/deno:1.10.3"
+            autoRemove: true
+        command: run https://examples.deno.land/hello-world.ts
+
+For more details, see `this page <https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2>`_.
+
+Advanced
+--------
+
+Making HTTP Requests
+~~~~~~~~~~~~~~~~~~~~~
+
+The `http` executor allows us to make an arbitrary HTTP request. This can be useful for interacting with web services or APIs.
+
+.. code-block:: yaml
+
+   steps:
+     - name: send POST request
+       command: POST https://foo.bar.com
+       executor:
+         type: http
+         config:
+           timeout: 10,
+           headers:
+             Authorization: "Bearer $TOKEN"
+           silent: true # If silent is true, it outputs response body only.
+           query:
+             key: "value"
+           body: "post body"
+
+Sending Email
+~~~~~~~~~~~~~~
+
+The `mail` executor can be used to send email. This can be useful for sending notifications or alerts.
+
+Example:
+
+.. code-block:: yaml
+
+    smtp:
+      host: "smtp.foo.bar"
+      port: "587"
+      username: "<username>"
+      password: "<password>"
+    
+    params: RECIPIENT=XXX
+
+    steps:
+      - name: step1
+        executor:
+          type: mail
+          config:
+            to: <to address>
+            from: <from address>
+            subject: "Exciting New Features Now Available"
+            message: |
+              Hello [RECIPIENT],
+
+              We hope you're enjoying your experience with MyApp!
+              We're thrilled to announce that [] v2.0 is now available,
+              and we've added some fantastic new features based on your
+              valuable feedback.
+
+              Thank you for choosing MyApp and for your continued support.
+              We look forward to hearing from you and providing you with
+              an even better MyApp experience.
+
+              Best regards,
+
+Command Execution over SSH
+--------------------------
+
+The `ssh` executor allows us to execute commands on remote hosts over SSH.
+
+.. code-block:: yaml
+
+    steps:
+      - name: step1
+        executor: 
+          type: ssh
+          config:
+            user: dagu
+            ip: XXX.XXX.XXX.XXX
+            port: 22
+            key: /Users/dagu/.ssh/private.pem
+        command: /usr/sbin/ifconfig
+
+Command Substitution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use command substitution in field values. I.e., a string enclosed in backquotes (`) is evaluated as a command and replaced with the result of standard output.
+
+.. code-block:: yaml
+
+  env:
+    TODAY: "`date '+%Y%m%d'`"
+  steps:
+    - name: hello
+      command: "echo hello, today is ${TODAY}"
+
+Lifecycle Hooks
+~~~~~~~~~~~~~~~~
 
 It is often desirable to take action when a specific event happens, for example, when a DAG fails. To achieve this, you can use `handlerOn` fields.
 
@@ -201,8 +370,8 @@ It is often desirable to take action when a specific event happens, for example,
     - name: A task
       command: main.sh
 
-Repeating a Task at Regular Intervals
--------------------------------------
+Repeat a Step
+~~~~~~~~~~~~~~
 
 If you want a task to repeat execution at regular intervals, you can use the `repeatPolicy` field. If you want to stop the repeating task, you can use the `stop` command to gracefully stop the task.
 
@@ -215,22 +384,80 @@ If you want a task to repeat execution at regular intervals, you can use the `re
         repeat: true
         intervalSec: 60
 
-Scheduling a DAG with Cron Expression
---------------------------------------
+User Defined Functions
+~~~~~~~~~~~~~~~~~~~~~~~
 
-You can use the `schedule` field to schedule a DAG with Cron expression.
+You can define functions in the DAG file and call them in steps. The ``params`` field is required for functions. The ``args`` field is used to pass arguments to functions. The arguments can be command substitutions or environment variables.
 
 .. code-block:: yaml
 
-  schedule: "5 4 * * *" # Run at 04:05.
+  functions:
+    - name: my_function
+      params: param1 param2
+      command: python main.py $param1 $param2
+
   steps:
-    - name: scheduled job
-      command: job.sh
+    - name: step 1
+      call:
+        function: my_function
+        args:
+          param1: 1
+          param2: 2
 
-See :ref:`scheduler configuration` for more details.
+JSON Processing
+-----------------
 
-All Available Fields for DAGs
--------------------------------
+Executing jq Command
+~~~~~~~~~~~~~~~~~~~~~~
+
+The `jq` executor can be used to transform, query, and format JSON. This can be useful for working with JSON data in pipelines or for data processing.
+
+.. code-block:: yaml
+
+    steps:
+      - name: run query
+        executor: jq
+        command: '{(.id): .["10"].b}'
+        script: |
+          {"id": "sample", "10": {"b": 42}}
+
+**Output:**
+
+.. code-block:: json
+
+    {
+        "sample": 42
+    }
+
+Formatting JSON
+~~~~~~~~~~~~~~~
+
+.. code-block:: yaml
+
+    steps:
+      - name: format json
+        executor: jq
+        script: |
+          {"id": "sample", "10": {"b": 42}}
+
+**Output:**
+
+.. code-block:: json
+
+    {
+        "10": {
+            "b": 42
+        },
+        "id": "sample"
+    }
+
+.. _command-execution-over-ssh:
+
+All Available Fields
+--------------------
+
+DAG
+~~~~
 
 This section provides a comprehensive list of available fields that can be used to configure DAGs and their steps in detail. Each field serves a specific purpose, enabling granular control over how the DAG runs. The fields include:
 
@@ -291,8 +518,8 @@ Example:
       exit:
         command: "echo finished"         
 
-All Available Fields for Steps
---------------------------------
+Step
+~~~~
 
 Each step can have its own set of configurations, including:
 

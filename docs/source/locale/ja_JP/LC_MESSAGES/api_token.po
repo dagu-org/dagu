@@ -1,12 +1,12 @@
 # SOME DESCRIPTIVE TITLE.
-# Copyright (C) 2023, Dagu Developers
-# This file is distributed under the same license as the Dagu package.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dagu \n"
+"Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-04-17 15:18+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -24,7 +24,7 @@ msgid "API Token"
 msgstr ""
 
 #: ../../source/api_token.rst:9
-msgid "To enable API token for Dagu, follow these steps:"
+msgid "To enable API token for DAGU, follow these steps:"
 msgstr ""
 
 #: ../../source/api_token.rst:11
@@ -34,7 +34,7 @@ msgstr ""
 #: ../../source/api_token.rst:18
 msgid ""
 "Replace ``<arbitrary token string>`` with a random string of your choice."
-" This string will be used as the API token for Dagu."
+" This string will be used as the API token for DAGU."
 msgstr ""
 
 #: ../../source/api_token.rst:20

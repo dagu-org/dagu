@@ -1,5 +1,5 @@
-Sending Email Notifications
-===========================
+Email Notifications
+====================
 
 Email notifications can be sent when a DAG finished with an error or successfully. To do so, you can set the ``smtp`` field and related fields in the DAG specs. You can use any email delivery services (e.g. Sendgrid, Mailgun, etc).
 

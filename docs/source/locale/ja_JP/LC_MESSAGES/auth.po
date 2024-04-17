@@ -1,12 +1,12 @@
 # SOME DESCRIPTIVE TITLE.
-# Copyright (C) 2023, Dagu Developers
-# This file is distributed under the same license as the Dagu package.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dagu \n"
+"Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-04-17 15:18+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -24,7 +24,7 @@ msgid "Basic Authentication"
 msgstr ""
 
 #: ../../source/auth.rst:9
-msgid "To enable basic authentication for Dagu, follow these steps:"
+msgid "To enable basic authentication for DAGU, follow these steps:"
 msgstr ""
 
 #: ../../source/auth.rst:11

@@ -20,7 +20,7 @@ Setting up your local environment
 
       make build-ui
 
-#. Run the following command to start the `Dagu` application:
+#. Run the following command to start the `DAGU` application:
 
    .. code-block:: sh
 
@@ -32,7 +32,7 @@ Setting up your local environment
 
       make build
 
-#. Run the following command to start the `Dagu` application:
+#. Run the following command to start the `DAGU` application:
 
    .. code-block:: sh
 
@@ -76,7 +76,7 @@ Setting up your local environment for front end development
 
       make build-ui
 
-#. Run the following command to start the `Dagu` application:
+#. Run the following command to start the `DAGU` application:
 
    .. code-block:: sh
 

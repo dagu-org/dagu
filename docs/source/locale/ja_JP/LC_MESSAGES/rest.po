@@ -1,12 +1,12 @@
 # SOME DESCRIPTIVE TITLE.
-# Copyright (C) 2023, Dagu Developers
-# This file is distributed under the same license as the Dagu package.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dagu \n"
+"Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-04-17 15:18+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -24,12 +24,12 @@ msgid "REST API Docs"
 msgstr ""
 
 #: ../../source/rest.rst:6
-msgid "Dagu server provides simple APIs to query and control workflows."
+msgid "DAGU server provides simple APIs to query and control workflows."
 msgstr ""
 
 #: ../../source/rest.rst:8
 msgid ""
-"See the `OpenAPI Schema for Dagu <https://github.com/dagu-"
+"See the `OpenAPI Schema for DAGU <https://github.com/dagu-"
 "dev/dagu/blob/main/swagger.yaml>`_ for more details."
 msgstr ""
 

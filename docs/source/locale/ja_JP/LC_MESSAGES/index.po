@@ -1,12 +1,12 @@
 # SOME DESCRIPTIVE TITLE.
-# Copyright (C) 2023, Dagu Developers
-# This file is distributed under the same license as the Dagu package.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Dagu \n"
+"Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2024-04-17 15:18+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -20,21 +20,21 @@ msgstr ""
 "Generated-By: Babel 2.12.1\n"
 
 #: ../../source/index.rst:7
-msgid "Welcome to Dagu's documentation!"
+msgid "Welcome to DAGU's documentation!"
 msgstr "DAGU のドキュメントへようこそ"
 
 #: ../../source/index.rst:10
-msgid "Dagu"
+msgid "DAGU"
 msgstr ""
 
 #: ../../source/index.rst:20
 msgid ""
-"Dagu is a powerful Cron alternative that comes with a Web UI. It allows "
+"DAGU is a powerful Cron alternative that comes with a Web UI. It allows "
 "you to define dependencies between commands as a `Directed Acyclic Graph "
 "(DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a "
-"declarative :ref:`YAML Format`. Additionally, Dagu natively supports "
+"declarative :ref:`YAML Format`. Additionally, DAGU natively supports "
 "running Docker containers, making HTTP requests, and executing commands "
-"over SSH. Dagu was designed to be easy to use, self-contained, and "
+"over SSH. DAGU was designed to be easy to use, self-contained, and "
 "require no coding, making it ideal for small projects."
 msgstr ""
 

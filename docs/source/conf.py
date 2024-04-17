@@ -6,15 +6,20 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Dagu'
-copyright = '2023, Dagu Developers'
-author = 'Dagu Developers'
+project = 'DAGU'
+copyright = '2023, DAGU Developers'
+author = 'DAGU Developers'
 release = '1.10'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.mathjax',
+    'sphinx.ext.viewcode',
     'sphinx_rtd_theme',
 ]
 
