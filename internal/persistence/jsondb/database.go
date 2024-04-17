@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 
@@ -147,16 +148,8 @@ func (store *Store) ReadStatusRecent(dagFile string, n int) []*model.StatusFile 
 
 // ReadStatusToday returns a list of status files.
 func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
-	file, err := store.latestToday(dagFile, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	return ParseFile(file)
-}
-
-// ReadStatusOfAll returns the status based on the latest run of the dag
-func (store *Store) ReadStatusOfAll(dagFile string) (*model.Status, error) {
-	file, err := store.latestOfAll(dagFile)
+	readLatestStatus := config.Get().LatestStatusToday
+	file, err := store.latestToday(dagFile, time.Now(), readLatestStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -313,24 +306,14 @@ func (store *Store) pattern(dagFile string) string {
 	return filepath.Join(dir, p)
 }
 
-func (store *Store) latestToday(dagFile string, day time.Time) (string, error) {
+func (store *Store) latestToday(dagFile string, day time.Time, latestStatusToday bool) (string, error) {
 	var ret []string
-	pattern := fmt.Sprintf("%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"))
-	matches, err := filepath.Glob(pattern)
-	if err == nil || len(matches) > 0 {
-		ret = filterLatest(matches, 1)
+	pattern := ""
+	if latestStatusToday {
+		pattern = fmt.Sprintf("%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"))
 	} else {
-		return "", persistence.ErrNoStatusDataToday
+		pattern = fmt.Sprintf("%s.*.*.dat", store.pattern(dagFile))
 	}
-	if len(ret) == 0 {
-		return "", persistence.ErrNoStatusData
-	}
-	return ret[0], err
-}
-
-func (store *Store) latestOfAll(dagFile string) (string, error) {
-	var ret []string
-	pattern := fmt.Sprintf("%s.*.*.dat", store.pattern(dagFile))
 	matches, err := filepath.Glob(pattern)
 	if err == nil || len(matches) > 0 {
 		ret = filterLatest(matches, 1)

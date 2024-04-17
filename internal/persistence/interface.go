@@ -2,11 +2,12 @@ package persistence
 
 import (
 	"fmt"
+	"path/filepath"
+	"time"
+
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
-	"path/filepath"
-	"time"
 )
 
 var (
@@ -29,7 +30,6 @@ type (
 		Update(dagFile, requestId string, st *model.Status) error
 		ReadStatusRecent(dagFile string, n int) []*model.StatusFile
 		ReadStatusToday(dagFile string) (*model.Status, error)
-		ReadStatusOfAll(dagFile string) (*model.Status, error)
 		FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error)
 		RemoveAll(dagFile string) error
 		RemoveOld(dagFile string, retentionDays int) error

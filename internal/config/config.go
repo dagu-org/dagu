@@ -34,6 +34,7 @@ type Config struct {
 	TLS                *TLS
 	IsAuthToken        bool
 	AuthToken          string
+	LatestStatusToday  bool
 }
 
 type TLS struct {
@@ -101,6 +102,7 @@ func LoadConfig(userHomeDir string) error {
 	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
 	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
 	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
+	_ = viper.BindEnv("latestStatusToday", "DAGU_LATEST_STATUS")
 	command := "dagu"
 	if ex, err := os.Executable(); err == nil {
 		command = ex
@@ -124,6 +126,7 @@ func LoadConfig(userHomeDir string) error {
 	viper.SetDefault("navbarTitle", "Dagu")
 	viper.SetDefault("isAuthToken", "0")
 	viper.SetDefault("authToken", "0")
+	viper.SetDefault("latestStatusToday", "0")
 
 	viper.AutomaticEnv()
 
