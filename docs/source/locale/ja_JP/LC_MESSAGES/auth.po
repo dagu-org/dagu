@@ -1,0 +1,62 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: DAGU \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-04-17 15:18+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja_JP\n"
+"Language-Team: ja_JP <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+#: ../../source/auth.rst:4
+msgid "Basic Authentication"
+msgstr ""
+
+#: ../../source/auth.rst:9
+msgid "To enable basic authentication for DAGU, follow these steps:"
+msgstr ""
+
+#: ../../source/auth.rst:11
+msgid "Set the environment variables to configure basic authentication:"
+msgstr ""
+
+#: ../../source/auth.rst:19
+msgid ""
+"Replace ``<your-username>`` and ``<your-password>`` with your desired "
+"username and password."
+msgstr ""
+
+#: ../../source/auth.rst:21
+msgid ""
+"Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` "
+"directory (default: ``$HOME/.dagu/``) to override the default "
+"configuration values."
+msgstr ""
+
+#: ../../source/auth.rst:30
+msgid "You can enable HTTPS by configuring the following environment variables:"
+msgstr ""
+
+#: ../../source/auth.rst:37
+msgid ""
+"Replace ``<path-to-cert-file>`` and ``<path-to-key-file>`` with the paths"
+" to your certificate and key files."
+msgstr ""
+
+#: ../../source/auth.rst:39
+msgid ""
+"See :ref:`Configuration Options` for more information on the "
+"configuration file."
+msgstr ""
+

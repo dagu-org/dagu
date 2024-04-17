@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/constants"
 	"testing"
+
+	"github.com/dagu-dev/dagu/internal/constants"
 )
 
 func TestVersionCommand(t *testing.T) {

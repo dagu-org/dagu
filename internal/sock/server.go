@@ -42,7 +42,7 @@ var (
 
 // Serve starts listening and serving requests.
 func (svr *Server) Serve(listen chan error) error {
-	os.Remove(svr.Addr)
+	_ = os.Remove(svr.Addr)
 	var err error
 	svr.listener, err = net.Listen("unix", svr.Addr)
 	if err != nil {
@@ -71,7 +71,7 @@ func (svr *Server) Serve(listen chan error) error {
 				if err == nil {
 					svr.HandlerFunc(newHttpResponseWriter(&conn), request)
 				}
-				conn.Close()
+				_ = conn.Close()
 			}()
 		}
 	}

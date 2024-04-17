@@ -70,7 +70,10 @@ func CreateMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 
 	exec := &MailExecutor{cfg: &cfg}
 
-	d := dag.GetDAGFromContext(ctx)
+	d, err := dag.GetDAGFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	m := &mailer.Mailer{
 		Config: &mailer.Config{
 			Host:     d.Smtp.Host,

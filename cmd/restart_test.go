@@ -1,14 +1,15 @@
 package cmd
 
 import (
+	"os"
+	"testing"
+	"time"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
-	"time"
 )
 
 func TestRestartCommand(t *testing.T) {

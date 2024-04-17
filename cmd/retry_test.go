@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRetryCommand(t *testing.T) {

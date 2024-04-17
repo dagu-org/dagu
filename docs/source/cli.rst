@@ -1,7 +1,9 @@
+.. _cli:
+
 Command Line Interface
 ======================
 
-The following commands are available for interacting with Dagu:
+The following commands are available for interacting with DAGU:
 
 .. code-block:: sh
 
@@ -26,7 +28,7 @@ The following commands are available for interacting with Dagu:
   # Launches both the web UI server and scheduler process
   dagu start-all [--host=<host>] [--port=<port>] [--dags=<path to directory>]
   
-  # Launches the Dagu web UI server
+  # Launches the DAGU web UI server
   dagu server [--host=<host>] [--port=<port>] [--dags=<path to directory>]
   
   # Starts the scheduler process

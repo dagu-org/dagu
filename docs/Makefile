@@ -29,7 +29,7 @@ install-libs:
 	pip install sphinx sphinx-autobuild
 
 build:
-	sphinx-build -b html source/ build/html
+	sphinx-build -b html -D language=ja_JP source/ build/html
 
 gettext-ja:
 	sphinx-build -b gettext source/ build/html

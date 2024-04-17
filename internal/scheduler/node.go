@@ -348,7 +348,7 @@ func (n *Node) teardown() error {
 	}
 	n.logLock.Lock()
 	n.done = true
-	var lastErr error = nil
+	var lastErr error
 	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
 		if w != nil {
 			if err := w.Flush(); err != nil {

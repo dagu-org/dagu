@@ -6,7 +6,7 @@ Basic Authentication
 .. contents::
     :local:
 
-To enable basic authentication for Dagu, follow these steps:
+To enable basic authentication for DAGU, follow these steps:
 
 #. Set the environment variables to configure basic authentication:
   

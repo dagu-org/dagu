@@ -234,14 +234,20 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 
 	go func() {
 		// create file for successful retry
-		<-time.After(time.Millisecond * 300)
+		timer1 := time.NewTimer(time.Millisecond * 300)
+		defer timer1.Stop()
+		<-timer1.C
+
 		f, err := os.Create(tmpFile)
 		require.NoError(t, err)
-		f.Close()
+		_ = f.Close()
 	}()
 
 	go func() {
-		<-time.After(time.Millisecond * 500)
+		timer2 := time.NewTimer(time.Millisecond * 500)
+		defer timer2.Stop()
+		<-timer2.C
+
 		nodes := g.Nodes()
 
 		// scheduled for retry
@@ -250,7 +256,9 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 		startedAt := nodes[1].State().StartedAt
 
 		// wait for retry
-		<-time.After(time.Millisecond * 500)
+		timer3 := time.NewTimer(time.Millisecond * 500)
+		defer timer3.Stop()
+		<-timer3.C
 
 		// check time difference
 		retriedAt := nodes[1].State().RetriedAt
@@ -363,7 +371,10 @@ func TestSchedulerOnSignal(t *testing.T) {
 	sc := &Scheduler{Config: &Config{}}
 
 	go func() {
-		<-time.After(time.Millisecond * 50)
+		timer := time.NewTimer(time.Millisecond * 50)
+		defer timer.Stop()
+		<-timer.C
+
 		sc.Signal(g, syscall.SIGTERM, nil, false)
 	}()
 
@@ -392,7 +403,9 @@ func TestSchedulerOnCancel(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		<-time.After(time.Millisecond * 500)
+		timer := time.NewTimer(time.Millisecond * 500)
+		defer timer.Stop()
+		<-timer.C
 		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
@@ -473,7 +486,9 @@ func TestRepeat(t *testing.T) {
 	sc := &Scheduler{Config: &Config{}}
 
 	go func() {
-		<-time.After(time.Millisecond * 3000)
+		timer := time.NewTimer(time.Millisecond * 3000)
+		defer timer.Stop()
+		<-timer.C
 		sc.Cancel(g)
 	}()
 
@@ -524,7 +539,9 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		<-time.After(time.Millisecond * 100)
+		timer := time.NewTimer(time.Millisecond * 100)
+		defer timer.Stop()
+		<-timer.C
 		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 

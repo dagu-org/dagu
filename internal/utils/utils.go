@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -17,6 +18,11 @@ import (
 )
 
 var defaultEnv map[string]string
+
+var (
+	ErrUnexpectedEOF         = errors.New("unexpected end of input after escape character")
+	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
+)
 
 func init() {
 	defaultEnv = map[string]string{
@@ -48,9 +54,9 @@ func MustGetwd() string {
 func FormatTime(t time.Time) string {
 	if t.IsZero() {
 		return constants.TimeEmpty
-	} else {
-		return t.Format(constants.TimeFormat)
 	}
+
+	return t.Format(constants.TimeFormat)
 }
 
 // ParseTime parses time string.
@@ -65,9 +71,9 @@ func ParseTime(val string) (time.Time, error) {
 func FormatDuration(t time.Duration, defaultVal string) string {
 	if t == 0 {
 		return defaultVal
-	} else {
-		return t.String()
 	}
+
+	return t.String()
 }
 
 // SplitCommand splits command string to program and arguments.
@@ -83,7 +89,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 		args, err := parser.Parse(a)
 		if err != nil {
 			log.Printf("failed to parse arguments: %s", err)
-			//if parse shell world error use all substing as args
+			// if parse shell world error use all substing as args
 			return program, []string{vals[1]}
 		}
 		ret := []string{}
@@ -100,7 +106,7 @@ func SplitCommand(cmd string, parse bool) (program string, args []string) {
 	return vals[0], []string{}
 }
 
-// Assign values to command parameters
+// AssignValues Assign values to command parameters
 func AssignValues(command string, params map[string]string) string {
 	updatedCommand := command
 
@@ -111,14 +117,14 @@ func AssignValues(command string, params map[string]string) string {
 	return updatedCommand
 }
 
-// Returns a command with parameters stripped from it.
+// RemoveParams Returns a command with parameters stripped from it.
 func RemoveParams(command string) string {
 	paramRegex := regexp.MustCompile(`\$\w+`)
 
 	return paramRegex.ReplaceAllString(command, "")
 }
 
-// extracts a slice of parameter names by removing the '$' from the command string.
+// ExtractParamNames extracts a slice of parameter names by removing the '$' from the command string.
 func ExtractParamNames(command string) []string {
 	words := strings.Fields(command)
 
@@ -244,7 +250,7 @@ func LogErr(action string, err error) {
 	}
 }
 
-// TrunString returns truncated string.
+// TruncString TurnString returns truncated string.
 func TruncString(val string, max int) string {
 	if len(val) > max {
 		return val[:max]
@@ -252,7 +258,7 @@ func TruncString(val string, max int) string {
 	return val
 }
 
-// StringsWithFallback returns the first non-empty string
+// StringWithFallback StringsWithFallback returns the first non-empty string
 // in the parameter list.
 func StringWithFallback(val, fallback string) string {
 	if val == "" {
@@ -407,7 +413,7 @@ func UnescapeArg(input string) (string, error) {
 		if char == '\\' {
 			i++
 			if i >= length {
-				return "", fmt.Errorf("unexpected end of input after escape character")
+				return "", ErrUnexpectedEOF
 			}
 
 			switch input[i] {
@@ -418,7 +424,7 @@ func UnescapeArg(input string) (string, error) {
 			case '"':
 				escaped.WriteRune('"')
 			default:
-				return "", fmt.Errorf("unknown escape sequence '\\%c'", input[i])
+				return "", fmt.Errorf("%w: '\\%c'", ErrUnknownEscapeSequence, input[i])
 			}
 		} else {
 			escaped.WriteByte(char)

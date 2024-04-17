@@ -1,6 +1,7 @@
 package dag
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dagu-dev/dagu/internal/utils"
@@ -12,6 +13,11 @@ type Condition struct {
 	Expected  string
 }
 
+var (
+	errConditionNotMet = errors.New("condition was not met")
+	errEvalCondition   = errors.New("failed to evaluate condition")
+)
+
 // Evaluate returns the actual value of the condition.
 func (c *Condition) Evaluate() (string, error) {
 	return utils.ParseVariable(c.Condition)
@@ -20,7 +26,7 @@ func (c *Condition) Evaluate() (string, error) {
 // CheckResult checks if the actual value of the condition matches the expected value.
 func (c *Condition) CheckResult(actualValue string) error {
 	if c.Expected != actualValue {
-		return fmt.Errorf("condition was not met. Condition=%s Expected=%s Actual=%s", c.Condition, c.Expected, actualValue)
+		return fmt.Errorf("%w. Condition=%s Expected=%s Actual=%s", errConditionNotMet, c.Condition, c.Expected, actualValue)
 	}
 	return nil
 }
@@ -29,7 +35,7 @@ func (c *Condition) CheckResult(actualValue string) error {
 func EvalCondition(c *Condition) error {
 	actual, err := c.Evaluate()
 	if err != nil {
-		return fmt.Errorf("failed to evaluate condition. Condition=%s Error=%v", c.Condition, err)
+		return fmt.Errorf("%w. Condition=%s Error=%v", errEvalCondition, c.Condition, err)
 	}
 	return c.CheckResult(actual)
 }

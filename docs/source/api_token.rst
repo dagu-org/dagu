@@ -6,7 +6,7 @@ API Token
 .. contents::
     :local:
 
-To enable API token for Dagu, follow these steps:
+To enable API token for DAGU, follow these steps:
 
 #. Set the environment variables to configure basic authentication:
   
@@ -15,7 +15,7 @@ To enable API token for Dagu, follow these steps:
        export DAGU_IS_AUTHTOKEN=1
        export DAGU_AUTHTOKEN="<arbitrary token string>"
   
-   Replace ``<arbitrary token string>`` with a random string of your choice. This string will be used as the API token for Dagu.
+   Replace ``<arbitrary token string>`` with a random string of your choice. This string will be used as the API token for DAGU.
 
 #. Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$HOME/.dagu/``) to override the default configuration values.
 
