@@ -42,6 +42,9 @@ You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory (default: ``$
     host: <hostname for web UI address>                          # default: 127.0.0.1
     port: <port number for web UI address>                       # default: 8080
 
+    # to show latest status of dags from today or history
+    latestStatusToday: true
+
     # path to the DAGs directory
     dags: <the location of DAG configuration files>              # default: ${DAGU_HOME}/dags
     
