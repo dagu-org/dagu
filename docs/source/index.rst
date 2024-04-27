@@ -1,9 +1,9 @@
-.. DAGU documentation master file, created by
+.. Dagu documentation master file, created by
    sphinx-quickstart on Thu Apr 13 22:21:41 2023.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-DAGU - Directed Acyclic Graph Utility
+Dagu - Directed Acyclic Graph Utility
 ======================================
 
 .. raw:: html
@@ -15,13 +15,13 @@ DAGU - Directed Acyclic Graph Utility
       </div>
    </div>
 
-DAGU is a powerful workflow engine that comes with a Web UI. It allows you to define dependencies between commands as a `Directed Acyclic Graph (DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a declarative :ref:`YAML Format`. Additionally, DAGU natively supports running Docker containers, making HTTP requests, and executing commands over SSH. DAGU was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+Dagu is a powerful workflow engine that comes with a Web UI. It allows you to define dependencies between commands as a `Directed Acyclic Graph (DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a declarative :ref:`YAML Format`. Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
 Quick Start
 ------------
 
 :doc:`installation`
-   How to install DAGU.
+   How to install Dagu.
 
 :doc:`quickstart`
    A quick start guide to get you up and running.

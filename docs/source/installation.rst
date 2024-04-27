@@ -4,7 +4,7 @@ Installation
 .. contents::
     :local:
 
-You can install DAGU quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
+You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
 
 Via Homebrew
 ------------

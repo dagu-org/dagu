@@ -3,9 +3,9 @@
 REST API Docs
 =============
 
-DAGU server provides simple APIs to query and control workflows.
+Dagu server provides simple APIs to query and control workflows.
 
-See the `OpenAPI Schema for DAGU <https://github.com/dagu-dev/dagu/blob/main/swagger.yaml>`_ for more details.
+See the `OpenAPI Schema for Dagu <https://github.com/dagu-dev/dagu/blob/main/swagger.yaml>`_ for more details.
 
 **Endpoint** : `localhost:8080` (default)
 
