@@ -25,11 +25,11 @@ type HTTPExecutor struct {
 }
 
 type HTTPConfig struct {
-	Timeout     int               `json:"timeout"`
-	Headers     map[string]string `json:"headers"`
-	QueryParams map[string]string `json:"query"`
-	Body        string            `json:"body"`
-	Silent      bool              `json:"silent"`
+	Timeout int               `json:"timeout"`
+	Headers map[string]string `json:"headers"`
+	Queries map[string]string `json:"queries"`
+	Body    string            `json:"body"`
+	Silent  bool              `json:"silent"`
 }
 
 var errHttpStatusCode = errors.New("http status code not 2xx")
@@ -86,6 +86,9 @@ func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 		for k, v := range reqCfg.Headers {
 			reqCfg.Headers[k] = os.ExpandEnv(v)
 		}
+		for k, v := range reqCfg.Queries {
+			reqCfg.Queries[k] = os.ExpandEnv(v)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -97,8 +100,8 @@ func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	if len(reqCfg.Headers) > 0 {
 		req = req.SetHeaders(reqCfg.Headers)
 	}
-	if len(reqCfg.QueryParams) > 0 {
-		req = req.SetQueryParams(reqCfg.QueryParams)
+	if len(reqCfg.Queries) > 0 {
+		req = req.SetQueryParams(reqCfg.Queries)
 	}
 	req = req.SetBody([]byte(reqCfg.Body))
 
@@ -121,11 +124,9 @@ func decodeHTTPConfig(dat map[string]interface{}, cfg *HTTPConfig) error {
 }
 
 func decodeHTTPConfigFromString(s string, cfg *HTTPConfig) error {
-	if len(s) > 0 {
-		ss := os.ExpandEnv(s)
-		if err := json.Unmarshal([]byte(ss), &cfg); err != nil {
-			return err
-		}
+	ss := os.ExpandEnv(s)
+	if err := json.Unmarshal([]byte(ss), &cfg); err != nil {
+		return err
 	}
 	return nil
 }

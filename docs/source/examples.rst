@@ -104,7 +104,7 @@ Sending HTTP Requests
         {
           "timeout": 10,
           "headers": {},
-          "query": {
+          "queries": {
             "postId": "1"
           },
           "body": ""
