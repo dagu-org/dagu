@@ -11,7 +11,7 @@ RUN rm -rf node_modules; \
     yarn build
 
 # Stage 2: Go Builder
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine as go-builder
+FROM --platform=$TARGETPLATFORM golang:1.22-alpine as go-builder
 
 ARG LDFLAGS
 ARG TARGETOS
@@ -26,7 +26,7 @@ COPY --from=ui-builder /app/dist/ ./service/frontend/assets/
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/dagu .
 
 # Stage 3: Final Image
-FROM --platform=$BUILDPLATFORM alpine:latest
+FROM --platform=$TARGETPLATFORM alpine:latest
 
 ARG USER="dagu"
 ARG USER_UID=1000
