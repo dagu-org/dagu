@@ -1,0 +1,127 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: DAGU \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-05-09 00:37+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja_JP\n"
+"Language-Team: ja_JP <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.15.0\n"
+
+#: ../../source/index.rst:41
+msgid "Installation"
+msgstr ""
+
+#: ../../source/index.rst:48
+msgid "Interface"
+msgstr ""
+
+#: ../../source/index.rst:57
+msgid "Workflow Language"
+msgstr ""
+
+#: ../../source/index.rst:65
+msgid "Configuration"
+msgstr ""
+
+#: ../../source/index.rst:74
+msgid "Container Setup"
+msgstr ""
+
+#: ../../source/index.rst:81
+msgid "Development"
+msgstr ""
+
+#: ../../source/index.rst:7
+msgid "Dagu"
+msgstr ""
+
+#: ../../source/index.rst:18
+#, fuzzy
+msgid ""
+"Dagu is a powerful Cron alternative that comes with a Web UI. It allows "
+"you to define dependencies between commands as a `Directed Acyclic Graph "
+"(DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a "
+"declarative :ref:`YAML Format`. Additionally, Dagu natively supports "
+"running Docker containers, making HTTP requests, and executing commands "
+"over SSH. Dagu was designed to be easy to use, self-contained, and "
+"require no coding, making it ideal for small projects."
+msgstr ""
+"DAGU は、Web UI を備えた強力な Cron の代替です。宣言的な :ref:`YAML 形式` で、コマンド間の依存関係を "
+"`有向非巡回グラフ (DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ "
+"として定義できます。さらに、DAGU は Docker コンテナの実行、HTTP リクエストの送信、SSH "
+"経由でのコマンド実行をネイティブにサポートしています。DAGU "
+"は使いやすく、自己完結型で、コーディングを必要としないように設計されているため、小規模なプロジェクトに最適です。"
+
+#: ../../source/index.rst:21
+msgid "Quick Start"
+msgstr ""
+
+#: ../../source/index.rst:24
+msgid ":doc:`installation`"
+msgstr ""
+
+#: ../../source/index.rst:24
+msgid "How to install Dagu."
+msgstr ""
+
+#: ../../source/index.rst:27
+msgid ":doc:`quickstart`"
+msgstr ""
+
+#: ../../source/index.rst:27
+msgid "A quick start guide to get you up and running."
+msgstr ""
+
+#: ../../source/index.rst:30
+msgid ":ref:`cli`"
+msgstr ""
+
+#: ../../source/index.rst:30
+msgid "Command line interface reference."
+msgstr ""
+
+#: ../../source/index.rst:33
+msgid ":ref:`YAML Format`"
+msgstr ""
+
+#: ../../source/index.rst:33
+msgid "Workflow language reference."
+msgstr ""
+
+#: ../../source/index.rst:36
+msgid ":ref:`examples`"
+msgstr ""
+
+#: ../../source/index.rst:36
+msgid "Examples of workflows."
+msgstr ""
+
+#: ../../source/index.rst:39
+msgid ":ref:`Configuration Options`"
+msgstr ""
+
+#: ../../source/index.rst:39
+msgid "Configuration options."
+msgstr ""
+
+#~ msgid "Welcome to DAGU's documentation!"
+#~ msgstr "DAGU のドキュメントへようこそ"
+
+#~ msgid "DAGU"
+#~ msgstr ""
+
+#~ msgid "Contents"
+#~ msgstr "目次"
+

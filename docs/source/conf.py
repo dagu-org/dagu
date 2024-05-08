@@ -9,7 +9,7 @@
 project = 'DAGU'
 copyright = '2023, DAGU Developers'
 author = 'DAGU Developers'
-release = '1.10'
+# release = '1.10'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -40,7 +40,6 @@ html_theme_options = {
 # -- Options for Localization ------------------------------------------------
 locale_dirs = ['locale/']  
 gettext_compact = False  
-languages = ['ja_JP']
 
 
 # layout

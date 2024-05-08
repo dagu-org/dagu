@@ -1,0 +1,584 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: DAGU \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-05-09 00:37+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja_JP\n"
+"Language-Team: ja_JP <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.15.0\n"
+
+#: ../../source/yaml_format.rst:4
+msgid "Workflow Language (YAML)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:10
+msgid "Basics"
+msgstr ""
+
+#: ../../source/yaml_format.rst:13
+msgid "Minimal Example"
+msgstr ""
+
+#: ../../source/yaml_format.rst:15
+msgid "The minimal example of a DAG file is as follows:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:30
+msgid "Working Directory"
+msgstr ""
+
+#: ../../source/yaml_format.rst:32
+msgid ""
+"You can specify the working directory for each step using the ``dir`` "
+"field."
+msgstr ""
+
+#: ../../source/yaml_format.rst:42
+msgid "Code Snippet"
+msgstr ""
+
+#: ../../source/yaml_format.rst:44
+msgid ""
+"``script`` field provides a way to run arbitrary snippets of code in any "
+"language."
+msgstr ""
+
+#: ../../source/yaml_format.rst:62
+msgid "Environment Variables"
+msgstr ""
+
+#: ../../source/yaml_format.rst:64
+msgid ""
+"You can define environment variables using the ``env`` field. The "
+"environment variables can be accessed by the DAG and its steps."
+msgstr ""
+
+#: ../../source/yaml_format.rst:78
+msgid "Parameters"
+msgstr ""
+
+#: ../../source/yaml_format.rst:80
+msgid ""
+"You can pass parameters to the DAG and its steps using the ``params`` "
+"field. The parameters can be accessed by the steps using ``$1``, ``$2``, "
+"and so on."
+msgstr ""
+
+#: ../../source/yaml_format.rst:90
+msgid "Named Parameters"
+msgstr ""
+
+#: ../../source/yaml_format.rst:92
+msgid ""
+"You can also use named parameters in the ``params`` field. The named "
+"parameters can be accessed by the steps using ``${FOO}``, ``${BAR}``, and"
+" so on."
+msgstr ""
+
+#: ../../source/yaml_format.rst:102
+msgid "Conditional Logic"
+msgstr ""
+
+#: ../../source/yaml_format.rst:104
+msgid ""
+"Sometimes you have parts of a DAG that you only want to run under certain"
+" conditions. You can use the ``preconditions`` field to add conditional "
+"branches to your DAG."
+msgstr ""
+
+#: ../../source/yaml_format.rst:106
+msgid "For example, the task below only runs on the first date of each month."
+msgstr ""
+
+#: ../../source/yaml_format.rst:117
+msgid ""
+"If you want the DAG to continue to the next step regardless of the step's"
+" conditional check result, you can use the ``continueOn`` field:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:131
+msgid "Capture Output"
+msgstr ""
+
+#: ../../source/yaml_format.rst:133
+msgid ""
+"The ``output`` field can be used to set an environment variable with "
+"standard output. Leading and trailing space will be trimmed "
+"automatically. The environment variables can be used in subsequent steps."
+msgstr ""
+
+#: ../../source/yaml_format.rst:143
+msgid "Redirect Standard Output and Error"
+msgstr ""
+
+#: ../../source/yaml_format.rst:145
+msgid "The `stdout` field can be used to write standard output to a file."
+msgstr ""
+
+#: ../../source/yaml_format.rst:154
+msgid ""
+"The `stderr` field allows to redirect stderr to other file without "
+"writing to the normal log file."
+msgstr ""
+
+#: ../../source/yaml_format.rst:165
+msgid "Schedule"
+msgstr ""
+
+#: ../../source/yaml_format.rst:167
+msgid "You can use the `schedule` field to schedule a DAG with Cron expression."
+msgstr ""
+
+#: ../../source/yaml_format.rst:176
+msgid "See :ref:`scheduler configuration` for more details."
+msgstr ""
+
+#: ../../source/yaml_format.rst:181
+msgid "Docker Image"
+msgstr ""
+
+#: ../../source/yaml_format.rst:184
+msgid "Execute an Image"
+msgstr ""
+
+#: ../../source/yaml_format.rst:186
+msgid "*Note: It requires Docker daemon running on the host.*"
+msgstr ""
+
+#: ../../source/yaml_format.rst:188
+msgid ""
+"The `docker` executor allows us to run Docker containers instead of bare "
+"commands. This can be useful for running commands in isolated "
+"environments or for reproducibility purposes."
+msgstr ""
+
+#: ../../source/yaml_format.rst:190
+msgid ""
+"In the example below, it pulls and runs `Deno's docker image "
+"<https://hub.docker.com/r/denoland/deno>`_ and prints 'Hello World'."
+msgstr ""
+
+#: ../../source/yaml_format.rst:203
+msgid "Example Log output:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:208
+msgid ""
+"You can config the Docker container (e.g., `volumes`, `env`, etc) by "
+"passing more detailed options."
+msgstr ""
+
+#: ../../source/yaml_format.rst:210
+msgid "For example:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:229
+msgid "See the Docker's API documentation for all available options."
+msgstr ""
+
+#: ../../source/yaml_format.rst:231
+msgid ""
+"For `container`, see `ContainerConfig "
+"<https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_."
+msgstr ""
+
+#: ../../source/yaml_format.rst:232
+msgid ""
+"For `host`, see `HostConfig "
+"<https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_."
+msgstr ""
+
+#: ../../source/yaml_format.rst:236
+msgid "Use Host's Docker Environment"
+msgstr ""
+
+#: ../../source/yaml_format.rst:238
+msgid "If you are running `dagu` using a container, you need the setup below."
+msgstr ""
+
+#: ../../source/yaml_format.rst:240
+msgid "Run a `socat` container with the command below."
+msgstr ""
+
+#: ../../source/yaml_format.rst:246
+msgid "Then you can set the `DOCKER_HOST` environment as follows."
+msgstr ""
+
+#: ../../source/yaml_format.rst:261
+msgid ""
+"For more details, see `this page <https://forums.docker.com/t/remote-api-"
+"with-docker-for-mac-beta/15639/2>`_."
+msgstr ""
+
+#: ../../source/yaml_format.rst:264
+msgid "Advanced"
+msgstr ""
+
+#: ../../source/yaml_format.rst:267
+msgid "Making HTTP Requests"
+msgstr ""
+
+#: ../../source/yaml_format.rst:269
+msgid ""
+"The `http` executor allows us to make an arbitrary HTTP request. This can"
+" be useful for interacting with web services or APIs."
+msgstr ""
+
+#: ../../source/yaml_format.rst:288
+msgid "Sending Email"
+msgstr ""
+
+#: ../../source/yaml_format.rst:290
+msgid ""
+"The `mail` executor can be used to send email. This can be useful for "
+"sending notifications or alerts."
+msgstr ""
+
+#: ../../source/yaml_format.rst:292 ../../source/yaml_format.rst:486
+#: ../../source/yaml_format.rst:541
+msgid "Example:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:327
+msgid "Command Execution over SSH"
+msgstr ""
+
+#: ../../source/yaml_format.rst:329
+msgid "The `ssh` executor allows us to execute commands on remote hosts over SSH."
+msgstr ""
+
+#: ../../source/yaml_format.rst:345
+msgid "Command Substitution"
+msgstr ""
+
+#: ../../source/yaml_format.rst:347
+msgid ""
+"You can use command substitution in field values. I.e., a string enclosed"
+" in backquotes (`) is evaluated as a command and replaced with the result"
+" of standard output."
+msgstr ""
+
+#: ../../source/yaml_format.rst:358
+msgid "Lifecycle Hooks"
+msgstr ""
+
+#: ../../source/yaml_format.rst:360
+msgid ""
+"It is often desirable to take action when a specific event happens, for "
+"example, when a DAG fails. To achieve this, you can use `handlerOn` "
+"fields."
+msgstr ""
+
+#: ../../source/yaml_format.rst:374
+msgid "Repeat a Step"
+msgstr ""
+
+#: ../../source/yaml_format.rst:376
+msgid ""
+"If you want a task to repeat execution at regular intervals, you can use "
+"the `repeatPolicy` field. If you want to stop the repeating task, you can"
+" use the `stop` command to gracefully stop the task."
+msgstr ""
+
+#: ../../source/yaml_format.rst:388
+msgid "User Defined Functions"
+msgstr ""
+
+#: ../../source/yaml_format.rst:390
+msgid ""
+"You can define functions in the DAG file and call them in steps. The "
+"``params`` field is required for functions. The ``args`` field is used to"
+" pass arguments to functions. The arguments can be command substitutions "
+"or environment variables."
+msgstr ""
+
+#: ../../source/yaml_format.rst:408
+msgid "JSON Processing"
+msgstr ""
+
+#: ../../source/yaml_format.rst:411
+msgid "Executing jq Command"
+msgstr ""
+
+#: ../../source/yaml_format.rst:413
+msgid ""
+"The `jq` executor can be used to transform, query, and format JSON. This "
+"can be useful for working with JSON data in pipelines or for data "
+"processing."
+msgstr ""
+
+#: ../../source/yaml_format.rst:424 ../../source/yaml_format.rst:443
+msgid "**Output:**"
+msgstr ""
+
+#: ../../source/yaml_format.rst:433
+msgid "Formatting JSON"
+msgstr ""
+
+#: ../../source/yaml_format.rst:457
+msgid "All Available Fields"
+msgstr ""
+
+#: ../../source/yaml_format.rst:460
+msgid "DAG"
+msgstr ""
+
+#: ../../source/yaml_format.rst:462
+msgid ""
+"This section provides a comprehensive list of available fields that can "
+"be used to configure DAGs and their steps in detail. Each field serves a "
+"specific purpose, enabling granular control over how the DAG runs. The "
+"fields include:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:464
+msgid ""
+"``name``: The name of the DAG, which is optional. The default name is the"
+" name of the file."
+msgstr ""
+
+#: ../../source/yaml_format.rst:465
+msgid "``description``: A brief description of the DAG."
+msgstr ""
+
+#: ../../source/yaml_format.rst:466
+msgid "``schedule``: The execution schedule of the DAG in Cron expression format."
+msgstr ""
+
+#: ../../source/yaml_format.rst:467
+msgid "``group``: The group name to organize DAGs, which is optional."
+msgstr ""
+
+#: ../../source/yaml_format.rst:468
+msgid ""
+"``tags``: Free tags that can be used to categorize DAGs, separated by "
+"commas."
+msgstr ""
+
+#: ../../source/yaml_format.rst:469
+msgid ""
+"``env``: Environment variables that can be accessed by the DAG and its "
+"steps."
+msgstr ""
+
+#: ../../source/yaml_format.rst:470
+msgid ""
+"``logDir``: The directory where the standard output is written. The "
+"default value is ``${DAGU_HOME}/logs/dags``."
+msgstr ""
+
+#: ../../source/yaml_format.rst:471
+msgid ""
+"``restartWaitSec``: The number of seconds to wait after the DAG process "
+"stops before restarting it."
+msgstr ""
+
+#: ../../source/yaml_format.rst:472
+msgid ""
+"``histRetentionDays``: The number of days to retain execution history "
+"(not for log files)."
+msgstr ""
+
+#: ../../source/yaml_format.rst:473
+msgid "``delaySec``: The interval time in seconds between steps."
+msgstr ""
+
+#: ../../source/yaml_format.rst:474
+msgid "``maxActiveRuns``: The maximum number of parallel running steps."
+msgstr ""
+
+#: ../../source/yaml_format.rst:475
+msgid ""
+"``params``: The default parameters that can be referred to by ``$1``, "
+"``$2``, and so on."
+msgstr ""
+
+#: ../../source/yaml_format.rst:476
+msgid ""
+"``preconditions``: The conditions that must be met before a DAG or step "
+"can run."
+msgstr ""
+
+#: ../../source/yaml_format.rst:477
+msgid ""
+"``mailOn``: Whether to send an email notification when a DAG or step "
+"fails or succeeds."
+msgstr ""
+
+#: ../../source/yaml_format.rst:478
+msgid ""
+"``MaxCleanUpTimeSec``: The maximum time to wait after sending a TERM "
+"signal to running steps before killing them."
+msgstr ""
+
+#: ../../source/yaml_format.rst:479
+msgid ""
+"``handlerOn``: The command to execute when a DAG or step succeeds, fails,"
+" cancels, or exits."
+msgstr ""
+
+#: ../../source/yaml_format.rst:480
+msgid "``steps``: A list of steps to execute in the DAG."
+msgstr ""
+
+#: ../../source/yaml_format.rst:482
+msgid ""
+"In addition, a global configuration file, ``$DAGU_HOME/config.yaml``, can"
+" be used to gather common settings, such as ``logDir`` or ``env``."
+msgstr ""
+
+#: ../../source/yaml_format.rst:484
+msgid ""
+"Note: If ``DAGU_HOME`` environment variable is not set, the default path "
+"is ``$HOME/.dagu/config.yaml``."
+msgstr ""
+
+#: ../../source/yaml_format.rst:522
+msgid "Step"
+msgstr ""
+
+#: ../../source/yaml_format.rst:524
+msgid "Each step can have its own set of configurations, including:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:526
+msgid "``name``: The name of the step."
+msgstr ""
+
+#: ../../source/yaml_format.rst:527
+msgid "``description``: A brief description of the step."
+msgstr ""
+
+#: ../../source/yaml_format.rst:528
+msgid "``dir``: The working directory for the step."
+msgstr ""
+
+#: ../../source/yaml_format.rst:529
+msgid "``command``: The command and parameters to execute."
+msgstr ""
+
+#: ../../source/yaml_format.rst:530
+msgid "``stdout``: The file to which the standard output is written."
+msgstr ""
+
+#: ../../source/yaml_format.rst:531
+msgid "``output``: The variable to which the result is written."
+msgstr ""
+
+#: ../../source/yaml_format.rst:532
+msgid "``script``: The script to execute."
+msgstr ""
+
+#: ../../source/yaml_format.rst:533
+msgid ""
+"``signalOnStop``: The signal name (e.g., ``SIGINT``) to be sent when the "
+"process is stopped."
+msgstr ""
+
+#: ../../source/yaml_format.rst:534
+msgid ""
+"``mailOn``: Whether to send an email notification when the step fails or "
+"succeeds."
+msgstr ""
+
+#: ../../source/yaml_format.rst:535
+msgid ""
+"``continueOn``: Whether to continue to the next step, regardless of "
+"whether the step failed or not or the preconditions are met or not."
+msgstr ""
+
+#: ../../source/yaml_format.rst:536
+msgid "``retryPolicy``: The retry policy for the step."
+msgstr ""
+
+#: ../../source/yaml_format.rst:537
+msgid "``repeatPolicy``: The repeat policy for the step."
+msgstr ""
+
+#: ../../source/yaml_format.rst:538
+msgid "``preconditions``: The conditions that must be met before a step can run."
+msgstr ""
+
+#: ../../source/yaml_format.rst:539
+msgid "``depends``: The step depends on the other step."
+msgstr ""
+
+#~ msgid "YAML Format"
+#~ msgstr ""
+
+#~ msgid "Minimal DAG Definition"
+#~ msgstr ""
+
+#~ msgid "The minimal DAG definition is as simple as follows."
+#~ msgstr ""
+
+#~ msgid "Specifying Working Directory"
+#~ msgstr ""
+
+#~ msgid "Running Arbitrary Code Snippets"
+#~ msgstr ""
+
+#~ msgid "Defining Environment Variables"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You can define environment variables and"
+#~ " refer to them using the ``env`` "
+#~ "field."
+#~ msgstr ""
+
+#~ msgid "Defining and Using Parameters"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You can define parameters using the "
+#~ "``params`` field and refer to each "
+#~ "parameter as $1, $2, etc. Parameters "
+#~ "can also be command substitutions or "
+#~ "environment variables. It can be "
+#~ "overridden by the ``--params=`` parameter "
+#~ "of the ``start`` command."
+#~ msgstr ""
+
+#~ msgid "Named parameters are also available as follows."
+#~ msgstr ""
+
+#~ msgid "Using Command Substitution"
+#~ msgstr ""
+
+#~ msgid "Adding Conditional Logic"
+#~ msgstr ""
+
+#~ msgid "Setting Environment Variables with Standard Output"
+#~ msgstr ""
+
+#~ msgid "Redirecting Stdout and Stderr"
+#~ msgstr ""
+
+#~ msgid "Adding Lifecycle Hooks"
+#~ msgstr ""
+
+#~ msgid "Repeating a Task at Regular Intervals"
+#~ msgstr ""
+
+#~ msgid "Scheduling a DAG with Cron Expression"
+#~ msgstr ""
+
+#~ msgid "All Available Fields for DAGs"
+#~ msgstr ""
+
+#~ msgid "All Available Fields for Steps"
+#~ msgstr ""
+

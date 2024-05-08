@@ -1,0 +1,187 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, DAGU Developers
+# This file is distributed under the same license as the DAGU package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: DAGU \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-05-09 00:37+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja_JP\n"
+"Language-Team: ja_JP <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.15.0\n"
+
+#: ../../source/config.rst:4
+msgid "Configurations"
+msgstr ""
+
+#: ../../source/config.rst:12
+msgid "Environment Variables"
+msgstr ""
+
+#: ../../source/config.rst:14
+msgid ""
+"The following environment variables can be used to configure the Dagu. "
+"Default values are provided in the parentheses:"
+msgstr ""
+
+#: ../../source/config.rst:16
+msgid "``DAGU_HOST`` (``127.0.0.1``): The host to bind the server to."
+msgstr ""
+
+#: ../../source/config.rst:17
+msgid "``DAGU_PORT`` (``8080``): The port to bind the server to."
+msgstr ""
+
+#: ../../source/config.rst:18
+msgid "``DAGU_DAGS`` (``$DAGU_HOME/dags``): The directory containing the DAGs."
+msgstr ""
+
+#: ../../source/config.rst:19
+msgid "``DAGU_IS_BASICAUTH`` (``0``): Set to 1 to enable basic authentication."
+msgstr ""
+
+#: ../../source/config.rst:20
+msgid ""
+"``DAGU_BASICAUTH_USERNAME`` (``\"\"``): The username to use for basic "
+"authentication."
+msgstr ""
+
+#: ../../source/config.rst:21
+msgid ""
+"``DAGU_BASICAUTH_PASSWORD`` (``\"\"``): The password to use for basic "
+"authentication."
+msgstr ""
+
+#: ../../source/config.rst:22
+msgid ""
+"``DAGU_LOG_DIR`` (``$DAGU_HOME/logs``): The directory where logs will be "
+"stored."
+msgstr ""
+
+#: ../../source/config.rst:23
+msgid ""
+"``DAGU_DATA_DIR`` (``$DAGU_HOME/data``): The directory where application "
+"data will be stored."
+msgstr ""
+
+#: ../../source/config.rst:24
+msgid ""
+"``DAGU_SUSPEND_FLAGS_DIR`` (``$DAGU_HOME/suspend``): The directory "
+"containing DAG suspend flags."
+msgstr ""
+
+#: ../../source/config.rst:25
+msgid ""
+"``DAGU_ADMIN_LOG_DIR`` (``$DAGU_HOME/logs/admin``): The directory where "
+"admin logs will be stored."
+msgstr ""
+
+#: ../../source/config.rst:26
+msgid ""
+"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/config.yaml``): The path to the base "
+"configuration file."
+msgstr ""
+
+#: ../../source/config.rst:27
+msgid ""
+"``DAGU_NAVBAR_COLOR`` (``\"\"``): The color to use for the navigation "
+"bar. E.g., ``red`` or ``#ff0000``."
+msgstr ""
+
+#: ../../source/config.rst:28
+msgid ""
+"``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation "
+"bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``"
+msgstr ""
+
+#: ../../source/config.rst:29
+msgid ""
+"``DAGU_WORK_DIR``: The working directory for DAGs. If not set, the "
+"default value is DAG location. Also you can set the working directory for"
+" each DAG steps in the DAG configuration file. For more information, see "
+":ref:`specifying working dir`."
+msgstr ""
+
+#: ../../source/config.rst:30
+msgid "``DAGU_CERT_FILE``: The path to the SSL certificate file."
+msgstr ""
+
+#: ../../source/config.rst:31
+msgid "``DAGU_KEY_FILE`` : The path to the SSL key file."
+msgstr ""
+
+#: ../../source/config.rst:33
+msgid ""
+"Note: If ``DAGU_HOME`` environment variable is not set, the default value"
+" is ``$HOME/.dagu``."
+msgstr ""
+
+#: ../../source/config.rst:36
+msgid "Config File"
+msgstr ""
+
+#: ../../source/config.rst:38
+msgid ""
+"You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory "
+"(default: ``$HOME/.dagu/``) to override the default configuration values."
+" The following configuration options are available:"
+msgstr ""
+
+#: ../../source/config.rst:78
+msgid "Server's Host and Port Configuration"
+msgstr ""
+
+#: ../../source/config.rst:80
+msgid ""
+"To specify the host and port for running the Dagu server, there are a "
+"couple of ways to do it."
+msgstr ""
+
+#: ../../source/config.rst:82
+msgid ""
+"The first way is to specify the ``DAGU_HOST`` and ``DAGU_PORT`` "
+"environment variables. For example, you could run the following command:"
+msgstr ""
+
+#: ../../source/config.rst:88
+msgid ""
+"The second way is to use the ``--host`` and ``--port`` options when "
+"running the ``dagu server`` command. For example:"
+msgstr ""
+
+#: ../../source/config.rst:94
+msgid "See :ref:`Environment Variables` for more information."
+msgstr ""
+
+#~ msgid "Configuration Options"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The following environment variables can "
+#~ "be used to configure the DAGU. "
+#~ "Default values are provided in the "
+#~ "parentheses:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``DAGU_NAVBAR_TITLE`` (``DAGU``): The title to"
+#~ " display in the navigation bar. E.g.,"
+#~ " ``DAGU - PROD`` or ``DAGU - "
+#~ "DEV``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To specify the host and port for"
+#~ " running the DAGU server, there are"
+#~ " a couple of ways to do it."
+#~ msgstr ""
+
