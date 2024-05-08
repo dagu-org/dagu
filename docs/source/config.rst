@@ -30,7 +30,7 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_CERT_FILE``: The path to the SSL certificate file.
 - ``DAGU_KEY_FILE`` : The path to the SSL key file.
 
-Note: If ``DAGU_HOME`` environment variable is not set, the default value is ``$HOME/.dagu``.
+Note: If ``DAGU_HOME`` environment variable is not set, the default value is ``$HOME/.dagu`` .
 
 Config File
 --------------

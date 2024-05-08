@@ -77,6 +77,8 @@ sphinx-build -b html -D language=<language> source/ build/html/<language>
 Replace `<language>` with the appropriate language code (e.g., `fr` for French).
 5. Submit a pull request with your changes.
 
+See [Sphinx Internationalization](https://www.sphinx-doc.org/en/master/usage/advanced/intl.html) for more information on internationalization in Sphinx.
+
 ## Dependencies
 The project dependencies are managed using Rye and specified in the `pyproject.toml` file. The main dependencies include:
 

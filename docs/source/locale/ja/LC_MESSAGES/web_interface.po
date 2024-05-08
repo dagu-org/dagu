@@ -21,62 +21,63 @@ msgstr ""
 
 #: ../../source/web_interface.rst:2 73ffdd133fcf4586a4756a3bcd6047c6
 msgid "Web Interface"
-msgstr ""
+msgstr "ウェブインターフェース"
 
 #: ../../source/web_interface.rst:-1 ../../source/web_interface.rst:8
 #: 6d773d86bc2c49a9b1e3b1d37180d154 c42de2fc4cf24e3f9057d802fe5a0dd1
 msgid "Workflows"
-msgstr ""
+msgstr "ワークフロー"
 
 #: ../../source/web_interface.rst:10 f354071d81d24395bf8b2e019feff5e0
 msgid "It shows all DAGs and the real-time status."
-msgstr ""
+msgstr "すべてのDAGとリアルタイムのステータスを表示します。"
 
 #: ../../source/web_interface.rst:-1 ../../source/web_interface.rst:19
 #: 2326d91aca3446c895ab7a9087d748ca 62aa668a89274c10ae0c2f10021a4f13
 msgid "Workflow Details"
-msgstr ""
+msgstr "ワークフローの詳細"
 
 #: ../../source/web_interface.rst:20 21f382fbabe447a5ad21f43a5c95fb74
 msgid ""
 "It shows the real-time status, logs, and DAG configurations. You can edit"
 " DAG configurations on a browser."
 msgstr ""
+"リアルタイムのステータス、ログ、およびDAG設定を表示します。"
+"ブラウザでDAG設定を編集できます。"
 
 #: ../../source/web_interface.rst:28 7bb2dd9df8b44ec685d4f5135638d873
 msgid ""
 "You can switch to the vertical graph with the button on the top right "
 "corner."
-msgstr ""
+msgstr "右上の角にあるボタンで、縦型のグラフに切り替えることができます。"
 
 #: ../../source/web_interface.rst:-1 32e3194afe24456b8a739715b2abd125
 msgid "Workflow Details (TD)"
-msgstr ""
+msgstr "ワークフローの詳細 (TD)"
 
 #: ../../source/web_interface.rst:-1 ../../source/web_interface.rst:37
 #: 9e77a85302d240688496978cc48e515b fc4be8357702423fb91297478c6e5271
 msgid "Search"
-msgstr ""
+msgstr "検索"
 
 #: ../../source/web_interface.rst:39 3cb60af213dc4058bb4ca81270598e71
 msgid "It searches given text across all DAGs."
-msgstr ""
+msgstr "すべてのDAGから指定されたテキストを検索します。"
 
 #: ../../source/web_interface.rst:-1 ../../source/web_interface.rst:48
 #: bbef2b9b34ea4804a3538d87d05a9c01 fc03b452252e4a88adfc3e10faa86141
 msgid "Execution History"
-msgstr ""
+msgstr "実行履歴"
 
 #: ../../source/web_interface.rst:50 db8b9fe01e7a48bf9c3f4850f269fb44
 msgid "It shows past execution results and logs."
-msgstr ""
+msgstr "過去の実行結果とログを表示します。"
 
 #: ../../source/web_interface.rst:-1 ../../source/web_interface.rst:59
 #: 264aff71d9b44b798cf67c6e704a631f 3dbbff22300749debf8f08cca9ca9fa7
 msgid "Execution Log"
-msgstr ""
+msgstr "実行ログ"
 
 #: ../../source/web_interface.rst:61 3fc93703687f4c7081f29918904e22b8
 msgid "It shows the detail log and standard output of each execution and step."
-msgstr ""
-
+msgstr "各実行とステップの詳細ログと標準出力を表示します。"

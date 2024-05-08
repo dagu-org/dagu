@@ -21,53 +21,55 @@ msgstr ""
 
 #: ../../source/yaml_format.rst:4 8267d62e056c4cfab5663e7f292b51bb
 msgid "Workflow Language (YAML)"
-msgstr ""
+msgstr "ワークフロー言語 (YAML)"
 
 #: ../../source/yaml_format.rst:10 edd1489ff9884f50b64c3585b88ceb82
 msgid "Basics"
-msgstr ""
+msgstr "基本"
 
 #: ../../source/yaml_format.rst:13 f5ac4ecbc9094cf8a679450eadf580c0
 msgid "Minimal Example"
-msgstr ""
+msgstr "最小限の例"
 
 #: ../../source/yaml_format.rst:15 7248dd5627e14c519d7b9cafd178ad3e
 msgid "The minimal example of a DAG file is as follows:"
-msgstr ""
+msgstr "DAGファイルの最小限の例は次のようになります:"
 
 #: ../../source/yaml_format.rst:30 ef429b4b6d97430ba7c016a6078ffeed
 msgid "Working Directory"
-msgstr ""
+msgstr "作業ディレクトリ"
 
 #: ../../source/yaml_format.rst:32 e5a7b800719b4eeb80ceb10228742273
 msgid ""
 "You can specify the working directory for each step using the ``dir`` "
 "field."
-msgstr ""
+msgstr "``dir`` フィールドを使用して、各ステップの作業ディレクトリを指定できます。"
 
 #: ../../source/yaml_format.rst:42 b7f8af8083b349a299ff4814b946ed8e
 msgid "Code Snippet"
-msgstr ""
+msgstr "コードスニペット"
 
 #: ../../source/yaml_format.rst:44 960748a8266c4a2b8f6cd6737f0e4d6e
 msgid ""
 "``script`` field provides a way to run arbitrary snippets of code in any "
 "language."
-msgstr ""
+msgstr "``script`` フィールドは、任意の言語で任意のコードスニペットを実行する方法を提供します。"
 
 #: ../../source/yaml_format.rst:62 44d39d748c374ca5beb696e01da0024f
 msgid "Environment Variables"
-msgstr ""
+msgstr "環境変数"
 
 #: ../../source/yaml_format.rst:64 8c228403894f45439b86b36b08b431e4
 msgid ""
 "You can define environment variables using the ``env`` field. The "
 "environment variables can be accessed by the DAG and its steps."
 msgstr ""
+"``env`` フィールドを使用して環境変数を定義できます。"
+"環境変数は、DAGとそのステップからアクセスできます。"
 
 #: ../../source/yaml_format.rst:78 1b6fc55efc8b45e098664ae2acadd94d
 msgid "Parameters"
-msgstr ""
+msgstr "パラメータ"
 
 #: ../../source/yaml_format.rst:80 03d50716335340f4a3ce3728893c90c1
 msgid ""
@@ -75,10 +77,12 @@ msgid ""
 "field. The parameters can be accessed by the steps using ``$1``, ``$2``, "
 "and so on."
 msgstr ""
+"``params`` フィールドを使用して、DAGとそのステップにパラメータを渡すことができます。"
+"パラメータは、``$1``、``$2`` などを使用してステップからアクセスできます。"
 
 #: ../../source/yaml_format.rst:90 c5cbd62d01694d01b52d5187f5c7965b
 msgid "Named Parameters"
-msgstr ""
+msgstr "名前付きパラメータ"
 
 #: ../../source/yaml_format.rst:92 3762bfe943714b74af75d8244bc071c4
 msgid ""
@@ -86,10 +90,12 @@ msgid ""
 "parameters can be accessed by the steps using ``${FOO}``, ``${BAR}``, and"
 " so on."
 msgstr ""
+"``params`` フィールドで名前付きパラメータを使用することもできます。"
+"名前付きパラメータは、``${FOO}``、``${BAR}`` などを使用してステップからアクセスできます。"
 
 #: ../../source/yaml_format.rst:102 12372648c35e42d6aba804aebad47ead
 msgid "Conditional Logic"
-msgstr ""
+msgstr "条件ロジック"
 
 #: ../../source/yaml_format.rst:104 48503e89c38e4e7eac0a2853e47db8f9
 msgid ""
@@ -97,20 +103,24 @@ msgid ""
 " conditions. You can use the ``preconditions`` field to add conditional "
 "branches to your DAG."
 msgstr ""
+"特定の条件下でのみ実行したいDAGの部分がある場合があります。"
+"``preconditions`` フィールドを使用して、DAGに条件分岐を追加できます。"
 
 #: ../../source/yaml_format.rst:106 3f7aec7fd7394d49b1342ada40cbe8d5
 msgid "For example, the task below only runs on the first date of each month."
-msgstr ""
+msgstr "たとえば、次のタスクは毎月の最初の日にのみ実行されます。"
 
 #: ../../source/yaml_format.rst:117 14076b744bb548a7aebec9eae3863cd9
 msgid ""
 "If you want the DAG to continue to the next step regardless of the step's"
 " conditional check result, you can use the ``continueOn`` field:"
 msgstr ""
+"ステップの条件チェックの結果に関係なく、DAGを次のステップに進めたい場合は、"
+"``continueOn`` フィールドを使用できます:"
 
 #: ../../source/yaml_format.rst:131 3736d5e1366f4acc9365794115527464
 msgid "Capture Output"
-msgstr ""
+msgstr "出力のキャプチャ"
 
 #: ../../source/yaml_format.rst:133 cd601cfb839d4e47bdb3e7b671900ed1
 msgid ""
@@ -118,44 +128,49 @@ msgid ""
 "standard output. Leading and trailing space will be trimmed "
 "automatically. The environment variables can be used in subsequent steps."
 msgstr ""
+"``output`` フィールドを使用して、標準出力で環境変数を設定できます。"
+"先頭と末尾のスペースは自動的にトリミングされます。"
+"環境変数は後続のステップで使用できます。"
 
 #: ../../source/yaml_format.rst:143 c0414d24a7f14675a15511fd2a5847c6
 msgid "Redirect Standard Output and Error"
-msgstr ""
+msgstr "標準出力とエラーのリダイレクト"
 
 #: ../../source/yaml_format.rst:145 62d54c3ae6f546cead5095f856d9adb5
 msgid "The `stdout` field can be used to write standard output to a file."
-msgstr ""
+msgstr "`stdout` フィールドを使用して、標準出力をファイルに書き込むことができます。"
 
 #: ../../source/yaml_format.rst:154 f48d8f04b5134e8d9a7dc9332d11d73b
 msgid ""
 "The `stderr` field allows to redirect stderr to other file without "
 "writing to the normal log file."
 msgstr ""
+"`stderr` フィールドを使用すると、通常のログファイルに書き込まずに stderr を"
+"別のファイルにリダイレクトできます。"
 
 #: ../../source/yaml_format.rst:165 9b632c62a093482fb204c63ebae439ee
 msgid "Schedule"
-msgstr ""
+msgstr "スケジュール"
 
 #: ../../source/yaml_format.rst:167 5fef9ec0775647b8b3da60bd7012fc26
 msgid "You can use the `schedule` field to schedule a DAG with Cron expression."
-msgstr ""
+msgstr "`schedule` フィールドを使用して、Cron式でDAGをスケジュールできます。"
 
 #: ../../source/yaml_format.rst:176 bdff856996ef4a7ea4d26aa0b32b0eed
 msgid "See :ref:`scheduler configuration` for more details."
-msgstr ""
+msgstr "詳細については、:ref:`scheduler configuration` を参照してください。"
 
 #: ../../source/yaml_format.rst:181 ae7ff533eae9430f8a03fe0960d7c139
 msgid "Docker Image"
-msgstr ""
+msgstr "Dockerイメージ"
 
 #: ../../source/yaml_format.rst:184 5d56008025f34d9482faf439d54ba1cb
 msgid "Execute an Image"
-msgstr ""
+msgstr "イメージの実行"
 
 #: ../../source/yaml_format.rst:186 03826912d40b4d25bc2ce204314df766
 msgid "*Note: It requires Docker daemon running on the host.*"
-msgstr ""
+msgstr "*注意: ホストでDockerデーモンが実行されている必要があります。*"
 
 #: ../../source/yaml_format.rst:188 6b8f3de94419462fa2bdaf2d7c0ae4ea
 msgid ""
@@ -163,106 +178,122 @@ msgid ""
 "commands. This can be useful for running commands in isolated "
 "environments or for reproducibility purposes."
 msgstr ""
+"`docker` エグゼキュータを使用すると、ベアコマンドの代わりにDockerコンテナを"
+"実行できます。これは、分離された環境でコマンドを実行したり、再現性のために役立ちます。"
 
 #: ../../source/yaml_format.rst:190 e7615b5dd71043ac80ca931dbcdc9bde
 msgid ""
 "In the example below, it pulls and runs `Deno's docker image "
 "<https://hub.docker.com/r/denoland/deno>`_ and prints 'Hello World'."
 msgstr ""
+"以下の例では、`Denoのdockerイメージ <https://hub.docker.com/r/denoland/deno>`_ を"
+"プルして実行し、'Hello World'を出力します。"
 
 #: ../../source/yaml_format.rst:203 9895b6e132064e2b9a63ba2ef559d4bb
 msgid "Example Log output:"
-msgstr ""
+msgstr "ログ出力の例:"
 
 #: ../../source/yaml_format.rst:208 4615aa03cca64d3ea96ade076fad3460
 msgid ""
 "You can config the Docker container (e.g., `volumes`, `env`, etc) by "
 "passing more detailed options."
 msgstr ""
+"より詳細なオプションを渡すことで、Dockerコンテナ（ ``volumes` 、 ``env`` など）を"
+"設定できます。"
 
 #: ../../source/yaml_format.rst:210 04960ee80f294365a25ab50c2d29449b
 msgid "For example:"
-msgstr ""
+msgstr "例えば:"
 
 #: ../../source/yaml_format.rst:229 461f22085e404cac9e08e2fd381ee60e
 msgid "See the Docker's API documentation for all available options."
-msgstr ""
+msgstr "利用可能なすべてのオプションについては、DockerのAPIドキュメントを参照してください。"
 
 #: ../../source/yaml_format.rst:231 84d5545a26dd4ace8f9d0926961736df
 msgid ""
 "For `container`, see `ContainerConfig "
 "<https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_."
 msgstr ""
+"`container`については、`ContainerConfig "
+"<https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_ を参照してください。"
 
 #: ../../source/yaml_format.rst:232 05752d3c956148dcbc36d17117fb669c
 msgid ""
 "For `host`, see `HostConfig "
 "<https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_."
 msgstr ""
+"`host`については、`HostConfig "
+"<https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_ を参照してください。"
 
 #: ../../source/yaml_format.rst:236 55046720dc2a495599fbfb46b43c6bc6
 msgid "Use Host's Docker Environment"
-msgstr ""
+msgstr "ホストのDocker環境を使用する"
 
 #: ../../source/yaml_format.rst:238 99368cb5d8ea4b1bb8a743152ed22476
 msgid "If you are running `dagu` using a container, you need the setup below."
-msgstr ""
+msgstr "コンテナを使用して `dagu` を実行している場合は、以下の設定が必要です。"
 
 #: ../../source/yaml_format.rst:240 905bb41666b54749a916a0127b0818f8
 msgid "Run a `socat` container with the command below."
-msgstr ""
+msgstr "以下のコマンドで `socat` コンテナを実行します。"
 
 #: ../../source/yaml_format.rst:246 f13071ec81c8413997fdf1880e4b191d
 msgid "Then you can set the `DOCKER_HOST` environment as follows."
-msgstr ""
+msgstr "そして、以下のように `DOCKER_HOST` 環境を設定できます。"
 
 #: ../../source/yaml_format.rst:261 7254474f3f5840f88e67b3bdedfd172b
 msgid ""
 "For more details, see `this page <https://forums.docker.com/t/remote-api-"
 "with-docker-for-mac-beta/15639/2>`_."
 msgstr ""
+"詳細については、`このページ <https://forums.docker.com/t/remote-api-"
+"with-docker-for-mac-beta/15639/2>`_ を参照してください。"
 
 #: ../../source/yaml_format.rst:264 827b29992fcc4b85a901067449388788
 msgid "Advanced"
-msgstr ""
+msgstr "高度な使用方法"
 
 #: ../../source/yaml_format.rst:267 36dbe0cb1be94d8bb6c1b847a5558af5
 msgid "Making HTTP Requests"
-msgstr ""
+msgstr "HTTPリクエストの作成"
 
 #: ../../source/yaml_format.rst:269 cf9490f616114ed9ab0231ec154b3b31
 msgid ""
 "The `http` executor allows us to make an arbitrary HTTP request. This can"
 " be useful for interacting with web services or APIs."
 msgstr ""
+"`http` エグゼキュータを使用すると、任意のHTTPリクエストを行うことができます。"
+"これは、Webサービスや API とのやり取りに役立ちます。"
 
 #: ../../source/yaml_format.rst:288 3ae0fdb2f8d644d484e50cbccb1b373c
 msgid "Sending Email"
-msgstr ""
+msgstr "メールの送信"
 
 #: ../../source/yaml_format.rst:290 3387ea32fe2c43928c2044fda60e75b2
 msgid ""
 "The `mail` executor can be used to send email. This can be useful for "
 "sending notifications or alerts."
 msgstr ""
+"`mail` エグゼキュータを使用してメールを送信できます。"
+"これは、通知やアラートの送信に役立ちます。"
 
 #: ../../source/yaml_format.rst:292 ../../source/yaml_format.rst:486
 #: ../../source/yaml_format.rst:541 4dfde18aa7014e7398d23307d3e0c7f3
 #: 58ba415eb21e4e649a42ca32ce720d96 69b87fa888d94168a20ac968adee530f
 msgid "Example:"
-msgstr ""
+msgstr "例:"
 
 #: ../../source/yaml_format.rst:327 ca0df183f34b4f4fa24355b22c24b3cd
 msgid "Command Execution over SSH"
-msgstr ""
+msgstr "SSHを介したコマンド実行"
 
 #: ../../source/yaml_format.rst:329 31d9f85bf0a1471984b86518aa077237
 msgid "The `ssh` executor allows us to execute commands on remote hosts over SSH."
-msgstr ""
+msgstr "`ssh` エグゼキュータを使用すると、SSHを介してリモートホストでコマンドを実行できます。"
 
 #: ../../source/yaml_format.rst:345 10d80f5bf1c241c29e485157f21400a8
 msgid "Command Substitution"
-msgstr ""
+msgstr "コマンド置換"
 
 #: ../../source/yaml_format.rst:347 133a6d53c0de4e89ab23ad0f741949da
 msgid ""
@@ -270,10 +301,12 @@ msgid ""
 " in backquotes (`) is evaluated as a command and replaced with the result"
 " of standard output."
 msgstr ""
+"フィールド値でコマンド置換を使用できます。つまり、バッククォート (`) で囲まれた文字列は"
+"コマンドとして評価され、標準出力の結果に置き換えられます。"
 
 #: ../../source/yaml_format.rst:358 093ad7ca82254b479a41d62c0ebac71c
 msgid "Lifecycle Hooks"
-msgstr ""
+msgstr "ライフサイクルフック"
 
 #: ../../source/yaml_format.rst:360 ff3199c754b247e895b8a84ac4f52a17
 msgid ""
@@ -281,10 +314,12 @@ msgid ""
 "example, when a DAG fails. To achieve this, you can use `handlerOn` "
 "fields."
 msgstr ""
+"特定のイベントが発生したときにアクションを実行することがよくあります。"
+"例えば、DAGが失敗したときなどです。これを実現するには、`handlerOn` フィールドを使用します。"
 
 #: ../../source/yaml_format.rst:374 5a1e114f3314430a9b18c67a052041bc
 msgid "Repeat a Step"
-msgstr ""
+msgstr "ステップの繰り返し"
 
 #: ../../source/yaml_format.rst:376 c5197dd39280428495c0dd446e47c92e
 msgid ""
@@ -292,10 +327,12 @@ msgid ""
 "the `repeatPolicy` field. If you want to stop the repeating task, you can"
 " use the `stop` command to gracefully stop the task."
 msgstr ""
+"タスクを一定の間隔で繰り返し実行したい場合は、`repeatPolicy` フィールドを使用できます。"
+"繰り返しタスクを停止したい場合は、`stop` コマンドを使用してタスクをグレースフルに停止できます。"
 
 #: ../../source/yaml_format.rst:388 d2aa5f47a15a4645a56d1b7fd3eb7c47
 msgid "User Defined Functions"
-msgstr ""
+msgstr "ユーザー定義関数"
 
 #: ../../source/yaml_format.rst:390 dc2b51b0cd6548579b48ff85a7537d00
 msgid ""
@@ -304,14 +341,16 @@ msgid ""
 " pass arguments to functions. The arguments can be command substitutions "
 "or environment variables."
 msgstr ""
+"DAGファイルで関数を定義し、ステップで呼び出すことができます。関数には ``params`` フィールドが必要です。"
+"``args`` フィールドは、関数に引数を渡すために使用されます。引数はコマンド置換または環境変数にできます。"
 
 #: ../../source/yaml_format.rst:408 b953aa228d604a11bc4bf3c3f8c88140
 msgid "JSON Processing"
-msgstr ""
+msgstr "JSONの処理"
 
 #: ../../source/yaml_format.rst:411 cb28649f43a94759874de54e22bd5506
 msgid "Executing jq Command"
-msgstr ""
+msgstr "jqコマンドの実行"
 
 #: ../../source/yaml_format.rst:413 57480cea794b489c811606b73bc14b95
 msgid ""
@@ -319,23 +358,25 @@ msgid ""
 "can be useful for working with JSON data in pipelines or for data "
 "processing."
 msgstr ""
+"`jq` エグゼキュータは、JSONの変換、クエリ、フォーマットに使用できます。"
+"これは、パイプラインでJSONデータを処理したり、データ処理に役立ちます。"
 
 #: ../../source/yaml_format.rst:424 ../../source/yaml_format.rst:443
 #: 77a457f264b84ea59c7e363fdefe771f 9c85dcb2d22641c982afeaf0193f40e8
 msgid "**Output:**"
-msgstr ""
+msgstr "**出力:**"
 
 #: ../../source/yaml_format.rst:433 5e5d11c92d114d4ab48068957104f7eb
 msgid "Formatting JSON"
-msgstr ""
+msgstr "JSONのフォーマット"
 
 #: ../../source/yaml_format.rst:457 e38f8970d3424e1aa5fc6cb7d65a3d4f
 msgid "All Available Fields"
-msgstr ""
+msgstr "利用可能なすべてのフィールド"
 
 #: ../../source/yaml_format.rst:460 1b0fd55a1f724873a8dd36aa08b54827
 msgid "DAG"
-msgstr ""
+msgstr "DAG"
 
 #: ../../source/yaml_format.rst:462 d15cec974c0d49799772b930898593cc
 msgid ""
@@ -344,176 +385,198 @@ msgid ""
 "specific purpose, enabling granular control over how the DAG runs. The "
 "fields include:"
 msgstr ""
+"このセクションでは、DAGとそのステップを詳細に設定するために使用できる利用可能なフィールドの"
+"包括的なリストを提供します。各フィールドは特定の目的を持ち、DAGの実行方法を細かく制御できます。"
+"フィールドは以下のようなものがあります:"
 
 #: ../../source/yaml_format.rst:464 78963fada3f44076ae02b94517ec583f
 msgid ""
 "``name``: The name of the DAG, which is optional. The default name is the"
 " name of the file."
 msgstr ""
+"``name``: DAGの名前。オプションです。デフォルトの名前はファイルの名前です。"
 
 #: ../../source/yaml_format.rst:465 10cd474e64b241809ef6370ba33f0ab4
 msgid "``description``: A brief description of the DAG."
-msgstr ""
+msgstr "``description``: DAGの簡単な説明。"
 
 #: ../../source/yaml_format.rst:466 3de7eb9f3a6b4989bbdbbe735719d673
 msgid "``schedule``: The execution schedule of the DAG in Cron expression format."
-msgstr ""
+msgstr "``schedule``: Cron式形式でのDAGの実行スケジュール。"
 
 #: ../../source/yaml_format.rst:467 cbd604450c724a3dbd07122b32a51097
 msgid "``group``: The group name to organize DAGs, which is optional."
-msgstr ""
+msgstr "``group``: DAGを整理するためのグループ名。オプションです。"
 
 #: ../../source/yaml_format.rst:468 2f1a8388986c4ca9b3fb95ba3077b8e8
 msgid ""
 "``tags``: Free tags that can be used to categorize DAGs, separated by "
 "commas."
 msgstr ""
+"``tags``: DAGを分類するために使用できる自由なタグ。カンマ区切りで指定します。"
 
 #: ../../source/yaml_format.rst:469 9bbeae6f1cc84bdbba20e4f7661a12e6
 msgid ""
 "``env``: Environment variables that can be accessed by the DAG and its "
 "steps."
 msgstr ""
+"``env``: DAGとそのステップからアクセスできる環境変数。"
 
 #: ../../source/yaml_format.rst:470 ca626ae5aa5348658cae797a94d64637
 msgid ""
 "``logDir``: The directory where the standard output is written. The "
 "default value is ``${DAGU_HOME}/logs/dags``."
 msgstr ""
+"``logDir``: 標準出力が書き込まれるディレクトリ。デフォルト値は ``${DAGU_HOME}/logs/dags`` です。"
 
 #: ../../source/yaml_format.rst:471 c03259efcaab44bab4fa7ac28ec3b675
 msgid ""
 "``restartWaitSec``: The number of seconds to wait after the DAG process "
 "stops before restarting it."
 msgstr ""
+"``restartWaitSec``: DAGプロセスが停止してから再起動するまでの待機秒数。"
 
 #: ../../source/yaml_format.rst:472 a5a5f6526c524cc0b9c81a15b3e78bb5
 msgid ""
 "``histRetentionDays``: The number of days to retain execution history "
 "(not for log files)."
 msgstr ""
+"``histRetentionDays``: 実行履歴を保持する日数（ログファイルは対象外）。"
 
 #: ../../source/yaml_format.rst:473 ca5a86f8a7174b7981b86417603848ac
 msgid "``delaySec``: The interval time in seconds between steps."
-msgstr ""
+msgstr "``delaySec``: ステップ間の間隔時間（秒）。"
 
 #: ../../source/yaml_format.rst:474 7ed32a629f5b473baa82a4d95861cd3e
 msgid "``maxActiveRuns``: The maximum number of parallel running steps."
-msgstr ""
+msgstr "``maxActiveRuns``: 並列実行ステップの最大数。"
 
 #: ../../source/yaml_format.rst:475 665b1fe9e2d94ff1b99a71a42a436ba5
 msgid ""
 "``params``: The default parameters that can be referred to by ``$1``, "
 "``$2``, and so on."
 msgstr ""
+"``params``: ``$1``、``$2`` などで参照できるデフォルトのパラメータ。"
 
 #: ../../source/yaml_format.rst:476 a191f0d54d914f278e33b9f4ea7f6f16
 msgid ""
 "``preconditions``: The conditions that must be met before a DAG or step "
 "can run."
 msgstr ""
+"``preconditions``: DAGまたはステップが実行される前に満たされる必要がある条件。"
 
 #: ../../source/yaml_format.rst:477 e5fd0d098a884eadb86ecc71cb3de86d
 msgid ""
 "``mailOn``: Whether to send an email notification when a DAG or step "
 "fails or succeeds."
 msgstr ""
+"``mailOn``: DAGまたはステップが失敗または成功したときにメール通知を送信するかどうか。"
 
 #: ../../source/yaml_format.rst:478 4f4f36a366a4470dbee168e46056853e
 msgid ""
 "``MaxCleanUpTimeSec``: The maximum time to wait after sending a TERM "
 "signal to running steps before killing them."
 msgstr ""
+"``MaxCleanUpTimeSec``: 実行中のステップにTERMシグナルを送信してから"
+"強制終了するまでの最大待機時間。"
 
 #: ../../source/yaml_format.rst:479 61b98f2abcd44ecf9c24f7b65d0ba772
 msgid ""
 "``handlerOn``: The command to execute when a DAG or step succeeds, fails,"
 " cancels, or exits."
 msgstr ""
+"``handlerOn``: DAGまたはステップが成功、失敗、キャンセル、または終了したときに実行するコマンド。"
 
 #: ../../source/yaml_format.rst:480 ed700cd92f244ee19152d50734e588aa
 msgid "``steps``: A list of steps to execute in the DAG."
-msgstr ""
+msgstr "``steps``: DAGで実行するステップのリスト。"
 
 #: ../../source/yaml_format.rst:482 d2ef99deab3945e59788eee68e7d87f5
 msgid ""
 "In addition, a global configuration file, ``$DAGU_HOME/config.yaml``, can"
 " be used to gather common settings, such as ``logDir`` or ``env``."
 msgstr ""
+"さらに、グローバル設定ファイル ``$DAGU_HOME/config.yaml`` を使用して、"
+"``logDir`` や ``env`` などの共通設定を集めることができます。"
 
 #: ../../source/yaml_format.rst:484 9a4859890b2f49c5a66923630d9282e6
 msgid ""
 "Note: If ``DAGU_HOME`` environment variable is not set, the default path "
 "is ``$HOME/.dagu/config.yaml``."
 msgstr ""
+"注意: ``DAGU_HOME`` 環境変数が設定されていない場合、デフォルトのパスは"
+" ``$HOME/.dagu/config.yaml`` です。"
 
 #: ../../source/yaml_format.rst:522 d8004407254d47db8fda9e238eadc212
 msgid "Step"
-msgstr ""
+msgstr "ステップ"
 
 #: ../../source/yaml_format.rst:524 4e2fcfce84cd468bbdc84aab6f14318a
 msgid "Each step can have its own set of configurations, including:"
-msgstr ""
+msgstr "各ステップには、以下のような独自の設定セットを持つことができます:"
 
 #: ../../source/yaml_format.rst:526 2b913a923c49475db63604c2f6ef7544
 msgid "``name``: The name of the step."
-msgstr ""
+msgstr "``name``: ステップの名前。"
 
 #: ../../source/yaml_format.rst:527 ea1226bf1eb94066b406792585f7e125
 msgid "``description``: A brief description of the step."
-msgstr ""
+msgstr "``description``: ステップの簡単な説明。"
 
 #: ../../source/yaml_format.rst:528 67fa71f516434cc48d2cc64e2b15421d
 msgid "``dir``: The working directory for the step."
-msgstr ""
+msgstr "``dir``: ステップの作業ディレクトリ。"
 
 #: ../../source/yaml_format.rst:529 dd1bb08d46044671b47504e59379c5a7
 msgid "``command``: The command and parameters to execute."
-msgstr ""
+msgstr "``command``: 実行するコマンドとパラメータ。"
 
 #: ../../source/yaml_format.rst:530 8322459f864240edab4f128dd6590672
 msgid "``stdout``: The file to which the standard output is written."
-msgstr ""
+msgstr "``stdout``: 標準出力が書き込まれるファイル。"
 
 #: ../../source/yaml_format.rst:531 bf4bba4a24da41728f31d9a1aa6c79f2
 msgid "``output``: The variable to which the result is written."
-msgstr ""
+msgstr "``output``: 結果が書き込まれる変数。"
 
 #: ../../source/yaml_format.rst:532 073ba5f471de440fa65c8ca8fb8d1297
 msgid "``script``: The script to execute."
-msgstr ""
+msgstr "``script``: 実行するスクリプト。"
 
 #: ../../source/yaml_format.rst:533 37f627cc76eb41d5bd47c664f0ac75ba
 msgid ""
 "``signalOnStop``: The signal name (e.g., ``SIGINT``) to be sent when the "
 "process is stopped."
 msgstr ""
+"``signalOnStop``: プロセスが停止したときに送信されるシグナル名（例: ``SIGINT``）。"
 
 #: ../../source/yaml_format.rst:534 eb8d9f7a96bd42c2955dbcbc36a8b059
 msgid ""
 "``mailOn``: Whether to send an email notification when the step fails or "
 "succeeds."
 msgstr ""
+"``mailOn``: ステップが失敗または成功したときにメール通知を送信するかどうか。"
 
 #: ../../source/yaml_format.rst:535 eb6ddc4b762c4351a42c1a5175998c85
 msgid ""
 "``continueOn``: Whether to continue to the next step, regardless of "
 "whether the step failed or not or the preconditions are met or not."
 msgstr ""
+"``continueOn``: ステップが失敗したかどうか、前提条件が満たされているかどうかに関係なく、"
+"次のステップに進むかどうか。"
 
 #: ../../source/yaml_format.rst:536 d08a04f899b343669f8f0062c1667f7f
 msgid "``retryPolicy``: The retry policy for the step."
-msgstr ""
+msgstr "``retryPolicy``: ステップのリトライポリシー。"
 
 #: ../../source/yaml_format.rst:537 26df1ec14ad740199992e142e4acaef6
 msgid "``repeatPolicy``: The repeat policy for the step."
-msgstr ""
+msgstr "``repeatPolicy``: ステップの繰り返しポリシー。"
 
 #: ../../source/yaml_format.rst:538 74b9b883bc4847eab20805348e5fad84
 msgid "``preconditions``: The conditions that must be met before a step can run."
-msgstr ""
+msgstr "``preconditions``: ステップが実行される前に満たされる必要がある条件。"
 
 #: ../../source/yaml_format.rst:539 1a6f00cf17e6477b885be0b8d167c586
 msgid "``depends``: The step depends on the other step."
-msgstr ""
-
+msgstr "``depends``: ステップが他のステップに依存していること。"

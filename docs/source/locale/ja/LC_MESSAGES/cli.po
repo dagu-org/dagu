@@ -21,9 +21,8 @@ msgstr ""
 
 #: ../../source/cli.rst:4 5836d3c055204802994daaa6eec5f501
 msgid "Command Line Interface"
-msgstr ""
+msgstr "コマンドラインインターフェース"
 
 #: ../../source/cli.rst:6 d4718c5af6584b63a3b666824963f427
 msgid "The following commands are available for interacting with Dagu:"
-msgstr ""
-
+msgstr "Daguとやり取りするには、次のコマンドが使用できます:"
