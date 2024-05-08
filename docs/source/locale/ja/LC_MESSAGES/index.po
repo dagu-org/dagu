@@ -8,11 +8,11 @@ msgid ""
 msgstr ""
 "Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-09 00:37+0900\n"
+"POT-Creation-Date: 2024-05-09 01:39+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language: ja_JP\n"
-"Language-Team: ja_JP <LL@li.org>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
@@ -21,34 +21,33 @@ msgstr ""
 
 #: ../../source/index.rst:41
 msgid "Installation"
-msgstr ""
+msgstr "インストール"
 
 #: ../../source/index.rst:48
 msgid "Interface"
-msgstr ""
+msgstr "インターフェース"
 
 #: ../../source/index.rst:57
 msgid "Workflow Language"
-msgstr ""
+msgstr "ワークフロー言語"
 
 #: ../../source/index.rst:65
 msgid "Configuration"
-msgstr ""
+msgstr "設定"
 
 #: ../../source/index.rst:74
 msgid "Container Setup"
-msgstr ""
+msgstr "コンテナのセットアップ"
 
 #: ../../source/index.rst:81
 msgid "Development"
-msgstr ""
+msgstr "開発"
 
-#: ../../source/index.rst:7
+#: ../../source/index.rst:7 6f8d3fb80c154c028d5b1884a7ea101b
 msgid "Dagu"
-msgstr ""
+msgstr "Dagu"
 
-#: ../../source/index.rst:18
-#, fuzzy
+#: ../../source/index.rst:18 32da244136024289a945813b9d08754c
 msgid ""
 "Dagu is a powerful Cron alternative that comes with a Web UI. It allows "
 "you to define dependencies between commands as a `Directed Acyclic Graph "
@@ -58,70 +57,60 @@ msgid ""
 "over SSH. Dagu was designed to be easy to use, self-contained, and "
 "require no coding, making it ideal for small projects."
 msgstr ""
-"DAGU は、Web UI を備えた強力な Cron の代替です。宣言的な :ref:`YAML 形式` で、コマンド間の依存関係を "
-"`有向非巡回グラフ (DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ "
-"として定義できます。さらに、DAGU は Docker コンテナの実行、HTTP リクエストの送信、SSH "
-"経由でのコマンド実行をネイティブにサポートしています。DAGU "
-"は使いやすく、自己完結型で、コーディングを必要としないように設計されているため、小規模なプロジェクトに最適です。"
+"DaguはWeb UIを備えた強力なCronの代替ツールです。宣言的な :ref:`YAML Format` で"
+"コマンド間の依存関係を有向非巡回グラフ(DAG)"
+"として定義することができます。さらに、DaguはDockerコンテナの実行、HTTPリクエストの送信、"
+"SSH経由でのコマンド実行をネイティブにサポートしています。Daguは使いやすく、自己完結型で、"
+"コーディングを必要としないように設計されており、小規模プロジェクトに最適です。"
 
-#: ../../source/index.rst:21
+#: ../../source/index.rst:21 5d53b2e3f35d465985f4f8d13b624f19
 msgid "Quick Start"
-msgstr ""
+msgstr "クイックスタート"
 
-#: ../../source/index.rst:24
+#: ../../source/index.rst:24 dfa5ab1643144d278da7d2394bda2374
 msgid ":doc:`installation`"
-msgstr ""
+msgstr ":doc:`installation`"
 
-#: ../../source/index.rst:24
+#: ../../source/index.rst:24 a8c4f09cb22b4a1c94e9bc38e29ab4c9
 msgid "How to install Dagu."
-msgstr ""
+msgstr "Daguのインストール方法。"
 
-#: ../../source/index.rst:27
+#: ../../source/index.rst:27 0825ec41cae24f03877d4c621691d37c
 msgid ":doc:`quickstart`"
-msgstr ""
+msgstr ":doc:`quickstart`"
 
-#: ../../source/index.rst:27
+#: ../../source/index.rst:27 4dafc946c53d474f8167ebb264553a8f
 msgid "A quick start guide to get you up and running."
-msgstr ""
+msgstr "すぐに開始するためのクイックスタートガイド。"
 
-#: ../../source/index.rst:30
+#: ../../source/index.rst:30 61b8f0eea5d14421821ae79e70c0b21b
 msgid ":ref:`cli`"
-msgstr ""
+msgstr ":ref:`cli`"
 
-#: ../../source/index.rst:30
+#: ../../source/index.rst:30 b1b7f983255c422287254633ae96ce79
 msgid "Command line interface reference."
-msgstr ""
+msgstr "コマンドラインインターフェースのリファレンス。"
 
-#: ../../source/index.rst:33
+#: ../../source/index.rst:33 8fe8ac28034a4c37954255eaeeffc2e8
 msgid ":ref:`YAML Format`"
-msgstr ""
+msgstr ":ref:`YAML Format`"
 
-#: ../../source/index.rst:33
+#: ../../source/index.rst:33 fce5a2df7daf4f97be2b5e9b39b404ec
 msgid "Workflow language reference."
-msgstr ""
+msgstr "ワークフロー言語のリファレンス。"
 
-#: ../../source/index.rst:36
+#: ../../source/index.rst:36 e0ec427e27384404b27a3ed76d38cfbe
 msgid ":ref:`examples`"
-msgstr ""
+msgstr ":ref:`examples`"
 
-#: ../../source/index.rst:36
+#: ../../source/index.rst:36 b80ab2cbcf9f4831918fff9158a29d20
 msgid "Examples of workflows."
-msgstr ""
+msgstr "ワークフローの例。"
 
-#: ../../source/index.rst:39
+#: ../../source/index.rst:39 c77362845426474f992d82a33ac4e834
 msgid ":ref:`Configuration Options`"
-msgstr ""
+msgstr ":ref:`Configuration Options`"
 
-#: ../../source/index.rst:39
+#: ../../source/index.rst:39 b9942449a2a44a8c940a7461d8203594
 msgid "Configuration options."
-msgstr ""
-
-#~ msgid "Welcome to DAGU's documentation!"
-#~ msgstr "DAGU のドキュメントへようこそ"
-
-#~ msgid "DAGU"
-#~ msgstr ""
-
-#~ msgid "Contents"
-#~ msgstr "目次"
-
+msgstr "設定オプション。"

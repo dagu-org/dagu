@@ -8,167 +8,167 @@ msgid ""
 msgstr ""
 "Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-09 00:37+0900\n"
+"POT-Creation-Date: 2024-05-09 02:01+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language: ja_JP\n"
-"Language-Team: ja_JP <LL@li.org>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.15.0\n"
 
-#: ../../source/contrib.rst:2
+#: ../../source/contrib.rst:2 6cfee28b3bf54955bd88f31c479d2077
 msgid "Contribution Guide"
 msgstr ""
 
-#: ../../source/contrib.rst:4
+#: ../../source/contrib.rst:4 65d4233dd6294d7f879621c85e1d26eb
 msgid ""
 "We welcome contributions of any size and skill level. If you have an idea"
 " for a new feature or have found a bug, please open an issue on the "
 "GitHub repository."
 msgstr ""
 
-#: ../../source/contrib.rst:7
+#: ../../source/contrib.rst:7 dd2185658bcb423981e497c715133b7f
 msgid "Prerequisite"
 msgstr ""
 
-#: ../../source/contrib.rst:9
+#: ../../source/contrib.rst:9 959111ca5ad14456b8650d1c730aa2c2
 msgid "`Go version 1.19 or later. <https://go.dev/doc/install>`_"
 msgstr ""
 
-#: ../../source/contrib.rst:10
+#: ../../source/contrib.rst:10 5075b196e11f474785b94658708c26f9
 msgid "Latest version of `Node.js <https://nodejs.org/en/download/>`_."
 msgstr ""
 
-#: ../../source/contrib.rst:11
+#: ../../source/contrib.rst:11 c565c5628f16405eb3d72dfc1a9fddd9
 msgid "`yarn <https://yarnpkg.com/>`_ package manager."
 msgstr ""
 
-#: ../../source/contrib.rst:14
+#: ../../source/contrib.rst:14 4035739df80c4658a0e0725f61a84099
 msgid "Setting up your local environment"
 msgstr ""
 
 #: ../../source/contrib.rst:16 ../../source/contrib.rst:72
+#: 355d029129fd4e81bd322daa355efab9 ff3d6c8b33d1474da2a593f294e870c7
 msgid "Clone the repository to your local machine."
 msgstr ""
 
 #: ../../source/contrib.rst:17 ../../source/contrib.rst:73
+#: ed332aa152ed4f938a4b954388931549 fa2b411b4c7c42239d0acfd526b0d6cb
 msgid ""
 "Navigate to the root directory of the cloned repository and build the "
 "frontend project by running the following command:"
 msgstr ""
 
 #: ../../source/contrib.rst:23 ../../source/contrib.rst:35
-#: ../../source/contrib.rst:79
+#: ../../source/contrib.rst:79 44d9c83d83c74f4d8d4b720225132c76
+#: b2f95eb5b6e3441685e9893e6b24592e b44e05f2788a4d8db6c6275e56565fa4
 msgid "Run the following command to start the `Dagu` application:"
 msgstr ""
 
-#: ../../source/contrib.rst:29
+#: ../../source/contrib.rst:29 db0a6a7d215f4cb18d57359ccb8a7b92
 msgid ""
 "Now you can change the source code and build the binary by running the "
 "following command:"
 msgstr ""
 
-#: ../../source/contrib.rst:42
+#: ../../source/contrib.rst:42 dea6c5c6890d42b0b3860b24c011a756
 msgid "Running Tests"
 msgstr ""
 
-#: ../../source/contrib.rst:44
+#: ../../source/contrib.rst:44 9e797d62243c4919b0269ebdbae947a5
 msgid "Run the following command to run the tests:"
 msgstr ""
 
-#: ../../source/contrib.rst:51
+#: ../../source/contrib.rst:51 dff1059103c24db49f24c20d686b211b
 msgid "Code Structure"
 msgstr ""
 
-#: ../../source/contrib.rst:53
+#: ../../source/contrib.rst:53 d779510d6d52474da97fbd8b698e2a7f
 msgid "``ui``: Frontend code for the Web UI."
 msgstr ""
 
-#: ../../source/contrib.rst:54
+#: ../../source/contrib.rst:54 5663582bf25a43dfaa75442de630e03e
 msgid "``cmd``: Contains the main application entry point."
 msgstr ""
 
-#: ../../source/contrib.rst:55
+#: ../../source/contrib.rst:55 5d08988c00004aecb869804953611bf3
 msgid "``docs``: Contains the documentation for the project."
 msgstr ""
 
-#: ../../source/contrib.rst:56
+#: ../../source/contrib.rst:56 ed71de110e3c4006986a9822f7d7f5f6
 msgid "``examples``: Contains the example workflows."
 msgstr ""
 
-#: ../../source/contrib.rst:57
+#: ../../source/contrib.rst:57 7d198fec7c4d438891f515ae5e6a964a
 msgid "``internal``: Contains the internal code for the project."
 msgstr ""
 
-#: ../../source/contrib.rst:59
+#: ../../source/contrib.rst:59 0fbd75569bae40a39523bb6074280db2
 msgid "``web``: Contains the backend code for the Web UI."
 msgstr ""
 
-#: ../../source/contrib.rst:60
+#: ../../source/contrib.rst:60 5bec09e1829042f08e5b9a71504cb2c1
 msgid "``agent``: Contains the code for running the workflows."
 msgstr ""
 
-#: ../../source/contrib.rst:61
+#: ../../source/contrib.rst:61 9f2974c0de0940ad8ff11cf7c7f278ec
 msgid "``config``: Contains the code for loading the configuration."
 msgstr ""
 
-#: ../../source/contrib.rst:62
+#: ../../source/contrib.rst:62 47545d2712644d2bad548962513efd5d
 msgid "``controller``: Contains the code for managing the workflows."
 msgstr ""
 
-#: ../../source/contrib.rst:63
+#: ../../source/contrib.rst:63 deb6d3086550405bb9c819d068595db8
 msgid "``dag``: Contains the code for parsing the workflow definition."
 msgstr ""
 
-#: ../../source/contrib.rst:64
+#: ../../source/contrib.rst:64 b1b0bd413ff1491280237e394bc2ee45
 msgid "``database``: Contains the code for interacting with the database."
 msgstr ""
 
-#: ../../source/contrib.rst:65
+#: ../../source/contrib.rst:65 2a2420209c294bdeb9a867f541782bea
 msgid "``executor``: Contains the code for different types of executors."
 msgstr ""
 
-#: ../../source/contrib.rst:66
+#: ../../source/contrib.rst:66 85b0908c49214c73822083f6cd2d9335
 msgid "``runner``: Contains the code for scheduler."
 msgstr ""
 
-#: ../../source/contrib.rst:67
+#: ../../source/contrib.rst:67 7a3876ae87024ba8b51821752aa1732b
 msgid "``sock``: Contains the code for interacting with the socket."
 msgstr ""
 
-#: ../../source/contrib.rst:70
+#: ../../source/contrib.rst:70 dc2a95b99e514d10acb5ac7890fa63cb
 msgid "Setting up your local environment for front end development"
 msgstr ""
 
-#: ../../source/contrib.rst:85
+#: ../../source/contrib.rst:85 3204ca1566504e9f91ea7a2a1c0c9066
 msgid ""
 "Navigate to ``ui`` directory and run the following command to install the"
 " dependencies:"
 msgstr ""
 
-#: ../../source/contrib.rst:92
+#: ../../source/contrib.rst:92 7ee151c519334a6bad6d385ec2f8e6e7
 msgid "Open the browser and navigate to http://localhost:8081."
 msgstr ""
 
-#: ../../source/contrib.rst:94
+#: ../../source/contrib.rst:94 794c5ee8499945d38cffcf0bcb7db444
 msgid ""
 "Make changes to the source code and refresh the browser to see the "
 "changes."
 msgstr ""
 
-#: ../../source/contrib.rst:97
+#: ../../source/contrib.rst:97 18669544776b484aaa20d98dcc993a00
 msgid "Branches"
 msgstr ""
 
-#: ../../source/contrib.rst:99
+#: ../../source/contrib.rst:99 0d60c9e935224c1b8948ed5df55a8c5a
 msgid ""
 "``main``: The main branch where the source code always reflects a "
 "production-ready state."
 msgstr ""
-
-#~ msgid "Run the following command to start the `DAGU` application:"
-#~ msgstr ""
 

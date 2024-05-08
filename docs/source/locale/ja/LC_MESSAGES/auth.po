@@ -8,58 +8,55 @@ msgid ""
 msgstr ""
 "Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-09 00:37+0900\n"
+"POT-Creation-Date: 2024-05-09 02:01+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language: ja_JP\n"
-"Language-Team: ja_JP <LL@li.org>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.15.0\n"
 
-#: ../../source/auth.rst:4
+#: ../../source/auth.rst:4 b13b40a4de0f433996483a806d8c6f5a
 msgid "Basic Authentication"
 msgstr ""
 
-#: ../../source/auth.rst:9
+#: ../../source/auth.rst:9 63a9182f90754ffe9e62220cc0bc0914
 msgid "To enable basic authentication for Dagu, follow these steps:"
 msgstr ""
 
-#: ../../source/auth.rst:11
+#: ../../source/auth.rst:11 86f3f3b2ab624f649383ac760781d5cf
 msgid "Set the environment variables to configure basic authentication:"
 msgstr ""
 
-#: ../../source/auth.rst:19
+#: ../../source/auth.rst:19 ed6b93f5e67d4560950f31696fb10d9e
 msgid ""
 "Replace ``<your-username>`` and ``<your-password>`` with your desired "
 "username and password."
 msgstr ""
 
-#: ../../source/auth.rst:21
+#: ../../source/auth.rst:21 bb9433b3c6854e77ba0cd11085fbc2c2
 msgid ""
 "Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` "
 "directory (default: ``$HOME/.dagu/``) to override the default "
 "configuration values."
 msgstr ""
 
-#: ../../source/auth.rst:30
+#: ../../source/auth.rst:30 707bbd8796d64329b7bb109384822219
 msgid "You can enable HTTPS by configuring the following environment variables:"
 msgstr ""
 
-#: ../../source/auth.rst:37
+#: ../../source/auth.rst:37 21785f6f2045456286c1c37daf254c42
 msgid ""
 "Replace ``<path-to-cert-file>`` and ``<path-to-key-file>`` with the paths"
 " to your certificate and key files."
 msgstr ""
 
-#: ../../source/auth.rst:39
+#: ../../source/auth.rst:39 fc39a2601df04639b5c24ff1900ba0dc
 msgid ""
 "See :ref:`Configuration Options` for more information on the "
 "configuration file."
 msgstr ""
-
-#~ msgid "To enable basic authentication for DAGU, follow these steps:"
-#~ msgstr ""
 

@@ -63,10 +63,12 @@ This command will generate the necessary gettext files in the `build/html` direc
 We welcome contributions for adding new translations to the documentation. To add a new translation:
 
 1. Create a new directory for the target language in the `source/locale` directory (e.g., `source/locale/fr` for French).
-2. Generate the gettext files for the target language by running:
-```shell
-sphinx-build -b gettext source/ build/locale
-```
+2. Generate the gettext files for the target language by running: 
+  ```shell
+  make gettext
+  sphinx-intl update -p build/gettext -l <language>
+  ```
+  Replace `<language>` with the appropriate language code (e.g., `fr` for French).
 3. Update the translation files in the source/locale/<language>/LC_MESSAGES directory.
 4. Build the documentation for the target language:
 ```shell
