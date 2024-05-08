@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-09 02:01+0900\n"
+"POT-Creation-Date: 2024-05-09 03:00+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -19,48 +19,21 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.15.0\n"
 
-#: ../../source/auth.rst:4 b13b40a4de0f433996483a806d8c6f5a
-msgid "Basic Authentication"
-msgstr "基本認証"
+#: ../../source/base_config.rst:4 2cfcbc34b88b4f60b9095689cced81ad
+msgid "Base Configuration for all Workflows"
+msgstr "すべてのワークフローの基本設定"
 
-#: ../../source/auth.rst:9 63a9182f90754ffe9e62220cc0bc0914
-msgid "To enable basic authentication for Dagu, follow these steps:"
-msgstr "Daguで基本認証を有効にするには、次の手順に従ってください:"
-
-#: ../../source/auth.rst:11 86f3f3b2ab624f649383ac760781d5cf
-msgid "Set the environment variables to configure basic authentication:"
-msgstr "基本認証を設定するための環境変数を設定します:"
-
-#: ../../source/auth.rst:19 ed6b93f5e67d4560950f31696fb10d9e
+#: ../../source/base_config.rst:6 0f42fc55990a404f9e436073ba71ba93
 msgid ""
-"Replace ``<your-username>`` and ``<your-password>`` with your desired "
-"username and password."
+"Creating a base configuration (default path: ``~/.dagu/config.yaml``) is "
+"a convenient way to organize shared settings among all workflows. The "
+"path to the base configuration file can be configured. See "
+":ref:`Configuration Options` for more details."
 msgstr ""
-"``<your-username>`` と ``<your-password>`` を希望のユーザー名とパスワードに置き換えてください。"
+"基本設定（デフォルトのパス: ``~/.dagu/config.yaml``）を作成することは、"
+"すべてのワークフロー間で共有設定を整理するのに便利な方法です。"
+"基本設定ファイルへのパスは設定可能です。詳細については、:ref:`Configuration Options` を参照してください。"
 
-#: ../../source/auth.rst:21 bb9433b3c6854e77ba0cd11085fbc2c2
-msgid ""
-"Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` "
-"directory (default: ``$HOME/.dagu/``) to override the default "
-"configuration values."
-msgstr ""
-"または、デフォルトの設定値を上書きするために、``$DAGU_HOME`` ディレクトリ "
-"(デフォルト: ``$HOME/.dagu/``) に ``admin.yaml`` ファイルを作成します。"
-
-#: ../../source/auth.rst:30 707bbd8796d64329b7bb109384822219
-msgid "You can enable HTTPS by configuring the following environment variables:"
-msgstr "次の環境変数を設定することで、HTTPSを有効にできます:"
-
-#: ../../source/auth.rst:37 21785f6f2045456286c1c37daf254c42
-msgid ""
-"Replace ``<path-to-cert-file>`` and ``<path-to-key-file>`` with the paths"
-" to your certificate and key files."
-msgstr ""
-"``<path-to-cert-file>`` と ``<path-to-key-file>`` を証明書とキーファイルのパスに置き換えてください。"
-
-#: ../../source/auth.rst:39 fc39a2601df04639b5c24ff1900ba0dc
-msgid ""
-"See :ref:`Configuration Options` for more information on the "
-"configuration file."
-msgstr ""
-"設定ファイルの詳細については、:ref:`Configuration Options` を参照してください。"
+#: ../../source/base_config.rst:8 b7458496869246558d3efeee58648edd
+msgid "Example:"
+msgstr "例:"
