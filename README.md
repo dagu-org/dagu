@@ -29,6 +29,7 @@
 Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands as a [Directed Acyclic Graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) in a declarative [YAML format](https://dagu.readthedocs.io/en/latest/yaml_format.html). Dagu simplifies the management and execution of complex workflows. It natively supports running Docker containers, making HTTP requests, and executing commands over SSH.
 
 - [Documentation](https://dagu.readthedocs.io) 
+- [Localized Documentation](#localized-documentation)
 - [Discord Community](https://discord.gg/gpahPUjGRk)
 
 ## **Highlights**
@@ -244,8 +245,11 @@ dagu scheduler [--dags=<path to directory>]
 dagu version
 ```
 
-## **Documentation**
+## **Localized Documentation**
+- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/cn)
+- [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
 
+## **Documentation**
 - [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
 - ️[Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
 - [Command Line Interface](https://dagu.readthedocs.io/en/latest/cli.html)

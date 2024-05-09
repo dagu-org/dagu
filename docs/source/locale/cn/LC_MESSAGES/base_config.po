@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../source/base_config.rst:4 2cfcbc34b88b4f60b9095689cced81ad
 msgid "Base Configuration for all Workflows"
-msgstr ""
+msgstr "所有工作流的基本配置"
 
 #: ../../source/base_config.rst:6 0f42fc55990a404f9e436073ba71ba93
 msgid ""
@@ -29,8 +29,9 @@ msgid ""
 "path to the base configuration file can be configured. See "
 ":ref:`Configuration Options` for more details."
 msgstr ""
+"创建基本配置(默认路径:``~/.dagu/config.yaml``)是组织所有工作流之间共享设置的一种便捷方式。"
+"可以配置基本配置文件的路径。有关更多详细信息,请参阅 :ref:`配置选项`。"
 
 #: ../../source/base_config.rst:8 b7458496869246558d3efeee58648edd
 msgid "Example:"
-msgstr ""
-
+msgstr "示例:"
