@@ -56,18 +56,21 @@ func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
 			return nil, err
 		}
 	}
+
+	var (
+		ret     []*Match
+		lines   []string
+		matches []int
+		idx     int
+	)
 	scanner := bufio.NewScanner(bytes.NewReader(dat))
-	ret := make([]*Match, 0)
-	lines := make([]string, 0)
-	matches := make([]int, 0)
-	i := 0
 	for scanner.Scan() {
 		t := scanner.Text()
 		lines = append(lines, t)
 		if matcher.Match(t) {
-			matches = append(matches, i)
+			matches = append(matches, idx)
 		}
-		i++
+		idx++
 	}
 	if len(matches) == 0 {
 		return nil, ErrNoMatch

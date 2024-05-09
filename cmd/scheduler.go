@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/dagu-dev/dagu/app"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/service/core"
+	scheduler "github.com/dagu-dev/dagu/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -19,7 +19,7 @@ func schedulerCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 
-			err := core.NewScheduler(app.TopLevelModule).Start(cmd.Context())
+			err := scheduler.New(app.TopLevelModule).Start(cmd.Context())
 			checkError(err)
 		},
 	}

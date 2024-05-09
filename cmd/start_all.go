@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	scheduler "github.com/dagu-dev/dagu/service"
 	"log"
 
 	"github.com/dagu-dev/dagu/app"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/service/core"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,7 +26,7 @@ func startAllCmd() *cobra.Command {
 
 			go func() {
 				config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
-				err := core.NewScheduler(app.TopLevelModule).Start(cmd.Context())
+				err := scheduler.New(app.TopLevelModule).Start(cmd.Context())
 				if err != nil {
 					log.Fatal(err) // nolint // deep-exit
 				}

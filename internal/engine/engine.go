@@ -241,7 +241,7 @@ func (e *engineImpl) GetAllStatus() (statuses []*persistence.DAGStatus, errs []s
 	ds := e.dataStoreFactory.NewDAGStore()
 	dags, errs, err := ds.List()
 
-	ret := make([]*persistence.DAGStatus, 0)
+	var ret []*persistence.DAGStatus
 	for _, d := range dags {
 		status, err := e.readStatus(d)
 		if err != nil {

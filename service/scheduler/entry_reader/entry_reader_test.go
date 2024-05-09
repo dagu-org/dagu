@@ -11,7 +11,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/utils"
-	"github.com/dagu-dev/dagu/service/core/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
 
 	"github.com/stretchr/testify/require"
 
