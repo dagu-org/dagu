@@ -246,7 +246,7 @@ dagu version
 ```
 
 ## **Localized Documentation**
-- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/cn)
+- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
 - [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
 
 ## **Documentation**

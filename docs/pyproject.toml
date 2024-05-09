@@ -17,5 +17,5 @@ requires-python = ">= 3.11"
 [tool.rye.scripts]
 serve = "sphinx-autobuild --watch docs --port 8000 --open-browser --delay 1 source build/html"
 build = "sphinx-build -b html -D language='en' source/ build/html"
+build-zh = "sphinx-build -b html -D language='zh' source/ build/html"
 build-ja = "sphinx-build -b html -D language='ja' source/ build/html"
-build-cn = "sphinx-build -b html -D language='cn' source/ build/html"
