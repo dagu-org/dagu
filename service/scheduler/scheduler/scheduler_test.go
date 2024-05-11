@@ -123,6 +123,8 @@ func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 	return er.Entries, nil
 }
 
+func (er *mockEntryReader) Start(chan any) {}
+
 // TODO: fix to use mock library
 type mockJob struct {
 	Name         string

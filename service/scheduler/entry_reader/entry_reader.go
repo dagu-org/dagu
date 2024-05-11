@@ -50,8 +50,11 @@ func New(params Params) *EntryReader {
 	if err := er.initDags(); err != nil {
 		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
 	}
-	go er.watchDags()
 	return er
+}
+
+func (er *EntryReader) Start(done chan any) {
+	go er.watchDags(done)
 }
 
 func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
@@ -109,7 +112,7 @@ func (er *EntryReader) initDags() error {
 	return nil
 }
 
-func (er *EntryReader) watchDags() {
+func (er *EntryReader) watchDags(done chan any) {
 	cl := dag.Loader{}
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
@@ -122,6 +125,8 @@ func (er *EntryReader) watchDags() {
 	_ = watcher.Add(er.dagsDir)
 	for {
 		select {
+		case <-done:
+			return
 		case event, ok := <-watcher.Events():
 			if !ok {
 				return

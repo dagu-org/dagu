@@ -24,6 +24,7 @@ type Scheduler struct {
 }
 
 type EntryReader interface {
+	Start(done chan any)
 	Read(now time.Time) ([]*Entry, error)
 }
 
@@ -91,6 +92,8 @@ func (s *Scheduler) Start() error {
 	sig := make(chan os.Signal, 1)
 	done := make(chan any)
 	defer close(done)
+
+	s.entryReader.Start(done)
 
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
