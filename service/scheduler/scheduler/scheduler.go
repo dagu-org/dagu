@@ -89,10 +89,18 @@ func (s *Scheduler) Start() error {
 	}
 
 	sig := make(chan os.Signal, 1)
+	done := make(chan any)
+	defer close(done)
+
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
 	go func() {
-		<-sig
-		s.Stop()
+		select {
+		case <-done:
+			return
+		case <-sig:
+			s.Stop()
+		}
 	}()
 
 	s.logger.Info("starting scheduler")
