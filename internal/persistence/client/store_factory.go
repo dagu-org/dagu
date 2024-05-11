@@ -13,6 +13,7 @@ import (
 type dataStoreFactoryImpl struct {
 	cfg          *config.Config
 	historyStore persistence.HistoryStore
+	dagStore     persistence.DAGStore
 }
 
 var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
@@ -45,7 +46,10 @@ func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 }
 
 func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
-	return local.NewDAGStore(f.cfg.DAGs)
+	if f.dagStore == nil {
+		f.dagStore = local.NewDAGStore(f.cfg.DAGs)
+	}
+	return f.dagStore
 }
 
 func (f *dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
