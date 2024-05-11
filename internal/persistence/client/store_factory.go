@@ -11,7 +11,8 @@ import (
 )
 
 type dataStoreFactoryImpl struct {
-	cfg *config.Config
+	cfg          *config.Config
+	historyStore persistence.HistoryStore
 }
 
 var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
@@ -24,7 +25,7 @@ func NewDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
 	return ds
 }
 
-func (f dataStoreFactoryImpl) InitDagDir() error {
+func (f *dataStoreFactoryImpl) InitDagDir() error {
 	_, err := os.Stat(f.cfg.DAGs)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(f.cfg.DAGs, 0755); err != nil {
@@ -35,16 +36,19 @@ func (f dataStoreFactoryImpl) InitDagDir() error {
 	return nil
 }
 
-func (f dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
+func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
-	return jsondb.New(f.cfg.DataDir, f.cfg.DAGs)
+	if f.historyStore == nil {
+		f.historyStore = jsondb.New(f.cfg.DataDir, f.cfg.DAGs)
+	}
+	return f.historyStore
 }
 
-func (f dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
+func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
 	return local.NewDAGStore(f.cfg.DAGs)
 }
 
-func (f dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
+func (f *dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
 	s := storage.NewStorage(f.cfg.SuspendFlagsDir)
 	return local.NewFlagStore(s)
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -117,11 +118,11 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag string, expected scheduler.Status) {
 	t.Helper()
 	require.Eventually(t, func() bool {
-		// TODO: do not use history store directly.
 		status := hs.ReadStatusRecent(dag, 1)
 		if len(status) < 1 {
 			return false
 		}
+		fmt.Println(status[0].Status.Status)
 		return expected == status[0].Status.Status
 	}, time.Millisecond*5000, time.Millisecond*50)
 }
