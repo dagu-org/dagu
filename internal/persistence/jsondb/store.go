@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 	"io"
 	"log"
 	"os"
@@ -35,6 +36,7 @@ type Store struct {
 	dir     string
 	dagsDir string
 	writer  *writer
+	cache   *filecache.Cache[*model.Status]
 }
 
 var (
@@ -46,7 +48,11 @@ var (
 // New creates a new Store with default configuration.
 func New(dir, dagsDir string) *Store {
 	// dagsDir is used to calculate the directory that is compatible with the old version.
-	return &Store{dir: dir, dagsDir: dagsDir}
+	return &Store{
+		dir:     dir,
+		dagsDir: dagsDir,
+		cache:   filecache.New[*model.Status](),
+	}
 }
 
 func (store *Store) Update(dagFile, requestId string, s *model.Status) error {
@@ -59,6 +65,7 @@ func (store *Store) Update(dagFile, requestId string, s *model.Status) error {
 		return err
 	}
 	defer func() {
+		store.cache.Invalidate(f.File)
 		_ = w.close()
 	}()
 	return w.write(s)
@@ -91,6 +98,7 @@ func (store *Store) Close() error {
 	if err := store.Compact(store.writer.dagFile, store.writer.target); err != nil {
 		return err
 	}
+	store.cache.Invalidate(store.writer.target)
 	return store.writer.close()
 }
 
@@ -142,25 +150,31 @@ func (store *Store) ReadStatusRecent(dagFile string, n int) []*model.StatusFile 
 	var ret []*model.StatusFile
 	files := store.latest(store.pattern(dagFile)+"*.dat", n)
 	for _, file := range files {
-		status, err := ParseFile(file)
-		if err == nil {
-			ret = append(ret, &model.StatusFile{
-				File:   file,
-				Status: status,
-			})
+		status, err := store.cache.LoadLatest(file, func() (*model.Status, error) {
+			return ParseFile(file)
+		})
+		if err != nil {
+			continue
 		}
+		ret = append(ret, &model.StatusFile{
+			File:   file,
+			Status: status,
+		})
 	}
 	return ret
 }
 
 // ReadStatusToday returns a list of status files.
 func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
+	// TODO: let's fix below not to use config here
 	readLatestStatus := config.Get().LatestStatusToday
 	file, err := store.latestToday(dagFile, time.Now(), readLatestStatus)
 	if err != nil {
 		return nil, err
 	}
-	return ParseFile(file)
+	return store.cache.LoadLatest(file, func() (*model.Status, error) {
+		return ParseFile(file)
+	})
 }
 
 // FindByRequestId finds a status file by requestId.
@@ -365,7 +379,7 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 		return nil, err
 	}
 	r := bufio.NewReader(f)
-	ret := []byte{}
+	var ret []byte
 	for {
 		b, isPrefix, err := r.ReadLine()
 		if err == io.EOF {

@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"go.uber.org/goleak"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -20,6 +21,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 	tempDir := utils.MustTempDir("runner_test")
 	changeHomeDir(tempDir)
 	testHomeDir = tempDir
@@ -93,6 +95,7 @@ func TestRestart(t *testing.T) {
 	go func() {
 		_ = r.Start()
 	}()
+	defer r.Stop()
 
 	time.Sleep(time.Second + time.Millisecond*100)
 	require.Equal(t, int32(1), er.Entries[0].Job.(*mockJob).RestartCount.Load())
@@ -119,6 +122,8 @@ var _ EntryReader = (*mockEntryReader)(nil)
 func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 	return er.Entries, nil
 }
+
+func (er *mockEntryReader) Start(chan any) {}
 
 // TODO: fix to use mock library
 type mockJob struct {

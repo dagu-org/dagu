@@ -1,6 +1,6 @@
 module github.com/dagu-dev/dagu
 
-go 1.19
+go 1.20
 
 require (
 	github.com/docker/docker v20.10.21+incompatible
@@ -63,6 +63,7 @@ require (
 	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/dig v1.17.0 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect

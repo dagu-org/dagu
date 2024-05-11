@@ -1,6 +1,7 @@
 package entry_reader
 
 import (
+	"go.uber.org/goleak"
 	"os"
 	"path"
 	"testing"
@@ -21,6 +22,12 @@ import (
 var (
 	testdataDir = path.Join(utils.MustGetwd(), "testdata")
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+	code := m.Run()
+	os.Exit(code)
+}
 
 // TODO: fix this tests to use mock
 func setupTest(t *testing.T) (string, engine.Factory) {
@@ -67,6 +74,11 @@ func TestReadEntries(t *testing.T) {
 		Logger:        logger.NewSlogLogger(),
 		EngineFactory: ef,
 	})
+
+	done := make(chan any)
+	defer close(done)
+	er.Start(done)
+
 	entries, err = er.Read(now)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(entries), 1)

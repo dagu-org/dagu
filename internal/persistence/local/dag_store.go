@@ -3,6 +3,7 @@ package local
 import (
 	"errors"
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,11 +16,15 @@ import (
 )
 
 type dagStoreImpl struct {
-	dir string
+	dir       string
+	metaCache *filecache.Cache[*dag.DAG]
 }
 
 func NewDAGStore(dir string) persistence.DAGStore {
-	return &dagStoreImpl{dir: dir}
+	return &dagStoreImpl{
+		dir:       dir,
+		metaCache: filecache.New[*dag.DAG](),
+	}
 }
 
 var (
@@ -40,12 +45,10 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	cl := dag.Loader{}
-	dat, err := cl.LoadMetadata(loc)
-	if err != nil {
-		return nil, err
-	}
-	return dat, nil
+	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
+		cl := dag.Loader{}
+		return cl.LoadMetadata(loc)
+	})
 }
 
 func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
@@ -91,6 +94,7 @@ func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s", errFailedToUpdateDAGFile, err)
 	}
+	d.metaCache.Invalidate(loc)
 	return nil
 }
 
@@ -117,6 +121,7 @@ func (d *dagStoreImpl) Delete(name string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %s", errFailedToDeleteDAGFile, err)
 	}
+	d.metaCache.Invalidate(loc)
 	return nil
 }
 
