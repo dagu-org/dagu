@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -122,7 +121,6 @@ func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag strin
 		if len(status) < 1 {
 			return false
 		}
-		fmt.Println(status[0].Status.Status)
 		return expected == status[0].Status.Status
 	}, time.Millisecond*5000, time.Millisecond*50)
 }

@@ -12,6 +12,7 @@ type Cache[T any] struct {
 
 type Entry[T any] struct {
 	Data         T
+	Size         int64
 	LastModified int64
 }
 
@@ -19,8 +20,8 @@ func New[T any]() *Cache[T] {
 	return &Cache[T]{}
 }
 
-func (c *Cache[T]) Store(fileName string, data T, lastModified int64) {
-	c.entries.Store(fileName, Entry[T]{Data: data, LastModified: lastModified})
+func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
+	c.entries.Store(fileName, Entry[T]{Data: data, Size: fi.Size(), LastModified: fi.ModTime().Unix()})
 }
 
 func (c *Cache[T]) Invalidate(fileName string) {
@@ -28,7 +29,7 @@ func (c *Cache[T]) Invalidate(fileName string) {
 }
 
 func (c *Cache[T]) LoadLatest(fileName string, loader func() (T, error)) (T, error) {
-	stale, lastModified, err := c.IsStale(fileName, c.LastModified(fileName))
+	stale, lastModified, err := c.IsStale(fileName, c.Entry(fileName))
 	if err != nil {
 		var zero T
 		return zero, err
@@ -47,13 +48,12 @@ func (c *Cache[T]) LoadLatest(fileName string, loader func() (T, error)) (T, err
 	return entry.Data, nil
 }
 
-func (c *Cache[T]) LastModified(fileName string) int64 {
+func (c *Cache[T]) Entry(fileName string) Entry[T] {
 	item, ok := c.entries.Load(fileName)
 	if !ok {
-		return 0
+		return Entry[T]{}
 	}
-	entry := item.(Entry[T])
-	return entry.LastModified
+	return item.(Entry[T])
 }
 
 func (c *Cache[T]) Load(fileName string) (T, bool) {
@@ -66,11 +66,11 @@ func (c *Cache[T]) Load(fileName string) (T, bool) {
 	return entry.Data, true
 }
 
-func (c *Cache[T]) IsStale(fileName string, lastModified int64) (bool, int64, error) {
+func (c *Cache[T]) IsStale(fileName string, entry Entry[T]) (bool, os.FileInfo, error) {
 	fi, err := os.Stat(fileName)
 	if err != nil {
-		return true, 0, fmt.Errorf("failed to stat file %s: %w", fileName, err)
+		return true, fi, fmt.Errorf("failed to stat file %s: %w", fileName, err)
 	}
 	t := fi.ModTime().Unix()
-	return lastModified < t, t, nil
+	return entry.LastModified < t || entry.Size != fi.Size(), fi, nil
 }
