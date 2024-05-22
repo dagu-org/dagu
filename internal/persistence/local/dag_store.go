@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
@@ -21,10 +22,12 @@ type dagStoreImpl struct {
 }
 
 func NewDAGStore(dir string) persistence.DAGStore {
-	return &dagStoreImpl{
+	ds := &dagStoreImpl{
 		dir:       dir,
-		metaCache: filecache.New[*dag.DAG](),
+		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
+	ds.metaCache.StartEviction()
+	return ds
 }
 
 var (
