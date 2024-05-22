@@ -75,6 +75,10 @@ func (c *Cache[T]) StartEviction() {
 	}()
 }
 
+func (c *Cache[T]) StopEviction() {
+	c.stopCh <- struct{}{}
+}
+
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
 	c.items.Add(1)
 	c.entries.Store(fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
