@@ -2,29 +2,90 @@ package filecache
 
 import (
 	"fmt"
+	"golang.org/x/exp/rand"
 	"os"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 type Cache[T any] struct {
-	entries sync.Map
+	entries  sync.Map
+	capacity int
+	ttl      time.Duration
+	items    atomic.Int32
+	stopCh   chan struct{}
 }
 
 type Entry[T any] struct {
 	Data         T
 	Size         int64
 	LastModified int64
+	ExpiresAt    time.Time
 }
 
-func New[T any]() *Cache[T] {
-	return &Cache[T]{}
+func newEntry[T any](data T, size int64, lastModified int64, ttl time.Duration) Entry[T] {
+	expiresAt := time.Now().Add(ttl)
+	// Add random jitter to avoid thundering herd
+	randMin := time.Duration(rand.Intn(60)) * time.Minute
+	expiresAt = expiresAt.Add(randMin)
+
+	return Entry[T]{
+		Data:         data,
+		Size:         size,
+		LastModified: lastModified,
+		ExpiresAt:    time.Now().Add(time.Hour * 24),
+	}
+}
+
+func New[T any](cap int, ttl time.Duration) *Cache[T] {
+	c := &Cache[T]{capacity: cap, ttl: ttl}
+	return c
+}
+
+func (c *Cache[T]) Stop() {
+	close(c.stopCh)
+}
+
+func (c *Cache[T]) StartEviction() {
+	go func() {
+		timer := time.NewTimer(time.Minute)
+		for {
+			select {
+			case <-timer.C:
+				timer.Reset(time.Minute)
+				c.entries.Range(func(key, value interface{}) bool {
+					entry := value.(Entry[T])
+					if time.Now().After(entry.ExpiresAt) {
+						c.entries.Delete(key)
+					}
+					return true
+				})
+				if c.capacity > 0 && int(c.items.Load()) > c.capacity {
+					c.entries.Range(func(key, value interface{}) bool {
+						c.items.Add(-1)
+						c.entries.Delete(key)
+						return int(c.items.Load()) > c.capacity
+					})
+				}
+			case <-c.stopCh:
+				return
+			}
+		}
+	}()
+}
+
+func (c *Cache[T]) StopEviction() {
+	c.stopCh <- struct{}{}
 }
 
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
-	c.entries.Store(fileName, Entry[T]{Data: data, Size: fi.Size(), LastModified: fi.ModTime().Unix()})
+	c.items.Add(1)
+	c.entries.Store(fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
 }
 
 func (c *Cache[T]) Invalidate(fileName string) {
+	c.items.Add(-1)
 	c.entries.Delete(fileName)
 }
 

@@ -45,14 +45,20 @@ var (
 	errDAGFileEmpty       = errors.New("dagFile is empty")
 )
 
+const (
+	defaultCacheSize = 300
+)
+
 // New creates a new Store with default configuration.
 func New(dir, dagsDir string) *Store {
 	// dagsDir is used to calculate the directory that is compatible with the old version.
-	return &Store{
+	s := &Store{
 		dir:     dir,
 		dagsDir: dagsDir,
-		cache:   filecache.New[*model.Status](),
+		cache:   filecache.New[*model.Status](defaultCacheSize, time.Hour*3),
 	}
+	s.cache.StartEviction()
+	return s
 }
 
 func (store *Store) Update(dagFile, requestId string, s *model.Status) error {
