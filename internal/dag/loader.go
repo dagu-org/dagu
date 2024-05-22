@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -206,6 +207,9 @@ func (fl *fileLoader) readFile(file string) (config map[string]interface{}, err 
 func (fl *fileLoader) unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
 	return cm, err
 }
 
