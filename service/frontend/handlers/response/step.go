@@ -7,7 +7,7 @@ import (
 )
 
 func ToStepObject(step dag.Step) *models.StepObject {
-	return &models.StepObject{
+	so := &models.StepObject{
 		Args:        step.Args,
 		CmdWithArgs: lo.ToPtr(step.CmdWithArgs),
 		Command:     lo.ToPtr(step.Command),
@@ -24,6 +24,11 @@ func ToStepObject(step dag.Step) *models.StepObject {
 		Script:       lo.ToPtr(step.Script),
 		Variables:    step.Variables,
 	}
+	if step.SubWorkflow != nil {
+		so.Run = step.SubWorkflow.Name
+		so.Params = step.SubWorkflow.Params
+	}
+	return so
 }
 
 func ToRepeatPolicy(repeatPolicy dag.RepeatPolicy) *models.RepeatPolicy {

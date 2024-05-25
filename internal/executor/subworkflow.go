@@ -61,9 +61,11 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubWorkflow.Name, err)
 	}
 
+	params := os.ExpandEnv(step.SubWorkflow.Params)
+
 	args := []string{
 		"start",
-		fmt.Sprintf("--params=%q", step.SubWorkflow.Params),
+		fmt.Sprintf("--params=%q", params),
 		d.Location,
 	}
 

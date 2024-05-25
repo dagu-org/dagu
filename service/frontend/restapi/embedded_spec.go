@@ -977,6 +977,9 @@ func init() {
         "Output": {
           "type": "string"
         },
+        "Params": {
+          "type": "string"
+        },
         "Preconditions": {
           "type": "array",
           "items": {
@@ -985,6 +988,9 @@ func init() {
         },
         "RepeatPolicy": {
           "$ref": "#/definitions/repeatPolicy"
+        },
+        "Run": {
+          "type": "string"
         },
         "Script": {
           "type": "string"
@@ -1965,6 +1971,9 @@ func init() {
         "Output": {
           "type": "string"
         },
+        "Params": {
+          "type": "string"
+        },
         "Preconditions": {
           "type": "array",
           "items": {
@@ -1973,6 +1982,9 @@ func init() {
         },
         "RepeatPolicy": {
           "$ref": "#/definitions/repeatPolicy"
+        },
+        "Run": {
+          "type": "string"
         },
         "Script": {
           "type": "string"

@@ -56,6 +56,9 @@ type StepObject struct {
 	// Required: true
 	Output *string `json:"Output"`
 
+	// params
+	Params string `json:"Params,omitempty"`
+
 	// preconditions
 	// Required: true
 	Preconditions []*Condition `json:"Preconditions"`
@@ -63,6 +66,9 @@ type StepObject struct {
 	// repeat policy
 	// Required: true
 	RepeatPolicy *RepeatPolicy `json:"RepeatPolicy"`
+
+	// run
+	Run string `json:"Run,omitempty"`
 
 	// script
 	// Required: true

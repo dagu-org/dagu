@@ -443,6 +443,9 @@ func parseSubWorkflow(step *Step, name, params string) error {
 		Params: params,
 	}
 	step.ExecutorConfig.Type = ExecutorTypeSubWorkflow
+	step.Command = fmt.Sprintf("run")
+	step.Args = []string{name, params}
+	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
 	return nil
 }
 
