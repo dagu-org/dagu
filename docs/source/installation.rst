@@ -24,7 +24,7 @@ Via Bash script
 
 .. code-block:: bash
 
-   curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
+   curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/installer.sh | bash
 
 Via Docker
 ----------

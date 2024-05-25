@@ -150,7 +150,7 @@ You can install Dagu quickly using Homebrew or by downloading the latest binary 
 ### Via Bash script
 
 ```sh
-curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/downloader.sh | bash
+curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/installer.sh | bash
 ```
 
 ### Via GitHub Releases Page
