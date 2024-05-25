@@ -63,8 +63,9 @@ func New(config *Config, e engine.Engine, ds persistence.DataStoreFactory) *Agen
 
 // Config contains the configuration for an Agent.
 type Config struct {
-	DAG *dag.DAG
-	Dry bool
+	DAG     *dag.DAG
+	DAGsDir string
+	Dry     bool
 
 	// RetryTarget is the status to retry.
 	RetryTarget *model.Status
@@ -337,7 +338,7 @@ func (a *Agent) run(ctx context.Context) error {
 		utils.LogErr("write status", a.historyStore.Write(a.Status()))
 	}()
 
-	ctx = dag.NewContext(ctx, a.DAG)
+	ctx = dag.NewContext(ctx, a.DAG, a.dataStoreFactory.NewDAGStore())
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()
@@ -369,7 +370,7 @@ func (a *Agent) dryRun() error {
 
 	log.Printf("***** Starting DRY-RUN *****")
 
-	ctx := dag.NewContext(context.Background(), a.DAG)
+	ctx := dag.NewContext(context.Background(), a.DAG, a.dataStoreFactory.NewDAGStore())
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()

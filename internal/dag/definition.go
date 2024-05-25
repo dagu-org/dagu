@@ -55,6 +55,8 @@ type stepDef struct {
 	SignalOnStop  *string
 	Env           string
 	Call          *callFuncDef
+	Run           string // Run is a sub workflow to run
+	Params        string // Params is a string of parameters to pass to the sub workflow
 }
 
 type funcDef struct {

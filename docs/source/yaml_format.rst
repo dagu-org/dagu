@@ -461,6 +461,19 @@ Formatting JSON
 
 .. _command-execution-over-ssh:
 
+
+Running Sub-DAG
+~~~~~~~~~~~~~~~~
+
+You can run a sub-DAG from a DAG file. The sub-DAG is defined in a separate file and can be called using the `run` field.
+
+.. code-block:: yaml
+
+  steps:
+    - name: A task
+      run: <DAG file name>  # e.g., sub_dag, sub_dag.yaml, /path/to/sub_dag.yaml
+      params: "FOO=BAR"     # optional
+
 All Available Fields
 --------------------
 
@@ -545,6 +558,8 @@ Each step can have its own set of configurations, including:
 - ``repeatPolicy``: The repeat policy for the step.
 - ``preconditions``: The conditions that must be met before a step can run.
 - ``depends``: The step depends on the other step.
+- ``run``: The sub-DAG to run.
+- ``params``: The parameters to pass to the sub-DAG.
 
 Example:
 
@@ -576,4 +591,6 @@ Example:
           - condition: "`echo $1`"       
             expected: "param1"
         depends:
-          -  some task name step          
+          -  some task name step
+        run: sub_dag
+        params: "FOO=BAR"
