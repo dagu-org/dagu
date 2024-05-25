@@ -51,6 +51,7 @@ func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error)
 		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
 	}
 	cmd.Dir = step.Dir
+	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
 	step.OutputVariables.Range(func(key, value interface{}) bool {
 		cmd.Env = append(cmd.Env, value.(string))
