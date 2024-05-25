@@ -43,9 +43,7 @@ func setupTest(t *testing.T) (string, engine.Factory) {
 		SuspendFlagsDir: tmpDir,
 	})
 
-	ef := engine.NewFactory(ds, &config.Config{
-		Command: path.Join(utils.MustGetwd(), "../../bin/dagu"),
-	})
+	ef := engine.NewFactory(ds, &config.Config{})
 
 	return tmpDir, ef
 }

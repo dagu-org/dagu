@@ -39,7 +39,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	})
 
 	e := engine.NewFactory(ds, &config.Config{
-		Command: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+		Executable: path.Join(utils.MustGetwd(), "../../bin/dagu"),
 	}).Create()
 
 	return tmpDir, e, ds
@@ -58,7 +58,7 @@ func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStore
 	})
 
 	e := engine.NewFactory(ds, &config.Config{
-		Command: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+		Executable: path.Join(utils.MustGetwd(), "../../bin/dagu"),
 	}).Create()
 
 	return tmpDir, e, ds

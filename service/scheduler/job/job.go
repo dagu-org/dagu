@@ -13,7 +13,7 @@ import (
 // TODO: write tests
 type Job struct {
 	DAG           *dag.DAG
-	Command       string
+	Executable    string
 	WorkDir       string
 	Next          time.Time
 	EngineFactory engine.Factory

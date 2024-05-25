@@ -14,7 +14,7 @@ type Config struct {
 	Host               string
 	Port               int
 	DAGs               string
-	Command            string
+	Executable         string
 	WorkDir            string
 	IsBasicAuth        bool
 	BasicAuthUsername  string
@@ -81,7 +81,7 @@ func LoadConfig() error {
 	viper.SetEnvPrefix("dagu")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
-	_ = viper.BindEnv("command", "DAGU_EXECUTABLE")
+	_ = viper.BindEnv("executable", "DAGU_EXECUTABLE")
 	_ = viper.BindEnv("dags", "DAGU_DAGS_DIR")
 	_ = viper.BindEnv("workDir", "DAGU_WORK_DIR")
 	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
@@ -100,14 +100,15 @@ func LoadConfig() error {
 	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
 	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
 	_ = viper.BindEnv("latestStatusToday", "DAGU_LATEST_STATUS")
-	command := "dagu"
-	if ex, err := os.Executable(); err == nil {
-		command = ex
+
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
-	viper.SetDefault("command", command)
+	viper.SetDefault("executable", executable)
 	viper.SetDefault("dags", path.Join(appHome, "dags"))
 	viper.SetDefault("workDir", "")
 	viper.SetDefault("isBasicAuth", "0")
@@ -130,8 +131,7 @@ func LoadConfig() error {
 	_ = viper.ReadInConfig()
 
 	cfg := &Config{}
-	err := viper.Unmarshal(cfg)
-	if err != nil {
+	if err := viper.Unmarshal(cfg); err != nil {
 		return fmt.Errorf("failed to unmarshal cfg file: %w", err)
 	}
 	loadLegacyEnvs(cfg)

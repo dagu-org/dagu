@@ -18,11 +18,8 @@ type factoryImpl struct {
 func NewFactory(ds persistence.DataStoreFactory, cfg *config.Config) Factory {
 	impl := &factoryImpl{
 		dataStoreFactory: ds,
+		executable:       cfg.Executable,
 	}
-	if cfg == nil {
-		cfg = config.Get()
-	}
-	impl.executable = cfg.Command
 	return impl
 }
 
