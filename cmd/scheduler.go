@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/app"
 	"github.com/dagu-dev/dagu/internal/config"
 	scheduler "github.com/dagu-dev/dagu/service"
 	"github.com/spf13/cobra"
@@ -14,12 +13,12 @@ func schedulerCmd() *cobra.Command {
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig(homeDir))
+			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 
-			err := scheduler.New(app.TopLevelModule).Start(cmd.Context())
+			err := scheduler.New(topLevelModule).Start(cmd.Context())
 			checkError(err)
 		},
 	}

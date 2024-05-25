@@ -38,7 +38,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 func changeHomeDir(dir string) {
 	homeDir = dir
 	_ = os.Setenv("HOME", dir)
-	_ = config.LoadConfig(dir)
+	_ = config.LoadConfig()
 }
 
 type cmdTest struct {

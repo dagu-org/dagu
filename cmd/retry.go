@@ -17,7 +17,7 @@ func retryCmd() *cobra.Command {
 		Long:  `dagu retry --req=<request-id> <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig(homeDir))
+			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			f, _ := filepath.Abs(args[0])

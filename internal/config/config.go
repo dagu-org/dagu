@@ -2,15 +2,13 @@ package config
 
 import (
 	"fmt"
+	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/spf13/viper"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
-
-	"github.com/dagu-dev/dagu/internal/utils"
-	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -37,49 +35,49 @@ type Config struct {
 	LatestStatusToday  bool
 }
 
+func (cfg *Config) GetAPIBaseURL() string {
+	return "/api/v1"
+}
+
 type TLS struct {
 	CertFile string
 	KeyFile  string
 }
 
 var (
+	cache = &configCache{}
+)
+
+type configCache struct {
 	instance *Config
 	mu       sync.RWMutex
-	isLoaded atomic.Bool
-)
+}
+
+func (cc *configCache) getConfig() *Config {
+	cc.mu.RLock()
+	defer cc.mu.RUnlock()
+	return cc.instance
+}
+
+func (cc *configCache) setConfig(cfg *Config) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	cc.instance = cfg
+}
 
 func Get() *Config {
-	if !isLoaded.Load() {
-		home, _ := os.UserHomeDir()
-		if err := LoadConfig(home); err != nil {
-			panic(err)
-		}
+	cfg := cache.getConfig()
+	if cfg != nil {
+		return cfg
 	}
-	return getConfig()
+	if err := LoadConfig(); err != nil {
+		panic(err)
+	}
+	return cache.getConfig()
 }
 
-func getConfig() *Config {
-	mu.Lock()
-	defer mu.Unlock()
-	return instance
-}
-
-func setConfig(cfg *Config) {
-	mu.Lock()
-	defer mu.Unlock()
-	isLoaded.Swap(true)
-	instance = cfg
-}
-
-var (
-	loadConfigLock sync.Mutex
-)
-
-func LoadConfig(userHomeDir string) error {
-	loadConfigLock.Lock()
-	defer loadConfigLock.Unlock()
-
-	appHome := appHomeDir(userHomeDir)
+func LoadConfig() error {
+	appHome := appHomeDir()
 
 	viper.SetEnvPrefix("dagu")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
@@ -140,13 +138,17 @@ func LoadConfig(userHomeDir string) error {
 	loadLegacyEnvs(cfg)
 	loadEnvs(cfg)
 
-	setConfig(cfg)
+	cache.setConfig(cfg)
 
 	return nil
 }
 
-func (cfg *Config) GetAPIBaseURL() string {
-	return "/api/v1"
+func homeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	return home
 }
 
 func loadEnvs(cfg *Config) {
@@ -200,10 +202,10 @@ const (
 	appHomeDefault = ".dagu"
 )
 
-func appHomeDir(userHomeDir string) string {
+func appHomeDir() string {
 	appDir := os.Getenv(appHomeEnv)
 	if appDir == "" {
-		return path.Join(userHomeDir, appHomeDefault)
+		return path.Join(homeDir(), appHomeDefault)
 	}
 	return appDir
 }

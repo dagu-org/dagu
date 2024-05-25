@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 
 func changeHomeDir(homeDir string) {
 	_ = os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig(homeDir)
+	_ = config.LoadConfig()
 }
 
 func TestScheduler(t *testing.T) {
