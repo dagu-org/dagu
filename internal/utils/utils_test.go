@@ -24,11 +24,6 @@ func TestMustGetUserHomeDir(t *testing.T) {
 	require.Equal(t, "/test", hd)
 }
 
-func TestDefaultEnv(t *testing.T) {
-	env := utils.DefaultEnv()
-	require.Contains(t, env, "PATH")
-}
-
 func TestMustGetwd(t *testing.T) {
 	wd, _ := os.Getwd()
 	require.Equal(t, utils.MustGetwd(), wd)

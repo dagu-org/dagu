@@ -23,7 +23,6 @@ type BuildDAGOptions struct {
 	parameters       string
 	skipEnvEval      bool
 	skipEnvSetup     bool
-	defaultEnvs      map[string]string
 }
 type DAGBuilder struct {
 	options    BuildDAGOptions
@@ -303,10 +302,6 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 	map[string]string, error,
 ) {
 	var vals []*envVariable
-	for k, v := range options.defaultEnvs {
-		vals = append(vals, &envVariable{k, v})
-	}
-
 	loadFn := func(a []*envVariable, m map[interface{}]interface{}) ([]*envVariable, error) {
 		for k, v := range m {
 			if k, ok := k.(string); ok {

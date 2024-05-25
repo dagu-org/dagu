@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/spf13/viper"
 	"os"
 	"path"
@@ -156,11 +155,6 @@ func loadEnvs(cfg *Config) {
 		_ = os.Setenv(k.(string), v.(string))
 		return true
 	})
-	for k, v := range utils.DefaultEnv() {
-		if _, ok := cfg.Env.Load(k); !ok {
-			cfg.Env.Store(k, v)
-		}
-	}
 }
 
 func loadLegacyEnvs(cfg *Config) {
