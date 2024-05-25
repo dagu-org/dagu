@@ -280,6 +280,9 @@ func (n *Node) setup(logDir string, requestId string) error {
 
 func (n *Node) setupScript() (err error) {
 	if n.step.Script != "" {
+		if len(n.step.Dir) > 0 && !utils.FileExists(n.step.Dir) {
+			return fmt.Errorf("directory %q does not exist", n.step.Dir)
+		}
 		n.scriptFile, _ = os.CreateTemp(n.step.Dir, "dagu_script-")
 		if _, err = n.scriptFile.WriteString(n.step.Script); err != nil {
 			return

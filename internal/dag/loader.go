@@ -90,7 +90,6 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 
 	buildOpts := *opts
 	buildOpts.loadMetadataOnly = false
-	buildOpts.defaultEnvs = utils.DefaultEnv()
 	b := &DAGBuilder{
 		options: buildOpts,
 	}

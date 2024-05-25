@@ -604,7 +604,6 @@ func TestNodeTeardownFailure(t *testing.T) {
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
-			Dir:     "${HOME}",
 		},
 	)
 	sc := &Scheduler{Config: &Config{}}
@@ -618,6 +617,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 	}()
 
 	err := sc.Schedule(context.Background(), g, nil)
+	// file already closed
 	require.Error(t, err)
 
 	require.Equal(t, sc.Status(g), StatusError)
