@@ -145,6 +145,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 						default:
 							// finish the node
 							node.setStatus(NodeStatusError)
+							node.setErr(execErr)
 							sc.lastError = execErr
 						}
 					}
