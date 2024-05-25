@@ -426,7 +426,27 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 	}
 	step.MailOnError = def.MailOnError
 	step.Preconditions = loadPreCondition(def.Preconditions)
+
+	if err := parseSubWorkflow(step, def.Run, def.Params); err != nil {
+		return nil, err
+	}
+
 	return step, nil
+}
+
+func parseSubWorkflow(step *Step, name, params string) error {
+	if name == "" {
+		return nil
+	}
+	step.SubWorkflow = &SubWorkflow{
+		Name:   name,
+		Params: params,
+	}
+	step.ExecutorConfig.Type = ExecutorTypeSubWorkflow
+	step.Command = fmt.Sprintf("run")
+	step.Args = []string{name, params}
+	step.CmdWithArgs = fmt.Sprintf("%s %s", name, params)
+	return nil
 }
 
 func parseExecutor(step *Step, executor any) error {
@@ -687,7 +707,7 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 		return errStepNameRequired
 	}
 	// TODO: Refactor the validation check for each executor.
-	if def.Executor == nil && def.Command == nil && def.Call == nil {
+	if def.Executor == nil && def.Command == nil && def.Call == nil && def.Run == "" {
 		return errStepCommandOrCallRequired
 	}
 

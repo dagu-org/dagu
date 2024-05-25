@@ -70,16 +70,16 @@ func CreateMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 
 	exec := &MailExecutor{cfg: &cfg}
 
-	d, err := dag.GetDAGFromContext(ctx)
+	dagCtx, err := dag.GetContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	m := &mailer.Mailer{
 		Config: &mailer.Config{
-			Host:     d.Smtp.Host,
-			Port:     d.Smtp.Port,
-			Username: d.Smtp.Username,
-			Password: d.Smtp.Password,
+			Host:     dagCtx.DAG.Smtp.Host,
+			Port:     dagCtx.DAG.Smtp.Port,
+			Username: dagCtx.DAG.Smtp.Username,
+			Password: dagCtx.DAG.Smtp.Password,
 		}}
 	exec.mailer = m
 

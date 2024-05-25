@@ -10,7 +10,7 @@ import (
 )
 
 type jobFactory struct {
-	Command       string
+	Executable    string
 	WorkDir       string
 	EngineFactory engine.Factory
 }
@@ -18,7 +18,7 @@ type jobFactory struct {
 func (jf jobFactory) NewJob(d *dag.DAG, next time.Time) scheduler.Job {
 	return &job.Job{
 		DAG:           d,
-		Command:       jf.Command,
+		Executable:    jf.Executable,
 		WorkDir:       jf.WorkDir,
 		Next:          next,
 		EngineFactory: jf.EngineFactory,

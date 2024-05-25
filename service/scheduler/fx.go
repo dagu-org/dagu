@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
@@ -42,9 +41,9 @@ func EntryReaderProvider(
 
 func JobFactoryProvider(cfg *config.Config, engineFactory engine.Factory) entry_reader.JobFactory {
 	return &jobFactory{
-		Command:       cfg.Command,
 		WorkDir:       cfg.WorkDir,
 		EngineFactory: engineFactory,
+		Executable:    cfg.Executable,
 	}
 }
 

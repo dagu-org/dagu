@@ -200,6 +200,8 @@ export type Step = {
   RepeatPolicy: RepeatPolicy;
   MailOnError: boolean;
   Preconditions: Condition[];
+  Run: string;
+  Params: string;
 };
 
 export type RetryPolicy = {

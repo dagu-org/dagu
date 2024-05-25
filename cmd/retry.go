@@ -26,7 +26,7 @@ func retryCmd() *cobra.Command {
 
 			// TODO: use engine.Engine instead of client.DataStoreFactory
 			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df, nil).Create()
+			e := engine.NewFactory(df, config.Get()).Create()
 
 			hs := df.NewHistoryStore()
 

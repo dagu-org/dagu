@@ -251,3 +251,60 @@ func (d *dagStoreImpl) Rename(oldDAGPath, newDAGPath string) error {
 	}
 	return os.Rename(oldLoc, newLoc)
 }
+
+func (d *dagStoreImpl) FindByName(name string) (*dag.DAG, error) {
+	file, err := d.resolve(name)
+	if err != nil {
+		return nil, err
+	}
+	cl := dag.Loader{}
+	return cl.Load(file, "")
+}
+
+func (d *dagStoreImpl) resolve(name string) (string, error) {
+	// check if the name is a file path
+	if strings.Contains(name, string(filepath.Separator)) {
+		if !utils.FileExists(name) {
+			return "", fmt.Errorf("workflow %s not found", name)
+		}
+		return name, nil
+	}
+
+	// check if the name is a file path
+	if strings.Contains(name, string(filepath.Separator)) {
+		foundPath, err := find(name)
+		if err != nil {
+			return "", fmt.Errorf("workflow %s not found", name)
+		}
+		return foundPath, nil
+	}
+
+	// find the DAG definition
+	for _, dir := range []string{".", d.dir} {
+		subWorkflowPath := filepath.Join(dir, name)
+		foundPath, err := find(subWorkflowPath)
+		if err == nil {
+			return foundPath, nil
+		}
+	}
+
+	// DAG not found
+	return "", fmt.Errorf("workflow %s not found", name)
+}
+
+// find finds the sub workflow file with the given name.
+func find(name string) (string, error) {
+	ext := path.Ext(name)
+	if ext == "" {
+		// try all supported extensions
+		for _, ext := range dag.EXTENSIONS {
+			if utils.FileExists(name + ext) {
+				return filepath.Abs(name + ext)
+			}
+		}
+	} else if utils.FileExists(name) {
+		// the name has an extension
+		return filepath.Abs(name)
+	}
+	return "", fmt.Errorf("sub workflow %s not found", name)
+}

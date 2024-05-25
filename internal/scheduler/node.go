@@ -130,6 +130,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	defer n.mu.Unlock()
 
 	ctx, fn := context.WithCancel(ctx)
+
 	n.cancelFunc = fn
 
 	if n.step.CmdWithArgs != "" {

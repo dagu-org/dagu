@@ -628,6 +628,10 @@ definitions:
         type: array
         items:
           type: string
+      Run:
+        type: string
+      Params:
+        type: string
       Depends:
         type: array
         items:
