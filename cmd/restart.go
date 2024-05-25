@@ -19,7 +19,7 @@ func restartCmd() *cobra.Command {
 		Long:  `dagu restart <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig(homeDir))
+			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			dagFile := args[0]

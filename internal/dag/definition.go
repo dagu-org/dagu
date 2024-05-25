@@ -41,7 +41,7 @@ type stepDef struct {
 	Description   string
 	Dir           string
 	Executor      interface{}
-	Command       string
+	Command       interface{}
 	Script        string
 	Stdout        string
 	Stderr        string

@@ -1,9 +1,9 @@
 .. _base configuration:
 
-Base Configuration for all Workflows
+Base Configuration for all DAGs
 =====================================
 
-Creating a base configuration (default path: ``~/.dagu/config.yaml``) is a convenient way to organize shared settings among all workflows. The path to the base configuration file can be configured. See :ref:`Configuration Options` for more details.
+Creating a base configuration (default path: ``~/.dagu/config.yaml``) is a convenient way to organize shared settings among all DAGs. The path to the base configuration file can be configured. See :ref:`Configuration Options` for more details.
 
 Example:
 

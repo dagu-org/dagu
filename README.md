@@ -46,8 +46,8 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - [**Features**](#features)
 - [**Use Cases**](#use-cases)
 - [**Web UI**](#web-ui)
-  - [Workflow Details](#workflow-details)
-  - [Workflows](#workflows)
+  - [DAG Details](#dag-details)
+  - [DAGs](#dags)
   - [Search](#search)
   - [Execution History](#execution-history)
   - [Log Viewer](#log-viewer)
@@ -58,15 +58,16 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [Via Docker](#via-docker)
 - [**Quick Start Guide**](#quick-start-guide)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
-  - [2. Create a New Workflow](#2-create-a-new-workflow)
-  - [3. Edit the Workflow](#3-edit-the-workflow)
-  - [4. Execute the Workflow](#4-execute-the-workflow)
+  - [2. Create a New DAG](#2-create-a-new-dag)
+  - [3. Edit the DAG](#3-edit-the-dag)
+  - [4. Execute the DAG](#4-execute-the-dag)
 - [**CLI**](#cli)
+- [**Localized Documentation**](#localized-documentation)
 - [**Documentation**](#documentation)
 - [**Running as a daemon**](#running-as-a-daemon)
-- [**Example Workflow**](#example-workflow)
+- [**Example DAG**](#example-dag)
 - [**Motivation**](#motivation)
-- [**Why Not Use an Existing Workflow Scheduler Like Airflow?**](#why-not-use-an-existing-workflow-scheduler-like-airflow)
+- [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
 - [**How It Works**](#how-it-works)
 - [**License**](#license)
 - [**Support and Community**](#support-and-community)
@@ -109,9 +110,9 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
 ## **Web UI**
 
-### Workflow Details
+### DAG Details
 
-It shows the real-time status, logs, and workflow configurations. You can edit workflow configurations on a browser.
+It shows the real-time status, logs, and DAG configurations. You can edit DAG configurations on a browser.
 
   ![example](assets/images/demo.gif?raw=true)
 
@@ -119,15 +120,15 @@ It shows the real-time status, logs, and workflow configurations. You can edit w
 
   ![Details-TD](assets/images/ui-details2.webp?raw=true)
 
-### Workflows
+### DAGs
 
-It shows all workflows and the real-time status.
+It shows all DAGs and the real-time status.
 
   ![DAGs](assets/images/ui-dags.webp?raw=true)
 
 ### Search
 
-It greps given text across all workflow definitions.
+It greps given text across all DAG definitions.
   ![History](assets/images/ui-search.webp?raw=true)
 
 ### Execution History
@@ -185,13 +186,13 @@ ghcr.io/dagu-dev/dagu:latest dagu start-all
 
 Start the server and scheduler with the command `dagu start-all` and browse to `http://127.0.0.1:8080` to explore the Web UI.
 
-### 2. Create a New Workflow
+### 2. Create a New DAG
 
 Navigate to the DAG List page by clicking the menu in the left panel of the Web UI. Then create a DAG by clicking the `NEW` button at the top of the page. Enter `example` in the dialog.
 
 *Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Configuration Options](https://dagu.readthedocs.io/en/latest/config.html) for more details.*
 
-### 3. Edit the Workflow
+### 3. Edit the DAG
 
 Go to the `SPEC` Tab and hit the `Edit` button. Copy & Paste the following example and click the `Save` button.
 
@@ -207,7 +208,7 @@ steps:
       - s1
 ```
 
-### 4. Execute the Workflow
+### 4. Execute the DAG
 
 You can execute the example by pressing the `Start` button. You can see "Hello Dagu" in the log page in the Web UI.
 
@@ -265,7 +266,7 @@ dagu version
   - [Redirecting Stdout and Stderr](https://dagu.readthedocs.io/en/latest/yaml_format.html#redirecting-stdout-and-stderr)
   - [Lifecycle Hooks](https://dagu.readthedocs.io/en/latest/yaml_format.html#adding-lifecycle-hooks)
   - [Repeating Task](https://dagu.readthedocs.io/en/latest/yaml_format.html#repeating-a-task-at-regular-intervals)
-  - [All Available Fields for a Workflow](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-dags)
+  - [All Available Fields for a DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-dags)
   - [All Available Fields for a Step](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-steps)
 - Example DAGs
   - [Hello World](https://dagu.readthedocs.io/en/latest/examples.html#hello-world)
@@ -300,13 +301,13 @@ fi
 exit
 ```
 
-## **Example Workflow**
+## **Example DAG**
 
-This example workflow showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
+This example DAG showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
 
 ![Details-TD](assets/images/example.webp?raw=true)
 
-The YAML code below represents this workflow:
+The YAML code below represents this DAG:
 
 ```yaml
 # Environment variables used throughout the pipeline
@@ -323,8 +324,8 @@ handlerOn:
   exit:
     command: "echo clean up"
 
-# The schedule for the workflow execution in cron format
-# This schedule runs the workflow daily at 12:00 AM
+# The schedule for the DAG execution in cron format
+# This schedule runs the DAG daily at 12:00 AM
 schedule: "0 0 * * *"
 
 steps:
@@ -385,7 +386,7 @@ Legacy systems often have complex and implicit dependencies between jobs. When t
 
 Dagu addresses these pain points by providing a user-friendly solution for explicitly defining and visualizing workflows. With its intuitive web UI, Dagu simplifies the management of workflows, enabling users to easily check dependencies, monitor execution status, view logs, and control job execution with just a few clicks.
 
-## **Why Not Use an Existing Workflow Scheduler Like Airflow?**
+## **Why Not Use an Existing DAG Scheduler Like Airflow?**
 
 There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 

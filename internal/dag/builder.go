@@ -43,6 +43,8 @@ var (
 	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
 	errStepNameRequired                   = errors.New("step name must be specified")
 	errStepCommandOrCallRequired          = errors.New("either step command or step call must be specified if executor is nil")
+	errStepCommandIsEmtpy                 = errors.New("step command is empty")
+	errStepCommandMustBeArrayOrString     = errors.New("step command must be an array of strings or a string")
 	errCallFunctionNotFound               = errors.New("call must specify a functions that exists")
 	errNumberOfParamsMismatch             = errors.New("the number of parameters defined in the function does not match the number of parameters given")
 	errRequiredParameterNotFound          = errors.New("required parameter not found")
@@ -376,38 +378,13 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 	step := &Step{}
 	step.Name = def.Name
 	step.Description = def.Description
-	if def.Call != nil {
-		step.Args = make([]string, 0, len(def.Call.Args))
-		passedArgs := map[string]string{}
-		for k, v := range def.Call.Args {
-			if strV, ok := v.(string); ok {
-				step.Args = append(step.Args, strV)
-				passedArgs[k] = strV
-				continue
-			}
 
-			if intV, ok := v.(int); ok {
-				strV := strconv.Itoa(intV)
-				step.Args = append(step.Args, strV)
-				passedArgs[k] = strV
-				continue
-			}
+	if err := parseFuncCall(step, def.Call, funcs); err != nil {
+		return nil, err
+	}
 
-			return nil, errArgsMustBeConvertibleToIntOrString
-		}
-
-		calledFuncDef := &funcDef{}
-		for _, funcDef := range funcs {
-			if funcDef.Name == def.Call.Function {
-				calledFuncDef = funcDef
-				break
-			}
-		}
-		step.Command = utils.RemoveParams(calledFuncDef.Command)
-		step.CmdWithArgs = utils.AssignValues(calledFuncDef.Command, passedArgs)
-	} else {
-		step.CmdWithArgs = def.Command
-		step.Command, step.Args = utils.SplitCommand(step.CmdWithArgs, false)
+	if err := parseCommand(step, def.Command); err != nil {
+		return nil, err
 	}
 
 	step.Script = def.Script
@@ -416,42 +393,8 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 	step.Output = def.Output
 	step.Dir = expandEnv(def.Dir, options)
 	step.ExecutorConfig.Config = map[string]interface{}{}
-	if def.Executor != nil {
-		switch val := (def.Executor).(type) {
-		case string:
-			step.ExecutorConfig.Type = val
-		case map[interface{}]interface{}:
-			for k, v := range val {
-				if k, ok := k.(string); ok {
-					switch k {
-					case "type":
-						if v, ok := v.(string); ok {
-							step.ExecutorConfig.Type = v
-						} else {
-							return nil, errExecutorTypeMustBeString
-						}
-					case "config":
-						if v, ok := v.(map[interface{}]interface{}); ok {
-							for k, v := range v {
-								if k, ok := k.(string); ok {
-									step.ExecutorConfig.Config[k] = v
-								} else {
-									return nil, errExecutorConfigMustBeString
-								}
-							}
-						} else {
-							return nil, errExecutorConfigValueMustBeMap
-						}
-					default:
-						return nil, fmt.Errorf("%w: %s", errExecutorHasInvalidKey, k)
-					}
-				} else {
-					return nil, errExecutorConfigMustBeString
-				}
-			}
-		default:
-			return nil, errExecutorConfigMustBeStringOrMap
-		}
+	if err := parseExecutor(step, def.Executor); err != nil {
+		return nil, err
 	}
 
 	// Convert map[interface{}]interface{} to map[string]interface{}
@@ -489,6 +432,112 @@ func buildStep(variables []string, def *stepDef, funcs []*funcDef, options Build
 	step.MailOnError = def.MailOnError
 	step.Preconditions = loadPreCondition(def.Preconditions)
 	return step, nil
+}
+
+func parseExecutor(step *Step, executor any) error {
+	if executor == nil {
+		return nil
+	}
+	switch val := executor.(type) {
+	case string:
+		step.ExecutorConfig.Type = val
+	case map[any]any:
+		for k, v := range val {
+			k, ok := k.(string)
+			if !ok {
+				return errExecutorConfigMustBeString
+			}
+			switch k {
+			case "type":
+				typ, ok := v.(string)
+				if !ok {
+					return errExecutorTypeMustBeString
+				}
+				step.ExecutorConfig.Type = typ
+			case "config":
+				configMap, ok := v.(map[any]any)
+				if !ok {
+					return errExecutorConfigValueMustBeMap
+				}
+				for k, v := range configMap {
+					k, ok := k.(string)
+					if !ok {
+						return errExecutorConfigMustBeString
+					}
+					step.ExecutorConfig.Config[k] = v
+				}
+			default:
+				return fmt.Errorf("%w: %s", errExecutorHasInvalidKey, k)
+			}
+		}
+	default:
+		return errExecutorConfigMustBeStringOrMap
+	}
+	return nil
+}
+
+func parseCommand(step *Step, command any) error {
+	if command == nil {
+		return nil
+	}
+	switch val := command.(type) {
+	case string:
+		if val == "" {
+			return errStepCommandIsEmtpy
+		}
+		step.CmdWithArgs = val
+		step.Command, step.Args = utils.SplitCommand(val, false)
+	case []any:
+		for _, v := range val {
+			val, ok := v.(string)
+			if !ok {
+				val = fmt.Sprintf("%v", v)
+			}
+			if step.Command == "" {
+				step.Command = val
+				continue
+			}
+			step.Args = append(step.Args, val)
+		}
+	default:
+		return errStepCommandMustBeArrayOrString
+	}
+	return nil
+}
+
+func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
+	if call == nil {
+		return nil
+	}
+	step.Args = make([]string, 0, len(call.Args))
+	passedArgs := map[string]string{}
+	for k, v := range call.Args {
+		if strV, ok := v.(string); ok {
+			step.Args = append(step.Args, strV)
+			passedArgs[k] = strV
+			continue
+		}
+
+		if intV, ok := v.(int); ok {
+			strV := strconv.Itoa(intV)
+			step.Args = append(step.Args, strV)
+			passedArgs[k] = strV
+			continue
+		}
+
+		return errArgsMustBeConvertibleToIntOrString
+	}
+
+	calledFuncDef := &funcDef{}
+	for _, funcDef := range funcs {
+		if funcDef.Name == call.Function {
+			calledFuncDef = funcDef
+			break
+		}
+	}
+	step.Command = utils.RemoveParams(calledFuncDef.Command)
+	step.CmdWithArgs = utils.AssignValues(calledFuncDef.Command, passedArgs)
+	return nil
 }
 
 func expandEnv(val string, options BuildDAGOptions) string {
@@ -643,7 +692,7 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 		return errStepNameRequired
 	}
 	// TODO: Refactor the validation check for each executor.
-	if def.Executor == nil && (def.Command == "" && def.Call == nil) {
+	if def.Executor == nil && def.Command == nil && def.Call == nil {
 		return errStepCommandOrCallRequired
 	}
 

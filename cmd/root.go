@@ -24,7 +24,7 @@ var (
 	}
 )
 
-const legacyPath = ".dagu"
+const configPath = ".dagu"
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -35,7 +35,7 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
 
-	cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initialize)
 
 	registerCommands(rootCmd)
 }
@@ -52,22 +52,22 @@ func init() {
 	homeDir = home
 }
 
-func initConfig() {
-	setConfigFile(homeDir)
-}
-
-func setConfigFile(home string) {
+func initialize() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		setDefaultConfigPath(home)
+		setDefaultConfigPath()
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("admin")
 	}
 }
 
-func setDefaultConfigPath(home string) {
-	viper.AddConfigPath(path.Join(home, legacyPath))
+func setDefaultConfigPath() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic("could not determine home directory")
+	}
+	viper.AddConfigPath(path.Join(homeDir, configPath))
 }
 
 func loadDAG(dagFile, params string) (d *dag.DAG, err error) {

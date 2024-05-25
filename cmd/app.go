@@ -1,8 +1,6 @@
-package app
+package cmd
 
 import (
-	"os"
-
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
@@ -12,33 +10,17 @@ import (
 )
 
 var (
-	TopLevelModule = fx.Options(
-		fx.Provide(ConfigProvider),
+	topLevelModule = fx.Options(
+		fx.Provide(config.Get),
 		fx.Provide(engine.NewFactory),
 		fx.Provide(logger.NewSlogLogger),
 		fx.Provide(client.NewDataStoreFactory),
 	)
-	cfgInstance *config.Config
 )
 
-func ConfigProvider() *config.Config {
-	if cfgInstance != nil {
-		return cfgInstance
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	if err := config.LoadConfig(home); err != nil {
-		panic(err)
-	}
-	cfgInstance = config.Get()
-	return cfgInstance
-}
-
-func NewFrontendService() *fx.App {
+func newFrontend() *fx.App {
 	return fx.New(
-		TopLevelModule,
+		topLevelModule,
 		frontend.Module,
 		fx.Invoke(frontend.LifetimeHooks),
 		fx.NopLogger,

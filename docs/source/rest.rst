@@ -3,7 +3,7 @@
 REST API Docs
 =============
 
-Dagu server provides simple APIs to query and control workflows.
+Dagu server provides simple APIs to query and control DAGs.
 
 See the `OpenAPI Schema for Dagu <https://github.com/dagu-dev/dagu/blob/main/swagger.yaml>`_ for more details.
 
@@ -43,10 +43,10 @@ Response Body
 ~~~~~~~~~~~~~
 
 
-Show Workflow Detail `GET /api/v1/dags/:name`
+Show DAG Detail `GET /api/v1/dags/:name`
 --------------------------------------
 
-Return details about the specified workflow.
+Return details about the specified DAG.
 
 URL
   : ``/api/v1/dags/:name``
@@ -71,10 +71,10 @@ Response Body
 TBU
 
 
-Show Workflow Spec `GET /api/v1/dags/:name/spec`
+Show DAG Spec `GET /api/v1/dags/:name/spec`
 ----------------------------------------
 
-Return the specifications of the specified workflow.
+Return the specifications of the specified DAG.
 
 URL
   : ``/api/v1/dags/:name/spec``
@@ -99,10 +99,10 @@ Response Body
 TBU
 
 
-Submit Workflow Action `POST /api/v1/dags/:name`
+Submit DAG Action `POST /api/v1/dags/:name`
 ----------------------------------------
 
-Submit an action to a specified workflow.
+Submit an action to a specified DAG.
 
 URL
   : ``/api/v1/dags/:name``

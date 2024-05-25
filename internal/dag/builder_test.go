@@ -39,18 +39,20 @@ env:
 	}
 
 	for _, tt := range tests {
-		fl := &fileLoader{}
-		d, err := fl.unmarshalData([]byte(tt.input))
-		require.NoError(t, err)
+		t.Run(tt.input, func(t *testing.T) {
+			fl := &fileLoader{}
+			d, err := fl.unmarshalData([]byte(tt.input))
+			require.NoError(t, err)
 
-		cdl := &configDefinitionLoader{}
-		def, err := cdl.decode(d)
-		require.NoError(t, err)
+			cdl := &configDefinitionLoader{}
+			def, err := cdl.decode(d)
+			require.NoError(t, err)
 
-		b := &DAGBuilder{}
+			b := &DAGBuilder{}
 
-		_, err = b.buildFromDefinition(def, nil)
-		require.Error(t, err)
+			_, err = b.buildFromDefinition(def, nil)
+			require.Error(t, err)
+		})
 	}
 }
 
@@ -179,6 +181,66 @@ params: %s
 		for k, v := range tt.expected {
 			require.Equal(t, v, os.Getenv(k))
 		}
+	}
+}
+
+func TestBuildCommands(t *testing.T) {
+	tests := []struct {
+		input string
+	}{
+		{
+			input: `
+steps:
+  - name: step1
+    command: echo 1`,
+		},
+		{
+			input: `
+steps:
+  - name: step1
+    command: ['echo', '1']`,
+		},
+		{
+			input: `
+steps:
+  - name: step1
+    command: [echo, 1]`,
+		},
+		{
+			input: `
+steps:
+  - name: step1
+    command:
+      - echo
+      - 1`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			fl := &fileLoader{}
+			d, err := fl.unmarshalData([]byte(tt.input))
+			require.NoError(t, err)
+
+			cdl := &configDefinitionLoader{}
+			def, err := cdl.decode(d)
+			require.NoError(t, err)
+
+			b := &DAGBuilder{}
+
+			dag, err := b.buildFromDefinition(def, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(dag.Steps) != 1 {
+				t.Fatalf("expected 1 step, got %d", len(dag.Steps))
+			}
+
+			step := dag.Steps[0]
+			require.Equal(t, "echo", step.Command)
+			require.Equal(t, []string{"1"}, step.Args)
+		})
 	}
 }
 
@@ -354,7 +416,7 @@ func TestOverwriteGlobalConfig(t *testing.T) {
 	require.Equal(t, d.HistRetentionDays, 30)
 }
 
-func TestBulidingExecutor(t *testing.T) {
+func TestBuildExecutor(t *testing.T) {
 	tests := []struct {
 		input          string
 		expectedExec   string

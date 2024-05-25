@@ -1,6 +1,6 @@
 .. _Yaml Format:
 
-Workflow Language (YAML)
+Writing DAGs
 ==========================
 
 .. contents::
@@ -23,6 +23,14 @@ The minimal example of a DAG file is as follows:
       command: echo world
       depends:
         - step 1
+
+The command can be string or list of strings. The list of strings is useful when you want to pass arguments to the command.
+
+.. code-block:: yaml
+
+  steps:
+    - name: step 1
+      command: [echo, hello]
 
 .. _specifying working dir:
 
