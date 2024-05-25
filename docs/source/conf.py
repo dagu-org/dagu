@@ -6,9 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'DAGU'
-copyright = '2023, DAGU Developers'
-author = 'DAGU Developers'
+project = 'Dagu'
+copyright = '2023, Dagu Developers'
+author = 'Dagu Developers'
 # release = '1.10'
 
 # -- General configuration ---------------------------------------------------
