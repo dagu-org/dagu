@@ -53,18 +53,19 @@ Code Structure
 - ``ui``: Frontend code for the Web UI.
 - ``cmd``: Contains the main application entry point.
 - ``docs``: Contains the documentation for the project.
-- ``examples``: Contains the example workflows.
+- ``examples``: Contains the example DAGs.
 - ``internal``: Contains the internal code for the project.
-
-  - ``web``: Contains the backend code for the Web UI.
-  - ``agent``: Contains the code for running the workflows.
+  - ``agent``: Contains the code for running the DAGs.
   - ``config``: Contains the code for loading the configuration.
-  - ``controller``: Contains the code for managing the workflows.
-  - ``dag``: Contains the code for parsing the workflow definition.
-  - ``database``: Contains the code for interacting with the database.
+  - ``dag``: Contains the code for parsing the DAG definition.
+  - ``engine``: Contains the code for managing the DAGs.
+  - ``persistence``: Contains the code for interacting with the database.
   - ``executor``: Contains the code for different types of executors.
-  - ``runner``: Contains the code for scheduler.
+  - ``scheduler``: Contains the code for running a DAG and steps.
   - ``sock``: Contains the code for interacting with the socket.
+  - ``service``: Contains the internal code for the project.
+    - ``frontend``: Contains the code for the frontend Web UI.
+    - ``scheduelr``: Contains the code for scheduler.
 
 Setting up your local environment for front end development
 -------------------------------------------------------------

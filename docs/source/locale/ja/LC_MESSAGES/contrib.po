@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: DAGU \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-09 02:01+0900\n"
+"POT-Creation-Date: 2024-05-09 03:00+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -19,156 +19,168 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.15.0\n"
 
-#: ../../source/contrib.rst:2 6cfee28b3bf54955bd88f31c479d2077
+#: ../../source/contrib.rst:2 ba3996dc09bb49efad5343d78041b5da
 msgid "Contribution Guide"
 msgstr ""
 
-#: ../../source/contrib.rst:4 65d4233dd6294d7f879621c85e1d26eb
+#: ../../source/contrib.rst:4 162cb96b9e8f4cf4bb4fb628960c97a9
 msgid ""
 "We welcome contributions of any size and skill level. If you have an idea"
 " for a new feature or have found a bug, please open an issue on the "
 "GitHub repository."
 msgstr ""
 
-#: ../../source/contrib.rst:7 dd2185658bcb423981e497c715133b7f
+#: ../../source/contrib.rst:7 f0c462e630954aa4bb6699ee93d601fd
 msgid "Prerequisite"
 msgstr ""
 
-#: ../../source/contrib.rst:9 959111ca5ad14456b8650d1c730aa2c2
+#: ../../source/contrib.rst:9 5fe5d626e4214680886addbd835c0665
 msgid "`Go version 1.19 or later. <https://go.dev/doc/install>`_"
 msgstr ""
 
-#: ../../source/contrib.rst:10 5075b196e11f474785b94658708c26f9
+#: ../../source/contrib.rst:10 fd5b208e4d9943bc92e77ba7740c9354
 msgid "Latest version of `Node.js <https://nodejs.org/en/download/>`_."
 msgstr ""
 
-#: ../../source/contrib.rst:11 c565c5628f16405eb3d72dfc1a9fddd9
+#: ../../source/contrib.rst:11 ea536051da4f453b8ca683e82bc29a9e
 msgid "`yarn <https://yarnpkg.com/>`_ package manager."
 msgstr ""
 
-#: ../../source/contrib.rst:14 4035739df80c4658a0e0725f61a84099
+#: ../../source/contrib.rst:14 81c082d41cd34375baf122afb0a984f9
 msgid "Setting up your local environment"
 msgstr ""
 
 #: ../../source/contrib.rst:16 ../../source/contrib.rst:72
-#: 355d029129fd4e81bd322daa355efab9 ff3d6c8b33d1474da2a593f294e870c7
+#: 338f6ab981214120917a7c92dfba74f0 4e08222332414bfea03cde9dce91569d
 msgid "Clone the repository to your local machine."
 msgstr ""
 
 #: ../../source/contrib.rst:17 ../../source/contrib.rst:73
-#: ed332aa152ed4f938a4b954388931549 fa2b411b4c7c42239d0acfd526b0d6cb
+#: 056b41cd9344455f82fafde4add604cc 559e9b3750c74bd4b98ef85885ede7b4
 msgid ""
 "Navigate to the root directory of the cloned repository and build the "
 "frontend project by running the following command:"
 msgstr ""
 
 #: ../../source/contrib.rst:23 ../../source/contrib.rst:35
-#: ../../source/contrib.rst:79 44d9c83d83c74f4d8d4b720225132c76
-#: b2f95eb5b6e3441685e9893e6b24592e b44e05f2788a4d8db6c6275e56565fa4
+#: ../../source/contrib.rst:79 15b72ed2091649ee92054046621bf98a
+#: 5413c4b80c4548f6893eba12beed6dc6 f203cd8313ca4509ba8618cd984f1a97
 msgid "Run the following command to start the `Dagu` application:"
 msgstr ""
 
-#: ../../source/contrib.rst:29 db0a6a7d215f4cb18d57359ccb8a7b92
+#: ../../source/contrib.rst:29 a733a1f83eea4222a67eb99b19f7cdc1
 msgid ""
 "Now you can change the source code and build the binary by running the "
 "following command:"
 msgstr ""
 
-#: ../../source/contrib.rst:42 dea6c5c6890d42b0b3860b24c011a756
+#: ../../source/contrib.rst:42 54c0901a625843399d306eb9af78a271
 msgid "Running Tests"
 msgstr ""
 
-#: ../../source/contrib.rst:44 9e797d62243c4919b0269ebdbae947a5
+#: ../../source/contrib.rst:44 599879bcab8743b683b5a9843cb7d0dd
 msgid "Run the following command to run the tests:"
 msgstr ""
 
-#: ../../source/contrib.rst:51 dff1059103c24db49f24c20d686b211b
+#: ../../source/contrib.rst:51 664d06461df448fe8bbf25ea8dbb4a2f
 msgid "Code Structure"
 msgstr ""
 
-#: ../../source/contrib.rst:53 d779510d6d52474da97fbd8b698e2a7f
+#: ../../source/contrib.rst:53 bb175506da4a4206afce0f2cb4ec8311
 msgid "``ui``: Frontend code for the Web UI."
 msgstr ""
 
-#: ../../source/contrib.rst:54 5663582bf25a43dfaa75442de630e03e
+#: ../../source/contrib.rst:54 6c51bf69dba24d4a9ecf6bf983f3a431
 msgid "``cmd``: Contains the main application entry point."
 msgstr ""
 
-#: ../../source/contrib.rst:55 5d08988c00004aecb869804953611bf3
+#: ../../source/contrib.rst:55 885211ed962549c4b149ba1834696ae6
 msgid "``docs``: Contains the documentation for the project."
 msgstr ""
 
-#: ../../source/contrib.rst:56 ed71de110e3c4006986a9822f7d7f5f6
+#: ../../source/contrib.rst:56 3dfc88298f48483b9378a4767c9fc9da
 msgid "``examples``: Contains the example workflows."
 msgstr ""
 
-#: ../../source/contrib.rst:57 7d198fec7c4d438891f515ae5e6a964a
+#: ../../source/contrib.rst:57 07c2f76c16ee437e936da51b38da6fa5
 msgid "``internal``: Contains the internal code for the project."
 msgstr ""
 
-#: ../../source/contrib.rst:59 0fbd75569bae40a39523bb6074280db2
+#: ../../source/contrib.rst:59 0e9744ff95074ab69538f28c7e7a87b9
 msgid "``web``: Contains the backend code for the Web UI."
 msgstr ""
 
-#: ../../source/contrib.rst:60 5bec09e1829042f08e5b9a71504cb2c1
+#: ../../source/contrib.rst:60 d24ee0505d1446d6b8641c7ba9a7eb6a
 msgid "``agent``: Contains the code for running the workflows."
 msgstr ""
 
-#: ../../source/contrib.rst:61 9f2974c0de0940ad8ff11cf7c7f278ec
+#: ../../source/contrib.rst:61 2abf2fad1f8147c5897152d428a40cd2
 msgid "``config``: Contains the code for loading the configuration."
 msgstr ""
 
-#: ../../source/contrib.rst:62 47545d2712644d2bad548962513efd5d
+#: ../../source/contrib.rst:62 643076848ff642a08bc17af3717fb2d6
 msgid "``controller``: Contains the code for managing the workflows."
 msgstr ""
 
-#: ../../source/contrib.rst:63 deb6d3086550405bb9c819d068595db8
+#: ../../source/contrib.rst:63 85e97332706647028bbb3ad0732dbf4a
 msgid "``dag``: Contains the code for parsing the workflow definition."
 msgstr ""
 
-#: ../../source/contrib.rst:64 b1b0bd413ff1491280237e394bc2ee45
+#: ../../source/contrib.rst:64 4563b99fe1d24c69a600afe5c7564fd1
 msgid "``database``: Contains the code for interacting with the database."
 msgstr ""
 
-#: ../../source/contrib.rst:65 2a2420209c294bdeb9a867f541782bea
+#: ../../source/contrib.rst:65 e95610413b9e4e10b5ef3858e7ff781a
 msgid "``executor``: Contains the code for different types of executors."
 msgstr ""
 
-#: ../../source/contrib.rst:66 85b0908c49214c73822083f6cd2d9335
+#: ../../source/contrib.rst:66 5f61ee76ea734b24867229b7bc1a6914
 msgid "``runner``: Contains the code for scheduler."
 msgstr ""
 
-#: ../../source/contrib.rst:67 7a3876ae87024ba8b51821752aa1732b
+#: ../../source/contrib.rst:67 ca34b5f7a79e468f96c0f05bc2a6d492
 msgid "``sock``: Contains the code for interacting with the socket."
 msgstr ""
 
-#: ../../source/contrib.rst:70 dc2a95b99e514d10acb5ac7890fa63cb
+#: ../../source/contrib.rst:70 e5f4604cc1804c6ba4fe083895f11c3a
 msgid "Setting up your local environment for front end development"
 msgstr ""
 
-#: ../../source/contrib.rst:85 3204ca1566504e9f91ea7a2a1c0c9066
+#: ../../source/contrib.rst:85 151a6cc7c2a7471895104a0ed1e7133c
 msgid ""
 "Navigate to ``ui`` directory and run the following command to install the"
 " dependencies:"
 msgstr ""
 
-#: ../../source/contrib.rst:92 7ee151c519334a6bad6d385ec2f8e6e7
+#: ../../source/contrib.rst:92 197631c9ef9042379238eaaeeb4f88f2
 msgid "Open the browser and navigate to http://localhost:8081."
 msgstr ""
 
-#: ../../source/contrib.rst:94 794c5ee8499945d38cffcf0bcb7db444
+#: ../../source/contrib.rst:94 a2242005f6844e9f9a411f562957112c
 msgid ""
 "Make changes to the source code and refresh the browser to see the "
 "changes."
 msgstr ""
 
-#: ../../source/contrib.rst:97 18669544776b484aaa20d98dcc993a00
+#: ../../source/contrib.rst:97 289d2227d0fa4e09b3098536640473da
 msgid "Branches"
 msgstr ""
 
-#: ../../source/contrib.rst:99 0d60c9e935224c1b8948ed5df55a8c5a
+#: ../../source/contrib.rst:99 879cf6949a964172ae747fd6f9e5e125
 msgid ""
 "``main``: The main branch where the source code always reflects a "
 "production-ready state."
 msgstr ""
+
+#~ msgid "``examples``: Contains the example DAGs."
+#~ msgstr ""
+
+#~ msgid "``agent``: Contains the code for running the DAGs."
+#~ msgstr ""
+
+#~ msgid "``controller``: Contains the code for managing the DAGs."
+#~ msgstr ""
+
+#~ msgid "``dag``: Contains the code for parsing the DAG definition."
+#~ msgstr ""
 

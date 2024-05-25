@@ -1,6 +1,6 @@
 .. _Yaml Format:
 
-Workflow Language (YAML)
+Writing DAGs
 ==========================
 
 .. contents::

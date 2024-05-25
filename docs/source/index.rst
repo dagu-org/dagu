@@ -30,10 +30,10 @@ Quick Start
    Command line interface reference.
 
 :ref:`YAML Format`
-   Workflow language reference.
+   Writing DAGs.
 
 :ref:`examples`
-   Examples of workflows.
+   Examples of DAGs.
 
 :ref:`Configuration Options`
    Configuration options.
@@ -55,7 +55,7 @@ Quick Start
    api_token
 
 .. toctree::
-   :caption: Workflow Language
+   :caption: Writing DAGs
    :hidden:
 
    yaml_format
