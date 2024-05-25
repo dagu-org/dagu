@@ -204,6 +204,12 @@ steps:
 			input: `
 steps:
   - name: step1
+    command: [echo, 1]`,
+		},
+		{
+			input: `
+steps:
+  - name: step1
     command:
       - echo
       - 1`,
