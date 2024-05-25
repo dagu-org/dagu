@@ -2,6 +2,8 @@ package executor
 
 import (
 	"context"
+	"fmt"
+	"github.com/dagu-dev/dagu/internal/utils"
 	"io"
 	"os"
 	"os/exec"
@@ -45,6 +47,9 @@ func (e *CommandExecutor) Kill(sig os.Signal) error {
 
 func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
+	if len(step.Dir) > 0 && !utils.FileExists(step.Dir) {
+		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
+	}
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, step.Variables...)
 	step.OutputVariables.Range(func(key, value interface{}) bool {
