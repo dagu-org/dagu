@@ -8,12 +8,15 @@ Dagu
 
 .. raw:: html
 
-
    <div style="margin-bottom: 16px;">
       <div class="github-star-button">
       <iframe src="https://ghbtns.com/github-btn.html?user=dagu-dev&repo=dagu&type=star&count=true&size=large" frameborder="0" scrolling="0" width="160px" height="30px"></iframe>
       </div>
    </div>
+
+.. image:: _static/dagu-logo.webp
+   :alt: Dew overview
+   :width: 800px
 
 Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands as a `Directed Acyclic Graph (DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a declarative :ref:`YAML Format`. Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
