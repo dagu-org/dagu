@@ -169,6 +169,19 @@ The `stderr` field allows to redirect stderr to other file without writing to th
       stderr: "/tmp/error.txt"
 
 
+Running Sub-DAG
+~~~~~~~~~~~~~~~~
+
+You can run a sub-DAG from a DAG file. The sub-DAG is defined in a separate file and can be called using the `run` field.
+
+.. code-block:: yaml
+
+  steps:
+    - name: A task
+      run: <DAG file name>  # e.g., sub_dag, sub_dag.yaml, /path/to/sub_dag.yaml
+      params: "FOO=BAR"     # optional
+
+
 Schedule
 ~~~~~~~~~~
 
@@ -182,6 +195,7 @@ You can use the `schedule` field to schedule a DAG with Cron expression.
       command: job.sh
 
 See :ref:`scheduler configuration` for more details.
+
 
 .. _docker executor:
 
@@ -460,19 +474,6 @@ Formatting JSON
     }
 
 .. _command-execution-over-ssh:
-
-
-Running Sub-DAG
-~~~~~~~~~~~~~~~~
-
-You can run a sub-DAG from a DAG file. The sub-DAG is defined in a separate file and can be called using the `run` field.
-
-.. code-block:: yaml
-
-  steps:
-    - name: A task
-      run: <DAG file name>  # e.g., sub_dag, sub_dag.yaml, /path/to/sub_dag.yaml
-      params: "FOO=BAR"     # optional
 
 All Available Fields
 --------------------
