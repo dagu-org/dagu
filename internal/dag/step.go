@@ -40,7 +40,7 @@ type RepeatPolicy struct {
 // ContinueOn contains the conditions to continue on failure or skipped.
 // Failure is the flag to continue to the next step on failure.
 // Skipped is the flag to continue to the next step on skipped.
-// A step can be skippped when the preconditions are not met.
+// A step can be skipped when the preconditions are not met.
 // Then if the ContinueOn.Skip is set, the step will continue to the next step.
 type ContinueOn struct {
 	Failure bool // Failure is the flag to continue to the next step on failure.
