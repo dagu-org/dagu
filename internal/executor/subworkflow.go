@@ -56,7 +56,7 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 		return nil, fmt.Errorf("failed to get dag context: %w", err)
 	}
 
-	sugDAG, err := dagCtx.Finder.FindByName(step.SubDAG.Name)
+	sugDAG, err := dagCtx.Finder.Find(step.SubDAG.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubDAG.Name, err)
 	}

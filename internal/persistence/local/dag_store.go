@@ -248,7 +248,7 @@ func (d *dagStoreImpl) Rename(oldDAGPath, newDAGPath string) error {
 	return os.Rename(oldLoc, newLoc)
 }
 
-func (d *dagStoreImpl) FindByName(name string) (*dag.DAG, error) {
+func (d *dagStoreImpl) Find(name string) (*dag.DAG, error) {
 	file, err := d.resolve(name)
 	if err != nil {
 		return nil, err

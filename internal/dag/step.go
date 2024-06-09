@@ -1,7 +1,9 @@
 package dag
 
 import (
+	"fmt"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -71,8 +73,23 @@ type ContinueOn struct {
 	Skipped bool
 }
 
-func (s *Step) init(defaultLocation string) {
+// setup sets the default values for the step.
+func (s *Step) setup(workDir string) {
+	// if the working directory is not set, use the directory of the DAG file.
 	if s.Dir == "" {
-		s.Dir = path.Dir(defaultLocation)
+		s.Dir = path.Dir(workDir)
 	}
+}
+
+// String implements the Stringer interface.
+// TODO: Remove if not needed.
+func (s *Step) String() string {
+	values := []string{
+		fmt.Sprintf("Name: %s", s.Name),
+		fmt.Sprintf("Dir: %s", s.Dir),
+		fmt.Sprintf("Command: %s", s.Command),
+		fmt.Sprintf("Args: %s", s.Args),
+		fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")),
+	}
+	return strings.Join(values, "\t")
 }

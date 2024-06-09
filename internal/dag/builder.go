@@ -81,6 +81,11 @@ func (b *builder) callBuilderFunc(fn builderFunc) {
 	}
 }
 
+var (
+	defaultHistoryRetentionDays = 30
+	defaultMaxCleanUpTime       = time.Second * 60
+)
+
 // build builds a DAG from a configuration definition and the base DAG.
 func (b *builder) build(def *configDefinition, base *DAG) (*DAG, error) {
 	b.def = def

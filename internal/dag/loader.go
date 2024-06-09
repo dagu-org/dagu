@@ -65,83 +65,99 @@ func LoadYAML(data []byte) (*DAG, error) {
 	return b.build(def, nil)
 }
 
+// loadBaseConfig loads the global configuration from the given file.
+// The global configuration can be overridden by the DAG configuration.
 func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
+	// The base config is optional.
 	if !util.FileExists(file) {
 		return nil, nil
 	}
 
-	raw, err := load(file)
+	// Load the raw data from the file.
+	raw, err := readFile(file)
 	if err != nil {
 		return nil, err
 	}
 
+	// Decode the raw data into a config definition.
 	cdl := &configDefinitionLoader{}
 	def, err := cdl.decode(raw)
 	if err != nil {
 		return nil, err
 	}
 
+	// Build the DAG from the config definition.
+	// Base configuration must load all the data.
 	buildOpts := opts
 	buildOpts.metadataOnly = false
-	b := &builder{
-		opts: buildOpts,
-	}
+	b := &builder{opts: buildOpts}
 	return b.build(def, nil)
 }
 
+// loadDAG loads the DAG from the given file.
 func loadDAG(dag string, opts buildOpts) (*DAG, error) {
+	// Find the absolute path to the file.
+	// The file must be a YAML file.
 	file, err := prepareFilepath(dag)
 	if err != nil {
 		return nil, err
 	}
 
+	// Load the base configuration unless only the metadata is required.
+	// If only the metadata is required, the base configuration is not loaded
+	// and the DAG is created with the default values.
 	dst, err := loadBaseConfigIfRequired(opts.base, file, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := load(file)
+	// Load the raw data from the file.
+	raw, err := readFile(file)
 	if err != nil {
 		return nil, err
 	}
 
+	// Decode the raw data into a config definition.
 	cdl := &configDefinitionLoader{}
-
 	def, err := cdl.decode(raw)
 	if err != nil {
 		return nil, err
 	}
 
+	// Build the DAG from the config definition.
 	b := builder{opts: opts}
 	c, err := b.build(def, dst)
-
 	if err != nil {
 		return nil, err
 	}
 
+	// Merge the DAG with the base configuration.
+	// The DAG configuration overrides the base configuration.
 	err = cdl.merge(dst, c)
 	if err != nil {
 		return nil, err
 	}
 
+	// Set the absolute path to the file.
 	dst.Location = file
 
-	if !opts.noEval {
-		dst.setup()
-	}
+	// Set the default values for the DAG.
+	dst.setup()
 
 	return dst, nil
 }
 
 // prepareFilepath prepares the filepath for the given file.
-func prepareFilepath(f string) (string, error) {
-	if f == "" {
+// The file must be a YAML file.
+func prepareFilepath(file string) (string, error) {
+	if file == "" {
 		return "", errConfigFileRequired
 	}
-	if !strings.HasSuffix(f, ".yaml") && !strings.HasSuffix(f, ".yml") {
-		f = fmt.Sprintf("%s.yaml", f)
+	// If the file does not have a YAML extension, add it.
+	if !strings.HasSuffix(file, ".yaml") && !strings.HasSuffix(file, ".yml") {
+		file = fmt.Sprintf("%s.yaml", file)
 	}
-	return filepath.Abs(f)
+	return filepath.Abs(file)
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
@@ -151,6 +167,7 @@ func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, er
 		if err != nil {
 			return nil, err
 		}
+		// Base config is optional.
 		if dag != nil {
 			return dag, nil
 		}
@@ -174,12 +191,8 @@ func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.
 	return nil
 }
 
-func load(file string) (config map[string]interface{}, err error) {
-	return readFile(file)
-}
-
 // readFile reads the contents of the file into a map.
-func readFile(file string) (config map[string]interface{}, err error) {
+func readFile(file string) (config map[string]any, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)

@@ -77,7 +77,7 @@ func Test_loadBaseConfig(t *testing.T) {
 	})
 }
 
-func Test_LoadDefault(t *testing.T) {
+func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("Load default config", func(t *testing.T) {
 		d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)

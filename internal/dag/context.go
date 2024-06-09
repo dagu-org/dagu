@@ -5,36 +5,39 @@ import (
 	"errors"
 )
 
-// NewContext creates a new context with the DAG and DAGFinder.
-func NewContext(ctx context.Context, dag *DAG, finder DAGFinder) context.Context {
+// Finder finds a DAG by name.
+// This is used to find the DAG when a node references another DAG.
+type Finder interface {
+	Find(name string) (*DAG, error)
+}
+
+// Context contains the current DAG and Finder.
+type Context struct {
+	DAG    *DAG
+	Finder Finder
+}
+
+// NewContext creates a new context with the DAG and Finder.
+func NewContext(ctx context.Context, dag *DAG, finder Finder) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
 		DAG:    dag,
 		Finder: finder,
 	})
 }
 
-// DAGFinder is an interface for finding a DAG by name.
-type DAGFinder interface {
-	FindByName(name string) (*DAG, error)
-}
-
-type Context struct {
-	DAG    *DAG
-	Finder DAGFinder
-}
-
 // ctxKey is used as the key for storing the DAG in the context.
 type ctxKey struct{}
 
 var (
-	errFailedAssertion = errors.New("failed to assert DAG from context")
+	errFailedCtxAssertion = errors.New("failed to assert DAG context")
 )
 
-// GetContext returns the DAG from the current context.
+// GetContext returns the DAG Context from the context.
+// It returns an error if the context does not contain a DAG Context.
 func GetContext(ctx context.Context) (Context, error) {
-	dag, ok := ctx.Value(ctxKey{}).(Context)
+	dagCtx, ok := ctx.Value(ctxKey{}).(Context)
 	if !ok {
-		return Context{}, errFailedAssertion
+		return Context{}, errFailedCtxAssertion
 	}
-	return dag, nil
+	return dagCtx, nil
 }
