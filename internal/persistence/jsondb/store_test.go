@@ -14,7 +14,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +36,7 @@ func TestNewDataFile(t *testing.T) {
 	requestId := "request-id-1"
 	f, err := db.newFile(d.Location, timestamp, requestId)
 	require.NoError(t, err)
-	p := utils.ValidFilename(strings.TrimSuffix(
+	p := util.ValidFilename(strings.TrimSuffix(
 		path.Base(d.Location), path.Ext(d.Location)), "_")
 	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
 
@@ -294,7 +294,7 @@ func TestCompactFile(t *testing.T) {
 
 	db2 := New(db.dir, "")
 	err = db2.Compact(d.Location, s.File)
-	require.False(t, utils.FileExists(s.File))
+	require.False(t, util.FileExists(s.File))
 	require.NoError(t, err)
 
 	var s2 *model.StatusFile
@@ -330,13 +330,13 @@ func TestErrorReadFile(t *testing.T) {
 }
 
 func TestErrorParseFile(t *testing.T) {
-	tmpDir := utils.MustTempDir("test_error_parse_file")
+	tmpDir := util.MustTempDir("test_error_parse_file")
 	tmpFile := filepath.Join(tmpDir, "test_error_parse_file.dat")
 
 	_, err := ParseFile(tmpFile)
 	require.Error(t, err)
 
-	f, err := utils.OpenOrCreateFile(tmpFile)
+	f, err := util.OpenOrCreateFile(tmpFile)
 	require.NoError(t, err)
 
 	_, err = ParseFile(tmpFile)
@@ -379,7 +379,7 @@ func TestTimestamp(t *testing.T) {
 }
 
 func TestReadLine(t *testing.T) {
-	tmpDir := utils.MustTempDir("test_read_line")
+	tmpDir := util.MustTempDir("test_read_line")
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()

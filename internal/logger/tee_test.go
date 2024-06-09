@@ -8,7 +8,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func TestTeeLogger(t *testing.T) {
 		log.SetOutput(origStdout)
 	}()
 
-	tmpDir := utils.MustTempDir("test-tee-logger")
+	tmpDir := util.MustTempDir("test-tee-logger")
 	tmpFile := path.Join(tmpDir, "test.log")
 	f, err := os.Create(tmpFile)
 	require.NoError(t, err)

@@ -17,19 +17,19 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testdataDir = path.Join(utils.MustGetwd(), "./testdata")
+	testdataDir = path.Join(util.MustGetwd(), "./testdata")
 )
 
 // TODO: fix this tests to use mock
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
-	tmpDir := utils.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
 	_ = config.LoadConfig()
 
@@ -39,7 +39,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	})
 
 	e := engine.NewFactory(ds, &config.Config{
-		Executable: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+		Executable: path.Join(util.MustGetwd(), "../../bin/dagu"),
 	}).Create()
 
 	return tmpDir, e, ds
@@ -48,7 +48,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
-	tmpDir := utils.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
 	_ = config.LoadConfig()
 
@@ -58,7 +58,7 @@ func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStore
 	})
 
 	e := engine.NewFactory(ds, &config.Config{
-		Executable: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+		Executable: path.Join(util.MustGetwd(), "../../bin/dagu"),
 	}).Create()
 
 	return tmpDir, e, ds

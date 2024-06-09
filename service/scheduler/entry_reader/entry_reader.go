@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -98,7 +98,7 @@ func (er *EntryReader) initDags() error {
 	}
 	var fileNames []string
 	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
@@ -131,7 +131,7 @@ func (er *EntryReader) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			if !utils.MatchExtension(event.Name, dag.EXTENSIONS) {
+			if !util.MatchExtension(event.Name, dag.EXTENSIONS) {
 				continue
 			}
 			er.dagsLock.Lock()

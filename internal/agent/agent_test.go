@@ -19,16 +19,16 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
-var testdataDir = path.Join(utils.MustGetwd(), "testdata")
+var testdataDir = path.Join(util.MustGetwd(), "testdata")
 
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
-	tmpDir := utils.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
 	_ = config.LoadConfig()
 

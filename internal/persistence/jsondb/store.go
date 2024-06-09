@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // Store is the interface to store dags status in local.
@@ -319,7 +319,7 @@ func (store *Store) newFile(dagFile string, t time.Time, requestId string) (stri
 	if dagFile == "" {
 		return "", errDAGFileEmpty
 	}
-	fileName := fmt.Sprintf("%s.%s.%s.dat", store.pattern(dagFile), t.Format("20060102.15:04:05.000"), utils.TruncString(requestId, 8))
+	fileName := fmt.Sprintf("%s.%s.%s.dat", store.pattern(dagFile), t.Format("20060102.15:04:05.000"), util.TruncString(requestId, 8))
 	return fileName, nil
 }
 

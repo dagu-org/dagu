@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // Condition represents a condition to be evaluated by the agent.
@@ -20,7 +20,7 @@ var (
 
 // Evaluate returns the actual value of the condition.
 func (c *Condition) Evaluate() (string, error) {
-	return utils.ParseVariable(c.Condition)
+	return util.ParseVariable(c.Condition)
 }
 
 // CheckResult checks if the actual value of the condition matches the expected value.

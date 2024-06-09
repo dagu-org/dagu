@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type dagStoreImpl struct {
@@ -206,13 +206,13 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 		After:    2,
 	}
 
-	utils.LogErr("read DAGs directory", err)
+	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
 			file := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(file)
 			if err != nil {
-				utils.LogErr("read DAG file", err)
+				util.LogErr("read DAG file", err)
 				continue
 			}
 			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
@@ -264,7 +264,7 @@ func (d *dagStoreImpl) FindByName(name string) (*dag.DAG, error) {
 func (d *dagStoreImpl) resolve(name string) (string, error) {
 	// check if the name is a file path
 	if strings.Contains(name, string(filepath.Separator)) {
-		if !utils.FileExists(name) {
+		if !util.FileExists(name) {
 			return "", fmt.Errorf("workflow %s not found", name)
 		}
 		return name, nil
@@ -298,11 +298,11 @@ func find(name string) (string, error) {
 	if ext == "" {
 		// try all supported extensions
 		for _, ext := range dag.EXTENSIONS {
-			if utils.FileExists(name + ext) {
+			if util.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}
 		}
-	} else if utils.FileExists(name) {
+	} else if util.FileExists(name) {
 		// the name has an extension
 		return filepath.Abs(name)
 	}

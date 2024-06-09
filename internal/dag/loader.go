@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
 
@@ -73,7 +73,7 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 }
 
 func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, error) {
-	if !utils.FileExists(file) {
+	if !util.FileExists(file) {
 		return nil, nil
 	}
 

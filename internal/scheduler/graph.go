@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
 	startedAt       time.Time
 	finishedAt      time.Time
-	outputVariables *utils.SyncMap
+	outputVariables *util.SyncMap
 	dict            map[int]*Node
 	nodes           []*Node
 	from            map[int][]int
@@ -32,7 +32,7 @@ var (
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		outputVariables: &utils.SyncMap{},
+		outputVariables: &util.SyncMap{},
 		dict:            make(map[int]*Node),
 		from:            make(map[int][]int),
 		to:              make(map[int][]int),
@@ -54,7 +54,7 @@ func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 // NewExecutionGraphForRetry creates a new execution graph for retry with given nodes.
 func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		outputVariables: &utils.SyncMap{},
+		outputVariables: &util.SyncMap{},
 		dict:            make(map[int]*Node),
 		from:            make(map[int][]int),
 		to:              make(map[int][]int),

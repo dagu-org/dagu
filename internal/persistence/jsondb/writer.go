@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // Writer is the interface to write status to local file.
@@ -25,7 +25,7 @@ type writer struct {
 // Open opens the writer.
 func (w *writer) open() (err error) {
 	_ = os.MkdirAll(path.Dir(w.target), 0755)
-	w.file, err = utils.OpenOrCreateFile(w.target)
+	w.file, err = util.OpenOrCreateFile(w.target)
 	if err == nil {
 		w.writer = bufio.NewWriter(w.file)
 	}
@@ -40,7 +40,7 @@ func (w *writer) write(st *model.Status) error {
 	str := strings.ReplaceAll(string(jsonb), "\n", " ")
 	str = strings.ReplaceAll(str, "\r", " ")
 	_, err := w.writer.WriteString(str + "\n")
-	utils.LogErr("write status", err)
+	util.LogErr("write status", err)
 	return w.writer.Flush()
 }
 
@@ -50,9 +50,9 @@ func (w *writer) close() (err error) {
 	defer w.mu.Unlock()
 	if !w.closed {
 		err = w.writer.Flush()
-		utils.LogErr("flush file", err)
-		utils.LogErr("file sync", w.file.Sync())
-		utils.LogErr("file close", w.file.Close())
+		util.LogErr("flush file", err)
+		util.LogErr("file sync", w.file.Sync())
+		util.LogErr("file close", w.file.Close())
 		w.closed = true
 	}
 	return err

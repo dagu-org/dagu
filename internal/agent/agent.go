@@ -26,7 +26,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/reporter"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/google/uuid"
 )
 
@@ -183,7 +183,7 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 }
 
 func (a *Agent) init() {
-	logDir := path.Join(a.DAG.LogDir, utils.ValidFilename(a.DAG.Name, "_"))
+	logDir := path.Join(a.DAG.LogDir, util.ValidFilename(a.DAG.Name, "_"))
 	config := &scheduler.Config{
 		LogDir:        logDir,
 		MaxActiveRuns: a.DAG.MaxActiveRuns,
@@ -221,9 +221,9 @@ func (a *Agent) init() {
 		}}
 	logFilename := filepath.Join(
 		logDir, fmt.Sprintf("agent_%s.%s.%s.log",
-			utils.ValidFilename(a.DAG.Name, "_"),
+			util.ValidFilename(a.DAG.Name, "_"),
 			time.Now().Format("20060102.15:04:05.000"),
-			utils.TruncString(a.requestId, 8),
+			util.TruncString(a.requestId, 8),
 		))
 	a.logManager = &logManager{logFilename: logFilename}
 }
@@ -259,7 +259,7 @@ func (a *Agent) setupDatabase() error {
 	// TODO: do not use the persistence package directly.
 	a.historyStore = a.dataStoreFactory.NewHistoryStore()
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
-		utils.LogErr("clean old history data", err)
+		util.LogErr("clean old history data", err)
 	}
 
 	return a.historyStore.Open(a.DAG.Location, time.Now(), a.requestId)
@@ -291,7 +291,7 @@ func (a *Agent) run(ctx context.Context) error {
 		return err
 	}
 	defer func() {
-		utils.LogErr("close log file", a.closeLogFile())
+		util.LogErr("close log file", a.closeLogFile())
 		tl.Close()
 	}()
 
@@ -301,7 +301,7 @@ func (a *Agent) run(ctx context.Context) error {
 		}
 	}()
 
-	utils.LogErr("write status", a.historyStore.Write(a.Status()))
+	util.LogErr("write status", a.historyStore.Write(a.Status()))
 
 	listen := make(chan error)
 	go func() {
@@ -312,7 +312,7 @@ func (a *Agent) run(ctx context.Context) error {
 	}()
 
 	defer func() {
-		utils.LogErr("shutdown socket frontend", a.socketServer.Shutdown())
+		util.LogErr("shutdown socket frontend", a.socketServer.Shutdown())
 	}()
 
 	if err := <-listen; err != nil {
@@ -325,8 +325,8 @@ func (a *Agent) run(ctx context.Context) error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			utils.LogErr("write status", a.historyStore.Write(status))
-			utils.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
+			util.LogErr("write status", a.historyStore.Write(status))
+			util.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
 		}
 	}()
 
@@ -335,7 +335,7 @@ func (a *Agent) run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		utils.LogErr("write status", a.historyStore.Write(a.Status()))
+		util.LogErr("write status", a.historyStore.Write(a.Status()))
 	}()
 
 	ctx = dag.NewContext(ctx, a.DAG, a.dataStoreFactory.NewDAGStore())
@@ -344,13 +344,13 @@ func (a *Agent) run(ctx context.Context) error {
 	status := a.Status()
 
 	log.Println("schedule finished.")
-	utils.LogErr("write status", a.historyStore.Write(a.Status()))
+	util.LogErr("write status", a.historyStore.Write(a.Status()))
 
 	a.reporter.ReportSummary(status, lastErr)
-	utils.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
+	util.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
 
 	a.finished.Store(true)
-	utils.LogErr("close data file", a.historyStore.Close())
+	util.LogErr("close data file", a.historyStore.Close())
 
 	return lastErr
 }
@@ -439,7 +439,7 @@ func (l *logManager) setupLogFile() (err error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	l.logFile, err = utils.OpenOrCreateFile(l.logFilename)
+	l.logFile, err = util.OpenOrCreateFile(l.logFilename)
 	return
 }
 

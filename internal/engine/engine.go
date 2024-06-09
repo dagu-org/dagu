@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type Engine interface {
@@ -99,7 +99,7 @@ func (e *engineImpl) Stop(d *dag.DAG) error {
 func (e *engineImpl) StartAsync(d *dag.DAG, params string) {
 	go func() {
 		err := e.Start(d, params)
-		utils.LogErr("starting a DAG", err)
+		util.LogErr("starting a DAG", err)
 	}()
 }
 
@@ -107,7 +107,7 @@ func (e *engineImpl) Start(d *dag.DAG, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, utils.EscapeArg(params, false)))
+		args = append(args, fmt.Sprintf(`"%s"`, util.EscapeArg(params, false)))
 	}
 	args = append(args, d.Location)
 	cmd := exec.Command(e.executable, args...)

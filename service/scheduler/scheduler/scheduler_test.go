@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
-	tempDir := utils.MustTempDir("runner_test")
+	tempDir := util.MustTempDir("runner_test")
 	changeHomeDir(tempDir)
 	testHomeDir = tempDir
 	code := m.Run()
@@ -37,7 +37,7 @@ func changeHomeDir(homeDir string) {
 
 func TestRun(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.SetFixedTime(now)
+	util.SetFixedTime(now)
 
 	er := &mockEntryReader{
 		Entries: []*Entry{
@@ -73,7 +73,7 @@ func TestRun(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.SetFixedTime(now)
+	util.SetFixedTime(now)
 
 	er := &mockEntryReader{
 		Entries: []*Entry{
@@ -103,7 +103,7 @@ func TestRestart(t *testing.T) {
 
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-	utils.SetFixedTime(n)
+	util.SetFixedTime(n)
 	r := New(Params{
 		EntryReader: &mockEntryReader{},
 		LogDir:      testHomeDir,

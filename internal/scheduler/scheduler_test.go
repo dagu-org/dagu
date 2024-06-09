@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +23,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	testHomeDir = utils.MustTempDir("scheduler-test")
+	testHomeDir = util.MustTempDir("scheduler-test")
 	changeHomeDir(testHomeDir)
 	code := m.Run()
 	_ = os.RemoveAll(testHomeDir)
@@ -172,7 +172,7 @@ func TestSchedulerCancel(t *testing.T) {
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
-	cmd := path.Join(utils.MustGetwd(), "testdata/testfile.sh")
+	cmd := path.Join(util.MustGetwd(), "testdata/testfile.sh")
 	g, sc, err := testSchedule(t,
 		dag.Step{
 			Name:        "1",
@@ -209,7 +209,7 @@ func TestSchedulerRetryFail(t *testing.T) {
 }
 
 func TestSchedulerRetrySuccess(t *testing.T) {
-	cmd := path.Join(utils.MustGetwd(), "testdata/testfile.sh")
+	cmd := path.Join(util.MustGetwd(), "testdata/testfile.sh")
 	tmpDir, err := os.MkdirTemp("", "scheduler_test")
 	tmpFile := path.Join(tmpDir, "flag")
 
@@ -645,7 +645,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 }
 
 func step(name, command string, depends ...string) dag.Step {
-	cmd, args := utils.SplitCommand(command, false)
+	cmd, args := util.SplitCommand(command, false)
 	return dag.Step{
 		Name:    name,
 		Command: cmd,

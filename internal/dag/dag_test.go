@@ -6,13 +6,13 @@ import (
 	"testing"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testdataDir = path.Join(utils.MustGetwd(), "testdata")
-	testHomeDir = path.Join(utils.MustGetwd(), "testdata/home")
+	testdataDir = path.Join(util.MustGetwd(), "testdata")
+	testHomeDir = path.Join(util.MustGetwd(), "testdata/home")
 )
 
 func TestMain(m *testing.M) {
@@ -37,7 +37,7 @@ func TestToString(t *testing.T) {
 }
 
 func TestReadingFile(t *testing.T) {
-	tmpDir := utils.MustTempDir("read-config-test")
+	tmpDir := util.MustTempDir("read-config-test")
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()

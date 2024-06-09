@@ -11,7 +11,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/constants"
 	// aliasing errors package to avoid conflict with the standard library
 	dagerrors "github.com/dagu-dev/dagu/internal/errors"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/robfig/cron/v3"
 	"golang.org/x/sys/unix"
 )
@@ -192,7 +192,7 @@ func buildEnvs(def *configDefinition, d, base *DAG, options BuildDAGOptions) (er
 }
 
 func buildLogDir(def *configDefinition, d *DAG) (err error) {
-	d.LogDir, err = utils.ParseVariable(def.LogDir)
+	d.LogDir, err = util.ParseVariable(def.LogDir)
 	return err
 }
 
@@ -259,8 +259,8 @@ func parseParameters(value string, eval bool, options BuildDAGOptions) (
 	envs []string,
 	err error,
 ) {
-	var parsedParams []utils.Parameter
-	parsedParams, err = utils.ParseParams(value, eval)
+	var parsedParams []util.Parameter
+	parsedParams, err = util.ParseParams(value, eval)
 	if err != nil {
 		return
 	}
@@ -270,7 +270,7 @@ func parseParameters(value string, eval bool, options BuildDAGOptions) (
 		if eval {
 			p.Value = os.ExpandEnv(p.Value)
 		}
-		strParam := utils.StringifyParam(p)
+		strParam := util.StringifyParam(p)
 		ret = append(ret, strParam)
 
 		if p.Name == "" {
@@ -336,7 +336,7 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 
 	vars := map[string]string{}
 	for _, v := range vals {
-		parsed, err := utils.ParseVariable(v.val)
+		parsed, err := util.ParseVariable(v.val)
 		if err != nil {
 			return nil, err
 		}
@@ -501,7 +501,7 @@ func parseCommand(step *Step, command any) error {
 			return errStepCommandIsEmtpy
 		}
 		step.CmdWithArgs = val
-		step.Command, step.Args = utils.SplitCommand(val, false)
+		step.Command, step.Args = util.SplitCommand(val, false)
 	case []any:
 		for _, v := range val {
 			val, ok := v.(string)
@@ -550,8 +550,8 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 			break
 		}
 	}
-	step.Command = utils.RemoveParams(calledFuncDef.Command)
-	step.CmdWithArgs = utils.AssignValues(calledFuncDef.Command, passedArgs)
+	step.Command = util.RemoveParams(calledFuncDef.Command)
+	step.CmdWithArgs = util.AssignValues(calledFuncDef.Command, passedArgs)
 	return nil
 }
 
@@ -687,7 +687,7 @@ func assertFunctions(funcs []*funcDef) error {
 		nameMap[funcDef.Name] = true
 
 		definedParamNames := strings.Split(funcDef.Params, " ")
-		passedParamNames := utils.ExtractParamNames(funcDef.Command)
+		passedParamNames := util.ExtractParamNames(funcDef.Command)
 		if len(definedParamNames) != len(passedParamNames) {
 			return errFuncParamsMismatch
 		}

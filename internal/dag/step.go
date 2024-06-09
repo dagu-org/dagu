@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // Step represents a step in a DAG.
@@ -14,7 +14,7 @@ type Step struct {
 	Name            string         `json:"Name"`
 	Description     string         `json:"Description,omitempty"`
 	Variables       []string       `json:"Variables,omitempty"`
-	OutputVariables *utils.SyncMap `json:"OutputVariables,omitempty"`
+	OutputVariables *util.SyncMap  `json:"OutputVariables,omitempty"`
 	Dir             string         `json:"Dir,omitempty"`
 	ExecutorConfig  ExecutorConfig `json:"ExecutorConfig,omitempty"`
 	CmdWithArgs     string         `json:"CmdWithArgs,omitempty"`
