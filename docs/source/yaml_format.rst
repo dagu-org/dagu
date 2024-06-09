@@ -298,7 +298,7 @@ The `http` executor allows us to make an arbitrary HTTP request. This can be use
        executor:
          type: http
          config:
-           timeout: 10,
+           timeout: 10
            headers:
              Authorization: "Bearer $TOKEN"
            silent: true # If silent is true, it outputs response body only.
