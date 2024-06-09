@@ -54,13 +54,13 @@ func LoadYAML(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
-	b := &builder{
-		opts: buildOpts{metadataOnly: false, noEval: true},
-	}
+
+	b := &builder{opts: buildOpts{metadataOnly: false, noEval: true}}
 	return b.build(def, nil)
 }
 
@@ -88,6 +88,7 @@ func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 	// Base configuration must load all the data.
 	buildOpts := opts
 	buildOpts.metadataOnly = false
+
 	b := &builder{opts: buildOpts}
 	return b.build(def, nil)
 }
@@ -139,7 +140,9 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	dst.Location = file
 
 	// Set the default values for the DAG.
-	dst.setup()
+	if !opts.metadataOnly {
+		dst.setup()
+	}
 
 	return dst, nil
 }
@@ -150,10 +153,12 @@ func prepareFilepath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
 	}
+
 	// The file name can be specified without the extension.
 	if !strings.HasSuffix(file, ".yaml") && !strings.HasSuffix(file, ".yml") {
 		file = fmt.Sprintf("%s.yaml", file)
 	}
+
 	return filepath.Abs(file)
 }
 
@@ -169,7 +174,10 @@ func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, er
 			return dag, nil
 		}
 	}
-	return &DAG{Name: strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))}, nil
+
+	// return a DAG with the default values.
+	dagName := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+	return &DAG{Name: dagName}, nil
 }
 
 type mergeTransformer struct{}
@@ -184,6 +192,7 @@ func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.
 			if dst.CanSet() {
 				dst.Set(src)
 			}
+
 			return nil
 		}
 	}

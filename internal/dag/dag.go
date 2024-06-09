@@ -126,13 +126,13 @@ func (d *DAG) HasTag(tag string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-// TODO: It needs to be unique for each process so that multiple
-// processes can run in parallel.
+// TODO: It needs to be unique for each process so that multiple processes can run in parallel.
 func (d *DAG) SockAddr() string {
 	s := strings.ReplaceAll(d.Location, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
