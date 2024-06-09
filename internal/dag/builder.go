@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -226,8 +228,9 @@ func (b *builder) buildEnvs() error {
 	return nil
 }
 
+// buildLogDir builds the log directory for the DAG.
 func (b *builder) buildLogDir() (err error) {
-	b.dag.LogDir, err = util.Evaluate(b.def.LogDir)
+	b.dag.LogDir, err = evaluateValue(b.def.LogDir)
 	return err
 }
 
@@ -381,7 +384,7 @@ func loadVariables(strVariables any, opts buildOpts) (
 			// Evaluate the value of the environment variable.
 			// This also executes command substitution.
 			var err error
-			value, err = util.Evaluate(value)
+			value, err = evaluateValue(value)
 			if err != nil {
 				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
 			}
@@ -844,4 +847,35 @@ func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string
 		}
 	}
 	return nil
+}
+
+// tickerMatcher matches the command in the value string.
+// Example: "`date`"
+var tickerMatcher = regexp.MustCompile("`[^`]+`")
+
+// substituteCommands substitutes command in the value string.
+// This logic needs to be refactored to handle more complex cases.
+func substituteCommands(value string) (string, error) {
+	matches := tickerMatcher.FindAllString(strings.TrimSpace(value), -1)
+	if matches == nil {
+		return value, nil
+	}
+	ret := value
+	for i := 0; i < len(matches); i++ {
+		command := matches[i]
+		str := strings.ReplaceAll(command, "`", "")
+		cmd, args := util.SplitCommand(str, false)
+		out, err := exec.Command(cmd, args...).Output()
+		if err != nil {
+			return "", err
+		}
+		ret = strings.ReplaceAll(ret, command, strings.TrimSpace(string(out[:])))
+
+	}
+	return ret, nil
+}
+
+// evaluateValue expands environment variables and execute command substitution.
+func evaluateValue(value string) (string, error) {
+	return substituteCommands(os.ExpandEnv(value))
 }

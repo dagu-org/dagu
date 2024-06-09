@@ -188,38 +188,6 @@ func ValidFilename(str, replacement string) string {
 	return strings.ReplaceAll(s, " ", replacement)
 }
 
-// Evaluate expands environment variables and execute command substitution.
-func Evaluate(value string) (string, error) {
-	val, err := SubstituteCommands(os.ExpandEnv(value))
-	if err != nil {
-		return "", err
-	}
-	return val, nil
-}
-
-var tickerMatcher = regexp.MustCompile("`[^`]+`")
-
-// SubstituteCommands substitutes command in the value string.
-func SubstituteCommands(value string) (string, error) {
-	matches := tickerMatcher.FindAllString(strings.TrimSpace(value), -1)
-	if matches == nil {
-		return value, nil
-	}
-	ret := value
-	for i := 0; i < len(matches); i++ {
-		command := matches[i]
-		str := strings.ReplaceAll(command, "`", "")
-		prog, args := SplitCommand(str, false)
-		out, err := exec.Command(prog, args...).Output()
-		if err != nil {
-			return "", err
-		}
-		ret = strings.ReplaceAll(ret, command, strings.TrimSpace(string(out[:])))
-
-	}
-	return ret, nil
-}
-
 // MustTempDir returns temporary directory.
 func MustTempDir(pattern string) string {
 	t, err := os.MkdirTemp("", pattern)

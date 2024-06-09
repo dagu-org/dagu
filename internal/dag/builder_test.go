@@ -573,3 +573,40 @@ func Test_convertMap(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func Test_evaluateValue(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{
+			input:    "${TEST_VAR}",
+			expected: "test",
+		},
+		{
+			input:    "`echo test`",
+			expected: "test",
+		},
+		{
+			input:   "`ech test`",
+			wantErr: true,
+		},
+	}
+
+	// Set the environment variable for the tests
+	err := os.Setenv("TEST_VAR", "test")
+	require.NoError(t, err)
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			r, err := evaluateValue(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, r)
+		})
+	}
+}

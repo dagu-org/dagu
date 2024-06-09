@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-// NewContext sets the current DAG to the context.
+// NewContext creates a new context with the DAG and DAGFinder.
 func NewContext(ctx context.Context, dag *DAG, finder DAGFinder) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
 		DAG:    dag,

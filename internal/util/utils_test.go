@@ -116,20 +116,6 @@ func TestOpenOrCreateFile(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestParseVariable(t *testing.T) {
-	_ = os.Setenv("TEST_VAR", "test")
-	r, err := util.Evaluate("${TEST_VAR}")
-	require.NoError(t, err)
-	require.Equal(t, r, "test")
-
-	_, err = util.Evaluate("`ech test`")
-	require.Error(t, err)
-
-	r, err = util.Evaluate("`echo test`")
-	require.NoError(t, err)
-	require.Equal(t, r, "test")
-}
-
 func TestMustTempDir(t *testing.T) {
 	dir := util.MustTempDir("tempdir")
 	defer os.RemoveAll(dir)
