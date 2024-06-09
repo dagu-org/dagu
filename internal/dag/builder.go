@@ -36,6 +36,7 @@ type buildOpts struct {
 
 // builder is used to build a DAG from a configuration definition.
 type builder struct {
+	def  *configDefinition
 	opts buildOpts
 	base *DAG
 	dag  *DAG
@@ -68,7 +69,19 @@ var (
 	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
 )
 
+// builderFunc is a function that builds a part of the DAG.
+type builderFunc func() error
+
+// callBuilderFunc calls a builder function and adds any errors to the error list.
+func (b *builder) callBuilderFunc(fn builderFunc) {
+	if err := fn(); err != nil {
+		b.errs.Add(err)
+	}
+}
+
+// build builds a DAG from a configuration definition and the base DAG.
 func (b *builder) build(def *configDefinition, base *DAG) (*DAG, error) {
+	b.def = def
 	b.base = base
 	b.dag = &DAG{
 		Name:        def.Name,
@@ -79,22 +92,19 @@ func (b *builder) build(def *configDefinition, base *DAG) (*DAG, error) {
 		Tags:        parseTags(def.Tags),
 	}
 
-	if err := buildEnvs(def, b.dag, b.base, b.opts); err != nil {
-		b.errs.Add(err)
-	}
-
-	b.callBuilderFunc(def, buildSchedule)
-	b.callBuilderFunc(def, buildMailOnConfig)
-	b.callBuilderFunc(def, buildParams)
+	b.callBuilderFunc(b.buildEnvs)
+	b.callBuilderFunc(b.buildSchedule)
+	b.callBuilderFunc(b.buildMailOnConfig)
+	b.callBuilderFunc(b.buildParams)
 
 	if !b.opts.metadataOnly {
-		b.callBuilderFunc(def, buildLogDir)
-		b.callBuilderFunc(def, buildSteps)
-		b.callBuilderFunc(def, buildHandlers)
-		b.callBuilderFunc(def, buildConfig)
-		b.callBuilderFunc(def, buildSMTPConfig)
-		b.callBuilderFunc(def, buildErrMailConfig)
-		b.callBuilderFunc(def, buildInfoMailConfig)
+		b.callBuilderFunc(b.buildLogDir)
+		b.callBuilderFunc(b.buildSteps)
+		b.callBuilderFunc(b.buildHandlers)
+		b.callBuilderFunc(b.buildConfig)
+		b.callBuilderFunc(b.buildSMTPConfig)
+		b.callBuilderFunc(b.buildErrMailConfig)
+		b.callBuilderFunc(b.buildInfoMailConfig)
 
 		if err := assertFunctions(def.Functions); err != nil {
 			b.errs.Add(err)
@@ -108,18 +118,12 @@ func (b *builder) build(def *configDefinition, base *DAG) (*DAG, error) {
 	return b.dag, nil
 }
 
-type builderFunc func(def *configDefinition, d *DAG, options buildOpts) error
-
-func (b *builder) callBuilderFunc(def *configDefinition, fn builderFunc) {
-	if err := fn(def, b.dag, b.opts); err != nil {
-		b.errs.Add(err)
-	}
-}
+type scheduleKey string
 
 const (
-	scheduleStart   = "start"
-	scheduleStop    = "stop"
-	scheduleRestart = "restart"
+	scheduleStart   scheduleKey = "start"
+	scheduleStop    scheduleKey = "stop"
+	scheduleRestart scheduleKey = "restart"
 )
 
 // buildSchedule parses the schedule in different formats and builds the schedule.
@@ -145,10 +149,10 @@ const (
 // - start: string or array of strings
 // - stop: string or array of strings
 // - restart: string or array of strings
-func buildSchedule(def *configDefinition, d *DAG, _ buildOpts) error {
+func (b *builder) buildSchedule() error {
 	var starts, stops, restarts []string
 
-	switch schedule := (def.Schedule).(type) {
+	switch schedule := (b.def.Schedule).(type) {
 	case string:
 		// Case 1. schedule is a string.
 		starts = append(starts, schedule)
@@ -171,44 +175,44 @@ func buildSchedule(def *configDefinition, d *DAG, _ buildOpts) error {
 		// If schedule is nil, return without error.
 	default:
 		// If schedule is of an invalid type, return an error.
-		return fmt.Errorf("%w: %T", errInvalidScheduleType, def.Schedule)
+		return fmt.Errorf("%w: %T", errInvalidScheduleType, b.def.Schedule)
 	}
 
 	// Parse each schedule as a cron expression.
 	var err error
-	d.Schedule, err = parseSchedules(starts)
+	b.dag.Schedule, err = parseSchedules(starts)
 	if err != nil {
 		return err
 	}
-	d.StopSchedule, err = parseSchedules(stops)
+	b.dag.StopSchedule, err = parseSchedules(stops)
 	if err != nil {
 		return err
 	}
-	d.RestartSchedule, err = parseSchedules(restarts)
+	b.dag.RestartSchedule, err = parseSchedules(restarts)
 	return err
 }
 
-func buildMailOnConfig(def *configDefinition, d *DAG, opts buildOpts) error {
-	if def.MailOn == nil {
+func (b *builder) buildMailOnConfig() error {
+	if b.def.MailOn == nil {
 		return nil
 	}
-	d.MailOn = &MailOn{
-		Failure: def.MailOn.Failure,
-		Success: def.MailOn.Success,
+	b.dag.MailOn = &MailOn{
+		Failure: b.def.MailOn.Failure,
+		Success: b.def.MailOn.Success,
 	}
 	return nil
 }
 
-func buildEnvs(def *configDefinition, d, base *DAG, opts buildOpts) (err error) {
+func (b *builder) buildEnvs() (err error) {
 	var env map[string]string
-	env, err = loadVariables(def.Env, opts)
+	env, err = loadVariables(b.def.Env, b.opts)
 	if err == nil {
-		d.Env = buildConfigEnv(env)
-		if base != nil {
-			for _, e := range base.Env {
+		b.dag.Env = buildConfigEnv(env)
+		if b.base != nil {
+			for _, e := range b.base.Env {
 				key := strings.SplitN(e, "=", 2)[0]
 				if _, ok := env[key]; !ok {
-					d.Env = append(d.Env, e)
+					b.dag.Env = append(b.dag.Env, e)
 				}
 			}
 		}
@@ -216,65 +220,65 @@ func buildEnvs(def *configDefinition, d, base *DAG, opts buildOpts) (err error) 
 	return
 }
 
-func buildLogDir(def *configDefinition, d *DAG, _ buildOpts) (err error) {
-	d.LogDir, err = util.ParseVariable(def.LogDir)
+func (b *builder) buildLogDir() (err error) {
+	b.dag.LogDir, err = util.ParseVariable(b.def.LogDir)
 	return err
 }
 
-func buildParams(def *configDefinition, d *DAG, options buildOpts) (err error) {
-	d.DefaultParams = def.Params
-	p := d.DefaultParams
-	if options.parameters != "" {
-		p = options.parameters
+func (b *builder) buildParams() (err error) {
+	b.dag.DefaultParams = b.def.Params
+	p := b.dag.DefaultParams
+	if b.opts.parameters != "" {
+		p = b.opts.parameters
 	}
 	var envs []string
-	d.Params, envs, err = parseParameters(p, !options.noEval, options)
+	b.dag.Params, envs, err = parseParameters(p, !b.opts.noEval, b.opts)
 	if err == nil {
-		d.Env = append(d.Env, envs...)
+		b.dag.Env = append(b.dag.Env, envs...)
 	}
 	return
 }
 
-func buildHandlers(def *configDefinition, d *DAG, options buildOpts) (err error) {
-	if def.HandlerOn.Exit != nil {
-		def.HandlerOn.Exit.Name = constants.OnExit
-		if d.HandlerOn.Exit, err = buildStep(d.Env, def.HandlerOn.Exit, def.Functions, options); err != nil {
+func (b *builder) buildHandlers() (err error) {
+	if b.def.HandlerOn.Exit != nil {
+		b.def.HandlerOn.Exit.Name = constants.OnExit
+		if b.dag.HandlerOn.Exit, err = buildStep(b.dag.Env, b.def.HandlerOn.Exit, b.def.Functions, b.opts); err != nil {
 			return err
 		}
 	}
 
-	if def.HandlerOn.Success != nil {
-		def.HandlerOn.Success.Name = constants.OnSuccess
-		if d.HandlerOn.Success, err = buildStep(d.Env, def.HandlerOn.Success, def.Functions, options); err != nil {
+	if b.def.HandlerOn.Success != nil {
+		b.def.HandlerOn.Success.Name = constants.OnSuccess
+		if b.dag.HandlerOn.Success, err = buildStep(b.dag.Env, b.def.HandlerOn.Success, b.def.Functions, b.opts); err != nil {
 			return
 		}
 	}
 
-	if def.HandlerOn.Failure != nil {
-		def.HandlerOn.Failure.Name = constants.OnFailure
-		if d.HandlerOn.Failure, err = buildStep(d.Env, def.HandlerOn.Failure, def.Functions, options); err != nil {
+	if b.def.HandlerOn.Failure != nil {
+		b.def.HandlerOn.Failure.Name = constants.OnFailure
+		if b.dag.HandlerOn.Failure, err = buildStep(b.dag.Env, b.def.HandlerOn.Failure, b.def.Functions, b.opts); err != nil {
 			return
 		}
 	}
 
-	if def.HandlerOn.Cancel != nil {
-		def.HandlerOn.Cancel.Name = constants.OnCancel
-		if d.HandlerOn.Cancel, err = buildStep(d.Env, def.HandlerOn.Cancel, def.Functions, options); err != nil {
+	if b.def.HandlerOn.Cancel != nil {
+		b.def.HandlerOn.Cancel.Name = constants.OnCancel
+		if b.dag.HandlerOn.Cancel, err = buildStep(b.dag.Env, b.def.HandlerOn.Cancel, b.def.Functions, b.opts); err != nil {
 			return
 		}
 	}
 	return nil
 }
 
-func buildConfig(def *configDefinition, d *DAG, _ buildOpts) (err error) {
-	if def.HistRetentionDays != nil {
-		d.HistRetentionDays = *def.HistRetentionDays
+func (b *builder) buildConfig() (err error) {
+	if b.def.HistRetentionDays != nil {
+		b.dag.HistRetentionDays = *b.def.HistRetentionDays
 	}
-	d.Preconditions = loadPreCondition(def.Preconditions)
-	d.MaxActiveRuns = def.MaxActiveRuns
+	b.dag.Preconditions = loadPreCondition(b.def.Preconditions)
+	b.dag.MaxActiveRuns = b.def.MaxActiveRuns
 
-	if def.MaxCleanUpTimeSec != nil {
-		d.MaxCleanUpTime = time.Second * time.Duration(*def.MaxCleanUpTimeSec)
+	if b.def.MaxCleanUpTimeSec != nil {
+		b.dag.MaxCleanUpTime = time.Second * time.Duration(*b.def.MaxCleanUpTimeSec)
 	}
 	return nil
 }
@@ -376,30 +380,50 @@ func loadVariables(strVariables interface{}, opts buildOpts) (
 	return vars, nil
 }
 
-func buildSteps(def *configDefinition, d *DAG, options buildOpts) error {
+func (b *builder) buildSteps() error {
 	var ret []Step
-	for _, stepDef := range def.Steps {
-		step, err := buildStep(d.Env, stepDef, def.Functions, options)
+	for _, stepDef := range b.def.Steps {
+		step, err := buildStep(b.dag.Env, stepDef, b.def.Functions, b.opts)
 		if err != nil {
 			return err
 		}
 		ret = append(ret, *step)
 	}
-	d.Steps = ret
+	b.dag.Steps = ret
 
 	return nil
 }
 
+func (b *builder) buildSMTPConfig() (err error) {
+	b.dag.Smtp = &SmtpConfig{
+		Host:     os.ExpandEnv(b.def.Smtp.Host),
+		Port:     os.ExpandEnv(b.def.Smtp.Port),
+		Username: os.ExpandEnv(b.def.Smtp.Username),
+		Password: os.ExpandEnv(b.def.Smtp.Password),
+	}
+	return nil
+}
+
+func (b *builder) buildErrMailConfig() (err error) {
+	b.dag.ErrorMail, err = buildMailConfigFromDefinition(b.def.ErrorMail)
+	return
+}
+
+func (b *builder) buildInfoMailConfig() (err error) {
+	b.dag.InfoMail, err = buildMailConfigFromDefinition(b.def.InfoMail)
+	return
+}
+
 // nolint // cognitive complexity
-func buildStep(variables []string, def *stepDef, funcs []*funcDef, options buildOpts) (*Step, error) {
-	if err := assertStepDef(def, funcs); err != nil {
+func buildStep(variables []string, def *stepDef, fns []*funcDef, options buildOpts) (*Step, error) {
+	if err := assertStepDef(def, fns); err != nil {
 		return nil, err
 	}
 	step := &Step{}
 	step.Name = def.Name
 	step.Description = def.Description
 
-	if err := parseFuncCall(step, def.Call, funcs); err != nil {
+	if err := parseFuncCall(step, def.Call, fns); err != nil {
 		return nil, err
 	}
 
@@ -623,26 +647,6 @@ func convertMap(m map[string]interface{}) error {
 	return nil
 }
 
-func buildSMTPConfig(def *configDefinition, d *DAG, _ buildOpts) (err error) {
-	d.Smtp = &SmtpConfig{
-		Host:     os.ExpandEnv(def.Smtp.Host),
-		Port:     os.ExpandEnv(def.Smtp.Port),
-		Username: os.ExpandEnv(def.Smtp.Username),
-		Password: os.ExpandEnv(def.Smtp.Password),
-	}
-	return nil
-}
-
-func buildErrMailConfig(def *configDefinition, d *DAG, _ buildOpts) (err error) {
-	d.ErrorMail, err = buildMailConfigFromDefinition(def.ErrorMail)
-	return
-}
-
-func buildInfoMailConfig(def *configDefinition, d *DAG, _ buildOpts) (err error) {
-	d.InfoMail, err = buildMailConfigFromDefinition(def.InfoMail)
-	return
-}
-
 func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
 	return &MailConfig{
 		From:       def.From,
@@ -809,7 +813,7 @@ func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string
 		}
 
 		var targets *[]string
-		switch key {
+		switch scheduleKey(key) {
 		case scheduleStart:
 			targets = starts
 		case scheduleStop:
