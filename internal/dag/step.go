@@ -92,5 +92,6 @@ func (s *Step) String() string {
 		fmt.Sprintf("Args: %s", s.Args),
 		fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")),
 	}
+
 	return strings.Join(values, "\t")
 }

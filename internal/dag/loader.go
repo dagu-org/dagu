@@ -187,6 +187,7 @@ func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.
 			return nil
 		}
 	}
+
 	return nil
 }
 
@@ -196,6 +197,7 @@ func readFile(file string) (config map[string]any, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
 	}
+
 	return unmarshalData(data)
 }
 
@@ -206,6 +208,7 @@ func unmarshalData(data []byte) (map[string]interface{}, error) {
 	if errors.Is(err, io.EOF) {
 		err = nil
 	}
+
 	return cm, err
 }
 
@@ -218,6 +221,7 @@ func decode(cm map[string]interface{}) (*definition, error) {
 		TagName:     "",
 	})
 	err := md.Decode(cm)
+
 	return c, err
 }
 

@@ -851,6 +851,7 @@ func parseMiscs(def *stepDef, step *Step) error {
 		}
 		step.SignalOnStop = sigDef
 	}
+
 	return nil
 }
 
@@ -859,6 +860,7 @@ func expandEnv(val string, noEval bool) string {
 	if noEval {
 		return val
 	}
+
 	return os.ExpandEnv(val)
 }
 
@@ -868,6 +870,7 @@ func parseKey(value any) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%w: %T", errInvalidKeyType, value)
 	}
+
 	return val, nil
 }
 
@@ -1127,6 +1130,7 @@ func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string
 			*targets = append(*targets, v)
 		}
 	}
+
 	return nil
 }
 

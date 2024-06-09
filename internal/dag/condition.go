@@ -32,9 +32,11 @@ func evalCondition(c *Condition) error {
 	if err != nil {
 		return fmt.Errorf("%w. Condition=%s Error=%v", errEvalCondition, c.Condition, err)
 	}
+
 	if c.Expected != actual {
 		return fmt.Errorf("%w. Condition=%s Expected=%s Actual=%s", errConditionNotMet, c.Condition, c.Expected, actual)
 	}
+
 	return nil
 }
 
@@ -46,5 +48,6 @@ func EvalConditions(cond []*Condition) error {
 			return err
 		}
 	}
+
 	return nil
 }
