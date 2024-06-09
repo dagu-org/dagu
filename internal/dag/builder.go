@@ -97,6 +97,9 @@ func (b *builder) build(def *configDefinition, base *DAG) (*DAG, error) {
 	b.callBuilderFunc(b.buildMailOnConfig)
 	b.callBuilderFunc(b.buildParams)
 
+	// If metadataOnly is set, return the DAG with the metadata.
+	// This is done for avoiding unnecessary processing when
+	// only the metadata is required.
 	if !b.opts.metadataOnly {
 		b.callBuilderFunc(b.buildLogDir)
 		b.callBuilderFunc(b.buildSteps)
@@ -203,25 +206,28 @@ func (b *builder) buildMailOnConfig() error {
 	return nil
 }
 
-func (b *builder) buildEnvs() (err error) {
-	var env map[string]string
-	env, err = loadVariables(b.def.Env, b.opts)
-	if err == nil {
-		b.dag.Env = buildConfigEnv(env)
-		if b.base != nil {
-			for _, e := range b.base.Env {
-				key := strings.SplitN(e, "=", 2)[0]
-				if _, ok := env[key]; !ok {
-					b.dag.Env = append(b.dag.Env, e)
-				}
+// buildEnvs builds the environment variables for the DAG.
+// Case 1: env is an array of maps with string keys and string values.
+// Case 2: env is a map with string keys and string values.
+func (b *builder) buildEnvs() error {
+	env, err := loadVariables(b.def.Env, b.opts)
+	if err != nil {
+		return err
+	}
+	b.dag.Env = buildConfigEnv(env)
+	if b.base != nil {
+		for _, e := range b.base.Env {
+			key := strings.SplitN(e, "=", 2)[0]
+			if _, ok := env[key]; !ok {
+				b.dag.Env = append(b.dag.Env, e)
 			}
 		}
 	}
-	return
+	return nil
 }
 
 func (b *builder) buildLogDir() (err error) {
-	b.dag.LogDir, err = util.ParseVariable(b.def.LogDir)
+	b.dag.LogDir, err = util.Evaluate(b.def.LogDir)
 	return err
 }
 
@@ -321,61 +327,69 @@ func parseParameters(value string, eval bool, options buildOpts) (
 	return ret, envs, nil
 }
 
-type envVariable struct {
+// pair represents a key-value pair.
+type pair struct {
 	key string
 	val string
 }
 
+// parseKeyValue parse a key-value pair from a map and appends it to the pairs slice.
+// Each entry in the map must have a string key and a string value.
+func parseKeyValue(m map[any]any, pairs *[]pair) error {
+	for k, v := range m {
+		key, ok := k.(string)
+		if !ok {
+			return errInvalidKeyType
+		}
+		val, ok := v.(string)
+		if !ok {
+			return errInvalidEnvValue
+		}
+		*pairs = append(*pairs, pair{key: key, val: val})
+	}
+	return nil
+}
+
 // nolint // cognitive complexity
-func loadVariables(strVariables interface{}, opts buildOpts) (
+func loadVariables(strVariables any, opts buildOpts) (
 	map[string]string, error,
 ) {
-	var vals []*envVariable
-	loadFn := func(a []*envVariable, m map[interface{}]interface{}) ([]*envVariable, error) {
-		for k, v := range m {
-			if k, ok := k.(string); ok {
-				if vv, ok := v.(string); ok {
-					a = append(a, &envVariable{k, vv})
-				} else {
-					return a, fmt.Errorf("%w: %s", errInvalidEnvValue, v)
-				}
-			}
-		}
-		return a, nil
-	}
+	var pairs []pair
 
-	var err error
-	if a, ok := strVariables.(map[interface{}]interface{}); ok {
-		vals, err = loadFn(vals, a)
-		if err != nil {
+	switch a := strVariables.(type) {
+	case map[any]any:
+		// Case 1. env is a map.
+		if err := parseKeyValue(a, &pairs); err != nil {
 			return nil, err
 		}
-	}
-
-	if a, ok := strVariables.([]interface{}); ok {
+	case []any:
+		// Case 2. env is an array of maps.
 		for _, v := range a {
-			if aa, ok := v.(map[interface{}]interface{}); ok {
-				vals, err = loadFn(vals, aa)
-				if err != nil {
+			if aa, ok := v.(map[any]any); ok {
+				if err := parseKeyValue(aa, &pairs); err != nil {
 					return nil, err
 				}
 			}
 		}
 	}
 
+	// Parse each key-value pair and set the environment variable.
 	vars := map[string]string{}
-	for _, v := range vals {
-		parsed, err := util.ParseVariable(v.val)
-		if err != nil {
-			return nil, err
-		}
-		vars[v.key] = parsed
+	for _, pair := range pairs {
+		value := pair.val
 		if !opts.noEval {
-			err = os.Setenv(v.key, parsed)
+			// Evaluate the value of the environment variable.
+			// This also executes command substitution.
+			var err error
+			value, err = util.Evaluate(value)
 			if err != nil {
+				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
+			}
+			if err := os.Setenv(pair.key, value); err != nil {
 				return nil, err
 			}
 		}
+		vars[pair.key] = value
 	}
 	return vars, nil
 }
@@ -441,7 +455,7 @@ func buildStep(variables []string, def *stepDef, fns []*funcDef, options buildOp
 		return nil, err
 	}
 
-	// Convert map[interface{}]interface{} to map[string]interface{}
+	// Convert map[any]any to map[string]any
 	if step.ExecutorConfig.Config != nil {
 		if err := convertMap(step.ExecutorConfig.Config); err != nil {
 			return nil, err
@@ -611,8 +625,8 @@ func expandEnv(val string, options buildOpts) string {
 	return os.ExpandEnv(val)
 }
 
-func convertMap(m map[string]interface{}) error {
-	convertKey := func(v interface{}) (interface{}, error) {
+func convertMap(m map[string]any) error {
+	convertKey := func(v any) (any, error) {
 		switch v.(type) {
 		case string:
 			return v, nil
@@ -621,14 +635,14 @@ func convertMap(m map[string]interface{}) error {
 		}
 	}
 
-	queue := []map[string]interface{}{m}
+	queue := []map[string]any{m}
 
 	for len(queue) > 0 {
 		curr := queue[0]
 		for k, v := range curr {
 			switch v := v.(type) {
-			case map[interface{}]interface{}:
-				ret := map[string]interface{}{}
+			case map[any]any:
+				ret := make(map[string]any)
 				for kk, vv := range v {
 					kk, err := convertKey(kk)
 					if err != nil {

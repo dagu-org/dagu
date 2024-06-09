@@ -3,7 +3,6 @@ package dag
 import (
 	"crypto/md5"
 	"fmt"
-	"os"
 	"path"
 	"strings"
 	"time"
@@ -57,11 +56,6 @@ type MailOn struct {
 	Success bool
 }
 
-func ReadFile(file string) (string, error) {
-	b, err := os.ReadFile(file)
-	return string(b), err
-}
-
 func (d *DAG) HasTag(tag string) bool {
 	for _, t := range d.Tags {
 		if t == tag {
@@ -78,11 +72,6 @@ func (d *DAG) SockAddr() string {
 	_, _ = h.Write([]byte(s))
 	bs := h.Sum(nil)
 	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
-}
-
-func (d *DAG) Clone() *DAG {
-	ret := *d
-	return &ret
 }
 
 func (d *DAG) String() string {

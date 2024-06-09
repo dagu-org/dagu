@@ -118,14 +118,14 @@ func TestOpenOrCreateFile(t *testing.T) {
 
 func TestParseVariable(t *testing.T) {
 	_ = os.Setenv("TEST_VAR", "test")
-	r, err := util.ParseVariable("${TEST_VAR}")
+	r, err := util.Evaluate("${TEST_VAR}")
 	require.NoError(t, err)
 	require.Equal(t, r, "test")
 
-	_, err = util.ParseVariable("`ech test`")
+	_, err = util.Evaluate("`ech test`")
 	require.Error(t, err)
 
-	r, err = util.ParseVariable("`echo test`")
+	r, err = util.Evaluate("`echo test`")
 	require.NoError(t, err)
 	require.Equal(t, r, "test")
 }

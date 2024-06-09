@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildErrors(t *testing.T) {
+func TestBuilder_BuildErrors(t *testing.T) {
 	tests := []struct {
 		input string
 	}{
@@ -55,19 +55,14 @@ env:
 	}
 }
 
-func TestBuildingEnvs(t *testing.T) {
+func TestBuilder_BuildEnvs(t *testing.T) {
 	tests := []struct {
+		name     string
 		input    string
 		expected map[string]string
 	}{
 		{
-			input: `
-env: 
-  VAR: "` + "`echo 1`" + `"
-`,
-			expected: map[string]string{"VAR": "1"},
-		},
-		{
+			name: "simple key value",
 			input: `
 env: 
   "1": "123"
@@ -75,6 +70,15 @@ env:
 			expected: map[string]string{"1": "123"},
 		},
 		{
+			name: "command substitution",
+			input: `
+env: 
+  VAR: "` + "`echo 1`" + `"
+`,
+			expected: map[string]string{"VAR": "1"},
+		},
+		{
+			name: "env substitution",
 			input: `
 env: 
   - "FOO": "BAR"
@@ -87,36 +91,41 @@ env:
 	}
 
 	for _, tt := range tests {
-		d, err := unmarshalData([]byte(tt.input))
-		require.NoError(t, err)
+		t.Run(tt.name, func(t *testing.T) {
+			d, err := unmarshalData([]byte(tt.input))
+			require.NoError(t, err)
 
-		cdl := &configDefinitionLoader{}
-		def, err := cdl.decode(d)
-		require.NoError(t, err)
+			cdl := &configDefinitionLoader{}
+			def, err := cdl.decode(d)
+			require.NoError(t, err)
 
-		b := &builder{}
-		_, err = b.build(def, nil)
-		require.NoError(t, err)
+			b := &builder{}
+			_, err = b.build(def, nil)
+			require.NoError(t, err)
 
-		for k, v := range tt.expected {
-			require.Equal(t, v, os.Getenv(k))
-		}
+			for k, v := range tt.expected {
+				require.Equal(t, v, os.Getenv(k))
+			}
+		})
 	}
 }
 
-func TestBuildingParameters(t *testing.T) {
+func TestBuilder_BuildParams(t *testing.T) {
 	tests := []struct {
+		name     string
 		params   string
 		env      string
 		expected map[string]string
 	}{
 		{
+			name:   "only one param with value",
 			params: "x",
 			expected: map[string]string{
 				"1": "x",
 			},
 		},
 		{
+			name:   "two params with values",
 			params: "x y",
 			expected: map[string]string{
 				"1": "x",
@@ -124,6 +133,7 @@ func TestBuildingParameters(t *testing.T) {
 			},
 		},
 		{
+			name:   "three params with values",
 			params: "x yy zzz",
 			expected: map[string]string{
 				"1": "x",
@@ -132,6 +142,7 @@ func TestBuildingParameters(t *testing.T) {
 			},
 		},
 		{
+			name:   "params with argument substitution",
 			params: "x $1",
 			expected: map[string]string{
 				"1": "x",
@@ -139,6 +150,7 @@ func TestBuildingParameters(t *testing.T) {
 			},
 		},
 		{
+			name:   "complex params with argument substitution and command substitution",
 			params: "first P1=foo P2=${FOO} P3=`/bin/echo BAR` X=bar Y=${P1} Z=\"A B C\"",
 			env:    "FOO: BAR",
 			expected: map[string]string{
@@ -160,50 +172,57 @@ func TestBuildingParameters(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		d, err := unmarshalData([]byte(fmt.Sprintf(`
+		t.Run(tt.name, func(t *testing.T) {
+			d, err := unmarshalData([]byte(fmt.Sprintf(`
 env:
   - %s
 params: %s
   	`, tt.env, tt.params)))
-		require.NoError(t, err)
+			require.NoError(t, err)
 
-		cdl := &configDefinitionLoader{}
-		def, err := cdl.decode(d)
-		require.NoError(t, err)
+			cdl := &configDefinitionLoader{}
+			def, err := cdl.decode(d)
+			require.NoError(t, err)
 
-		b := &builder{}
-		_, err = b.build(def, nil)
-		require.NoError(t, err)
+			b := &builder{}
+			_, err = b.build(def, nil)
+			require.NoError(t, err)
 
-		for k, v := range tt.expected {
-			require.Equal(t, v, os.Getenv(k))
-		}
+			for k, v := range tt.expected {
+				require.Equal(t, v, os.Getenv(k))
+			}
+		})
 	}
 }
 
-func TestBuildCommands(t *testing.T) {
+func TestBuilder_BuildCommand(t *testing.T) {
 	tests := []struct {
+		name  string
 		input string
 	}{
 		{
+			name: "simple command with single argument",
 			input: `
 steps:
   - name: step1
     command: echo 1`,
 		},
 		{
+			name: "JSON array command with single argument",
 			input: `
 steps:
   - name: step1
     command: ['echo', '1']`,
 		},
 		{
+			name: "JSON array command without quotes",
 			input: `
 steps:
   - name: step1
     command: [echo, 1]`,
 		},
 		{
+			name: "YAML array command with single argument",
 			input: `
 steps:
   - name: step1
@@ -214,7 +233,7 @@ steps:
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
@@ -240,52 +259,59 @@ steps:
 	}
 }
 
-func TestExpandingEnvs(t *testing.T) {
+func Test_expandEnv(t *testing.T) {
 	_ = os.Setenv("FOO", "BAR")
 	require.Equal(t, expandEnv("${FOO}", buildOpts{}), "BAR")
 	require.Equal(t, expandEnv("${FOO}", buildOpts{noEval: true}), "${FOO}")
 }
 
-func TestBuildingTags(t *testing.T) {
-	input := `tags: Daily, Monthly`
-	expected := []string{"daily", "monthly"}
+func TestBuilder_BuildTags(t *testing.T) {
+	t.Run("multiple tags", func(t *testing.T) {
+		input := `tags: Daily, Monthly`
+		expected := []string{"daily", "monthly"}
 
-	m, err := unmarshalData([]byte(input))
-	require.NoError(t, err)
+		m, err := unmarshalData([]byte(input))
+		require.NoError(t, err)
 
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(m)
-	require.NoError(t, err)
+		cdl := &configDefinitionLoader{}
+		def, err := cdl.decode(m)
+		require.NoError(t, err)
 
-	b := &builder{}
-	d, err := b.build(def, nil)
-	require.NoError(t, err)
+		b := &builder{}
+		d, err := b.build(def, nil)
+		require.NoError(t, err)
 
-	for _, tag := range expected {
-		require.True(t, d.HasTag(tag))
-	}
+		for _, tag := range expected {
+			require.True(t, d.HasTag(tag))
+		}
 
-	require.False(t, d.HasTag("weekly"))
+		require.False(t, d.HasTag("weekly"))
+	})
 }
 
-func TestBuildingSchedules(t *testing.T) {
+func TestBuilder_BuildSchedule(t *testing.T) {
 	tests := []struct {
+		name     string
 		input    string
-		isErr    bool
+		wantErr  bool
 		expected map[string][]string
 	}{
 		{
+			name: "start and stop schedules",
 			input: `
 schedule:
   start: "0 1 * * *"
   stop: "0 2 * * *"
+  restart: "0 12 * * *"
 `,
 			expected: map[string][]string{
-				"start": {"0 1 * * *"},
-				"stop":  {"0 2 * * *"},
+				"start":   {"0 1 * * *"},
+				"stop":    {"0 2 * * *"},
+				"restart": {"0 12 * * *"},
 			},
 		},
 		{
+			name: "start schedule only",
 			input: `
 schedule:
   start: "0 1 * * *"
@@ -295,6 +321,7 @@ schedule:
 			},
 		},
 		{
+			name: "stop schedule only",
 			input: `schedule:
   stop: "0 1 * * *"
 `,
@@ -303,6 +330,7 @@ schedule:
 			},
 		},
 		{
+			name: "multiple schedules for start and stop",
 			input: `
 schedule:
   start: 
@@ -318,36 +346,25 @@ schedule:
 			},
 		},
 		{
-			input: `
-schedule:
-  start: "0 8 * * *"
-  restart: "0 12 * * *"
-  stop: "0 20 * * *"
-`,
-			expected: map[string][]string{
-				"start":   {"0 8 * * *"},
-				"restart": {"0 12 * * *"},
-				"stop":    {"0 20 * * *"},
-			},
-		},
-		{
+			name: "invalid cron expression",
 			input: `
 schedule:
   stop: "* * * * * * *"
 `,
-			isErr: true,
+			wantErr: true,
 		},
 		{
+			name: "invalid schedule key",
 			input: `
 schedule:
   invalid: "* * * * * * *"
 `,
-			isErr: true,
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			m, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
@@ -358,7 +375,7 @@ schedule:
 			b := &builder{}
 			d, err := b.build(def, nil)
 
-			if tt.isErr {
+			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
@@ -366,12 +383,12 @@ schedule:
 
 			for k, v := range tt.expected {
 				var actual []*Schedule
-				switch k {
-				case "start":
+				switch scheduleKey(k) {
+				case scheduleStart:
 					actual = d.Schedule
-				case "stop":
+				case scheduleStop:
 					actual = d.StopSchedule
-				case "restart":
+				case scheduleRestart:
 					actual = d.RestartSchedule
 				}
 
@@ -389,34 +406,36 @@ schedule:
 	}
 }
 
-func TestGeneratingSockAddr(t *testing.T) {
-	d := &DAG{Location: "testdata/testDag.yml"}
-	require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, d.SockAddr())
+func TestLoad(t *testing.T) {
+	t.Run("Overwrite the base config", func(t *testing.T) {
+		baseCfg := config.Get().BaseConfig
+
+		d, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
+		require.NoError(t, err)
+
+		require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
+		require.Equal(t, d.HistRetentionDays, 7)
+	})
+	t.Run("Do not overwrite the base config", func(t *testing.T) {
+		baseCfg := config.Get().BaseConfig
+
+		d, err := Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
+		require.NoError(t, err)
+
+		require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
+		require.Equal(t, d.HistRetentionDays, 30)
+	})
 }
 
-func TestOverwriteGlobalConfig(t *testing.T) {
-	baseCfg := config.Get().BaseConfig
-
-	d, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
-	require.NoError(t, err)
-
-	require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
-	require.Equal(t, d.HistRetentionDays, 7)
-
-	d, err = Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
-	require.NoError(t, err)
-
-	require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
-	require.Equal(t, d.HistRetentionDays, 30)
-}
-
-func TestBuildExecutor(t *testing.T) {
+func TestBuilder_BuildExecutor(t *testing.T) {
 	tests := []struct {
+		name           string
 		input          string
 		expectedExec   string
 		expectedConfig map[string]interface{}
 	}{
 		{
+			name: "http executor",
 			input: `
 steps:
   - name: S1
@@ -427,6 +446,7 @@ steps:
 			expectedConfig: nil,
 		},
 		{
+			name: "http executor with config",
 			input: `
 steps:
   - name: S1
@@ -444,105 +464,112 @@ steps:
 	}
 
 	for _, tt := range tests {
-		d, err := unmarshalData([]byte(tt.input))
-		require.NoError(t, err)
+		t.Run(tt.name, func(t *testing.T) {
+			d, err := unmarshalData([]byte(tt.input))
+			require.NoError(t, err)
 
-		cdl := &configDefinitionLoader{}
-		def, err := cdl.decode(d)
-		require.NoError(t, err)
+			cdl := &configDefinitionLoader{}
+			def, err := cdl.decode(d)
+			require.NoError(t, err)
 
-		b := &builder{}
-		dag, err := b.build(def, nil)
-		require.NoError(t, err)
+			b := &builder{}
+			dag, err := b.build(def, nil)
+			require.NoError(t, err)
 
-		if len(dag.Steps) != 1 {
-			t.Errorf("expected 1 step, got %d", len(dag.Steps))
-		}
+			if len(dag.Steps) != 1 {
+				t.Errorf("expected 1 step, got %d", len(dag.Steps))
+			}
 
-		require.Equal(t, tt.expectedExec, dag.Steps[0].ExecutorConfig.Type)
-		if tt.expectedConfig != nil {
-			require.Equal(t, tt.expectedConfig, dag.Steps[0].ExecutorConfig.Config)
-		}
+			require.Equal(t, tt.expectedExec, dag.Steps[0].ExecutorConfig.Type)
+			if tt.expectedConfig != nil {
+				require.Equal(t, tt.expectedConfig, dag.Steps[0].ExecutorConfig.Config)
+			}
+		})
 	}
 }
 
-func TestBuildingSignalOnStop(t *testing.T) {
-	for _, tc := range []struct {
-		sig  string
-		want string
-		err  bool
+func TestBuilder_BuildSignalOnStop(t *testing.T) {
+	tests := []struct {
+		sig      string
+		expected string
+		wantErr  bool
 	}{
 		{
-			sig:  "SIGINT",
-			want: "SIGINT",
-			err:  false,
+			sig:      "SIGINT",
+			expected: "SIGINT",
 		},
 		{
-			sig: "2000",
-			err: true,
+			sig:     "2000",
+			wantErr: true,
 		},
-	} {
-		dat := fmt.Sprintf(`name: test DAG
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.sig, func(t *testing.T) {
+			dat := fmt.Sprintf(`name: test DAG
 steps:
   - name: "1"
     command: "true"
     signalOnStop: "%s"
-`, tc.sig)
-		ret, err := LoadData([]byte(dat))
-		if tc.err {
-			require.Error(t, err)
-			continue
+`, tt.sig)
+			ret, err := LoadYAML([]byte(dat))
+			if tt.wantErr != (err != nil) {
+				t.Errorf("expected error: %v, got: %v", tt.wantErr, err)
+			}
+			if tt.wantErr {
+				return
+			}
+			if len(ret.Steps) != 1 {
+				t.Fatalf("expected 1 step, got %d", len(ret.Steps))
+			}
+			require.Equal(t, ret.Steps[0].SignalOnStop, tt.expected)
+		})
+	}
+}
+
+func Test_convertMap(t *testing.T) {
+	t.Run("Convert map with string keys", func(t *testing.T) {
+		data := map[string]interface{}{
+			"key1": "value1",
+			"map": map[interface{}]interface{}{
+				"key2": "value2",
+				"map": map[interface{}]interface{}{
+					"key3": "value3",
+				},
+			},
 		}
+
+		err := convertMap(data)
 		require.NoError(t, err)
 
-		step := ret.Steps[0]
-		require.Equal(t, step.SignalOnStop, tc.want)
-	}
-}
+		m1 := data["map"]
+		k1 := reflect.TypeOf(m1).Key().Kind()
+		require.True(t, k1 == reflect.String)
 
-func TestConvertMap(t *testing.T) {
-	data := map[string]interface{}{
-		"key1": "value1",
-		"map": map[interface{}]interface{}{
-			"key2": "value2",
-			"map": map[interface{}]interface{}{
-				"key3": "value3",
+		m2 := data["map"].(map[string]interface{})["map"]
+		k2 := reflect.TypeOf(m2).Key().Kind()
+		require.True(t, k2 == reflect.String)
+
+		expected := map[string]any{
+			"key1": "value1",
+			"map": map[string]any{
+				"key2": "value2",
+				"map": map[string]any{
+					"key3": "value3",
+				},
 			},
-		},
-	}
-
-	err := convertMap(data)
-	require.NoError(t, err)
-
-	m1 := data["map"]
-	k1 := reflect.TypeOf(m1).Key().Kind()
-	require.True(t, k1 == reflect.String)
-
-	m2 := data["map"].(map[string]interface{})["map"]
-	k2 := reflect.TypeOf(m2).Key().Kind()
-	require.True(t, k2 == reflect.String)
-
-	expected := map[string]interface{}{
-		"key1": "value1",
-		"map": map[string]interface{}{
-			"key2": "value2",
-			"map": map[string]interface{}{
-				"key3": "value3",
+		}
+		require.Equal(t, expected, data)
+	})
+	t.Run("[Invalid] Convert map with non-string keys", func(t *testing.T) {
+		data := map[string]any{
+			"key1": "value1",
+			"map": map[any]any{
+				1: "value2",
 			},
-		},
-	}
+		}
 
-	require.Equal(t, expected, data)
-}
-
-func TestConvertMapError(t *testing.T) {
-	data := map[string]interface{}{
-		"key1": "value1",
-		"map": map[interface{}]interface{}{
-			1: "value2",
-		},
-	}
-
-	err := convertMap(data)
-	require.Error(t, err)
+		err := convertMap(data)
+		require.Error(t, err)
+	})
 }

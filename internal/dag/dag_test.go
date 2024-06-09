@@ -26,30 +26,19 @@ func changeHomeDir(homeDir string) {
 	_ = config.LoadConfig()
 }
 
-func TestToString(t *testing.T) {
-	d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
-	require.NoError(t, err)
+func TestDAG_String(t *testing.T) {
+	t.Run("String representation of default.yaml", func(t *testing.T) {
+		d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+		require.NoError(t, err)
 
-	ret := d.String()
-	require.Contains(t, ret, "Name: default")
+		ret := d.String()
+		require.Contains(t, ret, "Name: default")
+	})
 }
 
-func TestReadingFile(t *testing.T) {
-	tmpDir := util.MustTempDir("read-config-test")
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
-
-	tmpFile := path.Join(tmpDir, "DAG.yaml")
-	input := `
-steps:
-  - name: step 1
-    command: echo test
-`
-	err := os.WriteFile(tmpFile, []byte(input), 0644)
-	require.NoError(t, err)
-
-	ret, err := ReadFile(tmpFile)
-	require.NoError(t, err)
-	require.Equal(t, input, ret)
+func TestDAG_SockAddr(t *testing.T) {
+	t.Run("Unix Socket", func(t *testing.T) {
+		d := &DAG{Location: "testdata/testDag.yml"}
+		require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, d.SockAddr())
+	})
 }

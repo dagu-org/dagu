@@ -20,7 +20,7 @@ var (
 
 // Evaluate returns the actual value of the condition.
 func (c *Condition) Evaluate() (string, error) {
-	return util.ParseVariable(c.Condition)
+	return util.Evaluate(c.Condition)
 }
 
 // CheckResult checks if the actual value of the condition matches the expected value.

@@ -62,33 +62,34 @@ func FormatDuration(t time.Duration, defaultVal string) string {
 }
 
 // SplitCommand splits command string to program and arguments.
+// TODO: This function needs to be refactored to handle more complex cases.
 func SplitCommand(cmd string, parse bool) (program string, args []string) {
-	s := cmd
-	vals := strings.SplitN(s, " ", 2)
-	if len(vals) > 1 {
-		program = vals[0]
-		parser := shellwords.NewParser()
-		parser.ParseBacktick = parse
-		parser.ParseEnv = false
-		a := EscapeSpecialchars(vals[1])
-		args, err := parser.Parse(a)
-		if err != nil {
-			log.Printf("failed to parse arguments: %s", err)
-			// if parse shell world error use all substing as args
-			return program, []string{vals[1]}
-		}
-		ret := []string{}
-		for _, v := range args {
-			val := UnescapeSpecialchars(v)
-			if parse {
-				val = os.ExpandEnv(val)
-			}
-			ret = append(ret, val)
-		}
-		return program, ret
-
+	splits := strings.SplitN(cmd, " ", 2)
+	if len(splits) == 1 {
+		return splits[0], []string{}
 	}
-	return vals[0], []string{}
+	program = splits[0]
+	parser := shellwords.NewParser()
+	parser.ParseBacktick = parse
+	parser.ParseEnv = false
+
+	a := EscapeSpecialChars(splits[1])
+	args, err := parser.Parse(a)
+	if err != nil {
+		log.Printf("failed to parse arguments: %s", err)
+		// if parse shell world error use all string as argument
+		return program, []string{splits[1]}
+	}
+
+	var ret []string
+	for _, v := range args {
+		val := UnescapeSpecialChars(v)
+		if parse {
+			val = os.ExpandEnv(val)
+		}
+		ret = append(ret, val)
+	}
+	return program, ret
 }
 
 // AssignValues Assign values to command parameters
@@ -124,7 +125,7 @@ func ExtractParamNames(command string) []string {
 	return params
 }
 
-func UnescapeSpecialchars(str string) string {
+func UnescapeSpecialChars(str string) string {
 	repl := strings.NewReplacer(
 		`\\t`, `\t`,
 		`\\r`, `\r`,
@@ -133,7 +134,7 @@ func UnescapeSpecialchars(str string) string {
 	return repl.Replace(str)
 }
 
-func EscapeSpecialchars(str string) string {
+func EscapeSpecialChars(str string) string {
 	repl := strings.NewReplacer(
 		`\t`, `\\t`,
 		`\r`, `\\r`,
@@ -187,9 +188,9 @@ func ValidFilename(str, replacement string) string {
 	return strings.ReplaceAll(s, " ", replacement)
 }
 
-// ParseVariable parses variable string.
-func ParseVariable(value string) (string, error) {
-	val, err := ParseCommand(os.ExpandEnv(value))
+// Evaluate expands environment variables and execute command substitution.
+func Evaluate(value string) (string, error) {
+	val, err := SubstituteCommands(os.ExpandEnv(value))
 	if err != nil {
 		return "", err
 	}
@@ -198,8 +199,8 @@ func ParseVariable(value string) (string, error) {
 
 var tickerMatcher = regexp.MustCompile("`[^`]+`")
 
-// ParseCommand substitutes command in the value string.
-func ParseCommand(value string) (string, error) {
+// SubstituteCommands substitutes command in the value string.
+func SubstituteCommands(value string) (string, error) {
 	matches := tickerMatcher.FindAllString(strings.TrimSpace(value), -1)
 	if matches == nil {
 		return value, nil

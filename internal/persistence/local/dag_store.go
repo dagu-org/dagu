@@ -79,7 +79,7 @@ func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	_, err := dag.LoadData(spec)
+	_, err := dag.LoadYAML(spec)
 	if err != nil {
 		return err
 	}

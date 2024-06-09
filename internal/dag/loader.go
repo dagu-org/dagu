@@ -48,8 +48,8 @@ func LoadMetadata(dag string) (*DAG, error) {
 	})
 }
 
-// LoadData loads config from given data.
-func LoadData(data []byte) (*DAG, error) {
+// LoadYAML loads config from YAML data.
+func LoadYAML(data []byte) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err

@@ -4,9 +4,9 @@ type configDefinition struct {
 	Name              string
 	Group             string
 	Description       string
-	Schedule          interface{}
+	Schedule          any
 	LogDir            string
-	Env               interface{}
+	Env               any
 	HandlerOn         handerOnDef
 	Functions         []*funcDef
 	Steps             []*stepDef
