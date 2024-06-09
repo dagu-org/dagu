@@ -385,7 +385,7 @@ func TestReadLine(t *testing.T) {
 	}()
 	tmpFile := filepath.Join(tmpDir, "test_read_line.dat")
 
-	f, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := util.OpenOrCreateFile(tmpFile)
 	require.NoError(t, err)
 
 	// error

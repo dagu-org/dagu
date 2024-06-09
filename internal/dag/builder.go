@@ -775,6 +775,22 @@ func parseCommand(step *Step, command any) error {
 	return nil
 }
 
+var (
+	// paramRegex is a regex to match the parameters in the command.
+	paramRegex = regexp.MustCompile(`\$\w+`)
+)
+
+// assignValues Assign values to command parameters
+func assignValues(command string, params map[string]string) string {
+	updatedCommand := command
+
+	for k, v := range params {
+		updatedCommand = strings.ReplaceAll(updatedCommand, fmt.Sprintf("$%v", k), v)
+	}
+
+	return updatedCommand
+}
+
 // parseFuncCall parses the function call in the step definition.
 func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 	if call == nil {
@@ -810,8 +826,8 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 		}
 	}
 
-	step.Command = util.RemoveParams(calledFuncDef.Command)
-	step.CmdWithArgs = util.AssignValues(calledFuncDef.Command, passedArgs)
+	step.Command = paramRegex.ReplaceAllString(calledFuncDef.Command, "")
+	step.CmdWithArgs = assignValues(calledFuncDef.Command, passedArgs)
 
 	return nil
 }
@@ -936,6 +952,21 @@ func parseSchedules(values []string) ([]*Schedule, error) {
 	return ret, nil
 }
 
+// extractParamNames extracts a slice of parameter names by removing the '$' from the command string.
+func extractParamNames(command string) []string {
+	words := strings.Fields(command)
+
+	var params []string
+	for _, word := range words {
+		if strings.HasPrefix(word, "$") {
+			paramName := strings.TrimPrefix(word, "$")
+			params = append(params, paramName)
+		}
+	}
+
+	return params
+}
+
 // assertFunctions validates the function definitions.
 func assertFunctions(fns []*funcDef) error {
 	if fns == nil {
@@ -950,7 +981,7 @@ func assertFunctions(fns []*funcDef) error {
 		nameMap[funcDef.Name] = true
 
 		definedParamNames := strings.Split(funcDef.Params, " ")
-		passedParamNames := util.ExtractParamNames(funcDef.Command)
+		passedParamNames := extractParamNames(funcDef.Command)
 		if len(definedParamNames) != len(passedParamNames) {
 			return errFuncParamsMismatch
 		}

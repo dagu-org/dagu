@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -107,7 +108,7 @@ func (e *engineImpl) Start(d *dag.DAG, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, util.EscapeArg(params, false)))
+		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(params, false)))
 	}
 	args = append(args, d.Location)
 	cmd := exec.Command(e.executable, args...)
@@ -297,4 +298,22 @@ func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
 func (e *engineImpl) IsSuspended(id string) bool {
 	fs := e.dataStoreFactory.NewFlagStore()
 	return fs.IsSuspended(id)
+}
+
+func escapeArg(input string, doubleQuotes bool) string {
+	escaped := strings.Builder{}
+
+	for _, char := range input {
+		if char == '\r' {
+			escaped.WriteString("\\r")
+		} else if char == '\n' {
+			escaped.WriteString("\\n")
+		} else if char == '"' && doubleQuotes {
+			escaped.WriteString("\\\"")
+		} else {
+			escaped.WriteRune(char)
+		}
+	}
+
+	return escaped.String()
 }
