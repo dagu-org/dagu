@@ -10,17 +10,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
 
 	"gopkg.in/yaml.v2"
 )
-
-// Loader is a config loader.
-type Loader struct {
-	BaseConfig string
-}
 
 var (
 	errConfigFileRequired = errors.New("config file was not specified")
@@ -28,112 +23,124 @@ var (
 )
 
 // Load loads config from file.
-func (cl *Loader) Load(f, params string) (*DAG, error) {
-	return cl.loadWithOptions(f, params, false, false, false)
+func Load(base, dag, params string) (*DAG, error) {
+	return loadDAG(dag, buildOpts{
+		base:         base,
+		parameters:   params,
+		metadataOnly: false,
+		noEval:       false,
+	})
 }
 
 // LoadWithoutEval loads config from file without evaluating env variables.
-func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
-	return cl.loadWithOptions(f, "", false, true, true)
+func LoadWithoutEval(dag string) (*DAG, error) {
+	return loadDAG(dag, buildOpts{
+		metadataOnly: false,
+		noEval:       true,
+	})
 }
 
 // LoadMetadata loads config from file and returns only the headline data.
-func (cl *Loader) LoadMetadata(f string) (*DAG, error) {
-	return cl.loadWithOptions(f, "", true, true, true)
+func LoadMetadata(dag string) (*DAG, error) {
+	return loadDAG(dag, buildOpts{
+		metadataOnly: true,
+		noEval:       true,
+	})
 }
 
-// loadWithOptions loads the config file with the provided options.
-func (cl *Loader) loadWithOptions(f, params string, loadMetadataOnly, skipEnvEval, skipEnvSetup bool) (*DAG, error) {
-	return cl.loadDAG(f,
-		&BuildDAGOptions{
-			parameters:       params,
-			loadMetadataOnly: loadMetadataOnly,
-			skipEnvEval:      skipEnvEval,
-			skipEnvSetup:     skipEnvSetup,
-		},
-	)
-}
-
-// LoadData loads config from given data.
-func (cl *Loader) LoadData(data []byte) (*DAG, error) {
-	fl := &fileLoader{}
-	raw, err := fl.unmarshalData(data)
+// LoadYAML loads config from YAML data.
+func LoadYAML(data []byte) (*DAG, error) {
+	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
 	}
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(raw)
+
+	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
-	b := &DAGBuilder{
-		options: BuildDAGOptions{loadMetadataOnly: false, skipEnvEval: true, skipEnvSetup: true},
-	}
-	return b.buildFromDefinition(def, nil)
+
+	b := &builder{opts: buildOpts{metadataOnly: false, noEval: true}}
+	return b.build(def, nil)
 }
 
-func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, error) {
-	if !utils.FileExists(file) {
+// loadBaseConfig loads the global configuration from the given file.
+// The global configuration can be overridden by the DAG configuration.
+func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
+	// The base config is optional.
+	if !util.FileExists(file) {
 		return nil, nil
 	}
 
-	raw, err := cl.load(file)
+	// Load the raw data from the file.
+	raw, err := readFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(raw)
+	// Decode the raw data into a config definition.
+	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	buildOpts := *opts
-	buildOpts.loadMetadataOnly = false
-	b := &DAGBuilder{
-		options: buildOpts,
-	}
-	return b.buildFromDefinition(def, nil)
+	// Build the DAG from the config definition.
+	// Base configuration must load all the data.
+	buildOpts := opts
+	buildOpts.metadataOnly = false
+
+	b := &builder{opts: buildOpts}
+	return b.build(def, nil)
 }
 
-func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
-	file, err := cl.prepareFilepath(f)
+// loadDAG loads the DAG from the given file.
+func loadDAG(dag string, opts buildOpts) (*DAG, error) {
+	// Find the absolute path to the file.
+	// The file must be a YAML file.
+	file, err := prepareFilepath(dag)
 	if err != nil {
 		return nil, err
 	}
 
-	dst, err := cl.loadBaseConfigIfRequired(file, opts)
+	// Load the base configuration unless only the metadata is required.
+	// If only the metadata is required, the base configuration is not loaded
+	// and the DAG is created with the default values.
+	dst, err := loadBaseConfigIfRequired(opts.base, file, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := cl.load(file)
+	// Load the raw data from the file.
+	raw, err := readFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	cdl := &configDefinitionLoader{}
-
-	def, err := cdl.decode(raw)
+	// Decode the raw data into a config definition.
+	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	b := DAGBuilder{options: *opts}
-	c, err := b.buildFromDefinition(def, dst)
-
+	// Build the DAG from the config definition.
+	b := builder{opts: opts}
+	c, err := b.build(def, dst.Env)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cdl.merge(dst, c)
+	// Merge the DAG with the base configuration.
+	// The DAG configuration overrides the base configuration.
+	err = merge(dst, c)
 	if err != nil {
 		return nil, err
 	}
 
+	// Set the absolute path to the file.
 	dst.Location = file
 
-	if !opts.skipEnvSetup {
+	// Set the default values for the DAG.
+	if !opts.metadataOnly {
 		dst.setup()
 	}
 
@@ -141,28 +148,36 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 }
 
 // prepareFilepath prepares the filepath for the given file.
-func (cl *Loader) prepareFilepath(f string) (string, error) {
-	if f == "" {
+// The file must be a YAML file.
+func prepareFilepath(file string) (string, error) {
+	if file == "" {
 		return "", errConfigFileRequired
 	}
-	if !strings.HasSuffix(f, ".yaml") && !strings.HasSuffix(f, ".yml") {
-		f = fmt.Sprintf("%s.yaml", f)
+
+	// The file name can be specified without the extension.
+	if !strings.HasSuffix(file, ".yaml") && !strings.HasSuffix(file, ".yml") {
+		file = fmt.Sprintf("%s.yaml", file)
 	}
-	return filepath.Abs(f)
+
+	return filepath.Abs(file)
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (*DAG, error) {
-	if !opts.loadMetadataOnly && cl.BaseConfig != "" {
-		dag, err := cl.loadBaseConfig(cl.BaseConfig, opts)
+func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, error) {
+	if !opts.metadataOnly && baseConfig != "" {
+		dag, err := loadBaseConfig(baseConfig, opts)
 		if err != nil {
 			return nil, err
 		}
+		// Base config is optional.
 		if dag != nil {
 			return dag, nil
 		}
 	}
-	return &DAG{Name: strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))}, nil
+
+	// return a DAG with the default values.
+	dagName := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+	return &DAG{Name: dagName}, nil
 }
 
 type mergeTransformer struct{}
@@ -170,66 +185,57 @@ type mergeTransformer struct{}
 var _ mergo.Transformers = (*mergeTransformer)(nil)
 
 func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+	// mergo does not overwrite a value with zero value for a pointer.
 	if typ == reflect.TypeOf(MailOn{}) {
+		// We need to explicitly overwrite the value for a pointer with a zero value.
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {
 				dst.Set(src)
 			}
+
 			return nil
 		}
 	}
+
 	return nil
 }
 
-func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
-	return cl.readFile(file)
-}
-
-func (cl *Loader) readFile(file string) (config map[string]interface{}, err error) {
-	fl := &fileLoader{}
-	return fl.readFile(file)
-}
-
-// fileLoader is a helper struct to load and process configuration files.
-type fileLoader struct{}
-
 // readFile reads the contents of the file into a map.
-func (fl *fileLoader) readFile(file string) (config map[string]interface{}, err error) {
+func readFile(file string) (config map[string]any, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
 	}
-	return fl.unmarshalData(data)
+
+	return unmarshalData(data)
 }
 
 // unmarshalData unmarshals the data into a map.
-func (fl *fileLoader) unmarshalData(data []byte) (map[string]interface{}, error) {
+func unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
 	if errors.Is(err, io.EOF) {
 		err = nil
 	}
+
 	return cm, err
 }
 
-// configDefinitionLoader is a helper struct to decode and merge configuration definitions.
-type configDefinitionLoader struct{}
-
 // decode decodes the configuration map into a configDefinition.
-func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDefinition, error) {
-	c := &configDefinition{}
+func decode(cm map[string]interface{}) (*definition, error) {
+	c := &definition{}
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
 		TagName:     "",
 	})
 	err := md.Decode(cm)
+
 	return c, err
 }
 
 // merge merges the source DAG into the destination DAG.
-func (cdl *configDefinitionLoader) merge(dst, src *DAG) error {
-	err := mergo.Merge(dst, src, mergo.WithOverride,
+func merge(dst, src *DAG) error {
+	return mergo.Merge(dst, src, mergo.WithOverride,
 		mergo.WithTransformers(&mergeTransformer{}))
-	return err
 }

@@ -15,7 +15,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ import (
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
-	tmpDir := utils.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("dagu_test")
 	changeHomeDir(tmpDir)
 
 	ds := client.NewDataStoreFactory(&config.Config{
@@ -97,7 +97,7 @@ func withSpool(t *testing.T, f func()) string {
 }
 
 func testDAGFile(name string) string {
-	d := path.Join(utils.MustGetwd(), "testdata")
+	d := path.Join(util.MustGetwd(), "testdata")
 	return path.Join(d, name)
 }
 

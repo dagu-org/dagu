@@ -1,11 +1,12 @@
 package scheduler
 
 import (
-	"go.uber.org/goleak"
 	"os"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/logger"
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
-	tempDir := utils.MustTempDir("runner_test")
+	tempDir := util.MustTempDir("runner_test")
 	changeHomeDir(tempDir)
 	testHomeDir = tempDir
 	code := m.Run()
@@ -37,7 +38,7 @@ func changeHomeDir(homeDir string) {
 
 func TestRun(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.SetFixedTime(now)
+	setFixedTime(now)
 
 	er := &mockEntryReader{
 		Entries: []*Entry{
@@ -73,7 +74,7 @@ func TestRun(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	utils.SetFixedTime(now)
+	setFixedTime(now)
 
 	er := &mockEntryReader{
 		Entries: []*Entry{
@@ -103,7 +104,7 @@ func TestRestart(t *testing.T) {
 
 func TestNextTick(t *testing.T) {
 	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-	utils.SetFixedTime(n)
+	setFixedTime(n)
 	r := New(Params{
 		EntryReader: &mockEntryReader{},
 		LogDir:      testHomeDir,
@@ -160,4 +161,17 @@ func (j *mockJob) Stop() error {
 func (j *mockJob) Restart() error {
 	j.RestartCount.Add(1)
 	return nil
+}
+
+func Test_fixedTIme(t *testing.T) {
+	t.Run("now", func(t *testing.T) {
+		fixedTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+		setFixedTime(fixedTime)
+		require.Equal(t, fixedTime, now())
+
+		// Reset
+		setFixedTime(time.Time{})
+		require.NotEqual(t, fixedTime, now())
+	})
 }

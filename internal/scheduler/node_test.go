@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +18,7 @@ func TestExecute(t *testing.T) {
 	n := &Node{
 		step: dag.Step{
 			Command:         "true",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		}}
 	require.NoError(t, n.Execute(context.Background()))
 	require.Nil(t, n.Error)
@@ -29,7 +28,7 @@ func TestError(t *testing.T) {
 	n := &Node{
 		step: dag.Step{
 			Command:         "false",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		}}
 	err := n.Execute(context.Background())
 	require.True(t, err != nil)
@@ -41,7 +40,7 @@ func TestSignal(t *testing.T) {
 		step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		}}
 
 	go func() {
@@ -61,7 +60,7 @@ func TestSignalSpecified(t *testing.T) {
 		step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 			SignalOnStop:    "SIGINT",
 		}}
 
@@ -83,7 +82,7 @@ func TestLog(t *testing.T) {
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 
@@ -100,7 +99,7 @@ func TestStdout(t *testing.T) {
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
 			Stdout:          "stdout.log",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 
@@ -122,7 +121,7 @@ echo Stderr message >&2
 			Dir:             os.Getenv("HOME"),
 			Stdout:          "test-stderr-stdout.log",
 			Stderr:          "test-stderr-stderr.log",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 
@@ -142,7 +141,7 @@ func TestNode(t *testing.T) {
 		step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 	n.incDoneCount()
@@ -165,7 +164,7 @@ func TestOutput(t *testing.T) {
 		step: dag.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
@@ -185,7 +184,7 @@ func TestOutput(t *testing.T) {
 		step: dag.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 
@@ -198,7 +197,7 @@ func TestOutput(t *testing.T) {
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 
@@ -228,7 +227,7 @@ func TestOutputJson(t *testing.T) {
 				step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
-					OutputVariables: &utils.SyncMap{},
+					OutputVariables: &dag.SyncMap{},
 				},
 			}
 			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-jsondb-%d", i))
@@ -290,7 +289,7 @@ func TestOutputSpecialchar(t *testing.T) {
 				step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_SPECIALCHAR_TEST",
-					OutputVariables: &utils.SyncMap{},
+					OutputVariables: &dag.SyncMap{},
 				},
 			}
 			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
@@ -319,7 +318,7 @@ func TestRunScript(t *testing.T) {
 			  echo hello
 			`,
 			Output:          "SCRIPT_TEST",
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 
@@ -346,7 +345,7 @@ func TestTeardown(t *testing.T) {
 		step: dag.Step{
 			Command:         testCommand,
 			Args:            []string{},
-			OutputVariables: &utils.SyncMap{},
+			OutputVariables: &dag.SyncMap{},
 		},
 	}
 

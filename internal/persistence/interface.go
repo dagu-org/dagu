@@ -47,7 +47,7 @@ type (
 		Rename(oldName, newName string) error
 		GetSpec(name string) (string, error)
 		UpdateSpec(name string, spec []byte) error
-		FindByName(name string) (*dag.DAG, error)
+		Find(name string) (*dag.DAG, error)
 	}
 
 	FlagStore interface {

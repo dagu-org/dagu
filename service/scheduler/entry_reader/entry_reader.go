@@ -14,7 +14,7 @@ import (
 	"github.com/dagu-dev/dagu/service/scheduler/scheduler"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -91,15 +91,14 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 func (er *EntryReader) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
-	cl := dag.Loader{}
 	fis, err := os.ReadDir(er.dagsDir)
 	if err != nil {
 		return err
 	}
 	var fileNames []string
 	for _, fi := range fis {
-		if utils.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
+		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+			d, err := dag.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
@@ -113,7 +112,6 @@ func (er *EntryReader) initDags() error {
 }
 
 func (er *EntryReader) watchDags(done chan any) {
-	cl := dag.Loader{}
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		er.logger.Error("failed to init file watcher", tag.Error(err))
@@ -131,12 +129,12 @@ func (er *EntryReader) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			if !utils.MatchExtension(event.Name, dag.EXTENSIONS) {
+			if !util.MatchExtension(event.Name, dag.EXTENSIONS) {
 				continue
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				d, err := dag.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {

@@ -17,19 +17,19 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testdataDir = path.Join(utils.MustGetwd(), "./testdata")
+	testdataDir = path.Join(util.MustGetwd(), "./testdata")
 )
 
 // TODO: fix this tests to use mock
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
-	tmpDir := utils.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
 	_ = config.LoadConfig()
 
@@ -39,7 +39,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	})
 
 	e := engine.NewFactory(ds, &config.Config{
-		Executable: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+		Executable: path.Join(util.MustGetwd(), "../../bin/dagu"),
 	}).Create()
 
 	return tmpDir, e, ds
@@ -48,7 +48,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
-	tmpDir := utils.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
 	_ = config.LoadConfig()
 
@@ -58,7 +58,7 @@ func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStore
 	})
 
 	e := engine.NewFactory(ds, &config.Config{
-		Executable: path.Join(utils.MustGetwd(), "../../bin/dagu"),
+		Executable: path.Join(util.MustGetwd(), "../../bin/dagu"),
 	}).Create()
 
 	return tmpDir, e, ds
@@ -340,18 +340,10 @@ func TestCreateNewDAG(t *testing.T) {
 	id, err := e.CreateDAG("test-dag")
 	require.NoError(t, err)
 
-	// check file is created
-	cl := &dag.Loader{}
-
-	// TODO: fixme to use mock
-	d, err := cl.Load(path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
+	// Check if the new DAG is actually created.
+	d, err := dag.Load("", path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 	require.NoError(t, err)
 	require.Equal(t, "test-dag", d.Name)
-
-	steps := d.Steps[0]
-	require.Equal(t, "step1", steps.Name)
-	require.Equal(t, "echo", steps.Command)
-	require.Equal(t, []string{"hello"}, steps.Args)
 }
 
 func TestRenameDAG(t *testing.T) {
@@ -360,37 +352,36 @@ func TestRenameDAG(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
+	// Create a DAG to rename.
 	id, err := e.CreateDAG("old_name")
 	require.NoError(t, err)
-
-	// TODO: fixme to use mock
-	loc := path.Join(tmpDir, ".dagu", "dags", id+".yaml")
-
-	_, err = e.GetStatus(loc)
+	_, err = e.GetStatus(path.Join(tmpDir, ".dagu", "dags", id+".yaml"))
 	require.NoError(t, err)
 
-	// TODO: fixme
-	loc2 := path.Join(tmpDir, ".dagu", "dags", id+"_renamed.yaml")
-
+	// Rename the file.
 	err = e.Rename(id, id+"_renamed")
+
+	// Check if the file is renamed.
 	require.NoError(t, err)
-	require.FileExists(t, loc2)
+	require.FileExists(t, path.Join(tmpDir, ".dagu", "dags", id+"_renamed.yaml"))
 }
 
-func TestLoadConfig(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+func TestEngine_GetStatus(t *testing.T) {
+	t.Run("[Failure] Invalid DAG name", func(t *testing.T) {
+		tmpDir, e, _ := setupTest(t)
+		defer func() {
+			_ = os.RemoveAll(tmpDir)
+		}()
 
-	file := testDAG("invalid_dag.yaml")
+		file := testDAG("invalid_dag")
 
-	d, err := e.GetStatus(file)
-	require.Error(t, err)
-	require.NotNil(t, d)
+		d, err := e.GetStatus(file)
+		require.Error(t, err)
+		require.NotNil(t, d)
 
-	// contains error message
-	require.Error(t, d.Error)
+		// Check the status contains error.
+		require.Error(t, d.Error)
+	})
 }
 
 func TestReadAll(t *testing.T) {

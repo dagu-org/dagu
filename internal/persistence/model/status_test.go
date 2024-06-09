@@ -8,7 +8,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 
-	"github.com/dagu-dev/dagu/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,7 +63,7 @@ func TestCorrectRunningStatus(t *testing.T) {
 
 func TestJsonMarshal(t *testing.T) {
 	step := dag.Step{
-		OutputVariables: &utils.SyncMap{},
+		OutputVariables: &dag.SyncMap{},
 	}
 	step.OutputVariables.Store("A", "B")
 	js, err := json.Marshal(step)

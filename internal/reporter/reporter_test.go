@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,8 +62,8 @@ func TestReporter(t *testing.T) {
 						Args:    []string{"param-x"},
 					},
 					Status:     scheduler.NodeStatusRunning,
-					StartedAt:  utils.FormatTime(time.Now()),
-					FinishedAt: utils.FormatTime(time.Now().Add(time.Minute * 10)),
+					StartedAt:  util.FormatTime(time.Now()),
+					FinishedAt: util.FormatTime(time.Now().Add(time.Minute * 10)),
 				},
 			}
 

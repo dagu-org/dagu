@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -12,7 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type Engine interface {
@@ -99,7 +100,7 @@ func (e *engineImpl) Stop(d *dag.DAG) error {
 func (e *engineImpl) StartAsync(d *dag.DAG, params string) {
 	go func() {
 		err := e.Start(d, params)
-		utils.LogErr("starting a DAG", err)
+		util.LogErr("starting a DAG", err)
 	}()
 }
 
@@ -107,7 +108,7 @@ func (e *engineImpl) Start(d *dag.DAG, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, utils.EscapeArg(params, false)))
+		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(params, false)))
 	}
 	args = append(args, d.Location)
 	cmd := exec.Command(e.executable, args...)
@@ -297,4 +298,22 @@ func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
 func (e *engineImpl) IsSuspended(id string) bool {
 	fs := e.dataStoreFactory.NewFlagStore()
 	return fs.IsSuspended(id)
+}
+
+func escapeArg(input string, doubleQuotes bool) string {
+	escaped := strings.Builder{}
+
+	for _, char := range input {
+		if char == '\r' {
+			escaped.WriteString("\\r")
+		} else if char == '\n' {
+			escaped.WriteString("\\n")
+		} else if char == '"' && doubleQuotes {
+			escaped.WriteString("\\\"")
+		} else {
+			escaped.WriteRune(char)
+		}
+	}
+
+	return escaped.String()
 }

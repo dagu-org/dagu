@@ -6,13 +6,14 @@ import (
 	"os/signal"
 	"path"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type Scheduler struct {
@@ -123,7 +124,7 @@ func (s *Scheduler) setupLogFile() (err error) {
 }
 
 func (s *Scheduler) start() {
-	t := utils.Now().Truncate(time.Second * 60)
+	t := now().Truncate(time.Second * 60)
 	timer := time.NewTimer(0)
 	s.running.Store(true)
 	for {
@@ -131,7 +132,7 @@ func (s *Scheduler) start() {
 		case <-timer.C:
 			s.run(t)
 			t = s.nextTick(t)
-			timer = time.NewTimer(t.Sub(utils.Now()))
+			timer = time.NewTimer(t.Sub(now()))
 		case <-s.stop:
 			_ = timer.Stop()
 			return
@@ -141,7 +142,7 @@ func (s *Scheduler) start() {
 
 func (s *Scheduler) run(now time.Time) {
 	entries, err := s.entryReader.Read(now.Add(-time.Second))
-	utils.LogErr("failed to read entries", err)
+	util.LogErr("failed to read entries", err)
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].Next.Before(entries[j].Next)
 	})
@@ -171,4 +172,27 @@ func (s *Scheduler) Stop() {
 		s.stop <- struct{}{}
 	}
 	s.running.Store(false)
+}
+
+var (
+	fixedTime time.Time
+	lock      sync.RWMutex
+)
+
+// setFixedTime sets the fixed time.
+// This is used for testing.
+func setFixedTime(t time.Time) {
+	lock.Lock()
+	defer lock.Unlock()
+	fixedTime = t
+}
+
+// now returns the current time.
+func now() time.Time {
+	lock.RLock()
+	defer lock.RUnlock()
+	if fixedTime.IsZero() {
+		return time.Now()
+	}
+	return fixedTime
 }

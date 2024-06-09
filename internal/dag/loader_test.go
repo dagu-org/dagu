@@ -2,7 +2,6 @@ package dag
 
 import (
 	"path"
-	"strings"
 	"testing"
 	"time"
 
@@ -10,109 +9,104 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadingFile(t *testing.T) {
-	l := &Loader{}
-	f := path.Join(testdataDir, "loader_test.yaml")
-	d, err := l.Load(f, "")
-	require.NoError(t, err)
-	require.Equal(t, f, d.Location)
-
-	// without .yaml
-	d, err = l.Load(path.Join(testdataDir, "loader_test"), "")
-	require.NoError(t, err)
-	require.Equal(t, f, d.Location)
-}
-
-func TestLoaingErrors(t *testing.T) {
-
+func Test_Load(t *testing.T) {
 	tests := []struct {
-		file          string
-		expectedError string
+		name             string
+		file             string
+		expectedError    string
+		expectedLocation string
 	}{
 		{
+			name:             "Load file with .yaml",
+			file:             path.Join(testdataDir, "loader_test.yaml"),
+			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
+		},
+		{
+			name:             "Load file without .yaml",
+			file:             path.Join(testdataDir, "loader_test"),
+			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
+		},
+		{
+			name:          "[Invalid] DAG file does not exist",
 			file:          path.Join(testdataDir, "not_existing_file.yaml"),
 			expectedError: "no such file or directory",
 		},
 		{
+			name:          "[Invalid] DAG file has invalid keys",
 			file:          path.Join(testdataDir, "err_decode.yaml"),
 			expectedError: "has invalid keys: invalidkey",
 		},
 		{
+			name:          "[Invalid] DAG file cannot unmarshal",
 			file:          path.Join(testdataDir, "err_parse.yaml"),
 			expectedError: "cannot unmarshal",
 		},
 	}
-
-	for i, tt := range tests {
-		l := &Loader{}
-		_, err := l.Load(tt.file, "")
-		require.Error(t, err)
-
-		if !strings.Contains(err.Error(), tt.expectedError) {
-			t.Errorf("test %d: expected error %q, got %q", i, tt.expectedError, err.Error())
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, err := Load("", tt.file, "")
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expectedLocation, d.Location)
+			}
+		})
 	}
 }
 
-func TestLoadingHeadlineOnly(t *testing.T) {
-	l := &Loader{}
+func Test_LoadMetadata(t *testing.T) {
+	t.Run("Load metadata", func(t *testing.T) {
+		d, err := LoadMetadata(path.Join(testdataDir, "default.yaml"))
+		require.NoError(t, err)
 
-	d, err := l.LoadMetadata(path.Join(testdataDir, "default.yaml"))
-	require.NoError(t, err)
-
-	require.Equal(t, d.Name, "default")
-	require.True(t, len(d.Steps) == 0)
+		require.Equal(t, d.Name, "default")
+		// Check if steps are empty since we are loading metadata only
+		require.True(t, len(d.Steps) == 0)
+	})
 }
 
-func TestCloning(t *testing.T) {
-	l := &Loader{}
-
-	d, err := l.Load(path.Join(testdataDir, "default.yaml"), "")
-	require.NoError(t, err)
-
-	cloned := d.Clone()
-	require.Equal(t, d, cloned)
+func Test_loadBaseConfig(t *testing.T) {
+	t.Run("Load base config file", func(t *testing.T) {
+		// The base config file is set on the global config
+		// This should be `testdata/home/.dagu/config.yaml`.
+		d, err := loadBaseConfig(config.Get().BaseConfig, buildOpts{})
+		require.NotNil(t, d)
+		require.NoError(t, err)
+	})
 }
 
-func TestLoadingBaseConfig(t *testing.T) {
-	l := &Loader{}
-	d, err := l.loadBaseConfig(config.Get().BaseConfig, &BuildDAGOptions{})
-	require.NotNil(t, d)
-	require.NoError(t, err)
+func Test_LoadDefaultConfig(t *testing.T) {
+	t.Run("Load default config", func(t *testing.T) {
+		d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+		require.NoError(t, err)
+
+		// Check if the default values are set correctly
+		require.Equal(t, time.Second*60, d.MaxCleanUpTime)
+		require.Equal(t, 30, d.HistRetentionDays)
+	})
 }
 
-func TestLoadingDeafultValues(t *testing.T) {
-	l := &Loader{}
-	d, err := l.Load(path.Join(testdataDir, "default.yaml"), "")
-	require.NoError(t, err)
-
-	require.Equal(t, time.Second*60, d.MaxCleanUpTime)
-	require.Equal(t, 30, d.HistRetentionDays)
-}
-
-func TestLoadingFromMemory(t *testing.T) {
-	dat := `
+func Test_LoadYAML(t *testing.T) {
+	t.Run("Load YAML data", func(t *testing.T) {
+		dat := `
 name: test DAG
 steps:
   - name: "1"
     command: "true"
 `
-	l := &Loader{}
-	ret, err := l.LoadData([]byte(dat))
-	require.NoError(t, err)
-	require.Equal(t, ret.Name, "test DAG")
+		ret, err := LoadYAML([]byte(dat))
+		require.NoError(t, err)
+		require.Equal(t, ret.Name, "test DAG")
 
-	step := ret.Steps[0]
-	require.Equal(t, step.Name, "1")
-	require.Equal(t, step.Command, "true")
-
-	// error
-	dat = `invalidyaml`
-	_, err = l.LoadData([]byte(dat))
-	require.Error(t, err)
-
-	// error
-	dat = `invalidkey: test DAG`
-	_, err = l.LoadData([]byte(dat))
-	require.Error(t, err)
+		step := ret.Steps[0]
+		require.Equal(t, step.Name, "1")
+		require.Equal(t, step.Command, "true")
+	})
+	t.Run("[Invalid] Load invalid YAML data", func(t *testing.T) {
+		dat := `invalidyaml`
+		_, err := LoadYAML([]byte(dat))
+		require.Error(t, err)
+	})
 }

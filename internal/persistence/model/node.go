@@ -6,7 +6,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 var (
@@ -26,8 +26,8 @@ type Node struct {
 }
 
 func (n *Node) ToNode() *scheduler.Node {
-	startedAt, _ := utils.ParseTime(n.StartedAt)
-	finishedAt, _ := utils.ParseTime(n.FinishedAt)
+	startedAt, _ := util.ParseTime(n.StartedAt)
+	finishedAt, _ := util.ParseTime(n.FinishedAt)
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
 		Log:        n.Log,
@@ -43,8 +43,8 @@ func FromNode(n scheduler.NodeState, step dag.Step) *Node {
 	return &Node{
 		Step:       step,
 		Log:        n.Log,
-		StartedAt:  utils.FormatTime(n.StartedAt),
-		FinishedAt: utils.FormatTime(n.FinishedAt),
+		StartedAt:  util.FormatTime(n.StartedAt),
+		FinishedAt: util.FormatTime(n.FinishedAt),
 		Status:     n.Status,
 		StatusText: n.Status.String(),
 		RetryCount: n.RetryCount,

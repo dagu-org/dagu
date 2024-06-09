@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 func TestStorage(t *testing.T) {
-	tmpDir := utils.MustTempDir("test-storage")
+	tmpDir := util.MustTempDir("test-storage")
 	defer os.RemoveAll(tmpDir)
 
 	s := NewStorage(tmpDir)

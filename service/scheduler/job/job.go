@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // TODO: write tests
@@ -42,7 +42,7 @@ func (j *Job) Start() error {
 	}
 
 	// check the last execution time
-	t, err := utils.ParseTime(s.StartedAt)
+	t, err := util.ParseTime(s.StartedAt)
 	if err == nil {
 		t = t.Truncate(time.Second * 60)
 		if t.After(j.Next) || j.Next.Equal(t) {

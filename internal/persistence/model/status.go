@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type StatusResponse struct {
@@ -122,7 +122,7 @@ func formatTime(val *time.Time) string {
 	if val == nil || val.IsZero() {
 		return ""
 	}
-	return utils.FormatTime(*val)
+	return util.FormatTime(*val)
 }
 
 func (st *Status) CorrectRunningStatus() {

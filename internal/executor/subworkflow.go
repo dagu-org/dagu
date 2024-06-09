@@ -3,12 +3,13 @@ package executor
 import (
 	"context"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/utils"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
 	"syscall"
+
+	"github.com/dagu-dev/dagu/internal/util"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 )
@@ -56,7 +57,7 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 		return nil, fmt.Errorf("failed to get dag context: %w", err)
 	}
 
-	d, err := dagCtx.Finder.FindByName(step.SubWorkflow.Name)
+	sugDAG, err := dagCtx.Finder.Find(step.SubWorkflow.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubWorkflow.Name, err)
 	}
@@ -66,11 +67,11 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 	args := []string{
 		"start",
 		fmt.Sprintf("--params=%q", params),
-		d.Location,
+		sugDAG.Location,
 	}
 
 	cmd := exec.CommandContext(ctx, executable, args...)
-	if len(step.Dir) > 0 && !utils.FileExists(step.Dir) {
+	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
 		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
 	}
 	cmd.Dir = step.Dir

@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -96,11 +96,11 @@ func (e *DockerExecutor) Run() error {
 	}
 
 	_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
-	utils.LogErr("docker executor: stdcopy", err)
+	util.LogErr("docker executor: stdcopy", err)
 
 	if e.autoRemove {
 		err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
-		utils.LogErr("docker executor: remove container", err)
+		util.LogErr("docker executor: remove container", err)
 	}
 
 	return nil

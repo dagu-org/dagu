@@ -12,7 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/dagu-dev/dagu/internal/utils"
+	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // Server is a unix socket frontend that passes http requests to HandlerFunc.
@@ -69,7 +69,7 @@ func (svr *Server) Serve(listen chan error) error {
 		if err == nil {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
-				utils.LogErr("read request", err)
+				util.LogErr("read request", err)
 				if err == nil {
 					svr.HandlerFunc(newHttpResponseWriter(&conn), request)
 				}
@@ -87,7 +87,7 @@ func (svr *Server) Shutdown() error {
 		svr.quit.Store(true)
 		if svr.listener != nil {
 			err := svr.listener.Close()
-			utils.LogErr("close listener", err)
+			util.LogErr("close listener", err)
 			return err
 		}
 	}
