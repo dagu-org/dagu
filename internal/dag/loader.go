@@ -23,9 +23,9 @@ var (
 )
 
 // Load loads config from file.
-func Load(baseConfig, dag, params string) (*DAG, error) {
+func Load(base, dag, params string) (*DAG, error) {
 	return loadDAG(dag, buildOpts{
-		base:         baseConfig,
+		base:         base,
 		parameters:   params,
 		metadataOnly: false,
 		noEval:       false,
@@ -153,7 +153,7 @@ func prepareFilepath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
 	}
-	// If the file does not have a YAML extension, add it.
+	// The file name can be specified without the extension.
 	if !strings.HasSuffix(file, ".yaml") && !strings.HasSuffix(file, ".yml") {
 		file = fmt.Sprintf("%s.yaml", file)
 	}
@@ -180,7 +180,9 @@ type mergeTransformer struct{}
 var _ mergo.Transformers = (*mergeTransformer)(nil)
 
 func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+	// mergo does not overwrite a value with zero value for a pointer.
 	if typ == reflect.TypeOf(MailOn{}) {
+		// We need to explicitly overwrite the value for a pointer with a zero value.
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {
 				dst.Set(src)
@@ -227,7 +229,6 @@ func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDef
 
 // merge merges the source DAG into the destination DAG.
 func (cdl *configDefinitionLoader) merge(dst, src *DAG) error {
-	err := mergo.Merge(dst, src, mergo.WithOverride,
+	return mergo.Merge(dst, src, mergo.WithOverride,
 		mergo.WithTransformers(&mergeTransformer{}))
-	return err
 }

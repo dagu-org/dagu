@@ -407,21 +407,28 @@ schedule:
 }
 
 func TestLoad(t *testing.T) {
+	// Base config has the following values:
+	// MailOn: {Failure: true, Success: false}
 	t.Run("Overwrite the base config", func(t *testing.T) {
 		baseCfg := config.Get().BaseConfig
 
+		// Overwrite the base config with the following values:
+		// MailOn: {Failure: false, Success: false}
 		d, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
+		// The MailOn key should be overwritten.
 		require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
 		require.Equal(t, d.HistRetentionDays, 7)
 	})
 	t.Run("Do not overwrite the base config", func(t *testing.T) {
 		baseCfg := config.Get().BaseConfig
 
+		// no_overwrite.yaml does not have the MailOn key.
 		d, err := Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
+		// The MailOn key should be the same as the base config.
 		require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
 		require.Equal(t, d.HistRetentionDays, 30)
 	})
