@@ -125,7 +125,7 @@ func (d *DAG) setupHandlers() {
 		d.HandlerOn.Cancel,
 	} {
 		if handlerStep != nil {
-			handlerStep.setup(dir)
+			handlerStep.init(dir)
 		}
 	}
 }
@@ -133,6 +133,6 @@ func (d *DAG) setupHandlers() {
 func (d *DAG) setupSteps() {
 	dir := path.Dir(d.Location)
 	for _, step := range d.Steps {
-		step.setup(dir)
+		step.init(dir)
 	}
 }

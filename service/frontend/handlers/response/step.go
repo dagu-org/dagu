@@ -24,9 +24,9 @@ func ToStepObject(step dag.Step) *models.StepObject {
 		Script:       lo.ToPtr(step.Script),
 		Variables:    step.Variables,
 	}
-	if step.SubWorkflow != nil {
-		so.Run = step.SubWorkflow.Name
-		so.Params = step.SubWorkflow.Params
+	if step.SubDAG != nil {
+		so.Run = step.SubDAG.Name
+		so.Params = step.SubDAG.Params
 	}
 	return so
 }

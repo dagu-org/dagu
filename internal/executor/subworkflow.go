@@ -56,17 +56,17 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 		return nil, fmt.Errorf("failed to get dag context: %w", err)
 	}
 
-	d, err := dagCtx.Finder.FindByName(step.SubWorkflow.Name)
+	sugDAG, err := dagCtx.Finder.FindByName(step.SubDAG.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubWorkflow.Name, err)
+		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubDAG.Name, err)
 	}
 
-	params := os.ExpandEnv(step.SubWorkflow.Params)
+	params := os.ExpandEnv(step.SubDAG.Params)
 
 	args := []string{
 		"start",
 		fmt.Sprintf("--params=%q", params),
-		d.Location,
+		sugDAG.Location,
 	}
 
 	cmd := exec.CommandContext(ctx, executable, args...)

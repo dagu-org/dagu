@@ -49,8 +49,7 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
 	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
-		cl := dag.Loader{}
-		return cl.LoadMetadata(loc)
+		return dag.LoadMetadata(loc)
 	})
 }
 
@@ -59,8 +58,7 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	cl := dag.Loader{}
-	dat, err := cl.LoadWithoutEval(loc)
+	dat, err := dag.LoadWithoutEval(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +79,7 @@ func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	cl := dag.Loader{}
-	_, err := cl.LoadData(spec)
+	_, err := dag.LoadData(spec)
 	if err != nil {
 		return err
 	}
@@ -199,7 +196,6 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 	}
 
 	fis, err := os.ReadDir(d.dir)
-	dl := &dag.Loader{}
 	opts := &grep.Options{
 		IsRegexp: true,
 		Before:   2,
@@ -220,7 +216,7 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
-			d, err := dl.LoadMetadata(file)
+			d, err := dag.LoadMetadata(file)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue
@@ -257,8 +253,7 @@ func (d *dagStoreImpl) FindByName(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	cl := dag.Loader{}
-	return cl.Load(file, "")
+	return dag.LoadWithoutEval(file)
 }
 
 func (d *dagStoreImpl) resolve(name string) (string, error) {

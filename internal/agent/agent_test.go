@@ -351,8 +351,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 
 func testLoadDAG(t *testing.T, name string) *dag.DAG {
 	file := path.Join(testdataDir, name)
-	cl := &dag.Loader{}
-	d, err := cl.Load(file, "")
+	d, err := dag.Load("", file, "")
 	require.NoError(t, err)
 	return d
 }

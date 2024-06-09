@@ -19,12 +19,12 @@ import (
 var EXTENSIONS = []string{".yaml", ".yml"}
 
 type BuildDAGOptions struct {
-	loadMetadataOnly bool
-	parameters       string
-	skipEnvEval      bool
-	skipEnvSetup     bool
+	baseConfig   string
+	metadataOnly bool
+	parameters   string
+	noEval       bool
 }
-type DAGBuilder struct {
+type Builder struct {
 	options    BuildDAGOptions
 	baseConfig *DAG
 }
@@ -58,7 +58,7 @@ var (
 	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
 )
 
-func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
+func (b *Builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
 	b.baseConfig = baseConfig
 
 	d = &DAG{}
@@ -68,7 +68,7 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 	errList := &dagerrors.ErrorList{}
 
 	errList.Add(buildSchedule(def, d))
-	if !b.options.skipEnvEval {
+	if !b.options.noEval {
 		errList.Add(buildEnvs(def, d, b.baseConfig, b.options))
 	}
 	errList.Add(buildParams(def, d, b.options))
@@ -77,7 +77,7 @@ func (b *DAGBuilder) buildFromDefinition(def *configDefinition, baseConfig *DAG)
 		return nil, errList
 	}
 
-	if b.options.loadMetadataOnly {
+	if b.options.metadataOnly {
 		return
 	}
 
@@ -203,7 +203,7 @@ func buildParams(def *configDefinition, d *DAG, options BuildDAGOptions) (err er
 		p = options.parameters
 	}
 	var envs []string
-	d.Params, envs, err = parseParameters(p, !options.skipEnvEval, options)
+	d.Params, envs, err = parseParameters(p, !options.noEval, options)
 	if err == nil {
 		d.Env = append(d.Env, envs...)
 	}
@@ -279,7 +279,7 @@ func parseParameters(value string, eval bool, options BuildDAGOptions) (
 		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
 			return
 		}
-		if !options.skipEnvSetup {
+		if !options.noEval {
 			if p.Name != "" {
 				envs = append(envs, strParam)
 				err = os.Setenv(p.Name, p.Value)
@@ -298,7 +298,7 @@ type envVariable struct {
 }
 
 // nolint // cognitive complexity
-func loadVariables(strVariables interface{}, options BuildDAGOptions) (
+func loadVariables(strVariables interface{}, opts BuildDAGOptions) (
 	map[string]string, error,
 ) {
 	var vals []*envVariable
@@ -341,7 +341,7 @@ func loadVariables(strVariables interface{}, options BuildDAGOptions) (
 			return nil, err
 		}
 		vars[v.key] = parsed
-		if !options.skipEnvSetup {
+		if !opts.noEval {
 			err = os.Setenv(v.key, parsed)
 			if err != nil {
 				return nil, err
@@ -438,7 +438,7 @@ func parseSubWorkflow(step *Step, name, params string) error {
 	if name == "" {
 		return nil
 	}
-	step.SubWorkflow = &SubWorkflow{
+	step.SubDAG = &SubWorkflow{
 		Name:   name,
 		Params: params,
 	}
@@ -556,7 +556,7 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 }
 
 func expandEnv(val string, options BuildDAGOptions) string {
-	if options.skipEnvEval {
+	if options.noEval {
 		return val
 	}
 	return os.ExpandEnv(val)

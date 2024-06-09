@@ -17,47 +17,40 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Loader is a config loader.
-type Loader struct {
-	BaseConfig string
-}
-
 var (
 	errConfigFileRequired = errors.New("config file was not specified")
 	errReadFile           = errors.New("failed to read file")
 )
 
 // Load loads config from file.
-func (cl *Loader) Load(f, params string) (*DAG, error) {
-	return cl.loadWithOptions(f, params, false, false, false)
+func Load(baseConfig, dag, params string) (*DAG, error) {
+	return loadDAG(dag, BuildDAGOptions{
+		baseConfig:   baseConfig,
+		parameters:   params,
+		metadataOnly: false,
+		noEval:       false,
+	})
 }
 
 // LoadWithoutEval loads config from file without evaluating env variables.
-func (cl *Loader) LoadWithoutEval(f string) (*DAG, error) {
-	return cl.loadWithOptions(f, "", false, true, true)
+func LoadWithoutEval(dag string) (*DAG, error) {
+	return loadDAG(dag, BuildDAGOptions{
+		metadataOnly: false,
+		noEval:       true,
+	})
 }
 
 // LoadMetadata loads config from file and returns only the headline data.
-func (cl *Loader) LoadMetadata(f string) (*DAG, error) {
-	return cl.loadWithOptions(f, "", true, true, true)
-}
-
-// loadWithOptions loads the config file with the provided options.
-func (cl *Loader) loadWithOptions(f, params string, loadMetadataOnly, skipEnvEval, skipEnvSetup bool) (*DAG, error) {
-	return cl.loadDAG(f,
-		&BuildDAGOptions{
-			parameters:       params,
-			loadMetadataOnly: loadMetadataOnly,
-			skipEnvEval:      skipEnvEval,
-			skipEnvSetup:     skipEnvSetup,
-		},
-	)
+func LoadMetadata(dag string) (*DAG, error) {
+	return loadDAG(dag, BuildDAGOptions{
+		metadataOnly: true,
+		noEval:       true,
+	})
 }
 
 // LoadData loads config from given data.
-func (cl *Loader) LoadData(data []byte) (*DAG, error) {
-	fl := &fileLoader{}
-	raw, err := fl.unmarshalData(data)
+func LoadData(data []byte) (*DAG, error) {
+	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
 	}
@@ -66,18 +59,18 @@ func (cl *Loader) LoadData(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &DAGBuilder{
-		options: BuildDAGOptions{loadMetadataOnly: false, skipEnvEval: true, skipEnvSetup: true},
+	b := &Builder{
+		options: BuildDAGOptions{metadataOnly: false, noEval: true},
 	}
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, error) {
+func loadBaseConfig(file string, opts BuildDAGOptions) (*DAG, error) {
 	if !util.FileExists(file) {
 		return nil, nil
 	}
 
-	raw, err := cl.load(file)
+	raw, err := load(file)
 	if err != nil {
 		return nil, err
 	}
@@ -88,26 +81,26 @@ func (cl *Loader) loadBaseConfig(file string, opts *BuildDAGOptions) (*DAG, erro
 		return nil, err
 	}
 
-	buildOpts := *opts
-	buildOpts.loadMetadataOnly = false
-	b := &DAGBuilder{
+	buildOpts := opts
+	buildOpts.metadataOnly = false
+	b := &Builder{
 		options: buildOpts,
 	}
 	return b.buildFromDefinition(def, nil)
 }
 
-func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
-	file, err := cl.prepareFilepath(f)
+func loadDAG(dag string, opts BuildDAGOptions) (*DAG, error) {
+	file, err := prepareFilepath(dag)
 	if err != nil {
 		return nil, err
 	}
 
-	dst, err := cl.loadBaseConfigIfRequired(file, opts)
+	dst, err := loadBaseConfigIfRequired(opts.baseConfig, file, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := cl.load(file)
+	raw, err := load(file)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +112,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	b := DAGBuilder{options: *opts}
+	b := Builder{options: opts}
 	c, err := b.buildFromDefinition(def, dst)
 
 	if err != nil {
@@ -133,7 +126,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 
 	dst.Location = file
 
-	if !opts.skipEnvSetup {
+	if !opts.noEval {
 		dst.setup()
 	}
 
@@ -141,7 +134,7 @@ func (cl *Loader) loadDAG(f string, opts *BuildDAGOptions) (*DAG, error) {
 }
 
 // prepareFilepath prepares the filepath for the given file.
-func (cl *Loader) prepareFilepath(f string) (string, error) {
+func prepareFilepath(f string) (string, error) {
 	if f == "" {
 		return "", errConfigFileRequired
 	}
@@ -152,9 +145,9 @@ func (cl *Loader) prepareFilepath(f string) (string, error) {
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func (cl *Loader) loadBaseConfigIfRequired(file string, opts *BuildDAGOptions) (*DAG, error) {
-	if !opts.loadMetadataOnly && cl.BaseConfig != "" {
-		dag, err := cl.loadBaseConfig(cl.BaseConfig, opts)
+func loadBaseConfigIfRequired(baseConfig, file string, opts BuildDAGOptions) (*DAG, error) {
+	if !opts.metadataOnly && baseConfig != "" {
+		dag, err := loadBaseConfig(baseConfig, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -181,29 +174,21 @@ func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.
 	return nil
 }
 
-func (cl *Loader) load(file string) (config map[string]interface{}, err error) {
-	return cl.readFile(file)
+func load(file string) (config map[string]interface{}, err error) {
+	return readFile(file)
 }
-
-func (cl *Loader) readFile(file string) (config map[string]interface{}, err error) {
-	fl := &fileLoader{}
-	return fl.readFile(file)
-}
-
-// fileLoader is a helper struct to load and process configuration files.
-type fileLoader struct{}
 
 // readFile reads the contents of the file into a map.
-func (fl *fileLoader) readFile(file string) (config map[string]interface{}, err error) {
+func readFile(file string) (config map[string]interface{}, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
 	}
-	return fl.unmarshalData(data)
+	return unmarshalData(data)
 }
 
 // unmarshalData unmarshals the data into a map.
-func (fl *fileLoader) unmarshalData(data []byte) (map[string]interface{}, error) {
+func unmarshalData(data []byte) (map[string]interface{}, error) {
 	var cm map[string]interface{}
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
 	if errors.Is(err, io.EOF) {

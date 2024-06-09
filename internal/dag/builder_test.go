@@ -40,15 +40,14 @@ env:
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			fl := &fileLoader{}
-			d, err := fl.unmarshalData([]byte(tt.input))
+			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
 			cdl := &configDefinitionLoader{}
 			def, err := cdl.decode(d)
 			require.NoError(t, err)
 
-			b := &DAGBuilder{}
+			b := &Builder{}
 
 			_, err = b.buildFromDefinition(def, nil)
 			require.Error(t, err)
@@ -88,15 +87,14 @@ env:
 	}
 
 	for _, tt := range tests {
-		fl := &fileLoader{}
-		d, err := fl.unmarshalData([]byte(tt.input))
+		d, err := unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
 		cdl := &configDefinitionLoader{}
 		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
-		b := &DAGBuilder{}
+		b := &Builder{}
 		_, err = b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
@@ -162,8 +160,7 @@ func TestBuildingParameters(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		fl := &fileLoader{}
-		d, err := fl.unmarshalData([]byte(fmt.Sprintf(`
+		d, err := unmarshalData([]byte(fmt.Sprintf(`
 env:
   - %s
 params: %s
@@ -174,7 +171,7 @@ params: %s
 		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
-		b := &DAGBuilder{}
+		b := &Builder{}
 		_, err = b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
@@ -218,15 +215,14 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			fl := &fileLoader{}
-			d, err := fl.unmarshalData([]byte(tt.input))
+			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
 			cdl := &configDefinitionLoader{}
 			def, err := cdl.decode(d)
 			require.NoError(t, err)
 
-			b := &DAGBuilder{}
+			b := &Builder{}
 
 			dag, err := b.buildFromDefinition(def, nil)
 			if err != nil {
@@ -247,22 +243,21 @@ steps:
 func TestExpandingEnvs(t *testing.T) {
 	_ = os.Setenv("FOO", "BAR")
 	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{}), "BAR")
-	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{skipEnvEval: true}), "${FOO}")
+	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{noEval: true}), "${FOO}")
 }
 
 func TestBuildingTags(t *testing.T) {
 	input := `tags: Daily, Monthly`
 	expected := []string{"daily", "monthly"}
 
-	fl := &fileLoader{}
-	m, err := fl.unmarshalData([]byte(input))
+	m, err := unmarshalData([]byte(input))
 	require.NoError(t, err)
 
 	cdl := &configDefinitionLoader{}
 	def, err := cdl.decode(m)
 	require.NoError(t, err)
 
-	b := &DAGBuilder{}
+	b := &Builder{}
 	d, err := b.buildFromDefinition(def, nil)
 	require.NoError(t, err)
 
@@ -353,15 +348,14 @@ schedule:
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			fl := &fileLoader{}
-			m, err := fl.unmarshalData([]byte(tt.input))
+			m, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
 			cdl := &configDefinitionLoader{}
 			def, err := cdl.decode(m)
 			require.NoError(t, err)
 
-			b := &DAGBuilder{}
+			b := &Builder{}
 			d, err := b.buildFromDefinition(def, nil)
 
 			if tt.isErr {
@@ -401,15 +395,15 @@ func TestGeneratingSockAddr(t *testing.T) {
 }
 
 func TestOverwriteGlobalConfig(t *testing.T) {
-	l := &Loader{BaseConfig: config.Get().BaseConfig}
+	baseCfg := config.Get().BaseConfig
 
-	d, err := l.Load(path.Join(testdataDir, "overwrite.yaml"), "")
+	d, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
 	require.NoError(t, err)
 
 	require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
 	require.Equal(t, d.HistRetentionDays, 7)
 
-	d, err = l.Load(path.Join(testdataDir, "no_overwrite.yaml"), "")
+	d, err = Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
 	require.NoError(t, err)
 
 	require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
@@ -450,15 +444,14 @@ steps:
 	}
 
 	for _, tt := range tests {
-		fl := &fileLoader{}
-		d, err := fl.unmarshalData([]byte(tt.input))
+		d, err := unmarshalData([]byte(tt.input))
 		require.NoError(t, err)
 
 		cdl := &configDefinitionLoader{}
 		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
-		b := &DAGBuilder{}
+		b := &Builder{}
 		dag, err := b.buildFromDefinition(def, nil)
 		require.NoError(t, err)
 
@@ -495,8 +488,7 @@ steps:
     command: "true"
     signalOnStop: "%s"
 `, tc.sig)
-		l := &Loader{}
-		ret, err := l.LoadData([]byte(dat))
+		ret, err := LoadData([]byte(dat))
 		if tc.err {
 			require.Error(t, err)
 			continue

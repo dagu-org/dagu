@@ -91,7 +91,6 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 func (er *EntryReader) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
-	cl := dag.Loader{}
 	fis, err := os.ReadDir(er.dagsDir)
 	if err != nil {
 		return err
@@ -99,7 +98,7 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
+			d, err := dag.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
@@ -113,7 +112,6 @@ func (er *EntryReader) initDags() error {
 }
 
 func (er *EntryReader) watchDags(done chan any) {
-	cl := dag.Loader{}
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		er.logger.Error("failed to init file watcher", tag.Error(err))
@@ -136,7 +134,7 @@ func (er *EntryReader) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				d, err := cl.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				d, err := dag.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {

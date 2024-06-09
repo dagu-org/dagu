@@ -29,7 +29,7 @@ type Step struct {
 	MailOnError     bool           `json:"MailOnError,omitempty"`
 	Preconditions   []*Condition   `json:"Preconditions,omitempty"`
 	SignalOnStop    string         `json:"SignalOnStop,omitempty"`
-	SubWorkflow     *SubWorkflow   `json:"SubWorkflow,omitempty"`
+	SubDAG          *SubWorkflow   `json:"SubWorkflow,omitempty"`
 }
 
 // SubWorkflow contains information about a sub DAG to be executed.
@@ -71,8 +71,7 @@ type ContinueOn struct {
 	Skipped bool
 }
 
-// setup initializes the step's properties.
-func (s *Step) setup(defaultLocation string) {
+func (s *Step) init(defaultLocation string) {
 	if s.Dir == "" {
 		s.Dir = path.Dir(defaultLocation)
 	}

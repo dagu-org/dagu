@@ -27,9 +27,7 @@ func changeHomeDir(homeDir string) {
 }
 
 func TestToString(t *testing.T) {
-	l := &Loader{}
-
-	d, err := l.Load(path.Join(testdataDir, "default.yaml"), "")
+	d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
 	require.NoError(t, err)
 
 	ret := d.String()

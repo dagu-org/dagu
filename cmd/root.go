@@ -71,8 +71,7 @@ func setDefaultConfigPath() {
 }
 
 func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
-	dagLoader := &dag.Loader{BaseConfig: config.Get().BaseConfig}
-	return dagLoader.Load(dagFile, params)
+	return dag.Load(config.Get().BaseConfig, dagFile, params)
 }
 
 func getFlagString(cmd *cobra.Command, name, fallback string) string {
