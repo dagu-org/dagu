@@ -24,8 +24,8 @@ var (
 
 // Load loads config from file.
 func Load(baseConfig, dag, params string) (*DAG, error) {
-	return loadDAG(dag, BuildDAGOptions{
-		baseConfig:   baseConfig,
+	return loadDAG(dag, buildOpts{
+		base:         baseConfig,
 		parameters:   params,
 		metadataOnly: false,
 		noEval:       false,
@@ -34,7 +34,7 @@ func Load(baseConfig, dag, params string) (*DAG, error) {
 
 // LoadWithoutEval loads config from file without evaluating env variables.
 func LoadWithoutEval(dag string) (*DAG, error) {
-	return loadDAG(dag, BuildDAGOptions{
+	return loadDAG(dag, buildOpts{
 		metadataOnly: false,
 		noEval:       true,
 	})
@@ -42,7 +42,7 @@ func LoadWithoutEval(dag string) (*DAG, error) {
 
 // LoadMetadata loads config from file and returns only the headline data.
 func LoadMetadata(dag string) (*DAG, error) {
-	return loadDAG(dag, BuildDAGOptions{
+	return loadDAG(dag, buildOpts{
 		metadataOnly: true,
 		noEval:       true,
 	})
@@ -59,13 +59,13 @@ func LoadData(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &Builder{
-		options: BuildDAGOptions{metadataOnly: false, noEval: true},
+	b := &builder{
+		opts: buildOpts{metadataOnly: false, noEval: true},
 	}
-	return b.buildFromDefinition(def, nil)
+	return b.build(def, nil)
 }
 
-func loadBaseConfig(file string, opts BuildDAGOptions) (*DAG, error) {
+func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 	if !util.FileExists(file) {
 		return nil, nil
 	}
@@ -83,19 +83,19 @@ func loadBaseConfig(file string, opts BuildDAGOptions) (*DAG, error) {
 
 	buildOpts := opts
 	buildOpts.metadataOnly = false
-	b := &Builder{
-		options: buildOpts,
+	b := &builder{
+		opts: buildOpts,
 	}
-	return b.buildFromDefinition(def, nil)
+	return b.build(def, nil)
 }
 
-func loadDAG(dag string, opts BuildDAGOptions) (*DAG, error) {
+func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	file, err := prepareFilepath(dag)
 	if err != nil {
 		return nil, err
 	}
 
-	dst, err := loadBaseConfigIfRequired(opts.baseConfig, file, opts)
+	dst, err := loadBaseConfigIfRequired(opts.base, file, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +112,8 @@ func loadDAG(dag string, opts BuildDAGOptions) (*DAG, error) {
 		return nil, err
 	}
 
-	b := Builder{options: opts}
-	c, err := b.buildFromDefinition(def, dst)
+	b := builder{opts: opts}
+	c, err := b.build(def, dst)
 
 	if err != nil {
 		return nil, err
@@ -145,7 +145,7 @@ func prepareFilepath(f string) (string, error) {
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func loadBaseConfigIfRequired(baseConfig, file string, opts BuildDAGOptions) (*DAG, error) {
+func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, error) {
 	if !opts.metadataOnly && baseConfig != "" {
 		dag, err := loadBaseConfig(baseConfig, opts)
 		if err != nil {

@@ -16,24 +16,34 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// EXTENSIONS is a list of supported file extensions for DAG files.
 var EXTENSIONS = []string{".yaml", ".yml"}
 
-type BuildDAGOptions struct {
-	baseConfig   string
+// buildOpts is used to control the behavior of the builder.
+type buildOpts struct {
+	// base specifies the base configuration file for the DAG.
+	base string
+	// metadataOnly specifies whether to build only the metadata.
 	metadataOnly bool
-	parameters   string
-	noEval       bool
-}
-type Builder struct {
-	options    BuildDAGOptions
-	baseConfig *DAG
+	// parameters specifies the parameters to the DAG.
+	// parameters are used to override the default parameters for
+	// executing the DAG.
+	parameters string
+	// noEval specifies whether to evaluate environment variables.
+	// This is useful when loading details for a DAG, but not
+	// for execution.
+	noEval bool
 }
 
-var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+// builder is used to build a DAG from a configuration definition.
+type builder struct {
+	opts buildOpts
+	base *DAG
+}
 
+// errors on building a DAG.
 var (
 	errInvalidSchedule                    = errors.New("invalid schedule")
-	errScheduleMustBeArray                = errors.New("schedule must be an array of interfaces")
 	errScheduleMustBeStringOrArray        = errors.New("schedule must be a string or an array of strings")
 	errInvalidScheduleType                = errors.New("invalid schedule type")
 	errInvalidKeyType                     = errors.New("invalid key type")
@@ -42,12 +52,11 @@ var (
 	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
 	errStepNameRequired                   = errors.New("step name must be specified")
 	errStepCommandOrCallRequired          = errors.New("either step command or step call must be specified if executor is nil")
-	errStepCommandIsEmtpy                 = errors.New("step command is empty")
+	errStepCommandIsEmpty                 = errors.New("step command is empty")
 	errStepCommandMustBeArrayOrString     = errors.New("step command must be an array of strings or a string")
 	errCallFunctionNotFound               = errors.New("call must specify a functions that exists")
 	errNumberOfParamsMismatch             = errors.New("the number of parameters defined in the function does not match the number of parameters given")
 	errRequiredParameterNotFound          = errors.New("required parameter not found")
-	errScheduleKeyMustBeStartOrStop       = errors.New("schedule key must be start or stop")
 	errScheduleKeyMustBeString            = errors.New("schedule key must be a string")
 	errInvalidSignal                      = errors.New("invalid signal")
 	errInvalidEnvValue                    = errors.New("invalid value for env")
@@ -58,37 +67,50 @@ var (
 	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
 )
 
-func (b *Builder) buildFromDefinition(def *configDefinition, baseConfig *DAG) (d *DAG, err error) {
-	b.baseConfig = baseConfig
+func (b *builder) build(def *configDefinition, base *DAG) (d *DAG, err error) {
+	b.base = base
 
-	d = &DAG{}
-
-	setDAGProperties(def, d)
+	d = &DAG{
+		Name:        def.Name,
+		Group:       def.Group,
+		Description: def.Description,
+		Delay:       time.Second * time.Duration(def.DelaySec),
+		RestartWait: time.Second * time.Duration(def.RestartWaitSec),
+		Tags:        parseTags(def.Tags),
+	}
 
 	errList := &dagerrors.ErrorList{}
 
-	errList.Add(buildSchedule(def, d))
-	if !b.options.noEval {
-		errList.Add(buildEnvs(def, d, b.baseConfig, b.options))
+	// MailOn is optional
+	if def.MailOn != nil {
+		d.MailOn = &MailOn{
+			Failure: def.MailOn.Failure,
+			Success: def.MailOn.Success,
+		}
 	}
-	errList.Add(buildParams(def, d, b.options))
+
+	errList.Add(buildSchedule(def, d))
+	if !b.opts.noEval {
+		errList.Add(buildEnvs(def, d, b.base, b.opts))
+	}
+	errList.Add(buildParams(def, d, b.opts))
 
 	if errList.HasErrors() {
 		return nil, errList
 	}
 
-	if b.options.metadataOnly {
+	if b.opts.metadataOnly {
 		return
 	}
 
-	errList.Add(buildAll(def, d, b.options))
+	errList.Add(buildAll(def, d, b.opts))
 	if errList.HasErrors() {
 		return nil, errList
 	}
 	return d, nil
 }
 
-func buildAll(def *configDefinition, d *DAG, options BuildDAGOptions) error {
+func buildAll(def *configDefinition, d *DAG, options buildOpts) error {
 	errList := &dagerrors.ErrorList{}
 
 	errList.Add(buildLogDir(def, d))
@@ -113,68 +135,73 @@ const (
 	scheduleRestart = "restart"
 )
 
-func setDAGProperties(def *configDefinition, d *DAG) {
-	d.Name = def.Name
-	if def.Name != "" {
-		d.Name = def.Name
-	}
-	d.Group = def.Group
-	d.Description = def.Description
-	if def.MailOn != nil {
-		d.MailOn = &MailOn{
-			Failure: def.MailOn.Failure,
-			Success: def.MailOn.Success,
-		}
-	}
-	d.Delay = time.Second * time.Duration(def.DelaySec)
-	d.RestartWait = time.Second * time.Duration(def.RestartWaitSec)
-	d.Tags = parseTags(def.Tags)
-}
-
+// buildSchedule parses the schedule in different formats and builds the schedule.
+// It allows for flexibility in defining the schedule.
+//
+// Case 1: schedule is a string
+//
+// ```yaml
+// schedule: "0 1 * * *"
+// ```
+//
+// Case 2: schedule is an array of strings
+//
+// ```yaml
+// schedule:
+//   - "0 1 * * *"
+//   - "0 18 * * *"
+//
+// ```
+//
+// Case 3: schedule is a map
+// The map can have the following keys
+// - start: string or array of strings
+// - stop: string or array of strings
+// - restart: string or array of strings
 func buildSchedule(def *configDefinition, d *DAG) error {
-	var starts []string
-	var stops []string
-	var restarts []string
+	var starts, stops, restarts []string
 
-	switch (def.Schedule).(type) {
+	switch schedule := (def.Schedule).(type) {
 	case string:
-		starts = append(starts, def.Schedule.(string))
+		// Case 1. schedule is a string.
+		starts = append(starts, schedule)
 	case []interface{}:
-		schedules, ok := def.Schedule.([]interface{})
-		if !ok {
-			return fmt.Errorf("%w, got %T: ", errScheduleMustBeArray, def.Schedule)
-		}
-		for _, s := range schedules {
+		// Case 2. schedule is an array of strings.
+		// Append all the schedules to the starts slice.
+		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
 				return fmt.Errorf("%w, got %T: ", errScheduleMustBeStringOrArray, s)
 			}
-
 			starts = append(starts, s)
 		}
-	case map[interface{}]interface{}:
-		if err := parseScheduleMap(def.Schedule.(map[interface{}]interface{}), &starts, &stops, &restarts); err != nil {
+	case map[any]any:
+		// Case 3. schedule is a map.
+		if err := parseScheduleMap(schedule, &starts, &stops, &restarts); err != nil {
 			return err
 		}
 	case nil:
+		// If schedule is nil, return without error.
 	default:
+		// If schedule is of an invalid type, return an error.
 		return fmt.Errorf("%w: %T", errInvalidScheduleType, def.Schedule)
 	}
 
+	// Parse each schedule as a cron expression.
 	var err error
-	d.Schedule, err = parseSchedule(starts)
+	d.Schedule, err = parseSchedules(starts)
 	if err != nil {
 		return err
 	}
-	d.StopSchedule, err = parseSchedule(stops)
+	d.StopSchedule, err = parseSchedules(stops)
 	if err != nil {
 		return err
 	}
-	d.RestartSchedule, err = parseSchedule(restarts)
+	d.RestartSchedule, err = parseSchedules(restarts)
 	return err
 }
 
-func buildEnvs(def *configDefinition, d, base *DAG, options BuildDAGOptions) (err error) {
+func buildEnvs(def *configDefinition, d, base *DAG, options buildOpts) (err error) {
 	var env map[string]string
 	env, err = loadVariables(def.Env, options)
 	if err == nil {
@@ -196,7 +223,7 @@ func buildLogDir(def *configDefinition, d *DAG) (err error) {
 	return err
 }
 
-func buildParams(def *configDefinition, d *DAG, options BuildDAGOptions) (err error) {
+func buildParams(def *configDefinition, d *DAG, options buildOpts) (err error) {
 	d.DefaultParams = def.Params
 	p := d.DefaultParams
 	if options.parameters != "" {
@@ -210,7 +237,7 @@ func buildParams(def *configDefinition, d *DAG, options BuildDAGOptions) (err er
 	return
 }
 
-func buildHandlers(def *configDefinition, d *DAG, options BuildDAGOptions) (err error) {
+func buildHandlers(def *configDefinition, d *DAG, options buildOpts) (err error) {
 	if def.HandlerOn.Exit != nil {
 		def.HandlerOn.Exit.Name = constants.OnExit
 		if d.HandlerOn.Exit, err = buildStep(d.Env, def.HandlerOn.Exit, def.Functions, options); err != nil {
@@ -254,7 +281,7 @@ func buildConfig(def *configDefinition, d *DAG) (err error) {
 	return nil
 }
 
-func parseParameters(value string, eval bool, options BuildDAGOptions) (
+func parseParameters(value string, eval bool, options buildOpts) (
 	params []string,
 	envs []string,
 	err error,
@@ -298,7 +325,7 @@ type envVariable struct {
 }
 
 // nolint // cognitive complexity
-func loadVariables(strVariables interface{}, opts BuildDAGOptions) (
+func loadVariables(strVariables interface{}, opts buildOpts) (
 	map[string]string, error,
 ) {
 	var vals []*envVariable
@@ -351,7 +378,7 @@ func loadVariables(strVariables interface{}, opts BuildDAGOptions) (
 	return vars, nil
 }
 
-func buildSteps(def *configDefinition, d *DAG, options BuildDAGOptions) error {
+func buildSteps(def *configDefinition, d *DAG, options buildOpts) error {
 	var ret []Step
 	for _, stepDef := range def.Steps {
 		step, err := buildStep(d.Env, stepDef, def.Functions, options)
@@ -366,7 +393,7 @@ func buildSteps(def *configDefinition, d *DAG, options BuildDAGOptions) error {
 }
 
 // nolint // cognitive complexity
-func buildStep(variables []string, def *stepDef, funcs []*funcDef, options BuildDAGOptions) (*Step, error) {
+func buildStep(variables []string, def *stepDef, funcs []*funcDef, options buildOpts) (*Step, error) {
 	if err := assertStepDef(def, funcs); err != nil {
 		return nil, err
 	}
@@ -498,7 +525,7 @@ func parseCommand(step *Step, command any) error {
 	switch val := command.(type) {
 	case string:
 		if val == "" {
-			return errStepCommandIsEmtpy
+			return errStepCommandIsEmpty
 		}
 		step.CmdWithArgs = val
 		step.Command, step.Args = util.SplitCommand(val, false)
@@ -555,7 +582,7 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 	return nil
 }
 
-func expandEnv(val string, options BuildDAGOptions) string {
+func expandEnv(val string, options buildOpts) string {
 	if options.noEval {
 		return val
 	}
@@ -599,12 +626,12 @@ func convertMap(m map[string]interface{}) error {
 }
 
 func buildSMTPConfig(def *configDefinition, d *DAG) (err error) {
-	smtp := &SmtpConfig{}
-	smtp.Host = os.ExpandEnv(def.Smtp.Host)
-	smtp.Port = os.ExpandEnv(def.Smtp.Port)
-	smtp.Username = os.ExpandEnv(def.Smtp.Username)
-	smtp.Password = os.ExpandEnv(def.Smtp.Password)
-	d.Smtp = smtp
+	d.Smtp = &SmtpConfig{
+		Host:     os.ExpandEnv(def.Smtp.Host),
+		Port:     os.ExpandEnv(def.Smtp.Port),
+		Username: os.ExpandEnv(def.Smtp.Username),
+		Password: os.ExpandEnv(def.Smtp.Password),
+	}
 	return nil
 }
 
@@ -619,16 +646,16 @@ func buildInfoMailConfig(def *configDefinition, d *DAG) (err error) {
 }
 
 func buildMailConfigFromDefinition(def mailConfigDef) (*MailConfig, error) {
-	d := &MailConfig{}
-	d.From = def.From
-	d.To = def.To
-	d.Prefix = def.Prefix
-	d.AttachLogs = def.AttachLogs
-	return d, nil
+	return &MailConfig{
+		From:       def.From,
+		To:         def.To,
+		Prefix:     def.Prefix,
+		AttachLogs: def.AttachLogs,
+	}, nil
 }
 
 func buildConfigEnv(vars map[string]string) []string {
-	ret := []string{}
+	var ret []string
 	for k, v := range vars {
 		ret = append(ret, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -636,7 +663,7 @@ func buildConfigEnv(vars map[string]string) []string {
 }
 
 func loadPreCondition(cond []*conditionDef) []*Condition {
-	ret := []*Condition{}
+	var ret []*Condition
 	for _, v := range cond {
 		ret = append(ret, &Condition{
 			Condition: v.Condition,
@@ -658,17 +685,16 @@ func parseTags(value string) []string {
 	return ret
 }
 
-func parseSchedule(values []string) ([]*Schedule, error) {
-	ret := []*Schedule{}
+var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+func parseSchedules(values []string) ([]*Schedule, error) {
+	var ret []*Schedule
 	for _, v := range values {
-		paresed, err := cronParser.Parse(v)
+		parsed, err := cronParser.Parse(v)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", errInvalidSchedule, err)
 		}
-		ret = append(ret, &Schedule{
-			Expression: v,
-			Parsed:     paresed,
-		})
+		ret = append(ret, &Schedule{Expression: v, Parsed: parsed})
 	}
 	return ret, nil
 }
@@ -740,44 +766,65 @@ func assertStepDef(def *stepDef, funcs []*funcDef) error {
 	return nil
 }
 
+// parseScheduleMap parses the schedule map and populates the starts, stops, and restarts slices.
+// Each key in the map must be either "start", "stop", or "restart".
+// The value can be Case 1 or Case 2.
+//
+// Case 1: The value is a string
+// Case 2: The value is an array of strings
+//
+// Example:
+// ```yaml
+// schedule:
+//
+//	start: "0 1 * * *"
+//	stop: "0 18 * * *"
+//	restart:
+//	  - "0 1 * * *"
+//	  - "0 18 * * *"
+//
+// ```
 // nolint // cognitive complexity
-func parseScheduleMap(scheduleMap map[interface{}]interface{}, starts, stops, restarts *[]string) error {
+func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string) error {
 	for k, v := range scheduleMap {
-		if _, ok := k.(string); !ok {
+		// Key must be a string.
+		key, ok := k.(string)
+		if !ok {
 			return errScheduleKeyMustBeString
 		}
-		switch k.(string) {
-		case scheduleStart, scheduleStop, scheduleRestart:
-			switch v := (v).(type) {
-			case string:
-				switch k {
-				case scheduleStart:
-					*starts = append(*starts, v)
-				case scheduleStop:
-					*stops = append(*stops, v)
-				case scheduleRestart:
-					*restarts = append(*restarts, v)
+		var values []string
+
+		switch v := v.(type) {
+		case string:
+			// Case 1. schedule is a string.
+			values = append(values, v)
+		case []interface{}:
+			// Case 2. schedule is an array of strings.
+			// Append all the schedules to the values slice.
+			for _, s := range v {
+				s, ok := s.(string)
+				if !ok {
+					return errScheduleMustBeStringOrArray
 				}
-			case []interface{}:
-				for _, item := range v {
-					if item, ok := item.(string); ok {
-						switch k {
-						case scheduleStart:
-							*starts = append(*starts, item)
-						case scheduleStop:
-							*stops = append(*stops, item)
-						case scheduleRestart:
-							*restarts = append(*restarts, item)
-						}
-					} else {
-						return errScheduleMustBeStringOrArray
-					}
-				}
-			default:
-				return errScheduleMustBeStringOrArray
+				values = append(values, s)
 			}
-		default:
-			return errScheduleKeyMustBeStartOrStop
+		}
+
+		var targets *[]string
+		switch key {
+		case scheduleStart:
+			targets = starts
+		case scheduleStop:
+			targets = stops
+		case scheduleRestart:
+			targets = restarts
+		}
+
+		for _, v := range values {
+			if _, err := cronParser.Parse(v); err != nil {
+				return fmt.Errorf("%w: %s", errInvalidSchedule, err)
+			}
+			*targets = append(*targets, v)
 		}
 	}
 	return nil

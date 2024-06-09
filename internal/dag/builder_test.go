@@ -47,9 +47,9 @@ env:
 			def, err := cdl.decode(d)
 			require.NoError(t, err)
 
-			b := &Builder{}
+			b := &builder{}
 
-			_, err = b.buildFromDefinition(def, nil)
+			_, err = b.build(def, nil)
 			require.Error(t, err)
 		})
 	}
@@ -94,8 +94,8 @@ env:
 		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
-		b := &Builder{}
-		_, err = b.buildFromDefinition(def, nil)
+		b := &builder{}
+		_, err = b.build(def, nil)
 		require.NoError(t, err)
 
 		for k, v := range tt.expected {
@@ -171,8 +171,8 @@ params: %s
 		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
-		b := &Builder{}
-		_, err = b.buildFromDefinition(def, nil)
+		b := &builder{}
+		_, err = b.build(def, nil)
 		require.NoError(t, err)
 
 		for k, v := range tt.expected {
@@ -222,9 +222,9 @@ steps:
 			def, err := cdl.decode(d)
 			require.NoError(t, err)
 
-			b := &Builder{}
+			b := &builder{}
 
-			dag, err := b.buildFromDefinition(def, nil)
+			dag, err := b.build(def, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -242,8 +242,8 @@ steps:
 
 func TestExpandingEnvs(t *testing.T) {
 	_ = os.Setenv("FOO", "BAR")
-	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{}), "BAR")
-	require.Equal(t, expandEnv("${FOO}", BuildDAGOptions{noEval: true}), "${FOO}")
+	require.Equal(t, expandEnv("${FOO}", buildOpts{}), "BAR")
+	require.Equal(t, expandEnv("${FOO}", buildOpts{noEval: true}), "${FOO}")
 }
 
 func TestBuildingTags(t *testing.T) {
@@ -257,8 +257,8 @@ func TestBuildingTags(t *testing.T) {
 	def, err := cdl.decode(m)
 	require.NoError(t, err)
 
-	b := &Builder{}
-	d, err := b.buildFromDefinition(def, nil)
+	b := &builder{}
+	d, err := b.build(def, nil)
 	require.NoError(t, err)
 
 	for _, tag := range expected {
@@ -355,8 +355,8 @@ schedule:
 			def, err := cdl.decode(m)
 			require.NoError(t, err)
 
-			b := &Builder{}
-			d, err := b.buildFromDefinition(def, nil)
+			b := &builder{}
+			d, err := b.build(def, nil)
 
 			if tt.isErr {
 				require.Error(t, err)
@@ -451,8 +451,8 @@ steps:
 		def, err := cdl.decode(d)
 		require.NoError(t, err)
 
-		b := &Builder{}
-		dag, err := b.buildFromDefinition(def, nil)
+		b := &builder{}
+		dag, err := b.build(def, nil)
 		require.NoError(t, err)
 
 		if len(dag.Steps) != 1 {

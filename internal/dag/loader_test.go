@@ -69,7 +69,7 @@ func TestCloning(t *testing.T) {
 }
 
 func TestLoadingBaseConfig(t *testing.T) {
-	d, err := loadBaseConfig(config.Get().BaseConfig, BuildDAGOptions{})
+	d, err := loadBaseConfig(config.Get().BaseConfig, buildOpts{})
 	require.NotNil(t, d)
 	require.NoError(t, err)
 }
