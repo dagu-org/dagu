@@ -2,7 +2,8 @@ name: Release
 on:
   create:
     tags:
-      - '*'
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
 
 jobs:
   goreleaser:
@@ -21,13 +22,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 16
-      
+
       - name: Set up yarn
         run: npm install --global yarn
 
       - name: Check out code
         uses: actions/checkout@v3
-      
+
       - name: Yarn install
         run: yarn install
         working-directory: ui
