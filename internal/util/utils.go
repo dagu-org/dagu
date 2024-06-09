@@ -1,7 +1,6 @@
 package util
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -282,30 +281,6 @@ func Now() time.Time {
 		return time.Now()
 	}
 	return fixedTime
-}
-
-type SyncMap struct {
-	sync.Map
-}
-
-func (m *SyncMap) MarshalJSON() ([]byte, error) {
-	tmpMap := make(map[string]interface{})
-	m.Range(func(k, v interface{}) bool {
-		tmpMap[k.(string)] = v
-		return true
-	})
-	return json.Marshal(tmpMap)
-}
-
-func (m *SyncMap) UnmarshalJSON(data []byte) error {
-	var tmpMap map[string]interface{}
-	if err := json.Unmarshal(data, &tmpMap); err != nil {
-		return err
-	}
-	for key, value := range tmpMap {
-		m.Store(key, value)
-	}
-	return nil
 }
 
 type Parameter struct {

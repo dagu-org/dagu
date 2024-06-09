@@ -5,16 +5,16 @@ import (
 	"path"
 	"strings"
 	"time"
-
-	"github.com/dagu-dev/dagu/internal/util"
 )
 
-// Step represents a step in a DAG.
+// Step contains the runtime information for a step in a DAG.
+// A step is created from parsing a DAG file written in YAML.
+// It marshal/unmarshal to/from JSON when it is saved in the execution history.
 type Step struct {
 	Name            string         `json:"Name"`
 	Description     string         `json:"Description,omitempty"`
 	Variables       []string       `json:"Variables,omitempty"`
-	OutputVariables *util.SyncMap  `json:"OutputVariables,omitempty"`
+	OutputVariables *SyncMap       `json:"OutputVariables,omitempty"`
 	Dir             string         `json:"Dir,omitempty"`
 	ExecutorConfig  ExecutorConfig `json:"ExecutorConfig,omitempty"`
 	CmdWithArgs     string         `json:"CmdWithArgs,omitempty"`
@@ -34,40 +34,47 @@ type Step struct {
 	SubWorkflow     *SubWorkflow   `json:"SubWorkflow,omitempty"`
 }
 
+// SubWorkflow contains information about a sub DAG to be executed.
 type SubWorkflow struct {
 	Name   string
 	Params string
 }
 
-// ExecutorConfig represents the configuration for the executor of a step.
+// ExecutorConfig contains the configuration for the executor.
 type ExecutorConfig struct {
-	Type   string
+	// Type represents one of the registered executor.
+	// See `executor.Register` in `internal/executor/executor.go`.
+	Type string
+	// Config contains the executor specific configuration.
 	Config map[string]interface{}
 }
 
 const (
+	// ExecutorTypeSubWorkflow is defined here in order to parse
+	// the `run` field in the DAG file.
 	ExecutorTypeSubWorkflow = "subworkflow"
 )
 
-// RetryPolicy represents the retry policy for a step.
+// RetryPolicy contains the retry policy for a step.
 type RetryPolicy struct {
 	Limit    int
 	Interval time.Duration
 }
 
-// RepeatPolicy represents the repeat policy for a step.
+// RepeatPolicy contains the repeat policy for a step.
 type RepeatPolicy struct {
 	Repeat   bool
 	Interval time.Duration
 }
 
-// ContinueOn represents the conditions under which the step continues.
+// ContinueOn contains the conditions to continue on failure or skipped.
 type ContinueOn struct {
 	Failure bool
 	Skipped bool
 }
 
-// String returns a string representation of the step's properties.
+// String implements the Stringer interface, converting the step to a
+// human-readable string.
 func (s *Step) String() string {
 	vals := []string{
 		fmt.Sprintf("Name: %s", s.Name),
