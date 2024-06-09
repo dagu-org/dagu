@@ -35,8 +35,3 @@ func CreateExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}
 	return nil, fmt.Errorf("%w: %s", errInvalidExecutor, step.ExecutorConfig)
 }
-
-func ExecutorIsValid(name string) bool {
-	_, ok := executors[name]
-	return ok
-}

@@ -1,9 +1,7 @@
 package dag
 
 import (
-	"fmt"
 	"path"
-	"strings"
 	"time"
 )
 
@@ -71,19 +69,6 @@ type RepeatPolicy struct {
 type ContinueOn struct {
 	Failure bool
 	Skipped bool
-}
-
-// String implements the Stringer interface, converting the step to a
-// human-readable string.
-func (s *Step) String() string {
-	vals := []string{
-		fmt.Sprintf("Name: %s", s.Name),
-		fmt.Sprintf("Dir: %s", s.Dir),
-		fmt.Sprintf("Command: %s", s.Command),
-		fmt.Sprintf("Args: %s", s.Args),
-		fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")),
-	}
-	return strings.Join(vals, "\t")
 }
 
 // setup initializes the step's properties.
