@@ -3,12 +3,13 @@ package executor
 import (
 	"context"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/util"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
 	"syscall"
+
+	"github.com/dagu-dev/dagu/internal/util"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 )
@@ -56,12 +57,12 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 		return nil, fmt.Errorf("failed to get dag context: %w", err)
 	}
 
-	sugDAG, err := dagCtx.Finder.Find(step.SubDAG.Name)
+	sugDAG, err := dagCtx.Finder.Find(step.SubWorkflow.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubDAG.Name, err)
+		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubWorkflow.Name, err)
 	}
 
-	params := os.ExpandEnv(step.SubDAG.Params)
+	params := os.ExpandEnv(step.SubWorkflow.Params)
 
 	args := []string{
 		"start",

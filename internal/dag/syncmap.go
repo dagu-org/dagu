@@ -6,9 +6,7 @@ import (
 )
 
 // SyncMap wraps a sync.Map to make it JSON serializable.
-type SyncMap struct {
-	sync.Map
-}
+type SyncMap struct{ sync.Map }
 
 func (m *SyncMap) MarshalJSON() ([]byte, error) {
 	tmpMap := make(map[string]interface{})

@@ -192,12 +192,3 @@ func TestFixedTIme(t *testing.T) {
 	util.SetFixedTime(time.Time{})
 	require.NotEqual(t, tm, util.Now())
 }
-
-func TestParseParams(t *testing.T) {
-	val := "QUESTION=\"what is your favorite activity?\""
-	ret, err := util.ParseParams(val, true)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(ret))
-	require.Equal(t, ret[0].Name, "QUESTION")
-	require.Equal(t, ret[0].Value, "what is your favorite activity?")
-}

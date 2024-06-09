@@ -3,21 +3,22 @@ package dag
 import (
 	"crypto/md5"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/config"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/config"
 
 	"github.com/robfig/cron/v3"
 )
 
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {
-	Expression string
-	Parsed     cron.Schedule
+	Expression string        // Expression is the cron expression.
+	Parsed     cron.Schedule // Parsed is the parsed cron schedule.
 }
 
-// HandlerOn contains the steps to be executed on different events.
+// HandlerOn contains the steps to be executed on different events in the DAG.
 type HandlerOn struct {
 	Failure *Step
 	Success *Step
@@ -27,8 +28,24 @@ type HandlerOn struct {
 
 // MailOn contains the conditions to send mail.
 type MailOn struct {
-	Failure bool
-	Success bool
+	Failure bool // Failure is the flag to send mail on failure.
+	Success bool // Success is the flag to send mail on success.
+}
+
+// SmtpConfig contains the SMTP configuration.
+type SmtpConfig struct {
+	Host     string
+	Port     string
+	Username string
+	Password string
+}
+
+// MailConfig contains the mail configuration.
+type MailConfig struct {
+	From       string
+	To         string
+	Prefix     string // Prefix is the prefix for the subject of the mail.
+	AttachLogs bool   // AttachLogs is the flag to attach the logs in the mail.
 }
 
 // DAG contains all information about a workflow.

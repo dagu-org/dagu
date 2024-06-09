@@ -43,8 +43,7 @@ env:
 			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			cdl := &configDefinitionLoader{}
-			def, err := cdl.decode(d)
+			def, err := decode(d)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -95,8 +94,7 @@ env:
 			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			cdl := &configDefinitionLoader{}
-			def, err := cdl.decode(d)
+			def, err := decode(d)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -180,8 +178,7 @@ params: %s
   	`, tt.env, tt.params)))
 			require.NoError(t, err)
 
-			cdl := &configDefinitionLoader{}
-			def, err := cdl.decode(d)
+			def, err := decode(d)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -237,8 +234,7 @@ steps:
 			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			cdl := &configDefinitionLoader{}
-			def, err := cdl.decode(d)
+			def, err := decode(d)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -273,8 +269,7 @@ func TestBuilder_BuildTags(t *testing.T) {
 		m, err := unmarshalData([]byte(input))
 		require.NoError(t, err)
 
-		cdl := &configDefinitionLoader{}
-		def, err := cdl.decode(m)
+		def, err := decode(m)
 		require.NoError(t, err)
 
 		b := &builder{}
@@ -368,8 +363,7 @@ schedule:
 			m, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			cdl := &configDefinitionLoader{}
-			def, err := cdl.decode(m)
+			def, err := decode(m)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -384,11 +378,11 @@ schedule:
 			for k, v := range tt.expected {
 				var actual []*Schedule
 				switch scheduleKey(k) {
-				case scheduleStart:
+				case scheduleKeyStart:
 					actual = d.Schedule
-				case scheduleStop:
+				case scheduleKeyStop:
 					actual = d.StopSchedule
-				case scheduleRestart:
+				case scheduleKeyRestart:
 					actual = d.RestartSchedule
 				}
 
@@ -475,8 +469,7 @@ steps:
 			d, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			cdl := &configDefinitionLoader{}
-			def, err := cdl.decode(d)
+			def, err := decode(d)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -616,4 +609,15 @@ func Test_evaluateValue(t *testing.T) {
 			require.Equal(t, tt.expected, r)
 		})
 	}
+}
+
+func Test_parseParams(t *testing.T) {
+	t.Run("Parse params with command substitution", func(t *testing.T) {
+		val := "QUESTION=\"what is your favorite activity?\""
+		ret, err := parseParams(val, true)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(ret))
+		require.Equal(t, ret[0].name, "QUESTION")
+		require.Equal(t, ret[0].value, "what is your favorite activity?")
+	})
 }

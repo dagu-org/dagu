@@ -54,8 +54,7 @@ func LoadYAML(data []byte) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(raw)
+	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +79,7 @@ func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 	}
 
 	// Decode the raw data into a config definition.
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(raw)
+	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -118,22 +116,21 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	}
 
 	// Decode the raw data into a config definition.
-	cdl := &configDefinitionLoader{}
-	def, err := cdl.decode(raw)
+	def, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
 
 	// Build the DAG from the config definition.
 	b := builder{opts: opts}
-	c, err := b.build(def, dst)
+	c, err := b.build(def, dst.Env)
 	if err != nil {
 		return nil, err
 	}
 
 	// Merge the DAG with the base configuration.
 	// The DAG configuration overrides the base configuration.
-	err = cdl.merge(dst, c)
+	err = merge(dst, c)
 	if err != nil {
 		return nil, err
 	}
@@ -212,12 +209,9 @@ func unmarshalData(data []byte) (map[string]interface{}, error) {
 	return cm, err
 }
 
-// configDefinitionLoader is a helper struct to decode and merge configuration definitions.
-type configDefinitionLoader struct{}
-
 // decode decodes the configuration map into a configDefinition.
-func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDefinition, error) {
-	c := &configDefinition{}
+func decode(cm map[string]interface{}) (*definition, error) {
+	c := &definition{}
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
@@ -228,7 +222,7 @@ func (cdl *configDefinitionLoader) decode(cm map[string]interface{}) (*configDef
 }
 
 // merge merges the source DAG into the destination DAG.
-func (cdl *configDefinitionLoader) merge(dst, src *DAG) error {
+func merge(dst, src *DAG) error {
 	return mergo.Merge(dst, src, mergo.WithOverride,
 		mergo.WithTransformers(&mergeTransformer{}))
 }
