@@ -256,9 +256,11 @@ steps:
 }
 
 func Test_expandEnv(t *testing.T) {
-	_ = os.Setenv("FOO", "BAR")
-	require.Equal(t, expandEnv("${FOO}", buildOpts{}), "BAR")
-	require.Equal(t, expandEnv("${FOO}", buildOpts{noEval: true}), "${FOO}")
+	t.Run("expand env", func(t *testing.T) {
+		_ = os.Setenv("FOO", "BAR")
+		require.Equal(t, expandEnv("${FOO}", false), "BAR")
+		require.Equal(t, expandEnv("${FOO}", true), "${FOO}")
+	})
 }
 
 func TestBuilder_BuildTags(t *testing.T) {

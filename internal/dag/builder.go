@@ -38,11 +38,12 @@ type buildOpts struct {
 
 // builder is used to build a DAG from a configuration definition.
 type builder struct {
-	def  *definition // intermediate value to build the DAG.
-	envs []string    // environment variables for the DAG.
-	opts buildOpts   // options for building the DAG.
-	dag  *DAG        // the final DAG.
-	errs errorList
+	def         *definition // intermediate value to build the DAG.
+	envs        []string    // environment variables for the DAG.
+	opts        buildOpts   // options for building the DAG.
+	dag         *DAG        // the final DAG.
+	errs        errorList
+	stepBuilder stepBuilder
 }
 
 // errors on building a DAG.
@@ -102,6 +103,7 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 		RestartWait: time.Second * time.Duration(def.RestartWaitSec),
 		Tags:        parseTags(def.Tags),
 	}
+	b.stepBuilder = stepBuilder{noEval: b.opts.noEval}
 
 	b.callBuilderFunc(b.buildEnvs)
 	b.callBuilderFunc(b.buildSchedule)
@@ -112,13 +114,13 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 	// This is done for avoiding unnecessary processing when
 	// only the metadata is required.
 	if !b.opts.metadataOnly {
-		b.callBuilderFunc(b.buildLogDir)
 		b.callBuilderFunc(b.buildSteps)
+		b.callBuilderFunc(b.buildLogDir)
 		b.callBuilderFunc(b.buildHandlers)
-		b.callBuilderFunc(b.buildMiscs)
 		b.callBuilderFunc(b.buildSMTPConfig)
 		b.callBuilderFunc(b.buildErrMailConfig)
 		b.callBuilderFunc(b.buildInfoMailConfig)
+		b.callBuilderFunc(b.buildMiscs)
 
 		if err := assertFunctions(def.Functions); err != nil {
 			b.errs.Add(err)
@@ -272,28 +274,28 @@ func (b *builder) buildParams() (err error) {
 func (b *builder) buildHandlers() (err error) {
 	if b.def.HandlerOn.Exit != nil {
 		b.def.HandlerOn.Exit.Name = constants.OnExit
-		if b.dag.HandlerOn.Exit, err = buildStep(b.dag.Env, b.def.HandlerOn.Exit, b.def.Functions, b.opts); err != nil {
+		if b.dag.HandlerOn.Exit, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Exit, b.def.Functions); err != nil {
 			return err
 		}
 	}
 
 	if b.def.HandlerOn.Success != nil {
 		b.def.HandlerOn.Success.Name = constants.OnSuccess
-		if b.dag.HandlerOn.Success, err = buildStep(b.dag.Env, b.def.HandlerOn.Success, b.def.Functions, b.opts); err != nil {
+		if b.dag.HandlerOn.Success, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Success, b.def.Functions); err != nil {
 			return
 		}
 	}
 
 	if b.def.HandlerOn.Failure != nil {
 		b.def.HandlerOn.Failure.Name = constants.OnFailure
-		if b.dag.HandlerOn.Failure, err = buildStep(b.dag.Env, b.def.HandlerOn.Failure, b.def.Functions, b.opts); err != nil {
+		if b.dag.HandlerOn.Failure, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Failure, b.def.Functions); err != nil {
 			return
 		}
 	}
 
 	if b.def.HandlerOn.Cancel != nil {
 		b.def.HandlerOn.Cancel.Name = constants.OnCancel
-		if b.dag.HandlerOn.Cancel, err = buildStep(b.dag.Env, b.def.HandlerOn.Cancel, b.def.Functions, b.opts); err != nil {
+		if b.dag.HandlerOn.Cancel, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Cancel, b.def.Functions); err != nil {
 			return
 		}
 	}
@@ -505,7 +507,7 @@ func (b *builder) buildSteps() error {
 	var ret []Step
 
 	for _, stepDef := range b.def.Steps {
-		step, err := buildStep(b.dag.Env, stepDef, b.def.Functions, b.opts)
+		step, err := b.stepBuilder.buildStep(b.dag.Env, stepDef, b.def.Functions)
 		if err != nil {
 			return err
 		}
@@ -543,9 +545,27 @@ func (b *builder) buildInfoMailConfig() (err error) {
 	return
 }
 
+// stepBuilder is used to build a step from the step definition.
+type stepBuilder struct {
+	noEval bool
+}
+
+// stepBuilderFunc is a function that builds a step from the step definition.
+type stepBuilderFunc func(def *stepDef, step *Step) error
+
+var (
+	// stepBuilderFuncs is a list of functions that build a step from the step definition.
+	stepBuilderFuncs = []stepBuilderFunc{
+		parseCommand,
+		parseExecutor,
+		parseSubWorkflow,
+		parseMiscs,
+	}
+)
+
 // buildStep builds a step from the step definition.
 // nolint // cognitive complexity
-func buildStep(variables []string, def *stepDef, fns []*funcDef, opts buildOpts) (*Step, error) {
+func (b *stepBuilder) buildStep(variables []string, def *stepDef, fns []*funcDef) (*Step, error) {
 	if err := assertStepDef(def, fns); err != nil {
 		return nil, err
 	}
@@ -554,10 +574,10 @@ func buildStep(variables []string, def *stepDef, fns []*funcDef, opts buildOpts)
 		Name:           def.Name,
 		Description:    def.Description,
 		Script:         def.Script,
-		Stdout:         expandEnv(def.Stdout, opts),
-		Stderr:         expandEnv(def.Stderr, opts),
+		Stdout:         expandEnv(def.Stdout, b.noEval),
+		Stderr:         expandEnv(def.Stderr, b.noEval),
 		Output:         def.Output,
-		Dir:            expandEnv(def.Dir, opts),
+		Dir:            expandEnv(def.Dir, b.noEval),
 		Variables:      variables,
 		Depends:        def.Depends,
 		MailOnError:    def.MailOnError,
@@ -569,49 +589,10 @@ func buildStep(variables []string, def *stepDef, fns []*funcDef, opts buildOpts)
 		return nil, err
 	}
 
-	if err := parseCommand(step, def.Command); err != nil {
-		return nil, err
-	}
-
-	if err := parseExecutor(step, def.Executor); err != nil {
-		return nil, err
-	}
-
-	// Convert map[any]any to map[string]any for executor config.
-	// It is up to the executor to parse the values.
-	if err := convertMap(step.ExecutorConfig.Config); err != nil {
-		return nil, err
-	}
-
-	if err := parseSubWorkflow(step, def.Run, def.Params); err != nil {
-		return nil, err
-	}
-
-	// TODO: validate executor config
-	if def.ContinueOn != nil {
-		step.ContinueOn.Skipped = def.ContinueOn.Skipped
-		step.ContinueOn.Failure = def.ContinueOn.Failure
-	}
-
-	if def.RetryPolicy != nil {
-		step.RetryPolicy = &RetryPolicy{
-			Limit:    def.RetryPolicy.Limit,
-			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
+	for _, fn := range stepBuilderFuncs {
+		if err := fn(def, step); err != nil {
+			return nil, err
 		}
-	}
-
-	if def.RepeatPolicy != nil {
-		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
-		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
-	}
-
-	if def.SignalOnStop != nil {
-		sigDef := *def.SignalOnStop
-		sig := unix.SignalNum(sigDef)
-		if sig == 0 {
-			return nil, fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
-		}
-		step.SignalOnStop = sigDef
 	}
 
 	return step, nil
@@ -623,7 +604,9 @@ func buildStep(variables []string, def *stepDef, fns []*funcDef, opts buildOpts)
 const commandRun = "run"
 
 // parseSubWorkflow parses the subworkflow definition and sets the step fields.
-func parseSubWorkflow(step *Step, name, params string) error {
+func parseSubWorkflow(def *stepDef, step *Step) error {
+	name, params := def.Run, def.Params
+
 	// if the run field is not set, return nil.
 	if name == "" {
 		return nil
@@ -647,7 +630,9 @@ const (
 // Case 1: executor is nil
 // Case 2: executor is a string
 // Case 3: executor is a struct
-func parseExecutor(step *Step, executor any) error {
+func parseExecutor(def *stepDef, step *Step) error {
+	executor := def.Executor
+
 	// Case 1: executor is nil
 	if executor == nil {
 		return nil
@@ -707,6 +692,12 @@ func parseExecutor(step *Step, executor any) error {
 
 	}
 
+	// Convert map[any]any to map[string]any for executor config.
+	// It is up to the executor to parse the values.
+	if err := convertMap(step.ExecutorConfig.Config); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -733,7 +724,8 @@ func parseExecutor(step *Step, executor any) error {
 //
 // ```
 // It returns an error if the command is not nil but empty.
-func parseCommand(step *Step, command any) error {
+func parseCommand(def *stepDef, step *Step) error {
+	command := def.Command
 
 	// Case 1: command is nil
 	if command == nil {
@@ -832,9 +824,39 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 	return nil
 }
 
+// parseMiscs parses the miscellaneous fields in the step definition.
+func parseMiscs(def *stepDef, step *Step) error {
+	if def.ContinueOn != nil {
+		step.ContinueOn.Skipped = def.ContinueOn.Skipped
+		step.ContinueOn.Failure = def.ContinueOn.Failure
+	}
+
+	if def.RetryPolicy != nil {
+		step.RetryPolicy = &RetryPolicy{
+			Limit:    def.RetryPolicy.Limit,
+			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
+		}
+	}
+
+	if def.RepeatPolicy != nil {
+		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
+		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+	}
+
+	if def.SignalOnStop != nil {
+		sigDef := *def.SignalOnStop
+		sig := unix.SignalNum(sigDef)
+		if sig == 0 {
+			return fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
+		}
+		step.SignalOnStop = sigDef
+	}
+	return nil
+}
+
 // expandEnv expands the environment variables in the value if the noEval option is false.
-func expandEnv(val string, options buildOpts) string {
-	if options.noEval {
+func expandEnv(val string, noEval bool) string {
+	if noEval {
 		return val
 	}
 	return os.ExpandEnv(val)
@@ -1070,6 +1092,7 @@ func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string
 		case string:
 			// Case 1. schedule is a string.
 			values = append(values, v)
+
 		case []interface{}:
 			// Case 2. schedule is an array of strings.
 			// Append all the schedules to the values slice.
@@ -1080,6 +1103,7 @@ func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string
 				}
 				values = append(values, s)
 			}
+
 		}
 
 		var targets *[]string
