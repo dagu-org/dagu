@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -44,14 +43,14 @@ func Test_FormatTime(t *testing.T) {
 		require.Equal(t, tm, parsed)
 
 		// Test empty time
-		require.Equal(t, constants.TimeEmpty, util.FormatTime(time.Time{}))
-		parsed, err = util.ParseTime(constants.TimeEmpty)
+		require.Equal(t, "-", util.FormatTime(time.Time{}))
+		parsed, err = util.ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
 	t.Run("format time empty", func(t *testing.T) {
 		// Test empty time
-		require.Equal(t, constants.TimeEmpty, util.FormatTime(time.Time{}))
+		require.Equal(t, "-", util.FormatTime(time.Time{}))
 	})
 }
 
@@ -62,7 +61,7 @@ func Test_ParseTime(t *testing.T) {
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location()), parsed)
 	})
 	t.Run("parse empty time", func(t *testing.T) {
-		parsed, err := util.ParseTime(constants.TimeEmpty)
+		parsed, err := util.ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/mattn/go-shellwords"
 )
 
@@ -32,21 +31,26 @@ func MustGetwd() string {
 	return wd
 }
 
+const (
+	timeFormat = "2006-01-02 15:04:05"
+	timeEmpty  = "-"
+)
+
 // FormatTime returns formatted time.
 func FormatTime(t time.Time) string {
 	if t.IsZero() {
-		return constants.TimeEmpty
+		return timeEmpty
 	}
 
-	return t.Format(constants.TimeFormat)
+	return t.Format(timeFormat)
 }
 
 // ParseTime parses time string.
 func ParseTime(val string) (time.Time, error) {
-	if val == constants.TimeEmpty {
+	if val == timeEmpty {
 		return time.Time{}, nil
 	}
-	return time.ParseInLocation(constants.TimeFormat, val, time.Local)
+	return time.ParseInLocation(timeFormat, val, time.Local)
 }
 
 var (
