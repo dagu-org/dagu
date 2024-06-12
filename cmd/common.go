@@ -11,9 +11,28 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
+	"github.com/dagu-dev/dagu/service/frontend"
 	"github.com/spf13/cobra"
+	"go.uber.org/fx"
 )
+
+var topLevelModule = fx.Options(
+	fx.Provide(config.Get),
+	fx.Provide(engine.NewFactory),
+	fx.Provide(logger.NewSlogLogger),
+	fx.Provide(client.NewDataStoreFactory),
+)
+
+func newFrontend() *fx.App {
+	return fx.New(
+		topLevelModule,
+		frontend.Module,
+		fx.Invoke(frontend.LifetimeHooks),
+		fx.NopLogger,
+	)
+}
 
 func execDAG(ctx context.Context, e engine.Engine, cmd *cobra.Command, args []string, dry bool) {
 	params, err := cmd.Flags().GetString("params")
@@ -29,10 +48,7 @@ func execDAG(ctx context.Context, e engine.Engine, cmd *cobra.Command, args []st
 }
 
 func start(ctx context.Context, e engine.Engine, dg *dag.DAG, dry bool) error {
-	// TODO: remove this
-	ds := client.NewDataStoreFactory(config.Get())
-
-	a := agent.New(&agent.Config{DAG: dg, Dry: dry}, e, ds)
+	a := agent.New(&agent.Config{DAG: dg, Dry: dry}, e, client.NewDataStoreFactory(config.Get()))
 	listenSignals(ctx, a)
 	return a.Run(ctx)
 }
@@ -41,9 +57,7 @@ type signalListener interface {
 	Signal(os.Signal)
 }
 
-var (
-	signalChan = make(chan os.Signal, 100)
-)
+var signalChan = make(chan os.Signal, 100)
 
 func listenSignals(ctx context.Context, a signalListener) {
 	go func() {

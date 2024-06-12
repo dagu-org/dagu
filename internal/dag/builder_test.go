@@ -46,9 +46,7 @@ env:
 			def, err := decode(dg)
 			require.NoError(t, err)
 
-			b := &builder{}
-
-			_, err = b.build(def, nil)
+			_, err = new(builder).build(def, nil)
 			require.Error(t, err)
 		})
 	}
@@ -97,8 +95,7 @@ env:
 			def, err := decode(dg)
 			require.NoError(t, err)
 
-			b := &builder{}
-			_, err = b.build(def, nil)
+			_, err = new(builder).build(def, nil)
 			require.NoError(t, err)
 
 			for k, v := range tt.expected {
@@ -181,8 +178,7 @@ params: %s
 			def, err := decode(dg)
 			require.NoError(t, err)
 
-			b := &builder{}
-			_, err = b.build(def, nil)
+			_, err = new(builder).build(def, nil)
 			require.NoError(t, err)
 
 			for k, v := range tt.expected {
@@ -237,9 +233,7 @@ steps:
 			def, err := decode(dg)
 			require.NoError(t, err)
 
-			b := &builder{}
-
-			dag, err := b.build(def, nil)
+			dag, err := new(builder).build(def, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -472,8 +466,7 @@ steps:
 			def, err := decode(dg)
 			require.NoError(t, err)
 
-			b := &builder{}
-			dag, err := b.build(def, nil)
+			dag, err := new(builder).build(def, nil)
 			require.NoError(t, err)
 
 			if len(dag.Steps) != 1 {

@@ -186,7 +186,7 @@ func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, er
 		}
 	}
 
-	return &DAG{}, nil
+	return new(DAG), nil
 }
 
 type mergeTransformer struct{}
@@ -232,7 +232,7 @@ func unmarshalData(data []byte) (map[string]interface{}, error) {
 
 // decode decodes the configuration map into a configDefinition.
 func decode(cm map[string]interface{}) (*definition, error) {
-	c := &definition{}
+	c := new(definition)
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,

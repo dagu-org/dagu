@@ -55,7 +55,7 @@ type StatusFile struct {
 }
 
 func StatusFromJson(s string) (*Status, error) {
-	status := &Status{}
+	status := new(Status)
 	err := json.Unmarshal([]byte(s), status)
 	if err != nil {
 		return nil, err

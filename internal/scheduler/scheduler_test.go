@@ -368,7 +368,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 		Command: "sleep",
 		Args:    []string{"10"},
 	})
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 50)
@@ -483,7 +483,7 @@ func TestRepeat(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 3000)
@@ -513,7 +513,7 @@ func TestRepeatFail(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
@@ -535,7 +535,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	done := make(chan bool)
 	go func() {
@@ -588,7 +588,7 @@ func TestNodeSetupFailure(t *testing.T) {
 			Script:  "echo 1",
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), StatusError)
@@ -606,7 +606,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 			Args:    []string{"1"},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	nodes := g.Nodes()
 	go func() {
@@ -633,7 +633,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	s2.Script = "echo $PREV_OUT"
 	s2.Output = "TOOK_PREV_OUT"
 
-	g, sc := newTestSchedule(t, &Config{}, s1, s2)
+	g, sc := newTestSchedule(t, new(Config), s1, s2)
 	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 

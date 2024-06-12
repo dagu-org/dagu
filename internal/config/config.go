@@ -2,12 +2,13 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -43,9 +44,7 @@ type TLS struct {
 	KeyFile  string
 }
 
-var (
-	cache = &configCache{}
-)
+var cache = new(configCache)
 
 type configCache struct {
 	instance *Config
@@ -130,7 +129,7 @@ func LoadConfig() error {
 
 	_ = viper.ReadInConfig()
 
-	cfg := &Config{}
+	cfg := new(Config)
 	if err := viper.Unmarshal(cfg); err != nil {
 		return fmt.Errorf("failed to unmarshal cfg file: %w", err)
 	}

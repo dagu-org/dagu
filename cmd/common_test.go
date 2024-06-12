@@ -36,8 +36,9 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 }
 
 func changeHomeDir(dir string) {
-	homeDir = dir
+	// Change the home directory for testing.
 	_ = os.Setenv("HOME", dir)
+	// Reload the configuration.
 	_ = config.LoadConfig()
 }
 
