@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
-	domain "github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/service/frontend/handlers/response"
 	"github.com/dagu-dev/dagu/service/frontend/models"
@@ -216,14 +216,14 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 }
 
 func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
-	var stepByName = map[string]*domain.Node{
+	var stepByName = map[string]*model.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
 		constants.OnCancel:  nil,
 		constants.OnExit:    nil,
 	}
 
-	var status *domain.Status
+	var status *model.Status
 
 	e := h.engineFactory.Create()
 
@@ -247,7 +247,7 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 	stepByName[constants.OnCancel] = status.OnCancel
 	stepByName[constants.OnExit] = status.OnExit
 
-	node, ok := lo.Find(status.Nodes, func(item *domain.Node) bool {
+	node, ok := lo.Find(status.Nodes, func(item *model.Node) bool {
 		return item.Name == stepName
 	})
 	if !ok {
@@ -422,7 +422,7 @@ func (h *DAGHandler) updateStatus(dg *dag.DAG, reqId, step string, to scheduler.
 		return err
 	}
 
-	_, idx, ok := lo.FindIndexOf(status.Nodes, func(item *domain.Node) bool {
+	_, idx, ok := lo.FindIndexOf(status.Nodes, func(item *model.Node) bool {
 		return item.Step.Name == step
 	})
 	if !ok {

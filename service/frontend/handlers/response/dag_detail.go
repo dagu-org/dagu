@@ -3,7 +3,7 @@ package response
 import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	domain "github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
@@ -78,7 +78,7 @@ func ToHandlerOn(handlerOn dag.HandlerOn) *models.HandlerOn {
 	return ret
 }
 
-func ToDagStatusDetail(s *domain.Status) *models.DagStatusDetail {
+func ToDagStatusDetail(s *model.Status) *models.DagStatusDetail {
 	return &models.DagStatusDetail{
 		Log:        lo.ToPtr(s.Log),
 		Name:       lo.ToPtr(s.Name),
@@ -89,7 +89,7 @@ func ToDagStatusDetail(s *domain.Status) *models.DagStatusDetail {
 		FinishedAt: lo.ToPtr(s.FinishedAt),
 		Status:     lo.ToPtr(int64(s.Status)),
 		StatusText: lo.ToPtr(s.StatusText),
-		Nodes: lo.Map(s.Nodes, func(item *domain.Node, _ int) *models.StatusNode {
+		Nodes: lo.Map(s.Nodes, func(item *model.Node, _ int) *models.StatusNode {
 			return ToNode(item)
 		}),
 	}

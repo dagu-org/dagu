@@ -5,13 +5,13 @@ import (
 	"strings"
 
 	"github.com/dagu-dev/dagu/internal/constants"
-	domain "github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
-func ToDagLogResponse(logs []*domain.StatusFile) *models.DagLogResponse {
+func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 	statusByName := map[string][]scheduler.NodeStatus{}
 	for i, l := range logs {
 		for _, node := range l.Status.Nodes {
@@ -48,7 +48,7 @@ func ToDagLogResponse(logs []*domain.StatusFile) *models.DagLogResponse {
 		}
 	}
 
-	converted := lo.Map(logs, func(item *domain.StatusFile, _ int) *models.DagStatusFile {
+	converted := lo.Map(logs, func(item *model.StatusFile, _ int) *models.DagStatusFile {
 		return ToDagStatusFile(item)
 	})
 
@@ -60,14 +60,14 @@ func ToDagLogResponse(logs []*domain.StatusFile) *models.DagLogResponse {
 	return ret
 }
 
-func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx int, node *domain.Node) {
+func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx int, node *model.Node) {
 	if _, ok := data[node.Name]; !ok {
 		data[node.Name] = make([]scheduler.NodeStatus, logLen)
 	}
 	data[node.Name][logIdx] = node.Status
 }
 
-func ToDagStatusFile(status *domain.StatusFile) *models.DagStatusFile {
+func ToDagStatusFile(status *model.StatusFile) *models.DagStatusFile {
 	return &models.DagStatusFile{
 		File:   lo.ToPtr(status.File),
 		Status: ToDagStatusDetail(status.Status),
@@ -83,7 +83,7 @@ func ToDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGr
 	}
 }
 
-func ToDagStepLogResponse(logFile, content string, step *domain.Node) *models.DagStepLogResponse {
+func ToDagStepLogResponse(logFile, content string, step *model.Node) *models.DagStepLogResponse {
 	return &models.DagStepLogResponse{
 		LogFile: lo.ToPtr(logFile),
 		Step:    ToNode(step),
