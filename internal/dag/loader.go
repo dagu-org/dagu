@@ -139,12 +139,23 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Set the absolute path to the file.
 	dst.Location = file
 
+	// Set the name if not set.
+	if dst.Name == "" {
+		dst.Name = defaultName(file)
+	}
+
 	// Set the default values for the DAG.
 	if !opts.metadataOnly {
 		dst.setup()
 	}
 
 	return dst, nil
+}
+
+// defaultName returns the default name for the given file.
+// The default name is the filename without the extension.
+func defaultName(file string) string {
+	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
 // prepareFilepath prepares the filepath for the given file.
@@ -175,9 +186,7 @@ func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, er
 		}
 	}
 
-	// return a DAG with the default values.
-	dagName := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
-	return &DAG{Name: dagName}, nil
+	return &DAG{}, nil
 }
 
 type mergeTransformer struct{}
