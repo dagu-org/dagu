@@ -2,7 +2,6 @@ package dag
 
 import (
 	"fmt"
-	"path"
 	"strings"
 	"time"
 )
@@ -78,7 +77,7 @@ type Step struct {
 func (s *Step) setup(workDir string) {
 	// if the working directory is not set, use the directory of the DAG file.
 	if s.Dir == "" {
-		s.Dir = path.Dir(workDir)
+		s.Dir = workDir
 	}
 }
 

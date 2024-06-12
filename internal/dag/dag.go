@@ -125,8 +125,8 @@ func (d *DAG) setup() {
 
 	// set the default working directory for the steps if not set
 	dir := path.Dir(d.Location)
-	for _, step := range d.Steps {
-		step.setup(dir)
+	for i := range d.Steps {
+		d.Steps[i].setup(dir)
 	}
 
 	// set the default working directory for the handler steps if not set

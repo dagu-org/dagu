@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,13 +79,24 @@ func Test_loadBaseConfig(t *testing.T) {
 }
 
 func Test_LoadDefaultConfig(t *testing.T) {
-	t.Run("Load default config", func(t *testing.T) {
-		d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+	t.Run("Load default config without base config", func(t *testing.T) {
+		file := path.Join(testdataDir, "default.yaml")
+		d, err := Load("", file, "")
+
 		require.NoError(t, err)
 
 		// Check if the default values are set correctly
-		require.Equal(t, time.Second*60, d.MaxCleanUpTime)
-		require.Equal(t, 30, d.HistRetentionDays)
+		assert.Equal(t, path.Join(testHomeDir, "/.dagu/logs"), d.LogDir)
+		assert.Equal(t, file, d.Location)
+		assert.Equal(t, "default", d.Name)
+		assert.Equal(t, time.Second*60, d.MaxCleanUpTime)
+		assert.Equal(t, 30, d.HistRetentionDays)
+
+		// Check if the steps are loaded correctly
+		require.Len(t, d.Steps, 1)
+		assert.Equal(t, "1", d.Steps[0].Name, "1")
+		assert.Equal(t, "true", d.Steps[0].Command, "true")
+		assert.Equal(t, path.Dir(file), d.Steps[0].Dir)
 	})
 }
 
