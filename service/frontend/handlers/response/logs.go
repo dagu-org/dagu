@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/constants"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/service/frontend/models"
@@ -27,24 +27,24 @@ func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 		return strings.Compare(lo.FromPtr(grid[i].Name), lo.FromPtr(grid[c].Name)) <= 0
 	})
 
-	hookStatusByName := map[string][]scheduler.NodeStatus{}
+	handlerStatusByName := map[string][]scheduler.NodeStatus{}
 	for i, l := range logs {
 		if l.Status.OnSuccess != nil {
-			addStatusGridItem(hookStatusByName, len(logs), i, l.Status.OnSuccess)
+			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnSuccess)
 		}
 		if l.Status.OnFailure != nil {
-			addStatusGridItem(hookStatusByName, len(logs), i, l.Status.OnFailure)
+			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnFailure)
 		}
 		if l.Status.OnCancel != nil {
-			addStatusGridItem(hookStatusByName, len(logs), i, l.Status.OnCancel)
+			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnCancel)
 		}
 		if l.Status.OnExit != nil {
-			addStatusGridItem(hookStatusByName, len(logs), i, l.Status.OnExit)
+			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnExit)
 		}
 	}
-	for _, k := range []string{constants.OnSuccess, constants.OnFailure, constants.OnCancel, constants.OnExit} {
-		if v, ok := hookStatusByName[k]; ok {
-			grid = append(grid, ToDagLogGridItem(k, v))
+	for _, handlerType := range []dag.HandlerType{dag.HandlerOnSuccess, dag.HandlerOnFailure, dag.HandlerOnCancel, dag.HandlerOnExit} {
+		if v, ok := handlerStatusByName[handlerType.String()]; ok {
+			grid = append(grid, ToDagLogGridItem(handlerType.String(), v))
 		}
 	}
 

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
@@ -335,7 +334,7 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
 	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
 
-	onExitNode := sc.HandlerNode(constants.OnExit)
+	onExitNode := sc.HandlerNode(dag.HandlerOnExit)
 	require.NotNil(t, onExitNode)
 	require.Equal(t, NodeStatusSuccess, onExitNode.State().Status)
 }
@@ -359,7 +358,7 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
 	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
 
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnExit).State().Status)
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
@@ -417,9 +416,9 @@ func TestSchedulerOnCancel(t *testing.T) {
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
 	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnSuccess).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnFailure).State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnCancel).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnSuccess).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnFailure).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnCancel).State().Status)
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
@@ -440,9 +439,9 @@ func TestSchedulerOnSuccess(t *testing.T) {
 
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnSuccess).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnFailure).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnExit).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnSuccess).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnFailure).State().Status)
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
@@ -465,10 +464,10 @@ func TestSchedulerOnFailure(t *testing.T) {
 
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnSuccess).State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnFailure).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnCancel).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnExit).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnSuccess).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnFailure).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnCancel).State().Status)
 }
 
 func TestRepeat(t *testing.T) {

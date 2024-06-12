@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 )
 
@@ -53,7 +52,7 @@ type Scheduler struct {
 	mu        sync.RWMutex
 	pause     time.Duration
 	lastError error
-	handlers  map[string]*Node
+	handlers  map[dag.HandlerType]*Node
 }
 
 type Config struct {
@@ -184,16 +183,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	}
 	wg.Wait()
 
-	var handlers []string
+	var handlers []dag.HandlerType
 	switch sc.Status(g) {
 	case StatusSuccess:
-		handlers = append(handlers, constants.OnSuccess)
+		handlers = append(handlers, dag.HandlerOnSuccess)
 	case StatusError:
-		handlers = append(handlers, constants.OnFailure)
+		handlers = append(handlers, dag.HandlerOnFailure)
 	case StatusCancel:
-		handlers = append(handlers, constants.OnCancel)
+		handlers = append(handlers, dag.HandlerOnCancel)
 	}
-	handlers = append(handlers, constants.OnExit)
+	handlers = append(handlers, dag.HandlerOnExit)
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
 			log.Printf("%s started", n.data.Step.Name)
@@ -287,7 +286,7 @@ func (sc *Scheduler) isError() bool {
 }
 
 // HandlerNode returns the handler node with the given name.
-func (sc *Scheduler) HandlerNode(name string) *Node {
+func (sc *Scheduler) HandlerNode(name dag.HandlerType) *Node {
 	if v, ok := sc.handlers[name]; ok {
 		return v
 	}
@@ -371,18 +370,18 @@ func (sc *Scheduler) setup() (err error) {
 			return
 		}
 	}
-	sc.handlers = map[string]*Node{}
+	sc.handlers = map[dag.HandlerType]*Node{}
 	if sc.OnExit != nil {
-		sc.handlers[constants.OnExit] = &Node{data: NodeData{Step: *sc.OnExit}}
+		sc.handlers[dag.HandlerOnExit] = &Node{data: NodeData{Step: *sc.OnExit}}
 	}
 	if sc.OnSuccess != nil {
-		sc.handlers[constants.OnSuccess] = &Node{data: NodeData{Step: *sc.OnSuccess}}
+		sc.handlers[dag.HandlerOnSuccess] = &Node{data: NodeData{Step: *sc.OnSuccess}}
 	}
 	if sc.OnFailure != nil {
-		sc.handlers[constants.OnFailure] = &Node{data: NodeData{Step: *sc.OnFailure}}
+		sc.handlers[dag.HandlerOnFailure] = &Node{data: NodeData{Step: *sc.OnFailure}}
 	}
 	if sc.OnCancel != nil {
-		sc.handlers[constants.OnCancel] = &Node{data: NodeData{Step: *sc.OnCancel}}
+		sc.handlers[dag.HandlerOnCancel] = &Node{data: NodeData{Step: *sc.OnCancel}}
 	}
 	return
 }

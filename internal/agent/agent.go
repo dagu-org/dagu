@@ -17,7 +17,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/persistence"
 
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
@@ -186,16 +185,16 @@ func (a *Agent) Status() *model.Status {
 		Params:     model.Params(a.DAG.Params),
 	}
 
-	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
+	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
 		status.OnExit = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
+	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
 		status.OnSuccess = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
+	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
 		status.OnFailure = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
+	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
 		status.OnCancel = model.FromNode(node.Data())
 	}
 

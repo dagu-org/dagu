@@ -103,6 +103,34 @@ type DAG struct {
 	HistRetentionDays int           `json:"HistRetentionDays"` // HistRetentionDays is the number of days to keep the history.
 }
 
+// HandlerType is the type of the handler.
+type HandlerType string
+
+const (
+	HandlerOnSuccess HandlerType = "onSuccess"
+	HandlerOnFailure HandlerType = "onFailure"
+	HandlerOnCancel  HandlerType = "onCancel"
+	HandlerOnExit    HandlerType = "onExit"
+)
+
+func (e HandlerType) String() string {
+	return string(e)
+}
+
+// ParseHandlerType converts a string to a HandlerType.
+func ParseHandlerType(s string) HandlerType {
+	return nameToHandlerType[s]
+}
+
+var (
+	nameToHandlerType = map[string]HandlerType{
+		"onSuccess": HandlerOnSuccess,
+		"onFailure": HandlerOnFailure,
+		"onCancel":  HandlerOnCancel,
+		"onExit":    HandlerOnExit,
+	}
+)
+
 // setup sets the default values for the DAG.
 func (d *DAG) setup() {
 	// LogDir is the directory where the logs are stored.

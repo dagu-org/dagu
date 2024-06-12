@@ -105,7 +105,7 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Load the base configuration unless only the metadata is required.
 	// If only the metadata is required, the base configuration is not loaded
 	// and the DAG is created with the default values.
-	dst, err := loadBaseConfigIfRequired(opts.base, file, opts)
+	dst, err := loadBaseConfigIfRequired(opts.base, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func prepareFilepath(file string) (string, error) {
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, error) {
+func loadBaseConfigIfRequired(baseConfig string, opts buildOpts) (*DAG, error) {
 	if !opts.metadataOnly && baseConfig != "" {
 		dag, err := loadBaseConfig(baseConfig, opts)
 		if err != nil {

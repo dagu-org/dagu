@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/constants"
-
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/robfig/cron/v3"
 	"golang.org/x/sys/unix"
@@ -273,28 +271,28 @@ func (b *builder) buildParams() (err error) {
 // The handlers are executed when the DAG is stopped, succeeded, failed, or cancelled.
 func (b *builder) buildHandlers() (err error) {
 	if b.def.HandlerOn.Exit != nil {
-		b.def.HandlerOn.Exit.Name = constants.OnExit
+		b.def.HandlerOn.Exit.Name = HandlerOnExit.String()
 		if b.dag.HandlerOn.Exit, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Exit, b.def.Functions); err != nil {
 			return err
 		}
 	}
 
 	if b.def.HandlerOn.Success != nil {
-		b.def.HandlerOn.Success.Name = constants.OnSuccess
+		b.def.HandlerOn.Success.Name = HandlerOnSuccess.String()
 		if b.dag.HandlerOn.Success, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Success, b.def.Functions); err != nil {
 			return
 		}
 	}
 
 	if b.def.HandlerOn.Failure != nil {
-		b.def.HandlerOn.Failure.Name = constants.OnFailure
+		b.def.HandlerOn.Failure.Name = HandlerOnFailure.String()
 		if b.dag.HandlerOn.Failure, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Failure, b.def.Functions); err != nil {
 			return
 		}
 	}
 
 	if b.def.HandlerOn.Cancel != nil {
-		b.def.HandlerOn.Cancel.Name = constants.OnCancel
+		b.def.HandlerOn.Cancel.Name = HandlerOnCancel.String()
 		if b.dag.HandlerOn.Cancel, err = b.stepBuilder.buildStep(b.dag.Env, b.def.HandlerOn.Cancel, b.def.Functions); err != nil {
 			return
 		}

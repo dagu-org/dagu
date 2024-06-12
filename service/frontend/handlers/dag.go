@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence"
@@ -216,11 +215,11 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 }
 
 func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
-	var stepByName = map[string]*model.Node{
-		constants.OnSuccess: nil,
-		constants.OnFailure: nil,
-		constants.OnCancel:  nil,
-		constants.OnExit:    nil,
+	var stepByName = map[dag.HandlerType]*model.Node{
+		dag.HandlerOnSuccess: nil,
+		dag.HandlerOnFailure: nil,
+		dag.HandlerOnCancel:  nil,
+		dag.HandlerOnExit:    nil,
 	}
 
 	var status *model.Status
@@ -242,10 +241,10 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 		status = s
 	}
 
-	stepByName[constants.OnSuccess] = status.OnSuccess
-	stepByName[constants.OnFailure] = status.OnFailure
-	stepByName[constants.OnCancel] = status.OnCancel
-	stepByName[constants.OnExit] = status.OnExit
+	stepByName[dag.HandlerOnSuccess] = status.OnSuccess
+	stepByName[dag.HandlerOnFailure] = status.OnFailure
+	stepByName[dag.HandlerOnCancel] = status.OnCancel
+	stepByName[dag.HandlerOnExit] = status.OnExit
 
 	node, ok := lo.Find(status.Nodes, func(item *model.Node) bool {
 		return item.Name == stepName
