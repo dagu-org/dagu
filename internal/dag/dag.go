@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/util"
 
 	"github.com/robfig/cron/v3"
 )
@@ -50,30 +51,54 @@ type MailConfig struct {
 
 // DAG contains all information about a workflow.
 type DAG struct {
-	Location          string        // Location is the absolute path to the DAG file.
-	Group             string        // Group is the group name of the DAG. This is optional.
-	Name              string        // Name is the name of the DAG. The default is the filename without the extension.
-	Schedule          []*Schedule   // Schedule is the start schedule of the DAG.
-	StopSchedule      []*Schedule   // StopSchedule is the stop schedule of the DAG.
-	RestartSchedule   []*Schedule   // RestartSchedule is the restart schedule of the DAG.
-	Description       string        // Description is the description of the DAG. optional.
-	Env               []string      // Env contains a list of environment variables to be set before running the DAG.
-	LogDir            string        // LogDir is the directory where the logs are stored.
-	HandlerOn         HandlerOn     // HandlerOn contains the steps to be executed on different events.
-	Steps             []Step        // Steps contains the list of steps in the DAG.
-	MailOn            *MailOn       // MailOn contains the conditions to send mail.
-	ErrorMail         *MailConfig   // ErrorMail contains the mail configuration for error.
-	InfoMail          *MailConfig   // InfoMail contains the mail configuration for info.
-	Smtp              *SmtpConfig   // Smtp contains the SMTP configuration.
-	Delay             time.Duration // Delay is the delay before starting the DAG.
-	RestartWait       time.Duration // RestartWait is the time to wait before restarting the DAG.
-	HistRetentionDays int           // HistRetentionDays is the number of days to keep the history.
-	Preconditions     []*Condition  // Preconditions contains the conditions to be met before running the DAG.
-	MaxActiveRuns     int           // MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
-	Params            []string      // Params contains the list of parameters to be passed to the DAG.
-	DefaultParams     string        // DefaultParams contains the default parameters to be passed to the DAG.
-	MaxCleanUpTime    time.Duration // MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
-	Tags              []string      // Tags contains the list of tags for the DAG. optional.
+	Location    string   // `json:"Location"` Location is the absolute path to the DAG file.
+	Group       string   // `json:"Group"` Group is the group name of the DAG. This is optional.
+	Name        string   // `json:"Name"` Name is the name of the DAG. The default is the filename without the extension.
+	Tags        []string // `json:"Tags"` Tags contains the list of tags for the DAG. optional.
+	Description string   // `json:"Description"` Description is the description of the DAG. optional.
+
+	// Schedule configuration.
+	// This is used by the scheduler to start / stop / restart the DAG.
+	Schedule        []*Schedule // `json:"Schedule"` Schedule is the start schedule of the DAG.
+	StopSchedule    []*Schedule // `json:"StopSchedule"` StopSchedule is the stop schedule of the DAG.
+	RestartSchedule []*Schedule // `json:"RestartSchedule"` RestartSchedule is the restart schedule of the DAG.
+
+	// Env contains a list of environment variables to be set before running the DAG.
+	Env []string // `json:"Env"`
+
+	// LogDir is the directory where the logs are stored.
+	// The actual log directory is LogDir + Name (with invalid characters replaced with '_').
+	LogDir string // `json:"LogDir"`
+
+	// Paramerter configuration.
+	// The DAG definition contains only DefaultParams. Params are automatically set by the DAG loader.
+	DefaultParams string   // `json:"DefaultParams"` DefaultParams contains the default parameters to be passed to the DAG.
+	Params        []string // `json:"Params"` Params contains the list of parameters to be passed to the DAG.
+
+	// Commands configuration to be executed in the DAG.
+	// Steps represents the nodes in the DAG.
+	Steps     []Step    // `json:"Steps"` Steps contains the list of steps in the DAG.
+	HandlerOn HandlerOn // `json:"HandlerOn"` HandlerOn contains the steps to be executed on different events.
+
+	// Preconditions contains the conditions to be met before running the DAG.
+	// If the conditions are not met, the whole DAG is skipped.
+	Preconditions []*Condition // `json:"Preconditions"`
+
+	// Mail notification configuration.
+	// MailOn contains the conditions to send mail.
+	// Smtp contains the SMTP configuration.
+	// If you don't want to repeat the SMTP configuration for each DAG, you can set it in the base configuration.
+	Smtp      *SmtpConfig // `json:"Smtp"` Smtp contains the SMTP configuration.
+	MailOn    *MailOn     // `json:"MailOn"`
+	ErrorMail *MailConfig // `json:"ErrorMail"` ErrorMail contains the mail configuration for error.
+	InfoMail  *MailConfig // `json:"InfoMail"` InfoMail contains the mail configuration for info.
+
+	// Misc configuration for DAG execution.
+	Delay             time.Duration // `json:"Delay"` Delay is the delay before starting the DAG.
+	RestartWait       time.Duration // `json:"RestartWait"` RestartWait is the time to wait before restarting the DAG.
+	MaxActiveRuns     int           // `json:"MaxActiveRuns"` MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
+	MaxCleanUpTime    time.Duration // `json:"MaxCleanUpTime"` MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
+	HistRetentionDays int           // `json:"HistRetentionDays"` HistRetentionDays is the number of days to keep the history.
 }
 
 // setup sets the default values for the DAG.
@@ -128,6 +153,13 @@ func (d *DAG) HasTag(tag string) bool {
 	}
 
 	return false
+}
+
+// GetLogDir returns the log directory for the DAG.
+// Log directory is the directory where the execution logs are stored.
+// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
+func (d *DAG) GetLogDir() string {
+	return path.Join(d.LogDir, util.ValidFilename(d.Name, "_"))
 }
 
 // SockAddr returns the unix socket address for the DAG.
