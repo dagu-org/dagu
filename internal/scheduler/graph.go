@@ -39,7 +39,7 @@ func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	}
 	for _, step := range steps {
 		step.OutputVariables = graph.outputVariables
-		node := &Node{step: step}
+		node := &Node{data: NodeData{Step: step}}
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -60,8 +60,8 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 		nodes:           []*Node{},
 	}
 	for _, node := range nodes {
-		if node.step.OutputVariables != nil {
-			node.step.OutputVariables.Range(func(key, value interface{}) bool {
+		if node.data.Step.OutputVariables != nil {
+			node.data.Step.OutputVariables.Range(func(key, value interface{}) bool {
 				k, ok := key.(string)
 				if !ok {
 					return false
@@ -79,7 +79,7 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 				return true
 			})
 		}
-		node.step.OutputVariables = graph.outputVariables
+		node.data.Step.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -155,6 +155,20 @@ func (g *ExecutionGraph) Nodes() []*Node {
 	return g.nodes
 }
 
+func (g *ExecutionGraph) NodeData() []NodeData {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	var ret []NodeData
+	for _, node := range g.nodes {
+		node.mu.Lock()
+		ret = append(ret, node.data)
+		node.mu.Unlock()
+	}
+
+	return ret
+}
+
 func (g *ExecutionGraph) node(id int) *Node {
 	return g.dict[id]
 }
@@ -163,12 +177,12 @@ func (g *ExecutionGraph) setupRetry() error {
 	dict := map[int]NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
-		dict[node.id] = node.Status
+		dict[node.id] = node.data.Status
 		retry[node.id] = false
 	}
 	var frontier []int
 	for _, node := range g.nodes {
-		if len(node.step.Depends) == 0 {
+		if len(node.data.Step.Depends) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
@@ -176,7 +190,7 @@ func (g *ExecutionGraph) setupRetry() error {
 		var next []int
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError || dict[u] == NodeStatusCancel {
-				log.Printf("clear node state: %s", g.dict[u].step.Name)
+				log.Printf("clear node state: %s", g.dict[u].data.Step.Name)
 				g.dict[u].clearState()
 				retry[u] = true
 			}
@@ -194,7 +208,7 @@ func (g *ExecutionGraph) setupRetry() error {
 
 func (g *ExecutionGraph) setup() error {
 	for _, node := range g.nodes {
-		for _, dep := range node.step.Depends {
+		for _, dep := range node.data.Step.Depends {
 			depStep, err := g.findStep(dep)
 			if err != nil {
 				return err
@@ -253,7 +267,7 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	for _, n := range g.dict {
-		if n.step.Name == name {
+		if n.data.Step.Name == name {
 			return n, nil
 		}
 	}

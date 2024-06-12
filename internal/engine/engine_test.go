@@ -419,14 +419,9 @@ func testDAG(name string) string {
 }
 
 func testNewStatus(dg *dag.DAG, reqId string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
-	now := time.Now()
-	ret := model.NewStatus(
-		dg, []model.NodeStepPair{
-			{
-				Node: scheduler.NodeState{Status: nodeStatus},
-			},
-		},
-		status, 0, &now, nil)
+	ret := model.NewStatus(dg, []scheduler.NodeData{{
+		NodeState: scheduler.NodeState{Status: nodeStatus},
+	}}, status, 0, model.Time(time.Now()), nil)
 	ret.RequestId = reqId
 	return ret
 }

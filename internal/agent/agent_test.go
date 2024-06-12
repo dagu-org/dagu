@@ -50,7 +50,8 @@ func TestRunDAG(t *testing.T) {
 	d := testLoadDAG(t, "run.yaml")
 	a := agent.New(&agent.Config{DAG: d}, e, df)
 
-	status, _ := e.GetLatestStatus(d)
+	status, err := e.GetLatestStatus(d)
+	require.NoError(t, err)
 	require.Equal(t, scheduler.StatusNone, status.Status)
 
 	go func() {
@@ -69,7 +70,7 @@ func TestRunDAG(t *testing.T) {
 	// check deletion of expired history files
 	d.HistRetentionDays = 0
 	a = agent.New(&agent.Config{DAG: d}, e, df)
-	err := a.Run(context.Background())
+	err = a.Run(context.Background())
 	require.NoError(t, err)
 	statusList := e.GetRecentHistory(d, 100)
 	require.Equal(t, 1, len(statusList))

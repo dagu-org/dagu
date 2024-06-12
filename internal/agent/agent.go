@@ -39,57 +39,55 @@ var (
 type Agent struct {
 	*Config
 
-	// TODO: Do not use the persistence package directly.
-	dataStoreFactory persistence.DataStoreFactory
-	engine           engine.Engine
-	scheduler        *scheduler.Scheduler
-	graph            *scheduler.ExecutionGraph
-	logManager       *logManager
-	reporter         *reporter.Reporter
-	historyStore     persistence.HistoryStore
-	socketServer     *sock.Server
-	requestId        string
-	finished         atomic.Bool
-	lock             sync.RWMutex
+	dataStore    persistence.DataStoreFactory
+	engine       engine.Engine
+	scheduler    *scheduler.Scheduler
+	graph        *scheduler.ExecutionGraph
+	logManager   *logManager
+	reporter     *reporter.Reporter
+	historyStore persistence.HistoryStore
+	socketServer *sock.Server
+
+	// reqID is request ID to identify the DAG run.
+	// The request ID can be used for history lookup, retry, etc.
+	reqID    string
+	finished atomic.Bool
+
+	lock sync.RWMutex
 }
 
-func New(config *Config, e engine.Engine, ds persistence.DataStoreFactory) *Agent {
+func New(config *Config, engine engine.Engine, dataStore persistence.DataStoreFactory) *Agent {
 	return &Agent{
-		Config:           config,
-		engine:           e,
-		dataStoreFactory: ds,
+		Config:    config,
+		engine:    engine,
+		dataStore: dataStore,
 	}
 }
 
-// Config contains the configuration for an Agent.
+// Config for Agent.
 type Config struct {
-	DAG     *dag.DAG
-	DAGsDir string
-	Dry     bool
-
+	// DAG is the DAG to run.
+	DAG *dag.DAG
+	// Dry is a dry-run mode. It does not execute the actual command.
+	Dry bool
 	// RetryTarget is the status to retry.
 	RetryTarget *model.Status
 }
 
 // Run starts the dags execution.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := func() error {
-		a.lock.Lock()
-		defer a.lock.Unlock()
-		if err := a.setupRequestId(); err != nil {
-			return err
-		}
-		a.init()
-		return a.setupGraph()
-	}(); err != nil {
+	if err := a.setup(); err != nil {
 		return err
 	}
+
 	if err := a.checkPreconditions(); err != nil {
 		return err
 	}
+
 	if a.Dry {
 		return a.dryRun()
 	}
+
 	for _, fn := range []func() error{
 		a.checkIsRunning,
 		a.setupDatabase,
@@ -100,42 +98,115 @@ func (a *Agent) Run(ctx context.Context) error {
 			return err
 		}
 	}
+
 	return a.run(ctx)
 }
 
-// Status returns the current status of the DAG.
+func (a *Agent) setup() error {
+	// Lock to prevent race condition.
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	if err := a.setupReqID(); err != nil {
+		return err
+	}
+
+	logDir := a.DAG.GetLogDir()
+
+	// Setup the scheduler for the DAG.
+	cfg := &scheduler.Config{
+		LogDir:        logDir,
+		MaxActiveRuns: a.DAG.MaxActiveRuns,
+		Delay:         a.DAG.Delay,
+		Dry:           a.Dry,
+		ReqID:         a.reqID,
+	}
+
+	if a.DAG.HandlerOn.Exit != nil {
+		cfg.OnExit = a.DAG.HandlerOn.Exit
+	}
+
+	if a.DAG.HandlerOn.Success != nil {
+		cfg.OnSuccess = a.DAG.HandlerOn.Success
+	}
+
+	if a.DAG.HandlerOn.Failure != nil {
+		cfg.OnFailure = a.DAG.HandlerOn.Failure
+	}
+
+	if a.DAG.HandlerOn.Cancel != nil {
+		cfg.OnCancel = a.DAG.HandlerOn.Cancel
+	}
+
+	a.scheduler = &scheduler.Scheduler{Config: cfg}
+
+	a.reporter = &reporter.Reporter{
+		Config: &reporter.Config{
+			Mailer: &mailer.Mailer{
+				Config: &mailer.Config{
+					Host:     a.DAG.Smtp.Host,
+					Port:     a.DAG.Smtp.Port,
+					Username: a.DAG.Smtp.Username,
+					Password: a.DAG.Smtp.Password,
+				},
+			},
+		}}
+
+	logFilename := filepath.Join(
+		logDir, fmt.Sprintf("agent_%s.%s.%s.log",
+			util.ValidFilename(a.DAG.Name, "_"),
+			time.Now().Format("20060102.15:04:05.000"),
+			util.TruncString(a.reqID, 8),
+		))
+
+	a.logManager = &logManager{logFilename: logFilename}
+
+	if err := a.setupGraph(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Status collects the current running status of the DAG and returns it.
 func (a *Agent) Status() *model.Status {
+	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 
-	scStatus := a.scheduler.Status(a.graph)
-	// TODO: fix this weird logic.
-	if scStatus == scheduler.StatusNone && a.graph.IsStarted() {
-		scStatus = scheduler.StatusRunning
+	schedulerStatus := a.scheduler.Status(a.graph)
+	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
+		// Match the status to the execution graph.
+		schedulerStatus = scheduler.StatusRunning
 	}
-	var ns []model.NodeStepPair
-	for _, n := range a.graph.Nodes() {
-		ns = append(ns, model.NodeStepPair{
-			Node: n.State(),
-			Step: n.Step(),
-		})
+
+	// Create the status object to record the current status.
+	status := &model.Status{
+		RequestId:  a.reqID,
+		Name:       a.DAG.Name,
+		Status:     schedulerStatus,
+		StatusText: schedulerStatus.String(),
+		Pid:        model.Pid(os.Getpid()),
+		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.DAG.Steps),
+		StartedAt:  model.FormatTime(a.graph.StartAt()),
+		FinishedAt: model.FormatTime(a.graph.FinishAt()),
+		Log:        a.logManager.logFilename,
+		Params:     model.Params(a.DAG.Params),
 	}
-	st, et := model.Time(a.graph.StartAt()), model.Time(a.graph.FinishAt())
-	status := model.NewStatus(a.DAG, ns, scStatus, os.Getpid(), st, et)
-	status.RequestId = a.requestId
-	status.Log = a.logManager.logFilename
+
 	if node := a.scheduler.HandlerNode(constants.OnExit); node != nil {
-		status.OnExit = model.FromNode(node.State(), node.Step())
+		status.OnExit = model.FromNode(node.Data())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node.State(), node.Step())
+		status.OnSuccess = model.FromNode(node.Data())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnFailure); node != nil {
-		status.OnFailure = model.FromNode(node.State(), node.Step())
+		status.OnFailure = model.FromNode(node.Data())
 	}
 	if node := a.scheduler.HandlerNode(constants.OnCancel); node != nil {
-		status.OnCancel = model.FromNode(node.State(), node.Step())
+		status.OnCancel = model.FromNode(node.Data())
 	}
+
 	return status
 }
 
@@ -182,52 +253,6 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	}
 }
 
-func (a *Agent) init() {
-	logDir := path.Join(a.DAG.LogDir, util.ValidFilename(a.DAG.Name, "_"))
-	config := &scheduler.Config{
-		LogDir:        logDir,
-		MaxActiveRuns: a.DAG.MaxActiveRuns,
-		Delay:         a.DAG.Delay,
-		Dry:           a.Dry,
-		RequestId:     a.requestId,
-	}
-
-	if a.DAG.HandlerOn.Exit != nil {
-		config.OnExit = a.DAG.HandlerOn.Exit
-	}
-
-	if a.DAG.HandlerOn.Success != nil {
-		config.OnSuccess = a.DAG.HandlerOn.Success
-	}
-
-	if a.DAG.HandlerOn.Failure != nil {
-		config.OnFailure = a.DAG.HandlerOn.Failure
-	}
-
-	if a.DAG.HandlerOn.Cancel != nil {
-		config.OnCancel = a.DAG.HandlerOn.Cancel
-	}
-	a.scheduler = &scheduler.Scheduler{Config: config}
-	a.reporter = &reporter.Reporter{
-		Config: &reporter.Config{
-			Mailer: &mailer.Mailer{
-				Config: &mailer.Config{
-					Host:     a.DAG.Smtp.Host,
-					Port:     a.DAG.Smtp.Port,
-					Username: a.DAG.Smtp.Username,
-					Password: a.DAG.Smtp.Password,
-				},
-			},
-		}}
-	logFilename := filepath.Join(
-		logDir, fmt.Sprintf("agent_%s.%s.%s.log",
-			util.ValidFilename(a.DAG.Name, "_"),
-			time.Now().Format("20060102.15:04:05.000"),
-			util.TruncString(a.requestId, 8),
-		))
-	a.logManager = &logManager{logFilename: logFilename}
-}
-
 func (a *Agent) setupGraph() (err error) {
 	if a.RetryTarget != nil {
 		log.Printf("setup for retry")
@@ -246,23 +271,24 @@ func (a *Agent) setupRetry() (err error) {
 	return
 }
 
-func (a *Agent) setupRequestId() error {
+// setupReqID generates a new request ID.
+func (a *Agent) setupReqID() error {
 	id, err := uuid.NewRandom()
 	if err != nil {
 		return err
 	}
-	a.requestId = id.String()
+	a.reqID = id.String()
+
 	return nil
 }
 
 func (a *Agent) setupDatabase() error {
-	// TODO: do not use the persistence package directly.
-	a.historyStore = a.dataStoreFactory.NewHistoryStore()
+	a.historyStore = a.dataStore.NewHistoryStore()
 	if err := a.historyStore.RemoveOld(a.DAG.Location, a.DAG.HistRetentionDays); err != nil {
 		util.LogErr("clean old history data", err)
 	}
 
-	return a.historyStore.Open(a.DAG.Location, time.Now(), a.requestId)
+	return a.historyStore.Open(a.DAG.Location, time.Now(), a.reqID)
 }
 
 func (a *Agent) setupSocketServer() (err error) {
@@ -338,7 +364,7 @@ func (a *Agent) run(ctx context.Context) error {
 		util.LogErr("write status", a.historyStore.Write(a.Status()))
 	}()
 
-	ctx = dag.NewContext(ctx, a.DAG, a.dataStoreFactory.NewDAGStore())
+	ctx = dag.NewContext(ctx, a.DAG, a.dataStore.NewDAGStore())
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()
@@ -370,7 +396,7 @@ func (a *Agent) dryRun() error {
 
 	log.Printf("***** Starting DRY-RUN *****")
 
-	ctx := dag.NewContext(context.Background(), a.DAG, a.dataStoreFactory.NewDAGStore())
+	ctx := dag.NewContext(context.Background(), a.DAG, a.dataStore.NewDAGStore())
 
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 	status := a.Status()

@@ -39,17 +39,17 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
-func FromNode(n scheduler.NodeState, step dag.Step) *Node {
+func FromNode(node scheduler.NodeData) *Node {
 	return &Node{
-		Step:       step,
-		Log:        n.Log,
-		StartedAt:  util.FormatTime(n.StartedAt),
-		FinishedAt: util.FormatTime(n.FinishedAt),
-		Status:     n.Status,
-		StatusText: n.Status.String(),
-		RetryCount: n.RetryCount,
-		DoneCount:  n.DoneCount,
-		Error:      errText(n.Error),
+		Step:       node.Step,
+		Log:        node.Log,
+		StartedAt:  util.FormatTime(node.StartedAt),
+		FinishedAt: util.FormatTime(node.FinishedAt),
+		Status:     node.Status,
+		StatusText: node.Status.String(),
+		RetryCount: node.RetryCount,
+		DoneCount:  node.DoneCount,
+		Error:      errText(node.Error),
 	}
 }
 
@@ -67,10 +67,10 @@ func errText(err error) string {
 	return err.Error()
 }
 
-func FromNodes(nodes []NodeStepPair) []*Node {
+func FromNodes(nodes []scheduler.NodeData) []*Node {
 	var ret []*Node
-	for _, n := range nodes {
-		ret = append(ret, FromNode(n.Node, n.Step))
+	for _, node := range nodes {
+		ret = append(ret, FromNode(node))
 	}
 	return ret
 }

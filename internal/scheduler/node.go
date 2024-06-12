@@ -50,13 +50,19 @@ func (s NodeStatus) String() string {
 }
 
 func NewNode(step dag.Step, state NodeState) *Node {
-	return &Node{step: step, NodeState: state}
+	return &Node{
+		data: NodeData{Step: step, NodeState: state},
+	}
+}
+
+type NodeData struct {
+	dag.Step
+	NodeState
 }
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {
-	step dag.Step
-	NodeState
+	data NodeData
 
 	id           int
 	mu           sync.RWMutex
@@ -90,19 +96,19 @@ type NodeState struct {
 func (n *Node) finish() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.FinishedAt = time.Now()
+	n.data.FinishedAt = time.Now()
 }
 
 func (n *Node) SetError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.Error = err
+	n.data.Error = err
 }
 
 func (n *Node) State() NodeState {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.NodeState
+	return n.data.NodeState
 }
 
 // Execute runs the command synchronously and returns error if any.
@@ -112,17 +118,17 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 	n.SetError(cmd.Run())
-	if n.outputReader != nil && n.step.Output != "" {
+	if n.outputReader != nil && n.data.Step.Output != "" {
 		util.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
 		// TODO: Error handling
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
-		_ = os.Setenv(n.step.Output, ret)
-		n.step.OutputVariables.Store(n.step.Output, fmt.Sprintf("%s=%s", n.step.Output, ret))
+		_ = os.Setenv(n.data.Step.Output, ret)
+		n.data.Step.OutputVariables.Store(n.data.Step.Output, fmt.Sprintf("%s=%s", n.data.Step.Output, ret))
 	}
 
-	return n.Error
+	return n.data.Error
 }
 
 func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
@@ -133,17 +139,17 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 
 	n.cancelFunc = fn
 
-	if n.step.CmdWithArgs != "" {
-		n.step.Command, n.step.Args = util.SplitCommand(n.step.CmdWithArgs, true)
+	if n.data.Step.CmdWithArgs != "" {
+		n.data.Step.Command, n.data.Step.Args = util.SplitCommand(n.data.Step.CmdWithArgs, true)
 	}
 
 	if n.scriptFile != nil {
 		var args []string
-		args = append(args, n.step.Args...)
-		n.step.Args = append(args, n.scriptFile.Name())
+		args = append(args, n.data.Step.Args...)
+		n.data.Step.Args = append(args, n.scriptFile.Name())
 	}
 
-	cmd, err := executor.CreateExecutor(ctx, n.step)
+	cmd, err := executor.CreateExecutor(ctx, n.data.Step)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +166,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 		stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
 	}
 
-	if n.step.Output != "" {
+	if n.data.Step.Output != "" {
 		var err error
 		if n.outputReader, n.outputWriter, err = os.Pipe(); err != nil {
 			return nil, err
@@ -178,79 +184,79 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	return cmd, nil
 }
 
-func (n *Node) Step() dag.Step {
+func (n *Node) Data() NodeData {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.step
+	return n.data
 }
 
 func (n *Node) getRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.RetryCount
+	return n.data.RetryCount
 }
 
 func (n *Node) setRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.RetriedAt = retriedAt
+	n.data.RetriedAt = retriedAt
 }
 
 func (n *Node) getRetriedAt() time.Time {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.RetriedAt
+	return n.data.RetriedAt
 }
 
 func (n *Node) getDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.DoneCount
+	return n.data.DoneCount
 }
 
 func (n *Node) clearState() {
-	n.NodeState = NodeState{}
+	n.data.NodeState = NodeState{}
 }
 
 func (n *Node) setStatus(status NodeStatus) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.Status = status
+	n.data.Status = status
 }
 
 func (n *Node) setErr(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.Error = err
-	n.Status = NodeStatusError
+	n.data.Error = err
+	n.data.Status = NodeStatusError
 }
 
 func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.Status
+	status := n.data.Status
 	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
-		if allowOverride && n.step.SignalOnStop != "" {
-			sigsig = unix.SignalNum(n.step.SignalOnStop)
+		if allowOverride && n.data.Step.SignalOnStop != "" {
+			sigsig = unix.SignalNum(n.data.Step.SignalOnStop)
 		}
-		log.Printf("Sending %s signal to %s", sigsig, n.step.Name)
+		log.Printf("Sending %s signal to %s", sigsig, n.data.Step.Name)
 		util.LogErr("sending signal", n.cmd.Kill(sigsig))
 	}
 	if status == NodeStatusRunning {
-		n.Status = NodeStatusCancel
+		n.data.Status = NodeStatusCancel
 	}
 }
 
 func (n *Node) cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.Status
+	status := n.data.Status
 	if status == NodeStatusRunning {
-		n.Status = NodeStatusCancel
+		n.data.Status = NodeStatusCancel
 	}
 	if n.cancelFunc != nil {
-		log.Printf("canceling node: %s", n.step.Name)
+		log.Printf("canceling node: %s", n.data.Step.Name)
 		n.cancelFunc()
 	}
 }
@@ -259,10 +265,10 @@ func (n *Node) setup(logDir string, requestId string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.StartedAt = time.Now()
-	n.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
-		util.ValidFilename(n.step.Name, "_"),
-		n.StartedAt.Format("20060102.15:04:05.000"),
+	n.data.StartedAt = time.Now()
+	n.data.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
+		util.ValidFilename(n.data.Step.Name, "_"),
+		n.data.StartedAt.Format("20060102.15:04:05.000"),
 		util.TruncString(requestId, 8),
 	))
 	for _, fn := range []func() error{
@@ -272,7 +278,7 @@ func (n *Node) setup(logDir string, requestId string) error {
 		n.setupScript,
 	} {
 		if err := fn(); err != nil {
-			n.Error = err
+			n.data.Error = err
 			return err
 		}
 	}
@@ -280,12 +286,12 @@ func (n *Node) setup(logDir string, requestId string) error {
 }
 
 func (n *Node) setupScript() (err error) {
-	if n.step.Script != "" {
-		if len(n.step.Dir) > 0 && !util.FileExists(n.step.Dir) {
-			return fmt.Errorf("directory %q does not exist", n.step.Dir)
+	if n.data.Step.Script != "" {
+		if len(n.data.Step.Dir) > 0 && !util.FileExists(n.data.Step.Dir) {
+			return fmt.Errorf("directory %q does not exist", n.data.Step.Dir)
 		}
-		n.scriptFile, _ = os.CreateTemp(n.step.Dir, "dagu_script-")
-		if _, err = n.scriptFile.WriteString(n.step.Script); err != nil {
+		n.scriptFile, _ = os.CreateTemp(n.data.Step.Dir, "dagu_script-")
+		if _, err = n.scriptFile.WriteString(n.data.Step.Script); err != nil {
 			return
 		}
 		defer func() {
@@ -297,15 +303,15 @@ func (n *Node) setupScript() (err error) {
 }
 
 func (n *Node) setupStdout() error {
-	if n.step.Stdout != "" {
-		f := n.step.Stdout
+	if n.data.Step.Stdout != "" {
+		f := n.data.Step.Stdout
 		if !filepath.IsAbs(f) {
-			f = filepath.Join(n.step.Dir, f)
+			f = filepath.Join(n.data.Step.Dir, f)
 		}
 		var err error
 		n.stdoutFile, err = util.OpenOrCreateFile(f)
 		if err != nil {
-			n.Error = err
+			n.data.Error = err
 			return err
 		}
 		n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
@@ -314,15 +320,15 @@ func (n *Node) setupStdout() error {
 }
 
 func (n *Node) setupStderr() error {
-	if n.step.Stderr != "" {
-		f := n.step.Stderr
+	if n.data.Step.Stderr != "" {
+		f := n.data.Step.Stderr
 		if !filepath.IsAbs(f) {
-			f = filepath.Join(n.step.Dir, f)
+			f = filepath.Join(n.data.Step.Dir, f)
 		}
 		var err error
 		n.stderrFile, err = util.OpenOrCreateFile(f)
 		if err != nil {
-			n.Error = err
+			n.data.Error = err
 			return err
 		}
 		n.stderrWriter = bufio.NewWriter(n.stderrFile)
@@ -331,15 +337,15 @@ func (n *Node) setupStderr() error {
 }
 
 func (n *Node) setupLog() error {
-	if n.Log == "" {
+	if n.data.Log == "" {
 		return nil
 	}
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 	var err error
-	n.logFile, err = util.OpenOrCreateFile(n.Log)
+	n.logFile, err = util.OpenOrCreateFile(n.data.Log)
 	if err != nil {
-		n.Error = err
+		n.data.Error = err
 		return err
 	}
 	n.logWriter = bufio.NewWriter(n.logFile)
@@ -374,7 +380,7 @@ func (n *Node) teardown() error {
 		_ = os.Remove(n.scriptFile.Name())
 	}
 	if lastErr != nil {
-		n.Error = lastErr
+		n.data.Error = lastErr
 	}
 	return lastErr
 }
@@ -382,13 +388,13 @@ func (n *Node) teardown() error {
 func (n *Node) incRetryCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.RetryCount++
+	n.data.RetryCount++
 }
 
 func (n *Node) incDoneCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.DoneCount++
+	n.data.DoneCount++
 }
 
 var nextNodeId = 1
@@ -399,13 +405,13 @@ func (n *Node) init() {
 	}
 	n.id = nextNodeId
 	nextNodeId++
-	if n.step.Variables == nil {
-		n.step.Variables = []string{}
+	if n.data.Step.Variables == nil {
+		n.data.Step.Variables = []string{}
 	}
-	if n.step.Variables == nil {
-		n.step.Variables = []string{}
+	if n.data.Step.Variables == nil {
+		n.data.Step.Variables = []string{}
 	}
-	if n.step.Preconditions == nil {
-		n.step.Preconditions = []*dag.Condition{}
+	if n.data.Step.Preconditions == nil {
+		n.data.Step.Preconditions = []*dag.Condition{}
 	}
 }
