@@ -131,13 +131,15 @@ func createFile(file string) (*os.File, error) {
 var (
 	filenameReservedRegex             = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
 	filenameReservedWindowsNamesRegex = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
+	filenameSpacingRegex              = regexp.MustCompile(`\s`)
+	specialCharRepl                   = "_"
 )
 
 // ValidFilename makes filename valid by replacing reserved characters.
-func ValidFilename(str, replacement string) string {
-	s := filenameReservedRegex.ReplaceAllString(str, replacement)
-	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
-	return strings.ReplaceAll(s, " ", replacement)
+func ValidFilename(str string) string {
+	s := filenameReservedRegex.ReplaceAllString(str, specialCharRepl)
+	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, specialCharRepl)
+	return filenameSpacingRegex.ReplaceAllString(s, specialCharRepl)
 }
 
 // MustTempDir returns temporary directory.

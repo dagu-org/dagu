@@ -96,7 +96,7 @@ func Test_FileExits(t *testing.T) {
 
 func Test_ValidFilename(t *testing.T) {
 	t.Run("valid filename", func(t *testing.T) {
-		ret := util.ValidFilename("file\\name", "_")
+		ret := util.ValidFilename("file\\name")
 		require.Equal(t, ret, "file_name")
 	})
 }

@@ -36,8 +36,7 @@ func TestNewDataFile(t *testing.T) {
 	requestId := "request-id-1"
 	f, err := db.newFile(d.Location, timestamp, requestId)
 	require.NoError(t, err)
-	p := util.ValidFilename(strings.TrimSuffix(
-		path.Base(d.Location), path.Ext(d.Location)), "_")
+	p := util.ValidFilename(strings.TrimSuffix(path.Base(d.Location), path.Ext(d.Location)))
 	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
 
 	_, err = db.newFile("", timestamp, requestId)

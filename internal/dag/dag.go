@@ -161,7 +161,7 @@ func (d *DAG) HasTag(tag string) bool {
 // Log directory is the directory where the execution logs are stored.
 // It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
 func (d *DAG) GetLogDir() string {
-	return path.Join(d.LogDir, util.ValidFilename(d.Name, "_"))
+	return path.Join(d.LogDir, util.ValidFilename(d.Name))
 }
 
 // SockAddr returns the unix socket address for the DAG.

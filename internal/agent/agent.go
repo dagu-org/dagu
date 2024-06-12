@@ -139,7 +139,6 @@ func (a *Agent) setup() error {
 	}
 
 	a.scheduler = &scheduler.Scheduler{Config: cfg}
-
 	a.reporter = &reporter.Reporter{
 		Config: &reporter.Config{
 			Mailer: &mailer.Mailer{
@@ -152,14 +151,7 @@ func (a *Agent) setup() error {
 			},
 		}}
 
-	logFilename := filepath.Join(
-		logDir, fmt.Sprintf("agent_%s.%s.%s.log",
-			util.ValidFilename(a.DAG.Name, "_"),
-			time.Now().Format("20060102.15:04:05.000"),
-			util.TruncString(a.reqID, 8),
-		))
-
-	a.logManager = &logManager{logFilename: logFilename}
+	a.logManager = &logManager{logFilename: a.logFile(logDir)}
 
 	if err := a.setupGraph(); err != nil {
 		return err
@@ -220,6 +212,20 @@ func (a *Agent) Signal(sig os.Signal) {
 func (a *Agent) Kill() {
 	log.Printf("Sending KILL signal to running child processes.")
 	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
+}
+
+const (
+	logFileTimeStampFmt = "20060102.15:04:05.000"
+	reqIDTruncLen       = 8
+)
+
+func (a *Agent) logFile(dir string) string {
+	fileName := fmt.Sprintf("agent_%s.%s.%s.log",
+		util.ValidFilename(a.DAG.Name),
+		time.Now().Format(logFileTimeStampFmt),
+		util.TruncString(a.reqID, reqIDTruncLen),
+	)
+	return filepath.Join(dir, fileName)
 }
 
 func (a *Agent) signal(sig os.Signal, allowOverride bool) {
