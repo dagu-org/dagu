@@ -63,8 +63,8 @@ func StatusFromJson(s string) (*Status, error) {
 	return status, err
 }
 
-func NewStatusDefault(d *dag.DAG) *Status {
-	return NewStatus(d, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
+func NewStatusDefault(dg *dag.DAG) *Status {
+	return NewStatus(dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
 }
 
 func Time(t time.Time) *time.Time {

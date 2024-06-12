@@ -15,9 +15,9 @@ type jobFactory struct {
 	EngineFactory engine.Factory
 }
 
-func (jf jobFactory) NewJob(d *dag.DAG, next time.Time) scheduler.Job {
+func (jf jobFactory) NewJob(dg *dag.DAG, next time.Time) scheduler.Job {
 	return &job.Job{
-		DAG:           d,
+		DAG:           dg,
 		Executable:    jf.Executable,
 		WorkDir:       jf.WorkDir,
 		Next:          next,

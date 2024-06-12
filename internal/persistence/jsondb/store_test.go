@@ -354,9 +354,9 @@ func TestErrorParseFile(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func testWriteStatus(t *testing.T, db *Store, d *dag.DAG, status *model.Status, tm time.Time) {
+func testWriteStatus(t *testing.T, db *Store, dg *dag.DAG, status *model.Status, tm time.Time) {
 	t.Helper()
-	dw, _, err := db.newWriter(d.Location, tm, status.RequestId)
+	dw, _, err := db.newWriter(dg.Location, tm, status.RequestId)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 	defer func() {

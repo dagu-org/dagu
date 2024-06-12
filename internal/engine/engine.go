@@ -21,16 +21,16 @@ type Engine interface {
 	GetDAGSpec(id string) (string, error)
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
 	Rename(oldDAGPath, newDAGPath string) error
-	Stop(d *dag.DAG) error
-	StartAsync(d *dag.DAG, params string)
-	Start(d *dag.DAG, params string) error
-	Restart(d *dag.DAG) error
-	Retry(d *dag.DAG, reqId string) error
-	GetCurrentStatus(d *dag.DAG) (*model.Status, error)
-	GetStatusByRequestId(d *dag.DAG, requestId string) (*model.Status, error)
-	GetLatestStatus(d *dag.DAG) (*model.Status, error)
-	GetRecentHistory(d *dag.DAG, n int) []*model.StatusFile
-	UpdateStatus(d *dag.DAG, status *model.Status) error
+	Stop(dg *dag.DAG) error
+	StartAsync(dg *dag.DAG, params string)
+	Start(dg *dag.DAG, params string) error
+	Restart(dg *dag.DAG) error
+	Retry(dg *dag.DAG, reqId string) error
+	GetCurrentStatus(dg *dag.DAG) (*model.Status, error)
+	GetStatusByRequestId(dg *dag.DAG, requestId string) (*model.Status, error)
+	GetLatestStatus(dg *dag.DAG) (*model.Status, error)
+	GetRecentHistory(dg *dag.DAG, n int) []*model.StatusFile
+	UpdateStatus(dg *dag.DAG, status *model.Status) error
 	UpdateDAG(id string, spec string) error
 	DeleteDAG(name, loc string) error
 	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
@@ -90,27 +90,27 @@ func (e *engineImpl) Rename(oldName, newName string) error {
 	return nil
 }
 
-func (e *engineImpl) Stop(d *dag.DAG) error {
+func (e *engineImpl) Stop(dg *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.Client{Addr: d.SockAddr()}
+	client := sock.Client{Addr: dg.SockAddr()}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *engineImpl) StartAsync(d *dag.DAG, params string) {
+func (e *engineImpl) StartAsync(dg *dag.DAG, params string) {
 	go func() {
-		err := e.Start(d, params)
+		err := e.Start(dg, params)
 		util.LogErr("starting a DAG", err)
 	}()
 }
 
-func (e *engineImpl) Start(d *dag.DAG, params string) error {
+func (e *engineImpl) Start(dg *dag.DAG, params string) error {
 	args := []string{"start"}
 	if params != "" {
 		args = append(args, "-p")
 		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(params, false)))
 	}
-	args = append(args, d.Location)
+	args = append(args, dg.Location)
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
@@ -125,8 +125,8 @@ func (e *engineImpl) Start(d *dag.DAG, params string) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Restart(d *dag.DAG) error {
-	args := []string{"restart", d.Location}
+func (e *engineImpl) Restart(dg *dag.DAG) error {
+	args := []string{"restart", dg.Location}
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
@@ -138,10 +138,10 @@ func (e *engineImpl) Restart(d *dag.DAG) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Retry(d *dag.DAG, reqId string) error {
+func (e *engineImpl) Retry(dg *dag.DAG, reqId string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", reqId))
-	args = append(args, d.Location)
+	args = append(args, dg.Location)
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	cmd.Dir = e.workDir
@@ -153,24 +153,24 @@ func (e *engineImpl) Retry(d *dag.DAG, reqId string) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) GetCurrentStatus(d *dag.DAG) (*model.Status, error) {
-	client := sock.Client{Addr: d.SockAddr()}
+func (e *engineImpl) GetCurrentStatus(dg *dag.DAG) (*model.Status, error) {
+	client := sock.Client{Addr: dg.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(d), nil
+		return model.NewStatusDefault(dg), nil
 	}
 	return model.StatusFromJson(ret)
 }
 
-func (e *engineImpl) GetStatusByRequestId(d *dag.DAG, requestId string) (*model.Status, error) {
-	ret, err := e.dataStoreFactory.NewHistoryStore().FindByRequestId(d.Location, requestId)
+func (e *engineImpl) GetStatusByRequestId(dg *dag.DAG, requestId string) (*model.Status, error) {
+	ret, err := e.dataStoreFactory.NewHistoryStore().FindByRequestId(dg.Location, requestId)
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetCurrentStatus(d)
+	status, _ := e.GetCurrentStatus(dg)
 	if status != nil && status.RequestId != requestId {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -178,8 +178,8 @@ func (e *engineImpl) GetStatusByRequestId(d *dag.DAG, requestId string) (*model.
 	return ret.Status, err
 }
 
-func (e *engineImpl) getCurrentStatus(d *dag.DAG) (*model.Status, error) {
-	client := sock.Client{Addr: d.SockAddr()}
+func (e *engineImpl) getCurrentStatus(dg *dag.DAG) (*model.Status, error) {
+	client := sock.Client{Addr: dg.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
@@ -187,28 +187,28 @@ func (e *engineImpl) getCurrentStatus(d *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJson(ret)
 }
 
-func (e *engineImpl) GetLatestStatus(d *dag.DAG) (*model.Status, error) {
-	currStatus, _ := e.getCurrentStatus(d)
+func (e *engineImpl) GetLatestStatus(dg *dag.DAG) (*model.Status, error) {
+	currStatus, _ := e.getCurrentStatus(dg)
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(d.Location)
+	status, err := e.dataStoreFactory.NewHistoryStore().ReadStatusToday(dg.Location)
 	if errors.Is(err, persistence.ErrNoStatusDataToday) || errors.Is(err, persistence.ErrNoStatusData) {
-		return model.NewStatusDefault(d), nil
+		return model.NewStatusDefault(dg), nil
 	}
 	if err != nil {
-		return model.NewStatusDefault(d), err
+		return model.NewStatusDefault(dg), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
 }
 
-func (e *engineImpl) GetRecentHistory(d *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStoreFactory.NewHistoryStore().ReadStatusRecent(d.Location, n)
+func (e *engineImpl) GetRecentHistory(dg *dag.DAG, n int) []*model.StatusFile {
+	return e.dataStoreFactory.NewHistoryStore().ReadStatusRecent(dg.Location, n)
 }
 
-func (e *engineImpl) UpdateStatus(d *dag.DAG, status *model.Status) error {
-	client := sock.Client{Addr: d.SockAddr()}
+func (e *engineImpl) UpdateStatus(dg *dag.DAG, status *model.Status) error {
+	client := sock.Client{Addr: dg.SockAddr()}
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -221,7 +221,7 @@ func (e *engineImpl) UpdateStatus(d *dag.DAG, status *model.Status) error {
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStoreFactory.NewHistoryStore().Update(d.Location, status.RequestId, status)
+	return e.dataStoreFactory.NewHistoryStore().Update(dg.Location, status.RequestId, status)
 }
 
 func (e *engineImpl) UpdateDAG(id string, spec string) error {
@@ -257,25 +257,25 @@ func (e *engineImpl) GetAllStatus() (statuses []*persistence.DAGStatus, errs []s
 func (e *engineImpl) getDAG(name string, metadataOnly bool) (*dag.DAG, error) {
 	ds := e.dataStoreFactory.NewDAGStore()
 	if metadataOnly {
-		d, err := ds.GetMetadata(name)
-		return e.emptyDAGIfNil(d, name), err
+		dg, err := ds.GetMetadata(name)
+		return e.emptyDAGIfNil(dg, name), err
 	}
-	d, err := ds.GetDetails(name)
-	return e.emptyDAGIfNil(d, name), err
+	dg, err := ds.GetDetails(name)
+	return e.emptyDAGIfNil(dg, name), err
 }
 
 func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
-	d, err := e.getDAG(id, false)
-	if d == nil {
+	dg, err := e.getDAG(id, false)
+	if dg == nil {
 		// TODO: fix not to use location
-		d = &dag.DAG{Name: id, Location: id}
+		dg = &dag.DAG{Name: id, Location: id}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
-		_, err = scheduler.NewExecutionGraph(d.Steps...)
+		_, err = scheduler.NewExecutionGraph(dg.Steps...)
 	}
-	status, _ := e.GetLatestStatus(d)
-	return persistence.NewDAGStatus(d, status, e.IsSuspended(d.Name), err), err
+	status, _ := e.GetLatestStatus(dg)
+	return persistence.NewDAGStatus(dg, status, e.IsSuspended(dg.Name), err), err
 }
 
 func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
@@ -283,14 +283,14 @@ func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
 	return fs.ToggleSuspend(id, suspend)
 }
 
-func (e *engineImpl) readStatus(d *dag.DAG) (*persistence.DAGStatus, error) {
-	status, err := e.GetLatestStatus(d)
-	return persistence.NewDAGStatus(d, status, e.IsSuspended(d.Name), err), err
+func (e *engineImpl) readStatus(dg *dag.DAG) (*persistence.DAGStatus, error) {
+	status, err := e.GetLatestStatus(dg)
+	return persistence.NewDAGStatus(dg, status, e.IsSuspended(dg.Name), err), err
 }
 
-func (e *engineImpl) emptyDAGIfNil(d *dag.DAG, dagLocation string) *dag.DAG {
-	if d != nil {
-		return d
+func (e *engineImpl) emptyDAGIfNil(dg *dag.DAG, dagLocation string) *dag.DAG {
+	if dg != nil {
+		return dg
 	}
 	return &dag.DAG{Location: dagLocation}
 }

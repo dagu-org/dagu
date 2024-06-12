@@ -104,11 +104,11 @@ func testDAGFile(name string) string {
 func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.Status) {
 	t.Helper()
 
-	d, err := loadDAG(dagFile, "")
+	dg, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(d)
+		status, err := e.GetCurrentStatus(dg)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, time.Millisecond*5000, time.Millisecond*50)

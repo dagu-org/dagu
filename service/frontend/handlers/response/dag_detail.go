@@ -34,30 +34,30 @@ func ToDagStatusWithDetails(dagStatus *persistence.DAGStatus) *models.DagStatusW
 	}
 }
 
-func ToDagDetail(d *dag.DAG) *models.DagDetail {
+func ToDagDetail(dg *dag.DAG) *models.DagDetail {
 	return &models.DagDetail{
-		DefaultParams:     lo.ToPtr(d.DefaultParams),
-		Delay:             lo.ToPtr(int64(d.Delay)),
-		Description:       lo.ToPtr(d.Description),
-		Env:               d.Env,
-		Group:             lo.ToPtr(d.Group),
-		HandlerOn:         ToHandlerOn(d.HandlerOn),
-		HistRetentionDays: lo.ToPtr(int64(d.HistRetentionDays)),
-		Location:          lo.ToPtr(d.Location),
-		LogDir:            lo.ToPtr(d.LogDir),
-		MaxActiveRuns:     lo.ToPtr(int64(d.MaxActiveRuns)),
-		Name:              lo.ToPtr(d.Name),
-		Params:            d.Params,
-		Preconditions: lo.Map(d.Preconditions, func(item *dag.Condition, _ int) *models.Condition {
+		DefaultParams:     lo.ToPtr(dg.DefaultParams),
+		Delay:             lo.ToPtr(int64(dg.Delay)),
+		Description:       lo.ToPtr(dg.Description),
+		Env:               dg.Env,
+		Group:             lo.ToPtr(dg.Group),
+		HandlerOn:         ToHandlerOn(dg.HandlerOn),
+		HistRetentionDays: lo.ToPtr(int64(dg.HistRetentionDays)),
+		Location:          lo.ToPtr(dg.Location),
+		LogDir:            lo.ToPtr(dg.LogDir),
+		MaxActiveRuns:     lo.ToPtr(int64(dg.MaxActiveRuns)),
+		Name:              lo.ToPtr(dg.Name),
+		Params:            dg.Params,
+		Preconditions: lo.Map(dg.Preconditions, func(item *dag.Condition, _ int) *models.Condition {
 			return ToCondition(item)
 		}),
-		Schedule: lo.Map(d.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
+		Schedule: lo.Map(dg.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
-		Steps: lo.Map(d.Steps, func(item dag.Step, _ int) *models.StepObject {
+		Steps: lo.Map(dg.Steps, func(item dag.Step, _ int) *models.StepObject {
 			return ToStepObject(item)
 		}),
-		Tags: d.Tags,
+		Tags: dg.Tags,
 	}
 }
 

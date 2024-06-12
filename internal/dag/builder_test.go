@@ -40,10 +40,10 @@ env:
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			d, err := unmarshalData([]byte(tt.input))
+			dg, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			def, err := decode(d)
+			def, err := decode(dg)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -91,10 +91,10 @@ env:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := unmarshalData([]byte(tt.input))
+			dg, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			def, err := decode(d)
+			def, err := decode(dg)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -171,14 +171,14 @@ func TestBuilder_BuildParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := unmarshalData([]byte(fmt.Sprintf(`
+			dg, err := unmarshalData([]byte(fmt.Sprintf(`
 env:
   - %s
 params: %s
   	`, tt.env, tt.params)))
 			require.NoError(t, err)
 
-			def, err := decode(d)
+			def, err := decode(dg)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -231,10 +231,10 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := unmarshalData([]byte(tt.input))
+			dg, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			def, err := decode(d)
+			def, err := decode(dg)
 			require.NoError(t, err)
 
 			b := &builder{}
@@ -274,15 +274,14 @@ func TestBuilder_BuildTags(t *testing.T) {
 		def, err := decode(m)
 		require.NoError(t, err)
 
-		b := &builder{}
-		d, err := b.build(def, nil)
+		dg, err := new(builder).build(def, nil)
 		require.NoError(t, err)
 
 		for _, tag := range expected {
-			require.True(t, d.HasTag(tag))
+			require.True(t, dg.HasTag(tag))
 		}
 
-		require.False(t, d.HasTag("weekly"))
+		require.False(t, dg.HasTag("weekly"))
 	})
 }
 
@@ -368,8 +367,7 @@ schedule:
 			def, err := decode(m)
 			require.NoError(t, err)
 
-			b := &builder{}
-			d, err := b.build(def, nil)
+			dg, err := new(builder).build(def, nil)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -381,11 +379,11 @@ schedule:
 				var actual []*Schedule
 				switch scheduleKey(k) {
 				case scheduleKeyStart:
-					actual = d.Schedule
+					actual = dg.Schedule
 				case scheduleKeyStop:
-					actual = d.StopSchedule
+					actual = dg.StopSchedule
 				case scheduleKeyRestart:
-					actual = d.RestartSchedule
+					actual = dg.RestartSchedule
 				}
 
 				if len(actual) != len(v) {
@@ -410,23 +408,23 @@ func TestLoad(t *testing.T) {
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		d, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
+		dg, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
-		require.Equal(t, &MailOn{Failure: false, Success: false}, d.MailOn)
-		require.Equal(t, d.HistRetentionDays, 7)
+		require.Equal(t, &MailOn{Failure: false, Success: false}, dg.MailOn)
+		require.Equal(t, dg.HistRetentionDays, 7)
 	})
 	t.Run("Do not overwrite the base config", func(t *testing.T) {
 		baseCfg := config.Get().BaseConfig
 
 		// no_overwrite.yaml does not have the MailOn key.
-		d, err := Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
+		dg, err := Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.
-		require.Equal(t, &MailOn{Failure: true, Success: false}, d.MailOn)
-		require.Equal(t, d.HistRetentionDays, 30)
+		require.Equal(t, &MailOn{Failure: true, Success: false}, dg.MailOn)
+		require.Equal(t, dg.HistRetentionDays, 30)
 	})
 }
 
@@ -468,10 +466,10 @@ steps:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := unmarshalData([]byte(tt.input))
+			dg, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
-			def, err := decode(d)
+			def, err := decode(dg)
 			require.NoError(t, err)
 
 			b := &builder{}

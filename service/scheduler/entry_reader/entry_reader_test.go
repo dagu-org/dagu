@@ -1,11 +1,12 @@
 package entry_reader
 
 import (
-	"go.uber.org/goleak"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
@@ -106,8 +107,8 @@ func TestReadEntries(t *testing.T) {
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) NewJob(d *dag.DAG, next time.Time) scheduler.Job {
-	return &mockJob{DAG: d}
+func (f *mockJobFactory) NewJob(dg *dag.DAG, next time.Time) scheduler.Job {
+	return &mockJob{DAG: dg}
 }
 
 // TODO: fix to use mock library

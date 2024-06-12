@@ -19,7 +19,7 @@ import (
 )
 
 type JobFactory interface {
-	NewJob(d *dag.DAG, next time.Time) scheduler.Job
+	NewJob(dg *dag.DAG, next time.Time) scheduler.Job
 }
 
 type Params struct {
@@ -58,17 +58,16 @@ func (er *EntryReader) Start(done chan any) {
 }
 
 func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
-	var entries []*scheduler.Entry
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
-	f := func(d *dag.DAG, s []*dag.Schedule, e scheduler.Type) {
+	var entries []*scheduler.Entry
+	addEntriesFn := func(dg *dag.DAG, s []*dag.Schedule, e scheduler.Type) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &scheduler.Entry{
-				Next: ss.Parsed.Next(now),
-				// TODO: fix this
-				Job:       er.jf.NewJob(d, next),
+				Next:      ss.Parsed.Next(now),
+				Job:       er.jf.NewJob(dg, next),
 				EntryType: e,
 				Logger:    er.logger,
 			})
@@ -80,9 +79,9 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 		if e.IsSuspended(d.Name) {
 			continue
 		}
-		f(d, d.Schedule, scheduler.Start)
-		f(d, d.StopSchedule, scheduler.Stop)
-		f(d, d.RestartSchedule, scheduler.Restart)
+		addEntriesFn(d, d.Schedule, scheduler.Start)
+		addEntriesFn(d, d.StopSchedule, scheduler.Stop)
+		addEntriesFn(d, d.RestartSchedule, scheduler.Restart)
 	}
 
 	return entries, nil
@@ -91,22 +90,25 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 func (er *EntryReader) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
+
 	fis, err := os.ReadDir(er.dagsDir)
 	if err != nil {
 		return err
 	}
+
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			d, err := dag.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
+			dg, err := dag.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
 			}
-			er.dags[fi.Name()] = d
+			er.dags[fi.Name()] = dg
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
+
 	er.logger.Info("init backend dags", "files", strings.Join(fileNames, ","))
 	return nil
 }
@@ -117,10 +119,12 @@ func (er *EntryReader) watchDags(done chan any) {
 		er.logger.Error("failed to init file watcher", tag.Error(err))
 		return
 	}
+
 	defer func() {
 		_ = watcher.Close()
 	}()
 	_ = watcher.Add(er.dagsDir)
+
 	for {
 		select {
 		case <-done:
@@ -134,11 +138,11 @@ func (er *EntryReader) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				d, err := dag.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dg, err := dag.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {
-					er.dags[filepath.Base(event.Name)] = d
+					er.dags[filepath.Base(event.Name)] = dg
 					er.logger.Info("reload DAG entry_reader", "file", event.Name)
 				}
 			}

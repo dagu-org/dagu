@@ -215,7 +215,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	return resp, nil
 }
 
-func (h *DAGHandler) getStepLog(d *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
+func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
 	var stepByName = map[string]*domain.Node{
 		constants.OnSuccess: nil,
 		constants.OnFailure: nil,
@@ -228,7 +228,7 @@ func (h *DAGHandler) getStepLog(d *dag.DAG, logFile, stepName string) (*models.D
 	e := h.engineFactory.Create()
 
 	if logFile == "" {
-		s, err := e.GetLatestStatus(d)
+		s, err := e.GetLatestStatus(dg)
 		if err != nil {
 			return nil, ErrFailedToReadStatus
 		}
@@ -292,15 +292,12 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *DAGHandler) readSchedulerLog(d *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
-	var (
-		logFile string
-	)
-
+func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
 	e := h.engineFactory.Create()
 
+	var logFile string
 	if statusFile == "" {
-		s, err := e.GetLatestStatus(d)
+		s, err := e.GetLatestStatus(dg)
 		if err != nil {
 			return nil, ErrReadingLastStatus
 		}
@@ -313,17 +310,19 @@ func (h *DAGHandler) readSchedulerLog(d *dag.DAG, statusFile string) (*models.Da
 		}
 		logFile = s.Log
 	}
+
 	content, err := readFileContent(logFile, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
+
 	return response.ToDagSchedulerLogResponse(logFile, string(content)), nil
 }
 
 // nolint // cognitive complexity
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
 	e := h.engineFactory.Create()
-	d, err := e.GetStatus(params.DagID)
+	dg, err := e.GetStatus(params.DagID)
 
 	if err != nil && *params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
@@ -331,21 +330,21 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	switch *params.Body.Action {
 	case "start":
-		if d.Status.Status == scheduler.StatusRunning {
+		if dg.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
 		e := h.engineFactory.Create()
-		e.StartAsync(d.DAG, params.Body.Params)
+		e.StartAsync(dg.DAG, params.Body.Params)
 
 	case "suspend":
 		_ = e.ToggleSuspend(params.DagID, params.Body.Value == "true")
 
 	case "stop":
-		if d.Status.Status != scheduler.StatusRunning {
+		if dg.Status.Status != scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 		}
 		e := h.engineFactory.Create()
-		if err := e.Stop(d.DAG); err != nil {
+		if err := e.Stop(dg.DAG); err != nil {
 			return nil, response.NewBadRequestError(fmt.Errorf("error trying to stop the DAG: %w", err))
 		}
 
@@ -354,13 +353,13 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 		}
 		e := h.engineFactory.Create()
-		err = e.Retry(d.DAG, params.Body.RequestID)
+		err = e.Retry(dg.DAG, params.Body.RequestID)
 		if err != nil {
 			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
 		}
 
 	case "mark-success":
-		if d.Status.Status == scheduler.StatusRunning {
+		if dg.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 		}
 		if params.Body.RequestID == "" {
@@ -370,13 +369,13 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusSuccess)
+		err = h.updateStatus(dg.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusSuccess)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
 	case "mark-failed":
-		if d.Status.Status == scheduler.StatusRunning {
+		if dg.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 		}
 		if params.Body.RequestID == "" {
@@ -386,7 +385,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = h.updateStatus(d.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusError)
+		err = h.updateStatus(dg.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusError)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
@@ -416,9 +415,9 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAGHandler) updateStatus(d *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
+func (h *DAGHandler) updateStatus(dg *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
 	e := h.engineFactory.Create()
-	status, err := e.GetStatusByRequestId(d, reqId)
+	status, err := e.GetStatusByRequestId(dg, reqId)
 	if err != nil {
 		return err
 	}
@@ -433,7 +432,7 @@ func (h *DAGHandler) updateStatus(d *dag.DAG, reqId, step string, to scheduler.N
 	status.Nodes[idx].Status = to
 	status.Nodes[idx].StatusText = to.String()
 
-	return e.UpdateStatus(d, status)
+	return e.UpdateStatus(dg, status)
 }
 
 func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
