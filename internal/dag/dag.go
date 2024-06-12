@@ -15,90 +15,92 @@ import (
 
 // Schedule contains the cron expression and the parsed cron schedule.
 type Schedule struct {
-	Expression string        // Expression is the cron expression.
-	Parsed     cron.Schedule // Parsed is the parsed cron schedule.
+	// Expression is the cron expression.
+	Expression string `json:"Expression"`
+	// Parsed is the parsed cron schedule.
+	Parsed cron.Schedule `json:"-"`
 }
 
 // HandlerOn contains the steps to be executed on different events in the DAG.
 type HandlerOn struct {
-	Failure *Step
-	Success *Step
-	Cancel  *Step
-	Exit    *Step
+	Failure *Step `json:"Failure"` // Failure is the step to be executed on failure.
+	Success *Step `json:"Success"` // Success is the step to be executed on success.
+	Cancel  *Step `json:"Cancel"`  // Cancel is the step to be executed on cancel.
+	Exit    *Step `json:"Exit"`    // Exit is the step to be executed on exit.
 }
 
 // MailOn contains the conditions to send mail.
 type MailOn struct {
-	Failure bool // Failure is the flag to send mail on failure.
-	Success bool // Success is the flag to send mail on success.
+	Failure bool `json:"Failure"` // Failure is the flag to send mail on failure.
+	Success bool `json:"Success"` // Success is the flag to send mail on success.
 }
 
 // SmtpConfig contains the SMTP configuration.
 type SmtpConfig struct {
-	Host     string
-	Port     string
-	Username string
-	Password string
+	Host     string `json:"Host"`
+	Port     string `json:"Port"`
+	Username string `json:"Username"`
+	Password string `json:"Password"`
 }
 
 // MailConfig contains the mail configuration.
 type MailConfig struct {
-	From       string
-	To         string
-	Prefix     string // Prefix is the prefix for the subject of the mail.
-	AttachLogs bool   // AttachLogs is the flag to attach the logs in the mail.
+	From       string `json:"From"`
+	To         string `json:"To"`
+	Prefix     string `json:"Prefix"`     // Prefix is the prefix for the subject of the mail.
+	AttachLogs bool   `json:"AttachLogs"` // AttachLogs is the flag to attach the logs in the mail.
 }
 
 // DAG contains all information about a workflow.
 type DAG struct {
-	Location    string   // `json:"Location"` Location is the absolute path to the DAG file.
-	Group       string   // `json:"Group"` Group is the group name of the DAG. This is optional.
-	Name        string   // `json:"Name"` Name is the name of the DAG. The default is the filename without the extension.
-	Tags        []string // `json:"Tags"` Tags contains the list of tags for the DAG. optional.
-	Description string   // `json:"Description"` Description is the description of the DAG. optional.
+	Location    string   `json:"Location"`    // Location is the absolute path to the DAG file.
+	Group       string   `json:"Group"`       // Group is the group name of the DAG. This is optional.
+	Name        string   `json:"Name"`        // Name is the name of the DAG. The default is the filename without the extension.
+	Tags        []string `json:"Tags"`        // Tags contains the list of tags for the DAG. optional.
+	Description string   `json:"Description"` // Description is the description of the DAG. optional.
 
 	// Schedule configuration.
 	// This is used by the scheduler to start / stop / restart the DAG.
-	Schedule        []*Schedule // `json:"Schedule"` Schedule is the start schedule of the DAG.
-	StopSchedule    []*Schedule // `json:"StopSchedule"` StopSchedule is the stop schedule of the DAG.
-	RestartSchedule []*Schedule // `json:"RestartSchedule"` RestartSchedule is the restart schedule of the DAG.
+	Schedule        []*Schedule `json:"Schedule"`        // Schedule is the start schedule of the DAG.
+	StopSchedule    []*Schedule `json:"StopSchedule"`    // StopSchedule is the stop schedule of the DAG.
+	RestartSchedule []*Schedule `json:"RestartSchedule"` // RestartSchedule is the restart schedule of the DAG.
 
 	// Env contains a list of environment variables to be set before running the DAG.
-	Env []string // `json:"Env"`
+	Env []string `json:"Env"`
 
 	// LogDir is the directory where the logs are stored.
 	// The actual log directory is LogDir + Name (with invalid characters replaced with '_').
-	LogDir string // `json:"LogDir"`
+	LogDir string `json:"LogDir"`
 
 	// Paramerter configuration.
 	// The DAG definition contains only DefaultParams. Params are automatically set by the DAG loader.
-	DefaultParams string   // `json:"DefaultParams"` DefaultParams contains the default parameters to be passed to the DAG.
-	Params        []string // `json:"Params"` Params contains the list of parameters to be passed to the DAG.
+	DefaultParams string   `json:"DefaultParams"` // DefaultParams contains the default parameters to be passed to the DAG.
+	Params        []string `json:"Params"`        // Params contains the list of parameters to be passed to the DAG.
 
 	// Commands configuration to be executed in the DAG.
 	// Steps represents the nodes in the DAG.
-	Steps     []Step    // `json:"Steps"` Steps contains the list of steps in the DAG.
-	HandlerOn HandlerOn // `json:"HandlerOn"` HandlerOn contains the steps to be executed on different events.
+	Steps     []Step    `json:"Steps"`     // Steps contains the list of steps in the DAG.
+	HandlerOn HandlerOn `json:"HandlerOn"` // HandlerOn contains the steps to be executed on different events.
 
 	// Preconditions contains the conditions to be met before running the DAG.
 	// If the conditions are not met, the whole DAG is skipped.
-	Preconditions []*Condition // `json:"Preconditions"`
+	Preconditions []*Condition `json:"Preconditions"`
 
 	// Mail notification configuration.
 	// MailOn contains the conditions to send mail.
 	// Smtp contains the SMTP configuration.
 	// If you don't want to repeat the SMTP configuration for each DAG, you can set it in the base configuration.
-	Smtp      *SmtpConfig // `json:"Smtp"` Smtp contains the SMTP configuration.
-	MailOn    *MailOn     // `json:"MailOn"`
-	ErrorMail *MailConfig // `json:"ErrorMail"` ErrorMail contains the mail configuration for error.
-	InfoMail  *MailConfig // `json:"InfoMail"` InfoMail contains the mail configuration for info.
+	Smtp      *SmtpConfig `json:"Smtp"`      // Smtp contains the SMTP configuration.
+	ErrorMail *MailConfig `json:"ErrorMail"` // ErrorMail contains the mail configuration for error.
+	InfoMail  *MailConfig `json:"InfoMail"`  // InfoMail contains the mail configuration for info.
+	MailOn    *MailOn     `json:"MailOn"`    // MailOn contains the conditions to send mail.
 
 	// Misc configuration for DAG execution.
-	Delay             time.Duration // `json:"Delay"` Delay is the delay before starting the DAG.
-	RestartWait       time.Duration // `json:"RestartWait"` RestartWait is the time to wait before restarting the DAG.
-	MaxActiveRuns     int           // `json:"MaxActiveRuns"` MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
-	MaxCleanUpTime    time.Duration // `json:"MaxCleanUpTime"` MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
-	HistRetentionDays int           // `json:"HistRetentionDays"` HistRetentionDays is the number of days to keep the history.
+	Delay             time.Duration `json:"Delay"`             // Delay is the delay before starting the DAG.
+	RestartWait       time.Duration `json:"RestartWait"`       // RestartWait is the time to wait before restarting the DAG.
+	MaxActiveRuns     int           `json:"MaxActiveRuns"`     // MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
+	MaxCleanUpTime    time.Duration `json:"MaxCleanUpTime"`    // MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
+	HistRetentionDays int           `json:"HistRetentionDays"` // HistRetentionDays is the number of days to keep the history.
 }
 
 // setup sets the default values for the DAG.
