@@ -17,11 +17,19 @@ func startCmd() *cobra.Command {
 			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			ds := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(ds, config.Get()).Create()
-			execDAG(cmd.Context(), e, cmd, args, false)
+			runDAG(cmd.Context(),
+				engine.New(
+					client.NewDataStoreFactory(config.Get()),
+					engine.DefaultConfig(),
+					config.Get(),
+				),
+				cmd,
+				args,
+				false,
+			)
 		},
 	}
+
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	return cmd
 }

@@ -32,13 +32,11 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	_ = os.Setenv("HOME", tmpDir)
 	_ = config.LoadConfig()
 
-	ds := client.NewDataStoreFactory(&config.Config{
+	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	e := engine.NewFactory(ds, config.Get()).Create()
-
-	return tmpDir, e, ds
+	return tmpDir, engine.New(dataStore, new(engine.Config), config.Get()), dataStore
 }
 
 func TestRunDAG(t *testing.T) {

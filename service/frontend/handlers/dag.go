@@ -43,12 +43,12 @@ var (
 )
 
 type DAGHandler struct {
-	engineFactory engine.Factory
+	engine engine.Engine
 }
 
-func NewDAG(engineFactory engine.Factory) server.New {
+func NewDAG(eng engine.Engine) server.New {
 	return &DAGHandler{
-		engineFactory: engineFactory,
+		engine: eng,
 	}
 }
 
@@ -112,8 +112,7 @@ func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDa
 	switch lo.FromPtr(params.Body.Action) {
 	case "new":
 		name := *params.Body.Value
-		e := h.engineFactory.Create()
-		id, err := e.CreateDAG(name)
+		id, err := h.engine.CreateDAG(name)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
@@ -123,20 +122,18 @@ func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDa
 	}
 }
 func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedError {
-	e := h.engineFactory.Create()
-	dagStatus, err := e.GetStatus(params.DagID)
+	dagStatus, err := h.engine.GetStatus(params.DagID)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
-	if err := e.DeleteDAG(params.DagID, dagStatus.DAG.Location); err != nil {
+	if err := h.engine.DeleteDAG(params.DagID, dagStatus.DAG.Location); err != nil {
 		return response.NewInternalError(err)
 	}
 	return nil
 }
 
 func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
-	e := h.engineFactory.Create()
-	dags, errs, err := e.GetAllStatus()
+	dags, errs, err := h.engine.GetAllStatus()
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}
@@ -165,8 +162,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	logFile := params.File
 	stepName := params.Step
 
-	e := h.engineFactory.Create()
-	dagStatus, err := e.GetStatus(dagID)
+	dagStatus, err := h.engine.GetStatus(dagID)
 	if dagStatus == nil {
 		return nil, response.NewNotFoundError(err)
 	}
@@ -183,15 +179,14 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	switch tab {
 	case dagTabTypeStatus:
 	case dagTabTypeSpec:
-		dagContent, err := e.GetDAGSpec(dagID)
+		dagContent, err := h.engine.GetDAGSpec(dagID)
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
 		resp.Definition = lo.ToPtr(dagContent)
 
 	case dagTabTypeHistory:
-		e := h.engineFactory.Create()
-		logs := e.GetRecentHistory(dagStatus.DAG, 30)
+		logs := h.engine.GetRecentHistory(dagStatus.DAG, 30)
 		resp.LogData = response.ToDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
@@ -224,10 +219,8 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 
 	var status *model.Status
 
-	e := h.engineFactory.Create()
-
 	if logFile == "" {
-		s, err := e.GetLatestStatus(dg)
+		s, err := h.engine.GetLatestStatus(dg)
 		if err != nil {
 			return nil, ErrFailedToReadStatus
 		}
@@ -292,22 +285,21 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 }
 
 func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
-	e := h.engineFactory.Create()
 
 	var logFile string
 	if statusFile == "" {
-		s, err := e.GetLatestStatus(dg)
+		lastStatus, err := h.engine.GetLatestStatus(dg)
 		if err != nil {
 			return nil, ErrReadingLastStatus
 		}
-		logFile = s.Log
+		logFile = lastStatus.Log
 	} else {
 		// TODO: fix not to use json db directly
-		s, err := jsondb.ParseFile(statusFile)
+		status, err := jsondb.ParseFile(statusFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", statusFile, err)
 		}
-		logFile = s.Log
+		logFile = status.Log
 	}
 
 	content, err := readFileContent(logFile, nil)
@@ -320,8 +312,7 @@ func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.D
 
 // nolint // cognitive complexity
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
-	e := h.engineFactory.Create()
-	dg, err := e.GetStatus(params.DagID)
+	dg, err := h.engine.GetStatus(params.DagID)
 
 	if err != nil && *params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
@@ -332,18 +323,16 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		if dg.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
-		e := h.engineFactory.Create()
-		e.StartAsync(dg.DAG, params.Body.Params)
+		h.engine.StartAsync(dg.DAG, params.Body.Params)
 
 	case "suspend":
-		_ = e.ToggleSuspend(params.DagID, params.Body.Value == "true")
+		_ = h.engine.ToggleSuspend(params.DagID, params.Body.Value == "true")
 
 	case "stop":
 		if dg.Status.Status != scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 		}
-		e := h.engineFactory.Create()
-		if err := e.Stop(dg.DAG); err != nil {
+		if err := h.engine.Stop(dg.DAG); err != nil {
 			return nil, response.NewBadRequestError(fmt.Errorf("error trying to stop the DAG: %w", err))
 		}
 
@@ -351,9 +340,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		if params.Body.RequestID == "" {
 			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 		}
-		e := h.engineFactory.Create()
-		err = e.Retry(dg.DAG, params.Body.RequestID)
-		if err != nil {
+		if err := h.engine.Retry(dg.DAG, params.Body.RequestID); err != nil {
 			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
 		}
 
@@ -390,9 +377,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		}
 
 	case "save":
-		e := h.engineFactory.Create()
-		err := e.UpdateDAG(params.DagID, params.Body.Value)
-		if err != nil {
+		if err := h.engine.UpdateDAG(params.DagID, params.Body.Value); err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
@@ -401,8 +386,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		if newName == "" {
 			return nil, response.NewBadRequestError(fmt.Errorf("new name is required: %w", errInvalidArgs))
 		}
-		e := h.engineFactory.Create()
-		if err := e.Rename(params.DagID, newName); err != nil {
+		if err := h.engine.Rename(params.DagID, newName); err != nil {
 			return nil, response.NewInternalError(err)
 		}
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
@@ -415,8 +399,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 }
 
 func (h *DAGHandler) updateStatus(dg *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
-	e := h.engineFactory.Create()
-	status, err := e.GetStatusByRequestId(dg, reqId)
+	status, err := h.engine.GetStatusByRequestId(dg, reqId)
 	if err != nil {
 		return err
 	}
@@ -431,7 +414,7 @@ func (h *DAGHandler) updateStatus(dg *dag.DAG, reqId, step string, to scheduler.
 	status.Nodes[idx].Status = to
 	status.Nodes[idx].StatusText = to.String()
 
-	return e.UpdateStatus(dg, status)
+	return h.engine.UpdateStatus(dg, status)
 }
 
 func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
@@ -440,8 +423,7 @@ func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchD
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 
-	e := h.engineFactory.Create()
-	ret, errs, err := e.Grep(query)
+	ret, errs, err := h.engine.Grep(query)
 	if err != nil {
 		return nil, response.NewInternalError(err)
 	}

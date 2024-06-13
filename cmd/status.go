@@ -6,7 +6,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
 )
 
@@ -20,17 +19,23 @@ func statusCmd() *cobra.Command {
 			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			// Load the DAG file and get the current running status.
 			loadedDAG, err := loadDAG(args[0], "")
-			checkError(err)
+			if err != nil {
+				log.Fatalf("Failed to load DAG: %v", err)
+			}
 
-			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df, config.Get()).Create()
+			curStatus, err := engine.New(
+				client.NewDataStoreFactory(config.Get()),
+				engine.DefaultConfig(),
+				config.Get(),
+			).GetCurrentStatus(loadedDAG)
 
-			status, err := e.GetCurrentStatus(loadedDAG)
-			checkError(err)
+			if err != nil {
+				log.Fatalf("Failed to get the current status: %v", err)
+			}
 
-			res := &model.StatusResponse{Status: status}
-			log.Printf("Pid=%d Status=%s", res.Status.Pid, res.Status.Status)
+			log.Printf("Pid=%d Status=%s", curStatus.Pid, curStatus.Status)
 		},
 	}
 }

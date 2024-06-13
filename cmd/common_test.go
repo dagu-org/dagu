@@ -20,6 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setupTest is a helper function to setup the test environment.
+// This function does the following:
+// 1. It creates a temporary directory and returns the path to it.
+// 2. Sets the home directory to the temporary directory.
+// 3. Creates a new data store factory and engine.
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
 	t.Helper()
 
@@ -30,23 +35,25 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	e := engine.NewFactory(ds, config.Get()).Create()
-
-	return tmpDir, e, ds
+	return tmpDir, engine.New(ds, new(engine.Config), config.Get()), ds
 }
 
+// changeHomeDir changes the home directory for testing.
 func changeHomeDir(dir string) {
-	// Change the home directory for testing.
 	_ = os.Setenv("HOME", dir)
-	// Reload the configuration.
+
+	// Reload the configuration file that is present in the new home directory.
 	_ = config.LoadConfig()
 }
 
+// cmdTest is a helper struct to test commands.
+// It contains the arguments to the command and the expected output.
 type cmdTest struct {
 	args        []string
 	expectedOut []string
 }
 
+// testRunCommand is a helper function to test a command.
 func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 	t.Helper()
 
@@ -68,7 +75,8 @@ func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 	}
 }
 
-func withSpool(t *testing.T, f func()) string {
+// withSpool temporarily buffers the standard output and returns it as a string.
+func withSpool(t *testing.T, testFunction func()) string {
 	t.Helper()
 
 	origStdout := os.Stdout
@@ -85,7 +93,7 @@ func withSpool(t *testing.T, f func()) string {
 		_ = w.Close()
 	}()
 
-	f()
+	testFunction()
 
 	os.Stdout = origStdout
 	_ = w.Close()
@@ -98,10 +106,18 @@ func withSpool(t *testing.T, f func()) string {
 }
 
 func testDAGFile(name string) string {
-	d := path.Join(util.MustGetwd(), "testdata")
-	return path.Join(d, name)
+	return path.Join(
+		path.Join(util.MustGetwd(), "testdata"),
+		name,
+	)
 }
 
+const (
+	waitForStatusTimeout = time.Millisecond * 5000
+	tick                 = time.Millisecond * 50
+)
+
+// testStatusEventual tests the status of a DAG to be the expected status.
 func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.Status) {
 	t.Helper()
 
@@ -112,16 +128,18 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 		status, err := e.GetCurrentStatus(dg)
 		require.NoError(t, err)
 		return expected == status.Status
-	}, time.Millisecond*5000, time.Millisecond*50)
+	}, waitForStatusTimeout, tick)
 }
 
-func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dag string, expected scheduler.Status) {
+// testLastStatusEventual tests the last status of a DAG to be the expected status.
+func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dg string, expected scheduler.Status) {
 	t.Helper()
+
 	require.Eventually(t, func() bool {
-		status := hs.ReadStatusRecent(dag, 1)
+		status := hs.ReadStatusRecent(dg, 1)
 		if len(status) < 1 {
 			return false
 		}
 		return expected == status[0].Status.Status
-	}, time.Millisecond*5000, time.Millisecond*50)
+	}, waitForStatusTimeout, tick)
 }

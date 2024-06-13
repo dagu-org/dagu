@@ -23,29 +23,29 @@ type JobFactory interface {
 }
 
 type Params struct {
-	DagsDir       string
-	JobFactory    JobFactory
-	Logger        logger.Logger
-	EngineFactory engine.Factory
+	DagsDir    string
+	JobFactory JobFactory
+	Logger     logger.Logger
+	Engine     engine.Engine
 }
 
 type EntryReader struct {
-	dagsDir       string
-	dagsLock      sync.Mutex
-	dags          map[string]*dag.DAG
-	jf            JobFactory
-	logger        logger.Logger
-	engineFactory engine.Factory
+	dagsDir  string
+	dagsLock sync.Mutex
+	dags     map[string]*dag.DAG
+	jf       JobFactory
+	logger   logger.Logger
+	engine   engine.Engine
 }
 
 func New(params Params) *EntryReader {
 	er := &EntryReader{
-		dagsDir:       params.DagsDir,
-		dagsLock:      sync.Mutex{},
-		dags:          map[string]*dag.DAG{},
-		jf:            params.JobFactory,
-		logger:        params.Logger,
-		engineFactory: params.EngineFactory,
+		dagsDir:  params.DagsDir,
+		dagsLock: sync.Mutex{},
+		dags:     map[string]*dag.DAG{},
+		jf:       params.JobFactory,
+		logger:   params.Logger,
+		engine:   params.Engine,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
@@ -74,14 +74,13 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 		}
 	}
 
-	e := er.engineFactory.Create()
-	for _, d := range er.dags {
-		if e.IsSuspended(d.Name) {
+	for _, dg := range er.dags {
+		if er.engine.IsSuspended(dg.Name) {
 			continue
 		}
-		addEntriesFn(d, d.Schedule, scheduler.Start)
-		addEntriesFn(d, d.StopSchedule, scheduler.Stop)
-		addEntriesFn(d, d.RestartSchedule, scheduler.Restart)
+		addEntriesFn(dg, dg.Schedule, scheduler.Start)
+		addEntriesFn(dg, dg.StopSchedule, scheduler.Stop)
+		addEntriesFn(dg, dg.RestartSchedule, scheduler.Restart)
 	}
 
 	return entries, nil

@@ -51,15 +51,17 @@ func TestRestartCommand(t *testing.T) {
 	testStatusEventual(t, e, dagFile, scheduler.StatusNone)
 
 	// Check parameter was the same as the first execution
-	d, err := loadDAG(dagFile, "")
+	dg, err := loadDAG(dagFile, "")
 	require.NoError(t, err)
 
-	df := client.NewDataStoreFactory(config.Get())
-	e = engine.NewFactory(df, config.Get()).Create()
+	recentHistory := engine.New(
+		client.NewDataStoreFactory(config.Get()),
+		engine.DefaultConfig(),
+		config.Get(),
+	).GetRecentHistory(dg, 2)
 
-	sts := e.GetRecentHistory(d, 2)
-	require.Len(t, sts, 2)
-	require.Equal(t, sts[0].Status.Params, sts[1].Status.Params)
+	require.Len(t, recentHistory, 2)
+	require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)
 
 	<-done
 }

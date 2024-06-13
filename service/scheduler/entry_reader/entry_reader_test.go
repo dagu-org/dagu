@@ -31,54 +31,57 @@ func TestMain(m *testing.M) {
 }
 
 // TODO: fix this tests to use mock
-func setupTest(t *testing.T) (string, engine.Factory) {
+func setupTest(t *testing.T) (string, engine.Engine) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
-	_ = os.Setenv("HOME", tmpDir)
-	_ = config.LoadConfig()
 
-	ds := client.NewDataStoreFactory(&config.Config{
+	err := os.Setenv("HOME", tmpDir)
+	require.NoError(t, err)
+
+	err = config.LoadConfig()
+	require.NoError(t, err)
+
+	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir:         path.Join(tmpDir, ".dagu", "data"),
 		DAGs:            testdataDir,
 		SuspendFlagsDir: tmpDir,
 	})
 
-	ef := engine.NewFactory(ds, &config.Config{})
-
-	return tmpDir, ef
+	return tmpDir, engine.New(dataStore, new(engine.Config), &config.Config{})
 }
 
 func TestReadEntries(t *testing.T) {
-	tmpDir, ef := setupTest(t)
+	tmpDir, eng := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 
-	er := New(Params{
-		DagsDir:       path.Join(testdataDir, "invalid_directory"),
-		JobFactory:    &mockJobFactory{},
-		Logger:        logger.NewSlogLogger(),
-		EngineFactory: ef,
+	entryReader := New(Params{
+		DagsDir:    path.Join(testdataDir, "invalid_directory"),
+		JobFactory: &mockJobFactory{},
+		Logger:     logger.NewSlogLogger(),
+		Engine:     eng,
 	})
-	entries, err := er.Read(now)
+
+	entries, err := entryReader.Read(now)
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	er = New(Params{
-		DagsDir:       testdataDir,
-		JobFactory:    &mockJobFactory{},
-		Logger:        logger.NewSlogLogger(),
-		EngineFactory: ef,
+	entryReader = New(Params{
+		DagsDir:    testdataDir,
+		JobFactory: &mockJobFactory{},
+		Logger:     logger.NewSlogLogger(),
+		Engine:     eng,
 	})
 
 	done := make(chan any)
 	defer close(done)
-	er.Start(done)
+	entryReader.Start(done)
 
-	entries, err = er.Read(now)
+	entries, err = entryReader.Read(now)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(entries), 1)
 
@@ -95,12 +98,11 @@ func TestReadEntries(t *testing.T) {
 		}
 	}
 
-	e := ef.Create()
-	err = e.ToggleSuspend(j.GetDAG().Name, true)
+	err = eng.ToggleSuspend(j.GetDAG().Name, true)
 	require.NoError(t, err)
 
 	// check if the job is suspended
-	lives, err := er.Read(now)
+	lives, err := entryReader.Read(now)
 	require.NoError(t, err)
 	require.Equal(t, len(entries)-1, len(lives))
 }
