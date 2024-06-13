@@ -31,11 +31,11 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	tmpDir := util.MustTempDir("dagu_test")
 	changeHomeDir(tmpDir)
 
-	ds := client.NewDataStoreFactory(&config.Config{
+	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	return tmpDir, engine.New(ds, new(engine.Config), config.Get()), ds
+	return tmpDir, engine.New(dataStore, new(engine.Config), config.Get()), dataStore
 }
 
 // changeHomeDir changes the home directory for testing.

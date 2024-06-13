@@ -48,9 +48,9 @@ func TestRunDAG(t *testing.T) {
 	d := testLoadDAG(t, "run.yaml")
 	a := agent.New(&agent.Config{DAG: d}, e, df)
 
-	status, err := e.GetLatestStatus(d)
+	latestStatus, err := e.GetLatestStatus(d)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.StatusNone, status.Status)
+	require.Equal(t, scheduler.StatusNone, latestStatus.Status)
 
 	go func() {
 		err := a.Run(context.Background())
@@ -136,9 +136,9 @@ func TestCancelDAG(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 		abort(a)
 		time.Sleep(time.Millisecond * 500)
-		status, err := e.GetLatestStatus(d)
+		latestStatus, err := e.GetLatestStatus(d)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.StatusCancel, status.Status)
+		require.Equal(t, scheduler.StatusCancel, latestStatus.Status)
 	}
 }
 

@@ -30,21 +30,21 @@ func (j *Job) GetDAG() *dag.DAG {
 }
 
 func (j *Job) Start() error {
-	s, err := j.Engine.GetLatestStatus(j.DAG)
+	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
 
-	if s.Status == scheduler.StatusRunning {
+	if latestStatus.Status == scheduler.StatusRunning {
 		// already running
 		return ErrJobRunning
 	}
 
 	// check the last execution time
-	t, err := util.ParseTime(s.StartedAt)
+	lastExecTime, err := util.ParseTime(latestStatus.StartedAt)
 	if err == nil {
-		t = t.Truncate(time.Second * 60)
-		if t.After(j.Next) || j.Next.Equal(t) {
+		lastExecTime = lastExecTime.Truncate(time.Second * 60)
+		if lastExecTime.After(j.Next) || j.Next.Equal(lastExecTime) {
 			return ErrJobFinished
 		}
 	}
@@ -53,11 +53,11 @@ func (j *Job) Start() error {
 }
 
 func (j *Job) Stop() error {
-	s, err := j.Engine.GetLatestStatus(j.DAG)
+	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
-	if s.Status != scheduler.StatusRunning {
+	if latestStatus.Status != scheduler.StatusRunning {
 		return ErrJobIsNotRunning
 	}
 	return j.Engine.Stop(j.DAG)

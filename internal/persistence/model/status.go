@@ -78,7 +78,7 @@ func NewStatus(
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
-	s := &Status{
+	statusObj := &Status{
 		Name:       dg.Name,
 		Status:     status,
 		StatusText: status.String(),
@@ -91,12 +91,12 @@ func NewStatus(
 		Params:     Params(dg.Params),
 	}
 	if startTime != nil {
-		s.StartedAt = util.FormatTime(*startTime)
+		statusObj.StartedAt = util.FormatTime(*startTime)
 	}
 	if endTime != nil {
-		s.FinishedAt = util.FormatTime(*endTime)
+		statusObj.FinishedAt = util.FormatTime(*endTime)
 	}
-	return s
+	return statusObj
 }
 
 func Params(params []string) string {

@@ -55,18 +55,18 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	r := New(Params{
+	schedulerInstance := New(Params{
 		EntryReader: er,
 		LogDir:      testHomeDir,
 		Logger:      logger.NewSlogLogger(),
 	})
 
 	go func() {
-		_ = r.Start()
+		_ = schedulerInstance.Start()
 	}()
 
 	time.Sleep(time.Second + time.Millisecond*100)
-	r.Stop()
+	schedulerInstance.Stop()
 
 	require.Equal(t, int32(1), er.Entries[0].Job.(*mockJob).RunCount.Load())
 	require.Equal(t, int32(0), er.Entries[1].Job.(*mockJob).RunCount.Load())
@@ -76,7 +76,7 @@ func TestRestart(t *testing.T) {
 	now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	setFixedTime(now)
 
-	er := &mockEntryReader{
+	entryReader := &mockEntryReader{
 		Entries: []*Entry{
 			{
 				EntryType: Restart,
@@ -87,30 +87,30 @@ func TestRestart(t *testing.T) {
 		},
 	}
 
-	r := New(Params{
-		EntryReader: er,
+	schedulerInstance := New(Params{
+		EntryReader: entryReader,
 		LogDir:      testHomeDir,
 		Logger:      logger.NewSlogLogger(),
 	})
 
 	go func() {
-		_ = r.Start()
+		_ = schedulerInstance.Start()
 	}()
-	defer r.Stop()
+	defer schedulerInstance.Stop()
 
 	time.Sleep(time.Second + time.Millisecond*100)
-	require.Equal(t, int32(1), er.Entries[0].Job.(*mockJob).RestartCount.Load())
+	require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RestartCount.Load())
 }
 
 func TestNextTick(t *testing.T) {
-	n := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
-	setFixedTime(n)
-	r := New(Params{
+	now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
+	setFixedTime(now)
+	schedulerInstance := New(Params{
 		EntryReader: &mockEntryReader{},
 		LogDir:      testHomeDir,
 		Logger:      logger.NewSlogLogger(),
 	})
-	next := r.nextTick(n)
+	next := schedulerInstance.nextTick(now)
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }
 

@@ -220,18 +220,17 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 	var status *model.Status
 
 	if logFile == "" {
-		s, err := h.engine.GetLatestStatus(dg)
+		latestStatus, err := h.engine.GetLatestStatus(dg)
 		if err != nil {
 			return nil, ErrFailedToReadStatus
 		}
-		status = s
+		status = latestStatus
 	} else {
-		// TODO: fix not to use json db directly
-		s, err := jsondb.ParseFile(logFile)
+		unmarshalledStatus, err := jsondb.ParseFile(logFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", logFile, err)
 		}
-		status = s
+		status = unmarshalledStatus
 	}
 
 	stepByName[dag.HandlerOnSuccess] = status.OnSuccess
@@ -312,7 +311,7 @@ func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.D
 
 // nolint // cognitive complexity
 func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
-	dg, err := h.engine.GetStatus(params.DagID)
+	dagStatus, err := h.engine.GetStatus(params.DagID)
 
 	if err != nil && *params.Body.Action != "save" {
 		return nil, response.NewBadRequestError(err)
@@ -320,19 +319,19 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	switch *params.Body.Action {
 	case "start":
-		if dg.Status.Status == scheduler.StatusRunning {
+		if dagStatus.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(errInvalidArgs)
 		}
-		h.engine.StartAsync(dg.DAG, params.Body.Params)
+		h.engine.StartAsync(dagStatus.DAG, params.Body.Params)
 
 	case "suspend":
 		_ = h.engine.ToggleSuspend(params.DagID, params.Body.Value == "true")
 
 	case "stop":
-		if dg.Status.Status != scheduler.StatusRunning {
+		if dagStatus.Status.Status != scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
 		}
-		if err := h.engine.Stop(dg.DAG); err != nil {
+		if err := h.engine.Stop(dagStatus.DAG); err != nil {
 			return nil, response.NewBadRequestError(fmt.Errorf("error trying to stop the DAG: %w", err))
 		}
 
@@ -340,12 +339,12 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		if params.Body.RequestID == "" {
 			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 		}
-		if err := h.engine.Retry(dg.DAG, params.Body.RequestID); err != nil {
+		if err := h.engine.Retry(dagStatus.DAG, params.Body.RequestID); err != nil {
 			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
 		}
 
 	case "mark-success":
-		if dg.Status.Status == scheduler.StatusRunning {
+		if dagStatus.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 		}
 		if params.Body.RequestID == "" {
@@ -355,13 +354,13 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = h.updateStatus(dg.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusSuccess)
+		err = h.updateStatus(dagStatus.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusSuccess)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
 	case "mark-failed":
-		if dg.Status.Status == scheduler.StatusRunning {
+		if dagStatus.Status.Status == scheduler.StatusRunning {
 			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
 		}
 		if params.Body.RequestID == "" {
@@ -371,7 +370,7 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
 		}
 
-		err = h.updateStatus(dg.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusError)
+		err = h.updateStatus(dagStatus.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusError)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}

@@ -31,7 +31,7 @@ func TestDialTimeout(t *testing.T) {
 		_ = os.Remove(f.Name())
 	}()
 
-	s, err := NewServer(
+	srv, err := NewServer(
 		&Config{
 			Addr: f.Name(),
 			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,7 @@ func TestDialTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		_ = s.Serve(nil)
+		_ = srv.Serve(nil)
 	}()
 
 	time.Sleep(time.Millisecond * 500)

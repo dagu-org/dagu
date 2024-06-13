@@ -415,7 +415,8 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 	for _, node := range g.Nodes() {
-		if st := node.State().Status; st == NodeStatusSuccess || st == NodeStatusSkipped {
+		nodeStatus := node.State().Status
+		if nodeStatus == NodeStatusSuccess || nodeStatus == NodeStatusSkipped {
 			continue
 		}
 		return false

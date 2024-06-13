@@ -64,12 +64,12 @@ func restartCmd() *cobra.Command {
 // stopDAGIfRunning stops the DAG if it is running.
 // Otherwise, it does nothing.
 func stopDAGIfRunning(e engine.Engine, dg *dag.DAG) error {
-	st, err := e.GetCurrentStatus(dg)
+	curStatus, err := e.GetCurrentStatus(dg)
 	if err != nil {
 		return err
 	}
 
-	if st.Status == scheduler.StatusRunning {
+	if curStatus.Status == scheduler.StatusRunning {
 		log.Printf("Stopping %s for restart...", dg.Name)
 		cobra.CheckErr(stopRunningDAG(e, dg))
 	}

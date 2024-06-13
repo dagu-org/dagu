@@ -30,11 +30,11 @@ type Mailer interface {
 
 // ReportStep is a function that reports the status of a step.
 func (rp *Reporter) ReportStep(dg *dag.DAG, status *model.Status, node *scheduler.Node) error {
-	st := node.State().Status
-	if st != scheduler.NodeStatusNone {
+	nodeStatus := node.State().Status
+	if nodeStatus != scheduler.NodeStatusNone {
 		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
 	}
-	if st == scheduler.NodeStatusError && node.Data().Step.MailOnError {
+	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
 		return rp.Mailer.SendMail(
 			dg.ErrorMail.From,
 			[]string{dg.ErrorMail.To},

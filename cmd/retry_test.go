@@ -22,12 +22,12 @@ func TestRetryCommand(t *testing.T) {
 		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 		// Find the request ID.
-		s, err := e.GetStatus(dagFile)
+		status, err := e.GetStatus(dagFile)
 		require.NoError(t, err)
-		require.Equal(t, s.Status.Status, scheduler.StatusSuccess)
-		require.NotNil(t, s.Status)
+		require.Equal(t, status.Status.Status, scheduler.StatusSuccess)
+		require.NotNil(t, status.Status)
 
-		reqID := s.Status.RequestId
+		reqID := status.Status.RequestId
 
 		// Retry with the request ID.
 		testRunCommand(t, retryCmd(), cmdTest{

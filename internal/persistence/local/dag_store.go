@@ -23,12 +23,12 @@ type dagStoreImpl struct {
 }
 
 func NewDAGStore(dir string) persistence.DAGStore {
-	ds := &dagStoreImpl{
+	dagStore := &dagStoreImpl{
 		dir:       dir,
 		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
-	ds.metaCache.StartEviction()
-	return ds
+	dagStore.metaCache.StartEviction()
+	return dagStore
 }
 
 var (

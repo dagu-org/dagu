@@ -10,7 +10,7 @@ import (
 
 func TestStopCommand(t *testing.T) {
 	t.Run("[Success] Stop a DAG", func(t *testing.T) {
-		tmpDir, _, ds := setupTest(t)
+		tmpDir, _, dataStore := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
@@ -27,8 +27,7 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the DAG running.
-		// TODO: Do not use history store.
-		testLastStatusEventual(t, ds.NewHistoryStore(), dagFile, scheduler.StatusRunning)
+		testLastStatusEventual(t, dataStore.NewHistoryStore(), dagFile, scheduler.StatusRunning)
 
 		// Stop the DAG.
 		testRunCommand(t, stopCmd(), cmdTest{
@@ -36,8 +35,7 @@ func TestStopCommand(t *testing.T) {
 			expectedOut: []string{"Stopping..."}})
 
 		// Check the last execution is cancelled.
-		// TODO: Do not use history store.
-		testLastStatusEventual(t, ds.NewHistoryStore(), dagFile, scheduler.StatusCancel)
+		testLastStatusEventual(t, dataStore.NewHistoryStore(), dagFile, scheduler.StatusCancel)
 		<-done
 	})
 }
