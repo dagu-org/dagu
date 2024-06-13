@@ -10,27 +10,29 @@ import (
 )
 
 func TestRetryCommand(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	t.Run("[Success] Retry a DAG", func(t *testing.T) {
+		tmpDir, e, _ := setupTest(t)
+		defer func() {
+			_ = os.RemoveAll(tmpDir)
+		}()
 
-	dagFile := testDAGFile("retry.yaml")
+		dagFile := testDAGFile("retry.yaml")
 
-	// Run a DAG.
-	testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+		// Run a DAG.
+		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
-	// Find the request ID.
-	s, err := e.GetStatus(dagFile)
-	require.NoError(t, err)
-	require.Equal(t, s.Status.Status, scheduler.StatusSuccess)
-	require.NotNil(t, s.Status)
+		// Find the request ID.
+		s, err := e.GetStatus(dagFile)
+		require.NoError(t, err)
+		require.Equal(t, s.Status.Status, scheduler.StatusSuccess)
+		require.NotNil(t, s.Status)
 
-	reqID := s.Status.RequestId
+		reqID := s.Status.RequestId
 
-	// Retry with the request ID.
-	testRunCommand(t, retryCmd(), cmdTest{
-		args:        []string{"retry", fmt.Sprintf("--req=%s", reqID), dagFile},
-		expectedOut: []string{"param is foo"},
+		// Retry with the request ID.
+		testRunCommand(t, retryCmd(), cmdTest{
+			args:        []string{"retry", fmt.Sprintf("--req=%s", reqID), dagFile},
+			expectedOut: []string{"param is foo"},
+		})
 	})
 }
