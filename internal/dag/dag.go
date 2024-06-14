@@ -72,7 +72,7 @@ type DAG struct {
 	// The actual log directory is LogDir + Name (with invalid characters replaced with '_').
 	LogDir string `json:"LogDir"`
 
-	// Paramerter configuration.
+	// Parameters configuration.
 	// The DAG definition contains only DefaultParams. Params are automatically set by the DAG loader.
 	DefaultParams string   `json:"DefaultParams"` // DefaultParams contains the default parameters to be passed to the DAG.
 	Params        []string `json:"Params"`        // Params contains the list of parameters to be passed to the DAG.
