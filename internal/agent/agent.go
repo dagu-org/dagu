@@ -34,7 +34,12 @@ var (
 	errDAGAlreadyRunning         = errors.New("the DAG is already running")
 )
 
-// Agent is the interface to run / cancel / signal / status / etc.
+// Agent is responsible for running the DAG and handling communication
+// via the unix socket. The agent performs the following tasks:
+// 1. Start the DAG execution.
+// 2. Propagate a signal to the running processes.
+// 3. Handle the HTTP request via the unix socket.
+// 4. Write the log and status to the data store.
 type Agent struct {
 	*Config
 
@@ -42,10 +47,10 @@ type Agent struct {
 	engine       engine.Engine
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
-	logManager   *logManager
 	reporter     *reporter.Reporter
 	historyStore persistence.HistoryStore
 	socketServer *sock.Server
+	logFile      *os.File
 
 	// reqID is request ID to identify the DAG run.
 	// The request ID can be used for history lookup, retry, etc.
@@ -55,15 +60,12 @@ type Agent struct {
 	lock sync.RWMutex
 }
 
+// New creates a new Agent.
 func New(config *Config, engine engine.Engine, dataStore persistence.DataStoreFactory) *Agent {
-	return &Agent{
-		Config:    config,
-		engine:    engine,
-		dataStore: dataStore,
-	}
+	return &Agent{Config: config, engine: engine, dataStore: dataStore}
 }
 
-// Config for Agent.
+// Config is the configuration for the Agent.
 type Config struct {
 	// DAG is the DAG to run.
 	DAG *dag.DAG
@@ -73,7 +75,7 @@ type Config struct {
 	RetryTarget *model.Status
 }
 
-// Run starts the dags execution.
+// Run setups the scheduler and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
 	if err := a.setup(); err != nil {
 		return err
@@ -83,6 +85,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// If it is a dry-run, do not run the DAG.
 	if a.Dry {
 		return a.dryRun()
 	}
@@ -91,7 +94,6 @@ func (a *Agent) Run(ctx context.Context) error {
 		a.checkIsRunning,
 		a.setupDatabase,
 		a.setupSocketServer,
-		a.logManager.setupLogFile,
 	} {
 		if err := fn(); err != nil {
 			return err
@@ -99,6 +101,86 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	return a.run(ctx)
+}
+
+// Status collects the current running status of the DAG and returns it.
+func (a *Agent) Status() *model.Status {
+	// Lock to avoid race condition.
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	schedulerStatus := a.scheduler.Status(a.graph)
+	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
+		// Match the status to the execution graph.
+		schedulerStatus = scheduler.StatusRunning
+	}
+
+	// Create the status object to record the current status.
+	status := &model.Status{
+		RequestId:  a.reqID,
+		Name:       a.DAG.Name,
+		Status:     schedulerStatus,
+		StatusText: schedulerStatus.String(),
+		Pid:        model.Pid(os.Getpid()),
+		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.DAG.Steps),
+		StartedAt:  model.FormatTime(a.graph.StartAt()),
+		FinishedAt: model.FormatTime(a.graph.FinishAt()),
+		Log:        a.logFile.Name(),
+		Params:     model.Params(a.DAG.Params),
+	}
+
+	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
+		status.OnExit = model.FromNode(node.Data())
+	}
+	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
+		status.OnSuccess = model.FromNode(node.Data())
+	}
+	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
+		status.OnFailure = model.FromNode(node.Data())
+	}
+	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
+		status.OnCancel = model.FromNode(node.Data())
+	}
+
+	return status
+}
+
+// Signal sends the signal to the processes running
+// if processes do not terminate after MaxCleanUp time, it will send KILL signal.
+func (a *Agent) Signal(sig os.Signal) {
+	a.signal(sig, false)
+}
+
+// dryRun performs a dry-run of the DAG.
+// It only simulates the execution of the DAG without running the actual command.
+func (a *Agent) dryRun() error {
+	// done channel receives the node when the node is done.
+	// It's a way to update the status in real-time in efficient manner.
+	done := make(chan *scheduler.Node)
+	defer func() {
+		close(done)
+	}()
+
+	go func() {
+		for node := range done {
+			status := a.Status()
+			_ = a.reporter.ReportStep(a.DAG, status, node)
+		}
+	}()
+
+	log.Printf("***** Starting DRY-RUN *****")
+
+	lastErr := a.scheduler.Schedule(
+		dag.NewContext(context.Background(), a.DAG, a.dataStore.NewDAGStore()),
+		a.graph,
+		done,
+	)
+
+	a.reporter.ReportSummary(a.Status(), lastErr)
+
+	log.Printf("***** Finished DRY-RUN *****")
+
+	return lastErr
 }
 
 func (a *Agent) setup() error {
@@ -110,11 +192,13 @@ func (a *Agent) setup() error {
 		return err
 	}
 
-	logDir := a.DAG.GetLogDir()
+	if err := a.setupLogFile(); err != nil {
+		return err
+	}
 
 	// Setup the scheduler for the DAG.
 	cfg := &scheduler.Config{
-		LogDir:        logDir,
+		LogDir:        a.DAG.GetLogDir(),
 		MaxActiveRuns: a.DAG.MaxActiveRuns,
 		Delay:         a.DAG.Delay,
 		Dry:           a.Dry,
@@ -150,8 +234,6 @@ func (a *Agent) setup() error {
 			},
 		}}
 
-	a.logManager = &logManager{logFilename: a.logFile(logDir)}
-
 	if err := a.setupGraph(); err != nil {
 		return err
 	}
@@ -159,56 +241,8 @@ func (a *Agent) setup() error {
 	return nil
 }
 
-// Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() *model.Status {
-	// Lock to avoid race condition.
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	schedulerStatus := a.scheduler.Status(a.graph)
-	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
-		// Match the status to the execution graph.
-		schedulerStatus = scheduler.StatusRunning
-	}
-
-	// Create the status object to record the current status.
-	status := &model.Status{
-		RequestId:  a.reqID,
-		Name:       a.DAG.Name,
-		Status:     schedulerStatus,
-		StatusText: schedulerStatus.String(),
-		Pid:        model.Pid(os.Getpid()),
-		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.DAG.Steps),
-		StartedAt:  model.FormatTime(a.graph.StartAt()),
-		FinishedAt: model.FormatTime(a.graph.FinishAt()),
-		Log:        a.logManager.logFilename,
-		Params:     model.Params(a.DAG.Params),
-	}
-
-	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
-		status.OnExit = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
-		status.OnFailure = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
-		status.OnCancel = model.FromNode(node.Data())
-	}
-
-	return status
-}
-
-// Signal sends the signal to the processes running
-// if processes do not terminate after MaxCleanUp time, it will send KILL signal.
-func (a *Agent) Signal(sig os.Signal) {
-	a.signal(sig, false)
-}
-
-// Kill sends KILL signal to all child processes.
-func (a *Agent) Kill() {
+// kill sends KILL signal to child processes.
+func (a *Agent) kill() {
 	log.Printf("Sending KILL signal to running child processes.")
 	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
 }
@@ -217,15 +251,6 @@ const (
 	logFileTimeStampFmt = "20060102.15:04:05.000"
 	reqIDTruncLen       = 8
 )
-
-func (a *Agent) logFile(dir string) string {
-	fileName := fmt.Sprintf("agent_%s.%s.%s.log",
-		util.ValidFilename(a.DAG.Name),
-		time.Now().Format(logFileTimeStampFmt),
-		util.TruncString(a.reqID, reqIDTruncLen),
-	)
-	return filepath.Join(dir, fileName)
-}
 
 func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	log.Printf("Sending %s signal to running child processes.", sig)
@@ -245,7 +270,7 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 			return
 		case <-timeout.C:
 			log.Printf("Time reached to max cleanup time")
-			a.Kill()
+			a.kill()
 			return
 		case <-tick.C:
 			log.Printf("Sending signal again")
@@ -317,7 +342,7 @@ func (a *Agent) checkPreconditions() error {
 }
 
 func (a *Agent) run(ctx context.Context) error {
-	tl := &logger.Tee{Writer: a.logManager.logFile}
+	tl := &logger.Tee{Writer: a.logFile}
 	if err := tl.Open(); err != nil {
 		return err
 	}
@@ -386,32 +411,6 @@ func (a *Agent) run(ctx context.Context) error {
 	return lastErr
 }
 
-func (a *Agent) dryRun() error {
-	done := make(chan *scheduler.Node)
-	defer func() {
-		close(done)
-	}()
-
-	go func() {
-		for node := range done {
-			status := a.Status()
-			_ = a.reporter.ReportStep(a.DAG, status, node)
-		}
-	}()
-
-	log.Printf("***** Starting DRY-RUN *****")
-
-	ctx := dag.NewContext(context.Background(), a.DAG, a.dataStore.NewDAGStore())
-
-	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
-	status := a.Status()
-	a.reporter.ReportSummary(status, lastErr)
-
-	log.Printf("***** Finished DRY-RUN *****")
-
-	return lastErr
-}
-
 func (a *Agent) checkIsRunning() error {
 	status, err := a.engine.GetCurrentStatus(a.DAG)
 	if err != nil {
@@ -423,9 +422,30 @@ func (a *Agent) checkIsRunning() error {
 	return nil
 }
 
+func (a *Agent) setupLogFile() error {
+	fileName := fmt.Sprintf("agent_%s.%s.%s.log",
+		util.ValidFilename(a.DAG.Name),
+		time.Now().Format(logFileTimeStampFmt),
+		util.TruncString(a.reqID, reqIDTruncLen),
+	)
+	absFilepath := filepath.Join(a.DAG.GetLogDir(), fileName)
+
+	// Create the log directory
+	if err := os.MkdirAll(path.Dir(absFilepath), 0755); err != nil {
+		return err
+	}
+
+	file, err := util.OpenOrCreateFile(absFilepath)
+	if err != nil {
+		return err
+	}
+	a.logFile = file
+	return nil
+}
+
 func (a *Agent) closeLogFile() error {
-	if a.logManager.logFile != nil {
-		return a.logManager.logFile.Close()
+	if a.logFile != nil {
+		return a.logFile.Close()
 	}
 	return nil
 }
@@ -458,20 +478,6 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		encodeError(w, &HTTPError{Code: http.StatusNotFound, Message: "Not found"})
 	}
-}
-
-type logManager struct {
-	logFilename string
-	logFile     *os.File
-}
-
-func (l *logManager) setupLogFile() (err error) {
-	dir := path.Dir(l.logFilename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	l.logFile, err = util.OpenOrCreateFile(l.logFilename)
-	return
 }
 
 type HTTPError struct {
