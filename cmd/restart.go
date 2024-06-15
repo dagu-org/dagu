@@ -18,21 +18,23 @@ func restartCmd() *cobra.Command {
 		Short: "Restart the DAG",
 		Long:  `dagu restart <DAG file>`,
 		Args:  cobra.ExactArgs(1),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig())
-		},
 		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				log.Fatalf("Failed to load config: %v", err)
+			}
+
 			// Load the DAG file and stop the DAG if it is running.
 			dagFilePath := args[0]
-			dg, err := loadDAG(dagFilePath, "")
+			dg, err := loadDAG(cfg, dagFilePath, "")
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
 			eng := engine.New(
-				client.NewDataStoreFactory(config.Get()),
+				client.NewDataStoreFactory(cfg),
 				engine.DefaultConfig(),
-				config.Get(),
+				cfg,
 			)
 
 			if err := stopDAGIfRunning(eng, dg); err != nil {
@@ -51,12 +53,12 @@ func restartCmd() *cobra.Command {
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			dg, err = loadDAG(dagFilePath, params)
+			dg, err = loadDAG(cfg, dagFilePath, params)
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			cobra.CheckErr(start(cmd.Context(), eng, dg, false))
+			cobra.CheckErr(start(cmd.Context(), cfg, eng, dg, false))
 		},
 	}
 }

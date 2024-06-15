@@ -8,7 +8,7 @@ import (
 
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("Start the scheduler", func(t *testing.T) {
-		tmpDir, _, _ := setupTest(t)
+		tmpDir, _, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()

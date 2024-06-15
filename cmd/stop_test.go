@@ -10,7 +10,7 @@ import (
 
 func TestStopCommand(t *testing.T) {
 	t.Run("Stop a DAG", func(t *testing.T) {
-		tmpDir, _, dataStore := setupTest(t)
+		tmpDir, _, dataStore, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()

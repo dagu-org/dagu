@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
@@ -24,16 +23,14 @@ var (
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 	tempDir := util.MustTempDir("runner_test")
-	changeHomeDir(tempDir)
+	err := os.Setenv("HOME", tempDir)
+	if err != nil {
+		panic(err)
+	}
 	testHomeDir = tempDir
 	code := m.Run()
 	_ = os.RemoveAll(tempDir)
 	os.Exit(code)
-}
-
-func changeHomeDir(homeDir string) {
-	_ = os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig()
 }
 
 func TestRun(t *testing.T) {

@@ -20,43 +20,40 @@ import (
 
 // baseModule is a common module for all commands.
 var baseModule = fx.Options(
-	fx.Provide(config.Get),
 	fx.Provide(engine.New),
 	fx.Provide(engine.DefaultConfig),
 	fx.Provide(logger.NewSlogLogger),
 	fx.Provide(client.NewDataStoreFactory),
 )
 
-// newFrontendApp initializes the web server that serves the frontend.
-func newFrontendApp() *fx.App {
-	return fx.New(
-		baseModule,
-		frontend.Module,
-		fx.Invoke(frontend.LifetimeHooks),
-		fx.NopLogger,
-	)
-}
+// frontendModule is a module for the frontend server.
+var frontendModule = fx.Options(
+	baseModule,
+	frontend.Module,
+	fx.NopLogger,
+)
 
+// newFrontendApp initializes the web server that serves the frontend.
 // runDAG reads the DAG file and executes it with the given parameters.
-func runDAG(ctx context.Context, eng engine.Engine, cmd *cobra.Command, args []string, dry bool) {
+func runDAG(ctx context.Context, cfg *config.Config, eng engine.Engine, cmd *cobra.Command, args []string, dry bool) {
 	params, err := cmd.Flags().GetString("params")
 	if err != nil {
 		log.Fatalf("Failed to get params: %v", err)
 	}
 
-	dg, err := loadDAG(args[0], removeQuotes(params))
+	dg, err := loadDAG(cfg, args[0], removeQuotes(params))
 	if err != nil {
 		log.Fatalf("Failed to load DAG: %v", err)
 	}
 
-	if err := start(ctx, eng, dg, dry); err != nil {
+	if err := start(ctx, cfg, eng, dg, dry); err != nil {
 		log.Fatalf("Failed to start DAG: %v", err) // nolint // deep-exit
 	}
 }
 
 // start is responsible for actually starting the DAG.
-func start(ctx context.Context, eng engine.Engine, dg *dag.DAG, dry bool) error {
-	dagAgent := agent.New(&agent.Config{DAG: dg, Dry: dry}, eng, client.NewDataStoreFactory(config.Get()))
+func start(ctx context.Context, cfg *config.Config, eng engine.Engine, dg *dag.DAG, dry bool) error {
+	dagAgent := agent.New(&agent.Config{DAG: dg, Dry: dry}, eng, client.NewDataStoreFactory(cfg))
 	listenSignals(ctx, dagAgent)
 	return dagAgent.Run(ctx)
 }

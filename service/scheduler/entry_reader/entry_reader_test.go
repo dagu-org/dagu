@@ -30,8 +30,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// TODO: fix this tests to use mock
-func setupTest(t *testing.T) (string, engine.Engine) {
+func setupTest(t *testing.T) (string, engine.Engine, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
@@ -39,32 +38,32 @@ func setupTest(t *testing.T) (string, engine.Engine) {
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
-	err = config.LoadConfig()
-	require.NoError(t, err)
-
-	dataStore := client.NewDataStoreFactory(&config.Config{
+	cfg := &config.Config{
 		DataDir:         path.Join(tmpDir, ".dagu", "data"),
 		DAGs:            testdataDir,
 		SuspendFlagsDir: tmpDir,
-	})
+	}
 
-	return tmpDir, engine.New(dataStore, new(engine.Config), &config.Config{})
+	dataStore := client.NewDataStoreFactory(cfg)
+
+	return tmpDir, engine.New(dataStore, new(engine.Config), cfg), cfg
 }
 
 func TestReadEntries(t *testing.T) {
-	tmpDir, eng := setupTest(t)
+	tmpDir, eng, cfg := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
+	loader := dag.NewLoader(cfg)
 
 	entryReader := New(Params{
 		DagsDir:    path.Join(testdataDir, "invalid_directory"),
 		JobFactory: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
 		Engine:     eng,
-	})
+	}, loader)
 
 	entries, err := entryReader.Read(now)
 	require.NoError(t, err)
@@ -75,7 +74,7 @@ func TestReadEntries(t *testing.T) {
 		JobFactory: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
 		Engine:     eng,
-	})
+	}, loader)
 
 	done := make(chan any)
 	defer close(done)

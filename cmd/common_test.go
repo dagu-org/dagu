@@ -25,25 +25,21 @@ import (
 // 1. It creates a temporary directory and returns the path to it.
 // 2. Sets the home directory to the temporary directory.
 // 3. Creates a new data store factory and engine.
-func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
+func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
-	changeHomeDir(tmpDir)
+	err := os.Setenv("HOME", tmpDir)
+	require.NoError(t, err)
 
 	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	return tmpDir, engine.New(dataStore, new(engine.Config), config.Get()), dataStore
-}
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err)
 
-// changeHomeDir changes the home directory for testing.
-func changeHomeDir(dir string) {
-	_ = os.Setenv("HOME", dir)
-
-	// Reload the configuration file that is present in the new home directory.
-	_ = config.LoadConfig()
+	return tmpDir, engine.New(dataStore, new(engine.Config), cfg), dataStore, cfg
 }
 
 // cmdTest is a helper struct to test commands.
@@ -121,7 +117,10 @@ const (
 func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.Status) {
 	t.Helper()
 
-	dg, err := loadDAG(dagFile, "")
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err)
+
+	dg, err := loadDAG(cfg, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

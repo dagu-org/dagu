@@ -16,19 +16,20 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	changeHomeDir(testHomeDir)
-	code := m.Run()
-	os.Exit(code)
-}
-
-func changeHomeDir(homeDir string) {
-	_ = os.Setenv("HOME", homeDir)
-	_ = config.LoadConfig()
+	err := os.Setenv("HOME", testHomeDir)
+	if err != nil {
+		panic(err)
+	}
+	os.Exit(m.Run())
 }
 
 func TestDAG_String(t *testing.T) {
 	t.Run("String representation of default.yaml", func(t *testing.T) {
-		dg, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+		cfg, err := config.LoadConfig()
+		require.NoError(t, err)
+
+		loader := NewLoader(cfg)
+		dg, err := loader.Load("", path.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 
 		ret := dg.String()

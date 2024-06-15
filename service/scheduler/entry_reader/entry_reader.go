@@ -30,6 +30,7 @@ type Params struct {
 }
 
 type EntryReader struct {
+	loader   *dag.Loader
 	dagsDir  string
 	dagsLock sync.Mutex
 	dags     map[string]*dag.DAG
@@ -38,8 +39,9 @@ type EntryReader struct {
 	engine   engine.Engine
 }
 
-func New(params Params) *EntryReader {
+func New(params Params, loader *dag.Loader) *EntryReader {
 	er := &EntryReader{
+		loader:   loader,
 		dagsDir:  params.DagsDir,
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},
@@ -98,7 +100,7 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dg, err := dag.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
+			dg, err := er.loader.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
@@ -137,7 +139,7 @@ func (er *EntryReader) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dg, err := dag.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dg, err := er.loader.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 )
 
@@ -366,11 +365,9 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 
 func (sc *Scheduler) setup() (err error) {
 	sc.pause = time.Millisecond * 100
-	if sc.LogDir == "" {
-		sc.LogDir = config.Get().LogDir
-	}
 	if !sc.Dry {
 		if err = os.MkdirAll(sc.LogDir, 0755); err != nil {
+			err = fmt.Errorf("failed to create log directory: %w", err)
 			return
 		}
 	}

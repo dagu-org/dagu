@@ -7,6 +7,7 @@ import (
 	scheduler "github.com/dagu-dev/dagu/service"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
 )
 
 func schedulerCmd() *cobra.Command {
@@ -14,13 +15,19 @@ func schedulerCmd() *cobra.Command {
 		Use:   "scheduler",
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
-		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig())
-		},
 		Run: func(cmd *cobra.Command, args []string) {
-			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
-
-			if err := scheduler.New(baseModule).Start(cmd.Context()); err != nil {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				log.Fatalf("Failed to load config: %v", err)
+			}
+			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
+				cfg.DAGs = dagsOpt
+			}
+			opts := fx.Options(
+				fx.Provide(func() *config.Config { return cfg }),
+				baseModule,
+			)
+			if err := scheduler.New(opts).Start(cmd.Context()); err != nil {
 				log.Fatalf("Failed to start scheduler: %v", err)
 			}
 		},

@@ -4,8 +4,10 @@ import (
 	"log"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/service/frontend"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/fx"
 )
 
 func serverCmd() *cobra.Command {
@@ -17,10 +19,19 @@ func serverCmd() *cobra.Command {
 			_ = viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 			_ = viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 			_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
-			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := newFrontendApp().Start(cmd.Context()); err != nil {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				log.Fatalf("Failed to load config: %v", err)
+			}
+
+			app := fx.New(
+				frontendModule,
+				fx.Provide(func() *config.Config { return cfg }),
+				fx.Invoke(frontend.LifetimeHooks),
+			)
+			if err := app.Start(cmd.Context()); err != nil {
 				log.Fatalf("Failed to start server: %v", err)
 			}
 		},

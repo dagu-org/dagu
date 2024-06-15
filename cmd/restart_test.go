@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -18,7 +17,7 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("Restart a DAG", func(t *testing.T) {
-		tmpDir, e, _ := setupTest(t)
+		tmpDir, eng, _, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
@@ -33,7 +32,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG running.
-		testStatusEventual(t, e, dagFile, scheduler.StatusRunning)
+		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
 
 		// Restart the DAG.
 		done := make(chan struct{})
@@ -45,7 +44,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG running again.
-		testStatusEventual(t, e, dagFile, scheduler.StatusRunning)
+		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
 		testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
@@ -53,16 +52,16 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG is stopped.
-		testStatusEventual(t, e, dagFile, scheduler.StatusNone)
+		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dg, err := loadDAG(dagFile, "")
+		dg, err := loadDAG(cfg, dagFile, "")
 		require.NoError(t, err)
 
 		recentHistory := engine.New(
-			client.NewDataStoreFactory(config.Get()),
+			client.NewDataStoreFactory(cfg),
 			engine.DefaultConfig(),
-			config.Get(),
+			cfg,
 		).GetRecentHistory(dg, 2)
 
 		require.Len(t, recentHistory, 2)

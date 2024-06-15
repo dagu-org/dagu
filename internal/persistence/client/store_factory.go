@@ -38,14 +38,14 @@ func (f *dataStoreFactoryImpl) InitDagDir() error {
 func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
-		f.historyStore = jsondb.New(f.cfg.DataDir, f.cfg.DAGs)
+		f.historyStore = jsondb.New(f.cfg.DataDir, f.cfg.DAGs, f.cfg.LatestStatusToday)
 	}
 	return f.historyStore
 }
 
 func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
 	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(f.cfg.DAGs)
+		f.dagStore = local.NewDAGStore(f.cfg, f.cfg.DAGs)
 	}
 	return f.dagStore
 }

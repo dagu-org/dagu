@@ -132,11 +132,11 @@ var (
 )
 
 // setup sets the default values for the DAG.
-func (d *DAG) setup() {
+func (d *DAG) setup(cfg *config.Config) {
 	// LogDir is the directory where the logs are stored.
 	// It is used to write the stdout and stderr of the steps.
 	if d.LogDir == "" {
-		d.LogDir = config.Get().LogDir
+		d.LogDir = cfg.LogDir
 	}
 
 	// The default history retention days is 30 days.

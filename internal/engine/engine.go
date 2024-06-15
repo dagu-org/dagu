@@ -38,6 +38,7 @@ type Engine interface {
 	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
 	IsSuspended(id string) bool
 	ToggleSuspend(id string, suspend bool) error
+	Config() *config.Config
 }
 
 // Config is the configuration for engine instance.
@@ -56,6 +57,7 @@ func New(dataStore persistence.DataStoreFactory, cfg *Config, globalCfg *config.
 		dataStore:  dataStore,
 		executable: globalCfg.Executable,
 		workDir:    cfg.WorkDir,
+		config:     globalCfg,
 	}
 }
 
@@ -63,6 +65,7 @@ type engineImpl struct {
 	dataStore  persistence.DataStoreFactory
 	executable string
 	workDir    string
+	config     *config.Config
 }
 
 var (
@@ -78,6 +81,10 @@ var (
 	errGetStatus     = errors.New("failed to get status")
 	errDAGIsRunning  = errors.New("the DAG is running")
 )
+
+func (e *engineImpl) Config() *config.Config {
+	return e.config
+}
 
 func (e *engineImpl) GetDAGSpec(id string) (string, error) {
 	dagStore := e.dataStore.NewDAGStore()

@@ -17,9 +17,9 @@ var (
 	templatePath = "templates/"
 )
 
-func (svr *Server) useTemplate(layout string, name string) func(http.ResponseWriter, interface{}) {
+func (srv *Server) useTemplate(layout string, name string) func(http.ResponseWriter, interface{}) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))
-	tmpl, err := template.New(name).Funcs(defaultFunctions()).ParseFS(svr.assets, files...)
+	tmpl, err := template.New(name).Funcs(defaultFunctions(srv.cfg)).ParseFS(srv.assets, files...)
 	if err != nil {
 		panic(err)
 	}
@@ -36,9 +36,7 @@ func (svr *Server) useTemplate(layout string, name string) func(http.ResponseWri
 	}
 }
 
-func defaultFunctions() template.FuncMap {
-	cfg := config.Get()
-
+func defaultFunctions(cfg *config.Config) template.FuncMap {
 	return template.FuncMap{
 		"defTitle": func(ip interface{}) string {
 			v, ok := ip.(string)

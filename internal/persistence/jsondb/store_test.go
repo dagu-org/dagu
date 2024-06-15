@@ -21,7 +21,7 @@ import (
 func setupTest(t *testing.T) (string, *Store) {
 	tmpDir, err := os.MkdirTemp("", "test-persistence")
 	require.NoError(t, err)
-	db := New(tmpDir, "")
+	db := New(tmpDir, "", true)
 	return tmpDir, db
 }
 
@@ -291,7 +291,7 @@ func TestCompactFile(t *testing.T) {
 	}
 	require.NotNil(t, s)
 
-	db2 := New(db.dir, "")
+	db2 := New(db.dir, "", true)
 	err = db2.Compact(d.Location, s.File)
 	require.False(t, util.FileExists(s.File))
 	require.NoError(t, err)

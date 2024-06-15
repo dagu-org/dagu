@@ -398,11 +398,13 @@ func TestLoad(t *testing.T) {
 	// Base config has the following values:
 	// MailOn: {Failure: true, Success: false}
 	t.Run("Overwrite the base config", func(t *testing.T) {
-		baseCfg := config.Get().BaseConfig
+		cfg, err := config.LoadConfig()
+		require.NoError(t, err)
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		dg, err := Load(baseCfg, path.Join(testdataDir, "overwrite.yaml"), "")
+		loader := NewLoader(cfg)
+		dg, err := loader.Load(cfg.BaseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
@@ -410,10 +412,12 @@ func TestLoad(t *testing.T) {
 		require.Equal(t, dg.HistRetentionDays, 7)
 	})
 	t.Run("Do not overwrite the base config", func(t *testing.T) {
-		baseCfg := config.Get().BaseConfig
+		cfg, err := config.LoadConfig()
+		require.NoError(t, err)
 
 		// no_overwrite.yaml does not have the MailOn key.
-		dg, err := Load(baseCfg, path.Join(testdataDir, "no_overwrite.yaml"), "")
+		loader := NewLoader(cfg)
+		dg, err := loader.Load(cfg.BaseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.
@@ -481,43 +485,40 @@ steps:
 	}
 }
 
-func TestBuilder_BuildSignalOnStop(t *testing.T) {
-	tests := []struct {
-		sig      string
-		expected string
-		wantErr  bool
-	}{
-		{
-			sig:      "SIGINT",
-			expected: "SIGINT",
-		},
-		{
-			sig:     "2000",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.sig, func(t *testing.T) {
-			dat := fmt.Sprintf(`name: test DAG
+const (
+	testSignalOnStop = `
 steps:
   - name: "1"
     command: "true"
-    signalOnStop: "%s"
-`, tt.sig)
-			ret, err := LoadYAML([]byte(dat))
-			if tt.wantErr != (err != nil) {
-				t.Errorf("expected error: %v, got: %v", tt.wantErr, err)
-			}
-			if tt.wantErr {
-				return
-			}
-			if len(ret.Steps) != 1 {
-				t.Fatalf("expected 1 step, got %d", len(ret.Steps))
-			}
-			require.Equal(t, ret.Steps[0].SignalOnStop, tt.expected)
-		})
-	}
+    signalOnStop: "SIGINT"
+`
+	testSignalOnStopInvalid = `
+steps:
+  - name: "1"
+    command: "true"
+    signalOnStop: 1000
+`
+)
+
+func TestBuilder_BuildSignalOnStop(t *testing.T) {
+	t.Run("It should set the signal on stop", func(t *testing.T) {
+		cfg, err := config.LoadConfig()
+		loader := NewLoader(cfg)
+
+		ret, err := loader.LoadYAML([]byte(testSignalOnStop))
+		require.NoError(t, err)
+		if len(ret.Steps) != 1 {
+			t.Fatalf("expected 1 step, got %d", len(ret.Steps))
+		}
+		require.Equal(t, ret.Steps[0].SignalOnStop, "SIGINT")
+	})
+	t.Run("It should return an error if the signal is invalid", func(t *testing.T) {
+		cfg, err := config.LoadConfig()
+		loader := NewLoader(cfg)
+
+		_, err = loader.LoadYAML([]byte(testSignalOnStopInvalid))
+		require.Error(t, err)
+	})
 }
 
 func Test_convertMap(t *testing.T) {

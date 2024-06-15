@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 	"io"
 	"log"
 	"os"
@@ -17,7 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/persistence/filecache"
+
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 
@@ -33,10 +33,11 @@ import (
 // When Compact is called, it removes old data.
 // Compact must be called only once per file.
 type Store struct {
-	dir     string
-	dagsDir string
-	writer  *writer
-	cache   *filecache.Cache[*model.Status]
+	dir               string
+	dagsDir           string
+	writer            *writer
+	cache             *filecache.Cache[*model.Status]
+	latestStatusToday bool
 }
 
 var (
@@ -50,12 +51,13 @@ const (
 )
 
 // New creates a new Store with default configuration.
-func New(dir, dagsDir string) *Store {
+func New(dir, dagsDir string, latestStatusToday bool) *Store {
 	// dagsDir is used to calculate the directory that is compatible with the old version.
 	s := &Store{
-		dir:     dir,
-		dagsDir: dagsDir,
-		cache:   filecache.New[*model.Status](defaultCacheSize, time.Hour*3),
+		dir:               dir,
+		dagsDir:           dagsDir,
+		cache:             filecache.New[*model.Status](defaultCacheSize, time.Hour*3),
+		latestStatusToday: latestStatusToday,
 	}
 	s.cache.StartEviction()
 	return s
@@ -173,8 +175,7 @@ func (store *Store) ReadStatusRecent(dagFile string, n int) []*model.StatusFile 
 // ReadStatusToday returns a list of status files.
 func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 	// TODO: let's fix below not to use config here
-	readLatestStatus := config.Get().LatestStatusToday
-	file, err := store.latestToday(dagFile, time.Now(), readLatestStatus)
+	file, err := store.latestToday(dagFile, time.Now(), store.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}

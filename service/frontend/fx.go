@@ -18,7 +18,7 @@ var (
 
 var Module = fx.Options(
 	fx.Provide(
-		fx.Annotate(handlers.NewDAG, fx.ResultTags(`group:"handlers"`))),
+		fx.Annotate(handlers.NewDAGHandler, fx.ResultTags(`group:"handlers"`))),
 	fx.Provide(New),
 )
 
@@ -44,7 +44,7 @@ func LifetimeHooks(lc fx.Lifecycle, srv *server.Server) {
 	)
 }
 
-func New(params Params) *server.Server {
+func New(params Params, cfg *config.Config) *server.Server {
 	serverParams := server.Params{
 		Host:     params.Config.Host,
 		Port:     params.Config.Port,
@@ -67,5 +67,5 @@ func New(params Params) *server.Server {
 		}
 	}
 
-	return server.NewServer(serverParams)
+	return server.NewServer(serverParams, cfg)
 }

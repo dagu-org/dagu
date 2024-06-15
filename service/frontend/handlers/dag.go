@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence"
@@ -45,7 +44,7 @@ type DAGHandler struct {
 	engine engine.Engine
 }
 
-func NewDAG(eng engine.Engine) server.New {
+func NewDAGHandler(eng engine.Engine) server.New {
 	return &DAGHandler{
 		engine: eng,
 	}
@@ -242,7 +241,7 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
 	}
 
-	logContent, err := getLogFileContent(node.Log)
+	logContent, err := getLogFileContent(node.Log, h.engine.Config().LogEncodingCharset)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
@@ -250,9 +249,7 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 	return response.NewDagStepLogResponse(node.Log, logContent, node), nil
 }
 
-func getLogFileContent(fileName string) (string, error) {
-	enc := config.Get().LogEncodingCharset
-
+func getLogFileContent(fileName, enc string) (string, error) {
 	var decoder *encoding.Decoder
 	if strings.ToLower(enc) == "euc-jp" {
 		decoder = japanese.EUCJP.NewDecoder()

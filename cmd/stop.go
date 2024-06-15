@@ -15,22 +15,20 @@ func stopCmd() *cobra.Command {
 		Short: "Stop the running DAG",
 		Long:  `dagu stop <DAG file>`,
 		Args:  cobra.ExactArgs(1),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig())
-		},
 		Run: func(cmd *cobra.Command, args []string) {
-			loadedDAG, err := loadDAG(args[0], "")
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				log.Fatalf("Failed to load config: %v", err)
+			}
+			loadedDAG, err := loadDAG(cfg, args[0], "")
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
 			log.Printf("Stopping...")
-
-			if err := engine.New(
-				client.NewDataStoreFactory(config.Get()),
-				engine.DefaultConfig(),
-				config.Get(),
-			).Stop(loadedDAG); err != nil {
+			dataStore := client.NewDataStoreFactory(cfg)
+			eng := engine.New(dataStore, engine.DefaultConfig(), cfg)
+			if err := eng.Stop(loadedDAG); err != nil {
 				log.Fatalf("Failed to stop the DAG: %v", err)
 			}
 		},

@@ -35,8 +35,10 @@ type Config struct {
 	LatestStatusToday  bool
 }
 
+const apiBaseURL = "/api/v1"
+
 func (cfg *Config) GetAPIBaseURL() string {
-	return "/api/v1"
+	return apiBaseURL
 }
 
 type TLS struct {
@@ -44,39 +46,7 @@ type TLS struct {
 	KeyFile  string
 }
 
-var cache = new(configCache)
-
-type configCache struct {
-	instance *Config
-	mu       sync.RWMutex
-}
-
-func (cc *configCache) getConfig() *Config {
-	cc.mu.RLock()
-	defer cc.mu.RUnlock()
-	return cc.instance
-}
-
-func (cc *configCache) setConfig(cfg *Config) {
-	cc.mu.Lock()
-	defer cc.mu.Unlock()
-	cc.instance = cfg
-}
-
-func Get() *Config {
-	cfg := cache.getConfig()
-	if cfg != nil {
-		return cfg
-	}
-	if err := LoadConfig(); err != nil {
-		panic(err)
-	}
-	return cache.getConfig()
-}
-
-func LoadConfig() error {
-	appHome := appHomeDir()
-
+func LoadConfig() (*Config, error) {
 	viper.SetEnvPrefix("dagu")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
@@ -102,23 +72,25 @@ func LoadConfig() error {
 
 	executable, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
+		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
+
+	configDir := configDir()
 
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
 	viper.SetDefault("executable", executable)
-	viper.SetDefault("dags", path.Join(appHome, "dags"))
+	viper.SetDefault("dags", path.Join(configDir, "dags"))
 	viper.SetDefault("workDir", "")
 	viper.SetDefault("isBasicAuth", "0")
 	viper.SetDefault("basicAuthUsername", "")
 	viper.SetDefault("basicAuthPassword", "")
 	viper.SetDefault("logEncodingCharset", "")
-	viper.SetDefault("baseConfig", path.Join(appHome, "config.yaml"))
-	viper.SetDefault("logDir", path.Join(appHome, "logs"))
-	viper.SetDefault("dataDir", path.Join(appHome, "data"))
-	viper.SetDefault("suspendFlagsDir", path.Join(appHome, "suspend"))
-	viper.SetDefault("adminLogsDir", path.Join(appHome, "logs", "admin"))
+	viper.SetDefault("baseConfig", path.Join(configDir, "config.yaml"))
+	viper.SetDefault("logDir", path.Join(configDir, "logs"))
+	viper.SetDefault("dataDir", path.Join(configDir, "data"))
+	viper.SetDefault("suspendFlagsDir", path.Join(configDir, "suspend"))
+	viper.SetDefault("adminLogsDir", path.Join(configDir, "logs", "admin"))
 	viper.SetDefault("navbarColor", "")
 	viper.SetDefault("navbarTitle", "Dagu")
 	viper.SetDefault("isAuthToken", "0")
@@ -127,26 +99,20 @@ func LoadConfig() error {
 
 	viper.AutomaticEnv()
 
-	_ = viper.ReadInConfig()
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("failed to read cfg file: %w", err)
+		}
+	}
 
 	cfg := new(Config)
 	if err := viper.Unmarshal(cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal cfg file: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal cfg file: %w", err)
 	}
 	loadLegacyEnvs(cfg)
 	loadEnvs(cfg)
 
-	cache.setConfig(cfg)
-
-	return nil
-}
-
-func homeDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	return home
+	return cfg, nil
 }
 
 func loadEnvs(cfg *Config) {
@@ -170,24 +136,28 @@ func loadLegacyEnvs(cfg *Config) {
 }
 
 func getEnv(env, def string) string {
-	v := os.Getenv(env)
-	if v == "" {
-		return def
+	if v := os.Getenv(env); v != "" {
+		return v
 	}
-	return v
-}
-
-func parseInt(s string) int {
-	i, _ := strconv.Atoi(s)
-	return i
+	return def
 }
 
 func getEnvI(env string, def int) int {
-	v := os.Getenv(env)
-	if v == "" {
+	if v := os.Getenv(env); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
 		return def
 	}
-	return parseInt(v)
+	return def
+}
+
+func homeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	return home
 }
 
 const (
@@ -195,10 +165,9 @@ const (
 	appHomeDefault = ".dagu"
 )
 
-func appHomeDir() string {
-	appDir := os.Getenv(appHomeEnv)
-	if appDir == "" {
-		return path.Join(homeDir(), appHomeDefault)
+func configDir() string {
+	if appDir := os.Getenv(appHomeEnv); appDir != "" {
+		return appDir
 	}
-	return appDir
+	return path.Join(homeDir(), appHomeDefault)
 }

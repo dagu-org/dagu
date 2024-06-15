@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/service/scheduler/entry_reader"
@@ -31,12 +32,13 @@ func EntryReaderProvider(
 	jf entry_reader.JobFactory,
 	logger dagulogger.Logger,
 ) scheduler.EntryReader {
+	loader := dag.NewLoader(cfg)
 	return entry_reader.New(entry_reader.Params{
 		Engine:     engine,
 		DagsDir:    cfg.DAGs,
 		JobFactory: jf,
 		Logger:     logger,
-	})
+	}, loader)
 }
 
 func JobFactoryProvider(cfg *config.Config, eng engine.Engine) entry_reader.JobFactory {
@@ -51,8 +53,7 @@ func New(params Params) *scheduler.Scheduler {
 	return scheduler.New(scheduler.Params{
 		EntryReader: params.EntryReader,
 		Logger:      params.Logger,
-		// TODO: check this is used
-		LogDir: params.Config.LogDir,
+		LogDir:      params.Config.LogDir,
 	})
 }
 

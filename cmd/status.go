@@ -15,20 +15,21 @@ func statusCmd() *cobra.Command {
 		Short: "Display current status of the DAG",
 		Long:  `dagu status <DAG file>`,
 		Args:  cobra.ExactArgs(1),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig())
-		},
 		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				log.Fatalf("Failed to load config: %v", err)
+			}
 			// Load the DAG file and get the current running status.
-			loadedDAG, err := loadDAG(args[0], "")
+			loadedDAG, err := loadDAG(cfg, args[0], "")
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
 			curStatus, err := engine.New(
-				client.NewDataStoreFactory(config.Get()),
+				client.NewDataStoreFactory(cfg),
 				engine.DefaultConfig(),
-				config.Get(),
+				cfg,
 			).GetCurrentStatus(loadedDAG)
 
 			if err != nil {

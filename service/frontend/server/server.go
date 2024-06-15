@@ -43,6 +43,7 @@ type Params struct {
 }
 
 type Server struct {
+	cfg       *config.Config
 	host      string
 	port      int
 	basicAuth *BasicAuth
@@ -58,8 +59,9 @@ type New interface {
 	Configure(api *operations.DaguAPI)
 }
 
-func NewServer(params Params) *Server {
+func NewServer(params Params, cfg *config.Config) *Server {
 	return &Server{
+		cfg:       cfg,
 		host:      params.Host,
 		port:      params.Port,
 		basicAuth: params.BasicAuth,

@@ -4,6 +4,8 @@ import (
 	"log"
 
 	scheduler "github.com/dagu-dev/dagu/service"
+	"github.com/dagu-dev/dagu/service/frontend"
+	"go.uber.org/fx"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/spf13/cobra"
@@ -19,21 +21,39 @@ func startAllCmd() *cobra.Command {
 			_ = viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 			_ = viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 			_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
-			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx := cmd.Context()
+			cfg, err := config.LoadConfig()
+			if err != nil {
+				log.Fatalf("Failed to load config: %v", err)
+			}
+
+			if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
+				cfg.DAGs = dagsDir
+			}
+
+			opts := fx.Options(
+				fx.Provide(func() *config.Config { return cfg }),
+				baseModule,
+			)
+			dagScheduler := scheduler.New(opts)
 
 			// Start the scheduler process.
+			ctx := cmd.Context()
 			go func() {
-				config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
-				err := scheduler.New(baseModule).Start(ctx)
+				err := dagScheduler.Start(ctx)
 				if err != nil {
 					log.Fatal(err) // nolint // deep-exit
 				}
 			}()
 
-			if err := newFrontendApp().Start(ctx); err != nil {
+			app := fx.New(
+				frontendModule,
+				fx.Provide(func() *config.Config { return cfg }),
+				fx.Invoke(frontend.LifetimeHooks),
+			)
+
+			if err := app.Start(ctx); err != nil {
 				log.Fatalf("Failed to start server: %v", err)
 			}
 		},

@@ -25,13 +25,12 @@ var (
 	testdataDir = path.Join(util.MustGetwd(), "./testdata")
 )
 
-// TODO: fix this tests to use mock
-func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
+func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
-	_ = config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 
 	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
@@ -45,15 +44,15 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 			&config.Config{
 				Executable: path.Join(util.MustGetwd(), "../../bin/dagu"),
 			},
-		), dataStore
+		), dataStore, cfg
 }
 
-func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
+func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
-	_ = config.LoadConfig()
+	cfg, _ := config.LoadConfig()
 
 	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
@@ -67,11 +66,11 @@ func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStore
 			&config.Config{
 				Executable: path.Join(util.MustGetwd(), "../../bin/dagu"),
 			},
-		), dataStore
+		), dataStore, cfg
 }
 
 func TestGetStatusRunningAndDone(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -109,7 +108,7 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 }
 
 func TestUpdateStatus(t *testing.T) {
-	tmpDir, eng, hf := setupTest(t)
+	tmpDir, eng, dataStore, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -123,7 +122,7 @@ func TestUpdateStatus(t *testing.T) {
 	dagStatus, err := eng.GetStatus(file)
 	require.NoError(t, err)
 
-	historyStore := hf.NewHistoryStore()
+	historyStore := dataStore.NewHistoryStore()
 
 	err = historyStore.Open(dagStatus.DAG.Location, now, requestId)
 	require.NoError(t, err)
@@ -155,7 +154,7 @@ func TestUpdateStatus(t *testing.T) {
 }
 
 func TestUpdateStatusError(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -180,7 +179,7 @@ func TestUpdateStatusError(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -198,7 +197,7 @@ func TestStart(t *testing.T) {
 }
 
 func TestStop(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -224,7 +223,7 @@ func TestStop(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -243,7 +242,7 @@ func TestRestart(t *testing.T) {
 }
 
 func TestRetry(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -280,7 +279,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	tmpDir, eng, _ := setupTestTmpDir(t)
+	tmpDir, eng, _, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -310,7 +309,7 @@ steps:
 }
 
 func TestRemove(t *testing.T) {
-	tmpDir, e, _ := setupTestTmpDir(t)
+	tmpDir, eng, _, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -320,25 +319,25 @@ steps:
   - name: "1"
     command: "true"
 `
-	id, err := e.CreateDAG("test")
+	id, err := eng.CreateDAG("test")
 	require.NoError(t, err)
-	err = e.UpdateDAG(id, spec)
+	err = eng.UpdateDAG(id, spec)
 	require.NoError(t, err)
 
 	// check file
-	newSpec, err := e.GetDAGSpec(id)
+	newSpec, err := eng.GetDAGSpec(id)
 	require.NoError(t, err)
 	require.Equal(t, spec, newSpec)
 
-	status, _ := e.GetStatus(id)
+	status, _ := eng.GetStatus(id)
 
 	// delete
-	err = e.DeleteDAG(id, status.DAG.Location)
+	err = eng.DeleteDAG(id, status.DAG.Location)
 	require.NoError(t, err)
 }
 
 func TestCreateNewDAG(t *testing.T) {
-	tmpDir, eng, _ := setupTestTmpDir(t)
+	tmpDir, eng, _, cfg := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -347,13 +346,14 @@ func TestCreateNewDAG(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check if the new DAG is actually created.
-	dg, err := dag.Load("", path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
+	loader := dag.NewLoader(cfg)
+	dg, err := loader.Load("", path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 	require.NoError(t, err)
 	require.Equal(t, "test-dag", dg.Name)
 }
 
 func TestRenameDAG(t *testing.T) {
-	tmpDir, eng, _ := setupTestTmpDir(t)
+	tmpDir, eng, _, _ := setupTestTmpDir(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -374,7 +374,7 @@ func TestRenameDAG(t *testing.T) {
 
 func TestEngine_GetStatus(t *testing.T) {
 	t.Run("[Failure] Invalid DAG name", func(t *testing.T) {
-		tmpDir, eng, _ := setupTest(t)
+		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
@@ -389,7 +389,7 @@ func TestEngine_GetStatus(t *testing.T) {
 }
 
 func TestReadAll(t *testing.T) {
-	tmpDir, e, _ := setupTest(t)
+	tmpDir, e, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
@@ -407,7 +407,7 @@ func TestReadAll(t *testing.T) {
 }
 
 func TestReadDAGStatus(t *testing.T) {
-	tmpDir, eng, _ := setupTest(t)
+	tmpDir, eng, _, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
