@@ -69,10 +69,10 @@ type Config struct {
 	RetryTarget *model.Status
 }
 
-var (
-	waitForRunning = time.Millisecond * 100
-)
+// wait before read the running status
+var waitForRunning = time.Millisecond * 100
 
+// errors on running DAG
 var (
 	errFailedSetupUnixSocket = errors.New("failed to start the unix socket")
 	errDAGIsAlreadyRunning   = errors.New("the DAG is already running")
