@@ -55,6 +55,10 @@ type Scheduler struct {
 	handlers  map[dag.HandlerType]*Node
 }
 
+func New(cfg *Config) *Scheduler {
+	return &Scheduler{Config: cfg}
+}
+
 type Config struct {
 	LogDir        string
 	MaxActiveRuns int

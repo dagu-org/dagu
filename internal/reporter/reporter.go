@@ -18,6 +18,10 @@ type Reporter struct {
 	*Config
 }
 
+func New(cfg *Config) *Reporter {
+	return &Reporter{Config: cfg}
+}
+
 // Config is the configuration for the reporter.
 type Config struct {
 	Mailer Mailer
