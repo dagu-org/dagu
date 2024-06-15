@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    // Golang
+    "golang.go",
+    // Javascript
+    "dbaeumer.vscode-eslint",
+    // Prettier
+    "esbenp.prettier-vscode",
+  ]
+}

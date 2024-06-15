@@ -10,7 +10,12 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/main.go",
-            "args": ["server", "--port=9090", "-s", "localhost"]
+            "args": [
+                "server",
+                "--port=9090",
+                "-s",
+                "localhost"
+            ]
         },
         {
             "name": "Hello World",
@@ -18,7 +23,10 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/main.go",
-            "args": ["start", "${workspaceFolder}/examples/hello_world.yaml"]
+            "args": [
+                "start",
+                "${workspaceFolder}/examples/hello_world.yaml"
+            ]
         }
     ]
 }
