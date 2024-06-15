@@ -61,7 +61,7 @@ export type DAG = {
   HandlerOn: HandlerOn;
   Steps: Step[];
   HistRetentionDays: number;
-  Preconditions: Condition[];
+  Preconditions: Condition[] | null;
   MaxActiveRuns: number;
   Params: string[];
   DefaultParams?: string;
@@ -199,7 +199,7 @@ export type Step = {
   RetryPolicy?: RetryPolicy;
   RepeatPolicy: RepeatPolicy;
   MailOnError: boolean;
-  Preconditions: Condition[];
+  Preconditions: Condition[] | null;
   Run: string;
   Params: string;
 };

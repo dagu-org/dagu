@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/service/frontend"
+	"github.com/dagu-dev/dagu/service/scheduler"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
@@ -30,6 +31,13 @@ var baseModule = fx.Options(
 var frontendModule = fx.Options(
 	baseModule,
 	frontend.Module,
+	fx.NopLogger,
+)
+
+// schedulerModule is a module for the scheduler process.
+var schedulerModule = fx.Options(
+	baseModule,
+	scheduler.Module,
 	fx.NopLogger,
 )
 
