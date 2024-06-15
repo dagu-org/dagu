@@ -524,7 +524,7 @@ func (a *Agent) setupLog() error {
 }
 
 const (
-	// timestemp postfix for log files
+	// timestamp postfix for log files
 	logFileTimeStampFmt = "20060102.15:04:05.000"
 	// unique id postfix for each log files
 	reqIDLenSafe = 8
