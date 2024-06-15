@@ -80,57 +80,7 @@ var (
 
 // Run setups the scheduler and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
-	// Lock to prevent race condition.
-	a.lock.Lock()
-	defer a.lock.Unlock()
-
-	if err := a.setupReqID(); err != nil {
-		return err
-	}
-
-	if err := a.setupLog(); err != nil {
-		return err
-	}
-
-	// Setup the scheduler for the DAG.
-	cfg := &scheduler.Config{
-		LogDir:        a.DAG.GetLogDir(),
-		MaxActiveRuns: a.DAG.MaxActiveRuns,
-		Delay:         a.DAG.Delay,
-		Dry:           a.Dry,
-		ReqID:         a.reqID,
-	}
-
-	if a.DAG.HandlerOn.Exit != nil {
-		cfg.OnExit = a.DAG.HandlerOn.Exit
-	}
-
-	if a.DAG.HandlerOn.Success != nil {
-		cfg.OnSuccess = a.DAG.HandlerOn.Success
-	}
-
-	if a.DAG.HandlerOn.Failure != nil {
-		cfg.OnFailure = a.DAG.HandlerOn.Failure
-	}
-
-	if a.DAG.HandlerOn.Cancel != nil {
-		cfg.OnCancel = a.DAG.HandlerOn.Cancel
-	}
-
-	a.scheduler = &scheduler.Scheduler{Config: cfg}
-	a.reporter = &reporter.Reporter{
-		Config: &reporter.Config{
-			Mailer: &mailer.Mailer{
-				Config: &mailer.Config{
-					Host:     a.DAG.Smtp.Host,
-					Port:     a.DAG.Smtp.Port,
-					Username: a.DAG.Smtp.Username,
-					Password: a.DAG.Smtp.Password,
-				},
-			},
-		}}
-
-	if err := a.setupGraph(); err != nil {
+	if err := a.setup(); err != nil {
 		return err
 	}
 
@@ -145,9 +95,11 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err := a.checkIsAlreadyRunning(); err != nil {
 		return err
 	}
+
 	if err := a.setupDatabase(); err != nil {
 		return err
 	}
+
 	if err := a.setupSocketServer(); err != nil {
 		return err
 	}
@@ -311,6 +263,64 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *Agent) setup() error {
+	// Lock to prevent race condition.
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	if err := a.setupReqID(); err != nil {
+		return err
+	}
+
+	if err := a.setupLog(); err != nil {
+		return err
+	}
+
+	// Setup the scheduler for the DAG.
+	cfg := &scheduler.Config{
+		LogDir:        a.DAG.GetLogDir(),
+		MaxActiveRuns: a.DAG.MaxActiveRuns,
+		Delay:         a.DAG.Delay,
+		Dry:           a.Dry,
+		ReqID:         a.reqID,
+	}
+
+	if a.DAG.HandlerOn.Exit != nil {
+		cfg.OnExit = a.DAG.HandlerOn.Exit
+	}
+
+	if a.DAG.HandlerOn.Success != nil {
+		cfg.OnSuccess = a.DAG.HandlerOn.Success
+	}
+
+	if a.DAG.HandlerOn.Failure != nil {
+		cfg.OnFailure = a.DAG.HandlerOn.Failure
+	}
+
+	if a.DAG.HandlerOn.Cancel != nil {
+		cfg.OnCancel = a.DAG.HandlerOn.Cancel
+	}
+
+	a.scheduler = &scheduler.Scheduler{Config: cfg}
+	a.reporter = &reporter.Reporter{
+		Config: &reporter.Config{
+			Mailer: &mailer.Mailer{
+				Config: &mailer.Config{
+					Host:     a.DAG.Smtp.Host,
+					Port:     a.DAG.Smtp.Port,
+					Username: a.DAG.Smtp.Username,
+					Password: a.DAG.Smtp.Password,
+				},
+			},
+		}}
+
+	if err := a.setupGraph(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // dryRun performs a dry-run of the DAG.
 // It only simulates the execution of the DAG without running the actual command.
 func (a *Agent) dryRun() error {
@@ -414,11 +424,10 @@ func (a *Agent) setupDatabase() error {
 }
 
 func (a *Agent) setupSocketServer() (err error) {
-	a.socketServer, err = sock.NewServer(
-		&sock.Config{
-			Addr:        a.DAG.SockAddr(),
-			HandlerFunc: a.HandleHTTP,
-		})
+	a.socketServer, err = sock.NewServer(&sock.Config{
+		Addr:        a.DAG.SockAddr(),
+		HandlerFunc: a.HandleHTTP,
+	})
 	return
 }
 
