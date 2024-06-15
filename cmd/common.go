@@ -13,8 +13,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/service/frontend"
-	"github.com/dagu-dev/dagu/service/scheduler"
+	"github.com/dagu-dev/dagu/internal/service/frontend"
+	"github.com/dagu-dev/dagu/internal/service/scheduler"
 	"github.com/spf13/cobra"
 	"go.uber.org/fx"
 )
