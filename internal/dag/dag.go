@@ -84,7 +84,7 @@ type DAG struct {
 
 	// Preconditions contains the conditions to be met before running the DAG.
 	// If the conditions are not met, the whole DAG is skipped.
-	Preconditions []*Condition `json:"Preconditions"`
+	Preconditions []Condition `json:"Preconditions"`
 
 	// Mail notification configuration.
 	// MailOn contains the conditions to send mail.

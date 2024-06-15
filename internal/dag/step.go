@@ -68,7 +68,7 @@ type Step struct {
 	RetryPolicy     *RetryPolicy   `json:"RetryPolicy,omitempty"`     // RetryPolicy contains the retry policy for the step.
 	RepeatPolicy    RepeatPolicy   `json:"RepeatPolicy,omitempty"`    // RepeatPolicy contains the repeat policy for the step.
 	MailOnError     bool           `json:"MailOnError,omitempty"`     // MailOnError is the flag to send mail on error.
-	Preconditions   []*Condition   `json:"Preconditions,omitempty"`   // Preconditions contains the conditions to be met before running the step.
+	Preconditions   []Condition    `json:"Preconditions,omitempty"`   // Preconditions contains the conditions to be met before running the step.
 	SignalOnStop    string         `json:"SignalOnStop,omitempty"`    // SignalOnStop is the signal to send on stop.
 	SubWorkflow     *SubWorkflow   `json:"SubWorkflow,omitempty"`     // SubWorkflow contains the information about a sub DAG to be executed.
 }

@@ -125,7 +125,7 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 			Name:    "2",
 			Command: testCommand,
 			Depends: []string{"1"},
-			Preconditions: []*dag.Condition{
+			Preconditions: []dag.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "0",
@@ -286,7 +286,7 @@ func TestStepPreCondition(t *testing.T) {
 			Name:    "2",
 			Command: testCommand,
 			Depends: []string{"1"},
-			Preconditions: []*dag.Condition{
+			Preconditions: []dag.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "0",
@@ -297,7 +297,7 @@ func TestStepPreCondition(t *testing.T) {
 		dag.Step{
 			Name:    "4",
 			Command: testCommand,
-			Preconditions: []*dag.Condition{
+			Preconditions: []dag.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",

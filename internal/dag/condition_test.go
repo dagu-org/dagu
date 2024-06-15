@@ -10,20 +10,20 @@ import (
 func TestCondition_Eval(t *testing.T) {
 	tests := []struct {
 		name      string
-		condition []*Condition
+		condition []Condition
 		wantErr   bool
 	}{
 		{
 			name:      "Condition with a command substitution",
-			condition: []*Condition{{Condition: "`echo 1`", Expected: "1"}},
+			condition: []Condition{{Condition: "`echo 1`", Expected: "1"}},
 		},
 		{
 			name:      "Condition with environment variable",
-			condition: []*Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
+			condition: []Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
 		},
 		{
 			name: "Multiple conditions and all are met",
-			condition: []*Condition{
+			condition: []Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -36,7 +36,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "Multiple conditions and one is not met",
-			condition: []*Condition{
+			condition: []Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -50,7 +50,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "Invalid condition",
-			condition: []*Condition{
+			condition: []Condition{
 				{
 					Condition: "`invalid`",
 				},

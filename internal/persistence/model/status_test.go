@@ -32,7 +32,7 @@ func TestStatusSerialization(t *testing.T) {
 				Dir: "dir", Command: "echo 1", Args: []string{},
 				Depends: []string{}, ContinueOn: dag.ContinueOn{},
 				RetryPolicy: &dag.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []*dag.Condition{},
+				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []dag.Condition{},
 			},
 		},
 		MailOn:    &dag.MailOn{},

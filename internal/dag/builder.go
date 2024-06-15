@@ -930,10 +930,10 @@ func buildConfigEnv(vars map[string]string) []string {
 }
 
 // buildConditions builds a list of conditions from the definition.
-func buildConditions(cond []*conditionDef) []*Condition {
-	var ret []*Condition
+func buildConditions(cond []*conditionDef) []Condition {
+	var ret []Condition
 	for _, v := range cond {
-		ret = append(ret, &Condition{
+		ret = append(ret, Condition{
 			Condition: v.Condition,
 			Expected:  v.Expected,
 		})

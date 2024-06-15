@@ -412,6 +412,6 @@ func (n *Node) init() {
 		n.data.Step.Variables = []string{}
 	}
 	if n.data.Step.Preconditions == nil {
-		n.data.Step.Preconditions = []*dag.Condition{}
+		n.data.Step.Preconditions = []dag.Condition{}
 	}
 }

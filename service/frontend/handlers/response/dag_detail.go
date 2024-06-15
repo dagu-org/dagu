@@ -48,7 +48,7 @@ func ToDagDetail(dg *dag.DAG) *models.DagDetail {
 		MaxActiveRuns:     lo.ToPtr(int64(dg.MaxActiveRuns)),
 		Name:              lo.ToPtr(dg.Name),
 		Params:            dg.Params,
-		Preconditions: lo.Map(dg.Preconditions, func(item *dag.Condition, _ int) *models.Condition {
+		Preconditions: lo.Map(dg.Preconditions, func(item dag.Condition, _ int) *models.Condition {
 			return ToCondition(item)
 		}),
 		Schedule: lo.Map(dg.Schedule, func(item dag.Schedule, _ int) *models.Schedule {

@@ -122,7 +122,7 @@ func TestAgent_Run(t *testing.T) {
 		dg := testLoadDAG(t, "multiple_steps.yaml")
 
 		// Precondition is not met
-		dg.Preconditions = []*dag.Condition{{Condition: "`echo 1`", Expected: "0"}}
+		dg.Preconditions = []dag.Condition{{Condition: "`echo 1`", Expected: "0"}}
 
 		dagAgent := agent.New(&agent.Config{DAG: dg}, eng, dataStore)
 		err := dagAgent.Run(context.Background())
