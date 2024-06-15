@@ -1,4 +1,4 @@
-.PHONY: build server scheduler test proto certs swagger
+.PHONY: build server scheduler test proto certs swagger https
 
 ########## Variables ##########
 SRC_DIR=./
@@ -15,49 +15,70 @@ DEV_CERT_SUBJ_CLIENT="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=CLIENT/CN=*.client.dev/emai
 DEV_CERT_SUBJ_ALT="subjectAltName=DNS:localhost"
 
 ########## Main Targets ##########
+
+# main starts the backend server.
 main:
 	go run . server
 
+# https starts the server with the HTTPS protocol.
+https:
+	@DAGU_CERT_FILE=./cert/server-cert.pem \
+		DAGU_KEY_FILE=./cert/server-key.pem \
+		go run . server
+
+# watch starts development UI server.
+# The backend server should be running.
 watch:
 	nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
 
+# test runs all tests.
 test:
 	@go test --race ./...
 
+# test-clean cleans the test cache and run all tests.
 test-clean:
 	@go clean -testcache
 	@go test --race ./...
 
+# lint the Go code.
 lint:
 	golangci-lint run -v
 
+# install-tools installs the required tools.
 install-tools: install-nodemon install-swagger
 
+# swagger generates the swagger server code.
 swagger: clean-swagger gen-swagger
 
+# certs generates the certificates to use in the development environment.
 certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
 
+# build build the binary.
 build: build-ui build-dir go-lint build-bin
 
+# build-image build the docker image and push to the registry.
+# VERSION should be set via the argument as follows:
+# ```sh
+# make build-image VERSION={version}
+# ```
+# {version} should be the version number such as v1.13.0.
 build-image: build-image-version build-image-latest
-
 build-image-version:
 ifeq ($(VERSION),)
 	$(error "VERSION is null")
 endif
 	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:$(VERSION) .
 
+# build-image-latest build the docker image with the latest tag and push to 
+# the registry.
 build-image-latest:
 	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:latest .
 
+# server build the binary and start the server.
 server: go-lint build-dir build-bin
 	./bin/dagu server
 
-https-server:
-	@DAGU_CERT_FILE=./cert/server-cert.pem \
-		DAGU_KEY_FILE=./cert/server-key.pem \
-		go run . server
-
+# scheduler build the binary and start the scheduler.
 scheduler: go-lint build-dir build-bin
 	./bin/dagu scheduler
 
