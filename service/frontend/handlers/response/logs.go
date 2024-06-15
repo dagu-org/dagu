@@ -8,6 +8,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
 )
 
@@ -42,6 +43,7 @@ func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnExit)
 		}
 	}
+
 	for _, handlerType := range []dag.HandlerType{dag.HandlerOnSuccess, dag.HandlerOnFailure, dag.HandlerOnCancel, dag.HandlerOnExit} {
 		if v, ok := handlerStatusByName[handlerType.String()]; ok {
 			grid = append(grid, ToDagLogGridItem(handlerType.String(), v))
@@ -52,12 +54,10 @@ func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 		return ToDagStatusFile(item)
 	})
 
-	ret := &models.DagLogResponse{
+	return &models.DagLogResponse{
 		Logs:     lo.Reverse(converted),
 		GridData: grid,
 	}
-
-	return ret
 }
 
 func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx int, node *model.Node) {
@@ -69,14 +69,14 @@ func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx in
 
 func ToDagStatusFile(status *model.StatusFile) *models.DagStatusFile {
 	return &models.DagStatusFile{
-		File:   lo.ToPtr(status.File),
+		File:   swag.String(status.File),
 		Status: ToDagStatusDetail(status.Status),
 	}
 }
 
 func ToDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGridItem {
 	return &models.DagLogGridItem{
-		Name: lo.ToPtr(name),
+		Name: swag.String(name),
 		Vals: lo.Map(vals, func(item scheduler.NodeStatus, _ int) int64 {
 			return int64(item)
 		}),
@@ -85,15 +85,15 @@ func ToDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGr
 
 func ToDagStepLogResponse(logFile, content string, step *model.Node) *models.DagStepLogResponse {
 	return &models.DagStepLogResponse{
-		LogFile: lo.ToPtr(logFile),
+		LogFile: swag.String(logFile),
 		Step:    ToNode(step),
-		Content: lo.ToPtr(content),
+		Content: swag.String(content),
 	}
 }
 
 func ToDagSchedulerLogResponse(logFile, content string) *models.DagSchedulerLogResponse {
 	return &models.DagSchedulerLogResponse{
-		LogFile: lo.ToPtr(logFile),
-		Content: lo.ToPtr(content),
+		LogFile: swag.String(logFile),
+		Content: swag.String(content),
 	}
 }

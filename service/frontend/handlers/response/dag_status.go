@@ -3,19 +3,19 @@ package response
 import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/service/frontend/models"
-	"github.com/samber/lo"
+	"github.com/go-openapi/swag"
 )
 
-func ToDagStatus(s *model.Status) *models.DagStatus {
+func ToDagStatus(status *model.Status) *models.DagStatus {
 	return &models.DagStatus{
-		Log:        lo.ToPtr(s.Log),
-		Name:       lo.ToPtr(s.Name),
-		Params:     lo.ToPtr(s.Params),
-		Pid:        lo.ToPtr(int64(s.Pid)),
-		RequestID:  lo.ToPtr(s.RequestId),
-		StartedAt:  lo.ToPtr(s.StartedAt),
-		FinishedAt: lo.ToPtr(s.FinishedAt),
-		Status:     lo.ToPtr(int64(s.Status)),
-		StatusText: lo.ToPtr(s.StatusText),
+		Log:        swag.String(status.Log),
+		Name:       swag.String(status.Name),
+		Params:     swag.String(status.Params),
+		Pid:        swag.Int64(int64(status.Pid)),
+		RequestID:  swag.String(status.RequestId),
+		StartedAt:  swag.String(status.StartedAt),
+		FinishedAt: swag.String(status.FinishedAt),
+		Status:     swag.Int64(int64(status.Status)),
+		StatusText: swag.String(status.StatusText),
 	}
 }

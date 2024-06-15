@@ -183,7 +183,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
-		resp.Definition = lo.ToPtr(dagContent)
+		resp.Definition = swag.String(dagContent)
 
 	case dagTabTypeHistory:
 		logs := h.engine.GetRecentHistory(dagStatus.DAG, 30)

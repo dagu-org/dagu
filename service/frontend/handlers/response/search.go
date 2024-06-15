@@ -16,11 +16,11 @@ func ToSearchDAGsResponse(ret []*persistence.GrepResult, errs []string) *models.
 	}
 }
 
-func ToSearchDAGsResultItem(workflow *persistence.GrepResult) *models.SearchDagsResultItem {
+func ToSearchDAGsResultItem(result *persistence.GrepResult) *models.SearchDagsResultItem {
 	return &models.SearchDagsResultItem{
-		Name: workflow.Name,
-		DAG:  ToDAG(workflow.DAG),
-		Matches: lo.Map(workflow.Matches, func(item *grep.Match, _ int) *models.SearchDagsMatchItem {
+		Name: result.Name,
+		DAG:  ToDAG(result.DAG),
+		Matches: lo.Map(result.Matches, func(item *grep.Match, _ int) *models.SearchDagsMatchItem {
 			return ToSearchDAGsMatchItem(item)
 		}),
 	}

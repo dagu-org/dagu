@@ -4,26 +4,23 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/go-openapi/swag"
-	"github.com/samber/lo"
 )
 
 func ToStepObject(step dag.Step) *models.StepObject {
 	so := &models.StepObject{
-		Args:        step.Args,
-		CmdWithArgs: swag.String(step.CmdWithArgs),
-		Command:     lo.ToPtr(step.Command),
-		Depends:     step.Depends,
-		Description: lo.ToPtr(step.Description),
-		Dir:         lo.ToPtr(step.Dir),
-		MailOnError: lo.ToPtr(step.MailOnError),
-		Name:        lo.ToPtr(step.Name),
-		Output:      lo.ToPtr(step.Output),
-		Preconditions: lo.Map(step.Preconditions, func(item dag.Condition, _ int) *models.Condition {
-			return ToCondition(item)
-		}),
-		RepeatPolicy: ToRepeatPolicy(step.RepeatPolicy),
-		Script:       lo.ToPtr(step.Script),
-		Variables:    step.Variables,
+		Args:          step.Args,
+		CmdWithArgs:   swag.String(step.CmdWithArgs),
+		Command:       swag.String(step.Command),
+		Depends:       step.Depends,
+		Description:   swag.String(step.Description),
+		Dir:           swag.String(step.Dir),
+		MailOnError:   swag.Bool(step.MailOnError),
+		Name:          swag.String(step.Name),
+		Output:        swag.String(step.Output),
+		Preconditions: ToConditions(step.Preconditions),
+		RepeatPolicy:  ToRepeatPolicy(step.RepeatPolicy),
+		Script:        swag.String(step.Script),
+		Variables:     step.Variables,
 	}
 	if step.SubWorkflow != nil {
 		so.Run = step.SubWorkflow.Name
@@ -37,6 +34,14 @@ func ToRepeatPolicy(repeatPolicy dag.RepeatPolicy) *models.RepeatPolicy {
 		Repeat:   repeatPolicy.Repeat,
 		Interval: int64(repeatPolicy.Interval),
 	}
+}
+
+func ToConditions(conditions []dag.Condition) []*models.Condition {
+	var result []*models.Condition
+	for _, cond := range conditions {
+		result = append(result, ToCondition(cond))
+	}
+	return result
 }
 
 func ToCondition(cond dag.Condition) *models.Condition {

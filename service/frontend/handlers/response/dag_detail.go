@@ -5,6 +5,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
 )
 
@@ -13,10 +14,10 @@ func ToGetDagDetailResponse(
 	tab string,
 ) *models.GetDagDetailsResponse {
 	return &models.GetDagDetailsResponse{
-		Title:      lo.ToPtr(workflowStatus.DAG.Name),
+		Title:      swag.String(workflowStatus.DAG.Name),
 		DAG:        ToDagStatusWithDetails(workflowStatus),
-		Tab:        lo.ToPtr(tab),
-		Definition: lo.ToPtr(""),
+		Tab:        swag.String(tab),
+		Definition: swag.String(""),
 		LogData:    nil,
 		Errors:     []string{},
 	}
@@ -25,28 +26,28 @@ func ToGetDagDetailResponse(
 func ToDagStatusWithDetails(dagStatus *persistence.DAGStatus) *models.DagStatusWithDetails {
 	return &models.DagStatusWithDetails{
 		DAG:       ToDagDetail(dagStatus.DAG),
-		Dir:       lo.ToPtr(dagStatus.Dir),
-		Error:     lo.ToPtr(toErrorText(dagStatus.Error)),
+		Dir:       swag.String(dagStatus.Dir),
+		Error:     swag.String(toErrorText(dagStatus.Error)),
 		ErrorT:    dagStatus.ErrorT,
-		File:      lo.ToPtr(dagStatus.File),
+		File:      swag.String(dagStatus.File),
 		Status:    ToDagStatusDetail(dagStatus.Status),
-		Suspended: lo.ToPtr(dagStatus.Suspended),
+		Suspended: swag.Bool(dagStatus.Suspended),
 	}
 }
 
 func ToDagDetail(dg *dag.DAG) *models.DagDetail {
 	return &models.DagDetail{
-		DefaultParams:     lo.ToPtr(dg.DefaultParams),
-		Delay:             lo.ToPtr(int64(dg.Delay)),
-		Description:       lo.ToPtr(dg.Description),
+		DefaultParams:     swag.String(dg.DefaultParams),
+		Delay:             swag.Int64(int64(dg.Delay)),
+		Description:       swag.String(dg.Description),
 		Env:               dg.Env,
-		Group:             lo.ToPtr(dg.Group),
+		Group:             swag.String(dg.Group),
 		HandlerOn:         ToHandlerOn(dg.HandlerOn),
-		HistRetentionDays: lo.ToPtr(int64(dg.HistRetentionDays)),
-		Location:          lo.ToPtr(dg.Location),
-		LogDir:            lo.ToPtr(dg.LogDir),
-		MaxActiveRuns:     lo.ToPtr(int64(dg.MaxActiveRuns)),
-		Name:              lo.ToPtr(dg.Name),
+		HistRetentionDays: swag.Int64(int64(dg.HistRetentionDays)),
+		Location:          swag.String(dg.Location),
+		LogDir:            swag.String(dg.LogDir),
+		MaxActiveRuns:     swag.Int64(int64(dg.MaxActiveRuns)),
+		Name:              swag.String(dg.Name),
 		Params:            dg.Params,
 		Preconditions: lo.Map(dg.Preconditions, func(item dag.Condition, _ int) *models.Condition {
 			return ToCondition(item)
@@ -80,15 +81,15 @@ func ToHandlerOn(handlerOn dag.HandlerOn) *models.HandlerOn {
 
 func ToDagStatusDetail(s *model.Status) *models.DagStatusDetail {
 	return &models.DagStatusDetail{
-		Log:        lo.ToPtr(s.Log),
-		Name:       lo.ToPtr(s.Name),
-		Params:     lo.ToPtr(s.Params),
-		Pid:        lo.ToPtr(int64(s.Pid)),
-		RequestID:  lo.ToPtr(s.RequestId),
-		StartedAt:  lo.ToPtr(s.StartedAt),
-		FinishedAt: lo.ToPtr(s.FinishedAt),
-		Status:     lo.ToPtr(int64(s.Status)),
-		StatusText: lo.ToPtr(s.StatusText),
+		Log:        swag.String(s.Log),
+		Name:       swag.String(s.Name),
+		Params:     swag.String(s.Params),
+		Pid:        swag.Int64(int64(s.Pid)),
+		RequestID:  swag.String(s.RequestId),
+		StartedAt:  swag.String(s.StartedAt),
+		FinishedAt: swag.String(s.FinishedAt),
+		Status:     swag.Int64(int64(s.Status)),
+		StatusText: swag.String(s.StatusText),
 		Nodes: lo.Map(s.Nodes, func(item *model.Node, _ int) *models.StatusNode {
 			return ToNode(item)
 		}),

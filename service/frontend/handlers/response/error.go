@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/dagu-dev/dagu/service/frontend/models"
-	"github.com/samber/lo"
+	"github.com/go-openapi/swag"
 )
 
 func toErrorText(err error) string {
@@ -27,8 +27,8 @@ func NewCodedError(code int, apiError *models.APIError) *CodedError {
 
 func NewAPIError(message, detailedMessage string) *models.APIError {
 	return &models.APIError{
-		Message:         lo.ToPtr(message),
-		DetailedMessage: lo.ToPtr(detailedMessage),
+		Message:         swag.String(message),
+		DetailedMessage: swag.String(detailedMessage),
 	}
 }
 

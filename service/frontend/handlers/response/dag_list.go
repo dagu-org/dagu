@@ -4,6 +4,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
 )
 
@@ -17,38 +18,44 @@ func ToListDagResponse(
 			return ToDagListItem(item)
 		}),
 		Errors:   errs,
-		HasError: lo.ToPtr(hasError),
+		HasError: swag.Bool(hasError),
 	}
 }
 
-func ToDagListItem(s *persistence.DAGStatus) *models.DagListItem {
+func ToDagListItem(status *persistence.DAGStatus) *models.DagListItem {
 	return &models.DagListItem{
-		Dir:       lo.ToPtr(s.Dir),
-		Error:     lo.ToPtr(toErrorText(s.Error)),
-		ErrorT:    s.ErrorT,
-		File:      lo.ToPtr(s.File),
-		Status:    ToDagStatus(s.Status),
-		Suspended: lo.ToPtr(s.Suspended),
-		DAG:       ToDAG(s.DAG),
+		Dir:       swag.String(status.Dir),
+		Error:     swag.String(toErrorText(status.Error)),
+		ErrorT:    status.ErrorT,
+		File:      swag.String(status.File),
+		Status:    ToDagStatus(status.Status),
+		Suspended: swag.Bool(status.Suspended),
+		DAG:       ToDAG(status.DAG),
 	}
 }
 
 func ToDAG(dg *dag.DAG) *models.Dag {
 	return &models.Dag{
-		Name:          lo.ToPtr(dg.Name),
-		Group:         lo.ToPtr(dg.Group),
-		Description:   lo.ToPtr(dg.Description),
+		Name:          swag.String(dg.Name),
+		Group:         swag.String(dg.Group),
+		Description:   swag.String(dg.Description),
 		Params:        dg.Params,
-		DefaultParams: lo.ToPtr(dg.DefaultParams),
+		DefaultParams: swag.String(dg.DefaultParams),
 		Tags:          dg.Tags,
-		Schedule: lo.Map(dg.Schedule, func(item dag.Schedule, _ int) *models.Schedule {
-			return ToSchedule(item)
-		}),
+		Schedule:      ToSchedules(dg.Schedule),
 	}
 }
 
-func ToSchedule(s dag.Schedule) *models.Schedule {
+func ToSchedules(schedules []dag.Schedule) []*models.Schedule {
+	var result []*models.Schedule
+	for _, item := range schedules {
+		result = append(result, ToSchedule(item))
+	}
+	return result
+}
+
+func ToSchedule(schedule dag.Schedule) *models.Schedule {
 	return &models.Schedule{
-		Expression: lo.ToPtr(s.Expression),
+		Expression: swag.String(schedule.Expression),
 	}
 }
