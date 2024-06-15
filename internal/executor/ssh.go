@@ -69,7 +69,7 @@ func (e *SSHExecutor) Run() error {
 }
 
 func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
-	cfg := &SSHConfig{}
+	cfg := new(SSHConfig)
 	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{Result: cfg})
 
 	if err != nil {

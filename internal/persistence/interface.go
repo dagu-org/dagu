@@ -25,7 +25,7 @@ type (
 
 	HistoryStore interface {
 		Open(dagFile string, t time.Time, requestId string) error
-		Write(st *model.Status) error
+		Write(status *model.Status) error
 		Close() error
 		Update(dagFile, requestId string, st *model.Status) error
 		ReadStatusRecent(dagFile string, n int) []*model.StatusFile
@@ -72,11 +72,11 @@ type (
 	}
 )
 
-func NewDAGStatus(d *dag.DAG, s *model.Status, suspended bool, err error) *DAGStatus {
+func NewDAGStatus(dg *dag.DAG, s *model.Status, suspended bool, err error) *DAGStatus {
 	ret := &DAGStatus{
-		File:      filepath.Base(d.Location),
-		Dir:       filepath.Dir(d.Location),
-		DAG:       d,
+		File:      filepath.Base(dg.Location),
+		Dir:       filepath.Dir(dg.Location),
+		DAG:       dg,
 		Status:    s,
 		Suspended: suspended,
 		Error:     err,

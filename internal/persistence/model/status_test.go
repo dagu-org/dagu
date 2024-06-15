@@ -24,7 +24,7 @@ func TestPid(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	d := &dag.DAG{
+	dg := &dag.DAG{
 		HandlerOn: dag.HandlerOn{},
 		Steps: []dag.Step{
 			{
@@ -40,22 +40,22 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &dag.MailConfig{},
 		Smtp:      &dag.SmtpConfig{},
 	}
-	st := NewStatus(d, nil, scheduler.StatusSuccess, 10000, &start, &end)
+	status := NewStatus(dg, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
-	js, err := st.ToJson()
+	rawJSON, err := status.ToJson()
 	require.NoError(t, err)
 
-	st_, err := StatusFromJson(string(js))
+	unmarshalled, err := StatusFromJson(string(rawJSON))
 	require.NoError(t, err)
 
-	require.Equal(t, st.Name, st_.Name)
-	require.Equal(t, 1, len(st_.Nodes))
-	require.Equal(t, d.Steps[0].Name, st_.Nodes[0].Name)
+	require.Equal(t, status.Name, unmarshalled.Name)
+	require.Equal(t, 1, len(unmarshalled.Nodes))
+	require.Equal(t, dg.Steps[0].Name, unmarshalled.Nodes[0].Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	d := &dag.DAG{Name: "test"}
-	status := NewStatus(d, nil, scheduler.StatusRunning,
+	dg := &dag.DAG{Name: "test"}
+	status := NewStatus(dg, nil, scheduler.StatusRunning,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)
@@ -66,9 +66,9 @@ func TestJsonMarshal(t *testing.T) {
 		OutputVariables: &dag.SyncMap{},
 	}
 	step.OutputVariables.Store("A", "B")
-	js, err := json.Marshal(step)
+	rawJSON, err := json.Marshal(step)
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	t.Logf(string(js))
+	t.Logf(string(rawJSON))
 }

@@ -3,12 +3,13 @@ package local
 import (
 	"errors"
 	"fmt"
-	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/grep"
@@ -22,12 +23,12 @@ type dagStoreImpl struct {
 }
 
 func NewDAGStore(dir string) persistence.DAGStore {
-	ds := &dagStoreImpl{
+	dagStore := &dagStoreImpl{
 		dir:       dir,
 		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
-	ds.metaCache.StartEviction()
-	return ds
+	dagStore.metaCache.StartEviction()
+	return dagStore
 }
 
 var (
@@ -216,14 +217,14 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
-			d, err := dag.LoadMetadata(file)
+			dg, err := dag.LoadMetadata(file)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue
 			}
 			ret = append(ret, &persistence.GrepResult{
 				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
-				DAG:     d,
+				DAG:     dg,
 				Matches: m,
 			})
 		}

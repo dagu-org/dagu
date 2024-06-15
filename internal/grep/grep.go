@@ -44,7 +44,7 @@ type Match struct {
 // If opts is nil, default options will be used.
 func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
 	if opts == nil {
-		opts = &Options{}
+		opts = new(Options)
 	}
 	if pattern == "" {
 		return nil, ErrEmptyPattern

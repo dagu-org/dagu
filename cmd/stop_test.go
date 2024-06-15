@@ -9,33 +9,33 @@ import (
 )
 
 func TestStopCommand(t *testing.T) {
-	tmpDir, _, ds := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	t.Run("[Success] Stop a DAG", func(t *testing.T) {
+		tmpDir, _, dataStore := setupTest(t)
+		defer func() {
+			_ = os.RemoveAll(tmpDir)
+		}()
 
-	dagFile := testDAGFile("stop.yaml")
+		dagFile := testDAGFile("stop.yaml")
 
-	// Start the DAG.
-	done := make(chan struct{})
-	go func() {
-		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", dagFile}})
-		close(done)
-	}()
+		// Start the DAG.
+		done := make(chan struct{})
+		go func() {
+			testRunCommand(t, startCmd(), cmdTest{args: []string{"start", dagFile}})
+			close(done)
+		}()
 
-	time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 100)
 
-	// Wait for the DAG running.
-	// TODO: Do not use history store.
-	testLastStatusEventual(t, ds.NewHistoryStore(), dagFile, scheduler.StatusRunning)
+		// Wait for the DAG running.
+		testLastStatusEventual(t, dataStore.NewHistoryStore(), dagFile, scheduler.StatusRunning)
 
-	// Stop the DAG.
-	testRunCommand(t, stopCmd(), cmdTest{
-		args:        []string{"stop", dagFile},
-		expectedOut: []string{"Stopping..."}})
+		// Stop the DAG.
+		testRunCommand(t, stopCmd(), cmdTest{
+			args:        []string{"stop", dagFile},
+			expectedOut: []string{"Stopping..."}})
 
-	// Check the last execution is cancelled.
-	// TODO: Do not use history store.
-	testLastStatusEventual(t, ds.NewHistoryStore(), dagFile, scheduler.StatusCancel)
-	<-done
+		// Check the last execution is cancelled.
+		testLastStatusEventual(t, dataStore.NewHistoryStore(), dagFile, scheduler.StatusCancel)
+		<-done
+	})
 }

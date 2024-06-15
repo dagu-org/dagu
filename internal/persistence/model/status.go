@@ -55,7 +55,7 @@ type StatusFile struct {
 }
 
 func StatusFromJson(s string) (*Status, error) {
-	status := &Status{}
+	status := new(Status)
 	err := json.Unmarshal([]byte(s), status)
 	if err != nil {
 		return nil, err
@@ -63,45 +63,44 @@ func StatusFromJson(s string) (*Status, error) {
 	return status, err
 }
 
-func NewStatusDefault(d *dag.DAG) *Status {
-	return NewStatus(d, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
+func NewStatusDefault(dg *dag.DAG) *Status {
+	return NewStatus(dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
 }
 
 func Time(t time.Time) *time.Time {
 	return &t
 }
 
-type NodeStepPair struct {
-	Node scheduler.NodeState
-	Step dag.Step
-}
-
 func NewStatus(
-	d *dag.DAG,
-	nodes []NodeStepPair,
+	dg *dag.DAG,
+	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
-	var onExit, onSuccess, onFailure, onCancel *Node
-	onExit = nodeOrNil(d.HandlerOn.Exit)
-	onSuccess = nodeOrNil(d.HandlerOn.Success)
-	onFailure = nodeOrNil(d.HandlerOn.Failure)
-	onCancel = nodeOrNil(d.HandlerOn.Cancel)
-	return &Status{
-		Name:       d.Name,
+	statusObj := &Status{
+		Name:       dg.Name,
 		Status:     status,
 		StatusText: status.String(),
 		Pid:        Pid(pid),
-		Nodes:      nodesOrSteps(nodes, d.Steps),
-		OnExit:     onExit,
-		OnSuccess:  onSuccess,
-		OnFailure:  onFailure,
-		OnCancel:   onCancel,
-		StartedAt:  formatTime(startTime),
-		FinishedAt: formatTime(endTime),
-		Params:     strings.Join(d.Params, " "),
+		Nodes:      FromNodesOrSteps(nodes, dg.Steps),
+		OnExit:     nodeOrNil(dg.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(dg.HandlerOn.Success),
+		OnFailure:  nodeOrNil(dg.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(dg.HandlerOn.Cancel),
+		Params:     Params(dg.Params),
 	}
+	if startTime != nil {
+		statusObj.StartedAt = util.FormatTime(*startTime)
+	}
+	if endTime != nil {
+		statusObj.FinishedAt = util.FormatTime(*endTime)
+	}
+	return statusObj
+}
+
+func Params(params []string) string {
+	return strings.Join(params, " ")
 }
 
 func nodeOrNil(s *dag.Step) *Node {
@@ -111,18 +110,18 @@ func nodeOrNil(s *dag.Step) *Node {
 	return NewNode(*s)
 }
 
-func nodesOrSteps(nodes []NodeStepPair, steps []dag.Step) []*Node {
+func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
 	if len(nodes) != 0 {
 		return FromNodes(nodes)
 	}
 	return FromSteps(steps)
 }
 
-func formatTime(val *time.Time) string {
-	if val == nil || val.IsZero() {
+func FormatTime(val time.Time) string {
+	if val.IsZero() {
 		return ""
 	}
-	return util.FormatTime(*val)
+	return util.FormatTime(val)
 }
 
 func (st *Status) CorrectRunningStatus() {

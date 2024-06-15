@@ -33,9 +33,7 @@ type HttpHandlerFunc func(w http.ResponseWriter, r *http.Request)
 
 // NewServer creates a new unix socket frontend.
 func NewServer(c *Config) (*Server, error) {
-	return &Server{
-		Config: c,
-	}, nil
+	return &Server{Config: c}, nil
 }
 
 var (

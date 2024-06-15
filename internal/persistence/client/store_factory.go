@@ -19,11 +19,9 @@ type dataStoreFactoryImpl struct {
 var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
 
 func NewDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
-	ds := &dataStoreFactoryImpl{
-		cfg: cfg,
-	}
-	_ = ds.InitDagDir()
-	return ds
+	dataStoreImpl := &dataStoreFactoryImpl{cfg: cfg}
+	_ = dataStoreImpl.InitDagDir()
+	return dataStoreImpl
 }
 
 func (f *dataStoreFactoryImpl) InitDagDir() error {
@@ -53,6 +51,5 @@ func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
 }
 
 func (f *dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
-	s := storage.NewStorage(f.cfg.SuspendFlagsDir)
-	return local.NewFlagStore(s)
+	return local.NewFlagStore(storage.NewStorage(f.cfg.SuspendFlagsDir))
 }

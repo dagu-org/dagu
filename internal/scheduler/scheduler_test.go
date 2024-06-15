@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
@@ -335,7 +334,7 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
 	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
 
-	onExitNode := sc.HandlerNode(constants.OnExit)
+	onExitNode := sc.HandlerNode(dag.HandlerOnExit)
 	require.NotNil(t, onExitNode)
 	require.Equal(t, NodeStatusSuccess, onExitNode.State().Status)
 }
@@ -359,7 +358,7 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
 	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
 
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnExit).State().Status)
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
@@ -368,7 +367,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 		Command: "sleep",
 		Args:    []string{"10"},
 	})
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 50)
@@ -417,9 +416,9 @@ func TestSchedulerOnCancel(t *testing.T) {
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
 	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnSuccess).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnFailure).State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnCancel).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnSuccess).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnFailure).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnCancel).State().Status)
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
@@ -440,9 +439,9 @@ func TestSchedulerOnSuccess(t *testing.T) {
 
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnSuccess).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnFailure).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnExit).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnSuccess).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnFailure).State().Status)
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
@@ -465,10 +464,10 @@ func TestSchedulerOnFailure(t *testing.T) {
 
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnExit).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnSuccess).State().Status)
-	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(constants.OnFailure).State().Status)
-	require.Equal(t, NodeStatusNone, sc.HandlerNode(constants.OnCancel).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnExit).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnSuccess).State().Status)
+	require.Equal(t, NodeStatusSuccess, sc.HandlerNode(dag.HandlerOnFailure).State().Status)
+	require.Equal(t, NodeStatusNone, sc.HandlerNode(dag.HandlerOnCancel).State().Status)
 }
 
 func TestRepeat(t *testing.T) {
@@ -483,7 +482,7 @@ func TestRepeat(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 3000)
@@ -499,7 +498,7 @@ func TestRepeat(t *testing.T) {
 
 	require.Equal(t, sc.Status(g), StatusCancel)
 	require.Equal(t, NodeStatusCancel, nodes[0].State().Status)
-	require.Equal(t, nodes[0].DoneCount, 2)
+	require.Equal(t, nodes[0].data.DoneCount, 2)
 }
 
 func TestRepeatFail(t *testing.T) {
@@ -513,14 +512,14 @@ func TestRepeatFail(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
 	require.Equal(t, sc.Status(g), StatusError)
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, nodes[0].DoneCount, 1)
+	require.Equal(t, nodes[0].data.DoneCount, 1)
 }
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
@@ -535,7 +534,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	done := make(chan bool)
 	go func() {
@@ -553,7 +552,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 
 	require.Equal(t, sc.Status(g), StatusSuccess)
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, nodes[0].DoneCount, 1)
+	require.Equal(t, nodes[0].data.DoneCount, 1)
 }
 
 func TestSchedulerStatusText(t *testing.T) {
@@ -588,14 +587,14 @@ func TestNodeSetupFailure(t *testing.T) {
 			Script:  "echo 1",
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), StatusError)
 
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, nodes[0].DoneCount, 0)
+	require.Equal(t, nodes[0].data.DoneCount, 0)
 }
 
 func TestNodeTeardownFailure(t *testing.T) {
@@ -606,7 +605,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 			Args:    []string{"1"},
 		},
 	)
-	sc := &Scheduler{Config: &Config{}}
+	sc := &Scheduler{Config: new(Config)}
 
 	nodes := g.Nodes()
 	go func() {
@@ -633,7 +632,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	s2.Script = "echo $PREV_OUT"
 	s2.Output = "TOOK_PREV_OUT"
 
-	g, sc := newTestSchedule(t, &Config{}, s1, s2)
+	g, sc := newTestSchedule(t, new(Config), s1, s2)
 	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 

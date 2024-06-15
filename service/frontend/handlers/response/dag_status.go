@@ -1,12 +1,12 @@
 package response
 
 import (
-	domain "github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
-func ToDagStatus(s *domain.Status) *models.DagStatus {
+func ToDagStatus(s *model.Status) *models.DagStatus {
 	return &models.DagStatus{
 		Log:        lo.ToPtr(s.Log),
 		Name:       lo.ToPtr(s.Name),

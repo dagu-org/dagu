@@ -105,7 +105,7 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Load the base configuration unless only the metadata is required.
 	// If only the metadata is required, the base configuration is not loaded
 	// and the DAG is created with the default values.
-	dst, err := loadBaseConfigIfRequired(opts.base, file, opts)
+	dst, err := loadBaseConfigIfRequired(opts.base, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +139,23 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Set the absolute path to the file.
 	dst.Location = file
 
+	// Set the name if not set.
+	if dst.Name == "" {
+		dst.Name = defaultName(file)
+	}
+
 	// Set the default values for the DAG.
 	if !opts.metadataOnly {
 		dst.setup()
 	}
 
 	return dst, nil
+}
+
+// defaultName returns the default name for the given file.
+// The default name is the filename without the extension.
+func defaultName(file string) string {
+	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
 // prepareFilepath prepares the filepath for the given file.
@@ -163,7 +174,7 @@ func prepareFilepath(file string) (string, error) {
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, error) {
+func loadBaseConfigIfRequired(baseConfig string, opts buildOpts) (*DAG, error) {
 	if !opts.metadataOnly && baseConfig != "" {
 		dag, err := loadBaseConfig(baseConfig, opts)
 		if err != nil {
@@ -175,9 +186,7 @@ func loadBaseConfigIfRequired(baseConfig, file string, opts buildOpts) (*DAG, er
 		}
 	}
 
-	// return a DAG with the default values.
-	dagName := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
-	return &DAG{Name: dagName}, nil
+	return new(DAG), nil
 }
 
 type mergeTransformer struct{}
@@ -223,7 +232,7 @@ func unmarshalData(data []byte) (map[string]interface{}, error) {
 
 // decode decodes the configuration map into a configDefinition.
 func decode(cm map[string]interface{}) (*definition, error) {
-	c := &definition{}
+	c := new(definition)
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,

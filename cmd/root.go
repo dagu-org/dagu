@@ -37,19 +37,7 @@ func init() {
 
 	cobra.OnInitialize(initialize)
 
-	registerCommands(rootCmd)
-}
-
-var (
-	homeDir string
-)
-
-func init() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		cobra.CheckErr(err)
-	}
-	homeDir = home
+	registerCommands()
 }
 
 func initialize() {
@@ -70,7 +58,7 @@ func setDefaultConfigPath() {
 	viper.AddConfigPath(path.Join(homeDir, configPath))
 }
 
-func loadDAG(dagFile, params string) (d *dag.DAG, err error) {
+func loadDAG(dagFile, params string) (dg *dag.DAG, err error) {
 	return dag.Load(config.Get().BaseConfig, dagFile, params)
 }
 
@@ -81,7 +69,7 @@ func getFlagString(cmd *cobra.Command, name, fallback string) string {
 	return fallback
 }
 
-func registerCommands(root *cobra.Command) {
+func registerCommands() {
 	rootCmd.AddCommand(startCmd())
 	rootCmd.AddCommand(stopCmd())
 	rootCmd.AddCommand(restartCmd())

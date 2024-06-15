@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
@@ -26,24 +27,23 @@ type Params struct {
 
 func EntryReaderProvider(
 	cfg *config.Config,
-	engineFactory engine.Factory,
+	engine engine.Engine,
 	jf entry_reader.JobFactory,
 	logger dagulogger.Logger,
 ) scheduler.EntryReader {
 	return entry_reader.New(entry_reader.Params{
-		EngineFactory: engineFactory,
-		// TODO: fix this
+		Engine:     engine,
 		DagsDir:    cfg.DAGs,
 		JobFactory: jf,
 		Logger:     logger,
 	})
 }
 
-func JobFactoryProvider(cfg *config.Config, engineFactory engine.Factory) entry_reader.JobFactory {
+func JobFactoryProvider(cfg *config.Config, eng engine.Engine) entry_reader.JobFactory {
 	return &jobFactory{
-		WorkDir:       cfg.WorkDir,
-		EngineFactory: engineFactory,
-		Executable:    cfg.Executable,
+		WorkDir:    cfg.WorkDir,
+		Engine:     eng,
+		Executable: cfg.Executable,
 	}
 }
 

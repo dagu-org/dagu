@@ -13,21 +13,21 @@ func TestStorage(t *testing.T) {
 	tmpDir := util.MustTempDir("test-storage")
 	defer os.RemoveAll(tmpDir)
 
-	s := NewStorage(tmpDir)
+	storage := NewStorage(tmpDir)
 
 	f := "test.flag"
-	exist := s.Exists(f)
+	exist := storage.Exists(f)
 	require.False(t, exist)
 
-	err := s.Create(f)
+	err := storage.Create(f)
 	require.NoError(t, err)
 
-	exist = s.Exists(f)
+	exist = storage.Exists(f)
 	require.True(t, exist)
 
-	err = s.Delete(f)
+	err = storage.Delete(f)
 	require.NoError(t, err)
 
-	exist = s.Exists(f)
+	exist = storage.Exists(f)
 	require.False(t, exist)
 }

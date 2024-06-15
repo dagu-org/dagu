@@ -1,12 +1,12 @@
 package response
 
 import (
-	domain "github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/service/frontend/models"
 	"github.com/samber/lo"
 )
 
-func ToNode(node *domain.Node) *models.StatusNode {
+func ToNode(node *model.Node) *models.StatusNode {
 	return &models.StatusNode{
 		DoneCount:  lo.ToPtr(int64(node.DoneCount)),
 		Error:      lo.ToPtr(node.Error),

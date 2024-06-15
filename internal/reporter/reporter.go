@@ -18,6 +18,10 @@ type Reporter struct {
 	*Config
 }
 
+func New(cfg *Config) *Reporter {
+	return &Reporter{Config: cfg}
+}
+
 // Config is the configuration for the reporter.
 type Config struct {
 	Mailer Mailer
@@ -29,18 +33,18 @@ type Mailer interface {
 }
 
 // ReportStep is a function that reports the status of a step.
-func (rp *Reporter) ReportStep(d *dag.DAG, status *model.Status, node *scheduler.Node) error {
-	st := node.State().Status
-	if st != scheduler.NodeStatusNone {
-		log.Printf("%s %s", node.Step().Name, status.StatusText)
+func (rp *Reporter) ReportStep(dg *dag.DAG, status *model.Status, node *scheduler.Node) error {
+	nodeStatus := node.State().Status
+	if nodeStatus != scheduler.NodeStatusNone {
+		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
 	}
-	if st == scheduler.NodeStatusError && node.Step().MailOnError {
+	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
 		return rp.Mailer.SendMail(
-			d.ErrorMail.From,
-			[]string{d.ErrorMail.To},
-			fmt.Sprintf("%s %s (%s)", d.ErrorMail.Prefix, d.Name, status.Status),
+			dg.ErrorMail.From,
+			[]string{dg.ErrorMail.To},
+			fmt.Sprintf("%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status),
 			renderHTML(status.Nodes),
-			addAttachmentList(d.ErrorMail.AttachLogs, status.Nodes),
+			addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
 		)
 	}
 	return nil
@@ -59,25 +63,25 @@ func (rp *Reporter) ReportSummary(status *model.Status, err error) {
 }
 
 // SendMail is a function that sends a report mail.
-func (rp *Reporter) SendMail(d *dag.DAG, status *model.Status, err error) error {
+func (rp *Reporter) SendMail(dg *dag.DAG, status *model.Status, err error) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if d.MailOn != nil && d.MailOn.Failure {
+		if dg.MailOn != nil && dg.MailOn.Failure {
 			return rp.Mailer.SendMail(
-				d.ErrorMail.From,
-				[]string{d.ErrorMail.To},
-				fmt.Sprintf("%s %s (%s)", d.ErrorMail.Prefix, d.Name, status.Status),
+				dg.ErrorMail.From,
+				[]string{dg.ErrorMail.To},
+				fmt.Sprintf("%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status),
 				renderHTML(status.Nodes),
-				addAttachmentList(d.ErrorMail.AttachLogs, status.Nodes),
+				addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if d.MailOn != nil && d.MailOn.Success {
+		if dg.MailOn != nil && dg.MailOn.Success {
 			_ = rp.Mailer.SendMail(
-				d.InfoMail.From,
-				[]string{d.InfoMail.To},
-				fmt.Sprintf("%s %s (%s)", d.InfoMail.Prefix, d.Name, status.Status),
+				dg.InfoMail.From,
+				[]string{dg.InfoMail.To},
+				fmt.Sprintf("%s %s (%s)", dg.InfoMail.Prefix, dg.Name, status.Status),
 				renderHTML(status.Nodes),
-				addAttachmentList(d.InfoMail.AttachLogs, status.Nodes),
+				addAttachmentList(dg.InfoMail.AttachLogs, status.Nodes),
 			)
 		}
 	}

@@ -12,11 +12,11 @@ import (
 
 // TODO: write tests
 type Job struct {
-	DAG           *dag.DAG
-	Executable    string
-	WorkDir       string
-	Next          time.Time
-	EngineFactory engine.Factory
+	DAG        *dag.DAG
+	Executable string
+	WorkDir    string
+	Next       time.Time
+	Engine     engine.Engine
 }
 
 var (
@@ -30,44 +30,41 @@ func (j *Job) GetDAG() *dag.DAG {
 }
 
 func (j *Job) Start() error {
-	e := j.EngineFactory.Create()
-	s, err := e.GetLatestStatus(j.DAG)
+	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
 
-	if s.Status == scheduler.StatusRunning {
+	if latestStatus.Status == scheduler.StatusRunning {
 		// already running
 		return ErrJobRunning
 	}
 
 	// check the last execution time
-	t, err := util.ParseTime(s.StartedAt)
+	lastExecTime, err := util.ParseTime(latestStatus.StartedAt)
 	if err == nil {
-		t = t.Truncate(time.Second * 60)
-		if t.After(j.Next) || j.Next.Equal(t) {
+		lastExecTime = lastExecTime.Truncate(time.Second * 60)
+		if lastExecTime.After(j.Next) || j.Next.Equal(lastExecTime) {
 			return ErrJobFinished
 		}
 	}
 	// should not be here
-	return e.Start(j.DAG, "")
+	return j.Engine.Start(j.DAG, "")
 }
 
 func (j *Job) Stop() error {
-	e := j.EngineFactory.Create()
-	s, err := e.GetLatestStatus(j.DAG)
+	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
-	if s.Status != scheduler.StatusRunning {
+	if latestStatus.Status != scheduler.StatusRunning {
 		return ErrJobIsNotRunning
 	}
-	return e.Stop(j.DAG)
+	return j.Engine.Stop(j.DAG)
 }
 
 func (j *Job) Restart() error {
-	e := j.EngineFactory.Create()
-	return e.Restart(j.DAG)
+	return j.Engine.Restart(j.DAG)
 }
 
 func (j *Job) String() string {

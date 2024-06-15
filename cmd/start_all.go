@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	scheduler "github.com/dagu-dev/dagu/service"
 	"log"
+
+	scheduler "github.com/dagu-dev/dagu/service"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/spf13/cobra"
@@ -23,17 +24,21 @@ func startAllCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
 
+			// Start the scheduler process.
 			go func() {
 				config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
-				err := scheduler.New(topLevelModule).Start(cmd.Context())
+				err := scheduler.New(baseModule).Start(ctx)
 				if err != nil {
 					log.Fatal(err) // nolint // deep-exit
 				}
 			}()
 
-			checkError(newFrontend().Start(ctx))
+			if err := newFrontendApp().Start(ctx); err != nil {
+				log.Fatalf("Failed to start server: %v", err)
+			}
 		},
 	}
+
 	bindStartAllCommandFlags(cmd)
 	return cmd
 }

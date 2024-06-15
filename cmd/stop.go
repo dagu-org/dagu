@@ -20,13 +20,19 @@ func stopCmd() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			loadedDAG, err := loadDAG(args[0], "")
-			checkError(err)
+			if err != nil {
+				log.Fatalf("Failed to load DAG: %v", err)
+			}
 
 			log.Printf("Stopping...")
 
-			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df, config.Get()).Create()
-			checkError(e.Stop(loadedDAG))
+			if err := engine.New(
+				client.NewDataStoreFactory(config.Get()),
+				engine.DefaultConfig(),
+				config.Get(),
+			).Stop(loadedDAG); err != nil {
+				log.Fatalf("Failed to stop the DAG: %v", err)
+			}
 		},
 	}
 }

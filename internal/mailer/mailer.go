@@ -17,6 +17,10 @@ type Mailer struct {
 	*Config
 }
 
+func New(cfg *Config) *Mailer {
+	return &Mailer{Config: cfg}
+}
+
 // Config is a config for SMTP mailer.
 type Config struct {
 	Host     string

@@ -16,12 +16,12 @@ func TestFlagStore(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	fs := NewFlagStore(storage.NewStorage(tmpDir))
+	flagStore := NewFlagStore(storage.NewStorage(tmpDir))
 
-	require.False(t, fs.IsSuspended("test"))
+	require.False(t, flagStore.IsSuspended("test"))
 
-	err := fs.ToggleSuspend("test", true)
+	err := flagStore.ToggleSuspend("test", true)
 	require.NoError(t, err)
 
-	require.True(t, fs.IsSuspended("test"))
+	require.True(t, flagStore.IsSuspended("test"))
 }

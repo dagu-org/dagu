@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/mattn/go-shellwords"
 )
 
@@ -32,21 +31,26 @@ func MustGetwd() string {
 	return wd
 }
 
+const (
+	timeFormat = "2006-01-02 15:04:05"
+	timeEmpty  = "-"
+)
+
 // FormatTime returns formatted time.
 func FormatTime(t time.Time) string {
 	if t.IsZero() {
-		return constants.TimeEmpty
+		return timeEmpty
 	}
 
-	return t.Format(constants.TimeFormat)
+	return t.Format(timeFormat)
 }
 
 // ParseTime parses time string.
 func ParseTime(val string) (time.Time, error) {
-	if val == constants.TimeEmpty {
+	if val == timeEmpty {
 		return time.Time{}, nil
 	}
-	return time.ParseInLocation(constants.TimeFormat, val, time.Local)
+	return time.ParseInLocation(timeFormat, val, time.Local)
 }
 
 var (
@@ -131,13 +135,15 @@ func createFile(file string) (*os.File, error) {
 var (
 	filenameReservedRegex             = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
 	filenameReservedWindowsNamesRegex = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
+	filenameSpacingRegex              = regexp.MustCompile(`\s`)
+	specialCharRepl                   = "_"
 )
 
 // ValidFilename makes filename valid by replacing reserved characters.
-func ValidFilename(str, replacement string) string {
-	s := filenameReservedRegex.ReplaceAllString(str, replacement)
-	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, replacement)
-	return strings.ReplaceAll(s, " ", replacement)
+func ValidFilename(str string) string {
+	s := filenameReservedRegex.ReplaceAllString(str, specialCharRepl)
+	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, specialCharRepl)
+	return filenameSpacingRegex.ReplaceAllString(s, specialCharRepl)
 }
 
 // MustTempDir returns temporary directory.

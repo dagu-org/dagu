@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -18,9 +20,12 @@ func serverCmd() *cobra.Command {
 			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			checkError(newFrontend().Start(cmd.Context()))
+			if err := newFrontendApp().Start(cmd.Context()); err != nil {
+				log.Fatalf("Failed to start server: %v", err)
+			}
 		},
 	}
+
 	bindServerCommandFlags(cmd)
 	return cmd
 }

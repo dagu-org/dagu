@@ -26,51 +26,67 @@ func TestCycleDetection(t *testing.T) {
 func TestRetryExecution(t *testing.T) {
 	nodes := []*Node{
 		{
-			step: dag.Step{Name: "1", Command: "true"},
-			NodeState: NodeState{
-				Status: NodeStatusSuccess,
+			data: NodeData{
+				Step: dag.Step{Name: "1", Command: "true"},
+				NodeState: NodeState{
+					Status: NodeStatusSuccess,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "2", Command: "true", Depends: []string{"1"}},
-			NodeState: NodeState{
-				Status: NodeStatusError,
+			data: NodeData{
+				Step: dag.Step{Name: "2", Command: "true", Depends: []string{"1"}},
+				NodeState: NodeState{
+					Status: NodeStatusError,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "3", Command: "true", Depends: []string{"2"}},
-			NodeState: NodeState{
-				Status: NodeStatusCancel,
+			data: NodeData{
+				Step: dag.Step{Name: "3", Command: "true", Depends: []string{"2"}},
+				NodeState: NodeState{
+					Status: NodeStatusCancel,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "4", Command: "true", Depends: []string{}},
-			NodeState: NodeState{
-				Status: NodeStatusSkipped,
+			data: NodeData{
+				Step: dag.Step{Name: "4", Command: "true", Depends: []string{}},
+				NodeState: NodeState{
+					Status: NodeStatusSkipped,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "5", Command: "true", Depends: []string{"4"}},
-			NodeState: NodeState{
-				Status: NodeStatusError,
+			data: NodeData{
+				Step: dag.Step{Name: "5", Command: "true", Depends: []string{"4"}},
+				NodeState: NodeState{
+					Status: NodeStatusError,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "6", Command: "true", Depends: []string{"5"}},
-			NodeState: NodeState{
-				Status: NodeStatusSuccess,
+			data: NodeData{
+				Step: dag.Step{Name: "6", Command: "true", Depends: []string{"5"}},
+				NodeState: NodeState{
+					Status: NodeStatusSuccess,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "7", Command: "true", Depends: []string{"6"}},
-			NodeState: NodeState{
-				Status: NodeStatusSkipped,
+			data: NodeData{
+				Step: dag.Step{Name: "7", Command: "true", Depends: []string{"6"}},
+				NodeState: NodeState{
+					Status: NodeStatusSkipped,
+				},
 			},
 		},
 		{
-			step: dag.Step{Name: "8", Command: "true", Depends: []string{}},
-			NodeState: NodeState{
-				Status: NodeStatusSkipped,
+			data: NodeData{
+				Step: dag.Step{Name: "8", Command: "true", Depends: []string{}},
+				NodeState: NodeState{
+					Status: NodeStatusSkipped,
+				},
 			},
 		},
 	}

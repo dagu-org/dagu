@@ -33,15 +33,15 @@ func ToDagListItem(s *persistence.DAGStatus) *models.DagListItem {
 	}
 }
 
-func ToDAG(d *dag.DAG) *models.Dag {
+func ToDAG(dg *dag.DAG) *models.Dag {
 	return &models.Dag{
-		Name:          lo.ToPtr(d.Name),
-		Group:         lo.ToPtr(d.Group),
-		Description:   lo.ToPtr(d.Description),
-		Params:        d.Params,
-		DefaultParams: lo.ToPtr(d.DefaultParams),
-		Tags:          d.Tags,
-		Schedule: lo.Map(d.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
+		Name:          lo.ToPtr(dg.Name),
+		Group:         lo.ToPtr(dg.Group),
+		Description:   lo.ToPtr(dg.Description),
+		Params:        dg.Params,
+		DefaultParams: lo.ToPtr(dg.DefaultParams),
+		Tags:          dg.Tags,
+		Schedule: lo.Map(dg.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
 	}

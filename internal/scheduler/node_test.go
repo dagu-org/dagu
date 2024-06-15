@@ -15,33 +15,33 @@ import (
 )
 
 func TestExecute(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "true",
 			OutputVariables: &dag.SyncMap{},
-		}}
+		}}}
 	require.NoError(t, n.Execute(context.Background()))
-	require.Nil(t, n.Error)
+	require.Nil(t, n.data.Error)
 }
 
 func TestError(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "false",
 			OutputVariables: &dag.SyncMap{},
-		}}
+		}}}
 	err := n.Execute(context.Background())
 	require.True(t, err != nil)
-	require.Equal(t, n.Error, err)
+	require.Equal(t, n.data.Error, err)
 }
 
 func TestSignal(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &dag.SyncMap{},
-		}}
+		}}}
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
@@ -56,13 +56,13 @@ func TestSignal(t *testing.T) {
 }
 
 func TestSignalSpecified(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &dag.SyncMap{},
 			SignalOnStop:    "SIGINT",
-		}}
+		}}}
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
@@ -77,13 +77,13 @@ func TestSignalSpecified(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	runTestNode(t, n)
@@ -93,26 +93,26 @@ func TestLog(t *testing.T) {
 }
 
 func TestStdout(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
 			Stdout:          "stdout.log",
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	runTestNode(t, n)
 
-	f := path.Join(os.Getenv("HOME"), n.step.Stdout)
+	f := path.Join(os.Getenv("HOME"), n.data.Step.Stdout)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "done\n", string(dat))
 }
 
 func TestStderr(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command: "sh",
 			Script: `
 echo Stdout message >&1
@@ -122,27 +122,27 @@ echo Stderr message >&2
 			Stdout:          "test-stderr-stdout.log",
 			Stderr:          "test-stderr-stderr.log",
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	runTestNode(t, n)
 
-	f := path.Join(os.Getenv("HOME"), n.step.Stderr)
+	f := path.Join(os.Getenv("HOME"), n.data.Step.Stderr)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "Stderr message\n", string(dat))
 
-	f = path.Join(os.Getenv("HOME"), n.step.Stdout)
+	f = path.Join(os.Getenv("HOME"), n.data.Step.Stdout)
 	dat, _ = os.ReadFile(f)
 	require.Equal(t, "Stdout message\n", string(dat))
 }
 
 func TestNode(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 	n.incDoneCount()
 	require.Equal(t, 1, n.getDoneCount())
@@ -152,20 +152,20 @@ func TestNode(t *testing.T) {
 
 	n.id = 1
 	n.init()
-	require.Nil(t, n.step.Variables)
+	require.Nil(t, n.data.Step.Variables)
 
 	n.id = 0
 	n.init()
-	require.Equal(t, n.step.Variables, []string{})
+	require.Equal(t, n.data.Step.Variables, []string{})
 }
 
 func TestOutput(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
 	require.NoError(t, err)
@@ -180,25 +180,25 @@ func TestOutput(t *testing.T) {
 	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST"))
 
 	// Use the previous output in the subsequent step
-	n2 := &Node{
-		step: dag.Step{
+	n2 := &Node{data: NodeData{
+		Step: dag.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	runTestNode(t, n2)
 	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST2"))
 
 	// Use the previous output in the subsequent step inside a script
-	n3 := &Node{
-		step: dag.Step{
+	n3 := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	runTestNode(t, n3)
@@ -223,12 +223,12 @@ func TestOutputJson(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			n := &Node{
-				step: dag.Step{
+			n := &Node{data: NodeData{
+				Step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
 					OutputVariables: &dag.SyncMap{},
-				},
+				}},
 			}
 			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-jsondb-%d", i))
 			require.NoError(t, err)
@@ -238,9 +238,9 @@ func TestOutputJson(t *testing.T) {
 
 			runTestNode(t, n)
 
-			require.Equal(t, test.WantArgs, len(n.step.Args))
+			require.Equal(t, test.WantArgs, len(n.data.Step.Args))
 
-			v, _ := n.step.OutputVariables.Load("OUTPUT_JSON_TEST")
+			v, _ := n.data.Step.OutputVariables.Load("OUTPUT_JSON_TEST")
 			require.Equal(t, fmt.Sprintf("OUTPUT_JSON_TEST=%s", test.Want), v)
 			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_JSON_TEST"))
 		})
@@ -285,12 +285,12 @@ func TestOutputSpecialchar(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			n := &Node{
-				step: dag.Step{
+			n := &Node{data: NodeData{
+				Step: dag.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_SPECIALCHAR_TEST",
 					OutputVariables: &dag.SyncMap{},
-				},
+				}},
 			}
 			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
 			require.NoError(t, err)
@@ -300,9 +300,9 @@ func TestOutputSpecialchar(t *testing.T) {
 
 			runTestNode(t, n)
 
-			require.Equal(t, test.WantArgs, len(n.step.Args))
+			require.Equal(t, test.WantArgs, len(n.data.Step.Args))
 
-			v, _ := n.step.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
+			v, _ := n.data.Step.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
 			require.Equal(t, fmt.Sprintf("OUTPUT_SPECIALCHAR_TEST=%s", test.Want), v)
 			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_SPECIALCHAR_TEST"))
 		})
@@ -310,8 +310,8 @@ func TestOutputSpecialchar(t *testing.T) {
 }
 
 func TestRunScript(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command: "sh",
 			Args:    []string{},
 			Script: `
@@ -319,7 +319,7 @@ func TestRunScript(t *testing.T) {
 			`,
 			Output:          "SCRIPT_TEST",
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	err := n.setup(os.Getenv("HOME"),
@@ -328,7 +328,7 @@ func TestRunScript(t *testing.T) {
 
 	require.FileExists(t, n.logFile.Name())
 	b, _ := os.ReadFile(n.scriptFile.Name())
-	require.Equal(t, n.step.Script, string(b))
+	require.Equal(t, n.data.Step.Script, string(b))
 
 	require.NoError(t, err)
 	err = n.Execute(context.Background())
@@ -341,12 +341,12 @@ func TestRunScript(t *testing.T) {
 }
 
 func TestTeardown(t *testing.T) {
-	n := &Node{
-		step: dag.Step{
+	n := &Node{data: NodeData{
+		Step: dag.Step{
 			Command:         testCommand,
 			Args:            []string{},
 			OutputVariables: &dag.SyncMap{},
-		},
+		}},
 	}
 
 	runTestNode(t, n)
@@ -354,13 +354,13 @@ func TestTeardown(t *testing.T) {
 	// no error since done flag is true
 	err := n.teardown()
 	require.NoError(t, err)
-	require.NoError(t, n.Error)
+	require.NoError(t, n.data.Error)
 
 	// error
 	n.done = false
 	err = n.teardown()
 	require.Error(t, err)
-	require.Error(t, n.Error)
+	require.Error(t, n.data.Error)
 }
 
 func runTestNode(t *testing.T, n *Node) {

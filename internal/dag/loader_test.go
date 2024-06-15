@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,13 +45,13 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := Load("", tt.file, "")
+			dg, err := Load("", tt.file, "")
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.expectedLocation, d.Location)
+				require.Equal(t, tt.expectedLocation, dg.Location)
 			}
 		})
 	}
@@ -58,12 +59,12 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Load metadata", func(t *testing.T) {
-		d, err := LoadMetadata(path.Join(testdataDir, "default.yaml"))
+		dg, err := LoadMetadata(path.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
 
-		require.Equal(t, d.Name, "default")
+		require.Equal(t, dg.Name, "default")
 		// Check if steps are empty since we are loading metadata only
-		require.True(t, len(d.Steps) == 0)
+		require.True(t, len(dg.Steps) == 0)
 	})
 }
 
@@ -71,20 +72,31 @@ func Test_loadBaseConfig(t *testing.T) {
 	t.Run("Load base config file", func(t *testing.T) {
 		// The base config file is set on the global config
 		// This should be `testdata/home/.dagu/config.yaml`.
-		d, err := loadBaseConfig(config.Get().BaseConfig, buildOpts{})
-		require.NotNil(t, d)
+		dg, err := loadBaseConfig(config.Get().BaseConfig, buildOpts{})
+		require.NotNil(t, dg)
 		require.NoError(t, err)
 	})
 }
 
 func Test_LoadDefaultConfig(t *testing.T) {
-	t.Run("Load default config", func(t *testing.T) {
-		d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+	t.Run("Load default config without base config", func(t *testing.T) {
+		file := path.Join(testdataDir, "default.yaml")
+		dg, err := Load("", file, "")
+
 		require.NoError(t, err)
 
 		// Check if the default values are set correctly
-		require.Equal(t, time.Second*60, d.MaxCleanUpTime)
-		require.Equal(t, 30, d.HistRetentionDays)
+		assert.Equal(t, path.Join(testHomeDir, "/.dagu/logs"), dg.LogDir)
+		assert.Equal(t, file, dg.Location)
+		assert.Equal(t, "default", dg.Name)
+		assert.Equal(t, time.Second*60, dg.MaxCleanUpTime)
+		assert.Equal(t, 30, dg.HistRetentionDays)
+
+		// Check if the steps are loaded correctly
+		require.Len(t, dg.Steps, 1)
+		assert.Equal(t, "1", dg.Steps[0].Name, "1")
+		assert.Equal(t, "true", dg.Steps[0].Command, "true")
+		assert.Equal(t, path.Dir(file), dg.Steps[0].Dir)
 	})
 }
 

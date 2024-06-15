@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	scheduler "github.com/dagu-dev/dagu/service"
 	"github.com/spf13/cobra"
@@ -18,10 +20,12 @@ func schedulerCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			config.Get().DAGs = getFlagString(cmd, "dags", config.Get().DAGs)
 
-			err := scheduler.New(topLevelModule).Start(cmd.Context())
-			checkError(err)
+			if err := scheduler.New(baseModule).Start(cmd.Context()); err != nil {
+				log.Fatalf("Failed to start scheduler: %v", err)
+			}
 		},
 	}
+
 	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
 	_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
 

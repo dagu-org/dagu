@@ -28,10 +28,10 @@ func changeHomeDir(homeDir string) {
 
 func TestDAG_String(t *testing.T) {
 	t.Run("String representation of default.yaml", func(t *testing.T) {
-		d, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+		dg, err := Load("", path.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 
-		ret := d.String()
+		ret := dg.String()
 		require.Contains(t, ret, "Name: default")
 	})
 }

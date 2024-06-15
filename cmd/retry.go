@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"log"
 	"path/filepath"
 
 	"github.com/dagu-dev/dagu/internal/agent"
@@ -20,28 +21,46 @@ func retryCmd() *cobra.Command {
 			cobra.CheckErr(config.LoadConfig())
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			f, _ := filepath.Abs(args[0])
 			reqID, err := cmd.Flags().GetString("req")
-			checkError(err)
+			if err != nil {
+				log.Fatalf("Request ID is required: %v", err)
+			}
 
-			// TODO: use engine.Engine instead of client.DataStoreFactory
-			df := client.NewDataStoreFactory(config.Get())
-			e := engine.NewFactory(df, config.Get()).Create()
+			// Read the specified DAG execution status from the history store.
+			dataStore := client.NewDataStoreFactory(config.Get())
+			historyStore := dataStore.NewHistoryStore()
 
-			hs := df.NewHistoryStore()
+			absoluteFilePath, err := filepath.Abs(args[0])
+			if err != nil {
+				log.Fatalf("Failed to get the absolute path of the DAG file: %v", err)
+			}
 
-			status, err := hs.FindByRequestId(f, reqID)
-			checkError(err)
+			status, err := historyStore.FindByRequestId(absoluteFilePath, reqID)
+			if err != nil {
+				log.Fatalf("Failed to find the request: %v", err)
+			}
 
+			// Start the DAG with the same parameters with the execution that is being retried.
 			loadedDAG, err := loadDAG(args[0], status.Status.Params)
-			checkError(err)
+			if err != nil {
+				log.Fatalf("Failed to load DAG: %v", err)
+			}
 
-			a := agent.New(&agent.Config{DAG: loadedDAG, RetryTarget: status.Status}, e, df)
+			dagAgent := agent.New(
+				&agent.Config{DAG: loadedDAG, RetryTarget: status.Status},
+				engine.New(dataStore, engine.DefaultConfig(), config.Get()),
+				dataStore,
+			)
+
 			ctx := cmd.Context()
-			listenSignals(ctx, a)
-			checkError(a.Run(ctx))
+			listenSignals(ctx, dagAgent)
+
+			if err := dagAgent.Run(ctx); err != nil {
+				log.Fatalf("Failed to start the DAG: %v", err)
+			}
 		},
 	}
+
 	cmd.Flags().StringP("req", "r", "", "request-id")
 	_ = cmd.MarkFlagRequired("req")
 	return cmd
