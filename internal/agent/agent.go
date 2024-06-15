@@ -19,7 +19,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/mailer"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/reporter"
@@ -27,11 +26,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/google/uuid"
-)
-
-var (
-	errFailedStartSocketFrontend = errors.New("failed to start the socket frontend")
-	errDAGAlreadyRunning         = errors.New("the DAG is already running")
 )
 
 // Agent is responsible for running the DAG and handling communication
@@ -75,115 +69,17 @@ type Config struct {
 	RetryTarget *model.Status
 }
 
+var (
+	waitForRunning = time.Millisecond * 100
+)
+
+var (
+	errFailedSetupUnixSocket = errors.New("failed to start the unix socket")
+	errDAGIsAlreadyRunning   = errors.New("the DAG is already running")
+)
+
 // Run setups the scheduler and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := a.setup(); err != nil {
-		return err
-	}
-
-	if err := a.checkPreconditions(); err != nil {
-		return err
-	}
-
-	// If it is a dry-run, do not run the DAG.
-	if a.Dry {
-		return a.dryRun()
-	}
-
-	for _, fn := range []func() error{
-		a.checkIsRunning,
-		a.setupDatabase,
-		a.setupSocketServer,
-	} {
-		if err := fn(); err != nil {
-			return err
-		}
-	}
-
-	return a.run(ctx)
-}
-
-// Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() *model.Status {
-	// Lock to avoid race condition.
-	a.lock.RLock()
-	defer a.lock.RUnlock()
-
-	schedulerStatus := a.scheduler.Status(a.graph)
-	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
-		// Match the status to the execution graph.
-		schedulerStatus = scheduler.StatusRunning
-	}
-
-	// Create the status object to record the current status.
-	status := &model.Status{
-		RequestId:  a.reqID,
-		Name:       a.DAG.Name,
-		Status:     schedulerStatus,
-		StatusText: schedulerStatus.String(),
-		Pid:        model.Pid(os.Getpid()),
-		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.DAG.Steps),
-		StartedAt:  model.FormatTime(a.graph.StartAt()),
-		FinishedAt: model.FormatTime(a.graph.FinishAt()),
-		Log:        a.logFile.Name(),
-		Params:     model.Params(a.DAG.Params),
-	}
-
-	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
-		status.OnExit = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
-		status.OnFailure = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
-		status.OnCancel = model.FromNode(node.Data())
-	}
-
-	return status
-}
-
-// Signal sends the signal to the processes running
-// if processes do not terminate after MaxCleanUp time, it will send KILL signal.
-func (a *Agent) Signal(sig os.Signal) {
-	a.signal(sig, false)
-}
-
-// dryRun performs a dry-run of the DAG.
-// It only simulates the execution of the DAG without running the actual command.
-func (a *Agent) dryRun() error {
-	// done channel receives the node when the node is done.
-	// It's a way to update the status in real-time in efficient manner.
-	done := make(chan *scheduler.Node)
-	defer func() {
-		close(done)
-	}()
-
-	go func() {
-		for node := range done {
-			status := a.Status()
-			_ = a.reporter.ReportStep(a.DAG, status, node)
-		}
-	}()
-
-	log.Printf("***** Starting DRY-RUN *****")
-
-	lastErr := a.scheduler.Schedule(
-		dag.NewContext(context.Background(), a.DAG, a.dataStore.NewDAGStore()),
-		a.graph,
-		done,
-	)
-
-	a.reporter.ReportSummary(a.Status(), lastErr)
-
-	log.Printf("***** Finished DRY-RUN *****")
-
-	return lastErr
-}
-
-func (a *Agent) setup() error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -192,7 +88,7 @@ func (a *Agent) setup() error {
 		return err
 	}
 
-	if err := a.setupLogFile(); err != nil {
+	if err := a.setupLog(); err != nil {
 		return err
 	}
 
@@ -238,19 +134,214 @@ func (a *Agent) setup() error {
 		return err
 	}
 
-	return nil
+	if err := a.checkPreconditions(); err != nil {
+		return err
+	}
+
+	if a.Dry {
+		return a.dryRun()
+	}
+
+	if err := a.checkIsAlreadyRunning(); err != nil {
+		return err
+	}
+	if err := a.setupDatabase(); err != nil {
+		return err
+	}
+	if err := a.setupSocketServer(); err != nil {
+		return err
+	}
+
+	tw := newTeeWriter(a.logFile)
+	if err := tw.Open(); err != nil {
+		return err
+	}
+
+	defer func() {
+		util.LogErr("close log file", a.closeLog())
+		tw.Close()
+	}()
+
+	defer func() {
+		if err := a.historyStore.Close(); err != nil {
+			log.Printf("failed to close history store: %v", err)
+		}
+	}()
+
+	util.LogErr("write status", a.historyStore.Write(a.Status()))
+
+	listen := make(chan error)
+	go func() {
+		err := a.socketServer.Serve(listen)
+		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
+			log.Printf("failed to start socket frontend %v", err)
+		}
+	}()
+
+	defer func() {
+		util.LogErr("shutdown socket frontend", a.socketServer.Shutdown())
+	}()
+
+	if err := <-listen; err != nil {
+		return errFailedSetupUnixSocket
+	}
+
+	done := make(chan *scheduler.Node)
+	defer close(done)
+
+	go func() {
+		for node := range done {
+			status := a.Status()
+			util.LogErr("write status", a.historyStore.Write(status))
+			util.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
+		}
+	}()
+
+	// Write the first status just after the start to store the running status.
+	// If the DAG is already finished, skip it.
+	go func() {
+		time.Sleep(waitForRunning)
+		if a.finished.Load() {
+			return
+		}
+		util.LogErr("write status", a.historyStore.Write(a.Status()))
+	}()
+
+	// Start the DAG execution.
+	lastErr := a.scheduler.Schedule(
+		dag.NewContext(ctx, a.DAG, a.dataStore.NewDAGStore()),
+		a.graph,
+		done,
+	)
+
+	finishedStatus := a.Status()
+	log.Println("schedule finished.")
+	util.LogErr("write status", a.historyStore.Write(a.Status()))
+
+	a.reporter.ReportSummary(finishedStatus, lastErr)
+	util.LogErr("send email", a.reporter.SendMail(a.DAG, finishedStatus, lastErr))
+
+	util.LogErr("close data file", a.historyStore.Close())
+	a.finished.Store(true)
+
+	return lastErr
 }
 
-// kill sends KILL signal to child processes.
-func (a *Agent) kill() {
-	log.Printf("Sending KILL signal to running child processes.")
-	a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
+// Status collects the current running status of the DAG and returns it.
+func (a *Agent) Status() *model.Status {
+	// Lock to avoid race condition.
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+
+	schedulerStatus := a.scheduler.Status(a.graph)
+	if schedulerStatus == scheduler.StatusNone && a.graph.IsStarted() {
+		// Match the status to the execution graph.
+		schedulerStatus = scheduler.StatusRunning
+	}
+
+	// Create the status object to record the current status.
+	status := &model.Status{
+		RequestId:  a.reqID,
+		Name:       a.DAG.Name,
+		Status:     schedulerStatus,
+		StatusText: schedulerStatus.String(),
+		Pid:        model.Pid(os.Getpid()),
+		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.DAG.Steps),
+		StartedAt:  model.FormatTime(a.graph.StartAt()),
+		FinishedAt: model.FormatTime(a.graph.FinishAt()),
+		Log:        a.logFile.Name(),
+		Params:     model.Params(a.DAG.Params),
+	}
+
+	// Collect the handler nodes.
+	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
+		status.OnExit = model.FromNode(node.Data())
+	}
+	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
+		status.OnSuccess = model.FromNode(node.Data())
+	}
+	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
+		status.OnFailure = model.FromNode(node.Data())
+	}
+	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
+		status.OnCancel = model.FromNode(node.Data())
+	}
+
+	return status
 }
 
-const (
-	logFileTimeStampFmt = "20060102.15:04:05.000"
-	reqIDTruncLen       = 8
+// Signal sends the signal to the processes running
+// if processes do not terminate after MaxCleanUp time, it will send KILL signal.
+func (a *Agent) Signal(sig os.Signal) {
+	a.signal(sig, false)
+}
+
+// Simple regular expressions for request routing
+var (
+	statusRe = regexp.MustCompile(`^/status[/]?$`)
+	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
 )
+
+// HandleHTTP handles HTTP requests via unix socket.
+func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
+	switch {
+	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
+		// Return the current status of the execution.
+		status := a.Status()
+		status.Status = scheduler.StatusRunning
+		b, err := status.ToJson()
+		if err != nil {
+			encodeError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(b)
+	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
+		// Handle Stop request for the DAG execution.
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+		go func() {
+			log.Printf("stop request received. shutting down...")
+			a.signal(syscall.SIGTERM, true)
+		}()
+	default:
+		// Unknown request
+		encodeError(w, &httpError{Code: http.StatusNotFound, Message: "Not found"})
+	}
+}
+
+// dryRun performs a dry-run of the DAG.
+// It only simulates the execution of the DAG without running the actual command.
+func (a *Agent) dryRun() error {
+	// done channel receives the node when the node is done.
+	// It's a way to update the status in real-time in efficient manner.
+	done := make(chan *scheduler.Node)
+	defer func() {
+		close(done)
+	}()
+
+	go func() {
+		for node := range done {
+			status := a.Status()
+			_ = a.reporter.ReportStep(a.DAG, status, node)
+		}
+	}()
+
+	log.Printf("***** Starting DRY-RUN *****")
+
+	lastErr := a.scheduler.Schedule(
+		dag.NewContext(context.Background(), a.DAG, a.dataStore.NewDAGStore()),
+		a.graph,
+		done,
+	)
+
+	a.reporter.ReportSummary(a.Status(), lastErr)
+
+	log.Printf("***** Finished DRY-RUN *****")
+
+	return lastErr
+}
 
 func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	log.Printf("Sending %s signal to running child processes.", sig)
@@ -270,7 +361,8 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 			return
 		case <-timeout.C:
 			log.Printf("Time reached to max cleanup time")
-			a.kill()
+			log.Printf("Sending KILL signal to running child processes.")
+			a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
 			return
 		case <-tick.C:
 			log.Printf("Sending signal again")
@@ -341,92 +433,27 @@ func (a *Agent) checkPreconditions() error {
 	return nil
 }
 
-func (a *Agent) run(ctx context.Context) error {
-	tl := &logger.Tee{Writer: a.logFile}
-	if err := tl.Open(); err != nil {
-		return err
-	}
-	defer func() {
-		util.LogErr("close log file", a.closeLogFile())
-		tl.Close()
-	}()
-
-	defer func() {
-		if err := a.historyStore.Close(); err != nil {
-			log.Printf("failed to close history store: %v", err)
-		}
-	}()
-
-	util.LogErr("write status", a.historyStore.Write(a.Status()))
-
-	listen := make(chan error)
-	go func() {
-		err := a.socketServer.Serve(listen)
-		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
-			log.Printf("failed to start socket frontend %v", err)
-		}
-	}()
-
-	defer func() {
-		util.LogErr("shutdown socket frontend", a.socketServer.Shutdown())
-	}()
-
-	if err := <-listen; err != nil {
-		return errFailedStartSocketFrontend
-	}
-
-	done := make(chan *scheduler.Node)
-	defer close(done)
-
-	go func() {
-		for node := range done {
-			status := a.Status()
-			util.LogErr("write status", a.historyStore.Write(status))
-			util.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
-		}
-	}()
-
-	go func() {
-		time.Sleep(time.Millisecond * 100)
-		if a.finished.Load() {
-			return
-		}
-		util.LogErr("write status", a.historyStore.Write(a.Status()))
-	}()
-
-	ctx = dag.NewContext(ctx, a.DAG, a.dataStore.NewDAGStore())
-
-	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
-	status := a.Status()
-
-	log.Println("schedule finished.")
-	util.LogErr("write status", a.historyStore.Write(a.Status()))
-
-	a.reporter.ReportSummary(status, lastErr)
-	util.LogErr("send email", a.reporter.SendMail(a.DAG, status, lastErr))
-
-	a.finished.Store(true)
-	util.LogErr("close data file", a.historyStore.Close())
-
-	return lastErr
-}
-
-func (a *Agent) checkIsRunning() error {
+func (a *Agent) checkIsAlreadyRunning() error {
 	status, err := a.engine.GetCurrentStatus(a.DAG)
 	if err != nil {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("%w. socket=%s", errDAGAlreadyRunning, a.DAG.SockAddr())
+		return fmt.Errorf("%w. socket=%s", errDAGIsAlreadyRunning, a.DAG.SockAddr())
 	}
 	return nil
 }
 
-func (a *Agent) setupLogFile() error {
+const (
+	logFileTimeStampFmt = "20060102.15:04:05.000"
+	reqIDLenSafe        = 8
+)
+
+func (a *Agent) setupLog() error {
 	fileName := fmt.Sprintf("agent_%s.%s.%s.log",
 		util.ValidFilename(a.DAG.Name),
 		time.Now().Format(logFileTimeStampFmt),
-		util.TruncString(a.reqID, reqIDTruncLen),
+		util.TruncString(a.reqID, reqIDLenSafe),
 	)
 	absFilepath := filepath.Join(a.DAG.GetLogDir(), fileName)
 
@@ -443,54 +470,24 @@ func (a *Agent) setupLogFile() error {
 	return nil
 }
 
-func (a *Agent) closeLogFile() error {
+func (a *Agent) closeLog() error {
 	if a.logFile != nil {
 		return a.logFile.Close()
 	}
 	return nil
 }
 
-var (
-	statusRe = regexp.MustCompile(`^/status[/]?$`)
-	stopRe   = regexp.MustCompile(`^/stop[/]?$`)
-)
-
-func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	switch {
-	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
-		status := a.Status()
-		status.Status = scheduler.StatusRunning
-		b, err := status.ToJson()
-		if err != nil {
-			encodeError(w, err)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(b)
-	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-		go func() {
-			log.Printf("stop request received. shutting down...")
-			a.signal(syscall.SIGTERM, true)
-		}()
-	default:
-		encodeError(w, &HTTPError{Code: http.StatusNotFound, Message: "Not found"})
-	}
-}
-
-type HTTPError struct {
+type httpError struct {
 	Code    int
 	Message string
 }
 
-func (e *HTTPError) Error() string {
-	return e.Message
-}
+// Error implements error interface.
+func (e *httpError) Error() string { return e.Message }
 
+// encodeError returns error to the HTTP client.
 func encodeError(w http.ResponseWriter, err error) {
-	var httpErr *HTTPError
+	var httpErr *httpError
 	if errors.As(err, &httpErr) {
 		http.Error(w, httpErr.Error(), httpErr.Code)
 	} else {

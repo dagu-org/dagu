@@ -25,7 +25,7 @@ type (
 
 	HistoryStore interface {
 		Open(dagFile string, t time.Time, requestId string) error
-		Write(st *model.Status) error
+		Write(status *model.Status) error
 		Close() error
 		Update(dagFile, requestId string, st *model.Status) error
 		ReadStatusRecent(dagFile string, n int) []*model.StatusFile

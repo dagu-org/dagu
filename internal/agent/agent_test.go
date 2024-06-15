@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,8 +23,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
-
-var testdataDir = path.Join(util.MustGetwd(), "testdata")
 
 // setupTest sets temporary directories and loads the configuration.
 func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory) {
@@ -286,9 +285,15 @@ func TestAgent_HandleHTTP(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
+		time.Sleep(time.Second * 2)
+
 		// Wait for the DAG to start
 		require.Eventually(t, func() bool {
 			status, err := eng.GetLatestStatus(dg)
+			log.Println(status.Status.String())
+			if err != nil {
+				log.Panicln(err.Error())
+			}
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusRunning
 		}, time.Second*2, time.Millisecond*100)
@@ -344,6 +349,14 @@ func TestAgent_HandleHTTP(t *testing.T) {
 			URL:    &url.URL{Path: "/invalid-path"},
 		})
 		require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
+
+		// Stop the DAG
+		dagAgent.Signal(syscall.SIGTERM)
+		require.Eventually(t, func() bool {
+			status, err := eng.GetLatestStatus(dg)
+			require.NoError(t, err)
+			return status.Status == scheduler.StatusCancel
+		}, time.Second*2, time.Millisecond*100)
 	})
 	t.Run("Handle cancel request and stop the DAG", func(t *testing.T) {
 		tmpDir, eng, dataStore := setupTest(t)
@@ -413,7 +426,8 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 // testLoadDAG load the specified DAG file for testing
 // without base config or parameters.
 func testLoadDAG(t *testing.T, name string) *dag.DAG {
-	dg, err := dag.Load("", path.Join(testdataDir, name), "")
+	file := path.Join(util.MustGetwd(), "testdata", name)
+	dg, err := dag.Load("", file, "")
 	require.NoError(t, err)
 	return dg
 }
