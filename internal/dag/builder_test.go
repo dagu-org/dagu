@@ -370,7 +370,7 @@ schedule:
 			require.NoError(t, err)
 
 			for k, v := range tt.expected {
-				var actual []*Schedule
+				var actual []Schedule
 				switch scheduleKey(k) {
 				case scheduleKeyStart:
 					actual = dg.Schedule

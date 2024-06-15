@@ -51,7 +51,7 @@ func ToDagDetail(dg *dag.DAG) *models.DagDetail {
 		Preconditions: lo.Map(dg.Preconditions, func(item *dag.Condition, _ int) *models.Condition {
 			return ToCondition(item)
 		}),
-		Schedule: lo.Map(dg.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
+		Schedule: lo.Map(dg.Schedule, func(item dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
 		Steps: lo.Map(dg.Steps, func(item dag.Step, _ int) *models.StepObject {

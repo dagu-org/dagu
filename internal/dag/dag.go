@@ -61,9 +61,9 @@ type DAG struct {
 
 	// Schedule configuration.
 	// This is used by the scheduler to start / stop / restart the DAG.
-	Schedule        []*Schedule `json:"Schedule"`        // Schedule is the start schedule of the DAG.
-	StopSchedule    []*Schedule `json:"StopSchedule"`    // StopSchedule is the stop schedule of the DAG.
-	RestartSchedule []*Schedule `json:"RestartSchedule"` // RestartSchedule is the restart schedule of the DAG.
+	Schedule        []Schedule `json:"Schedule"`        // Schedule is the start schedule of the DAG.
+	StopSchedule    []Schedule `json:"StopSchedule"`    // StopSchedule is the stop schedule of the DAG.
+	RestartSchedule []Schedule `json:"RestartSchedule"` // RestartSchedule is the restart schedule of the DAG.
 
 	// Env contains a list of environment variables to be set before running the DAG.
 	Env []string `json:"Env"`

@@ -41,13 +41,13 @@ func ToDAG(dg *dag.DAG) *models.Dag {
 		Params:        dg.Params,
 		DefaultParams: lo.ToPtr(dg.DefaultParams),
 		Tags:          dg.Tags,
-		Schedule: lo.Map(dg.Schedule, func(item *dag.Schedule, _ int) *models.Schedule {
+		Schedule: lo.Map(dg.Schedule, func(item dag.Schedule, _ int) *models.Schedule {
 			return ToSchedule(item)
 		}),
 	}
 }
 
-func ToSchedule(s *dag.Schedule) *models.Schedule {
+func ToSchedule(s dag.Schedule) *models.Schedule {
 	return &models.Schedule{
 		Expression: lo.ToPtr(s.Expression),
 	}

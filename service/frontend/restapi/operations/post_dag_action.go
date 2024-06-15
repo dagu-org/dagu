@@ -68,7 +68,7 @@ type PostDagActionBody struct {
 
 	// action
 	// Required: true
-	// Enum: [start suspend stop retry mark-success mark-failed save rename]
+	// Enum: ["start","suspend","stop","retry","mark-success","mark-failed","save","rename"]
 	Action *string `json:"action"`
 
 	// params

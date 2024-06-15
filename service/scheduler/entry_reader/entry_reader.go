@@ -62,7 +62,7 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 	defer er.dagsLock.Unlock()
 
 	var entries []*scheduler.Entry
-	addEntriesFn := func(dg *dag.DAG, s []*dag.Schedule, e scheduler.Type) {
+	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e scheduler.Type) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &scheduler.Entry{

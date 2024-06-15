@@ -961,15 +961,15 @@ var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month 
 
 // parseSchedules parses the schedule values and returns a list of schedules.
 // each schedule is parsed as a cron expression.
-func parseSchedules(values []string) ([]*Schedule, error) {
-	var ret []*Schedule
+func parseSchedules(values []string) ([]Schedule, error) {
+	var ret []Schedule
 
 	for _, v := range values {
 		parsed, err := cronParser.Parse(v)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", errInvalidSchedule, err)
 		}
-		ret = append(ret, &Schedule{Expression: v, Parsed: parsed})
+		ret = append(ret, Schedule{Expression: v, Parsed: parsed})
 	}
 
 	return ret, nil
