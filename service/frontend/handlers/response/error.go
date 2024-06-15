@@ -5,7 +5,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-func toErrorText(err error) string {
+func NewErrorText(err error) string {
 	if err == nil {
 		return ""
 	}

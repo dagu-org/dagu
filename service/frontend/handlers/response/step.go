@@ -6,7 +6,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-func ToStepObject(step dag.Step) *models.StepObject {
+func NewStepObject(step dag.Step) *models.StepObject {
 	so := &models.StepObject{
 		Args:          step.Args,
 		CmdWithArgs:   swag.String(step.CmdWithArgs),
@@ -17,8 +17,8 @@ func ToStepObject(step dag.Step) *models.StepObject {
 		MailOnError:   swag.Bool(step.MailOnError),
 		Name:          swag.String(step.Name),
 		Output:        swag.String(step.Output),
-		Preconditions: ToConditions(step.Preconditions),
-		RepeatPolicy:  ToRepeatPolicy(step.RepeatPolicy),
+		Preconditions: NewConditions(step.Preconditions),
+		RepeatPolicy:  NewRepeatPolicy(step.RepeatPolicy),
 		Script:        swag.String(step.Script),
 		Variables:     step.Variables,
 	}
@@ -29,22 +29,22 @@ func ToStepObject(step dag.Step) *models.StepObject {
 	return so
 }
 
-func ToRepeatPolicy(repeatPolicy dag.RepeatPolicy) *models.RepeatPolicy {
+func NewRepeatPolicy(repeatPolicy dag.RepeatPolicy) *models.RepeatPolicy {
 	return &models.RepeatPolicy{
 		Repeat:   repeatPolicy.Repeat,
 		Interval: int64(repeatPolicy.Interval),
 	}
 }
 
-func ToConditions(conditions []dag.Condition) []*models.Condition {
+func NewConditions(conditions []dag.Condition) []*models.Condition {
 	var result []*models.Condition
 	for _, cond := range conditions {
-		result = append(result, ToCondition(cond))
+		result = append(result, NewCondition(cond))
 	}
 	return result
 }
 
-func ToCondition(cond dag.Condition) *models.Condition {
+func NewCondition(cond dag.Condition) *models.Condition {
 	return &models.Condition{
 		Condition: cond.Condition,
 		Expected:  cond.Expected,

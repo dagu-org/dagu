@@ -27,7 +27,6 @@ import (
 )
 
 const (
-	// TODO: separate API
 	dagTabTypeStatus       = "status"
 	dagTabTypeSpec         = "spec"
 	dagTabTypeHistory      = "history"
@@ -138,7 +137,6 @@ func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsRespo
 		return nil, response.NewInternalError(err)
 	}
 
-	// TODO: remove this if it's not needed
 	_, _, hasErr := lo.FindIndexOf(dags, func(d *persistence.DAGStatus) bool {
 		return d.Error != nil
 	})
@@ -147,13 +145,12 @@ func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsRespo
 		hasErr = true
 	}
 
-	return response.ToListDagResponse(dags, errs, hasErr), nil
+	return response.NewListDagResponse(dags, errs, hasErr), nil
 }
 
 func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDetailsResponse, *response.CodedError) {
 	dagID := params.DagID
 
-	// TODO: separate API
 	tab := dagTabTypeStatus
 	if params.Tab != nil {
 		tab = *params.Tab
@@ -167,7 +164,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 		return nil, response.NewNotFoundError(err)
 	}
 
-	resp := response.ToGetDagDetailResponse(
+	resp := response.NewGetDagDetailResponse(
 		dagStatus,
 		tab,
 	)
@@ -187,7 +184,7 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 
 	case dagTabTypeHistory:
 		logs := h.engine.GetRecentHistory(dagStatus.DAG, 30)
-		resp.LogData = response.ToDagLogResponse(logs)
+		resp.LogData = response.NewDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
 		stepLog, err := h.getStepLog(dagStatus.DAG, lo.FromPtr(logFile), lo.FromPtr(stepName))
@@ -250,11 +247,10 @@ func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
 
-	return response.ToDagStepLogResponse(node.Log, logContent, node), nil
+	return response.NewDagStepLogResponse(node.Log, logContent, node), nil
 }
 
 func getLogFileContent(fileName string) (string, error) {
-	// TODO: fix this to change to dependency injection
 	enc := config.Get().LogEncodingCharset
 
 	var decoder *encoding.Decoder
@@ -265,7 +261,6 @@ func getLogFileContent(fileName string) (string, error) {
 	return string(logContent), err
 }
 
-// TODO: refactor this
 func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	if decoder == nil {
 		return os.ReadFile(f)
@@ -293,7 +288,6 @@ func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.D
 		}
 		logFile = lastStatus.Log
 	} else {
-		// TODO: fix not to use json db directly
 		status, err := jsondb.ParseFile(statusFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", statusFile, err)
@@ -306,7 +300,7 @@ func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.D
 		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
 	}
 
-	return response.ToDagSchedulerLogResponse(logFile, string(content)), nil
+	return response.NewDagSchedulerLogResponse(logFile, string(content)), nil
 }
 
 // nolint // cognitive complexity
@@ -427,5 +421,5 @@ func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchD
 		return nil, response.NewInternalError(err)
 	}
 
-	return response.ToSearchDAGsResponse(ret, errs), nil
+	return response.NewSearchDAGsResponse(ret, errs), nil
 }

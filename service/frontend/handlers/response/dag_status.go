@@ -6,7 +6,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-func ToDagStatus(status *model.Status) *models.DagStatus {
+func NewDagStatus(status *model.Status) *models.DagStatus {
 	return &models.DagStatus{
 		Log:        swag.String(status.Log),
 		Name:       swag.String(status.Name),

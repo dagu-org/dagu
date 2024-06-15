@@ -12,7 +12,7 @@ import (
 	"github.com/samber/lo"
 )
 
-func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
+func NewDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 	statusByName := map[string][]scheduler.NodeStatus{}
 	for i, l := range logs {
 		for _, node := range l.Status.Nodes {
@@ -21,7 +21,7 @@ func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 	}
 
 	grid := lo.MapToSlice(statusByName, func(k string, v []scheduler.NodeStatus) *models.DagLogGridItem {
-		return ToDagLogGridItem(k, v)
+		return NewDagLogGridItem(k, v)
 	})
 
 	sort.Slice(grid, func(i, c int) bool {
@@ -46,12 +46,12 @@ func ToDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 
 	for _, handlerType := range []dag.HandlerType{dag.HandlerOnSuccess, dag.HandlerOnFailure, dag.HandlerOnCancel, dag.HandlerOnExit} {
 		if v, ok := handlerStatusByName[handlerType.String()]; ok {
-			grid = append(grid, ToDagLogGridItem(handlerType.String(), v))
+			grid = append(grid, NewDagLogGridItem(handlerType.String(), v))
 		}
 	}
 
 	converted := lo.Map(logs, func(item *model.StatusFile, _ int) *models.DagStatusFile {
-		return ToDagStatusFile(item)
+		return NewDagStatusFile(item)
 	})
 
 	return &models.DagLogResponse{
@@ -67,14 +67,14 @@ func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx in
 	data[node.Name][logIdx] = node.Status
 }
 
-func ToDagStatusFile(status *model.StatusFile) *models.DagStatusFile {
+func NewDagStatusFile(status *model.StatusFile) *models.DagStatusFile {
 	return &models.DagStatusFile{
 		File:   swag.String(status.File),
-		Status: ToDagStatusDetail(status.Status),
+		Status: NewDagStatusDetail(status.Status),
 	}
 }
 
-func ToDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGridItem {
+func NewDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGridItem {
 	return &models.DagLogGridItem{
 		Name: swag.String(name),
 		Vals: lo.Map(vals, func(item scheduler.NodeStatus, _ int) int64 {
@@ -83,15 +83,15 @@ func ToDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGr
 	}
 }
 
-func ToDagStepLogResponse(logFile, content string, step *model.Node) *models.DagStepLogResponse {
+func NewDagStepLogResponse(logFile, content string, step *model.Node) *models.DagStepLogResponse {
 	return &models.DagStepLogResponse{
 		LogFile: swag.String(logFile),
-		Step:    ToNode(step),
+		Step:    NewNode(step),
 		Content: swag.String(content),
 	}
 }
 
-func ToDagSchedulerLogResponse(logFile, content string) *models.DagSchedulerLogResponse {
+func NewDagSchedulerLogResponse(logFile, content string) *models.DagSchedulerLogResponse {
 	return &models.DagSchedulerLogResponse{
 		LogFile: swag.String(logFile),
 		Content: swag.String(content),

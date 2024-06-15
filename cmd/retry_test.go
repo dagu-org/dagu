@@ -10,7 +10,7 @@ import (
 )
 
 func TestRetryCommand(t *testing.T) {
-	t.Run("[Success] Retry a DAG", func(t *testing.T) {
+	t.Run("Retry a DAG", func(t *testing.T) {
 		tmpDir, e, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
