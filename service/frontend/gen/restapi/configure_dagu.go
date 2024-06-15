@@ -12,7 +12,7 @@ import (
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
 
-	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
+	"github.com/dagu-dev/dagu/service/frontend/gen/restapi/operations"
 )
 
 //go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal interface{} --exclude-main

@@ -12,12 +12,12 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	"github.com/dagu-dev/dagu/service/frontend/restapi"
+	"github.com/dagu-dev/dagu/service/frontend/gen/restapi"
 	"github.com/go-openapi/loads"
 	flags "github.com/jessevdk/go-flags"
 
+	"github.com/dagu-dev/dagu/service/frontend/gen/restapi/operations"
 	pkgmiddleware "github.com/dagu-dev/dagu/service/frontend/middleware"
-	"github.com/dagu-dev/dagu/service/frontend/restapi/operations"
 
 	"github.com/go-chi/chi/v5"
 )

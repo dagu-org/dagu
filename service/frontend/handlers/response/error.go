@@ -1,7 +1,7 @@
 package response
 
 import (
-	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/service/frontend/gen/models"
 	"github.com/go-openapi/swag"
 )
 

@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
-	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/service/frontend/gen/models"
 	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
 )

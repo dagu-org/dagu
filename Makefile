@@ -116,14 +116,14 @@ gencert-check:
 
 clean-swagger:
 	@echo "Cleaning files"
-	@rm -rf service/frontend/restapi/models
-	@rm -rf service/frontend/restapi/operations
+	@rm -rf service/frontend/gen/restapi/models
+	@rm -rf service/frontend/gen/restapi/operations
 
 gen-swagger:
 	@echo "Validating swagger yaml"
 	@swagger validate ./swagger.yaml
 	@echo "Generating swagger server code from yaml"
-	@swagger generate server -t service/frontend --server-package=restapi --exclude-main -f ./swagger.yaml
+	@swagger generate server -t service/frontend/gen --server-package=restapi --exclude-main -f ./swagger.yaml
 	@echo "Running go mod tidy"
 	@go mod tidy
 

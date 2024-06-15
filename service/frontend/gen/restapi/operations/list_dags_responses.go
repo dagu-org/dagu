@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-openapi/runtime"
 
-	"github.com/dagu-dev/dagu/service/frontend/models"
+	"github.com/dagu-dev/dagu/service/frontend/gen/models"
 )
 
 // ListDagsOKCode is the HTTP code returned for type ListDagsOK
