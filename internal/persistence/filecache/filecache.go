@@ -10,6 +10,8 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+// TODO: Consider replacing this with golang-lru:
+// https://github.com/hashicorp/golang-lru
 type Cache[T any] struct {
 	entries  sync.Map
 	capacity int
@@ -55,25 +57,29 @@ func (c *Cache[T]) StartEviction() {
 			select {
 			case <-timer.C:
 				timer.Reset(time.Minute)
-				c.entries.Range(func(key, value interface{}) bool {
-					entry := value.(Entry[T])
-					if time.Now().After(entry.ExpiresAt) {
-						c.entries.Delete(key)
-					}
-					return true
-				})
-				if c.capacity > 0 && int(c.items.Load()) > c.capacity {
-					c.entries.Range(func(key, value interface{}) bool {
-						c.items.Add(-1)
-						c.entries.Delete(key)
-						return int(c.items.Load()) > c.capacity
-					})
-				}
+				c.evict()
 			case <-c.stopCh:
 				return
 			}
 		}
 	}()
+}
+
+func (c *Cache[T]) evict() {
+	c.entries.Range(func(key, value interface{}) bool {
+		entry := value.(Entry[T])
+		if time.Now().After(entry.ExpiresAt) {
+			c.entries.Delete(key)
+		}
+		return true
+	})
+	if c.capacity > 0 && int(c.items.Load()) > c.capacity {
+		c.entries.Range(func(key, _ interface{}) bool {
+			c.items.Add(-1)
+			c.entries.Delete(key)
+			return int(c.items.Load()) > c.capacity
+		})
+	}
 }
 
 func (c *Cache[T]) StopEviction() {
