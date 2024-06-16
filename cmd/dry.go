@@ -16,7 +16,7 @@ func dryCmd() *cobra.Command {
 		Long:  `dagu dry [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
+			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}

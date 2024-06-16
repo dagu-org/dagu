@@ -36,7 +36,7 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Load()
 	require.NoError(t, err)
 
 	return tmpDir, engine.New(dataStore, new(engine.Config), cfg), dataStore, cfg
@@ -117,7 +117,7 @@ const (
 func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.Status) {
 	t.Helper()
 
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Load()
 	require.NoError(t, err)
 
 	dg, err := loadDAG(cfg, dagFile, "")

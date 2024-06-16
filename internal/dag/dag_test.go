@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 
 func TestDAG_String(t *testing.T) {
 	t.Run("String representation of default.yaml", func(t *testing.T) {
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Load()
 		require.NoError(t, err)
 
 		loader := NewLoader(cfg)

@@ -45,7 +45,7 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.LoadConfig()
+			cfg, err := config.Load()
 			require.NoError(t, err)
 
 			loader := NewLoader(cfg)
@@ -63,7 +63,7 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Load metadata", func(t *testing.T) {
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Load()
 		require.NoError(t, err)
 
 		loader := NewLoader(cfg)
@@ -80,7 +80,7 @@ func Test_loadBaseConfig(t *testing.T) {
 	t.Run("Load base config file", func(t *testing.T) {
 		// The base config file is set on the global config
 		// This should be `testdata/home/.dagu/config.yaml`.
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Load()
 		require.NoError(t, err)
 
 		loader := NewLoader(cfg)
@@ -92,7 +92,7 @@ func Test_loadBaseConfig(t *testing.T) {
 
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("Load default config without base config", func(t *testing.T) {
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Load()
 		require.NoError(t, err)
 
 		loader := NewLoader(cfg)
@@ -127,7 +127,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("Load YAML data", func(t *testing.T) {
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Load()
 		require.NoError(t, err)
 
 		loader := NewLoader(cfg)
@@ -140,7 +140,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("[Invalid] Load invalid YAML data", func(t *testing.T) {
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Load()
 		require.NoError(t, err)
 
 		loader := NewLoader(cfg)

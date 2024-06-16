@@ -31,7 +31,7 @@ func setupTest(t *testing.T) (string, engine.Engine,
 
 	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
-	cfg, _ := config.LoadConfig()
+	cfg, _ := config.Load()
 
 	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
@@ -54,7 +54,7 @@ func setupTestTmpDir(t *testing.T) (string, engine.Engine,
 
 	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
-	cfg, _ := config.LoadConfig()
+	cfg, _ := config.Load()
 
 	dataStore := client.NewDataStoreFactory(&config.Config{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),

@@ -55,7 +55,7 @@ func defaultFunctions(cfg *config.Config) template.FuncMap {
 			return cfg.NavbarTitle
 		},
 		"apiURL": func() string {
-			return cfg.GetAPIBaseURL()
+			return cfg.APIBaseURL
 		},
 	}
 }

@@ -21,7 +21,7 @@ func serverCmd() *cobra.Command {
 			_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
+			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}

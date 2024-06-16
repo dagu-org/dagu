@@ -16,7 +16,7 @@ func schedulerCmd() *cobra.Command {
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.LoadConfig()
+			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}

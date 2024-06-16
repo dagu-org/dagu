@@ -32,7 +32,7 @@ func setupTest(t *testing.T) (string, engine.Engine,
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Load()
 	require.NoError(t, err)
 
 	dataStore := client.NewDataStoreFactory(&config.Config{
