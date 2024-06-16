@@ -94,13 +94,13 @@ build-ui:
 	@cd ui; \
 		yarn && yarn build
 
-	@rm -f ./service/frontend/assets/*.js
-	@rm -f ./service/frontend/assets/*.woff
-	@rm -f ./service/frontend/assets/*.woff2
+	@rm -f ./internal/service/frontend/assets/*.js
+	@rm -f ./internal/service/frontend/assets/*.woff
+	@rm -f ./internal/service/frontend/assets/*.woff2
 
-	@cp ui/dist/*.js ./service/frontend/assets/
-	@cp ui/dist/*.woff ./service/frontend/assets/
-	@cp ui/dist/*.woff2 ./service/frontend/assets/
+	@cp ui/dist/*.js ./internal/service/frontend/assets/
+	@cp ui/dist/*.woff ./internal/service/frontend/assets/
+	@cp ui/dist/*.woff2 ./internal/service/frontend/assets/
 
 go-lint:
 	@golangci-lint run ./...

@@ -39,9 +39,9 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp ui/dist/*.js ./service/frontend/assets/
-          cp ui/dist/*.woff ./service/frontend/assets/
-          cp ui/dist/*.woff2 ./service/frontend/assets/
+          cp ui/dist/*.js ./internal/service/frontend/assets/
+          cp ui/dist/*.woff ./internal/service/frontend/assets/
+          cp ui/dist/*.woff2 ./internal/service/frontend/assets/
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
