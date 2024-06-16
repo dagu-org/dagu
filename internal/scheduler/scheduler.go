@@ -135,7 +135,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 						case status == NodeStatusSuccess || status == NodeStatusCancel:
 							// do nothing
 						case sc.isCanceled():
-							sc.lastError = execErr
+							sc.setLastError(execErr)
 						case node.data.Step.RetryPolicy != nil && node.data.Step.RetryPolicy.Limit > node.getRetryCount():
 							// retry
 							log.Printf("%s failed but scheduled for retry", node.data.Step.Name)
@@ -148,7 +148,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 							// finish the node
 							node.setStatus(NodeStatusError)
 							node.setErr(execErr)
-							sc.lastError = execErr
+							sc.setLastError(execErr)
 						}
 					}
 					if node.State().Status != NodeStatusCancel {
@@ -173,7 +173,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 					node.setStatus(NodeStatusSuccess)
 				}
 				if err := sc.teardownNode(node); err != nil {
-					sc.lastError = err
+					sc.setLastError(err)
 					node.setStatus(NodeStatusError)
 				}
 				if done != nil {
@@ -201,7 +201,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			log.Printf("%s started", n.data.Step.Name)
 			n.data.Step.OutputVariables = g.outputVariables
 			if err := sc.runHandlerNode(ctx, n); err != nil {
-				sc.lastError = err
+				sc.setLastError(err)
 			}
 			if done != nil {
 				done <- n
@@ -209,6 +209,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 		}
 	}
 	return sc.lastError
+}
+
+func (sc *Scheduler) setLastError(err error) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	sc.lastError = err
 }
 
 func (sc *Scheduler) setupNode(node *Node) error {

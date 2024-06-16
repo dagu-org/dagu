@@ -205,12 +205,6 @@ func (n *Node) setRetriedAt(retriedAt time.Time) {
 	n.data.RetriedAt = retriedAt
 }
 
-func (n *Node) getRetriedAt() time.Time {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.data.RetriedAt
-}
-
 func (n *Node) getDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -400,14 +394,26 @@ func (n *Node) incDoneCount() {
 	n.data.DoneCount++
 }
 
-var nextNodeID = 1
+var (
+	nextNodeID = 1
+	nextNodeMu sync.Mutex
+)
+
+func getNextNodeID() int {
+	nextNodeMu.Lock()
+	defer nextNodeMu.Unlock()
+	v := nextNodeID
+	nextNodeID++
+	return v
+}
 
 func (n *Node) init() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if n.id != 0 {
 		return
 	}
-	n.id = nextNodeID
-	nextNodeID++
+	n.id = getNextNodeID()
 	if n.data.Step.Variables == nil {
 		n.data.Step.Variables = []string{}
 	}
