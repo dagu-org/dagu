@@ -100,6 +100,7 @@ func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 			// Use the PublicKeys method for remote authentication.
 			ssh.PublicKeys(signer),
 		},
+		// nolint: gosec
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 

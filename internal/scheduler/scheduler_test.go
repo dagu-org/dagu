@@ -644,7 +644,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 }
 
 func step(name, command string, depends ...string) dag.Step {
-	cmd, args := util.SplitCommand(command, false)
+	cmd, args := util.SplitCommand(command)
 	return dag.Step{
 		Name:    name,
 		Command: cmd,

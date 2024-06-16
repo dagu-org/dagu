@@ -66,9 +66,8 @@ var (
 	)
 )
 
-// SplitCommand splits command string to program and arguments.
-// TODO: This function needs to be refactored to handle more complex cases.
-func SplitCommand(cmd string, parse bool) (cmdx string, args []string) {
+// SplitCommandWithParse splits command string to program and arguments.
+func SplitCommandWithParse(cmd string) (cmdx string, args []string) {
 	splits := strings.SplitN(cmd, " ", 2)
 	if len(splits) == 1 {
 		return splits[0], []string{}
@@ -77,7 +76,7 @@ func SplitCommand(cmd string, parse bool) (cmdx string, args []string) {
 	cmdx = splits[0]
 
 	parser := shellwords.NewParser()
-	parser.ParseBacktick = parse
+	parser.ParseBacktick = true
 	parser.ParseEnv = false
 
 	args, err := parser.Parse(escapeReplacer.Replace(splits[1]))
@@ -89,14 +88,20 @@ func SplitCommand(cmd string, parse bool) (cmdx string, args []string) {
 
 	var ret []string
 	for _, v := range args {
-		val := unescapeReplacer.Replace(v)
-		if parse {
-			val = os.ExpandEnv(val)
-		}
-		ret = append(ret, val)
+		ret = append(ret, os.ExpandEnv(unescapeReplacer.Replace(v)))
 	}
 
 	return cmdx, ret
+}
+
+// SplitCommand splits command string to program and arguments.
+func SplitCommand(cmd string) (cmdx string, args []string) {
+	splits := strings.SplitN(cmd, " ", 2)
+	if len(splits) == 1 {
+		return splits[0], []string{}
+	}
+
+	return splits[0], strings.Fields(splits[1])
 }
 
 // FileExists returns true if file exists.

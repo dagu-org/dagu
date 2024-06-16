@@ -140,7 +140,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.cancelFunc = fn
 
 	if n.data.Step.CmdWithArgs != "" {
-		n.data.Step.Command, n.data.Step.Args = util.SplitCommand(n.data.Step.CmdWithArgs, true)
+		n.data.Step.Command, n.data.Step.Args = util.SplitCommandWithParse(n.data.Step.CmdWithArgs)
 	}
 
 	if n.scriptFile != nil {

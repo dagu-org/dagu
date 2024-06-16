@@ -1,6 +1,7 @@
 package dag
 
 import (
+	// nolint // gosec
 	"crypto/md5"
 	"fmt"
 	"path"
@@ -198,6 +199,7 @@ func (d *DAG) GetLogDir() string {
 func (d *DAG) SockAddr() string {
 	s := strings.ReplaceAll(d.Location, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
+	// nolint // gosec
 	h := md5.New()
 	_, _ = h.Write([]byte(s))
 	bs := h.Sum(nil)

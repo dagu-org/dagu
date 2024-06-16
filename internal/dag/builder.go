@@ -738,7 +738,7 @@ func parseCommand(def *stepDef, step *Step) error {
 		}
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
-		step.Command, step.Args = util.SplitCommand(val, false)
+		step.Command, step.Args = util.SplitCommand(val)
 
 	case []any:
 		// Case 3: command is an array
@@ -1149,7 +1149,7 @@ func substituteCommands(input string) (string, error) {
 		// Execute the command and replace the command with the output.
 		command := matches[i]
 
-		cmd, args := util.SplitCommand(strings.ReplaceAll(command, "`", ""), false)
+		cmd, args := util.SplitCommand(strings.ReplaceAll(command, "`", ""))
 
 		out, err := exec.Command(cmd, args...).Output()
 		if err != nil {

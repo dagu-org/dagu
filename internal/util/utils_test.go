@@ -69,19 +69,45 @@ func Test_ParseTime(t *testing.T) {
 
 func Test_SplitCommand(t *testing.T) {
 	t.Run("split command", func(t *testing.T) {
-		cmd, args := util.SplitCommand("ls -al test/", false)
+		cmd, args := util.SplitCommand("ls -al test/")
 		require.Equal(t, "ls", cmd)
-
 		require.Len(t, args, 2)
 		require.Equal(t, "-al", args[0])
 		require.Equal(t, "test/", args[1])
 	})
 	t.Run("split command with json", func(t *testing.T) {
-		cmd, args := util.SplitCommand(`echo {\"key\":\"value\"}`, true)
+		cmd, args := util.SplitCommand(`echo {"key":"value"}`)
 		require.Equal(t, "echo", cmd)
-
 		require.Len(t, args, 1)
-		require.Equal(t, "{\"key\":\"value\"}", args[0])
+		require.Equal(t, `{"key":"value"}`, args[0])
+	})
+	t.Run("split command with quoted json", func(t *testing.T) {
+		cmd, args := util.SplitCommand(`echo "{\"key\":\"value\"}"`)
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, `"{\"key\":\"value\"}"`, args[0])
+	})
+}
+
+func Test_SplitCommandWithParse(t *testing.T) {
+	t.Run("split command with command substitution", func(t *testing.T) {
+		cmd, args := util.SplitCommandWithParse("echo `echo hello`")
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, "hello", args[0])
+	})
+	t.Run("split command with quoted command substitution", func(t *testing.T) {
+		cmd, args := util.SplitCommandWithParse("echo `echo \"hello world\"`")
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, "hello world", args[0])
+	})
+	t.Run("split command with env variable", func(t *testing.T) {
+		os.Setenv("TEST_ARG", "hello")
+		cmd, args := util.SplitCommandWithParse("echo $TEST_ARG")
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, "hello", args[0])
 	})
 }
 
