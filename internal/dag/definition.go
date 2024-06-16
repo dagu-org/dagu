@@ -43,8 +43,8 @@ type stepDef struct {
 	Name          string
 	Description   string
 	Dir           string
-	Executor      interface{}
-	Command       interface{}
+	Executor      any
+	Command       any
 	Script        string
 	Stdout        string
 	Stderr        string
@@ -70,7 +70,7 @@ type funcDef struct {
 
 type callFuncDef struct {
 	Function string
-	Args     map[string]interface{}
+	Args     map[string]any
 }
 
 type continueOnDef struct {

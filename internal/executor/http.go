@@ -116,7 +116,7 @@ func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
-func decodeHTTPConfig(dat map[string]interface{}, cfg *HTTPConfig) error {
+func decodeHTTPConfig(dat map[string]any, cfg *HTTPConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,

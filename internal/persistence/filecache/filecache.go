@@ -66,7 +66,7 @@ func (c *Cache[T]) StartEviction() {
 }
 
 func (c *Cache[T]) evict() {
-	c.entries.Range(func(key, value interface{}) bool {
+	c.entries.Range(func(key, value any) bool {
 		entry := value.(Entry[T])
 		if time.Now().After(entry.ExpiresAt) {
 			c.entries.Delete(key)
@@ -74,7 +74,7 @@ func (c *Cache[T]) evict() {
 		return true
 	})
 	if c.capacity > 0 && int(c.items.Load()) > c.capacity {
-		c.entries.Range(func(key, _ interface{}) bool {
+		c.entries.Range(func(key, _ any) bool {
 			c.items.Add(-1)
 			c.entries.Delete(key)
 			return int(c.items.Load()) > c.capacity

@@ -61,7 +61,7 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	}
 	for _, node := range nodes {
 		if node.data.Step.OutputVariables != nil {
-			node.data.Step.OutputVariables.Range(func(key, value interface{}) bool {
+			node.data.Step.OutputVariables.Range(func(key, value any) bool {
 				k, ok := key.(string)
 				if !ok {
 					return false

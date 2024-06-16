@@ -431,7 +431,7 @@ func TestBuilder_BuildExecutor(t *testing.T) {
 		name           string
 		input          string
 		expectedExec   string
-		expectedConfig map[string]interface{}
+		expectedConfig map[string]any
 	}{
 		{
 			name: "http executor",
@@ -456,7 +456,7 @@ steps:
         key: value
 `,
 			expectedExec: "http",
-			expectedConfig: map[string]interface{}{
+			expectedConfig: map[string]any{
 				"key": "value",
 			},
 		},
@@ -523,11 +523,11 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 
 func Test_convertMap(t *testing.T) {
 	t.Run("Convert map with string keys", func(t *testing.T) {
-		data := map[string]interface{}{
+		data := map[string]any{
 			"key1": "value1",
-			"map": map[interface{}]interface{}{
+			"map": map[any]any{
 				"key2": "value2",
-				"map": map[interface{}]interface{}{
+				"map": map[any]any{
 					"key3": "value3",
 				},
 			},
@@ -540,7 +540,7 @@ func Test_convertMap(t *testing.T) {
 		k1 := reflect.TypeOf(m1).Key().Kind()
 		require.True(t, k1 == reflect.String)
 
-		m2 := data["map"].(map[string]interface{})["map"]
+		m2 := data["map"].(map[string]any)["map"]
 		k2 := reflect.TypeOf(m2).Key().Kind()
 		require.True(t, k2 == reflect.String)
 

@@ -86,7 +86,7 @@ func CreateMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	return exec, nil
 }
 
-func decodeMailConfig(dat map[string]interface{}, cfg *MailConfig) error {
+func decodeMailConfig(dat map[string]any, cfg *MailConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,

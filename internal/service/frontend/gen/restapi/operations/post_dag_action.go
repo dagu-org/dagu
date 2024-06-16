@@ -98,7 +98,7 @@ func (o *PostDagActionBody) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-var postDagActionBodyTypeActionPropEnum []interface{}
+var postDagActionBodyTypeActionPropEnum []any
 
 func init() {
 	var res []string

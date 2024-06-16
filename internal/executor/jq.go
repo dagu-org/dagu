@@ -17,7 +17,7 @@ type JqExecutor struct {
 	stdout io.Writer
 	stderr io.Writer
 	query  string
-	input  map[string]interface{}
+	input  map[string]any
 	cfg    *JqConfig
 }
 
@@ -75,7 +75,7 @@ func CreateJqExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 		}
 	}
 	s := os.ExpandEnv(step.Script)
-	input := map[string]interface{}{}
+	input := map[string]any{}
 	if err := json.Unmarshal([]byte(s), &input); err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func CreateJqExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
-func decodeJqConfig(dat map[string]interface{}, cfg *JqConfig) error {
+func decodeJqConfig(dat map[string]any, cfg *JqConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,

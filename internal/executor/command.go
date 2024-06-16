@@ -55,7 +55,7 @@ func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error)
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
-	step.OutputVariables.Range(func(key, value interface{}) bool {
+	step.OutputVariables.Range(func(key, value any) bool {
 		cmd.Env = append(cmd.Env, value.(string))
 		return true
 	})

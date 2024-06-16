@@ -15,7 +15,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/service/frontend/gen/restapi/operations"
 )
 
-//go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal interface{} --exclude-main
+//go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal any --exclude-main
 
 func configureFlags(api *operations.DaguAPI) {
 	// handlers.CommandLineOptionsGroups = []swag.CommandLineOptionsGroup{ ... }
@@ -26,7 +26,7 @@ func configureAPI(api *operations.DaguAPI) http.Handler {
 	api.ServeError = errors.ServeError
 
 	// Set your custom logger if needed. Default one is log.Printf
-	// Expected interface func(string, ...interface{})
+	// Expected interface func(string, ...any)
 	//
 	// Example:
 	// handlers.Logger = log.Printf

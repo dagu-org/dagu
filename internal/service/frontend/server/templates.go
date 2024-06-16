@@ -17,14 +17,14 @@ var (
 	templatePath = "templates/"
 )
 
-func (srv *Server) useTemplate(layout string, name string) func(http.ResponseWriter, interface{}) {
+func (srv *Server) useTemplate(layout string, name string) func(http.ResponseWriter, any) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))
 	tmpl, err := template.New(name).Funcs(defaultFunctions(srv.cfg)).ParseFS(srv.assets, files...)
 	if err != nil {
 		panic(err)
 	}
 
-	return func(w http.ResponseWriter, data interface{}) {
+	return func(w http.ResponseWriter, data any) {
 		var buf bytes.Buffer
 		if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
 			log.Printf("ERR: %v\n", err)
@@ -38,7 +38,7 @@ func (srv *Server) useTemplate(layout string, name string) func(http.ResponseWri
 
 func defaultFunctions(cfg *config.Config) template.FuncMap {
 	return template.FuncMap{
-		"defTitle": func(ip interface{}) string {
+		"defTitle": func(ip any) string {
 			v, ok := ip.(string)
 			if !ok || (ok && v == "") {
 				return ""

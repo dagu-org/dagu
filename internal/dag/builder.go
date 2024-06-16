@@ -171,7 +171,7 @@ func (b *builder) buildSchedule() error {
 		// Case 1. schedule is a string.
 		starts = append(starts, schedule)
 
-	case []interface{}:
+	case []any:
 		// Case 2. schedule is an array of strings.
 		// Append all the schedules to the starts slice.
 		for _, s := range schedule {
@@ -1094,7 +1094,7 @@ func parseScheduleMap(scheduleMap map[any]any, starts, stops, restarts *[]string
 			// Case 1. schedule is a string.
 			values = append(values, v)
 
-		case []interface{}:
+		case []any:
 			// Case 2. schedule is an array of strings.
 			// Append all the schedules to the values slice.
 			for _, s := range v {

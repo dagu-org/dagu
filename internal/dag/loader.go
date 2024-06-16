@@ -230,8 +230,8 @@ func readFile(file string) (config map[string]any, err error) {
 }
 
 // unmarshalData unmarshals the data into a map.
-func unmarshalData(data []byte) (map[string]interface{}, error) {
-	var cm map[string]interface{}
+func unmarshalData(data []byte) (map[string]any, error) {
+	var cm map[string]any
 	err := yaml.NewDecoder(bytes.NewReader(data)).Decode(&cm)
 	if errors.Is(err, io.EOF) {
 		err = nil
@@ -241,7 +241,7 @@ func unmarshalData(data []byte) (map[string]interface{}, error) {
 }
 
 // decode decodes the configuration map into a configDefinition.
-func decode(cm map[string]interface{}) (*definition, error) {
+func decode(cm map[string]any) (*definition, error) {
 	c := new(definition)
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,

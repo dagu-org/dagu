@@ -116,7 +116,7 @@ func LoadConfig() (*Config, error) {
 }
 
 func loadEnvs(cfg *Config) {
-	cfg.Env.Range(func(k, v interface{}) bool {
+	cfg.Env.Range(func(k, v any) bool {
 		_ = os.Setenv(k.(string), v.(string))
 		return true
 	})
