@@ -388,8 +388,8 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAGHandler) updateStatus(dg *dag.DAG, reqId, step string, to scheduler.NodeStatus) error {
-	status, err := h.engine.GetStatusByRequestId(dg, reqId)
+func (h *DAGHandler) updateStatus(dg *dag.DAG, reqID, step string, to scheduler.NodeStatus) error {
+	status, err := h.engine.GetStatusByRequestID(dg, reqID)
 	if err != nil {
 		return err
 	}

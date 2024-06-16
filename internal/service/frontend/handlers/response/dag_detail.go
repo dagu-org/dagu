@@ -85,7 +85,7 @@ func NewDagStatusDetail(s *model.Status) *models.DagStatusDetail {
 		Name:       swag.String(s.Name),
 		Params:     swag.String(s.Params),
 		Pid:        swag.Int64(int64(s.Pid)),
-		RequestID:  swag.String(s.RequestId),
+		RequestID:  swag.String(s.RequestID),
 		StartedAt:  swag.String(s.StartedAt),
 		FinishedAt: swag.String(s.FinishedAt),
 		Status:     swag.Int64(int64(s.Status)),

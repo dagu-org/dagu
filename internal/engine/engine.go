@@ -26,9 +26,9 @@ type Engine interface {
 	StartAsync(dg *dag.DAG, params string)
 	Start(dg *dag.DAG, params string) error
 	Restart(dg *dag.DAG) error
-	Retry(dg *dag.DAG, reqId string) error
+	Retry(dg *dag.DAG, reqID string) error
 	GetCurrentStatus(dg *dag.DAG) (*model.Status, error)
-	GetStatusByRequestId(dg *dag.DAG, requestId string) (*model.Status, error)
+	GetStatusByRequestID(dg *dag.DAG, reqID string) (*model.Status, error)
 	GetLatestStatus(dg *dag.DAG) (*model.Status, error)
 	GetRecentHistory(dg *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(dg *dag.DAG, status *model.Status) error
@@ -165,9 +165,9 @@ func (e *engineImpl) Restart(dg *dag.DAG) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Retry(dg *dag.DAG, reqId string) error {
+func (e *engineImpl) Retry(dg *dag.DAG, reqID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--req=%s", reqId))
+	args = append(args, fmt.Sprintf("--req=%s", reqID))
 	args = append(args, dg.Location)
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -192,13 +192,13 @@ func (e *engineImpl) GetCurrentStatus(dg *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJson(ret)
 }
 
-func (e *engineImpl) GetStatusByRequestId(dg *dag.DAG, requestId string) (*model.Status, error) {
-	ret, err := e.dataStore.NewHistoryStore().FindByRequestId(dg.Location, requestId)
+func (e *engineImpl) GetStatusByRequestID(dg *dag.DAG, reqID string) (*model.Status, error) {
+	ret, err := e.dataStore.NewHistoryStore().FindByRequestID(dg.Location, reqID)
 	if err != nil {
 		return nil, err
 	}
 	status, _ := e.GetCurrentStatus(dg)
-	if status != nil && status.RequestId != requestId {
+	if status != nil && status.RequestID != reqID {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
 	}
@@ -243,12 +243,12 @@ func (e *engineImpl) UpdateStatus(dg *dag.DAG, status *model.Status) error {
 		}
 	} else {
 		unmarshalled, _ := model.StatusFromJson(res)
-		if unmarshalled != nil && unmarshalled.RequestId == status.RequestId &&
+		if unmarshalled != nil && unmarshalled.RequestID == status.RequestID &&
 			unmarshalled.Status == scheduler.StatusRunning {
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStore.NewHistoryStore().Update(dg.Location, status.RequestId, status)
+	return e.dataStore.NewHistoryStore().Update(dg.Location, status.RequestID, status)
 }
 
 func (e *engineImpl) UpdateDAG(id string, spec string) error {

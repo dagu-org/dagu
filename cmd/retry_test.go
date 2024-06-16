@@ -27,7 +27,7 @@ func TestRetryCommand(t *testing.T) {
 		require.Equal(t, status.Status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
 
-		reqID := status.Status.RequestId
+		reqID := status.Status.RequestID
 
 		// Retry with the request ID.
 		testRunCommand(t, retryCmd(), cmdTest{

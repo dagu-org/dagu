@@ -214,7 +214,7 @@ func (a *Agent) Status() *model.Status {
 
 	// Create the status object to record the current status.
 	status := &model.Status{
-		RequestId:  a.reqID,
+		RequestID:  a.reqID,
 		Name:       a.DAG.Name,
 		Status:     schedulerStatus,
 		StatusText: schedulerStatus.String(),

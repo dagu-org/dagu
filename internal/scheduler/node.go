@@ -261,7 +261,7 @@ func (n *Node) cancel() {
 	}
 }
 
-func (n *Node) setup(logDir string, requestId string) error {
+func (n *Node) setup(logDir string, reqID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -269,7 +269,7 @@ func (n *Node) setup(logDir string, requestId string) error {
 	n.data.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		util.ValidFilename(n.data.Step.Name),
 		n.data.StartedAt.Format("20060102.15:04:05.000"),
-		util.TruncString(requestId, 8),
+		util.TruncString(reqID, 8),
 	))
 	for _, fn := range []func() error{
 		n.setupLog,
@@ -397,14 +397,14 @@ func (n *Node) incDoneCount() {
 	n.data.DoneCount++
 }
 
-var nextNodeId = 1
+var nextNodeID = 1
 
 func (n *Node) init() {
 	if n.id != 0 {
 		return
 	}
-	n.id = nextNodeId
-	nextNodeId++
+	n.id = nextNodeID
+	nextNodeID++
 	if n.data.Step.Variables == nil {
 		n.data.Step.Variables = []string{}
 	}

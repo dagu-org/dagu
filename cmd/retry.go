@@ -37,7 +37,7 @@ func retryCmd() *cobra.Command {
 				log.Fatalf("Failed to get the absolute path of the DAG file: %v", err)
 			}
 
-			status, err := historyStore.FindByRequestId(absoluteFilePath, reqID)
+			status, err := historyStore.FindByRequestID(absoluteFilePath, reqID)
 			if err != nil {
 				log.Fatalf("Failed to find the request: %v", err)
 			}

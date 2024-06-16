@@ -37,3 +37,5 @@ issues:
     - path: _test\.go|tests/.+\.go
       linters:
         - err113 # like err = errors.New("test error")
+        - gosec
+        - add-constant

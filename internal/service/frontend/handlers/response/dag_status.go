@@ -12,7 +12,7 @@ func NewDagStatus(status *model.Status) *models.DagStatus {
 		Name:       swag.String(status.Name),
 		Params:     swag.String(status.Params),
 		Pid:        swag.Int64(int64(status.Pid)),
-		RequestID:  swag.String(status.RequestId),
+		RequestID:  swag.String(status.RequestID),
 		StartedAt:  swag.String(status.StartedAt),
 		FinishedAt: swag.String(status.FinishedAt),
 		Status:     swag.Int64(int64(status.Status)),

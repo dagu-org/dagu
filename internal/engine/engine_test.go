@@ -25,7 +25,8 @@ var (
 	testdataDir = path.Join(util.MustGetwd(), "./testdata")
 )
 
-func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
+func setupTest(t *testing.T) (string, engine.Engine,
+	persistence.DataStoreFactory, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
@@ -47,7 +48,8 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 		), dataStore, cfg
 }
 
-func setupTestTmpDir(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
+func setupTestTmpDir(t *testing.T) (string, engine.Engine,
+	persistence.DataStoreFactory, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
@@ -82,8 +84,9 @@ func TestGetStatusRunningAndDone(t *testing.T) {
 	socketServer, _ := sock.NewServer(
 		&sock.Config{
 			Addr: dagStatus.DAG.SockAddr(),
-			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				status := model.NewStatus(dagStatus.DAG, nil, scheduler.StatusRunning, 0, nil, nil)
+			HandlerFunc: func(w http.ResponseWriter, _ *http.Request) {
+				status := model.NewStatus(dagStatus.DAG, nil,
+					scheduler.StatusRunning, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJson()
 				_, _ = w.Write(b)
@@ -115,7 +118,7 @@ func TestUpdateStatus(t *testing.T) {
 
 	var (
 		file      = testDAG("update_status.yaml")
-		requestId = "test-update-status"
+		requestID = "test-update-status"
 		now       = time.Now()
 	)
 
@@ -124,10 +127,10 @@ func TestUpdateStatus(t *testing.T) {
 
 	historyStore := dataStore.NewHistoryStore()
 
-	err = historyStore.Open(dagStatus.DAG.Location, now, requestId)
+	err = historyStore.Open(dagStatus.DAG.Location, now, requestID)
 	require.NoError(t, err)
 
-	status := testNewStatus(dagStatus.DAG, requestId,
+	status := testNewStatus(dagStatus.DAG, requestID,
 		scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
 	err = historyStore.Write(status)
@@ -136,7 +139,7 @@ func TestUpdateStatus(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	status, err = eng.GetStatusByRequestId(dagStatus.DAG, requestId)
+	status, err = eng.GetStatusByRequestID(dagStatus.DAG, requestID)
 	require.NoError(t, err)
 	require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
 
@@ -146,11 +149,11 @@ func TestUpdateStatus(t *testing.T) {
 	err = eng.UpdateStatus(dagStatus.DAG, status)
 	require.NoError(t, err)
 
-	statusByRequestId, err := eng.GetStatusByRequestId(dagStatus.DAG, requestId)
+	statusByRequestID, err := eng.GetStatusByRequestID(dagStatus.DAG, requestID)
 	require.NoError(t, err)
 
 	require.Equal(t, 1, len(status.Nodes))
-	require.Equal(t, newStatus, statusByRequestId.Nodes[0].Status)
+	require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
 }
 
 func TestUpdateStatusError(t *testing.T) {
@@ -161,19 +164,20 @@ func TestUpdateStatusError(t *testing.T) {
 
 	var (
 		file      = testDAG("update_status_failed.yaml")
-		requestId = "test-update-status-failure"
+		requestID = "test-update-status-failure"
 	)
 
 	dagStatus, err := eng.GetStatus(file)
 	require.NoError(t, err)
 
-	status := testNewStatus(dagStatus.DAG, requestId, scheduler.StatusError, scheduler.NodeStatusError)
+	status := testNewStatus(dagStatus.DAG, requestID, scheduler.StatusError,
+		scheduler.NodeStatusError)
 
 	err = eng.UpdateStatus(dagStatus.DAG, status)
 	require.Error(t, err)
 
 	// update with invalid request id
-	status.RequestId = "invalid-request-id"
+	status.RequestID = "invalid-request-id"
 	err = eng.UpdateStatus(dagStatus.DAG, status)
 	require.Error(t, err)
 }
@@ -259,10 +263,10 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, scheduler.StatusSuccess, status.Status)
 
-	requestId := status.RequestId
+	requestID := status.RequestID
 	params := status.Params
 
-	err = eng.Retry(dagStatus.DAG, requestId)
+	err = eng.Retry(dagStatus.DAG, requestID)
 	require.NoError(t, err)
 	status, err = eng.GetLatestStatus(dagStatus.DAG)
 	require.NoError(t, err)
@@ -270,9 +274,10 @@ func TestRetry(t *testing.T) {
 	require.Equal(t, scheduler.StatusSuccess, status.Status)
 	require.Equal(t, params, status.Params)
 
-	statusByRequestId, err := eng.GetStatusByRequestId(dagStatus.DAG, status.RequestId)
+	statusByRequestID, err := eng.GetStatusByRequestID(
+		dagStatus.DAG, status.RequestID)
 	require.NoError(t, err)
-	require.Equal(t, status, statusByRequestId)
+	require.Equal(t, status, statusByRequestID)
 
 	recentStatuses := eng.GetRecentHistory(dagStatus.DAG, 1)
 	require.Equal(t, status, recentStatuses[0].Status)
@@ -347,7 +352,8 @@ func TestCreateNewDAG(t *testing.T) {
 
 	// Check if the new DAG is actually created.
 	loader := dag.NewLoader(cfg)
-	dg, err := loader.Load("", path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
+	dg, err := loader.Load("",
+		path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 	require.NoError(t, err)
 	require.Equal(t, "test-dag", dg.Name)
 }
@@ -422,7 +428,8 @@ func testDAG(name string) string {
 	return path.Join(testdataDir, name)
 }
 
-func testNewStatus(dg *dag.DAG, reqId string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
+func testNewStatus(dg *dag.DAG, reqID string, status scheduler.Status,
+	nodeStatus scheduler.NodeStatus) *model.Status {
 	ret := model.NewStatus(
 		dg,
 		[]scheduler.NodeData{
@@ -435,6 +442,6 @@ func testNewStatus(dg *dag.DAG, reqId string, status scheduler.Status, nodeStatu
 		model.Time(time.Now()),
 		nil,
 	)
-	ret.RequestId = reqId
+	ret.RequestID = reqID
 	return ret
 }

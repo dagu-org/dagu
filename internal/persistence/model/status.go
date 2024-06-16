@@ -32,7 +32,7 @@ func (p Pid) IsRunning() bool {
 }
 
 type Status struct {
-	RequestId  string           `json:"RequestId"`
+	RequestID  string           `json:"RequestId"`
 	Name       string           `json:"Name"`
 	Status     scheduler.Status `json:"Status"`
 	StatusText string           `json:"StatusText"`

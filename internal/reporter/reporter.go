@@ -96,7 +96,7 @@ func renderSummary(status *model.Status, err error) string {
 	}
 	t.AppendHeader(table.Row{"RequestID", "Name", "Started At", "Finished At", "Status", "Params", "Error"})
 	t.AppendRow(table.Row{
-		status.RequestId,
+		status.RequestID,
 		status.Name,
 		status.StartedAt,
 		status.FinishedAt,

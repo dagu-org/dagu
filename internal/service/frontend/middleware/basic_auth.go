@@ -7,12 +7,17 @@ import (
 	"strings"
 )
 
+const (
+	authHeaderKey = "Authorization"
+)
+
+// nolint:revive
 func BasicAuth(realm string, creds map[string]string) func(
 	next http.Handler,
 ) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := strings.Split(r.Header.Get("Authorization"), " ")
+			authHeader := strings.Split(r.Header.Get(authHeaderKey), " ")
 			if skipBasicAuth(authHeader) {
 				next.ServeHTTP(w, r)
 				return
