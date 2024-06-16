@@ -2,11 +2,12 @@ package filecache
 
 import (
 	"fmt"
-	"golang.org/x/exp/rand"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/exp/rand"
 )
 
 type Cache[T any] struct {
@@ -34,7 +35,7 @@ func newEntry[T any](data T, size int64, lastModified int64, ttl time.Duration) 
 		Data:         data,
 		Size:         size,
 		LastModified: lastModified,
-		ExpiresAt:    time.Now().Add(time.Hour * 24),
+		ExpiresAt:    expiresAt,
 	}
 }
 
