@@ -21,7 +21,11 @@ func TestStartCommand(t *testing.T) {
 			expectedOut: []string{"params is p1 and p2"},
 		},
 		{
-			args:        []string{"start", `--params="p3 p4"`, testDAGFile("start_with_params.yaml")},
+			args: []string{
+				"start",
+				`--params="p3 p4"`,
+				testDAGFile("start_with_params.yaml"),
+			},
 			expectedOut: []string{"params is p3 and p4"},
 		},
 	}

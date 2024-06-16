@@ -43,7 +43,14 @@ var schedulerModule = fx.Options(
 
 // newFrontendApp initializes the web server that serves the frontend.
 // runDAG reads the DAG file and executes it with the given parameters.
-func runDAG(ctx context.Context, cfg *config.Config, eng engine.Engine, cmd *cobra.Command, args []string, dry bool) {
+func runDAG(
+	ctx context.Context,
+	cfg *config.Config,
+	eng engine.Engine,
+	cmd *cobra.Command,
+	args []string,
+	dry bool,
+) {
 	params, err := cmd.Flags().GetString("params")
 	if err != nil {
 		log.Fatalf("Failed to get params: %v", err)
@@ -60,7 +67,13 @@ func runDAG(ctx context.Context, cfg *config.Config, eng engine.Engine, cmd *cob
 }
 
 // start is responsible for actually starting the DAG.
-func start(ctx context.Context, cfg *config.Config, eng engine.Engine, dg *dag.DAG, dry bool) error {
+func start(
+	ctx context.Context,
+	cfg *config.Config,
+	eng engine.Engine,
+	dg *dag.DAG,
+	dry bool,
+) error {
 	dagAgent := agent.New(&agent.Config{DAG: dg, Dry: dry}, eng, client.NewDataStoreFactory(cfg))
 	listenSignals(ctx, dagAgent)
 	return dagAgent.Run(ctx)

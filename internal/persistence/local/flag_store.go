@@ -39,7 +39,9 @@ func fileName(id string) string {
 // https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
 var (
 	filenameReservedRegex             = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
-	filenameReservedWindowsNamesRegex = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
+	filenameReservedWindowsNamesRegex = regexp.MustCompile(
+		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
+	)
 )
 
 func normalizeFilename(str, replacement string) string {

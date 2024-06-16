@@ -20,9 +20,12 @@ func NewDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 		}
 	}
 
-	grid := lo.MapToSlice(statusByName, func(k string, v []scheduler.NodeStatus) *models.DagLogGridItem {
-		return NewDagLogGridItem(k, v)
-	})
+	grid := lo.MapToSlice(
+		statusByName,
+		func(k string, v []scheduler.NodeStatus) *models.DagLogGridItem {
+			return NewDagLogGridItem(k, v)
+		},
+	)
 
 	sort.Slice(grid, func(i, c int) bool {
 		return strings.Compare(lo.FromPtr(grid[i].Name), lo.FromPtr(grid[c].Name)) <= 0
@@ -60,7 +63,11 @@ func NewDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 	}
 }
 
-func addStatusGridItem(data map[string][]scheduler.NodeStatus, logLen, logIdx int, node *model.Node) {
+func addStatusGridItem(
+	data map[string][]scheduler.NodeStatus,
+	logLen, logIdx int,
+	node *model.Node,
+) {
 	if _, ok := data[node.Name]; !ok {
 		data[node.Name] = make([]scheduler.NodeStatus, logLen)
 	}

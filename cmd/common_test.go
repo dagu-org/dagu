@@ -131,7 +131,12 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 }
 
 // testLastStatusEventual tests the last status of a DAG to be the expected status.
-func testLastStatusEventual(t *testing.T, hs persistence.HistoryStore, dg string, expected scheduler.Status) {
+func testLastStatusEventual(
+	t *testing.T,
+	hs persistence.HistoryStore,
+	dg string,
+	expected scheduler.Status,
+) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {

@@ -46,28 +46,40 @@ type builder struct {
 
 // errors on building a DAG.
 var (
-	errInvalidSchedule                    = errors.New("invalid schedule")
-	errScheduleMustBeStringOrArray        = errors.New("schedule must be a string or an array of strings")
-	errInvalidScheduleType                = errors.New("invalid schedule type")
-	errInvalidKeyType                     = errors.New("invalid key type")
-	errExecutorConfigMustBeString         = errors.New("executor config key must be string")
-	errDuplicateFunction                  = errors.New("duplicate function")
-	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
-	errStepNameRequired                   = errors.New("step name must be specified")
-	errStepCommandOrCallRequired          = errors.New("either step command or step call must be specified if executor is nil")
-	errStepCommandIsEmpty                 = errors.New("step command is empty")
-	errStepCommandMustBeArrayOrString     = errors.New("step command must be an array of strings or a string")
-	errCallFunctionNotFound               = errors.New("call must specify a functions that exists")
-	errNumberOfParamsMismatch             = errors.New("the number of parameters defined in the function does not match the number of parameters given")
+	errInvalidSchedule             = errors.New("invalid schedule")
+	errScheduleMustBeStringOrArray = errors.New(
+		"schedule must be a string or an array of strings",
+	)
+	errInvalidScheduleType        = errors.New("invalid schedule type")
+	errInvalidKeyType             = errors.New("invalid key type")
+	errExecutorConfigMustBeString = errors.New("executor config key must be string")
+	errDuplicateFunction          = errors.New("duplicate function")
+	errFuncParamsMismatch         = errors.New(
+		"func params and args given to func command do not match",
+	)
+	errStepNameRequired          = errors.New("step name must be specified")
+	errStepCommandOrCallRequired = errors.New(
+		"either step command or step call must be specified if executor is nil",
+	)
+	errStepCommandIsEmpty             = errors.New("step command is empty")
+	errStepCommandMustBeArrayOrString = errors.New(
+		"step command must be an array of strings or a string",
+	)
+	errCallFunctionNotFound   = errors.New("call must specify a functions that exists")
+	errNumberOfParamsMismatch = errors.New(
+		"the number of parameters defined in the function does not match the number of parameters given",
+	)
 	errRequiredParameterNotFound          = errors.New("required parameter not found")
 	errScheduleKeyMustBeString            = errors.New("schedule key must be a string")
 	errInvalidSignal                      = errors.New("invalid signal")
 	errInvalidEnvValue                    = errors.New("invalid value for env")
-	errArgsMustBeConvertibleToIntOrString = errors.New("args must be convertible to either int or string")
-	errExecutorTypeMustBeString           = errors.New("executor.type value must be string")
-	errExecutorConfigValueMustBeMap       = errors.New("executor.config value must be a map")
-	errExecutorHasInvalidKey              = errors.New("executor has invalid key")
-	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
+	errArgsMustBeConvertibleToIntOrString = errors.New(
+		"args must be convertible to either int or string",
+	)
+	errExecutorTypeMustBeString        = errors.New("executor.type value must be string")
+	errExecutorConfigValueMustBeMap    = errors.New("executor.config value must be a map")
+	errExecutorHasInvalidKey           = errors.New("executor has invalid key")
+	errExecutorConfigMustBeStringOrMap = errors.New("executor config must be string or map")
 )
 
 // builderFunc is a function that builds a part of the DAG.
@@ -325,7 +337,9 @@ type paramPair struct {
 
 // parseParams parses the parameters for the DAG.
 func parseParams(input string, executeCommandSubstitution bool) ([]paramPair, error) {
-	paramRegex := regexp.MustCompile(`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`)
+	paramRegex := regexp.MustCompile(
+		`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
+	)
 	matches := paramRegex.FindAllStringSubmatch(input, -1)
 
 	var params []paramPair

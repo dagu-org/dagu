@@ -47,8 +47,16 @@ message: %s
 `
 
 func (e *MailExecutor) Run() error {
-	_, _ = e.stdout.Write([]byte(fmt.Sprintf(mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)))
-	err := e.mailer.SendMail(e.cfg.From, []string{e.cfg.To}, e.cfg.Subject, e.cfg.Message, []string{})
+	_, _ = e.stdout.Write(
+		[]byte(fmt.Sprintf(mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)),
+	)
+	err := e.mailer.SendMail(
+		e.cfg.From,
+		[]string{e.cfg.To},
+		e.cfg.Subject,
+		e.cfg.Message,
+		[]string{},
+	)
 	if err != nil {
 		_, _ = e.stdout.Write([]byte("error occurred."))
 	} else {

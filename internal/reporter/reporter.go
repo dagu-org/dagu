@@ -94,7 +94,9 @@ func renderSummary(status *model.Status, err error) string {
 	if err != nil {
 		errText = err.Error()
 	}
-	t.AppendHeader(table.Row{"RequestID", "Name", "Started At", "Finished At", "Status", "Params", "Error"})
+	t.AppendHeader(
+		table.Row{"RequestID", "Name", "Started At", "Finished At", "Status", "Params", "Error"},
+	)
 	t.AppendRow(table.Row{
 		status.RequestID,
 		status.Name,
@@ -109,7 +111,9 @@ func renderSummary(status *model.Status, err error) string {
 
 func renderTable(nodes []*model.Node) string {
 	t := table.NewWriter()
-	t.AppendHeader(table.Row{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"})
+	t.AppendHeader(
+		table.Row{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"},
+	)
 	for i, n := range nodes {
 		var command = n.Command
 		if n.Args != nil {

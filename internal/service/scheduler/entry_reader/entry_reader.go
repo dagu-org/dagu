@@ -139,7 +139,9 @@ func (er *EntryReader) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dg, err := er.loader.LoadMetadata(filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dg, err := er.loader.LoadMetadata(
+					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
+				)
 				if err != nil {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {

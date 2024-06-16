@@ -196,7 +196,9 @@ func checkExtension(file string) bool {
 	return false
 }
 
-func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs []string, err error) {
+func (d *dagStoreImpl) Grep(
+	pattern string,
+) (ret []*persistence.GrepResult, errs []string, err error) {
 	if err = d.ensureDirExist(); err != nil {
 		errs = append(errs, fmt.Sprintf("failed to create DAGs directory %s", d.dir))
 		return

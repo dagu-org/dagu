@@ -36,7 +36,12 @@ var (
 )
 
 // SendMail sends an email.
-func (m *Mailer) SendMail(from string, to []string, subject, body string, attachments []string) error {
+func (m *Mailer) SendMail(
+	from string,
+	to []string,
+	subject, body string,
+	attachments []string,
+) error {
 	log.Printf("Sending an email to %s, subject is \"%s\"", strings.Join(to, ","), subject)
 	if m.Username == "" && m.Password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
@@ -44,7 +49,12 @@ func (m *Mailer) SendMail(from string, to []string, subject, body string, attach
 	return m.sendWithAuth(from, to, subject, body, attachments)
 }
 
-func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string, attachments []string) error {
+func (m *Mailer) sendWithNoAuth(
+	from string,
+	to []string,
+	subject, body string,
+	attachments []string,
+) error {
 	c, err := smtp.Dial(m.Host + ":" + m.Port)
 	if err != nil {
 		return err
@@ -78,7 +88,12 @@ func (m *Mailer) sendWithNoAuth(from string, to []string, subject, body string, 
 	return c.Quit()
 }
 
-func (m *Mailer) sendWithAuth(from string, to []string, subject, body string, attachments []string) error {
+func (m *Mailer) sendWithAuth(
+	from string,
+	to []string,
+	subject, body string,
+	attachments []string,
+) error {
 	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
 	body = newlineToBrTag(body)
 	return smtp.SendMail(
@@ -99,7 +114,11 @@ func (m *Mailer) composeHeader(to []string, from string, subject string) string 
 		"Content-Transfer-Encoding: base64\r\n"
 }
 
-func (m *Mailer) composeMail(to []string, from, subject, body string, attachments []string) (b []byte) {
+func (m *Mailer) composeMail(
+	to []string,
+	from, subject, body string,
+	attachments []string,
+) (b []byte) {
 	msg := m.composeHeader(to, from, subject) +
 		"\r\n" + base64.StdEncoding.EncodeToString([]byte(body))
 	b = joinBytes([]byte(msg), addAttachments(attachments))
@@ -133,7 +152,9 @@ func addAttachments(attachments []string) []byte {
 			buf.WriteString(fmt.Sprintf("\r\n\n--%s\r\n", boundary))
 			buf.WriteString("Content-Type: text/plain;" + "\r\n")
 			buf.WriteString("Content-Transfer-Encoding: base64" + "\r\n")
-			buf.WriteString("Content-Disposition: attachment; filename=" + filepath.Base(fileName) + "\r\n")
+			buf.WriteString(
+				"Content-Disposition: attachment; filename=" + filepath.Base(fileName) + "\r\n",
+			)
 			buf.WriteString("Content-Transfer-Encoding: base64\r\n\n")
 			b := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
 			base64.StdEncoding.Encode(b, data)

@@ -320,7 +320,12 @@ func (store *Store) newFile(dagFile string, t time.Time, reqID string) (string, 
 	if dagFile == "" {
 		return "", errDAGFileEmpty
 	}
-	fileName := fmt.Sprintf("%s.%s.%s.dat", store.pattern(dagFile), t.Format("20060102.15:04:05.000"), util.TruncString(reqID, 8))
+	fileName := fmt.Sprintf(
+		"%s.%s.%s.dat",
+		store.pattern(dagFile),
+		t.Format("20060102.15:04:05.000"),
+		util.TruncString(reqID, 8),
+	)
 	return fileName, nil
 }
 
@@ -330,7 +335,11 @@ func (store *Store) pattern(dagFile string) string {
 	return filepath.Join(dir, p)
 }
 
-func (store *Store) latestToday(dagFile string, day time.Time, latestStatusToday bool) (string, error) {
+func (store *Store) latestToday(
+	dagFile string,
+	day time.Time,
+	latestStatusToday bool,
+) (string, error) {
 	var ret []string
 	pattern := ""
 	if latestStatusToday {

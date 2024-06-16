@@ -26,7 +26,11 @@ func TestRestartCommand(t *testing.T) {
 
 		// Start the DAG.
 		go func() {
-			testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+			testRunCommand(
+				t,
+				startCmd(),
+				cmdTest{args: []string{"start", `--params="foo"`, dagFile}},
+			)
 		}()
 
 		time.Sleep(waitForStatusUpdate)

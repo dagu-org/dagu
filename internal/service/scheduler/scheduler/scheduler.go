@@ -58,13 +58,31 @@ func (e *Entry) Invoke() error {
 	}
 	switch e.EntryType {
 	case Start:
-		e.Logger.Info("start job", "job", e.Job.String(), "time", e.Next.Format("2006-01-02 15:04:05"))
+		e.Logger.Info(
+			"start job",
+			"job",
+			e.Job.String(),
+			"time",
+			e.Next.Format("2006-01-02 15:04:05"),
+		)
 		return e.Job.Start()
 	case Stop:
-		e.Logger.Info("stop job", "job", e.Job.String(), "time", e.Next.Format("2006-01-02 15:04:05"))
+		e.Logger.Info(
+			"stop job",
+			"job",
+			e.Job.String(),
+			"time",
+			e.Next.Format("2006-01-02 15:04:05"),
+		)
 		return e.Job.Stop()
 	case Restart:
-		e.Logger.Info("restart job", "job", e.Job.String(), "time", e.Next.Format("2006-01-02 15:04:05"))
+		e.Logger.Info(
+			"restart job",
+			"job",
+			e.Job.String(),
+			"time",
+			e.Next.Format("2006-01-02 15:04:05"),
+		)
 		return e.Job.Restart()
 	}
 	return nil

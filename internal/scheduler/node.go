@@ -125,7 +125,10 @@ func (n *Node) Execute(ctx context.Context) error {
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
 		_ = os.Setenv(n.data.Step.Output, ret)
-		n.data.Step.OutputVariables.Store(n.data.Step.Output, fmt.Sprintf("%s=%s", n.data.Step.Output, ret))
+		n.data.Step.OutputVariables.Store(
+			n.data.Step.Output,
+			fmt.Sprintf("%s=%s", n.data.Step.Output, ret),
+		)
 	}
 
 	return n.data.Error

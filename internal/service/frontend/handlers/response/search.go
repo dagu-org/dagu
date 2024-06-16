@@ -7,11 +7,17 @@ import (
 	"github.com/samber/lo"
 )
 
-func NewSearchDAGsResponse(ret []*persistence.GrepResult, errs []string) *models.SearchDagsResponse {
+func NewSearchDAGsResponse(
+	ret []*persistence.GrepResult,
+	errs []string,
+) *models.SearchDagsResponse {
 	return &models.SearchDagsResponse{
-		Results: lo.Map(ret, func(item *persistence.GrepResult, _ int) *models.SearchDagsResultItem {
-			return NewSearchDAGsResultItem(item)
-		}),
+		Results: lo.Map(
+			ret,
+			func(item *persistence.GrepResult, _ int) *models.SearchDagsResultItem {
+				return NewSearchDAGsResultItem(item)
+			},
+		),
 		Errors: errs,
 	}
 }

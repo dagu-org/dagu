@@ -106,7 +106,9 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		})
 }
 
-func (h *DAGHandler) Create(params operations.CreateDagParams) (*models.CreateDagResponse, *response.CodedError) {
+func (h *DAGHandler) Create(
+	params operations.CreateDagParams,
+) (*models.CreateDagResponse, *response.CodedError) {
 	switch lo.FromPtr(params.Body.Action) {
 	case "new":
 		name := *params.Body.Value
@@ -130,7 +132,9 @@ func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedEr
 	return nil
 }
 
-func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsResponse, *response.CodedError) {
+func (h *DAGHandler) GetList(
+	_ operations.ListDagsParams,
+) (*models.ListDagsResponse, *response.CodedError) {
 	dags, errs, err := h.engine.GetAllStatus()
 	if err != nil {
 		return nil, response.NewInternalError(err)
@@ -147,7 +151,9 @@ func (h *DAGHandler) GetList(_ operations.ListDagsParams) (*models.ListDagsRespo
 	return response.NewListDagResponse(dags, errs, hasErr), nil
 }
 
-func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.GetDagDetailsResponse, *response.CodedError) {
+func (h *DAGHandler) GetDetail(
+	params operations.GetDagDetailsParams,
+) (*models.GetDagDetailsResponse, *response.CodedError) {
 	dagID := params.DagID
 
 	tab := dagTabTypeStatus
@@ -205,7 +211,10 @@ func (h *DAGHandler) GetDetail(params operations.GetDagDetailsParams) (*models.G
 	return resp, nil
 }
 
-func (h *DAGHandler) getStepLog(dg *dag.DAG, logFile, stepName string) (*models.DagStepLogResponse, error) {
+func (h *DAGHandler) getStepLog(
+	dg *dag.DAG,
+	logFile, stepName string,
+) (*models.DagStepLogResponse, error) {
 	var stepByName = map[dag.HandlerType]*model.Node{
 		dag.HandlerOnSuccess: nil,
 		dag.HandlerOnFailure: nil,
@@ -275,7 +284,10 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.DagSchedulerLogResponse, error) {
+func (h *DAGHandler) readSchedulerLog(
+	dg *dag.DAG,
+	statusFile string,
+) (*models.DagSchedulerLogResponse, error) {
 
 	var logFile string
 	if statusFile == "" {
@@ -301,7 +313,9 @@ func (h *DAGHandler) readSchedulerLog(dg *dag.DAG, statusFile string) (*models.D
 }
 
 // nolint // cognitive complexity
-func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.PostDagActionResponse, *response.CodedError) {
+func (h *DAGHandler) PostAction(
+	params operations.PostDagActionParams,
+) (*models.PostDagActionResponse, *response.CodedError) {
 	dagStatus, err := h.engine.GetStatus(params.DagID)
 
 	if err != nil && *params.Body.Action != "save" {
@@ -320,48 +334,78 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 
 	case "stop":
 		if dagStatus.Status.Status != scheduler.StatusRunning {
-			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is not running: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("the DAG is not running: %w", errInvalidArgs),
+			)
 		}
 		if err := h.engine.Stop(dagStatus.DAG); err != nil {
-			return nil, response.NewBadRequestError(fmt.Errorf("error trying to stop the DAG: %w", err))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("error trying to stop the DAG: %w", err),
+			)
 		}
 
 	case "retry":
 		if params.Body.RequestID == "" {
-			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("request-id is required: %w", errInvalidArgs),
+			)
 		}
 		if err := h.engine.Retry(dagStatus.DAG, params.Body.RequestID); err != nil {
-			return nil, response.NewInternalError(fmt.Errorf("error trying to retry the DAG: %w", err))
+			return nil, response.NewInternalError(
+				fmt.Errorf("error trying to retry the DAG: %w", err),
+			)
 		}
 
 	case "mark-success":
 		if dagStatus.Status.Status == scheduler.StatusRunning {
-			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("the DAG is still running: %w", errInvalidArgs),
+			)
 		}
 		if params.Body.RequestID == "" {
-			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("request-id is required: %w", errInvalidArgs),
+			)
 		}
 		if params.Body.Step == "" {
-			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("step name is required: %w", errInvalidArgs),
+			)
 		}
 
-		err = h.updateStatus(dagStatus.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusSuccess)
+		err = h.updateStatus(
+			dagStatus.DAG,
+			params.Body.RequestID,
+			params.Body.Step,
+			scheduler.NodeStatusSuccess,
+		)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
 
 	case "mark-failed":
 		if dagStatus.Status.Status == scheduler.StatusRunning {
-			return nil, response.NewBadRequestError(fmt.Errorf("the DAG is still running: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("the DAG is still running: %w", errInvalidArgs),
+			)
 		}
 		if params.Body.RequestID == "" {
-			return nil, response.NewBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("request-id is required: %w", errInvalidArgs),
+			)
 		}
 		if params.Body.Step == "" {
-			return nil, response.NewBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("step name is required: %w", errInvalidArgs),
+			)
 		}
 
-		err = h.updateStatus(dagStatus.DAG, params.Body.RequestID, params.Body.Step, scheduler.NodeStatusError)
+		err = h.updateStatus(
+			dagStatus.DAG,
+			params.Body.RequestID,
+			params.Body.Step,
+			scheduler.NodeStatusError,
+		)
 		if err != nil {
 			return nil, response.NewInternalError(err)
 		}
@@ -374,7 +418,9 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 	case "rename":
 		newName := params.Body.Value
 		if newName == "" {
-			return nil, response.NewBadRequestError(fmt.Errorf("new name is required: %w", errInvalidArgs))
+			return nil, response.NewBadRequestError(
+				fmt.Errorf("new name is required: %w", errInvalidArgs),
+			)
 		}
 		if err := h.engine.Rename(params.DagID, newName); err != nil {
 			return nil, response.NewInternalError(err)
@@ -382,7 +428,9 @@ func (h *DAGHandler) PostAction(params operations.PostDagActionParams) (*models.
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
 
 	default:
-		return nil, response.NewBadRequestError(fmt.Errorf("invalid action: %s", *params.Body.Action))
+		return nil, response.NewBadRequestError(
+			fmt.Errorf("invalid action: %s", *params.Body.Action),
+		)
 	}
 
 	return &models.PostDagActionResponse{}, nil
@@ -407,7 +455,9 @@ func (h *DAGHandler) updateStatus(dg *dag.DAG, reqID, step string, to scheduler.
 	return h.engine.UpdateStatus(dg, status)
 }
 
-func (h *DAGHandler) Search(params operations.SearchDagsParams) (*models.SearchDagsResponse, *response.CodedError) {
+func (h *DAGHandler) Search(
+	params operations.SearchDagsParams,
+) (*models.SearchDagsResponse, *response.CodedError) {
 	query := params.Q
 	if query == "" {
 		return nil, response.NewBadRequestError(errInvalidArgs)

@@ -220,7 +220,8 @@ func (e *engineImpl) GetLatestStatus(dg *dag.DAG) (*model.Status, error) {
 		return currStatus, nil
 	}
 	status, err := e.dataStore.NewHistoryStore().ReadStatusToday(dg.Location)
-	if errors.Is(err, persistence.ErrNoStatusDataToday) || errors.Is(err, persistence.ErrNoStatusData) {
+	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
+		errors.Is(err, persistence.ErrNoStatusData) {
 		return model.NewStatusDefault(dg), nil
 	}
 	if err != nil {
