@@ -71,7 +71,14 @@ type TLS struct {
 	KeyFile  string
 }
 
+var (
+	lock sync.Mutex
+)
+
 func Load() (*Config, error) {
+	lock.Lock()
+	defer lock.Unlock()
+
 	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
