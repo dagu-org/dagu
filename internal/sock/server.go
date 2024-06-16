@@ -54,7 +54,7 @@ func (svr *Server) Serve(listen chan error) error {
 	if listen != nil {
 		listen <- err
 	}
-	log.Printf("frontend is running at \"%v\"\n", svr.Addr)
+	log.Printf("unix socket is running at \"%v\"\n", svr.Addr)
 	defer func() {
 		_ = svr.Shutdown()
 		_ = os.Remove(svr.Addr)
