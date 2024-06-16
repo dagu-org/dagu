@@ -20,5 +20,13 @@
     },
     "files.associations": {
         "*.gohtml": "html"
+    },
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": "\\.go$",
+                "cmd": "golines ${file} -w"
+            }
+        ]
     }
 }
