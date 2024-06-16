@@ -46,6 +46,7 @@ func setupTest(t *testing.T) (string, engine.Engine,
 }
 
 func TestAgent_Run(t *testing.T) {
+	t.Parallel()
 	t.Run("Run a DAG successfully", func(t *testing.T) {
 		tmpDir, eng, dataStore, loader := setupTest(t)
 		defer func() {
@@ -76,7 +77,7 @@ func TestAgent_Run(t *testing.T) {
 		_, eng, dataStore, loader := setupTest(t)
 
 		// Create a history file by running a DAG
-		dg := testLoadDAG(t, "run.yaml", loader)
+		dg := testLoadDAG(t, "simple.yaml", loader)
 		dagAgent := agent.New(&agent.Config{DAG: dg}, eng, dataStore)
 		err := dagAgent.Run(context.Background())
 		require.NoError(t, err)
@@ -211,6 +212,7 @@ func TestAgent_Run(t *testing.T) {
 }
 
 func TestAgent_DryRun(t *testing.T) {
+	t.Parallel()
 	t.Run("Dry-run a DAG successfully", func(t *testing.T) {
 		tmpDir, eng, df, loader := setupTest(t)
 		defer func() {
@@ -234,6 +236,7 @@ func TestAgent_DryRun(t *testing.T) {
 }
 
 func TestAgent_Retry(t *testing.T) {
+	t.Parallel()
 	t.Run("Retry a DAG", func(t *testing.T) {
 		tmpDir, eng, dataStore, loader := setupTest(t)
 		defer func() {
@@ -274,6 +277,7 @@ func TestAgent_Retry(t *testing.T) {
 }
 
 func TestAgent_HandleHTTP(t *testing.T) {
+	t.Parallel()
 	t.Run("Handle HTTP requests and return the status of the DAG", func(t *testing.T) {
 		tmpDir, eng, dataStore, loader := setupTest(t)
 		defer func() {
