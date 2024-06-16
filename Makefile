@@ -27,6 +27,10 @@ CERT_DIR=./cert
 
 FRONTEND_BUILD_DIR=./ui/dist
 
+APP_NAME=dagu
+BIN_DIR=./bin
+BIN_NAME=${BIN_DIR}/${APP_NAME}
+
 ########## Main Targets ##########
 
 # main starts the backend server.
@@ -55,9 +59,8 @@ test-clean:
 	@go clean -testcache
 	@go test --race ./...
 
-# lint the Go code.
-lint:
-	golangci-lint run -v
+# lint runs the linter.
+lint: golangci-lint
 
 # swagger generates the swagger server code.
 swagger: clean-swagger gen-swagger
@@ -66,7 +69,7 @@ swagger: clean-swagger gen-swagger
 certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
 
 # build build the binary.
-build: build-ui build-dir go-lint build-bin
+build: build-ui build-bin
 
 # build-image build the docker image and push to the registry.
 # VERSION should be set via the argument as follows:
@@ -79,28 +82,26 @@ build-image-version:
 ifeq ($(VERSION),)
 	$(error "VERSION is null")
 endif
-	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:$(VERSION) .
+	$(DOCKER_CMD) -t ghcr.io/dagu-dev/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 build-image-latest:
-	$(DOCKER_CMD) -t ghcr.io/dagu-dev/dagu:latest .
+	$(DOCKER_CMD) -t ghcr.io/dagu-dev/${APP_NAME}:latest .
 
 # server build the binary and start the server.
-server: go-lint build-dir build-bin
-	./bin/dagu server
+server: golangci-lint build-bin
+	${BIN_NAME} server
 
 # scheduler build the binary and start the scheduler.
-scheduler: go-lint build-dir build-bin
-	./bin/dagu scheduler
+scheduler: golangci-lint build-bin
+	${BIN_NAME} scheduler
 
 ########## Tools ##########
 
-build-bin:
-	go build -ldflags="$(LDFLAGS)" -o ./bin/dagu .
-
-build-dir:
-	@mkdir -p ./bin
+build-bin: golangci-lint
+	@mkdir -p ${BIN_DIR}
+	@go build -ldflags="$(LDFLAGS)" -o ${BIN_NAME} .
 
 build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
@@ -115,7 +116,7 @@ build-ui:
 	@cp ${FRONTEND_BUILD_DIR}/*.woff ${FRONTEND_ASSETS_DIR}
 	@cp ${FRONTEND_BUILD_DIR}/*.woff2 ${FRONTEND_ASSETS_DIR}
 
-go-lint:
+golangci-lint:
 	@echo "${COLOR_GREEN}Installing golangci-lint...${COLOR_RESET}"
 	@go install $(PKG_GOLANGCI_LINT)
 	@echo "${COLOR_GREEN}Running golangci-lint...${COLOR_RESET}"
