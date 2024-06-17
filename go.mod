@@ -34,6 +34,7 @@ require (
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
 	golang.org/x/text v0.16.0
 	gopkg.in/yaml.v2 v2.4.0
+	gotest.tools/gotestsum v1.12.0
 )
 
 require (
@@ -63,6 +64,7 @@ require (
 	github.com/ashanbrown/forbidigo v1.6.0 // indirect
 	github.com/ashanbrown/makezero v1.1.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/bkielbasa/cyclop v1.2.1 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
 	github.com/bombsimon/wsl/v4 v4.2.1 // indirect
@@ -80,6 +82,7 @@ require (
 	github.com/daixiang0/gci v0.13.4 // indirect
 	github.com/dave/dst v0.27.3 // indirect
 	github.com/denis-tingaikin/go-header v0.5.0 // indirect
+	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -116,6 +119,7 @@ require (
 	github.com/golangci/revgrep v0.5.3 // indirect
 	github.com/golangci/unconvert v0.0.0-20240309020433-c5143eacb3ed // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gordonklaus/ineffassign v0.1.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
@@ -244,7 +248,6 @@ require (
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	gotest.tools/v3 v3.4.0 // indirect
 	honnef.co/go/tools v0.4.7 // indirect
 	mvdan.cc/gofumpt v0.6.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
