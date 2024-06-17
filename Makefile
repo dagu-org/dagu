@@ -63,15 +63,20 @@ watch:
 	@nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
 
 # test runs all tests.
-test: build-bin
-	@go install $(PKG_gotestsum)
-	@gotestsum $(GOTESTSUM_ARGS) -- -v --race ./...
+test:
+	@go install ${PKG_gotestsum}
+	@gotestsum ${GOTESTSUM_ARGS} -- -v --race ./...
+
+# test-coverage runs all tests with coverage.
+test-coverage:
+	@go install $(PKG_gotestsum}
+	@gotestsum ${GOTESTSUM_ARGS} -- -v --race coverprofile="coverage.txt" -covermode=atomic ./...
 
 # test-clean cleans the test cache and run all tests.
 test-clean: build-bin
-	@go install $(PKG_gotestsum)
+	@go install ${PKG_gotestsum}
 	@go clean -testcache
-	@gotestsum $(GOTESTSUM_ARGS) -- -v --race ./...
+	@gotestsum ${GOTESTSUM_ARGS} -- -v --race ./...
 
 # lint runs the linter.
 lint: golangci-lint

@@ -35,9 +35,7 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp ui/dist/*.js ./internal/service/frontend/assets/
-          cp ui/dist/*.woff ./internal/service/frontend/assets/
-          cp ui/dist/*.woff2 ./internal/service/frontend/assets/
+          cp ui/dist/* ./internal/service/frontend/assets/
 
       - name: Cache Go modules
         uses: actions/cache@v1
@@ -53,7 +51,7 @@ jobs:
 
       - name: Test
         run: |
-          go test --race -v -coverprofile="coverage.txt" -covermode=atomic ./...
+          make test-coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2
