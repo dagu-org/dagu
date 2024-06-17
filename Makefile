@@ -1,12 +1,20 @@
 .PHONY: build server scheduler test proto certs swagger https
 
+########## Arguments ##########
+
+VERSION=
+
 ########## Variables ##########
-SRC_DIR=./
+
+# This Makefile's directory
+SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+
+SRC_DIR=$(SCRIPT_DIR)
 DST_DIR=$(SRC_DIR)/internal
+
 BUILD_VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 
-VERSION=
 DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm64/v8 --builder container --build-arg VERSION=$(VERSION) --push --no-cache
 
 DEV_CERT_SUBJ_CA="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=DAGU/CN=*.dagu.dev/emailAddress=ca@dev.com"
@@ -16,20 +24,24 @@ DEV_CERT_SUBJ_ALT="subjectAltName=DNS:localhost"
 
 PKG_SWAGGER=github.com/go-swagger/go-swagger/cmd/swagger
 PKG_GOLANGCI_LINT=github.com/golangci/golangci-lint/cmd/golangci-lint
+PKG_gotestsum=gotest.tools/gotestsum
 
 COLOR_GREEN=\033[0;32m
 COLOR_RESET=\033[0m
 
-FRONTEND_DIR=./internal/service/frontend
-FRONTEND_GEN_DIR=${FRONTEND_DIR}/gen
-FRONTEND_ASSETS_DIR=${FRONTEND_DIR}/assets
-CERT_DIR=./cert
+FE_DIR=./internal/service/frontend
+FE_GEN_DIR=${FE_DIR}/gen
+FE_ASSETS_DIR=${FE_DIR}/assets
 
-FRONTEND_BUILD_DIR=./ui/dist
+CERT_DIR=${SCRIPT_DIR}/cert
+
+FE_BUILD_DIR=./ui/dist
 
 APP_NAME=dagu
-BIN_DIR=./bin
-BIN_NAME=${BIN_DIR}/${APP_NAME}
+BIN_DIR=${SCRIPT_DIR}/bin
+
+# gotestsum args
+GOTESTSUM_ARGS=--format=pkgname --format-hivis
 
 ########## Main Targets ##########
 
@@ -51,13 +63,15 @@ watch:
 	@nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
 
 # test runs all tests.
-test:
-	@go test --race ./...
+test: build-bin
+	@go install $(PKG_gotestsum)
+	@gotestsum $(GOTESTSUM_ARGS) -- -v --race ./...
 
 # test-clean cleans the test cache and run all tests.
-test-clean:
+test-clean: build-bin
+	@go install $(PKG_gotestsum)
 	@go clean -testcache
-	@go test --race ./...
+	@gotestsum $(GOTESTSUM_ARGS) -- -v --race ./...
 
 # lint runs the linter.
 lint: golangci-lint
@@ -91,50 +105,38 @@ build-image-latest:
 
 # server build the binary and start the server.
 server: golangci-lint build-bin
-	${BIN_NAME} server
+	${BIN_DIR}/${APP_NAME} server
 
 # scheduler build the binary and start the scheduler.
 scheduler: golangci-lint build-bin
-	${BIN_NAME} scheduler
+	${BIN_DIR}/${APP_NAME} scheduler
 
 ########## Tools ##########
 
-build-bin: golangci-lint
+build-bin:
 	@mkdir -p ${BIN_DIR}
-	@go build -ldflags="$(LDFLAGS)" -o ${BIN_NAME} .
+	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} .
 
 build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
 		yarn && yarn build
-
-	@rm -f ${FRONTEND_ASSETS_DIR}/*.js
-	@rm -f ${FRONTEND_ASSETS_DIR}/*.woff
-	@rm -f ${FRONTEND_ASSETS_DIR}/*.woff2
-
-	@cp ${FRONTEND_BUILD_DIR}/*.js ${FRONTEND_ASSETS_DIR}
-	@cp ${FRONTEND_BUILD_DIR}/*.woff ${FRONTEND_ASSETS_DIR}
-	@cp ${FRONTEND_BUILD_DIR}/*.woff2 ${FRONTEND_ASSETS_DIR}
+	@echo "${COLOR_GREEN}Copying UI assets...${COLOR_RESET}"
+	@rm -f ${FE_ASSETS_DIR}/*
+	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 
 golangci-lint:
-	@echo "${COLOR_GREEN}Installing golangci-lint...${COLOR_RESET}"
 	@go install $(PKG_GOLANGCI_LINT)
-	@echo "${COLOR_GREEN}Running golangci-lint...${COLOR_RESET}"
 	@golangci-lint run ./...
 
 clean-swagger:
-	@echo "${COLOR_GREEN}Cleaning swagger...${COLOR_RESET}"
-	@rm -rf ${FRONTEND_GEN_DIR}/restapi/models
-	@rm -rf ${FRONTEND_GEN_DIR}/restapi/operations
+	@rm -rf ${FE_GEN_DIR}/restapi/models
+	@rm -rf ${FE_GEN_DIR}/restapi/operations
 
 gen-swagger:
-	@echo "${COLOR_GREEN}Installing swagger...${COLOR_RESET}"
 	@go install $(PKG_SWAGGER)
-	@echo "${COLOR_GREEN}Validating swagger...${COLOR_RESET}"
 	@swagger validate ./swagger.yaml
-	@echo "${COLOR_GREEN}Generating swagger...${COLOR_RESET}"
-	@swagger generate server -t ${FRONTEND_GEN_DIR} --server-package=restapi --exclude-main -f ./swagger.yaml
-	@echo "${COLOR_GREEN}Running go mod tidy...${COLOR_RESET}"
+	@swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./swagger.yaml
 	@go mod tidy
 
 ########## Certificates ##########
