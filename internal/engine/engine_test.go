@@ -169,7 +169,7 @@ func TestEngine_GetStatus(t *testing.T) {
 		require.Equal(t, 1, len(status.Nodes))
 		require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
 	})
-	t.Run("[Invalid] Update status with invalid requiest ID", func(t *testing.T) {
+	t.Run("[Invalid] Update status with invalid request ID", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
