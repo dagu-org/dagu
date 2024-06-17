@@ -25,7 +25,9 @@ import (
 // 1. It creates a temporary directory and returns the path to it.
 // 2. Sets the home directory to the temporary directory.
 // 3. Creates a new data store factory and engine.
-func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
+func setupTest(t *testing.T) (
+	string, engine.Engine, persistence.DataStoreFactory, *config.Config,
+) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
@@ -39,7 +41,9 @@ func setupTest(t *testing.T) (string, engine.Engine, persistence.DataStoreFactor
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	return tmpDir, engine.New(dataStore, new(engine.Config), cfg), dataStore, cfg
+	return tmpDir, engine.New(
+		dataStore, new(engine.Config), cfg,
+	), dataStore, cfg
 }
 
 // cmdTest is a helper struct to test commands.

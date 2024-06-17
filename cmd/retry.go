@@ -34,7 +34,9 @@ func retryCmd() *cobra.Command {
 
 			absoluteFilePath, err := filepath.Abs(args[0])
 			if err != nil {
-				log.Fatalf("Failed to get the absolute path of the DAG file: %v", err)
+				log.Fatalf(
+					"Failed to get the absolute path of the DAG file: %v", err,
+				)
 			}
 
 			status, err := historyStore.FindByRequestID(absoluteFilePath, reqID)
@@ -42,7 +44,8 @@ func retryCmd() *cobra.Command {
 				log.Fatalf("Failed to find the request: %v", err)
 			}
 
-			// Start the DAG with the same parameters with the execution that is being retried.
+			// Start the DAG with the same parameters with the execution that
+			// is being retried.
 			loadedDAG, err := loadDAG(cfg, args[0], status.Status.Params)
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)

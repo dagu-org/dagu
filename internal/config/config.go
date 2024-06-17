@@ -86,7 +86,9 @@ func Load() (*Config, error) {
 	bindEnvs()
 
 	// Set default values for config keys.
-	setDefaults()
+	if err := setDefaults(); err != nil {
+		return nil, err
+	}
 
 	// Populate viper with environment variables.
 	viper.AutomaticEnv()

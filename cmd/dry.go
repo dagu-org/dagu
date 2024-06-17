@@ -18,6 +18,7 @@ func dryCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
+				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			runDAG(

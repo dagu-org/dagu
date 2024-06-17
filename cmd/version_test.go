@@ -7,7 +7,7 @@ import (
 )
 
 func TestVersionCommand(t *testing.T) {
-	t.Run("Version command should run", func(t *testing.T) {
+	t.Run("Version command should output version", func(t *testing.T) {
 		constants.Version = "1.2.3"
 		testRunCommand(t, versionCmd(), cmdTest{
 			args:        []string{"version"},

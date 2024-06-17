@@ -15,9 +15,10 @@ func schedulerCmd() *cobra.Command {
 		Use:   "scheduler",
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			cfg, err := config.Load()
 			if err != nil {
+				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
@@ -36,7 +37,9 @@ func schedulerCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
+	cmd.Flags().StringP(
+		"dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)",
+	)
 	_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
 
 	return cmd

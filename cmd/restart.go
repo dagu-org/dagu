@@ -100,7 +100,8 @@ func stopRunningDAG(e engine.Engine, dg *dag.DAG) error {
 	}
 }
 
-// waitForRestart waits for the specified amount of time before restarting the DAG.
+// waitForRestart waits for the specified amount of time before restarting
+// the DAG.
 func waitForRestart(restartWait time.Duration) {
 	if restartWait > 0 {
 		log.Printf("Waiting for %s...", restartWait)

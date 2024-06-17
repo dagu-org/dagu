@@ -14,15 +14,17 @@ func serverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Start the server",
-		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		// nolint:line-length-limit
+		Long: `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
+		PreRun: func(cmd *cobra.Command, _ []string) {
 			_ = viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 			_ = viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 			_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
 		},
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			cfg, err := config.Load()
 			if err != nil {
+				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
 
@@ -32,6 +34,7 @@ func serverCmd() *cobra.Command {
 				fx.Invoke(frontend.LifetimeHooks),
 			)
 			if err := app.Start(cmd.Context()); err != nil {
+				// nolint
 				log.Fatalf("Failed to start server: %v", err)
 			}
 		},

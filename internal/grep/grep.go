@@ -76,7 +76,7 @@ func scanLines(dat []byte, matcher Matcher) ([]string, []int, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(dat))
 	var lines []string
 	var matches []int
-	idx := 0
+	var idx int
 
 	for scanner.Scan() {
 		line := scanner.Text()

@@ -83,6 +83,8 @@ func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 	return string(dat), nil
 }
 
+const defaultPerm os.FileMode = 0600
+
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
 	loader := dag.NewLoader(d.cfg)
@@ -97,7 +99,7 @@ func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	if !exists(loc) {
 		return fmt.Errorf("%w: %s", errDOGFileNotExist, loc)
 	}
-	err = os.WriteFile(loc, spec, 0755)
+	err = os.WriteFile(loc, spec, defaultPerm)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errFailedToUpdateDAGFile, err)
 	}

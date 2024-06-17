@@ -72,7 +72,9 @@ type (
 	}
 )
 
-func NewDAGStatus(dg *dag.DAG, s *model.Status, suspended bool, err error) *DAGStatus {
+func NewDAGStatus(
+	dg *dag.DAG, s *model.Status, suspended bool, err error,
+) *DAGStatus {
 	ret := &DAGStatus{
 		File:      filepath.Base(dg.Location),
 		Dir:       filepath.Dir(dg.Location),
