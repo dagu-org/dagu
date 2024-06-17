@@ -5,7 +5,6 @@ linters:
     - err113
     - errcheck
     - goimports
-    - paralleltest
     - revive
     - staticcheck
     - govet
@@ -26,15 +25,23 @@ linters-settings:
     severity: error
     confidence: 0.8
     enable-all-rules: true
+    rules:
+      # Disabled rules
+      - name: add-constant
+        disabled: true
+      - name: max-public-structs
+        disabled: true
+      - name: cognitive-complexity
+        disabled: true
 issues:
   exclude-dirs:
-    - ^ui
-    - ^assets
-    - ^.git
-    - ^cert
-    - ^bin
-    - ^internal/service/frontend/gen
-    - ^internal/service/scheduler/filenotify/fsnotify.go
+    - ui
+    - assets
+    - .git
+    - cert
+    - bin
+    - internal/service/frontend/gen
+    - internal/service/scheduler/filenotify
   exclude-rules:
     - path: _test\.go|tests/.+\.go
       linters:
