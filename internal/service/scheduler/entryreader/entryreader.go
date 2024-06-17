@@ -1,4 +1,4 @@
-package entry_reader
+package entryreader
 
 import (
 	"os"
@@ -50,7 +50,7 @@ func New(params Params, loader *dag.Loader) *EntryReader {
 		engine:   params.Engine,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entry_reader dags", tag.Error(err))
+		er.logger.Error("failed to init entryreader dags", tag.Error(err))
 	}
 	return er
 }
@@ -100,7 +100,9 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
-			dg, err := er.loader.LoadMetadata(filepath.Join(er.dagsDir, fi.Name()))
+			dg, err := er.loader.LoadMetadata(
+				filepath.Join(er.dagsDir, fi.Name()),
+			)
 			if err != nil {
 				er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				continue
@@ -146,19 +148,21 @@ func (er *EntryReader) watchDags(done chan any) {
 					er.logger.Error("failed to read DAG cfg", tag.Error(err))
 				} else {
 					er.dags[filepath.Base(event.Name)] = dg
-					er.logger.Info("reload DAG entry_reader", "file", event.Name)
+					er.logger.Info(
+						"reload DAG entryreader", "file", event.Name,
+					)
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("remove DAG entry_reader", "file", event.Name)
+				er.logger.Info("remove DAG entryreader", "file", event.Name)
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entry_reader DAGs error", tag.Error(err))
+			er.logger.Error("watch entryreader DAGs error", tag.Error(err))
 		}
 	}
 

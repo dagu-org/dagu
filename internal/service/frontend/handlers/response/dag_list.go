@@ -14,9 +14,11 @@ func NewListDagResponse(
 	hasError bool,
 ) *models.ListDagsResponse {
 	return &models.ListDagsResponse{
-		DAGs: lo.Map(dagStatusList, func(item *persistence.DAGStatus, _ int) *models.DagListItem {
-			return NewDagListItem(item)
-		}),
+		DAGs: lo.Map(
+			dagStatusList, func(item *persistence.DAGStatus, _ int,
+			) *models.DagListItem {
+				return NewDagListItem(item)
+			}),
 		Errors:   errs,
 		HasError: swag.Bool(hasError),
 	}

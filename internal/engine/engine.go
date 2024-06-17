@@ -198,7 +198,7 @@ func (*engineImpl) GetCurrentStatus(dg *dag.DAG) (*model.Status, error) {
 		}
 		return model.NewStatusDefault(dg), nil
 	}
-	return model.StatusFromJson(ret)
+	return model.StatusFromJSON(ret)
 }
 
 func (e *engineImpl) GetStatusByRequestID(dg *dag.DAG, reqID string) (
@@ -224,7 +224,7 @@ func (*engineImpl) currentStatus(dg *dag.DAG) (*model.Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
 	}
-	return model.StatusFromJson(ret)
+	return model.StatusFromJSON(ret)
 }
 
 func (e *engineImpl) GetLatestStatus(dg *dag.DAG) (*model.Status, error) {
@@ -256,7 +256,7 @@ func (e *engineImpl) UpdateStatus(dg *dag.DAG, status *model.Status) error {
 			return err
 		}
 	} else {
-		unmarshalled, _ := model.StatusFromJson(res)
+		unmarshalled, _ := model.StatusFromJSON(res)
 		if unmarshalled != nil && unmarshalled.RequestID == status.RequestID &&
 			unmarshalled.Status == scheduler.StatusRunning {
 			return errDAGIsRunning

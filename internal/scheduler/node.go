@@ -143,7 +143,8 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.cancelFunc = fn
 
 	if n.data.Step.CmdWithArgs != "" {
-		n.data.Step.Command, n.data.Step.Args = util.SplitCommandWithParse(n.data.Step.CmdWithArgs)
+		n.data.Step.Command, n.data.Step.Args =
+			util.SplitCommandWithParse(n.data.Step.CmdWithArgs)
 	}
 
 	if n.scriptFile != nil {
@@ -228,6 +229,7 @@ func (n *Node) setErr(err error) {
 	n.data.Status = NodeStatusError
 }
 
+// nolint
 func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -282,14 +284,18 @@ func (n *Node) setup(logDir string, reqID string) error {
 	return nil
 }
 
+var (
+	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
+)
+
 func (n *Node) setupScript() (err error) {
 	if n.data.Step.Script != "" {
 		if len(n.data.Step.Dir) > 0 && !util.FileExists(n.data.Step.Dir) {
-			return fmt.Errorf("directory %q does not exist", n.data.Step.Dir)
+			return ErrWorkingDirNotExist
 		}
 		n.scriptFile, _ = os.CreateTemp(n.data.Step.Dir, "dagu_script-")
 		if _, err = n.scriptFile.WriteString(n.data.Step.Script); err != nil {
-			return
+			return err
 		}
 		defer func() {
 			_ = n.scriptFile.Close()

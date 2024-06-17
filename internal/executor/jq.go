@@ -33,7 +33,7 @@ func (e *JqExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (e *JqExecutor) Kill(sig os.Signal) error {
+func (*JqExecutor) Kill(_ os.Signal) error {
 	return nil
 }
 
@@ -67,10 +67,12 @@ func (e *JqExecutor) Run() error {
 	return nil
 }
 
-func CreateJqExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func CreateJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
 	var jqCfg JqConfig
 	if step.ExecutorConfig.Config != nil {
-		if err := decodeJqConfig(step.ExecutorConfig.Config, &jqCfg); err != nil {
+		if err := decodeJqConfig(
+			step.ExecutorConfig.Config, &jqCfg,
+		); err != nil {
 			return nil, err
 		}
 	}

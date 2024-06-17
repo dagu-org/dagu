@@ -90,7 +90,7 @@ func TestEngine_GetStatus(t *testing.T) {
 					status := model.NewStatus(dagStatus.DAG, nil,
 						scheduler.StatusRunning, 0, nil, nil)
 					w.WriteHeader(http.StatusOK)
-					b, _ := status.ToJson()
+					b, _ := status.ToJSON()
 					_, _ = w.Write(b)
 				},
 			})

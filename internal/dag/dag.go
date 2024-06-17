@@ -24,20 +24,20 @@ type Schedule struct {
 
 // HandlerOn contains the steps to be executed on different events in the DAG.
 type HandlerOn struct {
-	Failure *Step `json:"Failure"` // Failure is the step to be executed on failure.
-	Success *Step `json:"Success"` // Success is the step to be executed on success.
-	Cancel  *Step `json:"Cancel"`  // Cancel is the step to be executed on cancel.
-	Exit    *Step `json:"Exit"`    // Exit is the step to be executed on exit.
+	Failure *Step `json:"Failure"`
+	Success *Step `json:"Success"`
+	Cancel  *Step `json:"Cancel"`
+	Exit    *Step `json:"Exit"`
 }
 
 // MailOn contains the conditions to send mail.
 type MailOn struct {
-	Failure bool `json:"Failure"` // Failure is the flag to send mail on failure.
-	Success bool `json:"Success"` // Success is the flag to send mail on success.
+	Failure bool `json:"Failure"`
+	Success bool `json:"Success"`
 }
 
-// SmtpConfig contains the SMTP configuration.
-type SmtpConfig struct {
+// SMTPConfig contains the SMTP configuration.
+type SMTPConfig struct {
 	Host     string `json:"Host"`
 	Port     string `json:"Port"`
 	Username string `json:"Username"`
@@ -46,42 +46,56 @@ type SmtpConfig struct {
 
 // MailConfig contains the mail configuration.
 type MailConfig struct {
-	From       string `json:"From"`
-	To         string `json:"To"`
-	Prefix     string `json:"Prefix"`     // Prefix is the prefix for the subject of the mail.
-	AttachLogs bool   `json:"AttachLogs"` // AttachLogs is the flag to attach the logs in the mail.
+	From string `json:"From"`
+	To   string `json:"To"`
+	// Prefix is the prefix for the subject of the mail.
+	Prefix string `json:"Prefix"`
+	// AttachLogs is the flag to attach the logs in the mail.
+	AttachLogs bool `json:"AttachLogs"`
 }
 
 // DAG contains all information about a workflow.
 type DAG struct {
-	Location    string   `json:"Location"`    // Location is the absolute path to the DAG file.
-	Group       string   `json:"Group"`       // Group is the group name of the DAG. This is optional.
-	Name        string   `json:"Name"`        // Name is the name of the DAG. The default is the filename without the extension.
-	Tags        []string `json:"Tags"`        // Tags contains the list of tags for the DAG. optional.
-	Description string   `json:"Description"` // Description is the description of the DAG. optional.
+	// Location is the absolute path to the DAG file.
+	Location string `json:"Location"`
+	// Group is the group name of the DAG. This is optional.
+	Group string `json:"Group"`
+	// Name is the name of the DAG. The default is the filename without the
+	// extension.
+	Name string `json:"Name"`
+	// Tags contains the list of tags for the DAG. optional.
+	Tags []string `json:"Tags"`
+	// Description is the description of the DAG. optional.
+	Description string `json:"Description"`
 
 	// Schedule configuration.
 	// This is used by the scheduler to start / stop / restart the DAG.
-	Schedule        []Schedule `json:"Schedule"`        // Schedule is the start schedule of the DAG.
-	StopSchedule    []Schedule `json:"StopSchedule"`    // StopSchedule is the stop schedule of the DAG.
-	RestartSchedule []Schedule `json:"RestartSchedule"` // RestartSchedule is the restart schedule of the DAG.
+	Schedule        []Schedule `json:"Schedule"`
+	StopSchedule    []Schedule `json:"StopSchedule"`
+	RestartSchedule []Schedule `json:"RestartSchedule"`
 
-	// Env contains a list of environment variables to be set before running the DAG.
+	// Env contains a list of environment variables to be set before running
+	// the DAG.
 	Env []string `json:"Env"`
 
 	// LogDir is the directory where the logs are stored.
-	// The actual log directory is LogDir + Name (with invalid characters replaced with '_').
+	// The actual log directory is LogDir + Name (with invalid characters
+	// replaced with '_').
 	LogDir string `json:"LogDir"`
 
 	// Parameters configuration.
-	// The DAG definition contains only DefaultParams. Params are automatically set by the DAG loader.
-	DefaultParams string   `json:"DefaultParams"` // DefaultParams contains the default parameters to be passed to the DAG.
-	Params        []string `json:"Params"`        // Params contains the list of parameters to be passed to the DAG.
+	// The DAG definition contains only DefaultParams. Params are automatically
+	// set by the DAG loader.
+	// DefaultParams contains the default parameters to be passed to the DAG.
+	DefaultParams string `json:"DefaultParams"`
+	// Params contains the list of parameters to be passed to the DAG.
+	Params []string `json:"Params"`
 
 	// Commands configuration to be executed in the DAG.
-	// Steps represents the nodes in the DAG.
-	Steps     []Step    `json:"Steps"`     // Steps contains the list of steps in the DAG.
-	HandlerOn HandlerOn `json:"HandlerOn"` // HandlerOn contains the steps to be executed on different events.
+	// Steps contains the list of steps in the DAG.
+	Steps []Step `json:"Steps"`
+	// HandlerOn contains the steps to be executed on different events.
+	HandlerOn HandlerOn `json:"HandlerOn"`
 
 	// Preconditions contains the conditions to be met before running the DAG.
 	// If the conditions are not met, the whole DAG is skipped.
@@ -89,19 +103,30 @@ type DAG struct {
 
 	// Mail notification configuration.
 	// MailOn contains the conditions to send mail.
-	// Smtp contains the SMTP configuration.
-	// If you don't want to repeat the SMTP configuration for each DAG, you can set it in the base configuration.
-	Smtp      *SmtpConfig `json:"Smtp"`      // Smtp contains the SMTP configuration.
-	ErrorMail *MailConfig `json:"ErrorMail"` // ErrorMail contains the mail configuration for error.
-	InfoMail  *MailConfig `json:"InfoMail"`  // InfoMail contains the mail configuration for info.
-	MailOn    *MailOn     `json:"MailOn"`    // MailOn contains the conditions to send mail.
+	// SMTP contains the SMTP configuration.
+	// If you don't want to repeat the SMTP configuration for each DAG, you can
+	// set it in the base configuration.
+	SMTP *SMTPConfig `json:"Smtp"`
+	// ErrorMail contains the mail configuration for error.
+	ErrorMail *MailConfig `json:"ErrorMail"`
+	// InfoMail contains the mail configuration for info.
+	InfoMail *MailConfig `json:"InfoMail"`
+	// MailOn contains the conditions to send mail.
+	MailOn *MailOn `json:"MailOn"`
 
 	// Misc configuration for DAG execution.
-	Delay             time.Duration `json:"Delay"`             // Delay is the delay before starting the DAG.
-	RestartWait       time.Duration `json:"RestartWait"`       // RestartWait is the time to wait before restarting the DAG.
-	MaxActiveRuns     int           `json:"MaxActiveRuns"`     // MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
-	MaxCleanUpTime    time.Duration `json:"MaxCleanUpTime"`    // MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
-	HistRetentionDays int           `json:"HistRetentionDays"` // HistRetentionDays is the number of days to keep the history.
+	// Delay is the delay before starting the DAG.
+	Delay time.Duration `json:"Delay"`
+	// RestartWait is the time to wait before restarting the DAG.
+	RestartWait time.Duration `json:"RestartWait"`
+	// MaxActiveRuns specifies the maximum concurrent steps to run in an
+	// execution.
+	MaxActiveRuns int `json:"MaxActiveRuns"`
+	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is
+	// stopped.
+	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime"`
+	// HistRetentionDays is the number of days to keep the history.
+	HistRetentionDays int `json:"HistRetentionDays"`
 }
 
 // HandlerType is the type of the handler.
@@ -148,8 +173,9 @@ func (d *DAG) setup(cfg *config.Config) {
 	}
 
 	// The default max cleanup time is 60 seconds.
-	// It is the maximum time to wait for cleanup when the DAG gets a stop signal.
-	// If the cleanup takes more than this time, the process of the DAG is killed.
+	// It is the maximum time to wait for cleanup when the DAG gets a stop
+	// signal. If the cleanup takes more than this time, the process of the DAG
+	// is killed.
 	if d.MaxCleanUpTime == 0 {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime
 	}
@@ -195,7 +221,8 @@ func (d *DAG) GetLogDir() string {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-// TODO: It needs to be unique for each process so that multiple processes can run in parallel.
+// TODO: It needs to be unique for each process so that multiple processes can
+// run in parallel.
 func (d *DAG) SockAddr() string {
 	s := strings.ReplaceAll(d.Location, " ", "_")
 	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
@@ -212,7 +239,9 @@ func (d *DAG) SockAddr() string {
 func (d *DAG) String() string {
 	ret := "{\n"
 	ret = fmt.Sprintf("%s\tName: %s\n", ret, d.Name)
-	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(d.Description))
+	ret = fmt.Sprintf(
+		"%s\tDescription: %s\n", ret, strings.TrimSpace(d.Description),
+	)
 	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(d.Env, ", "))
 	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, d.LogDir)
 	for i, s := range d.Steps {

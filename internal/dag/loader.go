@@ -164,7 +164,7 @@ func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
 
 // defaultName returns the default name for the given file.
 // The default name is the filename without the extension.
-func (l *Loader) defaultName(file string) string {
+func (*Loader) defaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
@@ -183,8 +183,11 @@ func (l *Loader) prepareFilepath(file string) (string, error) {
 	return filepath.Abs(file)
 }
 
-// loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func (l *Loader) loadBaseConfigIfRequired(baseConfig string, opts buildOpts) (*DAG, error) {
+// loadBaseConfigIfRequired loads the base config if needed, based on the
+// given options.
+func (l *Loader) loadBaseConfigIfRequired(
+	baseConfig string, opts buildOpts,
+) (*DAG, error) {
 	if !opts.metadataOnly && baseConfig != "" {
 		dag, err := l.loadBaseConfig(baseConfig, opts)
 		if err != nil {
@@ -203,10 +206,13 @@ type mergeTransformer struct{}
 
 var _ mergo.Transformers = (*mergeTransformer)(nil)
 
-func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.Value) error {
+func (*mergeTransformer) Transformer(
+	typ reflect.Type,
+) func(dst, src reflect.Value) error {
 	// mergo does not overwrite a value with zero value for a pointer.
 	if typ == reflect.TypeOf(MailOn{}) {
-		// We need to explicitly overwrite the value for a pointer with a zero value.
+		// We need to explicitly overwrite the value for a pointer with a zero
+		// value.
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {
 				dst.Set(src)
@@ -220,7 +226,7 @@ func (mt *mergeTransformer) Transformer(typ reflect.Type) func(dst, src reflect.
 }
 
 // readFile reads the contents of the file into a map.
-func readFile(file string) (config map[string]any, err error) {
+func readFile(file string) (cfg map[string]any, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)

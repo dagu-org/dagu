@@ -38,14 +38,14 @@ func TestStatusSerialization(t *testing.T) {
 		MailOn:    &dag.MailOn{},
 		ErrorMail: &dag.MailConfig{},
 		InfoMail:  &dag.MailConfig{},
-		Smtp:      &dag.SmtpConfig{},
+		SMTP:      &dag.SMTPConfig{},
 	}
 	status := NewStatus(dg, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
-	rawJSON, err := status.ToJson()
+	rawJSON, err := status.ToJSON()
 	require.NoError(t, err)
 
-	unmarshalled, err := StatusFromJson(string(rawJSON))
+	unmarshalled, err := StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
 	require.Equal(t, status.Name, unmarshalled.Name)

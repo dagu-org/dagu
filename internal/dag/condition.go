@@ -30,7 +30,9 @@ func (c Condition) eval() (string, error) {
 func evalCondition(c Condition) error {
 	actual, err := c.eval()
 	if err != nil {
-		return fmt.Errorf("%w. Condition=%s Error=%v", errEvalCondition, c.Condition, err)
+		return fmt.Errorf(
+			"%w. Condition=%s Error=%v", errEvalCondition, c.Condition, err,
+		)
 	}
 
 	if c.Expected != actual {

@@ -39,7 +39,7 @@ func TestWriteStatusToFile(t *testing.T) {
 	dat, err := os.ReadFile(file)
 	require.NoError(t, err)
 
-	r, err := model.StatusFromJson(string(dat))
+	r, err := model.StatusFromJSON(string(dat))
 	require.NoError(t, err)
 
 	require.Equal(t, d.Name, r.Name)

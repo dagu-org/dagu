@@ -27,7 +27,9 @@ type Entry[T any] struct {
 	ExpiresAt    time.Time
 }
 
-func newEntry[T any](data T, size int64, lastModified int64, ttl time.Duration) Entry[T] {
+func newEntry[T any](
+	data T, size int64, lastModified int64, ttl time.Duration,
+) Entry[T] {
 	expiresAt := time.Now().Add(ttl)
 	// Add random jitter to avoid thundering herd
 	randMin := time.Duration(rand.Intn(60)) * time.Minute
@@ -88,7 +90,8 @@ func (c *Cache[T]) StopEviction() {
 
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
 	c.items.Add(1)
-	c.entries.Store(fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
+	c.entries.Store(
+		fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
 }
 
 func (c *Cache[T]) Invalidate(fileName string) {
@@ -96,7 +99,9 @@ func (c *Cache[T]) Invalidate(fileName string) {
 	c.entries.Delete(fileName)
 }
 
-func (c *Cache[T]) LoadLatest(fileName string, loader func() (T, error)) (T, error) {
+func (c *Cache[T]) LoadLatest(
+	fileName string, loader func() (T, error),
+) (T, error) {
 	stale, lastModified, err := c.IsStale(fileName, c.Entry(fileName))
 	if err != nil {
 		var zero T
@@ -134,7 +139,9 @@ func (c *Cache[T]) Load(fileName string) (T, bool) {
 	return entry.Data, true
 }
 
-func (c *Cache[T]) IsStale(fileName string, entry Entry[T]) (bool, os.FileInfo, error) {
+func (*Cache[T]) IsStale(
+	fileName string, entry Entry[T],
+) (bool, os.FileInfo, error) {
 	fi, err := os.Stat(fileName)
 	if err != nil {
 		return true, fi, fmt.Errorf("failed to stat file %s: %w", fileName, err)

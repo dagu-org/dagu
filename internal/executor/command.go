@@ -46,7 +46,9 @@ func (e *CommandExecutor) Kill(sig os.Signal) error {
 	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 
-func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func CreateCommandExecutor(
+	ctx context.Context, step dag.Step,
+) (Executor, error) {
 	// nolint: gosec
 	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
 	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
@@ -55,7 +57,7 @@ func CreateCommandExecutor(ctx context.Context, step dag.Step) (Executor, error)
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
-	step.OutputVariables.Range(func(key, value any) bool {
+	step.OutputVariables.Range(func(_, value any) bool {
 		cmd.Env = append(cmd.Env, value.(string))
 		return true
 	})

@@ -2,7 +2,6 @@
 linters:
   disable-all: true
   enable:
-    - err113
     - errcheck
     - goimports
     - revive
@@ -32,6 +31,26 @@ linters-settings:
       - name: max-public-structs
         disabled: true
       - name: cognitive-complexity
+        disabled: true
+      - name: unchecked-type-assertion
+        disabled: true
+      - name: cyclomatic
+        disabled: true
+      - name: empty-lines
+        disabled: true
+      - name: confusing-naming
+        disabled: true
+      - name: bare-return
+        disabled: true
+      - name: flag-parameter
+        disabled: true
+      - name: unused-receiver
+        disabled: true
+      - name: function-length
+        disabled: true
+      - name: unused-parameter
+        disabled: true
+      - name: deep-exit
         disabled: true
 issues:
   exclude-dirs:

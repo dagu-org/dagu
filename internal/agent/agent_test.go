@@ -307,7 +307,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 		// Check if the status is returned correctly
-		status, err := model.StatusFromJson(mockResponseWriter.body)
+		status, err := model.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, status.Status)
 

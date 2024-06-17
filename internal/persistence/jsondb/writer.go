@@ -36,7 +36,7 @@ func (w *writer) open() (err error) {
 func (w *writer) write(st *model.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	jsonb, _ := st.ToJson()
+	jsonb, _ := st.ToJSON()
 	str := strings.ReplaceAll(string(jsonb), "\n", " ")
 	str = strings.ReplaceAll(str, "\r", " ")
 	_, err := w.writer.WriteString(str + "\n")

@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/entry_reader"
+	"github.com/dagu-dev/dagu/internal/service/scheduler/entryreader"
 	"github.com/dagu-dev/dagu/internal/service/scheduler/scheduler"
 	"go.uber.org/fx"
 )
@@ -28,20 +28,22 @@ type Params struct {
 
 func EntryReaderProvider(
 	cfg *config.Config,
-	engine engine.Engine,
-	jf entry_reader.JobFactory,
+	eng engine.Engine,
+	jf entryreader.JobFactory,
 	logger dagulogger.Logger,
 ) scheduler.EntryReader {
 	loader := dag.NewLoader(cfg)
-	return entry_reader.New(entry_reader.Params{
-		Engine:     engine,
+	return entryreader.New(entryreader.Params{
+		Engine:     eng,
 		DagsDir:    cfg.DAGs,
 		JobFactory: jf,
 		Logger:     logger,
 	}, loader)
 }
 
-func JobFactoryProvider(cfg *config.Config, eng engine.Engine) entry_reader.JobFactory {
+func JobFactoryProvider(
+	cfg *config.Config, eng engine.Engine,
+) entryreader.JobFactory {
 	return &jobFactory{
 		WorkDir:    cfg.WorkDir,
 		Engine:     eng,

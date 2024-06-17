@@ -15,7 +15,7 @@ func (svr *Server) defaultRoutes(r *chi.Mux) *chi.Mux {
 
 func (svr *Server) handleRequest() http.HandlerFunc {
 	renderFunc := svr.useTemplate("index.gohtml", "index")
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		renderFunc(w, nil)
 	}
 }

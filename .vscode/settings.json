@@ -9,6 +9,9 @@
         80
     ],
     "go.lintTool": "golangci-lint",
+    "go.lintFlags": [
+        "--fast"
+    ],
     "go.formatTool": "gofmt",
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "files.associations": {

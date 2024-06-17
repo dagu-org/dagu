@@ -23,7 +23,9 @@ func NewGetDagDetailResponse(
 	}
 }
 
-func NewDagStatusWithDetails(dagStatus *persistence.DAGStatus) *models.DagStatusWithDetails {
+func NewDagStatusWithDetails(
+	dagStatus *persistence.DAGStatus,
+) *models.DagStatusWithDetails {
 	return &models.DagStatusWithDetails{
 		DAG:       NewDagDetail(dagStatus.DAG),
 		Dir:       swag.String(dagStatus.Dir),
@@ -49,12 +51,16 @@ func NewDagDetail(dg *dag.DAG) *models.DagDetail {
 		MaxActiveRuns:     swag.Int64(int64(dg.MaxActiveRuns)),
 		Name:              swag.String(dg.Name),
 		Params:            dg.Params,
-		Preconditions: lo.Map(dg.Preconditions, func(item dag.Condition, _ int) *models.Condition {
-			return NewCondition(item)
-		}),
-		Schedule: lo.Map(dg.Schedule, func(item dag.Schedule, _ int) *models.Schedule {
-			return NewSchedule(item)
-		}),
+		Preconditions: lo.Map(
+			dg.Preconditions, func(
+				item dag.Condition, _ int,
+			) *models.Condition {
+				return NewCondition(item)
+			}),
+		Schedule: lo.Map(
+			dg.Schedule, func(item dag.Schedule, _ int) *models.Schedule {
+				return NewSchedule(item)
+			}),
 		Steps: lo.Map(dg.Steps, func(item dag.Step, _ int) *models.StepObject {
 			return NewStepObject(item)
 		}),
@@ -90,8 +96,9 @@ func NewDagStatusDetail(s *model.Status) *models.DagStatusDetail {
 		FinishedAt: swag.String(s.FinishedAt),
 		Status:     swag.Int64(int64(s.Status)),
 		StatusText: swag.String(s.StatusText),
-		Nodes: lo.Map(s.Nodes, func(item *model.Node, _ int) *models.StatusNode {
-			return NewNode(item)
-		}),
+		Nodes: lo.Map(
+			s.Nodes, func(item *model.Node, _ int) *models.StatusNode {
+				return NewNode(item)
+			}),
 	}
 }

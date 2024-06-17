@@ -23,7 +23,7 @@ func startAllCmd() *cobra.Command {
 			_ = viper.BindPFlag("host", cmd.Flags().Lookup("host"))
 			_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
 		},
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, _ []string) {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
@@ -68,7 +68,9 @@ func startAllCmd() *cobra.Command {
 }
 
 func bindStartAllCommandFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)")
+	cmd.Flags().StringP(
+		"dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)",
+	)
 	cmd.Flags().StringP("host", "s", "", "server host (default is localhost)")
 	cmd.Flags().StringP("port", "p", "", "server port (default is 8080)")
 }

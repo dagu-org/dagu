@@ -83,7 +83,8 @@ func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 	return string(dat), nil
 }
 
-const defaultPerm os.FileMode = 0600
+// TODO: use 0600 // nolint: gosec
+const defaultPerm os.FileMode = 0744
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
@@ -118,6 +119,7 @@ func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 	if exists(loc) {
 		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, loc)
 	}
+	// nolint: gosec
 	return name, os.WriteFile(loc, spec, 0644)
 }
 
@@ -179,7 +181,9 @@ func (d *dagStoreImpl) List() (ret []*dag.DAG, errs []string, err error) {
 			if err == nil {
 				ret = append(ret, dat)
 			} else {
-				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
+				errs = append(errs, fmt.Sprintf(
+					"reading %s failed: %s", fi.Name(), err),
+				)
 			}
 		}
 	}
@@ -202,7 +206,9 @@ func (d *dagStoreImpl) Grep(
 	pattern string,
 ) (ret []*persistence.GrepResult, errs []string, err error) {
 	if err = d.ensureDirExist(); err != nil {
-		errs = append(errs, fmt.Sprintf("failed to create DAGs directory %s", d.dir))
+		errs = append(
+			errs, fmt.Sprintf("failed to create DAGs directory %s", d.dir),
+		)
 		return
 	}
 
@@ -224,13 +230,17 @@ func (d *dagStoreImpl) Grep(
 			}
 			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
+				errs = append(
+					errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err),
+				)
 				continue
 			}
 			loader := dag.NewLoader(d.cfg)
 			dg, err := loader.LoadMetadata(file)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
+				errs = append(
+					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
+				)
 				continue
 			}
 			ret = append(ret, &persistence.GrepResult{

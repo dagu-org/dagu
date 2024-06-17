@@ -14,7 +14,9 @@ func NewSearchDAGsResponse(
 	return &models.SearchDagsResponse{
 		Results: lo.Map(
 			ret,
-			func(item *persistence.GrepResult, _ int) *models.SearchDagsResultItem {
+			func(
+				item *persistence.GrepResult, _ int,
+			) *models.SearchDagsResultItem {
 				return NewSearchDAGsResultItem(item)
 			},
 		),
@@ -22,13 +24,18 @@ func NewSearchDAGsResponse(
 	}
 }
 
-func NewSearchDAGsResultItem(result *persistence.GrepResult) *models.SearchDagsResultItem {
+func NewSearchDAGsResultItem(
+	result *persistence.GrepResult,
+) *models.SearchDagsResultItem {
 	return &models.SearchDagsResultItem{
 		Name: result.Name,
 		DAG:  NewDAG(result.DAG),
-		Matches: lo.Map(result.Matches, func(item *grep.Match, _ int) *models.SearchDagsMatchItem {
-			return NewSearchDAGsMatchItem(item)
-		}),
+		Matches: lo.Map(
+			result.Matches,
+			func(item *grep.Match, _ int) *models.SearchDagsMatchItem {
+				return NewSearchDAGsMatchItem(item)
+			},
+		),
 	}
 }
 

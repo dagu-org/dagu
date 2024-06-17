@@ -241,15 +241,17 @@ func (sc *Scheduler) execNode(ctx context.Context, n *Node) error {
 // Signal sends a signal to the scheduler.
 // for a node with repeat policy, it does not stop the node and
 // wait to finish current run.
-func (sc *Scheduler) Signal(g *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool) {
+func (sc *Scheduler) Signal(
+	// nolint
+	g *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
+) {
 	if !sc.isCanceled() {
 		sc.setCanceled()
 	}
 	for _, node := range g.Nodes() {
-		if node.data.Step.RepeatPolicy.Repeat {
-			// for a repetitive task, we'll wait for the job to finish
-			// until time reaches max wait time
-		} else {
+		// for a repetitive task, we'll wait for the job to finish
+		// until time reaches max wait time
+		if !node.data.Step.RepeatPolicy.Repeat {
 			node.signal(sig, allowOverride)
 		}
 	}
@@ -374,7 +376,7 @@ func (sc *Scheduler) setup() (err error) {
 	if !sc.Dry {
 		if err = os.MkdirAll(sc.LogDir, 0755); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)
-			return
+			return err
 		}
 	}
 	sc.handlers = map[dag.HandlerType]*Node{}
@@ -382,15 +384,18 @@ func (sc *Scheduler) setup() (err error) {
 		sc.handlers[dag.HandlerOnExit] = &Node{data: NodeData{Step: *sc.OnExit}}
 	}
 	if sc.OnSuccess != nil {
-		sc.handlers[dag.HandlerOnSuccess] = &Node{data: NodeData{Step: *sc.OnSuccess}}
+		sc.handlers[dag.HandlerOnSuccess] =
+			&Node{data: NodeData{Step: *sc.OnSuccess}}
 	}
 	if sc.OnFailure != nil {
-		sc.handlers[dag.HandlerOnFailure] = &Node{data: NodeData{Step: *sc.OnFailure}}
+		sc.handlers[dag.HandlerOnFailure] =
+			&Node{data: NodeData{Step: *sc.OnFailure}}
 	}
 	if sc.OnCancel != nil {
-		sc.handlers[dag.HandlerOnCancel] = &Node{data: NodeData{Step: *sc.OnCancel}}
+		sc.handlers[dag.HandlerOnCancel] =
+			&Node{data: NodeData{Step: *sc.OnCancel}}
 	}
-	return
+	return err
 }
 
 func (sc *Scheduler) setCanceled() {
@@ -399,7 +404,7 @@ func (sc *Scheduler) setCanceled() {
 	sc.canceled = 1
 }
 
-func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
+func (*Scheduler) runningCount(g *ExecutionGraph) int {
 	count := 0
 	for _, node := range g.Nodes() {
 		if node.State().Status == NodeStatusRunning {
@@ -409,9 +414,10 @@ func (sc *Scheduler) runningCount(g *ExecutionGraph) int {
 	return count
 }
 
-func (sc *Scheduler) isFinished(g *ExecutionGraph) bool {
+func (*Scheduler) isFinished(g *ExecutionGraph) bool {
 	for _, node := range g.Nodes() {
-		if node.State().Status == NodeStatusRunning || node.State().Status == NodeStatusNone {
+		if node.State().Status == NodeStatusRunning ||
+			node.State().Status == NodeStatusNone {
 			return false
 		}
 	}

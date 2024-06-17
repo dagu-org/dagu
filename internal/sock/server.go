@@ -25,11 +25,11 @@ type Server struct {
 
 type Config struct {
 	Addr        string
-	HandlerFunc HttpHandlerFunc
+	HandlerFunc HTTPHandlerFunc
 }
 
-// HttpHandlerFunc is a function that handles HTTP requests.
-type HttpHandlerFunc func(w http.ResponseWriter, r *http.Request)
+// HTTPHandlerFunc is a function that handles HTTP requests.
+type HTTPHandlerFunc func(w http.ResponseWriter, r *http.Request)
 
 // NewServer creates a new unix socket frontend.
 func NewServer(c *Config) (*Server, error) {
@@ -37,7 +37,9 @@ func NewServer(c *Config) (*Server, error) {
 }
 
 var (
-	ErrServerRequestedShutdown = errors.New("socket frontend is requested to shutdown")
+	ErrServerRequestedShutdown = errors.New(
+		"socket frontend is requested to shutdown",
+	)
 )
 
 // Serve starts listening and serving requests.
@@ -69,7 +71,7 @@ func (svr *Server) Serve(listen chan error) error {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
 				util.LogErr("read request", err)
 				if err == nil {
-					svr.HandlerFunc(newHttpResponseWriter(&conn), request)
+					svr.HandlerFunc(newHTTPResponseWriter(&conn), request)
 				}
 				_ = conn.Close()
 			}()
@@ -100,7 +102,7 @@ type httpResponseWriter struct {
 
 var _ http.ResponseWriter = (*httpResponseWriter)(nil)
 
-func newHttpResponseWriter(conn *net.Conn) http.ResponseWriter {
+func newHTTPResponseWriter(conn *net.Conn) http.ResponseWriter {
 	return &httpResponseWriter{
 		conn:       conn,
 		header:     make(http.Header),

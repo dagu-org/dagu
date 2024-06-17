@@ -1,4 +1,4 @@
-package entry_reader
+package entryreader
 
 import (
 	"os"

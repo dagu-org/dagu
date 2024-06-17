@@ -503,6 +503,7 @@ steps:
 func TestBuilder_BuildSignalOnStop(t *testing.T) {
 	t.Run("It should set the signal on stop", func(t *testing.T) {
 		cfg, err := config.Load()
+		require.NoError(t, err)
 		loader := NewLoader(cfg)
 
 		ret, err := loader.LoadYAML([]byte(testSignalOnStop))
@@ -514,6 +515,7 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 	})
 	t.Run("It should return an error if the signal is invalid", func(t *testing.T) {
 		cfg, err := config.Load()
+		require.NoError(t, err)
 		loader := NewLoader(cfg)
 
 		_, err = loader.LoadYAML([]byte(testSignalOnStopInvalid))

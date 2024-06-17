@@ -50,27 +50,49 @@ type ContinueOn struct {
 // A step is created from parsing a DAG file written in YAML.
 // It marshal/unmarshal to/from JSON when it is saved in the execution history.
 type Step struct {
-	Name            string         `json:"Name"`                      // Name is the name of the step.
-	Description     string         `json:"Description,omitempty"`     // Description is the description of the step.
-	Variables       []string       `json:"Variables,omitempty"`       // Variables contains the list of variables to be set.
-	OutputVariables *SyncMap       `json:"OutputVariables,omitempty"` // OutputVariables is a structure to store the output variables for the following steps.
-	Dir             string         `json:"Dir,omitempty"`             // Dir is the working directory for the step.
-	ExecutorConfig  ExecutorConfig `json:"ExecutorConfig,omitempty"`  // ExecutorConfig contains the configuration for the executor.
-	CmdWithArgs     string         `json:"CmdWithArgs,omitempty"`     // CmdWithArgs is the command with arguments.
-	Command         string         `json:"Command,omitempty"`         // Command specifies only the command without arguments.
-	Script          string         `json:"Script,omitempty"`          // Script is the script to be executed.
-	Args            []string       `json:"Args,omitempty"`            // Args contains the arguments for the command.
-	Stdout          string         `json:"Stdout,omitempty"`          // Stdout is the file to store the standard output.
-	Stderr          string         `json:"Stderr,omitempty"`          // Stderr is the file to store the standard error.
-	Output          string         `json:"Output,omitempty"`          // Output is the variable name to store the output.
-	Depends         []string       `json:"Depends,omitempty"`         // Depends contains the list of step names to depend on.
-	ContinueOn      ContinueOn     `json:"ContinueOn,omitempty"`      // ContinueOn contains the conditions to continue on failure or skipped.
-	RetryPolicy     *RetryPolicy   `json:"RetryPolicy,omitempty"`     // RetryPolicy contains the retry policy for the step.
-	RepeatPolicy    RepeatPolicy   `json:"RepeatPolicy,omitempty"`    // RepeatPolicy contains the repeat policy for the step.
-	MailOnError     bool           `json:"MailOnError,omitempty"`     // MailOnError is the flag to send mail on error.
-	Preconditions   []Condition    `json:"Preconditions,omitempty"`   // Preconditions contains the conditions to be met before running the step.
-	SignalOnStop    string         `json:"SignalOnStop,omitempty"`    // SignalOnStop is the signal to send on stop.
-	SubWorkflow     *SubWorkflow   `json:"SubWorkflow,omitempty"`     // SubWorkflow contains the information about a sub DAG to be executed.
+	// Name is the name of the step.
+	Name string `json:"Name"`
+	// Description is the description of the step.
+	Description string `json:"Description,omitempty"`
+	// Variables contains the list of variables to be set.
+	Variables []string `json:"Variables,omitempty"`
+	// OutputVariables is a structure to store the output variables for the
+	// following steps.
+	OutputVariables *SyncMap `json:"OutputVariables,omitempty"`
+	// Dir is the working directory for the step.
+	Dir string `json:"Dir,omitempty"`
+	// ExecutorConfig contains the configuration for the executor.
+	ExecutorConfig ExecutorConfig `json:"ExecutorConfig,omitempty"`
+	// CmdWithArgs is the command with arguments.
+	CmdWithArgs string `json:"CmdWithArgs,omitempty"`
+	// Command specifies only the command without arguments.
+	Command string `json:"Command,omitempty"`
+	// Script is the script to be executed.
+	Script string `json:"Script,omitempty"`
+	// Args contains the arguments for the command.
+	Args []string `json:"Args,omitempty"`
+	// Stdout is the file to store the standard output.
+	Stdout string `json:"Stdout,omitempty"`
+	// Stderr is the file to store the standard error.
+	Stderr string `json:"Stderr,omitempty"`
+	// Output is the variable name to store the output.
+	Output string `json:"Output,omitempty"`
+	// Depends contains the list of step names to depend on.
+	Depends []string `json:"Depends,omitempty"`
+	// ContinueOn contains the conditions to continue on failure or skipped.
+	ContinueOn ContinueOn `json:"ContinueOn,omitempty"`
+	// RetryPolicy contains the retry policy for the step.
+	RetryPolicy *RetryPolicy `json:"RetryPolicy,omitempty"`
+	// RepeatPolicy contains the repeat policy for the step.
+	RepeatPolicy RepeatPolicy `json:"RepeatPolicy,omitempty"`
+	// MailOnError is the flag to send mail on error.
+	MailOnError bool `json:"MailOnError,omitempty"`
+	// Preconditions contains the conditions to be met before running the step.
+	Preconditions []Condition `json:"Preconditions,omitempty"`
+	// SignalOnStop is the signal to send on stop.
+	SignalOnStop string `json:"SignalOnStop,omitempty"`
+	// SubWorkflow contains the information about a sub DAG to be executed.
+	SubWorkflow *SubWorkflow `json:"SubWorkflow,omitempty"`
 }
 
 // setup sets the default values for the step.

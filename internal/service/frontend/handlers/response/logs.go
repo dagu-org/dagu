@@ -28,32 +28,49 @@ func NewDagLogResponse(logs []*model.StatusFile) *models.DagLogResponse {
 	)
 
 	sort.Slice(grid, func(i, c int) bool {
-		return strings.Compare(lo.FromPtr(grid[i].Name), lo.FromPtr(grid[c].Name)) <= 0
+		return strings.Compare(
+			lo.FromPtr(grid[i].Name), lo.FromPtr(grid[c].Name),
+		) <= 0
 	})
 
 	handlerStatusByName := map[string][]scheduler.NodeStatus{}
 	for i, l := range logs {
 		if l.Status.OnSuccess != nil {
-			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnSuccess)
+			addStatusGridItem(
+				handlerStatusByName, len(logs), i, l.Status.OnSuccess,
+			)
 		}
 		if l.Status.OnFailure != nil {
-			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnFailure)
+			addStatusGridItem(
+				handlerStatusByName, len(logs), i, l.Status.OnFailure,
+			)
 		}
 		if l.Status.OnCancel != nil {
-			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnCancel)
+			addStatusGridItem(
+				handlerStatusByName, len(logs), i, l.Status.OnCancel,
+			)
 		}
 		if l.Status.OnExit != nil {
-			addStatusGridItem(handlerStatusByName, len(logs), i, l.Status.OnExit)
+			addStatusGridItem(
+				handlerStatusByName, len(logs), i, l.Status.OnExit,
+			)
 		}
 	}
 
-	for _, handlerType := range []dag.HandlerType{dag.HandlerOnSuccess, dag.HandlerOnFailure, dag.HandlerOnCancel, dag.HandlerOnExit} {
+	for _, handlerType := range []dag.HandlerType{
+		dag.HandlerOnSuccess,
+		dag.HandlerOnFailure,
+		dag.HandlerOnCancel,
+		dag.HandlerOnExit,
+	} {
 		if v, ok := handlerStatusByName[handlerType.String()]; ok {
 			grid = append(grid, NewDagLogGridItem(handlerType.String(), v))
 		}
 	}
 
-	converted := lo.Map(logs, func(item *model.StatusFile, _ int) *models.DagStatusFile {
+	converted := lo.Map(logs, func(
+		item *model.StatusFile, _ int,
+	) *models.DagStatusFile {
 		return NewDagStatusFile(item)
 	})
 
@@ -81,7 +98,9 @@ func NewDagStatusFile(status *model.StatusFile) *models.DagStatusFile {
 	}
 }
 
-func NewDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogGridItem {
+func NewDagLogGridItem(
+	name string, vals []scheduler.NodeStatus,
+) *models.DagLogGridItem {
 	return &models.DagLogGridItem{
 		Name: swag.String(name),
 		Vals: lo.Map(vals, func(item scheduler.NodeStatus, _ int) int64 {
@@ -90,7 +109,9 @@ func NewDagLogGridItem(name string, vals []scheduler.NodeStatus) *models.DagLogG
 	}
 }
 
-func NewDagStepLogResponse(logFile, content string, step *model.Node) *models.DagStepLogResponse {
+func NewDagStepLogResponse(
+	logFile, content string, step *model.Node,
+) *models.DagStepLogResponse {
 	return &models.DagStepLogResponse{
 		LogFile: swag.String(logFile),
 		Step:    NewNode(step),
@@ -98,7 +119,9 @@ func NewDagStepLogResponse(logFile, content string, step *model.Node) *models.Da
 	}
 }
 
-func NewDagSchedulerLogResponse(logFile, content string) *models.DagSchedulerLogResponse {
+func NewDagSchedulerLogResponse(
+	logFile, content string,
+) *models.DagSchedulerLogResponse {
 	return &models.DagSchedulerLogResponse{
 		LogFile: swag.String(logFile),
 		Content: swag.String(content),

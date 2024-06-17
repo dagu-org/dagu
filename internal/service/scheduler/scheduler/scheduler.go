@@ -114,7 +114,9 @@ func (s *Scheduler) Start() error {
 
 	s.entryReader.Start(done)
 
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(
+		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
+	)
 
 	go func() {
 		select {
@@ -138,7 +140,7 @@ func (s *Scheduler) setupLogFile() (err error) {
 		return err
 	}
 	s.logger.Info("setup log", "filename", filename)
-	return
+	return err
 }
 
 func (s *Scheduler) start() {
@@ -172,13 +174,18 @@ func (s *Scheduler) run(now time.Time) {
 		go func(e *Entry) {
 			err := e.Invoke()
 			if err != nil {
-				s.logger.Error("failed to invoke entry_reader", "entry_reader", e.Job, "error", err)
+				s.logger.Error(
+					"failed to invoke entryreader", "entryreader",
+					e.Job,
+					"error",
+					err,
+				)
 			}
 		}(e)
 	}
 }
 
-func (s *Scheduler) nextTick(now time.Time) time.Time {
+func (*Scheduler) nextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
 }
 

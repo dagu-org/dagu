@@ -65,7 +65,9 @@ func setDefaultConfigPath() {
 	viper.AddConfigPath(path.Join(homeDir, configPath))
 }
 
-func loadDAG(cfg *config.Config, dagFile, params string) (dg *dag.DAG, err error) {
+func loadDAG(
+	cfg *config.Config, dagFile, params string,
+) (dg *dag.DAG, err error) {
 	loader := dag.NewLoader(cfg)
 	return loader.Load(cfg.BaseConfig, dagFile, params)
 }

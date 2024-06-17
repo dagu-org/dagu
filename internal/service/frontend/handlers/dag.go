@@ -55,7 +55,8 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		func(params operations.ListDagsParams) middleware.Responder {
 			resp, err := h.GetList(params)
 			if err != nil {
-				return operations.NewListDagsDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewListDagsDefault(err.Code).
+					WithPayload(err.APIError)
 			}
 			return operations.NewListDagsOK().WithPayload(resp)
 		})
@@ -64,7 +65,8 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		func(params operations.GetDagDetailsParams) middleware.Responder {
 			resp, err := h.GetDetail(params)
 			if err != nil {
-				return operations.NewGetDagDetailsDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewGetDagDetailsDefault(err.Code).
+					WithPayload(err.APIError)
 			}
 			return operations.NewGetDagDetailsOK().WithPayload(resp)
 		})
@@ -73,7 +75,8 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		func(params operations.PostDagActionParams) middleware.Responder {
 			resp, err := h.PostAction(params)
 			if err != nil {
-				return operations.NewPostDagActionDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewPostDagActionDefault(err.Code).
+					WithPayload(err.APIError)
 			}
 			return operations.NewPostDagActionOK().WithPayload(resp)
 		})
@@ -82,7 +85,8 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		func(params operations.CreateDagParams) middleware.Responder {
 			resp, err := h.Create(params)
 			if err != nil {
-				return operations.NewCreateDagDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewCreateDagDefault(err.Code).
+					WithPayload(err.APIError)
 			}
 			return operations.NewCreateDagOK().WithPayload(resp)
 		})
@@ -91,7 +95,8 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		func(params operations.DeleteDagParams) middleware.Responder {
 			err := h.Delete(params)
 			if err != nil {
-				return operations.NewDeleteDagDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewDeleteDagDefault(err.Code).
+					WithPayload(err.APIError)
 			}
 			return operations.NewDeleteDagOK()
 		})
@@ -100,7 +105,8 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		func(params operations.SearchDagsParams) middleware.Responder {
 			resp, err := h.Search(params)
 			if err != nil {
-				return operations.NewSearchDagsDefault(err.Code).WithPayload(err.APIError)
+				return operations.NewSearchDagsDefault(err.Code).
+					WithPayload(err.APIError)
 			}
 			return operations.NewSearchDagsOK().WithPayload(resp)
 		})
@@ -121,12 +127,16 @@ func (h *DAGHandler) Create(
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 }
-func (h *DAGHandler) Delete(params operations.DeleteDagParams) *response.CodedError {
+func (h *DAGHandler) Delete(
+	params operations.DeleteDagParams,
+) *response.CodedError {
 	dagStatus, err := h.engine.GetStatus(params.DagID)
 	if err != nil {
 		return response.NewNotFoundError(err)
 	}
-	if err := h.engine.DeleteDAG(params.DagID, dagStatus.DAG.Location); err != nil {
+	if err := h.engine.DeleteDAG(
+		params.DagID, dagStatus.DAG.Location,
+	); err != nil {
 		return response.NewInternalError(err)
 	}
 	return nil
@@ -192,14 +202,18 @@ func (h *DAGHandler) GetDetail(
 		resp.LogData = response.NewDagLogResponse(logs)
 
 	case dagTabTypeStepLog:
-		stepLog, err := h.getStepLog(dagStatus.DAG, lo.FromPtr(logFile), lo.FromPtr(stepName))
+		stepLog, err := h.getStepLog(
+			dagStatus.DAG, lo.FromPtr(logFile), lo.FromPtr(stepName),
+		)
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
 		resp.StepLog = stepLog
 
 	case dagTabTypeSchedulerLog:
-		schedulerLog, err := h.readSchedulerLog(dagStatus.DAG, lo.FromPtr(logFile))
+		schedulerLog, err := h.readSchedulerLog(
+			dagStatus.DAG, lo.FromPtr(logFile),
+		)
 		if err != nil {
 			return nil, response.NewNotFoundError(err)
 		}
@@ -250,7 +264,9 @@ func (h *DAGHandler) getStepLog(
 		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
 	}
 
-	logContent, err := getLogFileContent(node.Log, h.engine.Config().LogEncodingCharset)
+	logContent, err := getLogFileContent(
+		node.Log, h.engine.Config().LogEncodingCharset,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}
@@ -436,7 +452,9 @@ func (h *DAGHandler) PostAction(
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAGHandler) updateStatus(dg *dag.DAG, reqID, step string, to scheduler.NodeStatus) error {
+func (h *DAGHandler) updateStatus(
+	dg *dag.DAG, reqID, step string, to scheduler.NodeStatus,
+) error {
 	status, err := h.engine.GetStatusByRequestID(dg, reqID)
 	if err != nil {
 		return err

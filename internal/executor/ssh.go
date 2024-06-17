@@ -39,7 +39,7 @@ func (e *SSHExecutor) SetStderr(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *SSHExecutor) Kill(sig os.Signal) error {
+func (e *SSHExecutor) Kill(_ os.Signal) error {
 	if e.session != nil {
 		return e.session.Close()
 	}
@@ -64,13 +64,17 @@ func (e *SSHExecutor) Run() error {
 	// the remote side using the Run method.
 	session.Stdout = e.stdout
 	session.Stderr = e.stdout
-	command := strings.Join(append([]string{e.step.Command}, e.step.Args...), " ")
+	command := strings.Join(
+		append([]string{e.step.Command}, e.step.Args...), " ",
+	)
 	return session.Run(command)
 }
 
 func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cfg := new(SSHConfig)
-	md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{Result: cfg})
+	md, err := mapstructure.NewDecoder(
+		&mapstructure.DecoderConfig{Result: cfg},
+	)
 
 	if err != nil {
 		return nil, err

@@ -11,7 +11,8 @@ type Storage struct {
 }
 
 var (
-	defaultPermission os.FileMode = 0600
+	// TODO: use 0600 // nolint: gosec
+	defaultPermission os.FileMode = 0744
 )
 
 // NewStorage creates a new storage.

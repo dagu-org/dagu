@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
-// TokenAuth implements a similar middleware handler like go-chi's BasicAuth middleware but for bearer tokens
-func TokenAuth(realm string, token string) func(next http.Handler) http.Handler {
+// TokenAuth implements a similar middleware handler like go-chi's BasicAuth
+// middleware but for bearer tokens
+func TokenAuth(
+	realm string, token string,
+) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if skipTokenAuth(*r) {
@@ -34,7 +37,6 @@ func TokenAuth(realm string, token string) func(next http.Handler) http.Handler 
 			}
 
 			next.ServeHTTP(w, r)
-
 		})
 	}
 }

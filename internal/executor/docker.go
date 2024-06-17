@@ -39,7 +39,7 @@ func (e *DockerExecutor) SetStderr(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *DockerExecutor) Kill(sig os.Signal) error {
+func (e *DockerExecutor) Kill(_ os.Signal) error {
 	if e.cancel != nil {
 		e.cancel()
 	}
@@ -51,7 +51,9 @@ func (e *DockerExecutor) Run() error {
 	e.context = ctx
 	e.cancel = fn
 
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(
+		client.FromEnv, client.WithAPIVersionNegotiation(),
+	)
 	if err != nil {
 		return err
 	}
@@ -71,17 +73,23 @@ func (e *DockerExecutor) Run() error {
 	}
 	e.containerConfig.Cmd = append([]string{e.step.Command}, e.step.Args...)
 
-	resp, err := cli.ContainerCreate(ctx, e.containerConfig, e.hostConfig, nil, nil, "")
+	resp, err := cli.ContainerCreate(
+		ctx, e.containerConfig, e.hostConfig, nil, nil, "",
+	)
 
 	if err != nil {
 		return err
 	}
 
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := cli.ContainerStart(
+		ctx, resp.ID, types.ContainerStartOptions{},
+	); err != nil {
 		return err
 	}
 
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := cli.ContainerWait(
+		ctx, resp.ID, container.WaitConditionNotRunning,
+	)
 	select {
 	case err := <-errCh:
 		if err != nil {
@@ -90,7 +98,9 @@ func (e *DockerExecutor) Run() error {
 	case <-statusCh:
 	}
 
-	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+	out, err := cli.ContainerLogs(
+		ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true},
+	)
 	if err != nil {
 		return err
 	}
@@ -106,12 +116,15 @@ func (e *DockerExecutor) Run() error {
 	return nil
 }
 
-func CreateDockerExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func CreateDockerExecutor(
+	_ context.Context, step dag.Step,
+) (Executor, error) {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
 	execCfg := step.ExecutorConfig
 
 	if cfg, ok := execCfg.Config["container"]; ok {
+		// nolint
 		// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			Result: containerConfig,
@@ -127,6 +140,7 @@ func CreateDockerExecutor(ctx context.Context, step dag.Step) (Executor, error) 
 	}
 
 	if cfg, ok := execCfg.Config["host"]; ok {
+		// nolint
 		// See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			Result: hostConfig,

@@ -46,7 +46,13 @@ func (e *SubWorkflowExecutor) Kill(sig os.Signal) error {
 	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 
-func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+var (
+	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
+)
+
+func CreateSubWorkflowExecutor(
+	ctx context.Context, step dag.Step,
+) (Executor, error) {
 	executable, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
@@ -59,7 +65,9 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 
 	sugDAG, err := dagCtx.Finder.Find(step.SubWorkflow.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find subworkflow %q: %w", step.SubWorkflow.Name, err)
+		return nil, fmt.Errorf(
+			"failed to find subworkflow %q: %w", step.SubWorkflow.Name, err,
+		)
 	}
 
 	params := os.ExpandEnv(step.SubWorkflow.Params)
@@ -72,12 +80,12 @@ func CreateSubWorkflowExecutor(ctx context.Context, step dag.Step) (Executor, er
 
 	cmd := exec.CommandContext(ctx, executable, args...)
 	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
-		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
+		return nil, ErrWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
-	step.OutputVariables.Range(func(key, value any) bool {
+	step.OutputVariables.Range(func(_, value any) bool {
 		cmd.Env = append(cmd.Env, value.(string))
 		return true
 	})

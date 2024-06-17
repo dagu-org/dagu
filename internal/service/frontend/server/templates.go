@@ -17,9 +17,13 @@ var (
 	templatePath = "templates/"
 )
 
-func (srv *Server) useTemplate(layout string, name string) func(http.ResponseWriter, any) {
+func (srv *Server) useTemplate(
+	layout string, name string,
+) func(http.ResponseWriter, any) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))
-	tmpl, err := template.New(name).Funcs(defaultFunctions(srv.cfg)).ParseFS(srv.assets, files...)
+	tmpl, err := template.New(name).Funcs(
+		defaultFunctions(srv.cfg)).ParseFS(srv.assets, files...,
+	)
 	if err != nil {
 		panic(err)
 	}

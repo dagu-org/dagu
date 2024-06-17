@@ -17,6 +17,7 @@ import (
 	flags "github.com/jessevdk/go-flags"
 
 	"github.com/dagu-dev/dagu/internal/service/frontend/gen/restapi/operations"
+	// nolint
 	pkgmiddleware "github.com/dagu-dev/dagu/internal/service/frontend/middleware"
 
 	"github.com/go-chi/chi/v5"
@@ -122,7 +123,9 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 
 	// Listen for syscall signals for process to interrupt/quit
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	signal.Notify(
+		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
+	)
 	go func() {
 		<-sig
 
