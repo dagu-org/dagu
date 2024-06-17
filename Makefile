@@ -41,7 +41,7 @@ APP_NAME=dagu
 BIN_DIR=${SCRIPT_DIR}/bin
 
 # gotestsum args
-GOTESTSUM_ARGS=--format=pkgname --format-hivis
+GOTESTSUM_ARGS=--format=pkgname
 
 ########## Main Targets ##########
 
