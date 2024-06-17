@@ -1,5 +1,5 @@
 # binaries
-bin/*
+build/
 dist/
 
 # frontend assets
