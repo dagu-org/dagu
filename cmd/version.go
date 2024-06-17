@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/dagu-dev/dagu/internal/constants"
 	"github.com/spf13/cobra"
 )
@@ -12,9 +10,9 @@ func versionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Display the binary version",
 		Long:  `dagu version`,
-		Run: func(_ *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			// nolint // forbidgo
-			fmt.Println(constants.Version)
+			println(constants.Version)
 		},
 	}
 }
