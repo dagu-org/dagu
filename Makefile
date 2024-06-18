@@ -41,7 +41,7 @@ APP_NAME=dagu
 BIN_DIR=${SCRIPT_DIR}/bin
 
 # gotestsum args
-GOTESTSUM_ARGS=--format=pkgname
+GOTESTSUM_ARGS=--format=standard-quiet
 
 ########## Main Targets ##########
 
