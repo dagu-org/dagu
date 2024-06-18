@@ -14,10 +14,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Installing swagger
-        run: |
-          go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-
       - name: Set up NodeJS
         uses: actions/setup-node@v4
         with:
@@ -27,7 +23,7 @@ jobs:
         run: npm install --global yarn
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Yarn install
         run: yarn install
