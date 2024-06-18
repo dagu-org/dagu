@@ -69,8 +69,7 @@ jobs:
 
       - name: Test
         run: |
-          go install gotest.tools/gotestsum@latest
-          gotestsum --format=pkgname -- -v --race -coverprofile="coverage.txt" -covermode=atomic ./...
+          make test-coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2

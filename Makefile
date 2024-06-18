@@ -42,6 +42,7 @@ BIN_DIR=${SCRIPT_DIR}/bin
 
 # gotestsum args
 GOTESTSUM_ARGS=--format=standard-quiet
+GO_TEST_FLAGS=-v --race
 
 ########## Main Targets ##########
 
@@ -65,18 +66,18 @@ watch:
 # test runs all tests.
 test:
 	@go install ${PKG_gotestsum}
-	@gotestsum ${GOTESTSUM_ARGS} -- -v --race ./...
+	@gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
 
 # test-coverage runs all tests with coverage.
 test-coverage:
 	@go install $(PKG_gotestsum}
-	@gotestsum ${GOTESTSUM_ARGS} -- -v --race coverprofile="coverage.txt" -covermode=atomic ./...
+	@gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} coverprofile="coverage.txt" -covermode=atomic ./...
 
 # test-clean cleans the test cache and run all tests.
 test-clean: build-bin
 	@go install ${PKG_gotestsum}
 	@go clean -testcache
-	@gotestsum ${GOTESTSUM_ARGS} -- -v --race ./...
+	@gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
 
 # lint runs the linter.
 lint: golangci-lint
