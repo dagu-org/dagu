@@ -36,9 +36,9 @@ jobs:
           go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 
       - name: Set up Nodejs
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
 
       - name: Set up yarn
         run: npm install --global yarn
@@ -65,7 +65,7 @@ jobs:
 
       - name: Build
         run: |
-          mkdir ./bin && go build -o ./bin/dagu .
+          make build-bin
 
       - name: Test
         run: |
