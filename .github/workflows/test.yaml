@@ -1,14 +1,32 @@
 name: Test
 on: [push, pull_request]
 jobs:
-  build:
+  golint:
+    name: Go Linters
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+          args: --timeout=10m
+
+  test:
     name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.22.x
+          go-version-file: go.mod
 
       - name: Installing swagger
         run: |
@@ -23,7 +41,7 @@ jobs:
         run: npm install --global yarn
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Yarn install
         run: yarn install
