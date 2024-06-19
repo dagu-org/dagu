@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrRequestIdNotFound = fmt.Errorf("request id not found")
+	ErrRequestIDNotFound = fmt.Errorf("request id not found")
 	ErrNoStatusDataToday = fmt.Errorf("no status data today")
 	ErrNoStatusData      = fmt.Errorf("no status data")
 )
@@ -24,13 +24,13 @@ type (
 	}
 
 	HistoryStore interface {
-		Open(dagFile string, t time.Time, requestId string) error
+		Open(dagFile string, t time.Time, reqID string) error
 		Write(status *model.Status) error
 		Close() error
-		Update(dagFile, requestId string, st *model.Status) error
+		Update(dagFile, reqID string, st *model.Status) error
 		ReadStatusRecent(dagFile string, n int) []*model.StatusFile
 		ReadStatusToday(dagFile string) (*model.Status, error)
-		FindByRequestId(dagFile string, requestId string) (*model.StatusFile, error)
+		FindByRequestID(dagFile string, reqID string) (*model.StatusFile, error)
 		RemoveAll(dagFile string) error
 		RemoveOld(dagFile string, retentionDays int) error
 		Rename(oldName, newName string) error
@@ -72,7 +72,9 @@ type (
 	}
 )
 
-func NewDAGStatus(dg *dag.DAG, s *model.Status, suspended bool, err error) *DAGStatus {
+func NewDAGStatus(
+	dg *dag.DAG, s *model.Status, suspended bool, err error,
+) *DAGStatus {
 	ret := &DAGStatus{
 		File:      filepath.Base(dg.Location),
 		Dir:       filepath.Dir(dg.Location),

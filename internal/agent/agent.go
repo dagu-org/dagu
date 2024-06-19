@@ -55,8 +55,12 @@ type Agent struct {
 }
 
 // New creates a new Agent.
-func New(config *Config, engine engine.Engine, dataStore persistence.DataStoreFactory) *Agent {
-	return &Agent{Config: config, engine: engine, dataStore: dataStore}
+func New(
+	config *Config,
+	eng engine.Engine,
+	dataStore persistence.DataStoreFactory,
+) *Agent {
+	return &Agent{Config: config, engine: eng, dataStore: dataStore}
 }
 
 // Config is the configuration for the Agent.
@@ -163,7 +167,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		for node := range done {
 			status := a.Status()
 			util.LogErr("write status", a.historyStore.Write(status))
-			util.LogErr("report step", a.reporter.ReportStep(a.DAG, status, node))
+			util.LogErr(
+				"report step", a.reporter.ReportStep(a.DAG, status, node),
+			)
 		}
 	}()
 
@@ -191,7 +197,9 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Send the execution report if necessary.
 	a.reporter.ReportSummary(finishedStatus, lastErr)
-	util.LogErr("send email", a.reporter.SendMail(a.DAG, finishedStatus, lastErr))
+	util.LogErr(
+		"send email", a.reporter.SendMail(a.DAG, finishedStatus, lastErr),
+	)
 
 	// Mark the agent finished.
 	a.finished.Store(true)
@@ -214,7 +222,7 @@ func (a *Agent) Status() *model.Status {
 
 	// Create the status object to record the current status.
 	status := &model.Status{
-		RequestId:  a.reqID,
+		RequestID:  a.reqID,
 		Name:       a.DAG.Name,
 		Status:     schedulerStatus,
 		StatusText: schedulerStatus.String(),
@@ -262,7 +270,7 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 		// Return the current status of the execution.
 		status := a.Status()
 		status.Status = scheduler.StatusRunning
-		b, err := status.ToJson()
+		b, err := status.ToJSON()
 		if err != nil {
 			encodeError(w, err)
 			return
@@ -279,7 +287,9 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 		}()
 	default:
 		// Unknown request
-		encodeError(w, &httpError{Code: http.StatusNotFound, Message: "Not found"})
+		encodeError(
+			w, &httpError{Code: http.StatusNotFound, Message: "Not found"},
+		)
 	}
 }
 
@@ -300,10 +310,10 @@ func (a *Agent) setup() error {
 	a.scheduler = a.newScheduler()
 	a.reporter = reporter.New(&reporter.Config{
 		Mailer: mailer.New(&mailer.Config{
-			Host:     a.DAG.Smtp.Host,
-			Port:     a.DAG.Smtp.Port,
-			Username: a.DAG.Smtp.Username,
-			Password: a.DAG.Smtp.Password,
+			Host:     a.DAG.SMTP.Host,
+			Port:     a.DAG.SMTP.Port,
+			Username: a.DAG.SMTP.Username,
+			Password: a.DAG.SMTP.Password,
 		}),
 	})
 
@@ -496,7 +506,9 @@ func (a *Agent) checkIsAlreadyRunning() error {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf("%w. socket=%s", errDAGIsAlreadyRunning, a.DAG.SockAddr())
+		return fmt.Errorf(
+			"%w. socket=%s", errDAGIsAlreadyRunning, a.DAG.SockAddr(),
+		)
 	}
 	return nil
 }
@@ -532,9 +544,9 @@ const (
 	logFileNameFormat = "agent_%s.%s.%s.log"
 )
 
-func createLogfileName(DAGName, requestID string, now time.Time) string {
+func createLogfileName(dagName, requestID string, now time.Time) string {
 	return fmt.Sprintf(logFileNameFormat,
-		util.ValidFilename(DAGName),
+		util.ValidFilename(dagName),
 		now.Format(logFileTimeStampFmt),
 		util.TruncString(requestID, reqIDLenSafe),
 	)

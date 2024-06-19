@@ -1,9 +1,11 @@
-# build
-bin/*
+# binaries
+bin/
 dist/
-service/frontend/assets/fonts/*
-service/frontend/assets/*
-!service/frontend/assets/.gitkeep
+
+# frontend assets
+internal/service/frontend/assets/fonts/*
+internal/service/frontend/assets/*
+!internal/service/frontend/assets/.gitkeep
 
 # NVM
 .nvmrc

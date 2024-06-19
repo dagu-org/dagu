@@ -26,14 +26,21 @@ var (
 
 const configPath = ".dagu"
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute adds all child commands to the root command and sets flags
+// appropriately. This is called by main.main(). It only needs to happen
+// once to the rootCmd.
 func Execute() error {
 	return rootCmd.Execute()
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.dagu/admin.yaml)")
+	rootCmd.PersistentFlags().
+		StringVar(
+			&cfgFile,
+			"config",
+			"",
+			"config file (default is $HOME/.dagu/admin.yaml)",
+		)
 
 	cobra.OnInitialize(initialize)
 
@@ -58,15 +65,11 @@ func setDefaultConfigPath() {
 	viper.AddConfigPath(path.Join(homeDir, configPath))
 }
 
-func loadDAG(dagFile, params string) (dg *dag.DAG, err error) {
-	return dag.Load(config.Get().BaseConfig, dagFile, params)
-}
-
-func getFlagString(cmd *cobra.Command, name, fallback string) string {
-	if s, _ := cmd.Flags().GetString(name); s != "" {
-		return s
-	}
-	return fallback
+func loadDAG(
+	cfg *config.Config, dagFile, params string,
+) (dg *dag.DAG, err error) {
+	loader := dag.NewLoader(cfg)
+	return loader.Load(cfg.BaseConfig, dagFile, params)
 }
 
 func registerCommands() {

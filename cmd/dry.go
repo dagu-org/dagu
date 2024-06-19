@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"log"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
@@ -13,16 +15,19 @@ func dryCmd() *cobra.Command {
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry [--params="param1 param2"] <DAG file>`,
 		Args:  cobra.ExactArgs(1),
-		PreRun: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(config.LoadConfig())
-		},
 		Run: func(cmd *cobra.Command, args []string) {
+			cfg, err := config.Load()
+			if err != nil {
+				// nolint
+				log.Fatalf("Failed to load config: %v", err)
+			}
 			runDAG(
 				cmd.Context(),
+				cfg,
 				engine.New(
-					client.NewDataStoreFactory(config.Get()),
+					client.NewDataStoreFactory(cfg),
 					engine.DefaultConfig(),
-					config.Get(),
+					cfg,
 				),
 				cmd,
 				args,

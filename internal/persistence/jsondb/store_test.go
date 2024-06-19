@@ -21,7 +21,7 @@ import (
 func setupTest(t *testing.T) (string, *Store) {
 	tmpDir, err := os.MkdirTemp("", "test-persistence")
 	require.NoError(t, err)
-	db := New(tmpDir, "")
+	db := New(tmpDir, "", true)
 	return tmpDir, db
 }
 
@@ -33,13 +33,13 @@ func TestNewDataFile(t *testing.T) {
 
 	d := &dag.DAG{Location: "test_new_data_file.yaml"}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
-	requestId := "request-id-1"
-	f, err := db.newFile(d.Location, timestamp, requestId)
+	reqID := "request-id-1"
+	f, err := db.newFile(d.Location, timestamp, reqID)
 	require.NoError(t, err)
 	p := util.ValidFilename(strings.TrimSuffix(path.Base(d.Location), path.Ext(d.Location)))
-	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestId[:8]), f)
+	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, reqID[:8]), f)
 
-	_, err = db.newFile("", timestamp, requestId)
+	_, err = db.newFile("", timestamp, reqID)
 	require.Error(t, err)
 }
 
@@ -56,7 +56,7 @@ func TestWriteAndFindFiles(t *testing.T) {
 
 	for _, data := range []struct {
 		Status    *model.Status
-		RequestId string
+		ReqID     string
 		Timestamp time.Time
 	}{
 		{
@@ -76,7 +76,7 @@ func TestWriteAndFindFiles(t *testing.T) {
 		},
 	} {
 		status := data.Status
-		status.RequestId = data.RequestId
+		status.RequestID = data.ReqID
 		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
@@ -84,7 +84,7 @@ func TestWriteAndFindFiles(t *testing.T) {
 	require.Equal(t, 2, len(files))
 }
 
-func TestWriteAndFindByRequestId(t *testing.T) {
+func TestWriteAndFindByRequestID(t *testing.T) {
 	tmpDir, db := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
@@ -101,7 +101,7 @@ func TestWriteAndFindByRequestId(t *testing.T) {
 
 	for _, data := range []struct {
 		Status    *model.Status
-		RequestId string
+		ReqID     string
 		Timestamp time.Time
 	}{
 		{
@@ -121,15 +121,15 @@ func TestWriteAndFindByRequestId(t *testing.T) {
 		},
 	} {
 		status := data.Status
-		status.RequestId = data.RequestId
+		status.RequestID = data.ReqID
 		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
-	status, err := db.FindByRequestId(d.Location, "request-id-2")
+	status, err := db.FindByRequestID(d.Location, "request-id-2")
 	require.NoError(t, err)
-	require.Equal(t, status.Status.RequestId, "request-id-2")
+	require.Equal(t, status.Status.RequestID, "request-id-2")
 
-	status, err = db.FindByRequestId(d.Location, "request-id-10000")
+	status, err = db.FindByRequestID(d.Location, "request-id-10000")
 	require.Error(t, err)
 	require.Nil(t, status)
 }
@@ -144,7 +144,7 @@ func TestRemoveOldFiles(t *testing.T) {
 
 	for _, data := range []struct {
 		Status    *model.Status
-		RequestId string
+		ReqID     string
 		Timestamp time.Time
 	}{
 		{
@@ -164,7 +164,7 @@ func TestRemoveOldFiles(t *testing.T) {
 		},
 	} {
 		status := data.Status
-		status.RequestId = data.RequestId
+		status.RequestID = data.ReqID
 		testWriteStatus(t, db, d, data.Status, data.Timestamp)
 	}
 
@@ -187,9 +187,9 @@ func TestReadLatestStatus(t *testing.T) {
 	}()
 
 	d := &dag.DAG{Location: "test_config_status_reader.yaml"}
-	requestId := "request-id-1"
+	reqID := "request-id-1"
 
-	dw, _, err := db.newWriter(d.Location, time.Now(), requestId)
+	dw, _, err := db.newWriter(d.Location, time.Now(), reqID)
 	require.NoError(t, err)
 	err = dw.open()
 	require.NoError(t, err)
@@ -224,7 +224,7 @@ func TestReadStatusN(t *testing.T) {
 
 	for _, data := range []struct {
 		Status    *model.Status
-		RequestId string
+		ReqID     string
 		Timestamp time.Time
 	}{
 		{
@@ -244,7 +244,7 @@ func TestReadStatusN(t *testing.T) {
 		},
 	} {
 		status := data.Status
-		status.RequestId = data.RequestId
+		status.RequestID = data.ReqID
 		testWriteStatus(t, db, d, data.Status, data.Timestamp)
 	}
 
@@ -263,10 +263,10 @@ func TestCompactFile(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	d := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
-	requestId := "request-id-1"
+	dg := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
+	reqID := "request-id-1"
 
-	dw, _, err := db.newWriter(d.Location, time.Now(), requestId)
+	dw, _, err := db.newWriter(dg.Location, time.Now(), reqID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 
@@ -274,11 +274,11 @@ func TestCompactFile(t *testing.T) {
 		Status *model.Status
 	}{
 		{model.NewStatus(
-			d, nil, scheduler.StatusRunning, 10000, nil, nil)},
+			dg, nil, scheduler.StatusRunning, 10000, nil, nil)},
 		{model.NewStatus(
-			d, nil, scheduler.StatusCancel, 10000, nil, nil)},
+			dg, nil, scheduler.StatusCancel, 10000, nil, nil)},
 		{model.NewStatus(
-			d, nil, scheduler.StatusSuccess, 10000, nil, nil)},
+			dg, nil, scheduler.StatusSuccess, 10000, nil, nil)},
 	} {
 		require.NoError(t, dw.write(data.Status))
 	}
@@ -286,18 +286,18 @@ func TestCompactFile(t *testing.T) {
 	_ = dw.close()
 
 	var s *model.StatusFile
-	if h := db.ReadStatusRecent(d.Location, 1); len(h) > 0 {
+	if h := db.ReadStatusRecent(dg.Location, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
 
-	db2 := New(db.dir, "")
-	err = db2.Compact(d.Location, s.File)
+	db2 := New(db.dir, "", true)
+	err = db2.Compact(dg.Location, s.File)
 	require.False(t, util.FileExists(s.File))
 	require.NoError(t, err)
 
 	var s2 *model.StatusFile
-	if h := db2.ReadStatusRecent(d.Location, 1); len(h) > 0 {
+	if h := db2.ReadStatusRecent(dg.Location, 1); len(h) > 0 {
 		s2 = h[0]
 	}
 	require.NotNil(t, s2)
@@ -305,7 +305,7 @@ func TestCompactFile(t *testing.T) {
 	require.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
 	require.Equal(t, s.Status, s2.Status)
 
-	err = db2.Compact(d.Location, "Invalid_file_name.dat")
+	err = db2.Compact(dg.Location, "Invalid_file_name.dat")
 	require.Error(t, err)
 }
 
@@ -324,7 +324,7 @@ func TestErrorReadFile(t *testing.T) {
 	_, err = db.ReadStatusToday("invalid_file.yaml")
 	require.Error(t, err)
 
-	_, err = db.FindByRequestId("invalid_file.yaml", "invalid_id")
+	_, err = db.FindByRequestID("invalid_file.yaml", "invalid_id")
 	require.Error(t, err)
 }
 
@@ -356,7 +356,7 @@ func TestErrorParseFile(t *testing.T) {
 
 func testWriteStatus(t *testing.T, db *Store, dg *dag.DAG, status *model.Status, tm time.Time) {
 	t.Helper()
-	dw, _, err := db.newWriter(dg.Location, tm, status.RequestId)
+	dw, _, err := db.newWriter(dg.Location, tm, status.RequestID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 	defer func() {

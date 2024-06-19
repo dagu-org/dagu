@@ -125,7 +125,10 @@ func (n *Node) Execute(ctx context.Context) error {
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
 		_ = os.Setenv(n.data.Step.Output, ret)
-		n.data.Step.OutputVariables.Store(n.data.Step.Output, fmt.Sprintf("%s=%s", n.data.Step.Output, ret))
+		n.data.Step.OutputVariables.Store(
+			n.data.Step.Output,
+			fmt.Sprintf("%s=%s", n.data.Step.Output, ret),
+		)
 	}
 
 	return n.data.Error
@@ -140,7 +143,8 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.cancelFunc = fn
 
 	if n.data.Step.CmdWithArgs != "" {
-		n.data.Step.Command, n.data.Step.Args = util.SplitCommand(n.data.Step.CmdWithArgs, true)
+		n.data.Step.Command, n.data.Step.Args =
+			util.SplitCommandWithParse(n.data.Step.CmdWithArgs)
 	}
 
 	if n.scriptFile != nil {
@@ -202,12 +206,6 @@ func (n *Node) setRetriedAt(retriedAt time.Time) {
 	n.data.RetriedAt = retriedAt
 }
 
-func (n *Node) getRetriedAt() time.Time {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.data.RetriedAt
-}
-
 func (n *Node) getDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -231,6 +229,7 @@ func (n *Node) setErr(err error) {
 	n.data.Status = NodeStatusError
 }
 
+// nolint
 func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -261,7 +260,7 @@ func (n *Node) cancel() {
 	}
 }
 
-func (n *Node) setup(logDir string, requestId string) error {
+func (n *Node) setup(logDir string, reqID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -269,7 +268,7 @@ func (n *Node) setup(logDir string, requestId string) error {
 	n.data.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		util.ValidFilename(n.data.Step.Name),
 		n.data.StartedAt.Format("20060102.15:04:05.000"),
-		util.TruncString(requestId, 8),
+		util.TruncString(reqID, 8),
 	))
 	for _, fn := range []func() error{
 		n.setupLog,
@@ -285,14 +284,18 @@ func (n *Node) setup(logDir string, requestId string) error {
 	return nil
 }
 
+var (
+	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
+)
+
 func (n *Node) setupScript() (err error) {
 	if n.data.Step.Script != "" {
 		if len(n.data.Step.Dir) > 0 && !util.FileExists(n.data.Step.Dir) {
-			return fmt.Errorf("directory %q does not exist", n.data.Step.Dir)
+			return ErrWorkingDirNotExist
 		}
 		n.scriptFile, _ = os.CreateTemp(n.data.Step.Dir, "dagu_script-")
 		if _, err = n.scriptFile.WriteString(n.data.Step.Script); err != nil {
-			return
+			return err
 		}
 		defer func() {
 			_ = n.scriptFile.Close()
@@ -397,14 +400,26 @@ func (n *Node) incDoneCount() {
 	n.data.DoneCount++
 }
 
-var nextNodeId = 1
+var (
+	nextNodeID = 1
+	nextNodeMu sync.Mutex
+)
+
+func getNextNodeID() int {
+	nextNodeMu.Lock()
+	defer nextNodeMu.Unlock()
+	v := nextNodeID
+	nextNodeID++
+	return v
+}
 
 func (n *Node) init() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if n.id != 0 {
 		return
 	}
-	n.id = nextNodeId
-	nextNodeId++
+	n.id = getNextNodeID()
 	if n.data.Step.Variables == nil {
 		n.data.Step.Variables = []string{}
 	}
@@ -412,6 +427,6 @@ func (n *Node) init() {
 		n.data.Step.Variables = []string{}
 	}
 	if n.data.Step.Preconditions == nil {
-		n.data.Step.Preconditions = []*dag.Condition{}
+		n.data.Step.Preconditions = []dag.Condition{}
 	}
 }

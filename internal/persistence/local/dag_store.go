@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -18,12 +19,14 @@ import (
 )
 
 type dagStoreImpl struct {
+	cfg       *config.Config
 	dir       string
 	metaCache *filecache.Cache[*dag.DAG]
 }
 
-func NewDAGStore(dir string) persistence.DAGStore {
+func NewDAGStore(cfg *config.Config, dir string) persistence.DAGStore {
 	dagStore := &dagStoreImpl{
+		cfg:       cfg,
 		dir:       dir,
 		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
@@ -49,8 +52,9 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
+	loader := dag.NewLoader(d.cfg)
 	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
-		return dag.LoadMetadata(loc)
+		return loader.LoadMetadata(loc)
 	})
 }
 
@@ -59,7 +63,8 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	dat, err := dag.LoadWithoutEval(loc)
+	loader := dag.NewLoader(d.cfg)
+	dat, err := loader.LoadWithoutEval(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +83,13 @@ func (d *dagStoreImpl) GetSpec(name string) (string, error) {
 	return string(dat), nil
 }
 
+// TODO: use 0600 // nolint: gosec
+const defaultPerm os.FileMode = 0744
+
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	_, err := dag.LoadYAML(spec)
+	loader := dag.NewLoader(d.cfg)
+	_, err := loader.LoadYAML(spec)
 	if err != nil {
 		return err
 	}
@@ -91,7 +100,7 @@ func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	if !exists(loc) {
 		return fmt.Errorf("%w: %s", errDOGFileNotExist, loc)
 	}
-	err = os.WriteFile(loc, spec, 0755)
+	err = os.WriteFile(loc, spec, defaultPerm)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errFailedToUpdateDAGFile, err)
 	}
@@ -110,6 +119,7 @@ func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 	if exists(loc) {
 		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, loc)
 	}
+	// nolint: gosec
 	return name, os.WriteFile(loc, spec, 0644)
 }
 
@@ -171,7 +181,9 @@ func (d *dagStoreImpl) List() (ret []*dag.DAG, errs []string, err error) {
 			if err == nil {
 				ret = append(ret, dat)
 			} else {
-				errs = append(errs, fmt.Sprintf("reading %s failed: %s", fi.Name(), err))
+				errs = append(errs, fmt.Sprintf(
+					"reading %s failed: %s", fi.Name(), err),
+				)
 			}
 		}
 	}
@@ -190,9 +202,13 @@ func checkExtension(file string) bool {
 	return false
 }
 
-func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs []string, err error) {
+func (d *dagStoreImpl) Grep(
+	pattern string,
+) (ret []*persistence.GrepResult, errs []string, err error) {
 	if err = d.ensureDirExist(); err != nil {
-		errs = append(errs, fmt.Sprintf("failed to create DAGs directory %s", d.dir))
+		errs = append(
+			errs, fmt.Sprintf("failed to create DAGs directory %s", d.dir),
+		)
 		return
 	}
 
@@ -214,12 +230,17 @@ func (d *dagStoreImpl) Grep(pattern string) (ret []*persistence.GrepResult, errs
 			}
 			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
+				errs = append(
+					errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err),
+				)
 				continue
 			}
-			dg, err := dag.LoadMetadata(file)
+			loader := dag.NewLoader(d.cfg)
+			dg, err := loader.LoadMetadata(file)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
+				errs = append(
+					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
+				)
 				continue
 			}
 			ret = append(ret, &persistence.GrepResult{
@@ -254,7 +275,8 @@ func (d *dagStoreImpl) Find(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	return dag.LoadWithoutEval(file)
+	loader := dag.NewLoader(d.cfg)
+	return loader.LoadWithoutEval(file)
 }
 
 func (d *dagStoreImpl) resolve(name string) (string, error) {

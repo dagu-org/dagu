@@ -8,17 +8,22 @@
     "editor.rulers": [
         80
     ],
+    "editor.renderWhitespace": "all",
+    "go.lintTool": "golangci-lint",
+    "go.lintFlags": [
+        "--fast"
+    ],
     "go.formatTool": "gofmt",
-    "[json]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[typescript]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
-    "[markdown]": {
-        "editor.defaultFormatter": "esbenp.prettier-vscode"
-    },
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "files.associations": {
         "*.gohtml": "html"
-    }
+    },
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": "\\.go$",
+                "cmd": "golines ${file} -w"
+            }
+        ]
+    },
 }

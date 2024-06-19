@@ -17,7 +17,7 @@ type JqExecutor struct {
 	stdout io.Writer
 	stderr io.Writer
 	query  string
-	input  map[string]interface{}
+	input  map[string]any
 	cfg    *JqConfig
 }
 
@@ -33,7 +33,7 @@ func (e *JqExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (e *JqExecutor) Kill(sig os.Signal) error {
+func (*JqExecutor) Kill(_ os.Signal) error {
 	return nil
 }
 
@@ -67,15 +67,17 @@ func (e *JqExecutor) Run() error {
 	return nil
 }
 
-func CreateJqExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func CreateJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
 	var jqCfg JqConfig
 	if step.ExecutorConfig.Config != nil {
-		if err := decodeJqConfig(step.ExecutorConfig.Config, &jqCfg); err != nil {
+		if err := decodeJqConfig(
+			step.ExecutorConfig.Config, &jqCfg,
+		); err != nil {
 			return nil, err
 		}
 	}
 	s := os.ExpandEnv(step.Script)
-	input := map[string]interface{}{}
+	input := map[string]any{}
 	if err := json.Unmarshal([]byte(s), &input); err != nil {
 		return nil, err
 	}
@@ -87,7 +89,7 @@ func CreateJqExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
-func decodeJqConfig(dat map[string]interface{}, cfg *JqConfig) error {
+func decodeJqConfig(dat map[string]any, cfg *JqConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,

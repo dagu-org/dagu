@@ -32,7 +32,7 @@ func (p Pid) IsRunning() bool {
 }
 
 type Status struct {
-	RequestId  string           `json:"RequestId"`
+	RequestID  string           `json:"RequestId"`
 	Name       string           `json:"Name"`
 	Status     scheduler.Status `json:"Status"`
 	StatusText string           `json:"StatusText"`
@@ -54,7 +54,7 @@ type StatusFile struct {
 	Status *Status
 }
 
-func StatusFromJson(s string) (*Status, error) {
+func StatusFromJSON(s string) (*Status, error) {
 	status := new(Status)
 	err := json.Unmarshal([]byte(s), status)
 	if err != nil {
@@ -64,7 +64,9 @@ func StatusFromJson(s string) (*Status, error) {
 }
 
 func NewStatusDefault(dg *dag.DAG) *Status {
-	return NewStatus(dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil)
+	return NewStatus(
+		dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil,
+	)
 }
 
 func Time(t time.Time) *time.Time {
@@ -131,7 +133,7 @@ func (st *Status) CorrectRunningStatus() {
 	}
 }
 
-func (st *Status) ToJson() ([]byte, error) {
+func (st *Status) ToJSON() ([]byte, error) {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
 	js, err := json.Marshal(st)

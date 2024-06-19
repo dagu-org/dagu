@@ -9,6 +9,7 @@ import (
 )
 
 func TestGrep(t *testing.T) {
+	t.Parallel()
 	wd, _ := os.Getwd()
 	dir := path.Join(wd, "/testdata")
 	for _, tc := range []struct {

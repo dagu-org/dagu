@@ -8,8 +8,8 @@ import (
 )
 
 func TestStatusCommand(t *testing.T) {
-	t.Run("[Success] Status command should run", func(t *testing.T) {
-		tmpDir, _, df := setupTest(t)
+	t.Run("Status command should run", func(t *testing.T) {
+		tmpDir, _, df, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()

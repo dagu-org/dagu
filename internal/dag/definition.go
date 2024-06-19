@@ -13,7 +13,7 @@ type definition struct {
 	HandlerOn         handerOnDef
 	Functions         []*funcDef
 	Steps             []*stepDef
-	Smtp              smtpConfigDef
+	SMTP              smtpConfigDef
 	MailOn            *mailOnDef
 	ErrorMail         mailConfigDef
 	InfoMail          mailConfigDef
@@ -43,8 +43,8 @@ type stepDef struct {
 	Name          string
 	Description   string
 	Dir           string
-	Executor      interface{}
-	Command       interface{}
+	Executor      any
+	Command       any
 	Script        string
 	Stdout        string
 	Stderr        string
@@ -58,8 +58,10 @@ type stepDef struct {
 	SignalOnStop  *string
 	Env           string
 	Call          *callFuncDef
-	Run           string // Run is a sub workflow to run
-	Params        string // Params is a string of parameters to pass to the sub workflow
+	// Run is a sub workflow to run
+	Run string
+	// Params is a string of parameters to pass to the sub workflow
+	Params string
 }
 
 type funcDef struct {
@@ -70,7 +72,7 @@ type funcDef struct {
 
 type callFuncDef struct {
 	Function string
-	Args     map[string]interface{}
+	Args     map[string]any
 }
 
 type continueOnDef struct {

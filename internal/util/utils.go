@@ -13,7 +13,9 @@ import (
 )
 
 var (
-	ErrUnexpectedEOF         = errors.New("unexpected end of input after escape character")
+	ErrUnexpectedEOF = errors.New(
+		"unexpected end of input after escape character",
+	)
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
 )
 
@@ -66,37 +68,52 @@ var (
 	)
 )
 
-// SplitCommand splits command string to program and arguments.
-// TODO: This function needs to be refactored to handle more complex cases.
-func SplitCommand(cmd string, parse bool) (cmdx string, args []string) {
-	splits := strings.SplitN(cmd, " ", 2)
+const splitCmdN = 2
+
+// SplitCommandWithParse splits command string to program and arguments.
+func SplitCommandWithParse(cmd string) (cmdx string, args []string) {
+	splits := strings.SplitN(cmd, " ", splitCmdN)
+	// nolint:revive
 	if len(splits) == 1 {
+		// nolint:revive
 		return splits[0], []string{}
 	}
 
+	// nolint:revive
 	cmdx = splits[0]
 
 	parser := shellwords.NewParser()
-	parser.ParseBacktick = parse
+	parser.ParseBacktick = true
 	parser.ParseEnv = false
 
+	// nolint:revive
 	args, err := parser.Parse(escapeReplacer.Replace(splits[1]))
 	if err != nil {
 		log.Printf("failed to parse arguments: %s", err)
 		// if parse shell world error use all string as argument
+		// nolint:revive
 		return cmdx, []string{splits[1]}
 	}
 
 	var ret []string
 	for _, v := range args {
-		val := unescapeReplacer.Replace(v)
-		if parse {
-			val = os.ExpandEnv(val)
-		}
-		ret = append(ret, val)
+		ret = append(ret, os.ExpandEnv(unescapeReplacer.Replace(v)))
 	}
 
 	return cmdx, ret
+}
+
+// SplitCommand splits command string to program and arguments.
+func SplitCommand(cmd string) (cmdx string, args []string) {
+	splits := strings.SplitN(cmd, " ", splitCmdN)
+	// nolint:revive
+	if len(splits) == 1 {
+		// nolint:revive
+		return splits[0], []string{}
+	}
+
+	// nolint:revive
+	return splits[0], strings.Fields(splits[1])
 }
 
 // FileExists returns true if file exists.
@@ -133,10 +150,14 @@ func createFile(file string) (*os.File, error) {
 
 // https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
 var (
-	filenameReservedRegex             = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
-	filenameReservedWindowsNamesRegex = regexp.MustCompile(`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`)
-	filenameSpacingRegex              = regexp.MustCompile(`\s`)
-	specialCharRepl                   = "_"
+	filenameReservedRegex = regexp.MustCompile(
+		`[<>:"/\\|?*\x00-\x1F]`,
+	)
+	filenameReservedWindowsNamesRegex = regexp.MustCompile(
+		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
+	)
+	filenameSpacingRegex = regexp.MustCompile(`\s`)
+	specialCharRepl      = "_"
 )
 
 // ValidFilename makes filename valid by replacing reserved characters.

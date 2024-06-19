@@ -32,14 +32,14 @@ func TestWriteStatusToFile(t *testing.T) {
 	}()
 
 	status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
-	status.RequestId = fmt.Sprintf("request-id-%d", time.Now().Unix())
+	status.RequestID = fmt.Sprintf("request-id-%d", time.Now().Unix())
 	require.NoError(t, dw.write(status))
 	require.Regexp(t, ".*test_write_status.*", file)
 
 	dat, err := os.ReadFile(file)
 	require.NoError(t, err)
 
-	r, err := model.StatusFromJson(string(dat))
+	r, err := model.StatusFromJSON(string(dat))
 	require.NoError(t, err)
 
 	require.Equal(t, d.Name, r.Name)
@@ -63,7 +63,7 @@ func TestWriteStatusToFile(t *testing.T) {
 
 	ret := db.ReadStatusRecent(newS, 1)
 	require.Equal(t, 1, len(ret))
-	require.Equal(t, status.RequestId, ret[0].Status.RequestId)
+	require.Equal(t, status.RequestID, ret[0].Status.RequestID)
 }
 
 func TestWriteStatusToExistingFile(t *testing.T) {
@@ -78,11 +78,11 @@ func TestWriteStatusToExistingFile(t *testing.T) {
 	require.NoError(t, dw.open())
 
 	status := model.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
-	status.RequestId = "request-id-test-write-status-to-existing-file"
+	status.RequestID = "request-id-test-write-status-to-existing-file"
 	require.NoError(t, dw.write(status))
 	_ = dw.close()
 
-	data, err := db.FindByRequestId(d.Location, status.RequestId)
+	data, err := db.FindByRequestID(d.Location, status.RequestID)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.StatusCancel)
 	require.Equal(t, file, data.File)
@@ -93,7 +93,7 @@ func TestWriteStatusToExistingFile(t *testing.T) {
 	require.NoError(t, dw.write(status))
 	_ = dw.close()
 
-	data, err = db.FindByRequestId(d.Location, status.RequestId)
+	data, err = db.FindByRequestID(d.Location, status.RequestID)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.StatusSuccess)
 	require.Equal(t, file, data.File)

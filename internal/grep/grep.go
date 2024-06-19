@@ -40,7 +40,7 @@ type Match struct {
 	StartLine  int
 }
 
-// Grep read file and return matched lines.
+// Grep reads data and returns lines that match the given pattern.
 // If opts is nil, default options will be used.
 func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
 	if opts == nil {
@@ -49,43 +49,66 @@ func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
 	if pattern == "" {
 		return nil, ErrEmptyPattern
 	}
-	matcher := opts.Matcher
-	if matcher == nil {
-		var err error
-		if matcher, err = defaultMatcher(pattern, opts); err != nil {
-			return nil, err
-		}
+
+	matcher, err := getMatcher(pattern, opts)
+	if err != nil {
+		return nil, err
 	}
 
-	var (
-		ret     []*Match
-		lines   []string
-		matches []int
-		idx     int
-	)
+	lines, matches, err := scanLines(dat, matcher)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildMatches(lines, matches, opts), nil
+}
+
+// getMatcher returns a matcher based on the pattern and options.
+func getMatcher(pattern string, opts *Options) (Matcher, error) {
+	if opts.Matcher != nil {
+		return opts.Matcher, nil
+	}
+	return defaultMatcher(pattern, opts)
+}
+
+// scanLines scans through data and returns lines and their matched indices.
+func scanLines(dat []byte, matcher Matcher) ([]string, []int, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(dat))
+	var lines []string
+	var matches []int
+	var idx int
+
 	for scanner.Scan() {
-		t := scanner.Text()
-		lines = append(lines, t)
-		if matcher.Match(t) {
+		line := scanner.Text()
+		lines = append(lines, line)
+		if matcher.Match(line) {
 			matches = append(matches, idx)
 		}
 		idx++
 	}
+
 	if len(matches) == 0 {
-		return nil, ErrNoMatch
+		return nil, nil, ErrNoMatch
 	}
+	return lines, matches, scanner.Err()
+}
+
+// buildMatches constructs Match objects from matched line indices.
+func buildMatches(lines []string, matches []int, opts *Options) []*Match {
+	var ret []*Match
+
 	for _, m := range matches {
-		l := lo.Max([]int{0, m - opts.Before})
-		h := lo.Min([]int{len(lines), m + opts.After + 1})
-		s := strings.Join(lines[l:h], "\n")
+		low := lo.Max([]int{0, m - opts.Before})
+		high := lo.Min([]int{len(lines), m + opts.After + 1})
+		matchText := strings.Join(lines[low:high], "\n")
+
 		ret = append(ret, &Match{
-			StartLine:  l + 1,
+			StartLine:  low + 1,
 			LineNumber: m + 1,
-			Line:       s,
+			Line:       matchText,
 		})
 	}
-	return ret, nil
+	return ret
 }
 
 func defaultMatcher(pattern string, opts *Options) (Matcher, error) {

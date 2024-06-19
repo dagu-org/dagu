@@ -33,7 +33,7 @@ func (e *MailExecutor) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (e *MailExecutor) Kill(sig os.Signal) error {
+func (*MailExecutor) Kill(_ os.Signal) error {
 	return nil
 }
 
@@ -47,8 +47,22 @@ message: %s
 `
 
 func (e *MailExecutor) Run() error {
-	_, _ = e.stdout.Write([]byte(fmt.Sprintf(mailLogTemplate, e.cfg.From, e.cfg.To, e.cfg.Subject, e.cfg.Message)))
-	err := e.mailer.SendMail(e.cfg.From, []string{e.cfg.To}, e.cfg.Subject, e.cfg.Message, []string{})
+	_, _ = e.stdout.Write(
+		[]byte(fmt.Sprintf(
+			mailLogTemplate,
+			e.cfg.From,
+			e.cfg.To,
+			e.cfg.Subject,
+			e.cfg.Message,
+		)),
+	)
+	err := e.mailer.SendMail(
+		e.cfg.From,
+		[]string{e.cfg.To},
+		e.cfg.Subject,
+		e.cfg.Message,
+		[]string{},
+	)
 	if err != nil {
 		_, _ = e.stdout.Write([]byte("error occurred."))
 	} else {
@@ -76,17 +90,17 @@ func CreateMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}
 	m := &mailer.Mailer{
 		Config: &mailer.Config{
-			Host:     dagCtx.DAG.Smtp.Host,
-			Port:     dagCtx.DAG.Smtp.Port,
-			Username: dagCtx.DAG.Smtp.Username,
-			Password: dagCtx.DAG.Smtp.Password,
+			Host:     dagCtx.DAG.SMTP.Host,
+			Port:     dagCtx.DAG.SMTP.Port,
+			Username: dagCtx.DAG.SMTP.Username,
+			Password: dagCtx.DAG.SMTP.Password,
 		}}
 	exec.mailer = m
 
 	return exec, nil
 }
 
-func decodeMailConfig(dat map[string]interface{}, cfg *MailConfig) error {
+func decodeMailConfig(dat map[string]any, cfg *MailConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,

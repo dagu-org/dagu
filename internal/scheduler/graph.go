@@ -50,7 +50,8 @@ func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	return graph, nil
 }
 
-// NewExecutionGraphForRetry creates a new execution graph for retry with given nodes.
+// NewExecutionGraphForRetry creates a new execution graph for retry with
+// given nodes.
 func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		outputVariables: &dag.SyncMap{},
@@ -61,7 +62,7 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 	}
 	for _, node := range nodes {
 		if node.data.Step.OutputVariables != nil {
-			node.data.Step.OutputVariables.Range(func(key, value interface{}) bool {
+			node.data.Step.OutputVariables.Range(func(key, value any) bool {
 				k, ok := key.(string)
 				if !ok {
 					return false
@@ -189,7 +190,8 @@ func (g *ExecutionGraph) setupRetry() error {
 	for len(frontier) > 0 {
 		var next []int
 		for _, u := range frontier {
-			if retry[u] || dict[u] == NodeStatusError || dict[u] == NodeStatusCancel {
+			if retry[u] || dict[u] == NodeStatusError ||
+				dict[u] == NodeStatusCancel {
 				log.Printf("clear node state: %s", g.dict[u].data.Step.Name)
 				g.dict[u].clearState()
 				retry[u] = true

@@ -29,11 +29,15 @@ type Config struct {
 
 // Mailer is a mailer interface.
 type Mailer interface {
-	SendMail(from string, to []string, subject, body string, attachments []string) error
+	SendMail(
+		from string, to []string, subject, body string, attachments []string,
+	) error
 }
 
 // ReportStep is a function that reports the status of a step.
-func (rp *Reporter) ReportStep(dg *dag.DAG, status *model.Status, node *scheduler.Node) error {
+func (rp *Reporter) ReportStep(
+	dg *dag.DAG, status *model.Status, node *scheduler.Node,
+) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
 		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
@@ -42,7 +46,9 @@ func (rp *Reporter) ReportStep(dg *dag.DAG, status *model.Status, node *schedule
 		return rp.Mailer.SendMail(
 			dg.ErrorMail.From,
 			[]string{dg.ErrorMail.To},
-			fmt.Sprintf("%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status),
+			fmt.Sprintf(
+				"%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status,
+			),
 			renderHTML(status.Nodes),
 			addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
 		)
@@ -51,25 +57,29 @@ func (rp *Reporter) ReportStep(dg *dag.DAG, status *model.Status, node *schedule
 }
 
 // ReportSummary is a function that reports the status of the scheduler.
-func (rp *Reporter) ReportSummary(status *model.Status, err error) {
+func (*Reporter) ReportSummary(status *model.Status, err error) {
 	var buf bytes.Buffer
-	buf.Write([]byte("\n"))
-	buf.Write([]byte("Summary ->\n"))
-	buf.Write([]byte(renderSummary(status, err)))
-	buf.Write([]byte("\n"))
-	buf.Write([]byte("Details ->\n"))
-	buf.Write([]byte(renderTable(status.Nodes)))
+	_, _ = buf.Write([]byte("\n"))
+	_, _ = buf.Write([]byte("Summary ->\n"))
+	_, _ = buf.Write([]byte(renderSummary(status, err)))
+	_, _ = buf.Write([]byte("\n"))
+	_, _ = buf.Write([]byte("Details ->\n"))
+	_, _ = buf.Write([]byte(renderTable(status.Nodes)))
 	log.Print(buf.String())
 }
 
 // SendMail is a function that sends a report mail.
-func (rp *Reporter) SendMail(dg *dag.DAG, status *model.Status, err error) error {
+func (rp *Reporter) SendMail(
+	dg *dag.DAG, status *model.Status, err error,
+) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if dg.MailOn != nil && dg.MailOn.Failure {
 			return rp.Mailer.SendMail(
 				dg.ErrorMail.From,
 				[]string{dg.ErrorMail.To},
-				fmt.Sprintf("%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status),
+				fmt.Sprintf(
+					"%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status,
+				),
 				renderHTML(status.Nodes),
 				addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
 			)
@@ -79,7 +89,9 @@ func (rp *Reporter) SendMail(dg *dag.DAG, status *model.Status, err error) error
 			_ = rp.Mailer.SendMail(
 				dg.InfoMail.From,
 				[]string{dg.InfoMail.To},
-				fmt.Sprintf("%s %s (%s)", dg.InfoMail.Prefix, dg.Name, status.Status),
+				fmt.Sprintf(
+					"%s %s (%s)", dg.InfoMail.Prefix, dg.Name, status.Status,
+				),
 				renderHTML(status.Nodes),
 				addAttachmentList(dg.InfoMail.AttachLogs, status.Nodes),
 			)
@@ -94,9 +106,19 @@ func renderSummary(status *model.Status, err error) string {
 	if err != nil {
 		errText = err.Error()
 	}
-	t.AppendHeader(table.Row{"RequestID", "Name", "Started At", "Finished At", "Status", "Params", "Error"})
+	t.AppendHeader(
+		table.Row{
+			"RequestID",
+			"Name",
+			"Started At",
+			"Finished At",
+			"Status",
+			"Params",
+			"Error",
+		},
+	)
 	t.AppendRow(table.Row{
-		status.RequestId,
+		status.RequestID,
 		status.Name,
 		status.StartedAt,
 		status.FinishedAt,
@@ -109,11 +131,23 @@ func renderSummary(status *model.Status, err error) string {
 
 func renderTable(nodes []*model.Node) string {
 	t := table.NewWriter()
-	t.AppendHeader(table.Row{"#", "Step", "Started At", "Finished At", "Status", "Command", "Error"})
+	t.AppendHeader(
+		table.Row{
+			"#",
+			"Step",
+			"Started At",
+			"Finished At",
+			"Status",
+			"Command",
+			"Error",
+		},
+	)
 	for i, n := range nodes {
 		var command = n.Command
 		if n.Args != nil {
-			command = strings.Join([]string{n.Command, strings.Join(n.Args, " ")}, " ")
+			command = strings.Join(
+				[]string{n.Command, strings.Join(n.Args, " ")}, " ",
+			)
 		}
 		t.AppendRow(table.Row{
 			fmt.Sprintf("%d", i+1),
@@ -131,11 +165,13 @@ func renderTable(nodes []*model.Node) string {
 func renderHTML(nodes []*model.Node) string {
 	var buffer bytes.Buffer
 	addValFunc := func(val string) {
-		buffer.WriteString(
-			fmt.Sprintf("<td align=\"center\" style=\"padding: 10px;\">%s</td>",
-				val))
+		_, _ = buffer.WriteString(
+			fmt.Sprintf(
+				"<td align=\"center\" style=\"padding: 10px;\">%s</td>",
+				val,
+			))
 	}
-	buffer.WriteString(`
+	_, _ = buffer.WriteString(`
 	<table border="1" style="border-collapse: collapse;">
 		<thead>
 			<tr>
@@ -154,28 +190,32 @@ func renderHTML(nodes []*model.Node) string {
 			style = "color: #D01117;font-weight:bold;"
 		}
 
-		buffer.WriteString(
-			fmt.Sprintf("<td align=\"center\" style=\"padding: 10px; %s\">%s</td>",
-				style, status))
+		_, _ = buffer.WriteString(
+			fmt.Sprintf(
+				"<td align=\"center\" style=\"padding: 10px; %s\">%s</td>",
+				style, status,
+			))
 	}
 	for _, n := range nodes {
-		buffer.WriteString("<tr>")
+		_, _ = buffer.WriteString("<tr>")
 		addValFunc(n.Name)
 		addValFunc(n.StartedAt)
 		addValFunc(n.FinishedAt)
 		addStatusFunc(n.Status)
 		addValFunc(n.Error)
-		buffer.WriteString("</tr>")
+		_, _ = buffer.WriteString("</tr>")
 	}
-	buffer.WriteString("</table>")
+	_, _ = buffer.WriteString("</table>")
 	return buffer.String()
 }
 
-func addAttachmentList(trigger bool, nodes []*model.Node) (attachments []string) {
+func addAttachmentList(
+	trigger bool, nodes []*model.Node,
+) (attachments []string) {
 	if trigger {
 		for _, n := range nodes {
 			attachments = append(attachments, n.Log)
 		}
 	}
-	return
+	return attachments
 }

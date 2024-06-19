@@ -9,7 +9,7 @@ type Props = {
 };
 
 function DAGStepTableRow({ step }: Props) {
-  const preconditions = step.Preconditions.map((c) => (
+  const preconditions = step.Preconditions?.map((c) => (
     <li>
       {c.Condition}
       {' => '}

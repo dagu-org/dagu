@@ -1,29 +1,47 @@
 name: Test
 on: [push, pull_request]
 jobs:
-  build:
+  golint:
+    name: Go Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.59
+          args: --timeout=10m
+
+  test:
     name: Test
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.22.x
+          go-version-file: go.mod
 
       - name: Installing swagger
         run: |
           go install github.com/go-swagger/go-swagger/cmd/swagger@latest
 
       - name: Set up Nodejs
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
 
       - name: Set up yarn
         run: npm install --global yarn
-
-      - name: Check out code
-        uses: actions/checkout@v3
 
       - name: Yarn install
         run: yarn install
@@ -35,25 +53,25 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp ui/dist/*.js ./service/frontend/assets/
-          cp ui/dist/*.woff ./service/frontend/assets/
-          cp ui/dist/*.woff2 ./service/frontend/assets/
+          cp ui/dist/* ./internal/service/frontend/assets/
 
       - name: Cache Go modules
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
-          path: ~/go/pkg/mod
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
       - name: Build
         run: |
-          mkdir ./bin && go build -o ./bin/dagu .
+          make build-bin
 
       - name: Test
         run: |
-          go test --race -v -coverprofile="coverage.txt" -covermode=atomic ./...
+          make test-coverage
 
       - name: Upload coverage
         uses: codecov/codecov-action@v2

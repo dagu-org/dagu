@@ -2,13 +2,16 @@ package filecache
 
 import (
 	"fmt"
-	"golang.org/x/exp/rand"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/exp/rand"
 )
 
+// TODO: Consider replacing this with golang-lru:
+// https://github.com/hashicorp/golang-lru
 type Cache[T any] struct {
 	entries  sync.Map
 	capacity int
@@ -24,7 +27,9 @@ type Entry[T any] struct {
 	ExpiresAt    time.Time
 }
 
-func newEntry[T any](data T, size int64, lastModified int64, ttl time.Duration) Entry[T] {
+func newEntry[T any](
+	data T, size int64, lastModified int64, ttl time.Duration,
+) Entry[T] {
 	expiresAt := time.Now().Add(ttl)
 	// Add random jitter to avoid thundering herd
 	randMin := time.Duration(rand.Intn(60)) * time.Minute
@@ -34,7 +39,7 @@ func newEntry[T any](data T, size int64, lastModified int64, ttl time.Duration) 
 		Data:         data,
 		Size:         size,
 		LastModified: lastModified,
-		ExpiresAt:    time.Now().Add(time.Hour * 24),
+		ExpiresAt:    expiresAt,
 	}
 }
 
@@ -54,25 +59,29 @@ func (c *Cache[T]) StartEviction() {
 			select {
 			case <-timer.C:
 				timer.Reset(time.Minute)
-				c.entries.Range(func(key, value interface{}) bool {
-					entry := value.(Entry[T])
-					if time.Now().After(entry.ExpiresAt) {
-						c.entries.Delete(key)
-					}
-					return true
-				})
-				if c.capacity > 0 && int(c.items.Load()) > c.capacity {
-					c.entries.Range(func(key, value interface{}) bool {
-						c.items.Add(-1)
-						c.entries.Delete(key)
-						return int(c.items.Load()) > c.capacity
-					})
-				}
+				c.evict()
 			case <-c.stopCh:
 				return
 			}
 		}
 	}()
+}
+
+func (c *Cache[T]) evict() {
+	c.entries.Range(func(key, value any) bool {
+		entry := value.(Entry[T])
+		if time.Now().After(entry.ExpiresAt) {
+			c.entries.Delete(key)
+		}
+		return true
+	})
+	if c.capacity > 0 && int(c.items.Load()) > c.capacity {
+		c.entries.Range(func(key, _ any) bool {
+			c.items.Add(-1)
+			c.entries.Delete(key)
+			return int(c.items.Load()) > c.capacity
+		})
+	}
 }
 
 func (c *Cache[T]) StopEviction() {
@@ -81,7 +90,8 @@ func (c *Cache[T]) StopEviction() {
 
 func (c *Cache[T]) Store(fileName string, data T, fi os.FileInfo) {
 	c.items.Add(1)
-	c.entries.Store(fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
+	c.entries.Store(
+		fileName, newEntry(data, fi.Size(), fi.ModTime().Unix(), c.ttl))
 }
 
 func (c *Cache[T]) Invalidate(fileName string) {
@@ -89,7 +99,9 @@ func (c *Cache[T]) Invalidate(fileName string) {
 	c.entries.Delete(fileName)
 }
 
-func (c *Cache[T]) LoadLatest(fileName string, loader func() (T, error)) (T, error) {
+func (c *Cache[T]) LoadLatest(
+	fileName string, loader func() (T, error),
+) (T, error) {
 	stale, lastModified, err := c.IsStale(fileName, c.Entry(fileName))
 	if err != nil {
 		var zero T
@@ -127,7 +139,9 @@ func (c *Cache[T]) Load(fileName string) (T, bool) {
 	return entry.Data, true
 }
 
-func (c *Cache[T]) IsStale(fileName string, entry Entry[T]) (bool, os.FileInfo, error) {
+func (*Cache[T]) IsStale(
+	fileName string, entry Entry[T],
+) (bool, os.FileInfo, error) {
 	fi, err := os.Stat(fileName)
 	if err != nil {
 		return true, fi, fmt.Errorf("failed to stat file %s: %w", fileName, err)

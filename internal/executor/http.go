@@ -33,7 +33,7 @@ type HTTPConfig struct {
 	Debug   bool              `json:"debug"`
 }
 
-var errHttpStatusCode = errors.New("http status code not 2xx")
+var errHTTPStatusCode = errors.New("http status code not 2xx")
 
 func (e *HTTPExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
@@ -43,7 +43,7 @@ func (e *HTTPExecutor) SetStderr(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *HTTPExecutor) Kill(sig os.Signal) error {
+func (e *HTTPExecutor) Kill(_ os.Signal) error {
 	e.reqCancel()
 	return nil
 }
@@ -68,7 +68,7 @@ func (e *HTTPExecutor) Run() error {
 		return err
 	}
 	if isErr {
-		return fmt.Errorf("%w: %d", errHttpStatusCode, resCode)
+		return fmt.Errorf("%w: %d", errHTTPStatusCode, resCode)
 	}
 	return nil
 }
@@ -80,7 +80,9 @@ func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 			return nil, err
 		}
 	} else if step.ExecutorConfig.Config != nil {
-		if err := decodeHTTPConfig(step.ExecutorConfig.Config, &reqCfg); err != nil {
+		if err := decodeHTTPConfig(
+			step.ExecutorConfig.Config, &reqCfg,
+		); err != nil {
 			return nil, err
 		}
 		reqCfg.Body = os.ExpandEnv(reqCfg.Body)
@@ -116,7 +118,7 @@ func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
-func decodeHTTPConfig(dat map[string]interface{}, cfg *HTTPConfig) error {
+func decodeHTTPConfig(dat map[string]any, cfg *HTTPConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,
