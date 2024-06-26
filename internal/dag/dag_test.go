@@ -42,4 +42,10 @@ func TestDAG_SockAddr(t *testing.T) {
 		d := &DAG{Location: "testdata/testDag.yml"}
 		require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, d.SockAddr())
 	})
+	t.Run("Unix Socket", func(t *testing.T) {
+		d := &DAG{Location: "testdata/testDagVeryLongNameThatExceedsUnixSocketLengthMaximum-testDagVeryLongNameThatExceedsUnixSocketLengthMaximum.yml"}
+		// 108 is the maximum length of a unix socket address
+		require.Greater(t, 108, len(d.SockAddr()))
+		require.Equal(t, "/tmp/@dagu-testDagVeryLongNameThatExceedsUnixSocketLengthMax-b92b711162d6012f025a76d0cf0b40c2.sock", d.SockAddr())
+	})
 }
