@@ -52,6 +52,8 @@ linters-settings:
         disabled: true
       - name: deep-exit
         disabled: true
+      - name: line-length-limit
+        disabled: true
 issues:
   exclude-dirs:
     - ui
