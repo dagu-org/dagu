@@ -230,6 +230,13 @@ func (d *DAG) SockAddr() string {
 	h := md5.New()
 	_, _ = h.Write([]byte(s))
 	bs := h.Sum(nil)
+	// Socket name length must be shorter than 108 characters,
+	// so we truncate the name.
+	// 108 - 16 (length of the hash) - 34 (length remaining non-name) - 8 padding = 50
+	lengthLimit := 50
+	if len(name) > lengthLimit {
+		name = name[:lengthLimit-1]
+	}
 	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
 }
 
