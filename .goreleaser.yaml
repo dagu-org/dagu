@@ -37,3 +37,11 @@ brews:
     homepage: 'https://github.com/dagu-dev/dagu'
     description: 'A No-code workflow executor that runs DAGs defined in a simple YAML format'
     license: "GNU General Public License v3.0"
+    custom_block: |
+      service do
+        run [opt_bin/"dagu", "start-all"]
+        keep_alive true
+        error_log_path var/"log/dagu.log"
+        log_path var/"log/dagu.log"
+        working_dir var
+      end
