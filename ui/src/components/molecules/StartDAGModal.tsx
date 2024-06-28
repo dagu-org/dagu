@@ -78,7 +78,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                 <React.Fragment key={i}>
                   <TextField
                     label={p.Name}
-                    multiline
                     placeholder={p.Value}
                     variant="outlined"
                     style={{
@@ -112,7 +111,6 @@ function StartDAGModal({ visible, dag, dismissModal, onSubmit }: Props) {
                 <React.Fragment key={i}>
                   <TextField
                     label={`Parameter ${i + 1}`}
-                    multiline
                     placeholder={p.Value}
                     variant="outlined"
                     style={{
