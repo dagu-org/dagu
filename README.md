@@ -160,12 +160,12 @@ Download the latest binary from the [Releases page](https://github.com/dagu-dev/
 
 ### Via Homebrew (macOS)
 ```sh
-brew install yohamta/tap/dagu
+brew install dagu-dev/dagu/dagu
 ```
 
 Upgrade to the latest version:
 ```sh
-brew upgrade yohamta/tap/dagu
+brew upgrade dagu-dev/dagu/dagu
 ```
 
 ### Via Docker
