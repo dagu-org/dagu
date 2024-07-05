@@ -13,33 +13,39 @@ import (
 
 func TestBuilder_BuildErrors(t *testing.T) {
 	tests := []struct {
+		name  string
 		input string
 	}{
 		{
+			name: "NoName",
 			input: `
 steps:
   - command: echo 1`,
 		},
 		{
+			name: "NoCommand",
 			input: `
 steps:
   - name: step 1`,
 		},
 		{
+			name: "InvalidEnv",
 			input: fmt.Sprintf(`
 env: 
   - VAR: %q`, "`invalid`"),
 		},
 		{
+			name:  "InvalidParams",
 			input: fmt.Sprintf(`params: %q`, "`invalid`"),
 		},
 		{
+			name:  "InvalidSchedule",
 			input: `schedule: "1"`,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			dg, err := unmarshalData([]byte(tt.input))
 			require.NoError(t, err)
 
@@ -59,7 +65,7 @@ func TestBuilder_BuildEnvs(t *testing.T) {
 		expected map[string]string
 	}{
 		{
-			name: "simple key value",
+			name: "ValidEnv",
 			input: `
 env: 
   "1": "123"
@@ -67,7 +73,7 @@ env:
 			expected: map[string]string{"1": "123"},
 		},
 		{
-			name: "command substitution",
+			name: "ValidEnvWithSubstitution",
 			input: `
 env: 
   VAR: "` + "`echo 1`" + `"
@@ -75,7 +81,7 @@ env:
 			expected: map[string]string{"VAR": "1"},
 		},
 		{
-			name: "env substitution",
+			name: "ValidEnvWithSubstitutionAndEnv",
 			input: `
 env: 
   - "FOO": "BAR"
@@ -113,14 +119,14 @@ func TestBuilder_BuildParams(t *testing.T) {
 		expected map[string]string
 	}{
 		{
-			name:   "only one param with value",
+			name:   "ValidParams",
 			params: "x",
 			expected: map[string]string{
 				"1": "x",
 			},
 		},
 		{
-			name:   "two params with values",
+			name:   "TwoParams",
 			params: "x y",
 			expected: map[string]string{
 				"1": "x",
@@ -128,7 +134,7 @@ func TestBuilder_BuildParams(t *testing.T) {
 			},
 		},
 		{
-			name:   "three params with values",
+			name:   "ThreeParams",
 			params: "x yy zzz",
 			expected: map[string]string{
 				"1": "x",
@@ -137,7 +143,7 @@ func TestBuilder_BuildParams(t *testing.T) {
 			},
 		},
 		{
-			name:   "params with argument substitution",
+			name:   "ParamsWithSubstitution",
 			params: "x $1",
 			expected: map[string]string{
 				"1": "x",
@@ -145,7 +151,7 @@ func TestBuilder_BuildParams(t *testing.T) {
 			},
 		},
 		{
-			name:   "complex params with argument substitution and command substitution",
+			name:   "ComplexParams",
 			params: "first P1=foo P2=${FOO} P3=`/bin/echo BAR` X=bar Y=${P1} Z=\"A B C\"",
 			env:    "FOO: BAR",
 			expected: map[string]string{
@@ -194,28 +200,28 @@ func TestBuilder_BuildCommand(t *testing.T) {
 		input string
 	}{
 		{
-			name: "simple command with single argument",
+			name: "ValidCommand",
 			input: `
 steps:
   - name: step1
     command: echo 1`,
 		},
 		{
-			name: "JSON array command with single argument",
+			name: "ValidCommandInArray",
 			input: `
 steps:
   - name: step1
     command: ['echo', '1']`,
 		},
 		{
-			name: "JSON array command without quotes",
+			name: "ValidCommandInJSONArray",
 			input: `
 steps:
   - name: step1
     command: [echo, 1]`,
 		},
 		{
-			name: "YAML array command with single argument",
+			name: "ValidCommandInYAMLArray",
 			input: `
 steps:
   - name: step1
@@ -250,7 +256,7 @@ steps:
 }
 
 func Test_expandEnv(t *testing.T) {
-	t.Run("expand env", func(t *testing.T) {
+	t.Run("ExpandEnv", func(t *testing.T) {
 		_ = os.Setenv("FOO", "BAR")
 		require.Equal(t, expandEnv("${FOO}", false), "BAR")
 		require.Equal(t, expandEnv("${FOO}", true), "${FOO}")
@@ -258,7 +264,7 @@ func Test_expandEnv(t *testing.T) {
 }
 
 func TestBuilder_BuildTags(t *testing.T) {
-	t.Run("multiple tags", func(t *testing.T) {
+	t.Run("ValidTags", func(t *testing.T) {
 		input := `tags: Daily, Monthly`
 		expected := []string{"daily", "monthly"}
 
@@ -287,7 +293,7 @@ func TestBuilder_BuildSchedule(t *testing.T) {
 		expected map[string][]string
 	}{
 		{
-			name: "start and stop schedules",
+			name: "ValidSchedule",
 			input: `
 schedule:
   start: "0 1 * * *"
@@ -301,7 +307,7 @@ schedule:
 			},
 		},
 		{
-			name: "start schedule only",
+			name: "OnlyStartSchedule",
 			input: `
 schedule:
   start: "0 1 * * *"
@@ -311,7 +317,7 @@ schedule:
 			},
 		},
 		{
-			name: "stop schedule only",
+			name: "OnlyStopSchedule",
 			input: `schedule:
   stop: "0 1 * * *"
 `,
@@ -320,7 +326,7 @@ schedule:
 			},
 		},
 		{
-			name: "multiple schedules for start and stop",
+			name: "MultipleSchedules",
 			input: `
 schedule:
   start: 
@@ -336,7 +342,7 @@ schedule:
 			},
 		},
 		{
-			name: "invalid cron expression",
+			name: "InvalidCronExp",
 			input: `
 schedule:
   stop: "* * * * * * *"
@@ -344,7 +350,7 @@ schedule:
 			wantErr: true,
 		},
 		{
-			name: "invalid schedule key",
+			name: "InvalidKey",
 			input: `
 schedule:
   invalid: "* * * * * * *"
@@ -397,7 +403,7 @@ schedule:
 func TestLoad(t *testing.T) {
 	// Base config has the following values:
 	// MailOn: {Failure: true, Success: false}
-	t.Run("Overwrite the base config", func(t *testing.T) {
+	t.Run("WithBaseConfig", func(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
 
@@ -411,7 +417,7 @@ func TestLoad(t *testing.T) {
 		require.Equal(t, &MailOn{Failure: false, Success: false}, dg.MailOn)
 		require.Equal(t, dg.HistRetentionDays, 7)
 	})
-	t.Run("Do not overwrite the base config", func(t *testing.T) {
+	t.Run("WithoutBaseConfig", func(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
 
@@ -434,7 +440,7 @@ func TestBuilder_BuildExecutor(t *testing.T) {
 		expectedConfig map[string]any
 	}{
 		{
-			name: "http executor",
+			name: "HTTPExecutor",
 			input: `
 steps:
   - name: S1
@@ -445,7 +451,7 @@ steps:
 			expectedConfig: nil,
 		},
 		{
-			name: "http executor with config",
+			name: "HTTPExecutorWithConfig",
 			input: `
 steps:
   - name: S1
@@ -501,7 +507,7 @@ steps:
 )
 
 func TestBuilder_BuildSignalOnStop(t *testing.T) {
-	t.Run("It should set the signal on stop", func(t *testing.T) {
+	t.Run("SignalOnStop", func(t *testing.T) {
 		loader := NewLoader()
 
 		ret, err := loader.LoadYAML([]byte(testSignalOnStop))
@@ -511,7 +517,7 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 		}
 		require.Equal(t, ret.Steps[0].SignalOnStop, "SIGINT")
 	})
-	t.Run("It should return an error if the signal is invalid", func(t *testing.T) {
+	t.Run("InvalidSignal", func(t *testing.T) {
 		loader := NewLoader()
 
 		_, err := loader.LoadYAML([]byte(testSignalOnStopInvalid))
@@ -520,7 +526,7 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 }
 
 func Test_convertMap(t *testing.T) {
-	t.Run("Convert map with string keys", func(t *testing.T) {
+	t.Run("ValidMap", func(t *testing.T) {
 		data := map[string]any{
 			"key1": "value1",
 			"map": map[any]any{
@@ -553,7 +559,7 @@ func Test_convertMap(t *testing.T) {
 		}
 		require.Equal(t, expected, data)
 	})
-	t.Run("[Invalid] Convert map with non-string keys", func(t *testing.T) {
+	t.Run("InvalidMap", func(t *testing.T) {
 		data := map[string]any{
 			"key1": "value1",
 			"map": map[any]any{
@@ -568,19 +574,23 @@ func Test_convertMap(t *testing.T) {
 
 func Test_evaluateValue(t *testing.T) {
 	tests := []struct {
+		name     string
 		input    string
 		expected string
 		wantErr  bool
 	}{
 		{
+			name:     "EnvVar",
 			input:    "${TEST_VAR}",
 			expected: "test",
 		},
 		{
+			name:     "CommandSubstitution",
 			input:    "`echo test`",
 			expected: "test",
 		},
 		{
+			name:    "InvalidCommand",
 			input:   "`ech test`",
 			wantErr: true,
 		},
@@ -604,7 +614,7 @@ func Test_evaluateValue(t *testing.T) {
 }
 
 func Test_parseParams(t *testing.T) {
-	t.Run("Parse params with command substitution", func(t *testing.T) {
+	t.Run("ParamsWithCommandSubstitution", func(t *testing.T) {
 		val := "QUESTION=\"what is your favorite activity?\""
 		ret, err := parseParamValue(val, true)
 		require.NoError(t, err)

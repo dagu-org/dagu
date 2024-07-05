@@ -18,27 +18,27 @@ func Test_Load(t *testing.T) {
 		expectedLocation string
 	}{
 		{
-			name:             "Load file with .yaml",
+			name:             "WithExt",
 			file:             path.Join(testdataDir, "loader_test.yaml"),
 			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
 		},
 		{
-			name:             "Load file without .yaml",
+			name:             "WithoutExt",
 			file:             path.Join(testdataDir, "loader_test"),
 			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
 		},
 		{
-			name:          "[Invalid] DAG file does not exist",
+			name:          "InvalidPath",
 			file:          path.Join(testdataDir, "not_existing_file.yaml"),
 			expectedError: "no such file or directory",
 		},
 		{
-			name:          "[Invalid] DAG file has invalid keys",
+			name:          "InvalidDAG",
 			file:          path.Join(testdataDir, "err_decode.yaml"),
 			expectedError: "has invalid keys: invalidkey",
 		},
 		{
-			name:          "[Invalid] DAG file cannot unmarshal",
+			name:          "InvalidYAML",
 			file:          path.Join(testdataDir, "err_parse.yaml"),
 			expectedError: "cannot unmarshal",
 		},
@@ -59,7 +59,7 @@ func Test_Load(t *testing.T) {
 }
 
 func Test_LoadMetadata(t *testing.T) {
-	t.Run("Load metadata", func(t *testing.T) {
+	t.Run("Metadata", func(t *testing.T) {
 		loader := NewLoader()
 		dg, err := loader.LoadMetadata(path.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func Test_LoadMetadata(t *testing.T) {
 }
 
 func Test_loadBaseConfig(t *testing.T) {
-	t.Run("Load base config file", func(t *testing.T) {
+	t.Run("BaseConfigFile", func(t *testing.T) {
 		// The base config file is set on the global config
 		// This should be `testdata/home/.dagu/config.yaml`.
 		cfg, err := config.Load()
@@ -85,7 +85,7 @@ func Test_loadBaseConfig(t *testing.T) {
 }
 
 func Test_LoadDefaultConfig(t *testing.T) {
-	t.Run("Load default config without base config", func(t *testing.T) {
+	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
 		loader := NewLoader()
 		file := path.Join(testdataDir, "default.yaml")
 		dg, err := loader.Load("", file, "")
@@ -117,7 +117,7 @@ steps:
 )
 
 func Test_LoadYAML(t *testing.T) {
-	t.Run("Load YAML data", func(t *testing.T) {
+	t.Run("ValidYAMLData", func(t *testing.T) {
 		loader := NewLoader()
 		ret, err := loader.LoadYAML([]byte(testDAG))
 		require.NoError(t, err)
@@ -127,7 +127,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Name, "1")
 		require.Equal(t, step.Command, "true")
 	})
-	t.Run("[Invalid] Load invalid YAML data", func(t *testing.T) {
+	t.Run("InvalidYAMLData", func(t *testing.T) {
 		loader := NewLoader()
 		_, err := loader.LoadYAML([]byte(`invalidyaml`))
 		require.Error(t, err)

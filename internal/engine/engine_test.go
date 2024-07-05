@@ -75,7 +75,7 @@ func setupTestTmpDir(
 }
 
 func TestEngine_GetStatus(t *testing.T) {
-	t.Run("Get status of a DAG", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -113,7 +113,7 @@ func TestEngine_GetStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusNone, curStatus.Status)
 	})
-	t.Run("[Invalid] Invalid DAG name", func(t *testing.T) {
+	t.Run("InvalidDAGName", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -126,7 +126,7 @@ func TestEngine_GetStatus(t *testing.T) {
 		// Check the status contains error.
 		require.Error(t, dagStatus.Error)
 	})
-	t.Run("Update status", func(t *testing.T) {
+	t.Run("UpdateStatus", func(t *testing.T) {
 		tmpDir, eng, dataStore, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -171,7 +171,7 @@ func TestEngine_GetStatus(t *testing.T) {
 		require.Equal(t, 1, len(status.Nodes))
 		require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
 	})
-	t.Run("[Invalid] Update status with invalid request ID", func(t *testing.T) {
+	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -197,7 +197,7 @@ func TestEngine_GetStatus(t *testing.T) {
 
 // nolint // paralleltest
 func TestEngine_RunDAG(t *testing.T) {
-	t.Run("Start a DAG", func(t *testing.T) {
+	t.Run("Start", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -214,7 +214,7 @@ func TestEngine_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusError.String(), status.Status.String())
 	})
-	t.Run("Stop a DAG", func(t *testing.T) {
+	t.Run("Stop", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -239,7 +239,7 @@ func TestEngine_RunDAG(t *testing.T) {
 			return latestStatus.Status == scheduler.StatusCancel
 		}, time.Millisecond*1500, time.Millisecond*100)
 	})
-	t.Run("Restart a DAG", func(t *testing.T) {
+	t.Run("Restart", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -257,7 +257,7 @@ func TestEngine_RunDAG(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess, status.Status)
 	})
-	t.Run("Retry a DAG", func(t *testing.T) {
+	t.Run("Retry", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -298,7 +298,7 @@ func TestEngine_RunDAG(t *testing.T) {
 
 func TestEngine_UpdateDAG(t *testing.T) {
 	t.Parallel()
-	t.Run("Update DAG", func(t *testing.T) {
+	t.Run("Update", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTestTmpDir(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -327,7 +327,7 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, validDAG, spec)
 	})
-	t.Run("Remove a DAG", func(t *testing.T) {
+	t.Run("Remove", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTestTmpDir(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -354,7 +354,7 @@ steps:
 		err = eng.DeleteDAG(id, status.DAG.Location)
 		require.NoError(t, err)
 	})
-	t.Run("Create a new DAG", func(t *testing.T) {
+	t.Run("Create", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTestTmpDir(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
@@ -370,7 +370,7 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", dg.Name)
 	})
-	t.Run("Rename a DAG", func(t *testing.T) {
+	t.Run("Rename", func(t *testing.T) {
 		tmpDir, eng, _, _ := setupTestTmpDir(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
