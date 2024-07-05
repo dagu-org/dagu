@@ -25,6 +25,28 @@ type JqConfig struct {
 	Raw bool `mapstructure:"raw"`
 }
 
+func NewJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
+	var jqCfg JqConfig
+	if step.ExecutorConfig.Config != nil {
+		if err := decodeJqConfig(
+			step.ExecutorConfig.Config, &jqCfg,
+		); err != nil {
+			return nil, err
+		}
+	}
+	s := os.ExpandEnv(step.Script)
+	input := map[string]any{}
+	if err := json.Unmarshal([]byte(s), &input); err != nil {
+		return nil, err
+	}
+	return &JqExecutor{
+		stdout: os.Stdout,
+		input:  input,
+		query:  step.CmdWithArgs,
+		cfg:    &jqCfg,
+	}, nil
+}
+
 func (e *JqExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
 }
@@ -67,28 +89,6 @@ func (e *JqExecutor) Run() error {
 	return nil
 }
 
-func CreateJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
-	var jqCfg JqConfig
-	if step.ExecutorConfig.Config != nil {
-		if err := decodeJqConfig(
-			step.ExecutorConfig.Config, &jqCfg,
-		); err != nil {
-			return nil, err
-		}
-	}
-	s := os.ExpandEnv(step.Script)
-	input := map[string]any{}
-	if err := json.Unmarshal([]byte(s), &input); err != nil {
-		return nil, err
-	}
-	return &JqExecutor{
-		stdout: os.Stdout,
-		input:  input,
-		query:  step.CmdWithArgs,
-		cfg:    &jqCfg,
-	}, nil
-}
-
 func decodeJqConfig(dat map[string]any, cfg *JqConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
@@ -98,5 +98,5 @@ func decodeJqConfig(dat map[string]any, cfg *JqConfig) error {
 }
 
 func init() {
-	Register("jq", CreateJqExecutor)
+	Register("jq", NewJqExecutor)
 }

@@ -13,14 +13,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type SSHConfig struct {
-	User                  string
-	IP                    string
-	Port                  int
-	Key                   string
-	StrictHostKeyChecking bool
-}
-
 type SSHExecutor struct {
 	step      dag.Step
 	config    *SSHConfig
@@ -29,48 +21,15 @@ type SSHExecutor struct {
 	session   *ssh.Session
 }
 
-var errStrictHostKey = errors.New("StrictHostKeyChecking is not supported yet")
-
-func (e *SSHExecutor) SetStdout(out io.Writer) {
-	e.stdout = out
+type SSHConfig struct {
+	User                  string
+	IP                    string
+	Port                  int
+	Key                   string
+	StrictHostKeyChecking bool
 }
 
-func (e *SSHExecutor) SetStderr(out io.Writer) {
-	e.stdout = out
-}
-
-func (e *SSHExecutor) Kill(_ os.Signal) error {
-	if e.session != nil {
-		return e.session.Close()
-	}
-	return nil
-}
-
-func (e *SSHExecutor) Run() error {
-	addr := fmt.Sprintf("%s:%d", e.config.IP, e.config.Port)
-	conn, err := ssh.Dial("tcp", addr, e.sshConfig)
-	if err != nil {
-		return err
-	}
-
-	session, err := conn.NewSession()
-	if err != nil {
-		return err
-	}
-	e.session = session
-	defer session.Close()
-
-	// Once a Session is created, you can execute a single command on
-	// the remote side using the Run method.
-	session.Stdout = e.stdout
-	session.Stderr = e.stdout
-	command := strings.Join(
-		append([]string{e.step.Command}, e.step.Args...), " ",
-	)
-	return session.Run(command)
-}
-
-func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func NewSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cfg := new(SSHConfig)
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: cfg},
@@ -116,6 +75,47 @@ func CreateSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
+var errStrictHostKey = errors.New("StrictHostKeyChecking is not supported yet")
+
+func (e *SSHExecutor) SetStdout(out io.Writer) {
+	e.stdout = out
+}
+
+func (e *SSHExecutor) SetStderr(out io.Writer) {
+	e.stdout = out
+}
+
+func (e *SSHExecutor) Kill(_ os.Signal) error {
+	if e.session != nil {
+		return e.session.Close()
+	}
+	return nil
+}
+
+func (e *SSHExecutor) Run() error {
+	addr := fmt.Sprintf("%s:%d", e.config.IP, e.config.Port)
+	conn, err := ssh.Dial("tcp", addr, e.sshConfig)
+	if err != nil {
+		return err
+	}
+
+	session, err := conn.NewSession()
+	if err != nil {
+		return err
+	}
+	e.session = session
+	defer session.Close()
+
+	// Once a Session is created, you can execute a single command on
+	// the remote side using the Run method.
+	session.Stdout = e.stdout
+	session.Stderr = e.stdout
+	command := strings.Join(
+		append([]string{e.step.Command}, e.step.Args...), " ",
+	)
+	return session.Run(command)
+}
+
 // referenced code:
 //
 //	https://go.googlesource.com/crypto/+/master/ssh/example_test.go
@@ -141,5 +141,5 @@ func getPublicKeySigner(path string) (ssh.Signer, error) {
 }
 
 func init() {
-	Register("ssh", CreateSSHExecutor)
+	Register("ssh", NewSSHExecutor)
 }

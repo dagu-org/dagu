@@ -21,6 +21,7 @@ func statusCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
+
 			// Load the DAG file and get the current running status.
 			loadedDAG, err := loadDAG(cfg, args[0], "")
 			if err != nil {

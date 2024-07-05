@@ -6,46 +6,6 @@ import (
 	"time"
 )
 
-// SubWorkflow contains information about a sub DAG to be executed.
-type SubWorkflow struct {
-	Name   string
-	Params string
-}
-
-// ExecutorTypeSubWorkflow is defined here in order to parse
-// the `run` field in the DAG file.
-const ExecutorTypeSubWorkflow = "subworkflow"
-
-// ExecutorConfig contains the configuration for the executor.
-type ExecutorConfig struct {
-	// Type represents one of the registered executor.
-	// See `executor.Register` in `internal/executor/executor.go`.
-	Type   string
-	Config map[string]any // Config contains executor specific configuration.
-}
-
-// RetryPolicy contains the retry policy for a step.
-type RetryPolicy struct {
-	Limit    int           // Limit is the number of retries allowed.
-	Interval time.Duration // Interval is the time to wait between retries.
-}
-
-// RepeatPolicy contains the repeat policy for a step.
-type RepeatPolicy struct {
-	Repeat   bool          // Repeat determines if the step should be repeated.
-	Interval time.Duration // Interval is the time to wait between repeats.
-}
-
-// ContinueOn contains the conditions to continue on failure or skipped.
-// Failure is the flag to continue to the next step on failure.
-// Skipped is the flag to continue to the next step on skipped.
-// A step can be skipped when the preconditions are not met.
-// Then if the ContinueOn.Skip is set, the step will continue to the next step.
-type ContinueOn struct {
-	Failure bool // Failure is the flag to continue to the next step on failure.
-	Skipped bool // Skipped is the flag to continue to the next step on skipped.
-}
-
 // Step contains the runtime information for a step in a DAG.
 // A step is created from parsing a DAG file written in YAML.
 // It marshal/unmarshal to/from JSON when it is saved in the execution history.
@@ -115,4 +75,44 @@ func (s *Step) String() string {
 	}
 
 	return strings.Join(values, "\t")
+}
+
+// SubWorkflow contains information about a sub DAG to be executed.
+type SubWorkflow struct {
+	Name   string
+	Params string
+}
+
+// ExecutorTypeSubWorkflow is defined here in order to parse
+// the `run` field in the DAG file.
+const ExecutorTypeSubWorkflow = "subworkflow"
+
+// ExecutorConfig contains the configuration for the executor.
+type ExecutorConfig struct {
+	// Type represents one of the registered executor.
+	// See `executor.Register` in `internal/executor/executor.go`.
+	Type   string
+	Config map[string]any // Config contains executor specific configuration.
+}
+
+// RetryPolicy contains the retry policy for a step.
+type RetryPolicy struct {
+	Limit    int           // Limit is the number of retries allowed.
+	Interval time.Duration // Interval is the time to wait between retries.
+}
+
+// RepeatPolicy contains the repeat policy for a step.
+type RepeatPolicy struct {
+	Repeat   bool          // Repeat determines if the step should be repeated.
+	Interval time.Duration // Interval is the time to wait between repeats.
+}
+
+// ContinueOn contains the conditions to continue on failure or skipped.
+// Failure is the flag to continue to the next step on failure.
+// Skipped is the flag to continue to the next step on skipped.
+// A step can be skipped when the preconditions are not met.
+// Then if the ContinueOn.Skip is set, the step will continue to the next step.
+type ContinueOn struct {
+	Failure bool // Failure is the flag to continue to the next step on failure.
+	Skipped bool // Skipped is the flag to continue to the next step on skipped.
 }

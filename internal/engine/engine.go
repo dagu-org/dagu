@@ -73,7 +73,7 @@ type engineImpl struct {
 }
 
 var (
-	_DAGTemplate = []byte(`steps:
+	dagTemplate = []byte(`steps:
   - name: step1
     command: echo hello
 `)
@@ -97,7 +97,7 @@ func (e *engineImpl) GetDAGSpec(id string) (string, error) {
 
 func (e *engineImpl) CreateDAG(name string) (string, error) {
 	dagStore := e.dataStore.NewDAGStore()
-	id, err := dagStore.Create(name, _DAGTemplate)
+	id, err := dagStore.Create(name, dagTemplate)
 	if err != nil {
 		return "", fmt.Errorf("%w: %s", errCreateDAGFile, err)
 	}

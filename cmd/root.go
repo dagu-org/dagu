@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	// cfgFile parameter
 	cfgFile string
 
 	// rootCmd represents the base command when called without any subcommands
@@ -31,30 +32,6 @@ const configPath = ".dagu"
 // once to the rootCmd.
 func Execute() error {
 	return rootCmd.Execute()
-}
-
-func init() {
-	rootCmd.PersistentFlags().
-		StringVar(
-			&cfgFile,
-			"config",
-			"",
-			"config file (default is $HOME/.dagu/admin.yaml)",
-		)
-
-	cobra.OnInitialize(initialize)
-
-	registerCommands()
-}
-
-func initialize() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		setDefaultConfigPath()
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("admin")
-	}
 }
 
 func setDefaultConfigPath() {
@@ -83,4 +60,27 @@ func registerCommands() {
 	rootCmd.AddCommand(schedulerCmd())
 	rootCmd.AddCommand(retryCmd())
 	rootCmd.AddCommand(startAllCmd())
+}
+
+func init() {
+	rootCmd.PersistentFlags().
+		StringVar(
+			&cfgFile, "config", "",
+			"config file (default is $HOME/.dagu/admin.yaml)",
+		)
+
+	cobra.OnInitialize(initialize)
+
+	registerCommands()
+}
+
+func initialize() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+		return
+	}
+
+	setDefaultConfigPath()
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("admin")
 }

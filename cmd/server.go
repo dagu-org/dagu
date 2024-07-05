@@ -33,6 +33,7 @@ func serverCmd() *cobra.Command {
 				fx.Provide(func() *config.Config { return cfg }),
 				fx.Invoke(frontend.LifetimeHooks),
 			)
+
 			if err := app.Start(cmd.Context()); err != nil {
 				// nolint
 				log.Fatalf("Failed to start server: %v", err)

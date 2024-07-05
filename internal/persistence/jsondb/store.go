@@ -42,14 +42,13 @@ type Store struct {
 }
 
 var (
+	// errors
 	errRequestIDNotFound  = errors.New("request ID not found")
 	errCreateNewDirectory = errors.New("failed to create new directory")
 	errDAGFileEmpty       = errors.New("dagFile is empty")
 )
 
-const (
-	defaultCacheSize = 300
-)
+const defaultCacheSize = 300
 
 // New creates a new Store with default configuration.
 func New(dir, dagsDir string, latestStatusToday bool) *Store {
@@ -114,39 +113,6 @@ func (store *Store) Close() error {
 	}
 	store.cache.Invalidate(store.writer.target)
 	return store.writer.close()
-}
-
-func ParseFile(file string) (*model.Status, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		log.Printf("failed to open file. err: %v", err)
-		return nil, err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-	var offset int64
-	var ret *model.Status
-	for {
-		line, err := readLineFrom(f, offset)
-		if err == io.EOF {
-			if ret == nil {
-				return nil, err
-			}
-			return ret, nil
-		} else if err != nil {
-			return nil, err
-		}
-		offset += int64(len(line)) + 1 // +1 for newline
-		if len(line) > 0 {
-			var m *model.Status
-			m, err = model.StatusFromJSON(string(line))
-			if err == nil {
-				ret = m
-				continue
-			}
-		}
-	}
 }
 
 // NewWriter creates a new writer for a status.
@@ -391,7 +357,40 @@ func (*Store) latest(pattern string, n int) []string {
 	return ret
 }
 
-var rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
+func ParseFile(file string) (*model.Status, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		log.Printf("failed to open file. err: %v", err)
+		return nil, err
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+	var (
+		offset int64
+		ret    *model.Status
+	)
+	for {
+		line, err := readLineFrom(f, offset)
+		if err == io.EOF {
+			if ret == nil {
+				return nil, err
+			}
+			return ret, nil
+		} else if err != nil {
+			return nil, err
+		}
+		offset += int64(len(line)) + 1 // +1 for newline
+		if len(line) > 0 {
+			var m *model.Status
+			m, err = model.StatusFromJSON(string(line))
+			if err == nil {
+				ret = m
+				continue
+			}
+		}
+	}
+}
 
 func filterLatest(files []string, n int) []string {
 	if len(files) == 0 {
@@ -408,6 +407,8 @@ func filterLatest(files []string, n int) []string {
 	}
 	return ret
 }
+
+var rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
 
 func timestamp(file string) string {
 	return rTimestamp.FindString(file)

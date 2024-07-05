@@ -3,6 +3,7 @@ package dag
 import (
 	"errors"
 	"fmt"
+	"os"
 )
 
 // Condition contains a condition and the expected value.
@@ -22,7 +23,7 @@ var (
 // eval evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
 func (c Condition) eval() (string, error) {
-	return evaluateValue(c.Condition)
+	return substituteCommands(os.ExpandEnv(c.Condition))
 }
 
 // evalCondition evaluates a single condition and checks the result.

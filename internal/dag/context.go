@@ -17,6 +17,9 @@ type Context struct {
 	Finder Finder
 }
 
+// ctxKey is used as the key for storing the DAG in the context.
+type ctxKey struct{}
+
 // NewContext creates a new context with the DAG and Finder.
 func NewContext(ctx context.Context, dag *DAG, finder Finder) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
@@ -24,9 +27,6 @@ func NewContext(ctx context.Context, dag *DAG, finder Finder) context.Context {
 		Finder: finder,
 	})
 }
-
-// ctxKey is used as the key for storing the DAG in the context.
-type ctxKey struct{}
 
 var (
 	errFailedCtxAssertion = errors.New("failed to assert DAG context")

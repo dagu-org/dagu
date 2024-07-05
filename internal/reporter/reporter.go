@@ -12,26 +12,24 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-// Reporter is responsible for reporting the status of the scheduler
-// to the user.
-type Reporter struct {
-	*Config
+// Mailer is a mailer interface.
+type Mailer interface {
+	SendMail(
+		from string, to []string, subject, body string, attachments []string,
+	) error
 }
 
-func New(cfg *Config) *Reporter {
-	return &Reporter{Config: cfg}
-}
+// Reporter is responsible for reporting the status of the scheduler
+// to the user.
+type Reporter struct{ *Config }
 
 // Config is the configuration for the reporter.
 type Config struct {
 	Mailer Mailer
 }
 
-// Mailer is a mailer interface.
-type Mailer interface {
-	SendMail(
-		from string, to []string, subject, body string, attachments []string,
-	) error
+func New(cfg *Config) *Reporter {
+	return &Reporter{Config: cfg}
 }
 
 // ReportStep is a function that reports the status of a step.

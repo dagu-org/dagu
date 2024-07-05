@@ -99,7 +99,7 @@ func (er *EntryReader) initDags() error {
 
 	var fileNames []string
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+		if util.MatchExtension(fi.Name(), dag.Exts) {
 			dg, err := er.loader.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
@@ -136,7 +136,7 @@ func (er *EntryReader) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			if !util.MatchExtension(event.Name, dag.EXTENSIONS) {
+			if !util.MatchExtension(event.Name, dag.Exts) {
 				continue
 			}
 			er.dagsLock.Lock()

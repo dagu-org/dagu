@@ -12,8 +12,6 @@ import (
 var (
 	ErrTimeout           = fmt.Errorf("unix socket timeout")
 	ErrConnectionRefused = fmt.Errorf("unix socket connection failed")
-
-	timeout = time.Millisecond * 3000
 )
 
 // Client is a unix socket client that can send requests
@@ -21,6 +19,8 @@ var (
 type Client struct {
 	Addr string
 }
+
+var timeout = time.Millisecond * 3000
 
 // Request sends a request to the frontend and returns the response.
 func (cl *Client) Request(method, url string) (string, error) {

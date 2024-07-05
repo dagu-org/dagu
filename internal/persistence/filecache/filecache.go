@@ -10,6 +10,13 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+type Entry[T any] struct {
+	Data         T
+	Size         int64
+	LastModified int64
+	ExpiresAt    time.Time
+}
+
 // TODO: Consider replacing this with golang-lru:
 // https://github.com/hashicorp/golang-lru
 type Cache[T any] struct {
@@ -18,29 +25,6 @@ type Cache[T any] struct {
 	ttl      time.Duration
 	items    atomic.Int32
 	stopCh   chan struct{}
-}
-
-type Entry[T any] struct {
-	Data         T
-	Size         int64
-	LastModified int64
-	ExpiresAt    time.Time
-}
-
-func newEntry[T any](
-	data T, size int64, lastModified int64, ttl time.Duration,
-) Entry[T] {
-	expiresAt := time.Now().Add(ttl)
-	// Add random jitter to avoid thundering herd
-	randMin := time.Duration(rand.Intn(60)) * time.Minute
-	expiresAt = expiresAt.Add(randMin)
-
-	return Entry[T]{
-		Data:         data,
-		Size:         size,
-		LastModified: lastModified,
-		ExpiresAt:    expiresAt,
-	}
 }
 
 func New[T any](cap int, ttl time.Duration) *Cache[T] {
@@ -148,4 +132,20 @@ func (*Cache[T]) IsStale(
 	}
 	t := fi.ModTime().Unix()
 	return entry.LastModified < t || entry.Size != fi.Size(), fi, nil
+}
+
+func newEntry[T any](
+	data T, size int64, lastModified int64, ttl time.Duration,
+) Entry[T] {
+	expiresAt := time.Now().Add(ttl)
+	// Add random jitter to avoid thundering herd
+	randMin := time.Duration(rand.Intn(60)) * time.Minute
+	expiresAt = expiresAt.Add(randMin)
+
+	return Entry[T]{
+		Data:         data,
+		Size:         size,
+		LastModified: lastModified,
+		ExpiresAt:    expiresAt,
+	}
 }

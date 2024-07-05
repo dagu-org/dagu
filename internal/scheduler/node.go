@@ -153,7 +153,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 		n.data.Step.Args = append(args, n.scriptFile.Name())
 	}
 
-	cmd, err := executor.CreateExecutor(ctx, n.data.Step)
+	cmd, err := executor.NewExecutor(ctx, n.data.Step)
 	if err != nil {
 		return nil, err
 	}

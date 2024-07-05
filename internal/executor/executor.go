@@ -24,14 +24,14 @@ var (
 	errInvalidExecutor = errors.New("invalid executor")
 )
 
-func Register(name string, register Creator) {
-	executors[name] = register
-}
-
-func CreateExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func NewExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	f, ok := executors[step.ExecutorConfig.Type]
 	if ok {
 		return f(ctx, step)
 	}
 	return nil, fmt.Errorf("%w: %s", errInvalidExecutor, step.ExecutorConfig)
+}
+
+func Register(name string, register Creator) {
+	executors[name] = register
 }

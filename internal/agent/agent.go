@@ -54,15 +54,6 @@ type Agent struct {
 	lock sync.RWMutex
 }
 
-// New creates a new Agent.
-func New(
-	config *Config,
-	eng engine.Engine,
-	dataStore persistence.DataStoreFactory,
-) *Agent {
-	return &Agent{Config: config, engine: eng, dataStore: dataStore}
-}
-
 // Config is the configuration for the Agent.
 type Config struct {
 	// DAG is the DAG to run.
@@ -76,11 +67,20 @@ type Config struct {
 	RetryTarget *model.Status
 }
 
-// wait before read the running status
-var waitForRunning = time.Millisecond * 100
+// New creates a new Agent.
+func New(
+	config *Config,
+	eng engine.Engine,
+	dataStore persistence.DataStoreFactory,
+) *Agent {
+	return &Agent{Config: config, engine: eng, dataStore: dataStore}
+}
 
-// errors on running DAG
 var (
+	// wait before read the running status
+	waitForRunning = time.Millisecond * 100
+
+	// errors on running DAG
 	errFailedSetupUnixSocket = errors.New("failed to start the unix socket")
 	errDAGIsAlreadyRunning   = errors.New("the DAG is already running")
 )

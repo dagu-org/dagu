@@ -6,17 +6,27 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/util"
-	"github.com/robfig/cron/v3"
-	"golang.org/x/sys/unix"
 )
 
-// EXTENSIONS is a list of supported file extensions for DAG files.
-var EXTENSIONS = []string{".yaml", ".yml"}
+// Exts is a list of supported file extensions for DAG files.
+var Exts = []string{".yaml", ".yml"}
+
+// builder is used to build a DAG from a configuration definition.
+type builder struct {
+	def         *definition // intermediate value to build the DAG.
+	envs        []string    // environment variables for the DAG.
+	opts        buildOpts   // options for building the DAG.
+	dag         *DAG        // the final DAG.
+	errs        errorList
+	stepBuilder stepBuilder
+}
+
+// builderFunc is a function that builds a part of the DAG.
+type builderFunc func() error
 
 // buildOpts is used to control the behavior of the builder.
 type buildOpts struct {
@@ -32,16 +42,6 @@ type buildOpts struct {
 	// This is useful when loading details for a DAG, but not
 	// for execution.
 	noEval bool
-}
-
-// builder is used to build a DAG from a configuration definition.
-type builder struct {
-	def         *definition // intermediate value to build the DAG.
-	envs        []string    // environment variables for the DAG.
-	opts        buildOpts   // options for building the DAG.
-	dag         *DAG        // the final DAG.
-	errs        errorList
-	stepBuilder stepBuilder
 }
 
 // errors on building a DAG.
@@ -99,22 +99,6 @@ var (
 	)
 )
 
-// builderFunc is a function that builds a part of the DAG.
-type builderFunc func() error
-
-// callBuilderFunc calls a builder function and adds any errors to the error
-// list.
-func (b *builder) callBuilderFunc(fn builderFunc) {
-	if err := fn(); err != nil {
-		b.errs.Add(err)
-	}
-}
-
-var (
-	defaultHistoryRetentionDays = 30
-	defaultMaxCleanUpTime       = time.Second * 60
-)
-
 // build builds a DAG from a configuration definition and the base DAG.
 // This method requires two arguments:
 //   - def: the configuration definition for the DAG.
@@ -161,14 +145,6 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 
 	return b.dag, nil
 }
-
-type scheduleKey string
-
-const (
-	scheduleKeyStart   scheduleKey = "start"
-	scheduleKeyStop    scheduleKey = "stop"
-	scheduleKeyRestart scheduleKey = "restart"
-)
 
 // buildSchedule parses the schedule in different formats and builds the
 // schedule. It allows for flexibility in defining the schedule.
@@ -280,7 +256,11 @@ func (b *builder) buildEnvs() error {
 
 // buildLogDir builds the log directory for the DAG.
 func (b *builder) buildLogDir() (err error) {
-	b.dag.LogDir, err = evaluateValue(b.def.LogDir)
+	logDir, err := substituteCommands(os.ExpandEnv(b.def.LogDir))
+	if err != nil {
+		return err
+	}
+	b.dag.LogDir = logDir
 	return err
 }
 
@@ -294,7 +274,7 @@ func (b *builder) buildParams() (err error) {
 	}
 
 	var envs []string
-	b.dag.Params, envs, err = processParams(params, !b.opts.noEval, b.opts)
+	b.dag.Params, envs, err = parseParams(params, !b.opts.noEval, b.opts)
 	if err == nil {
 		b.dag.Env = append(b.dag.Env, envs...)
 	}
@@ -362,143 +342,6 @@ func (b *builder) buildMiscs() (err error) {
 	return nil
 }
 
-// paramPair represents a key-value pair for the parameters.
-type paramPair struct {
-	name  string
-	value string
-}
-
-// parseParams parses the parameters for the DAG.
-func parseParams(
-	input string, executeCommandSubstitution bool,
-) ([]paramPair, error) {
-	paramRegex := regexp.MustCompile(
-		// nolint
-		`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
-	)
-	matches := paramRegex.FindAllStringSubmatch(input, -1)
-
-	var params []paramPair
-
-	for _, match := range matches {
-		name := match[1]
-		value := match[2]
-
-		if strings.HasPrefix(value, `"`) || strings.HasPrefix(value, "`") {
-			if strings.HasPrefix(value, `"`) {
-				value = strings.Trim(value, `"`)
-				value = strings.ReplaceAll(value, `\"`, `"`)
-			}
-
-			if executeCommandSubstitution {
-				// Perform backtick command substitution
-				backtickRegex := regexp.MustCompile("`[^`]*`")
-
-				var cmdErr error
-				value = backtickRegex.ReplaceAllStringFunc(
-					value,
-					func(match string) string {
-						cmdStr := strings.Trim(match, "`")
-						cmdStr = os.ExpandEnv(cmdStr)
-						cmdOut, err := exec.Command("sh", "-c", cmdStr).Output()
-						if err != nil {
-							cmdErr = err
-							// Leave the original command if it fails
-							return fmt.Sprintf("`%s`", cmdStr)
-						}
-						return strings.TrimSpace(string(cmdOut))
-					},
-				)
-
-				if cmdErr != nil {
-					return nil, fmt.Errorf(
-						"error evaluating '%s': %w", value, cmdErr,
-					)
-				}
-			}
-		}
-
-		params = append(params, paramPair{name, value})
-	}
-
-	return params, nil
-}
-
-// stringifyParam converts a paramPair to a string representation.
-func stringifyParam(param paramPair) string {
-	if param.name != "" {
-		return fmt.Sprintf("%s=%s", param.name, param.value)
-	}
-	return param.value
-}
-
-// processParams parses and processes the parameters for the DAG.
-func processParams(value string, eval bool, options buildOpts) (
-	params []string,
-	envs []string,
-	err error,
-) {
-	var parsedParams []paramPair
-
-	parsedParams, err = parseParams(value, eval)
-	if err != nil {
-		return
-	}
-
-	var ret []string
-	for i, p := range parsedParams {
-		if eval {
-			p.value = os.ExpandEnv(p.value)
-		}
-
-		strParam := stringifyParam(p)
-		ret = append(ret, strParam)
-
-		if p.name == "" {
-			strParam = p.value
-		}
-
-		if err = os.Setenv(strconv.Itoa(i+1), strParam); err != nil {
-			return
-		}
-
-		if !options.noEval && p.name != "" {
-			envs = append(envs, strParam)
-			err = os.Setenv(p.name, p.value)
-			if err != nil {
-				return
-			}
-		}
-	}
-
-	return ret, envs, nil
-}
-
-// pair represents a key-value pair.
-type pair struct {
-	key string
-	val string
-}
-
-// parseKeyValue parse a key-value pair from a map and appends it to the pairs
-// slice. Each entry in the map must have a string key and a string value.
-func parseKeyValue(m map[any]any, pairs *[]pair) error {
-	for k, v := range m {
-		key, ok := k.(string)
-		if !ok {
-			return errInvalidKeyType
-		}
-
-		val, ok := v.(string)
-		if !ok {
-			return errInvalidEnvValue
-		}
-
-		*pairs = append(*pairs, pair{key: key, val: val})
-	}
-	return nil
-}
-
 // loadVariables loads the environment variables from the map.
 // Case 1: env is a map.
 // Case 2: env is an array of maps.
@@ -539,7 +382,7 @@ func loadVariables(strVariables any, opts buildOpts) (
 			// This also executes command substitution.
 			var err error
 
-			value, err = evaluateValue(value)
+			value, err = substituteCommands(os.ExpandEnv(value))
 			if err != nil {
 				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
 			}
@@ -599,24 +442,18 @@ func (b *builder) buildInfoMailConfig() (err error) {
 	return
 }
 
+// callBuilderFunc calls a builder function and adds any errors to the error
+// list.
+func (b *builder) callBuilderFunc(fn builderFunc) {
+	if err := fn(); err != nil {
+		b.errs.Add(err)
+	}
+}
+
 // stepBuilder is used to build a step from the step definition.
 type stepBuilder struct {
 	noEval bool
 }
-
-// stepBuilderFunc is a function that builds a step from the step definition.
-type stepBuilderFunc func(def *stepDef, step *Step) error
-
-var (
-	// stepBuilderFuncs is a list of functions that build a step from the step
-	// definition.
-	stepBuilderFuncs = []stepBuilderFunc{
-		parseCommand,
-		parseExecutor,
-		parseSubWorkflow,
-		parseMiscs,
-	}
-)
 
 // buildStep builds a step from the step definition.
 // nolint // cognitive complexity
@@ -654,6 +491,40 @@ func (b *stepBuilder) buildStep(
 
 	return step, nil
 }
+
+// expandEnv expands the environment variables in the value if the noEval
+// option is false.
+func expandEnv(val string, noEval bool) string {
+	if noEval {
+		return val
+	}
+
+	return os.ExpandEnv(val)
+}
+
+// buildMailConfig builds a MailConfig from the definition.
+func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
+	return &MailConfig{
+		From:       def.From,
+		To:         def.To,
+		Prefix:     def.Prefix,
+		AttachLogs: def.AttachLogs,
+	}, nil
+}
+
+// stepBuilderFunc is a function that builds a step from the step definition.
+type stepBuilderFunc func(def *stepDef, step *Step) error
+
+var (
+	// stepBuilderFuncs is a list of functions that build a step from the step
+	// definition.
+	stepBuilderFuncs = []stepBuilderFunc{
+		parseCommand,
+		parseExecutor,
+		parseSubWorkflow,
+		parseMiscs,
+	}
+)
 
 // commandRun is not a actual command.
 // subworkflow does not use this command field so it is used
@@ -820,11 +691,6 @@ func parseCommand(def *stepDef, step *Step) error {
 	return nil
 }
 
-var (
-	// paramRegex is a regex to match the parameters in the command.
-	paramRegex = regexp.MustCompile(`\$\w+`)
-)
-
 // assignValues Assign values to command parameters
 func assignValues(command string, params map[string]string) string {
 	updatedCommand := command
@@ -836,99 +702,6 @@ func assignValues(command string, params map[string]string) string {
 	}
 
 	return updatedCommand
-}
-
-// parseFuncCall parses the function call in the step definition.
-func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
-	if call == nil {
-		return nil
-	}
-
-	passedArgs := make(map[string]string)
-	step.Args = make([]string, 0, len(call.Args))
-
-	for k, v := range call.Args {
-		if strV, ok := v.(string); ok {
-			step.Args = append(step.Args, strV)
-			passedArgs[k] = strV
-			continue
-		}
-
-		if intV, ok := v.(int); ok {
-			strV := strconv.Itoa(intV)
-			step.Args = append(step.Args, strV)
-			passedArgs[k] = strV
-			continue
-		}
-
-		return errArgsMustBeConvertibleToIntOrString
-	}
-
-	calledFuncDef := &funcDef{}
-
-	for _, funcDef := range funcs {
-		if funcDef.Name == call.Function {
-			calledFuncDef = funcDef
-			break
-		}
-	}
-
-	step.Command = paramRegex.ReplaceAllString(calledFuncDef.Command, "")
-	step.CmdWithArgs = assignValues(calledFuncDef.Command, passedArgs)
-
-	return nil
-}
-
-// parseMiscs parses the miscellaneous fields in the step definition.
-func parseMiscs(def *stepDef, step *Step) error {
-	if def.ContinueOn != nil {
-		step.ContinueOn.Skipped = def.ContinueOn.Skipped
-		step.ContinueOn.Failure = def.ContinueOn.Failure
-	}
-
-	if def.RetryPolicy != nil {
-		step.RetryPolicy = &RetryPolicy{
-			Limit:    def.RetryPolicy.Limit,
-			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
-		}
-	}
-
-	if def.RepeatPolicy != nil {
-		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
-		step.RepeatPolicy.Interval = time.Second *
-			time.Duration(def.RepeatPolicy.IntervalSec)
-	}
-
-	if def.SignalOnStop != nil {
-		sigDef := *def.SignalOnStop
-		sig := unix.SignalNum(sigDef)
-		if sig == 0 {
-			return fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
-		}
-		step.SignalOnStop = sigDef
-	}
-
-	return nil
-}
-
-// expandEnv expands the environment variables in the value if the noEval
-// option is false.
-func expandEnv(val string, noEval bool) string {
-	if noEval {
-		return val
-	}
-
-	return os.ExpandEnv(val)
-}
-
-// parseKey parses the key as a string.
-func parseKey(value any) (string, error) {
-	val, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("%w: %T", errInvalidKeyType, value)
-	}
-
-	return val, nil
 }
 
 // convertMap converts a map[any]any to a map[string]any.
@@ -970,16 +743,6 @@ func convertMap(m map[string]any) error {
 	return nil
 }
 
-// buildMailConfig builds a MailConfig from the definition.
-func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
-	return &MailConfig{
-		From:       def.From,
-		To:         def.To,
-		Prefix:     def.Prefix,
-		AttachLogs: def.AttachLogs,
-	}, nil
-}
-
 // buildConfigEnv builds the environment variables from the map.
 func buildConfigEnv(vars map[string]string) []string {
 	var ret []string
@@ -1003,41 +766,6 @@ func buildConditions(cond []*conditionDef) []Condition {
 	return ret
 }
 
-// parseTags builds a list of tags from the value.
-// It converts the tags to lowercase and trims the whitespace.
-func parseTags(value string) []string {
-	ret := []string{}
-
-	for _, v := range strings.Split(value, ",") {
-		tag := strings.ToLower(strings.TrimSpace(v))
-		if tag != "" {
-			ret = append(ret, tag)
-		}
-	}
-
-	return ret
-}
-
-var cronParser = cron.NewParser(
-	cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow,
-)
-
-// parseSchedules parses the schedule values and returns a list of schedules.
-// each schedule is parsed as a cron expression.
-func parseSchedules(values []string) ([]Schedule, error) {
-	var ret []Schedule
-
-	for _, v := range values {
-		parsed, err := cronParser.Parse(v)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errInvalidSchedule, err)
-		}
-		ret = append(ret, Schedule{Expression: v, Parsed: parsed})
-	}
-
-	return ret, nil
-}
-
 // extractParamNames extracts a slice of parameter names by removing the '$'
 // from the command string.
 func extractParamNames(command string) []string {
@@ -1054,150 +782,13 @@ func extractParamNames(command string) []string {
 	return params
 }
 
-// assertFunctions validates the function definitions.
-func assertFunctions(fns []*funcDef) error {
-	if fns == nil {
-		return nil
-	}
+type scheduleKey string
 
-	nameMap := make(map[string]bool)
-	for _, funcDef := range fns {
-		if _, exists := nameMap[funcDef.Name]; exists {
-			return errDuplicateFunction
-		}
-		nameMap[funcDef.Name] = true
-
-		definedParamNames := strings.Split(funcDef.Params, " ")
-		passedParamNames := extractParamNames(funcDef.Command)
-		if len(definedParamNames) != len(passedParamNames) {
-			return errFuncParamsMismatch
-		}
-
-		for i := 0; i < len(definedParamNames); i++ {
-			if definedParamNames[i] != passedParamNames[i] {
-				return errFuncParamsMismatch
-			}
-		}
-	}
-
-	return nil
-}
-
-// assertStepDef validates the step definition.
-func assertStepDef(def *stepDef, funcs []*funcDef) error {
-	// Step name is required.
-	if def.Name == "" {
-		return errStepNameRequired
-	}
-
-	// TODO: Validate executor config for each executor type.
-	if def.Executor == nil && def.Command == nil && def.Call == nil &&
-		def.Run == "" {
-		return errStepCommandOrCallRequired
-	}
-
-	// validate the function call if it exists.
-	if def.Call != nil {
-		calledFunc := def.Call.Function
-		calledFuncDef := &funcDef{}
-		for _, funcDef := range funcs {
-			if funcDef.Name == calledFunc {
-				calledFuncDef = funcDef
-				break
-			}
-		}
-		if calledFuncDef.Name == "" {
-			return errCallFunctionNotFound
-		}
-
-		definedParamNames := strings.Split(calledFuncDef.Params, " ")
-		if len(def.Call.Args) != len(definedParamNames) {
-			return errNumberOfParamsMismatch
-		}
-
-		for _, paramName := range definedParamNames {
-			_, exists := def.Call.Args[paramName]
-			if !exists {
-				return errRequiredParameterNotFound
-			}
-		}
-	}
-
-	return nil
-}
-
-// parseScheduleMap parses the schedule map and populates the starts, stops,
-// and restarts slices. Each key in the map must be either "start", "stop", or
-// "restart". The value can be Case 1 or Case 2.
-//
-// Case 1: The value is a string
-// Case 2: The value is an array of strings
-//
-// Example:
-// ```yaml
-// schedule:
-//
-//	start: "0 1 * * *"
-//	stop: "0 18 * * *"
-//	restart:
-//	  - "0 1 * * *"
-//	  - "0 18 * * *"
-//
-// ```
-// nolint // cognitive complexity
-func parseScheduleMap(
-	scheduleMap map[any]any, starts, stops, restarts *[]string,
-) error {
-	for k, v := range scheduleMap {
-		// Key must be a string.
-		key, ok := k.(string)
-		if !ok {
-			return errScheduleKeyMustBeString
-		}
-		var values []string
-
-		switch v := v.(type) {
-		case string:
-			// Case 1. schedule is a string.
-			values = append(values, v)
-
-		case []any:
-			// Case 2. schedule is an array of strings.
-			// Append all the schedules to the values slice.
-			for _, s := range v {
-				s, ok := s.(string)
-				if !ok {
-					return errScheduleMustBeStringOrArray
-				}
-				values = append(values, s)
-			}
-
-		}
-
-		var targets *[]string
-
-		switch scheduleKey(key) {
-		case scheduleKeyStart:
-			targets = starts
-
-		case scheduleKeyStop:
-			targets = stops
-
-		case scheduleKeyRestart:
-			targets = restarts
-
-		}
-
-		for _, v := range values {
-			if _, err := cronParser.Parse(v); err != nil {
-				return fmt.Errorf("%w: %s", errInvalidSchedule, err)
-			}
-			*targets = append(*targets, v)
-		}
-	}
-
-	return nil
-}
+const (
+	scheduleKeyStart   scheduleKey = "start"
+	scheduleKeyStop    scheduleKey = "stop"
+	scheduleKeyRestart scheduleKey = "restart"
+)
 
 // tickerMatcher matches the command in the value string.
 // Example: "`date`"
@@ -1229,9 +820,4 @@ func substituteCommands(input string) (string, error) {
 	}
 
 	return ret, nil
-}
-
-// evaluateValue expands environment variables and execute command substitution.
-func evaluateValue(value string) (string, error) {
-	return substituteCommands(os.ExpandEnv(value))
 }

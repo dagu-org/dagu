@@ -19,38 +19,11 @@ type SubWorkflowExecutor struct {
 	lock sync.Mutex
 }
 
-func (e *SubWorkflowExecutor) Run() error {
-	e.lock.Lock()
-	err := e.cmd.Start()
-	e.lock.Unlock()
-	if err != nil {
-		return err
-	}
-	return e.cmd.Wait()
-}
-
-func (e *SubWorkflowExecutor) SetStdout(out io.Writer) {
-	e.cmd.Stdout = out
-}
-
-func (e *SubWorkflowExecutor) SetStderr(out io.Writer) {
-	e.cmd.Stderr = out
-}
-
-func (e *SubWorkflowExecutor) Kill(sig os.Signal) error {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	if e.cmd == nil || e.cmd.Process == nil {
-		return nil
-	}
-	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
-}
-
 var (
 	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 )
 
-func CreateSubWorkflowExecutor(
+func NewSubWorkflowExecutor(
 	ctx context.Context, step dag.Step,
 ) (Executor, error) {
 	executable, err := os.Executable()
@@ -99,6 +72,33 @@ func CreateSubWorkflowExecutor(
 	}, nil
 }
 
+func (e *SubWorkflowExecutor) Run() error {
+	e.lock.Lock()
+	err := e.cmd.Start()
+	e.lock.Unlock()
+	if err != nil {
+		return err
+	}
+	return e.cmd.Wait()
+}
+
+func (e *SubWorkflowExecutor) SetStdout(out io.Writer) {
+	e.cmd.Stdout = out
+}
+
+func (e *SubWorkflowExecutor) SetStderr(out io.Writer) {
+	e.cmd.Stderr = out
+}
+
+func (e *SubWorkflowExecutor) Kill(sig os.Signal) error {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if e.cmd == nil || e.cmd.Process == nil {
+		return nil
+	}
+	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
+}
+
 func init() {
-	Register(dag.ExecutorTypeSubWorkflow, CreateSubWorkflowExecutor)
+	Register(dag.ExecutorTypeSubWorkflow, NewSubWorkflowExecutor)
 }

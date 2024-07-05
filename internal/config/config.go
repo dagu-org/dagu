@@ -36,44 +36,14 @@ type Config struct {
 	APIBaseURL         string   // Base URL for API
 }
 
-const (
-	// Constants for config.
-	envPrefix      = "DAGU"
-	appHomeDefault = ".dagu"
-	legacyAppHome  = "DAGU_HOME"
-
-	// Default base config file.
-	baseConfig = "config.yaml"
-
-	// default directories
-	dagsDir    = "dags"
-	dataDir    = "data"
-	logDir     = "logs"
-	suspendDir = "suspend"
-)
-
-var adminLogsDir = path.Join(logDir, "admin")
-
-var (
-	defaults = Config{
-		Host:              "127.0.0.1",
-		Port:              8080,
-		IsBasicAuth:       false,
-		NavbarTitle:       "Dagu",
-		IsAuthToken:       false,
-		LatestStatusToday: false,
-		APIBaseURL:        "/api/v1",
-	}
-)
-
 type TLS struct {
 	CertFile string
 	KeyFile  string
 }
 
-var (
-	lock sync.Mutex
-)
+var lock sync.Mutex
+
+const envPrefix = "DAGU"
 
 func Load() (*Config, error) {
 	lock.Lock()
@@ -116,6 +86,32 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
+var defaults = Config{
+	Host:              "127.0.0.1",
+	Port:              8080,
+	IsBasicAuth:       false,
+	NavbarTitle:       "Dagu",
+	IsAuthToken:       false,
+	LatestStatusToday: false,
+	APIBaseURL:        "/api/v1",
+	AdminLogsDir:      path.Join(logDir, "admin"),
+}
+
+const (
+	// Constants for config.
+	appHomeDefault = ".dagu"
+	legacyAppHome  = "DAGU_HOME"
+
+	// Default base config file.
+	baseConfig = "config.yaml"
+
+	// default directories
+	dagsDir    = "dags"
+	dataDir    = "data"
+	logDir     = "logs"
+	suspendDir = "suspend"
+)
+
 func setDefaults() error {
 	executable, err := os.Executable()
 	if err != nil {
@@ -137,7 +133,7 @@ func setDefaults() error {
 	viper.SetDefault("logDir", path.Join(paths.configDir, logDir))
 	viper.SetDefault("dataDir", path.Join(paths.configDir, dataDir))
 	viper.SetDefault("suspendFlagsDir", path.Join(paths.configDir, suspendDir))
-	viper.SetDefault("adminLogsDir", path.Join(paths.configDir, adminLogsDir))
+	viper.SetDefault("adminLogsDir", path.Join(paths.configDir, defaults.AdminLogsDir))
 	viper.SetDefault("navbarColor", defaults.NavbarColor)
 	viper.SetDefault("navbarTitle", defaults.NavbarTitle)
 	viper.SetDefault("isAuthToken", defaults.IsAuthToken)
@@ -200,6 +196,7 @@ func loadLegacyEnvs(cfg *Config) {
 
 type defaultPaths struct {
 	configDir string
+	// Add more paths here if needed.
 }
 
 func getDefaultPaths() defaultPaths {

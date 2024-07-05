@@ -596,7 +596,7 @@ func Test_evaluateValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			r, err := evaluateValue(tt.input)
+			r, err := substituteCommands(os.ExpandEnv(tt.input))
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -610,7 +610,7 @@ func Test_evaluateValue(t *testing.T) {
 func Test_parseParams(t *testing.T) {
 	t.Run("Parse params with command substitution", func(t *testing.T) {
 		val := "QUESTION=\"what is your favorite activity?\""
-		ret, err := parseParams(val, true)
+		ret, err := parseParamValue(val, true)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(ret))
 		require.Equal(t, ret[0].name, "QUESTION")

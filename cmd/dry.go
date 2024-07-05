@@ -21,6 +21,7 @@ func dryCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
+
 			runDAG(
 				cmd.Context(),
 				cfg,

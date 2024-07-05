@@ -20,6 +20,7 @@ func stopCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
+
 			loadedDAG, err := loadDAG(cfg, args[0], "")
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
@@ -28,6 +29,7 @@ func stopCmd() *cobra.Command {
 			log.Printf("Stopping...")
 			dataStore := client.NewDataStoreFactory(cfg)
 			eng := engine.New(dataStore, engine.DefaultConfig(), cfg)
+
 			if err := eng.Stop(loadedDAG); err != nil {
 				log.Fatalf("Failed to stop the DAG: %v", err)
 			}

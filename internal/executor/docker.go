@@ -29,8 +29,6 @@ type DockerExecutor struct {
 	cancel          func()
 }
 
-var errImageMustBeString = errors.New("image must be string")
-
 func (e *DockerExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
 }
@@ -115,6 +113,8 @@ func (e *DockerExecutor) Run() error {
 
 	return nil
 }
+
+var errImageMustBeString = errors.New("image must be string")
 
 func CreateDockerExecutor(
 	_ context.Context, step dag.Step,

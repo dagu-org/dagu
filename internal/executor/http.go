@@ -33,47 +33,7 @@ type HTTPConfig struct {
 	Debug   bool              `json:"debug"`
 }
 
-var errHTTPStatusCode = errors.New("http status code not 2xx")
-
-func (e *HTTPExecutor) SetStdout(out io.Writer) {
-	e.stdout = out
-}
-
-func (e *HTTPExecutor) SetStderr(out io.Writer) {
-	e.stdout = out
-}
-
-func (e *HTTPExecutor) Kill(_ os.Signal) error {
-	e.reqCancel()
-	return nil
-}
-
-func (e *HTTPExecutor) Run() error {
-	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
-	if err != nil {
-		return err
-	}
-
-	resCode := rsp.StatusCode()
-	isErr := resCode < 200 || resCode > 299
-	if isErr || !e.cfg.Silent {
-		if _, err := e.stdout.Write([]byte(rsp.Status() + "\n")); err != nil {
-			return err
-		}
-		if err := rsp.Header().Write(e.stdout); err != nil {
-			return err
-		}
-	}
-	if _, err := e.stdout.Write(rsp.Body()); err != nil {
-		return err
-	}
-	if isErr {
-		return fmt.Errorf("%w: %d", errHTTPStatusCode, resCode)
-	}
-	return nil
-}
-
-func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func NewHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	var reqCfg HTTPConfig
 	if len(step.Script) > 0 {
 		if err := decodeHTTPConfigFromString(step.Script, &reqCfg); err != nil {
@@ -118,6 +78,46 @@ func CreateHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
+func (e *HTTPExecutor) SetStdout(out io.Writer) {
+	e.stdout = out
+}
+
+func (e *HTTPExecutor) SetStderr(out io.Writer) {
+	e.stdout = out
+}
+
+func (e *HTTPExecutor) Kill(_ os.Signal) error {
+	e.reqCancel()
+	return nil
+}
+
+var errHTTPStatusCode = errors.New("http status code not 2xx")
+
+func (e *HTTPExecutor) Run() error {
+	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
+	if err != nil {
+		return err
+	}
+
+	resCode := rsp.StatusCode()
+	isErr := resCode < 200 || resCode > 299
+	if isErr || !e.cfg.Silent {
+		if _, err := e.stdout.Write([]byte(rsp.Status() + "\n")); err != nil {
+			return err
+		}
+		if err := rsp.Header().Write(e.stdout); err != nil {
+			return err
+		}
+	}
+	if _, err := e.stdout.Write(rsp.Body()); err != nil {
+		return err
+	}
+	if isErr {
+		return fmt.Errorf("%w: %d", errHTTPStatusCode, resCode)
+	}
+	return nil
+}
+
 func decodeHTTPConfig(dat map[string]any, cfg *HTTPConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
@@ -137,5 +137,5 @@ func decodeHTTPConfigFromString(s string, cfg *HTTPConfig) error {
 }
 
 func init() {
-	Register("http", CreateHTTPExecutor)
+	Register("http", NewHTTPExecutor)
 }

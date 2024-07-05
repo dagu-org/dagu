@@ -19,6 +19,29 @@ type CommandExecutor struct {
 	lock sync.Mutex
 }
 
+func NewCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+	// nolint: gosec
+	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
+	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
+		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
+	}
+	cmd.Dir = step.Dir
+	cmd.Env = append(cmd.Env, os.Environ()...)
+	cmd.Env = append(cmd.Env, step.Variables...)
+	step.OutputVariables.Range(func(_, value any) bool {
+		cmd.Env = append(cmd.Env, value.(string))
+		return true
+	})
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+		Pgid:    0,
+	}
+
+	return &CommandExecutor{
+		cmd: cmd,
+	}, nil
+}
+
 func (e *CommandExecutor) Run() error {
 	e.lock.Lock()
 	err := e.cmd.Start()
@@ -46,32 +69,7 @@ func (e *CommandExecutor) Kill(sig os.Signal) error {
 	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
 }
 
-func CreateCommandExecutor(
-	ctx context.Context, step dag.Step,
-) (Executor, error) {
-	// nolint: gosec
-	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
-	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
-		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
-	}
-	cmd.Dir = step.Dir
-	cmd.Env = append(cmd.Env, os.Environ()...)
-	cmd.Env = append(cmd.Env, step.Variables...)
-	step.OutputVariables.Range(func(_, value any) bool {
-		cmd.Env = append(cmd.Env, value.(string))
-		return true
-	})
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-		Pgid:    0,
-	}
-
-	return &CommandExecutor{
-		cmd: cmd,
-	}, nil
-}
-
 func init() {
-	Register("", CreateCommandExecutor)
-	Register("command", CreateCommandExecutor)
+	Register("", NewCommandExecutor)
+	Register("command", NewCommandExecutor)
 }

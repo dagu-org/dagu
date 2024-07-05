@@ -10,13 +10,13 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
 )
 
+var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
+
 type dataStoreFactoryImpl struct {
 	cfg          *config.Config
 	historyStore persistence.HistoryStore
 	dagStore     persistence.DAGStore
 }
-
-var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
 
 func NewDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
 	dataStoreImpl := &dataStoreFactoryImpl{cfg: cfg}

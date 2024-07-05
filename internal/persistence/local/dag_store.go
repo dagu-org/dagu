@@ -221,7 +221,7 @@ func (d *dagStoreImpl) Grep(
 
 	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+		if util.MatchExtension(fi.Name(), dag.Exts) {
 			file := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(file)
 			if err != nil {
@@ -315,7 +315,7 @@ func find(name string) (string, error) {
 	ext := path.Ext(name)
 	if ext == "" {
 		// try all supported extensions
-		for _, ext := range dag.EXTENSIONS {
+		for _, ext := range dag.Exts {
 			if util.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}

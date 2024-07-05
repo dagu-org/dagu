@@ -126,21 +126,21 @@ func defaultMatcher(pattern string, opts *Options) (Matcher, error) {
 	}, nil
 }
 
+var _ Matcher = (*regexpMatcher)(nil)
+
 type regexpMatcher struct {
 	Regexp *regexp.Regexp
 }
-
-var _ Matcher = (*regexpMatcher)(nil)
 
 func (rm *regexpMatcher) Match(line string) bool {
 	return rm.Regexp.MatchString(line)
 }
 
+var _ Matcher = (*simpleMatcher)(nil)
+
 type simpleMatcher struct {
 	Pattern string
 }
-
-var _ Matcher = (*simpleMatcher)(nil)
 
 func (rm *simpleMatcher) Match(line string) bool {
 	return strings.Contains(line, rm.Pattern)

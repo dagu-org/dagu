@@ -12,23 +12,29 @@ import (
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
+func StatusFromJSON(s string) (*Status, error) {
+	status := new(Status)
+	err := json.Unmarshal([]byte(s), status)
+	if err != nil {
+		return nil, err
+	}
+	return status, err
+}
+
+func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
+	if len(nodes) != 0 {
+		return FromNodes(nodes)
+	}
+	return FromSteps(steps)
+}
+
+type StatusFile struct {
+	File   string
+	Status *Status
+}
+
 type StatusResponse struct {
 	Status *Status `json:"status"`
-}
-
-type Pid int
-
-const PidNotRunning Pid = -1
-
-func (p Pid) String() string {
-	if p == PidNotRunning {
-		return ""
-	}
-	return fmt.Sprintf("%d", p)
-}
-
-func (p Pid) IsRunning() bool {
-	return p != PidNotRunning
 }
 
 type Status struct {
@@ -49,28 +55,10 @@ type Status struct {
 	mu         sync.RWMutex
 }
 
-type StatusFile struct {
-	File   string
-	Status *Status
-}
-
-func StatusFromJSON(s string) (*Status, error) {
-	status := new(Status)
-	err := json.Unmarshal([]byte(s), status)
-	if err != nil {
-		return nil, err
-	}
-	return status, err
-}
-
 func NewStatusDefault(dg *dag.DAG) *Status {
 	return NewStatus(
 		dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil,
 	)
-}
-
-func Time(t time.Time) *time.Time {
-	return &t
 }
 
 func NewStatus(
@@ -101,31 +89,6 @@ func NewStatus(
 	return statusObj
 }
 
-func Params(params []string) string {
-	return strings.Join(params, " ")
-}
-
-func nodeOrNil(s *dag.Step) *Node {
-	if s == nil {
-		return nil
-	}
-	return NewNode(*s)
-}
-
-func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
-	if len(nodes) != 0 {
-		return FromNodes(nodes)
-	}
-	return FromSteps(steps)
-}
-
-func FormatTime(val time.Time) string {
-	if val.IsZero() {
-		return ""
-	}
-	return util.FormatTime(val)
-}
-
 func (st *Status) CorrectRunningStatus() {
 	if st.Status == scheduler.StatusRunning {
 		st.Status = scheduler.StatusError
@@ -141,4 +104,41 @@ func (st *Status) ToJSON() ([]byte, error) {
 		return []byte{}, err
 	}
 	return js, nil
+}
+
+func FormatTime(val time.Time) string {
+	if val.IsZero() {
+		return ""
+	}
+	return util.FormatTime(val)
+}
+
+func Time(t time.Time) *time.Time {
+	return &t
+}
+
+func Params(params []string) string {
+	return strings.Join(params, " ")
+}
+
+type Pid int
+
+const PidNotRunning Pid = -1
+
+func (p Pid) String() string {
+	if p == PidNotRunning {
+		return ""
+	}
+	return fmt.Sprintf("%d", p)
+}
+
+func (p Pid) IsRunning() bool {
+	return p != PidNotRunning
+}
+
+func nodeOrNil(s *dag.Step) *Node {
+	if s == nil {
+		return nil
+	}
+	return NewNode(*s)
 }

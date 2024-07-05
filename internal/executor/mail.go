@@ -25,6 +25,35 @@ type MailConfig struct {
 	Message string `mapstructure:"message"`
 }
 
+func NewMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+	var cfg MailConfig
+	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
+		return nil, err
+	}
+
+	cfg.From = os.ExpandEnv(cfg.From)
+	cfg.To = os.ExpandEnv(cfg.To)
+	cfg.Subject = os.ExpandEnv(cfg.Subject)
+	cfg.Message = os.ExpandEnv(cfg.Message)
+
+	exec := &MailExecutor{cfg: &cfg}
+
+	dagCtx, err := dag.GetContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m := &mailer.Mailer{
+		Config: &mailer.Config{
+			Host:     dagCtx.DAG.SMTP.Host,
+			Port:     dagCtx.DAG.SMTP.Port,
+			Username: dagCtx.DAG.SMTP.Username,
+			Password: dagCtx.DAG.SMTP.Password,
+		}}
+	exec.mailer = m
+
+	return exec, nil
+}
+
 func (e *MailExecutor) SetStdout(out io.Writer) {
 	e.stdout = out
 }
@@ -71,35 +100,6 @@ func (e *MailExecutor) Run() error {
 	return err
 }
 
-func CreateMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
-	var cfg MailConfig
-	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
-		return nil, err
-	}
-
-	cfg.From = os.ExpandEnv(cfg.From)
-	cfg.To = os.ExpandEnv(cfg.To)
-	cfg.Subject = os.ExpandEnv(cfg.Subject)
-	cfg.Message = os.ExpandEnv(cfg.Message)
-
-	exec := &MailExecutor{cfg: &cfg}
-
-	dagCtx, err := dag.GetContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	m := &mailer.Mailer{
-		Config: &mailer.Config{
-			Host:     dagCtx.DAG.SMTP.Host,
-			Port:     dagCtx.DAG.SMTP.Port,
-			Username: dagCtx.DAG.SMTP.Username,
-			Password: dagCtx.DAG.SMTP.Password,
-		}}
-	exec.mailer = m
-
-	return exec, nil
-}
-
 func decodeMailConfig(dat map[string]any, cfg *MailConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
@@ -109,5 +109,5 @@ func decodeMailConfig(dat map[string]any, cfg *MailConfig) error {
 }
 
 func init() {
-	Register("mail", CreateMailExecutor)
+	Register("mail", NewMailExecutor)
 }
