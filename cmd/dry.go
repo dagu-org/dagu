@@ -4,8 +4,6 @@ import (
 	"log"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 )
 
@@ -22,18 +20,7 @@ func dryCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 
-			runDAG(
-				cmd.Context(),
-				cfg,
-				engine.New(
-					client.NewDataStoreFactory(cfg),
-					engine.DefaultConfig(),
-					cfg,
-				),
-				cmd,
-				args,
-				true,
-			)
+			runDAG(cmd.Context(), cfg, newEngine(cfg), cmd, args, true)
 		},
 	}
 

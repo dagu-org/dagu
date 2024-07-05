@@ -4,8 +4,6 @@ import (
 	"log"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 )
 
@@ -29,11 +27,9 @@ func statusCmd() *cobra.Command {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			curStatus, err := engine.New(
-				client.NewDataStoreFactory(cfg),
-				engine.DefaultConfig(),
-				cfg,
-			).GetCurrentStatus(loadedDAG)
+			eng := newEngine(cfg)
+
+			curStatus, err := eng.GetCurrentStatus(loadedDAG)
 
 			if err != nil {
 				// nolint

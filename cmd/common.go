@@ -11,34 +11,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/internal/service/frontend"
-	"github.com/dagu-dev/dagu/internal/service/scheduler"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-)
-
-// baseModule is a common module for all commands.
-var baseModule = fx.Options(
-	fx.Provide(engine.New),
-	fx.Provide(engine.DefaultConfig),
-	fx.Provide(logger.NewSlogLogger),
-	fx.Provide(client.NewDataStoreFactory),
-)
-
-// frontendModule is a module for the frontend server.
-var frontendModule = fx.Options(
-	baseModule,
-	frontend.Module,
-	fx.NopLogger,
-)
-
-// schedulerModule is a module for the scheduler process.
-var schedulerModule = fx.Options(
-	baseModule,
-	scheduler.Module,
-	fx.NopLogger,
 )
 
 // newFrontendApp initializes the web server that serves the frontend.

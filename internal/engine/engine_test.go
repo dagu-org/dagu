@@ -45,7 +45,7 @@ func setupTest(t *testing.T) (
 
 	return tmpDir,
 		engine.New(
-			dataStore, new(engine.Config), &config.Config{Executable: exec},
+			&engine.NewEngineArgs{DataStore: dataStore, Executable: exec},
 		),
 		dataStore, cfg
 }
@@ -68,8 +68,8 @@ func setupTestTmpDir(
 
 	return tmpDir,
 		engine.New(
-			dataStore, new(engine.Config), &config.Config{Executable: exec},
-		), dataStore, cfg
+			&engine.NewEngineArgs{DataStore: dataStore, Executable: exec}),
+		dataStore, cfg
 }
 
 func TestEngine_GetStatus(t *testing.T) {

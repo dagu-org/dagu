@@ -40,7 +40,11 @@ func setupTest(t *testing.T) (string, engine.Engine,
 	})
 
 	loader := dag.NewLoader(cfg)
-	eng := engine.New(dataStore, new(engine.Config), cfg)
+	eng := engine.New(&engine.NewEngineArgs{
+		DataStore:  dataStore,
+		WorkDir:    cfg.WorkDir,
+		Executable: cfg.Executable,
+	})
 
 	return tmpDir, eng, dataStore, loader
 }

@@ -41,12 +41,19 @@ var (
 )
 
 type DAGHandler struct {
-	engine engine.Engine
+	engine             engine.Engine
+	logEncodingCharset string
 }
 
-func NewDAGHandler(eng engine.Engine) server.New {
+type NewDAGHandlerArgs struct {
+	Engine             engine.Engine
+	LogEncodingCharset string
+}
+
+func NewDAGHandler(args *NewDAGHandlerArgs) server.Handler {
 	return &DAGHandler{
-		engine: eng,
+		engine:             args.Engine,
+		logEncodingCharset: args.LogEncodingCharset,
 	}
 }
 
@@ -264,9 +271,7 @@ func (h *DAGHandler) getStepLog(
 		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
 	}
 
-	logContent, err := getLogFileContent(
-		node.Log, h.engine.Config().LogEncodingCharset,
-	)
+	logContent, err := getLogFileContent(node.Log, h.logEncodingCharset)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %w", node.Log, err)
 	}

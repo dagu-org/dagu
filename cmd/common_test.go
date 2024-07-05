@@ -38,9 +38,9 @@ func setupTest(t *testing.T) (
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	return tmpDir, engine.New(
-		dataStore, new(engine.Config), cfg,
-	), dataStore, cfg
+	return tmpDir, engine.New(&engine.NewEngineArgs{
+		DataStore: dataStore,
+	}), dataStore, cfg
 }
 
 // cmdTest is a helper struct to test commands.

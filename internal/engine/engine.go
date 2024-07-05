@@ -8,7 +8,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
@@ -38,30 +37,21 @@ type Engine interface {
 	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
 	IsSuspended(id string) bool
 	ToggleSuspend(id string, suspend bool) error
-	Config() *config.Config
 }
 
-// Config is the configuration for engine instance.
-// The WorkDir is optional and specifies the working directory where the engine
-// will operate.
-type Config struct{ WorkDir string }
-
-// DefaultConfig returns the default configuration for the engine.
-func DefaultConfig() *Config {
-	return &Config{}
+type NewEngineArgs struct {
+	DataStore  persistence.DataStoreFactory
+	Executable string
+	WorkDir    string
 }
 
 // New creates a new Engine instance.
 // The Engine is used to interact with the DAG execution engine.
-func New(
-	dataStore persistence.DataStoreFactory, cfg *Config,
-	globalCfg *config.Config,
-) Engine {
+func New(args *NewEngineArgs) Engine {
 	return &engineImpl{
-		dataStore:  dataStore,
-		executable: globalCfg.Executable,
-		workDir:    cfg.WorkDir,
-		config:     globalCfg,
+		dataStore:  args.DataStore,
+		executable: args.Executable,
+		workDir:    args.WorkDir,
 	}
 }
 
@@ -69,7 +59,6 @@ type engineImpl struct {
 	dataStore  persistence.DataStoreFactory
 	executable string
 	workDir    string
-	config     *config.Config
 }
 
 var (
@@ -85,10 +74,6 @@ var (
 	errGetStatus     = errors.New("failed to get status")
 	errDAGIsRunning  = errors.New("the DAG is running")
 )
-
-func (e *engineImpl) Config() *config.Config {
-	return e.config
-}
 
 func (e *engineImpl) GetDAGSpec(id string) (string, error) {
 	dagStore := e.dataStore.NewDAGStore()

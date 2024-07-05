@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -62,11 +60,7 @@ func TestRestartCommand(t *testing.T) {
 		dg, err := loadDAG(cfg, dagFile, "")
 		require.NoError(t, err)
 
-		recentHistory := engine.New(
-			client.NewDataStoreFactory(cfg),
-			engine.DefaultConfig(),
-			cfg,
-		).GetRecentHistory(dg, 2)
+		recentHistory := newEngine(cfg).GetRecentHistory(dg, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

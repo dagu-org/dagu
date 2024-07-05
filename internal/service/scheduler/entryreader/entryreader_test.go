@@ -46,7 +46,9 @@ func setupTest(t *testing.T) (string, engine.Engine, *config.Config) {
 
 	dataStore := client.NewDataStoreFactory(cfg)
 
-	return tmpDir, engine.New(dataStore, new(engine.Config), cfg), cfg
+	return tmpDir, engine.New(&engine.NewEngineArgs{
+		DataStore: dataStore,
+	}), cfg
 }
 
 func TestReadEntries(t *testing.T) {

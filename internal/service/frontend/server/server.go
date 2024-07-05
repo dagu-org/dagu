@@ -23,26 +23,6 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type BasicAuth struct {
-	Username string
-	Password string
-}
-
-type AuthToken struct {
-	Token string
-}
-
-type Params struct {
-	Host      string
-	Port      int
-	BasicAuth *BasicAuth
-	AuthToken *AuthToken
-	TLS       *config.TLS
-	Logger    logger.Logger
-	Handlers  []New
-	AssetsFS  fs.FS
-}
-
 type Server struct {
 	cfg       *config.Config
 	host      string
@@ -52,11 +32,31 @@ type Server struct {
 	tls       *config.TLS
 	logger    logger.Logger
 	server    *restapi.Server
-	handlers  []New
+	handlers  []Handler
 	assets    fs.FS
 }
 
-type New interface {
+type Params struct {
+	Host      string
+	Port      int
+	BasicAuth *BasicAuth
+	AuthToken *AuthToken
+	TLS       *config.TLS
+	Logger    logger.Logger
+	Handlers  []Handler
+	AssetsFS  fs.FS
+}
+
+type BasicAuth struct {
+	Username string
+	Password string
+}
+
+type AuthToken struct {
+	Token string
+}
+
+type Handler interface {
 	Configure(api *operations.DaguAPI)
 }
 

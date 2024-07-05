@@ -7,7 +7,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 )
@@ -31,11 +30,7 @@ func restartCmd() *cobra.Command {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			eng := engine.New(
-				client.NewDataStoreFactory(cfg),
-				engine.DefaultConfig(),
-				cfg,
-			)
+			eng := newEngine(cfg)
 
 			if err := stopDAGIfRunning(eng, dg); err != nil {
 				log.Fatalf("Failed to stop the DAG: %v", err)

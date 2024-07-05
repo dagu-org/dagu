@@ -6,7 +6,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 )
@@ -51,9 +50,11 @@ func retryCmd() *cobra.Command {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
+			eng := newEngine(cfg)
+
 			dagAgent := agent.New(
 				&agent.Config{DAG: loadedDAG, RetryTarget: status.Status},
-				engine.New(dataStore, engine.DefaultConfig(), cfg),
+				eng,
 				dataStore,
 			)
 
