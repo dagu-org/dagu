@@ -403,7 +403,7 @@ func TestLoad(t *testing.T) {
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		loader := NewLoader(cfg)
+		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
 		dg, err := loader.Load(cfg.BaseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
@@ -416,7 +416,7 @@ func TestLoad(t *testing.T) {
 		require.NoError(t, err)
 
 		// no_overwrite.yaml does not have the MailOn key.
-		loader := NewLoader(cfg)
+		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
 		dg, err := loader.Load(cfg.BaseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
@@ -504,7 +504,7 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 	t.Run("It should set the signal on stop", func(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
-		loader := NewLoader(cfg)
+		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
 
 		ret, err := loader.LoadYAML([]byte(testSignalOnStop))
 		require.NoError(t, err)
@@ -516,7 +516,7 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 	t.Run("It should return an error if the signal is invalid", func(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
-		loader := NewLoader(cfg)
+		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
 
 		_, err = loader.LoadYAML([]byte(testSignalOnStopInvalid))
 		require.Error(t, err)

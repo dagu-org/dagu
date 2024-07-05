@@ -36,9 +36,10 @@ func setupTest(t *testing.T) (
 	_ = os.Setenv("HOME", tmpDir)
 	cfg, _ := config.Load()
 
-	dataStore := client.NewDataStoreFactory(&config.Config{
+	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    testdataDir,
+		Loader:  dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir}),
 	})
 
 	exec := path.Join(util.MustGetwd(), "../../bin/dagu")
@@ -59,9 +60,10 @@ func setupTestTmpDir(
 	_ = os.Setenv("HOME", tmpDir)
 	cfg, _ := config.Load()
 
-	dataStore := client.NewDataStoreFactory(&config.Config{
+	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
+		Loader:  dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir}),
 	})
 
 	exec := path.Join(util.MustGetwd(), "../../bin/dagu")
@@ -362,7 +364,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		loader := dag.NewLoader(cfg)
+		loader := dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir})
 		dg, err := loader.Load("",
 			path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 		require.NoError(t, err)

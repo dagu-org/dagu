@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/util"
 
 	"github.com/robfig/cron/v3"
@@ -163,13 +162,7 @@ var (
 )
 
 // setup sets the default values for the DAG.
-func (d *DAG) setup(cfg *config.Config) {
-	// LogDir is the directory where the logs are stored.
-	// It is used to write the stdout and stderr of the steps.
-	if d.LogDir == "" {
-		d.LogDir = cfg.LogDir
-	}
-
+func (d *DAG) setup() {
 	// The default history retention days is 30 days.
 	// It is the number of days to keep the history.
 	// The older history is deleted when the DAG is executed.

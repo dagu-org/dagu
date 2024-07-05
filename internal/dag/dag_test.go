@@ -28,7 +28,7 @@ func TestDAG_String(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
 
-		loader := NewLoader(cfg)
+		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
 		dg, err := loader.Load("", path.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 
@@ -43,9 +43,15 @@ func TestDAG_SockAddr(t *testing.T) {
 		require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, d.SockAddr())
 	})
 	t.Run("Unix Socket", func(t *testing.T) {
-		d := &DAG{Location: "testdata/testDagVeryLongNameThatExceedsUnixSocketLengthMaximum-testDagVeryLongNameThatExceedsUnixSocketLengthMaximum.yml"}
+		d := &DAG{
+			Location: "testdata/testDagVeryLongNameThatExceedsUnixSocketLengthMaximum-testDagVeryLongNameThatExceedsUnixSocketLengthMaximum.yml",
+		}
 		// 108 is the maximum length of a unix socket address
 		require.Greater(t, 108, len(d.SockAddr()))
-		require.Equal(t, "/tmp/@dagu-testDagVeryLongNameThatExceedsUnixSocketLengthMax-b92b711162d6012f025a76d0cf0b40c2.sock", d.SockAddr())
+		require.Equal(
+			t,
+			"/tmp/@dagu-testDagVeryLongNameThatExceedsUnixSocketLengthMax-b92b711162d6012f025a76d0cf0b40c2.sock",
+			d.SockAddr(),
+		)
 	})
 }

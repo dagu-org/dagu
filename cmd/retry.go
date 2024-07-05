@@ -6,7 +6,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +27,7 @@ func retryCmd() *cobra.Command {
 			}
 
 			// Read the specified DAG execution status from the history store.
-			dataStore := client.NewDataStoreFactory(cfg)
+			dataStore := newDataStoreFactory(cfg)
 			historyStore := dataStore.NewHistoryStore()
 
 			absoluteFilePath, err := filepath.Abs(args[0])

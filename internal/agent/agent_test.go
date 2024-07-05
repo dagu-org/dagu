@@ -35,11 +35,14 @@ func setupTest(t *testing.T) (string, engine.Engine,
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dataStore := client.NewDataStoreFactory(&config.Config{
+	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	loader := dag.NewLoader(cfg)
+	loader := dag.NewLoader(&dag.NewLoaderArgs{
+		LogDir: cfg.LogDir,
+	})
+
 	eng := engine.New(&engine.NewEngineArgs{
 		DataStore:  dataStore,
 		WorkDir:    cfg.WorkDir,

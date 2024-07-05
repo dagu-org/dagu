@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
@@ -25,11 +24,17 @@ var (
 
 // Loader creates a DAG from a configuration file.
 type Loader struct {
-	cfg *config.Config
+	logDir string
 }
 
-func NewLoader(cfg *config.Config) *Loader {
-	return &Loader{cfg: cfg}
+type NewLoaderArgs struct {
+	LogDir string
+}
+
+func NewLoader(args *NewLoaderArgs) *Loader {
+	return &Loader{
+		logDir: args.LogDir,
+	}
 }
 
 // Load loads config from file.
@@ -154,9 +159,15 @@ func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
 		dst.Name = l.defaultName(file)
 	}
 
+	// LogDir is the directory where the logs are stored.
+	// It is used to write the stdout and stderr of the steps.
+	if dst.LogDir == "" {
+		dst.LogDir = l.logDir
+	}
+
 	// Set the default values for the DAG.
 	if !opts.metadataOnly {
-		dst.setup(l.cfg)
+		dst.setup()
 	}
 
 	return dst, nil

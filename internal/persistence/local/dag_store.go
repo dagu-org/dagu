@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -19,15 +18,20 @@ import (
 )
 
 type dagStoreImpl struct {
-	cfg       *config.Config
 	dir       string
+	loader    *dag.Loader
 	metaCache *filecache.Cache[*dag.DAG]
 }
 
-func NewDAGStore(cfg *config.Config, dir string) persistence.DAGStore {
+type NewDAGStoreArgs struct {
+	Dir    string
+	Loader *dag.Loader
+}
+
+func NewDAGStore(args *NewDAGStoreArgs) persistence.DAGStore {
 	dagStore := &dagStoreImpl{
-		cfg:       cfg,
-		dir:       dir,
+		dir:       args.Dir,
+		loader:    args.Loader,
 		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
 	dagStore.metaCache.StartEviction()
@@ -52,9 +56,8 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	loader := dag.NewLoader(d.cfg)
 	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
-		return loader.LoadMetadata(loc)
+		return d.loader.LoadMetadata(loc)
 	})
 }
 
@@ -63,8 +66,7 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	loader := dag.NewLoader(d.cfg)
-	dat, err := loader.LoadWithoutEval(loc)
+	dat, err := d.loader.LoadWithoutEval(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -88,8 +90,7 @@ const defaultPerm os.FileMode = 0744
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	loader := dag.NewLoader(d.cfg)
-	_, err := loader.LoadYAML(spec)
+	_, err := d.loader.LoadYAML(spec)
 	if err != nil {
 		return err
 	}
@@ -235,8 +236,7 @@ func (d *dagStoreImpl) Grep(
 				)
 				continue
 			}
-			loader := dag.NewLoader(d.cfg)
-			dg, err := loader.LoadMetadata(file)
+			dg, err := d.loader.LoadMetadata(file)
 			if err != nil {
 				errs = append(
 					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
@@ -275,8 +275,7 @@ func (d *dagStoreImpl) Find(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	loader := dag.NewLoader(d.cfg)
-	return loader.LoadWithoutEval(file)
+	return d.loader.LoadWithoutEval(file)
 }
 
 func (d *dagStoreImpl) resolve(name string) (string, error) {

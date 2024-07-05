@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/service/frontend"
 	"github.com/dagu-dev/dagu/internal/service/scheduler"
@@ -33,8 +35,18 @@ var baseModule = fx.Options(
 
 func newEngine(cfg *config.Config) engine.Engine {
 	return engine.New(&engine.NewEngineArgs{
-		DataStore:  client.NewDataStoreFactory(cfg),
+		DataStore:  newDataStoreFactory(cfg),
 		Executable: cfg.Executable,
 		WorkDir:    cfg.WorkDir,
+	})
+}
+
+func newDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
+	return client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
+		DAGs:              cfg.DAGs,
+		DataDir:           cfg.DataDir,
+		SuspendFlagsDir:   cfg.SuspendFlagsDir,
+		LatestStatusToday: cfg.LatestStatusToday,
+		Loader:            dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir}),
 	})
 }

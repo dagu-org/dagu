@@ -8,7 +8,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -31,12 +30,11 @@ func setupTest(t *testing.T) (
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
-	dataStore := client.NewDataStoreFactory(&config.Config{
-		DataDir: path.Join(tmpDir, ".dagu", "data"),
-	})
-
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
+	cfg.DataDir = path.Join(tmpDir, ".dagu", "data")
+	dataStore := newDataStoreFactory(cfg)
 
 	return tmpDir, engine.New(&engine.NewEngineArgs{
 		DataStore: dataStore,
