@@ -426,13 +426,10 @@ func parseParams(
 
 // stringifyParam converts a paramPair to a string representation.
 func stringifyParam(param paramPair) string {
-	escapedValue := strings.ReplaceAll(param.value, `"`, `\"`)
-	quotedValue := fmt.Sprintf(`"%s"`, escapedValue)
-
 	if param.name != "" {
-		return fmt.Sprintf("%s=%s", param.name, quotedValue)
+		return fmt.Sprintf("%s=%s", param.name, param.value)
 	}
-	return quotedValue
+	return param.value
 }
 
 // processParams parses and processes the parameters for the DAG.
