@@ -1,4 +1,4 @@
-package reporter
+package agent
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node,
+		t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -67,22 +67,18 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			rp := &Reporter{
-				ReporterConfig: &ReporterConfig{
-					Sender: &mockSender{},
-				},
-			}
+			rp := &reporter{Sender: &mockSender{}}
 
 			fn(t, rp, d, nodes)
 		})
 	}
 }
 
-func testErrorMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	dg.MailOn.Failure = true
 	dg.MailOn.Success = false
 
-	_ = rp.SendMail(dg, &model.Status{
+	_ = rp.send(dg, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -94,11 +90,11 @@ func testErrorMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node)
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	dg.MailOn.Failure = false
 	dg.MailOn.Success = true
 
-	err := rp.SendMail(dg, &model.Status{
+	err := rp.send(dg, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -109,11 +105,11 @@ func testNoErrorMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Nod
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	dg.MailOn.Failure = true
 	dg.MailOn.Success = true
 
-	err := rp.SendMail(dg, &model.Status{
+	err := rp.send(dg, &model.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -126,7 +122,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Nod
 	require.Equal(t, 1, mock.count)
 }
 
-func testReportSummary(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testReportSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -138,7 +134,7 @@ func testReportSummary(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.N
 		log.SetOutput(origStdout)
 	}()
 
-	rp.ReportSummary(&model.Status{
+	rp.report(&model.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, errors.New("test error"))
@@ -154,7 +150,7 @@ func testReportSummary(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.N
 	require.Contains(t, s, "test error")
 }
 
-func testReportStep(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testReportStep(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -167,7 +163,7 @@ func testReportStep(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node
 	}()
 
 	dg.Steps[0].MailOnError = true
-	err = rp.ReportStep(
+	err = rp.reportStep(
 		dg,
 		&model.Status{
 			Status: scheduler.StatusRunning,
@@ -192,7 +188,7 @@ func testReportStep(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testRenderSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	status := &model.Status{
 		Name:   dg.Name,
 		Status: scheduler.StatusError,
@@ -203,7 +199,7 @@ func testRenderSummary(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.N
 	require.Contains(t, summary, dg.Name)
 }
 
-func testRenderTable(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node) {
+func testRenderTable(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
 	summary := renderTable(nodes)
 	require.Contains(t, summary, nodes[0].Name)
 	require.Contains(t, summary, nodes[0].Args[0])

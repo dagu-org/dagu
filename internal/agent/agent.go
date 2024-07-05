@@ -21,7 +21,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/mailer"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
-	"github.com/dagu-dev/dagu/internal/reporter"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/util"
@@ -41,7 +40,7 @@ type Agent struct {
 	engine       engine.Engine
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
-	reporter     *reporter.Reporter
+	reporter     *reporter
 	historyStore persistence.HistoryStore
 	socketServer *sock.Server
 	logFile      *os.File
@@ -168,7 +167,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			status := a.Status()
 			util.LogErr("write status", a.historyStore.Write(status))
 			util.LogErr(
-				"report step", a.reporter.ReportStep(a.DAG, status, node),
+				"report step", a.reporter.reportStep(a.DAG, status, node),
 			)
 		}
 	}()
@@ -196,9 +195,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	util.LogErr("write status", a.historyStore.Write(a.Status()))
 
 	// Send the execution report if necessary.
-	a.reporter.ReportSummary(finishedStatus, lastErr)
+	a.reporter.report(finishedStatus, lastErr)
 	util.LogErr(
-		"send email", a.reporter.SendMail(a.DAG, finishedStatus, lastErr),
+		"send email", a.reporter.send(a.DAG, finishedStatus, lastErr),
 	)
 
 	// Mark the agent finished.
@@ -308,14 +307,12 @@ func (a *Agent) setup() error {
 	}
 
 	a.scheduler = a.newScheduler()
-	a.reporter = reporter.NewReporter(&reporter.ReporterConfig{
-		Sender: mailer.New(&mailer.Config{
-			Host:     a.DAG.SMTP.Host,
-			Port:     a.DAG.SMTP.Port,
-			Username: a.DAG.SMTP.Username,
-			Password: a.DAG.SMTP.Password,
-		}),
-	})
+	a.reporter = newReporter(mailer.New(&mailer.Config{
+		Host:     a.DAG.SMTP.Host,
+		Port:     a.DAG.SMTP.Port,
+		Username: a.DAG.SMTP.Username,
+		Password: a.DAG.SMTP.Password,
+	}))
 
 	return a.setupGraph()
 }
@@ -362,7 +359,7 @@ func (a *Agent) dryRun() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			_ = a.reporter.ReportStep(a.DAG, status, node)
+			_ = a.reporter.reportStep(a.DAG, status, node)
 		}
 	}()
 
@@ -374,7 +371,7 @@ func (a *Agent) dryRun() error {
 		done,
 	)
 
-	a.reporter.ReportSummary(a.Status(), lastErr)
+	a.reporter.report(a.Status(), lastErr)
 
 	log.Printf("***** Finished DRY-RUN *****")
 

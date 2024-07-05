@@ -1,4 +1,4 @@
-package reporter
+package agent
 
 import (
 	"bytes"
@@ -19,21 +19,16 @@ type Sender interface {
 	) error
 }
 
-// Reporter is responsible for reporting the status of the scheduler
+// reporter is responsible for reporting the status of the scheduler
 // to the user.
-type Reporter struct{ *ReporterConfig }
+type reporter struct{ Sender }
 
-// ReporterConfig is the configuration for the reporter.
-type ReporterConfig struct {
-	Sender Sender
+func newReporter(sender Sender) *reporter {
+	return &reporter{Sender: sender}
 }
 
-func NewReporter(cfg *ReporterConfig) *Reporter {
-	return &Reporter{ReporterConfig: cfg}
-}
-
-// ReportStep is a function that reports the status of a step.
-func (rp *Reporter) ReportStep(
+// reportStep is a function that reports the status of a step.
+func (rp *reporter) reportStep(
 	dg *dag.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
@@ -41,7 +36,7 @@ func (rp *Reporter) ReportStep(
 		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
-		return rp.Sender.Send(
+		return rp.Send(
 			dg.ErrorMail.From,
 			[]string{dg.ErrorMail.To},
 			fmt.Sprintf(
@@ -54,8 +49,8 @@ func (rp *Reporter) ReportStep(
 	return nil
 }
 
-// ReportSummary is a function that reports the status of the scheduler.
-func (*Reporter) ReportSummary(status *model.Status, err error) {
+// report is a function that reports the status of the scheduler.
+func (*reporter) report(status *model.Status, err error) {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -66,13 +61,13 @@ func (*Reporter) ReportSummary(status *model.Status, err error) {
 	log.Print(buf.String())
 }
 
-// SendMail is a function that sends a report mail.
-func (rp *Reporter) SendMail(
+// send is a function that sends a report mail.
+func (rp *reporter) send(
 	dg *dag.DAG, status *model.Status, err error,
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if dg.MailOn != nil && dg.MailOn.Failure {
-			return rp.Sender.Send(
+			return rp.Send(
 				dg.ErrorMail.From,
 				[]string{dg.ErrorMail.To},
 				fmt.Sprintf(
@@ -84,7 +79,7 @@ func (rp *Reporter) SendMail(
 		}
 	} else if status.Status == scheduler.StatusSuccess {
 		if dg.MailOn != nil && dg.MailOn.Success {
-			_ = rp.Sender.Send(
+			_ = rp.Send(
 				dg.InfoMail.From,
 				[]string{dg.InfoMail.To},
 				fmt.Sprintf(
