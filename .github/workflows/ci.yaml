@@ -15,6 +15,17 @@ on:
       - ready_for_review # PR is ready for review
 
 jobs:
+  # Spell check
+  codespell:
+    name: Check for spelling errors
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Codespell
+        uses: codespell-project/actions-codespell@v2
+
   # Lint Go code
   golint:
     name: Go Linter
