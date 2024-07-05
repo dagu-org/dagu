@@ -38,7 +38,7 @@ var (
 )
 
 // SendMail sends an email.
-func (m *Mailer) SendMail(
+func (m *Mailer) Send(
 	from string,
 	to []string,
 	subject, body string,

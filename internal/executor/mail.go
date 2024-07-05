@@ -85,7 +85,7 @@ func (e *MailExecutor) Run() error {
 			e.cfg.Message,
 		)),
 	)
-	err := e.mailer.SendMail(
+	err := e.mailer.Send(
 		e.cfg.From,
 		[]string{e.cfg.To},
 		e.cfg.Subject,

@@ -12,24 +12,24 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-// Mailer is a mailer interface.
-type Mailer interface {
-	SendMail(
+// Sender is a mailer interface.
+type Sender interface {
+	Send(
 		from string, to []string, subject, body string, attachments []string,
 	) error
 }
 
 // Reporter is responsible for reporting the status of the scheduler
 // to the user.
-type Reporter struct{ *Config }
+type Reporter struct{ *ReporterConfig }
 
-// Config is the configuration for the reporter.
-type Config struct {
-	Mailer Mailer
+// ReporterConfig is the configuration for the reporter.
+type ReporterConfig struct {
+	Sender Sender
 }
 
-func New(cfg *Config) *Reporter {
-	return &Reporter{Config: cfg}
+func NewReporter(cfg *ReporterConfig) *Reporter {
+	return &Reporter{ReporterConfig: cfg}
 }
 
 // ReportStep is a function that reports the status of a step.
@@ -41,7 +41,7 @@ func (rp *Reporter) ReportStep(
 		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
-		return rp.Mailer.SendMail(
+		return rp.Sender.Send(
 			dg.ErrorMail.From,
 			[]string{dg.ErrorMail.To},
 			fmt.Sprintf(
@@ -72,7 +72,7 @@ func (rp *Reporter) SendMail(
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if dg.MailOn != nil && dg.MailOn.Failure {
-			return rp.Mailer.SendMail(
+			return rp.Sender.Send(
 				dg.ErrorMail.From,
 				[]string{dg.ErrorMail.To},
 				fmt.Sprintf(
@@ -84,7 +84,7 @@ func (rp *Reporter) SendMail(
 		}
 	} else if status.Status == scheduler.StatusSuccess {
 		if dg.MailOn != nil && dg.MailOn.Success {
-			_ = rp.Mailer.SendMail(
+			_ = rp.Sender.Send(
 				dg.InfoMail.From,
 				[]string{dg.InfoMail.To},
 				fmt.Sprintf(
