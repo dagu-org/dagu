@@ -68,8 +68,8 @@ func TestReporter(t *testing.T) {
 			}
 
 			rp := &Reporter{
-				Config: &Config{
-					Mailer: &mockMailer{},
+				ReporterConfig: &ReporterConfig{
+					Sender: &mockSender{},
 				},
 			}
 
@@ -87,7 +87,7 @@ func testErrorMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node)
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
 
-	mock, ok := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Sender.(*mockSender)
 	require.True(t, ok)
 	require.Contains(t, mock.subject, "Error")
 	require.Contains(t, mock.subject, "test DAG")
@@ -104,7 +104,7 @@ func testNoErrorMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Nod
 	}, nil)
 	require.NoError(t, err)
 
-	mock, ok := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Sender.(*mockSender)
 	require.True(t, ok)
 	require.Equal(t, 0, mock.count)
 }
@@ -119,7 +119,7 @@ func testSuccessMail(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Nod
 	}, nil)
 	require.NoError(t, err)
 
-	mock, ok := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Sender.(*mockSender)
 	require.True(t, ok)
 	require.Contains(t, mock.subject, "Success")
 	require.Contains(t, mock.subject, "test DAG")
@@ -187,7 +187,7 @@ func testReportStep(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Node
 	s := buf.String()
 	require.Contains(t, s, dg.Steps[0].Name)
 
-	mock, ok := rp.Mailer.(*mockMailer)
+	mock, ok := rp.Sender.(*mockSender)
 	require.True(t, ok)
 	require.Equal(t, 1, mock.count)
 }
@@ -209,7 +209,7 @@ func testRenderTable(t *testing.T, rp *Reporter, dg *dag.DAG, nodes []*model.Nod
 	require.Contains(t, summary, nodes[0].Args[0])
 }
 
-type mockMailer struct {
+type mockSender struct {
 	from    string
 	to      []string
 	subject string
@@ -217,9 +217,7 @@ type mockMailer struct {
 	count   int
 }
 
-var _ Mailer = (*mockMailer)(nil)
-
-func (m *mockMailer) SendMail(from string, to []string, subject, body string, _ []string) error {
+func (m *mockSender) Send(from string, to []string, subject, body string, _ []string) error {
 	m.count += 1
 	m.from = from
 	m.to = to
