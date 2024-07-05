@@ -11,13 +11,13 @@ Via Homebrew
 
 .. code-block:: bash
 
-   brew install yohamta/tap/dagu
+   brew install dagu-dev/brew/dagu
 
 Upgrade to the latest version:
 
 .. code-block:: bash
 
-   brew upgrade yohamta/tap/dagu
+   brew upgrade dagu-dev/brew/dagu
 
 Via Bash script
 ---------------
