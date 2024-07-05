@@ -1,6 +1,32 @@
-name: Test
-on: [push, pull_request]
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+  pull_request:
+    types:
+      - opened
+      - reopened # new commits are pushed to the branch that the PR is based on
+      - synchronize # new commits are pushed to the branch that the PR is based on
+      - ready_for_review # PR is ready for review
+
 jobs:
+  # Spell check
+  codespell:
+    name: Check for spelling errors
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Codespell
+        uses: codespell-project/actions-codespell@v2
+
+  # Lint Go code
   golint:
     name: Go Linter
     runs-on: ubuntu-latest
@@ -19,6 +45,7 @@ jobs:
           version: v1.59
           args: --timeout=10m
 
+  # Test Go code
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -30,30 +57,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Installing swagger
-        run: |
-          go install github.com/go-swagger/go-swagger/cmd/swagger@latest
-
-      - name: Set up Nodejs
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Set up yarn
-        run: npm install --global yarn
-
-      - name: Yarn install
-        run: yarn install
-        working-directory: ui
-
-      - name: Build web UI
-        run: yarn build
-        working-directory: ui
-
-      - name: Copy web assets
-        run: |
-          cp ui/dist/* ./internal/service/frontend/assets/
 
       - name: Cache Go modules
         uses: actions/cache@v3
