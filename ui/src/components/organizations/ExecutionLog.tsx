@@ -10,10 +10,17 @@ type Props = {
   log?: LogFile;
 };
 
+// Credit: https://github.com/chalk/ansi-regex/commit/02fa893d619d3da85411acc8fd4e2eea0e95a9d9 under MIT license
+const ANSI_CODES_REGEX = [
+  '[\\u001B\\u009B][[\\]()#;?]*(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
+  '(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]))',
+].join('|');
+
 function ExecutionLog({ log }: Props) {
   if (!log) {
     return <LoadingIndicator />;
   }
+  log.Content = log.Content.replace(new RegExp(ANSI_CODES_REGEX, 'g'), '');
   return (
     <Box>
       <Stack spacing={1} direction="column" sx={{ width: '100%' }}>
