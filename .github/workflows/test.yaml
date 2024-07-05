@@ -57,6 +57,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Build
+        run: |
+          make build-bin
+
       - name: Test
         run: |
           make test-coverage
