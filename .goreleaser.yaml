@@ -20,22 +20,38 @@ builds:
     goarm:
       - 7
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
+      - "^docs:"
+      - "^test:"
 brews:
+  # DEPRECATED: prefer using dagu-dev/dagu for brew formula
   - repository:
       owner: yohamta
       name: homebrew-tap
     folder: Formula
-    homepage: 'https://github.com/dagu-dev/dagu'
-    description: 'A No-code workflow executor that runs DAGs defined in a simple YAML format'
+    homepage: "https://github.com/dagu-dev/dagu"
+    description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
+    license: "GNU General Public License v3.0"
+    custom_block: |
+      service do
+        run [opt_bin/"dagu", "start-all"]
+        keep_alive true
+        error_log_path var/"log/dagu.log"
+        log_path var/"log/dagu.log"
+        working_dir var
+      end
+  - repository:
+      owner: dagu-dev
+      name: homebrew-dagu
+    folder: Formula
+    homepage: "https://github.com/dagu-dev/dagu"
+    description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
