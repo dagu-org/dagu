@@ -14,12 +14,12 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 )
 
-type CommandExecutor struct {
+type commandExecutor struct {
 	cmd  *exec.Cmd
 	lock sync.Mutex
 }
 
-func NewCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
+func newCommand(ctx context.Context, step dag.Step) (Executor, error) {
 	// nolint: gosec
 	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
 	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
@@ -37,12 +37,12 @@ func NewCommandExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 		Pgid:    0,
 	}
 
-	return &CommandExecutor{
+	return &commandExecutor{
 		cmd: cmd,
 	}, nil
 }
 
-func (e *CommandExecutor) Run() error {
+func (e *commandExecutor) Run() error {
 	e.lock.Lock()
 	err := e.cmd.Start()
 	e.lock.Unlock()
@@ -52,15 +52,15 @@ func (e *CommandExecutor) Run() error {
 	return e.cmd.Wait()
 }
 
-func (e *CommandExecutor) SetStdout(out io.Writer) {
+func (e *commandExecutor) SetStdout(out io.Writer) {
 	e.cmd.Stdout = out
 }
 
-func (e *CommandExecutor) SetStderr(out io.Writer) {
+func (e *commandExecutor) SetStderr(out io.Writer) {
 	e.cmd.Stderr = out
 }
 
-func (e *CommandExecutor) Kill(sig os.Signal) error {
+func (e *commandExecutor) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
@@ -70,6 +70,6 @@ func (e *CommandExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register("", NewCommandExecutor)
-	Register("command", NewCommandExecutor)
+	Register("", newCommand)
+	Register("command", newCommand)
 }

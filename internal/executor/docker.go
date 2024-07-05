@@ -18,7 +18,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type DockerExecutor struct {
+type docker struct {
 	image           string
 	autoRemove      bool
 	step            dag.Step
@@ -29,22 +29,22 @@ type DockerExecutor struct {
 	cancel          func()
 }
 
-func (e *DockerExecutor) SetStdout(out io.Writer) {
+func (e *docker) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *DockerExecutor) SetStderr(out io.Writer) {
+func (e *docker) SetStderr(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *DockerExecutor) Kill(_ os.Signal) error {
+func (e *docker) Kill(_ os.Signal) error {
 	if e.cancel != nil {
 		e.cancel()
 	}
 	return nil
 }
 
-func (e *DockerExecutor) Run() error {
+func (e *docker) Run() error {
 	ctx, fn := context.WithCancel(context.Background())
 	e.context = ctx
 	e.cancel = fn
@@ -116,7 +116,7 @@ func (e *DockerExecutor) Run() error {
 
 var errImageMustBeString = errors.New("image must be string")
 
-func CreateDockerExecutor(
+func newDocker(
 	_ context.Context, step dag.Step,
 ) (Executor, error) {
 	containerConfig := &container.Config{}
@@ -167,7 +167,7 @@ func CreateDockerExecutor(
 		}
 	}
 
-	exec := &DockerExecutor{
+	exec := &docker{
 		step:            step,
 		stdout:          os.Stdout,
 		containerConfig: containerConfig,
@@ -185,5 +185,5 @@ func CreateDockerExecutor(
 }
 
 func init() {
-	Register("docker", CreateDockerExecutor)
+	Register("docker", newDocker)
 }

@@ -11,22 +11,22 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-type MailExecutor struct {
+type mail struct {
 	stdout io.Writer
 	stderr io.Writer
 	mailer *mailer.Mailer
-	cfg    *MailConfig
+	cfg    *mailConfig
 }
 
-type MailConfig struct {
+type mailConfig struct {
 	From    string `mapstructure:"from"`
 	To      string `mapstructure:"to"`
 	Subject string `mapstructure:"subject"`
 	Message string `mapstructure:"message"`
 }
 
-func NewMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
-	var cfg MailConfig
+func newMail(ctx context.Context, step dag.Step) (Executor, error) {
+	var cfg mailConfig
 	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func NewMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	cfg.Subject = os.ExpandEnv(cfg.Subject)
 	cfg.Message = os.ExpandEnv(cfg.Message)
 
-	exec := &MailExecutor{cfg: &cfg}
+	exec := &mail{cfg: &cfg}
 
 	dagCtx, err := dag.GetContext(ctx)
 	if err != nil {
@@ -54,15 +54,15 @@ func NewMailExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	return exec, nil
 }
 
-func (e *MailExecutor) SetStdout(out io.Writer) {
+func (e *mail) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *MailExecutor) SetStderr(out io.Writer) {
+func (e *mail) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (*MailExecutor) Kill(_ os.Signal) error {
+func (*mail) Kill(_ os.Signal) error {
 	return nil
 }
 
@@ -75,7 +75,7 @@ message: %s
 -----
 `
 
-func (e *MailExecutor) Run() error {
+func (e *mail) Run() error {
 	_, _ = e.stdout.Write(
 		[]byte(fmt.Sprintf(
 			mailLogTemplate,
@@ -100,7 +100,7 @@ func (e *MailExecutor) Run() error {
 	return err
 }
 
-func decodeMailConfig(dat map[string]any, cfg *MailConfig) error {
+func decodeMailConfig(dat map[string]any, cfg *mailConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,
@@ -109,5 +109,5 @@ func decodeMailConfig(dat map[string]any, cfg *MailConfig) error {
 }
 
 func init() {
-	Register("mail", NewMailExecutor)
+	Register("mail", newMail)
 }

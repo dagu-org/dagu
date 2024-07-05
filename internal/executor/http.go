@@ -15,16 +15,16 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-type HTTPExecutor struct {
+type http struct {
 	stdout    io.Writer
 	req       *resty.Request
 	reqCancel context.CancelFunc
 	url       string
 	method    string
-	cfg       *HTTPConfig
+	cfg       *httpConfig
 }
 
-type HTTPConfig struct {
+type httpConfig struct {
 	Timeout int               `json:"timeout"`
 	Headers map[string]string `json:"headers"`
 	Query   map[string]string `json:"query"`
@@ -33,8 +33,8 @@ type HTTPConfig struct {
 	Debug   bool              `json:"debug"`
 }
 
-func NewHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
-	var reqCfg HTTPConfig
+func newHTTP(ctx context.Context, step dag.Step) (Executor, error) {
+	var reqCfg httpConfig
 	if len(step.Script) > 0 {
 		if err := decodeHTTPConfigFromString(step.Script, &reqCfg); err != nil {
 			return nil, err
@@ -68,7 +68,7 @@ func NewHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}
 	req = req.SetBody([]byte(reqCfg.Body))
 
-	return &HTTPExecutor{
+	return &http{
 		stdout:    os.Stdout,
 		req:       req,
 		reqCancel: cancel,
@@ -78,22 +78,22 @@ func NewHTTPExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
-func (e *HTTPExecutor) SetStdout(out io.Writer) {
+func (e *http) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *HTTPExecutor) SetStderr(out io.Writer) {
+func (e *http) SetStderr(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *HTTPExecutor) Kill(_ os.Signal) error {
+func (e *http) Kill(_ os.Signal) error {
 	e.reqCancel()
 	return nil
 }
 
 var errHTTPStatusCode = errors.New("http status code not 2xx")
 
-func (e *HTTPExecutor) Run() error {
+func (e *http) Run() error {
 	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func (e *HTTPExecutor) Run() error {
 	return nil
 }
 
-func decodeHTTPConfig(dat map[string]any, cfg *HTTPConfig) error {
+func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,
@@ -126,7 +126,7 @@ func decodeHTTPConfig(dat map[string]any, cfg *HTTPConfig) error {
 	return md.Decode(dat)
 }
 
-func decodeHTTPConfigFromString(s string, cfg *HTTPConfig) error {
+func decodeHTTPConfigFromString(s string, cfg *httpConfig) error {
 	if len(s) > 0 {
 		ss := os.ExpandEnv(s)
 		if err := json.Unmarshal([]byte(ss), &cfg); err != nil {
@@ -137,5 +137,5 @@ func decodeHTTPConfigFromString(s string, cfg *HTTPConfig) error {
 }
 
 func init() {
-	Register("http", NewHTTPExecutor)
+	Register("http", newHTTP)
 }

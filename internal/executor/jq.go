@@ -13,20 +13,20 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-type JqExecutor struct {
+type jq struct {
 	stdout io.Writer
 	stderr io.Writer
 	query  string
 	input  map[string]any
-	cfg    *JqConfig
+	cfg    *jqConfig
 }
 
-type JqConfig struct {
+type jqConfig struct {
 	Raw bool `mapstructure:"raw"`
 }
 
-func NewJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
-	var jqCfg JqConfig
+func newJQ(_ context.Context, step dag.Step) (Executor, error) {
+	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(
 			step.ExecutorConfig.Config, &jqCfg,
@@ -39,7 +39,7 @@ func NewJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
 	if err := json.Unmarshal([]byte(s), &input); err != nil {
 		return nil, err
 	}
-	return &JqExecutor{
+	return &jq{
 		stdout: os.Stdout,
 		input:  input,
 		query:  step.CmdWithArgs,
@@ -47,19 +47,19 @@ func NewJqExecutor(_ context.Context, step dag.Step) (Executor, error) {
 	}, nil
 }
 
-func (e *JqExecutor) SetStdout(out io.Writer) {
+func (e *jq) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *JqExecutor) SetStderr(out io.Writer) {
+func (e *jq) SetStderr(out io.Writer) {
 	e.stderr = out
 }
 
-func (*JqExecutor) Kill(_ os.Signal) error {
+func (*jq) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *JqExecutor) Run() error {
+func (e *jq) Run() error {
 	query, err := gojq.Parse(e.query)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (e *JqExecutor) Run() error {
 	return nil
 }
 
-func decodeJqConfig(dat map[string]any, cfg *JqConfig) error {
+func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: false,
 		Result:      cfg,
@@ -98,5 +98,5 @@ func decodeJqConfig(dat map[string]any, cfg *JqConfig) error {
 }
 
 func init() {
-	Register("jq", NewJqExecutor)
+	Register("jq", newJQ)
 }

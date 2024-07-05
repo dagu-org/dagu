@@ -13,15 +13,15 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type SSHExecutor struct {
+type sshExec struct {
 	step      dag.Step
-	config    *SSHConfig
+	config    *sshExecConfig
 	sshConfig *ssh.ClientConfig
 	stdout    io.Writer
 	session   *ssh.Session
 }
 
-type SSHConfig struct {
+type sshExecConfig struct {
 	User                  string
 	IP                    string
 	Port                  int
@@ -29,8 +29,8 @@ type SSHConfig struct {
 	StrictHostKeyChecking bool
 }
 
-func NewSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
-	cfg := new(SSHConfig)
+func newSSHExec(ctx context.Context, step dag.Step) (Executor, error) {
+	cfg := new(sshExecConfig)
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: cfg},
 	)
@@ -67,7 +67,7 @@ func NewSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	return &SSHExecutor{
+	return &sshExec{
 		step:      step,
 		config:    cfg,
 		sshConfig: sshConfig,
@@ -77,22 +77,22 @@ func NewSSHExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 
 var errStrictHostKey = errors.New("StrictHostKeyChecking is not supported yet")
 
-func (e *SSHExecutor) SetStdout(out io.Writer) {
+func (e *sshExec) SetStdout(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *SSHExecutor) SetStderr(out io.Writer) {
+func (e *sshExec) SetStderr(out io.Writer) {
 	e.stdout = out
 }
 
-func (e *SSHExecutor) Kill(_ os.Signal) error {
+func (e *sshExec) Kill(_ os.Signal) error {
 	if e.session != nil {
 		return e.session.Close()
 	}
 	return nil
 }
 
-func (e *SSHExecutor) Run() error {
+func (e *sshExec) Run() error {
 	addr := fmt.Sprintf("%s:%d", e.config.IP, e.config.Port)
 	conn, err := ssh.Dial("tcp", addr, e.sshConfig)
 	if err != nil {
@@ -141,5 +141,5 @@ func getPublicKeySigner(path string) (ssh.Signer, error) {
 }
 
 func init() {
-	Register("ssh", NewSSHExecutor)
+	Register("ssh", newSSHExec)
 }

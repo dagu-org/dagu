@@ -14,16 +14,14 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 )
 
-type SubWorkflowExecutor struct {
+type subWorkflow struct {
 	cmd  *exec.Cmd
 	lock sync.Mutex
 }
 
-var (
-	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
-)
+var errWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
-func NewSubWorkflowExecutor(
+func newSubworkflow(
 	ctx context.Context, step dag.Step,
 ) (Executor, error) {
 	executable, err := os.Executable()
@@ -53,7 +51,7 @@ func NewSubWorkflowExecutor(
 
 	cmd := exec.CommandContext(ctx, executable, args...)
 	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
-		return nil, ErrWorkingDirNotExist
+		return nil, errWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
@@ -67,12 +65,12 @@ func NewSubWorkflowExecutor(
 		Pgid:    0,
 	}
 
-	return &SubWorkflowExecutor{
+	return &subWorkflow{
 		cmd: cmd,
 	}, nil
 }
 
-func (e *SubWorkflowExecutor) Run() error {
+func (e *subWorkflow) Run() error {
 	e.lock.Lock()
 	err := e.cmd.Start()
 	e.lock.Unlock()
@@ -82,15 +80,15 @@ func (e *SubWorkflowExecutor) Run() error {
 	return e.cmd.Wait()
 }
 
-func (e *SubWorkflowExecutor) SetStdout(out io.Writer) {
+func (e *subWorkflow) SetStdout(out io.Writer) {
 	e.cmd.Stdout = out
 }
 
-func (e *SubWorkflowExecutor) SetStderr(out io.Writer) {
+func (e *subWorkflow) SetStderr(out io.Writer) {
 	e.cmd.Stderr = out
 }
 
-func (e *SubWorkflowExecutor) Kill(sig os.Signal) error {
+func (e *subWorkflow) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
@@ -100,5 +98,5 @@ func (e *SubWorkflowExecutor) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(dag.ExecutorTypeSubWorkflow, NewSubWorkflowExecutor)
+	Register(dag.ExecutorTypeSubWorkflow, newSubworkflow)
 }
