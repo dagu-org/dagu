@@ -5,7 +5,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -25,10 +24,7 @@ func TestMain(m *testing.M) {
 
 func TestDAG_String(t *testing.T) {
 	t.Run("String representation of default.yaml", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
+		loader := NewLoader()
 		dg, err := loader.Load("", path.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 

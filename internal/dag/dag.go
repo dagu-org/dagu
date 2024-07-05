@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/util"
-
 	"github.com/robfig/cron/v3"
 )
 
@@ -208,13 +206,6 @@ func (d *DAG) HasTag(tag string) bool {
 	}
 
 	return false
-}
-
-// GetLogDir returns the log directory for the DAG.
-// Log directory is the directory where the execution logs are stored.
-// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
-func (d *DAG) GetLogDir() string {
-	return path.Join(d.LogDir, util.ValidFilename(d.Name))
 }
 
 // SockAddr returns the unix socket address for the DAG.

@@ -51,11 +51,11 @@ func retryCmd() *cobra.Command {
 
 			eng := newEngine(cfg)
 
-			dagAgent := agent.New(
-				&agent.Config{DAG: loadedDAG, RetryTarget: status.Status},
-				eng,
-				dataStore,
-			)
+			dagAgent := agent.New(&agent.Config{
+				DAG:         loadedDAG,
+				RetryTarget: status.Status,
+				LogDir:      cfg.LogDir,
+			}, eng, dataStore)
 
 			ctx := cmd.Context()
 			listenSignals(ctx, dagAgent)

@@ -48,7 +48,7 @@ func setupTest(t *testing.T) (string, engine.Engine, *config.Config) {
 		DAGs:            cfg.DAGs,
 		DataDir:         cfg.DataDir,
 		SuspendFlagsDir: cfg.SuspendFlagsDir,
-		Loader:          dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir}),
+		Loader:          dag.NewLoader(),
 	})
 
 	return tmpDir, engine.New(&engine.NewEngineArgs{
@@ -57,13 +57,13 @@ func setupTest(t *testing.T) (string, engine.Engine, *config.Config) {
 }
 
 func TestReadEntries(t *testing.T) {
-	tmpDir, eng, cfg := setupTest(t)
+	tmpDir, eng, _ := setupTest(t)
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-	loader := dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir})
+	loader := dag.NewLoader()
 
 	entryReader := New(Params{
 		DagsDir:    path.Join(testdataDir, "invalid_directory"),

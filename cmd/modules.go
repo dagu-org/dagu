@@ -47,6 +47,6 @@ func newDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
 		DataDir:           cfg.DataDir,
 		SuspendFlagsDir:   cfg.SuspendFlagsDir,
 		LatestStatusToday: cfg.LatestStatusToday,
-		Loader:            dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir}),
+		Loader:            dag.NewLoader(),
 	})
 }

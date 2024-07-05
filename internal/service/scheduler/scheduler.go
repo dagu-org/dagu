@@ -32,7 +32,7 @@ func EntryReaderProvider(
 	jf entryreader.JobFactory,
 	logger dagulogger.Logger,
 ) scheduler.EntryReader {
-	loader := dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir})
+	loader := dag.NewLoader()
 	return entryreader.New(entryreader.Params{
 		Engine:     eng,
 		DagsDir:    cfg.DAGs,

@@ -24,17 +24,10 @@ var (
 
 // Loader creates a DAG from a configuration file.
 type Loader struct {
-	logDir string
 }
 
-type NewLoaderArgs struct {
-	LogDir string
-}
-
-func NewLoader(args *NewLoaderArgs) *Loader {
-	return &Loader{
-		logDir: args.LogDir,
-	}
+func NewLoader() *Loader {
+	return &Loader{}
 }
 
 // Load loads config from file.
@@ -157,12 +150,6 @@ func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Set the name if not set.
 	if dst.Name == "" {
 		dst.Name = l.defaultName(file)
-	}
-
-	// LogDir is the directory where the logs are stored.
-	// It is used to write the stdout and stderr of the steps.
-	if dst.LogDir == "" {
-		dst.LogDir = l.logDir
 	}
 
 	// Set the default values for the DAG.

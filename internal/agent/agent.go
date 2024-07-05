@@ -44,6 +44,7 @@ type Agent struct {
 	historyStore persistence.HistoryStore
 	socketServer *sock.Server
 	logFile      *os.File
+	logDir       string
 
 	// reqID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
@@ -64,6 +65,8 @@ type Config struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *model.Status
+	// Default directory for writing log files.
+	LogDir string
 }
 
 // New creates a new Agent.
@@ -320,7 +323,7 @@ func (a *Agent) setup() error {
 // newScheduler creates a scheduler instance for the DAG execution.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
-		LogDir:        a.DAG.GetLogDir(),
+		LogDir:        a.logDir,
 		MaxActiveRuns: a.DAG.MaxActiveRuns,
 		Delay:         a.DAG.Delay,
 		Dry:           a.Dry,
@@ -512,10 +515,16 @@ func (a *Agent) checkIsAlreadyRunning() error {
 
 // setupLog create the log directory to write log files of children processes.
 func (a *Agent) setupLog() error {
-	absFilepath := filepath.Join(
-		a.DAG.GetLogDir(),
-		createLogfileName(a.DAG.Name, a.reqID, time.Now()),
-	)
+	// Log directory is the directory where the execution logs are stored.
+	// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
+	// It is used to write the stdout and stderr of the steps.
+	if a.DAG.LogDir == "" {
+		a.logDir = a.Config.LogDir
+	} else {
+		a.logDir = path.Join(a.Config.LogDir, util.ValidFilename(a.DAG.Name))
+	}
+
+	absFilepath := filepath.Join(a.logDir, createLogfileName(a.DAG.Name, a.reqID, time.Now()))
 
 	// Create the log directory
 	if err := os.MkdirAll(path.Dir(absFilepath), 0755); err != nil {

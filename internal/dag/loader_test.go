@@ -45,10 +45,7 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.Load()
-			require.NoError(t, err)
-
-			loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
+			loader := NewLoader()
 			dg, err := loader.Load("", tt.file, "")
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -63,10 +60,7 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Load metadata", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
+		loader := NewLoader()
 		dg, err := loader.LoadMetadata(path.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
 
@@ -83,7 +77,7 @@ func Test_loadBaseConfig(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
 
-		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
+		loader := NewLoader()
 		dg, err := loader.loadBaseConfig(cfg.BaseConfig, buildOpts{})
 		require.NotNil(t, dg)
 		require.NoError(t, err)
@@ -92,17 +86,14 @@ func Test_loadBaseConfig(t *testing.T) {
 
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("Load default config without base config", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
+		loader := NewLoader()
 		file := path.Join(testdataDir, "default.yaml")
 		dg, err := loader.Load("", file, "")
 
 		require.NoError(t, err)
 
 		// Check if the default values are set correctly
-		assert.Equal(t, path.Join(testHomeDir, "/.dagu/logs"), dg.LogDir)
+		assert.Equal(t, "", dg.LogDir)
 		assert.Equal(t, file, dg.Location)
 		assert.Equal(t, "default", dg.Name)
 		assert.Equal(t, time.Second*60, dg.MaxCleanUpTime)
@@ -127,10 +118,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("Load YAML data", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
+		loader := NewLoader()
 		ret, err := loader.LoadYAML([]byte(testDAG))
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
@@ -140,11 +128,8 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("[Invalid] Load invalid YAML data", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(&NewLoaderArgs{LogDir: cfg.LogDir})
-		_, err = loader.LoadYAML([]byte(`invalidyaml`))
+		loader := NewLoader()
+		_, err := loader.LoadYAML([]byte(`invalidyaml`))
 		require.Error(t, err)
 	})
 }

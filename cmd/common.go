@@ -48,7 +48,9 @@ func start(
 	dry bool,
 ) error {
 	dagAgent := agent.New(
-		&agent.Config{DAG: dg, Dry: dry}, eng, newDataStoreFactory(cfg),
+		&agent.Config{
+			DAG: dg, Dry: dry, LogDir: cfg.LogDir,
+		}, eng, newDataStoreFactory(cfg),
 	)
 	listenSignals(ctx, dagAgent)
 	return dagAgent.Run(ctx)

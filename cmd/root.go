@@ -45,7 +45,7 @@ func setDefaultConfigPath() {
 func loadDAG(
 	cfg *config.Config, dagFile, params string,
 ) (dg *dag.DAG, err error) {
-	loader := dag.NewLoader(&dag.NewLoaderArgs{LogDir: cfg.LogDir})
+	loader := dag.NewLoader()
 	return loader.Load(cfg.BaseConfig, dagFile, params)
 }
 
