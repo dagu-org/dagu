@@ -336,11 +336,34 @@ func (h *Handler) processSchedulerLogRequest(
 	params operations.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	schedulerLog, err := h.readSchedulerLog(dg, lo.FromPtr(params.File))
-	if err != nil {
-		return nil, newNotFoundError(err)
+	var logFile string
+
+	if params.File != nil {
+		status, err := jsondb.ParseFile(*params.File)
+		if err != nil {
+			return nil, newBadRequestError(err)
+		}
+		logFile = status.Log
 	}
-	resp.ScLog = schedulerLog
+
+	if logFile == "" {
+		lastStatus, err := h.engine.GetLatestStatus(dg)
+		if err != nil {
+			return nil, newInternalError(err)
+		}
+		logFile = lastStatus.Log
+	}
+
+	content, err := readFileContent(logFile, nil)
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+
+	resp.ScLog = &models.DagSchedulerLogResponse{
+		LogFile: swag.String(logFile),
+		Content: swag.String(string(content)),
+	}
+
 	return resp, nil
 }
 
@@ -603,45 +626,22 @@ func (h *Handler) getStepLog(
 	}, nil
 }
 
-func (h *Handler) readSchedulerLog(
-	dg *dag.DAG,
-	statusFile string,
-) (*models.DagSchedulerLogResponse, error) {
-
-	var logFile string
-	if statusFile == "" {
-		lastStatus, err := h.engine.GetLatestStatus(dg)
-		if err != nil {
-			return nil, ErrReadingLastStatus
-		}
-		logFile = lastStatus.Log
-	} else {
-		status, err := jsondb.ParseFile(statusFile)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing %s: %w", statusFile, err)
-		}
-		logFile = status.Log
-	}
-
-	content, err := readFileContent(logFile, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %w", logFile, err)
-	}
-
-	return &models.DagSchedulerLogResponse{
-		LogFile: swag.String(logFile),
-		Content: swag.String(string(content)),
-	}, nil
-}
-
 // nolint // cognitive complexity
 func (h *Handler) postAction(
 	params operations.PostDagActionParams,
 ) (*models.PostDagActionResponse, *codedError) {
-	dagStatus, err := h.engine.GetStatus(params.DagID)
+	if params.Body.Action == nil {
+		return nil, newBadRequestError(errInvalidArgs)
+	}
 
-	if err != nil && *params.Body.Action != "save" {
-		return nil, newBadRequestError(err)
+	var dagStatus *persistence.DAGStatus
+
+	if *params.Body.Action != "save" {
+		s, err := h.engine.GetStatus(params.DagID)
+		if err != nil {
+			return nil, newBadRequestError(err)
+		}
+		dagStatus = s
 	}
 
 	switch *params.Body.Action {
@@ -650,9 +650,11 @@ func (h *Handler) postAction(
 			return nil, newBadRequestError(errInvalidArgs)
 		}
 		h.engine.StartAsync(dagStatus.DAG, params.Body.Params)
+		return &models.PostDagActionResponse{}, nil
 
 	case "suspend":
 		_ = h.engine.ToggleSuspend(params.DagID, params.Body.Value == "true")
+		return &models.PostDagActionResponse{}, nil
 
 	case "stop":
 		if dagStatus.Status.Status != scheduler.StatusRunning {
@@ -665,6 +667,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("error trying to stop the DAG: %w", err),
 			)
 		}
+		return &models.PostDagActionResponse{}, nil
 
 	case "retry":
 		if params.Body.RequestID == "" {
@@ -677,6 +680,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("error trying to retry the DAG: %w", err),
 			)
 		}
+		return &models.PostDagActionResponse{}, nil
 
 	case "mark-success":
 		return h.processUpdateStatus(
@@ -692,6 +696,7 @@ func (h *Handler) postAction(
 		if err := h.engine.UpdateDAG(params.DagID, params.Body.Value); err != nil {
 			return nil, newInternalError(err)
 		}
+		return &models.PostDagActionResponse{}, nil
 
 	case "rename":
 		newName := params.Body.Value
@@ -710,8 +715,6 @@ func (h *Handler) postAction(
 			fmt.Errorf("invalid action: %s", *params.Body.Action),
 		)
 	}
-
-	return &models.PostDagActionResponse{}, nil
 }
 
 func (h *Handler) processUpdateStatus(
