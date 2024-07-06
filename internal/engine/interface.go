@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"path/filepath"
+
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
@@ -23,8 +25,36 @@ type Engine interface {
 	UpdateStatus(dg *dag.DAG, status *model.Status) error
 	UpdateDAG(id string, spec string) error
 	DeleteDAG(name, loc string) error
-	GetAllStatus() (statuses []*persistence.DAGStatus, errs []string, err error)
-	GetStatus(dagLocation string) (*persistence.DAGStatus, error)
+	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
+	GetStatus(dagLocation string) (*DAGStatus, error)
 	IsSuspended(id string) bool
 	ToggleSuspend(id string, suspend bool) error
+}
+
+type DAGStatus struct {
+	File      string
+	Dir       string
+	DAG       *dag.DAG
+	Status    *model.Status
+	Suspended bool
+	Error     error
+	ErrorT    *string
+}
+
+func newDAGStatus(
+	dg *dag.DAG, s *model.Status, suspended bool, err error,
+) *DAGStatus {
+	ret := &DAGStatus{
+		File:      filepath.Base(dg.Location),
+		Dir:       filepath.Dir(dg.Location),
+		DAG:       dg,
+		Status:    s,
+		Suspended: suspended,
+		Error:     err,
+	}
+	if err != nil {
+		errT := err.Error()
+		ret.ErrorT = &errT
+	}
+	return ret
 }

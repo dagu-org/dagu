@@ -2,7 +2,6 @@ package persistence
 
 import (
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -58,32 +57,4 @@ type GrepResult struct {
 	Name    string
 	DAG     *dag.DAG
 	Matches []*grep.Match
-}
-
-type DAGStatus struct {
-	File      string
-	Dir       string
-	DAG       *dag.DAG
-	Status    *model.Status
-	Suspended bool
-	Error     error
-	ErrorT    *string
-}
-
-func NewDAGStatus(
-	dg *dag.DAG, s *model.Status, suspended bool, err error,
-) *DAGStatus {
-	ret := &DAGStatus{
-		File:      filepath.Base(dg.Location),
-		Dir:       filepath.Dir(dg.Location),
-		DAG:       dg,
-		Status:    s,
-		Suspended: suspended,
-		Error:     err,
-	}
-	if err != nil {
-		errT := err.Error()
-		ret.ErrorT = &errT
-	}
-	return ret
 }

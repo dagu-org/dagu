@@ -244,12 +244,12 @@ func (e *engineImpl) DeleteDAG(name, loc string) error {
 }
 
 func (e *engineImpl) GetAllStatus() (
-	statuses []*persistence.DAGStatus, errs []string, err error,
+	statuses []*DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.NewDAGStore()
 	dags, errs, err := dagStore.List()
 
-	var ret []*persistence.DAGStatus
+	var ret []*DAGStatus
 	for _, d := range dags {
 		status, err := e.readStatus(d)
 		if err != nil {
@@ -267,7 +267,7 @@ func (e *engineImpl) getDAG(name string) (*dag.DAG, error) {
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
+func (e *engineImpl) GetStatus(id string) (*DAGStatus, error) {
 	dg, err := e.getDAG(id)
 	if dg == nil {
 		// TODO: fix not to use location
@@ -278,7 +278,7 @@ func (e *engineImpl) GetStatus(id string) (*persistence.DAGStatus, error) {
 		_, err = scheduler.NewExecutionGraph(dg.Steps...)
 	}
 	latestStatus, _ := e.GetLatestStatus(dg)
-	return persistence.NewDAGStatus(
+	return newDAGStatus(
 		dg, latestStatus, e.IsSuspended(dg.Name), err,
 	), err
 }
@@ -288,9 +288,9 @@ func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *engineImpl) readStatus(dg *dag.DAG) (*persistence.DAGStatus, error) {
+func (e *engineImpl) readStatus(dg *dag.DAG) (*DAGStatus, error) {
 	latestStatus, err := e.GetLatestStatus(dg)
-	return persistence.NewDAGStatus(
+	return newDAGStatus(
 		dg, latestStatus, e.IsSuspended(dg.Name), err,
 	), err
 }

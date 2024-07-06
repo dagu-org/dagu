@@ -14,7 +14,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/frontend/gen/models"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-dev/dagu/internal/frontend/server"
-	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/go-openapi/runtime/middleware"
@@ -569,7 +568,7 @@ func (h *Handler) postAction(
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
-	var dagStatus *persistence.DAGStatus
+	var dagStatus *engine.DAGStatus
 
 	if *params.Body.Action != "save" {
 		s, err := h.engine.GetStatus(params.DagID)
@@ -654,7 +653,7 @@ func (h *Handler) postAction(
 
 func (h *Handler) processUpdateStatus(
 	params operations.PostDagActionParams,
-	dagStatus *persistence.DAGStatus, to scheduler.NodeStatus,
+	dagStatus *engine.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
 		return nil, newBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
