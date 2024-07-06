@@ -1,0 +1,96 @@
+package dag
+
+import (
+	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/service/frontend/gen/models"
+	"github.com/go-openapi/swag"
+	"github.com/samber/lo"
+)
+
+func convertToDAG(dg *dag.DAG) *models.Dag {
+	var schedules []*models.Schedule
+	for _, s := range dg.Schedule {
+		schedules = append(schedules, &models.Schedule{
+			Expression: swag.String(s.Expression),
+		})
+	}
+
+	return &models.Dag{
+		Name:          swag.String(dg.Name),
+		Group:         swag.String(dg.Group),
+		Description:   swag.String(dg.Description),
+		Params:        dg.Params,
+		DefaultParams: swag.String(dg.DefaultParams),
+		Tags:          dg.Tags,
+		Schedule:      schedules,
+	}
+}
+
+func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
+	return &models.DagStatusDetail{
+		Log:        swag.String(s.Log),
+		Name:       swag.String(s.Name),
+		Params:     swag.String(s.Params),
+		Pid:        swag.Int64(int64(s.Pid)),
+		RequestID:  swag.String(s.RequestID),
+		StartedAt:  swag.String(s.StartedAt),
+		FinishedAt: swag.String(s.FinishedAt),
+		Status:     swag.Int64(int64(s.Status)),
+		StatusText: swag.String(s.StatusText),
+		Nodes: lo.Map(
+			s.Nodes, func(item *model.Node, _ int) *models.StatusNode {
+				return convertToNode(item)
+			}),
+	}
+}
+
+func convertToNode(node *model.Node) *models.StatusNode {
+	return &models.StatusNode{
+		DoneCount:  swag.Int64(int64(node.DoneCount)),
+		Error:      swag.String(node.Error),
+		FinishedAt: swag.String(node.FinishedAt),
+		Log:        swag.String(node.Log),
+		RetryCount: swag.Int64(int64(node.RetryCount)),
+		StartedAt:  swag.String(node.StartedAt),
+		Status:     swag.Int64(int64(node.Status)),
+		StatusText: swag.String(node.StatusText),
+		Step:       convertToStepObject(node.Step),
+	}
+}
+
+func convertToStepObject(step dag.Step) *models.StepObject {
+	var conditions []*models.Condition
+	for _, cond := range step.Preconditions {
+		conditions = append(conditions, &models.Condition{
+			Condition: cond.Condition,
+			Expected:  cond.Expected,
+		})
+	}
+
+	repeatPolicy := &models.RepeatPolicy{
+		Repeat:   step.RepeatPolicy.Repeat,
+		Interval: int64(step.RepeatPolicy.Interval),
+	}
+
+	so := &models.StepObject{
+		Args:          step.Args,
+		CmdWithArgs:   swag.String(step.CmdWithArgs),
+		Command:       swag.String(step.Command),
+		Depends:       step.Depends,
+		Description:   swag.String(step.Description),
+		Dir:           swag.String(step.Dir),
+		MailOnError:   swag.Bool(step.MailOnError),
+		Name:          swag.String(step.Name),
+		Output:        swag.String(step.Output),
+		Preconditions: conditions,
+		RepeatPolicy:  repeatPolicy,
+		Script:        swag.String(step.Script),
+		Variables:     step.Variables,
+	}
+	if step.SubWorkflow != nil {
+		so.Run = step.SubWorkflow.Name
+		so.Params = step.SubWorkflow.Params
+	}
+	return so
+}
