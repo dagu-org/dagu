@@ -36,6 +36,7 @@ FE_ASSETS_DIR=${FE_DIR}/assets
 CERT_DIR=${SCRIPT_DIR}/cert
 
 FE_BUILD_DIR=./ui/dist
+FE_BUNDLE_JS=${FE_ASSETS_DIR}/bundle.js
 
 APP_NAME=dagu
 BIN_DIR=${SCRIPT_DIR}/bin
@@ -47,8 +48,12 @@ GO_TEST_FLAGS=-v --race
 ########## Main Targets ##########
 
 # run starts the backend server.
-run: build-ui
+run: ${FE_BUNDLE_JS}
 	go run . server
+
+# check if the frontend assets are built.
+${FE_BUNDLE_JS}:
+	echo "Please run 'make build-ui' to build the frontend assets."
 
 # https starts the server with the HTTPS protocol.
 https:
