@@ -67,7 +67,7 @@ ${FE_BUNDLE_JS}:
 	echo "Please run 'make build-ui' to build the frontend assets."
 
 # https starts the server with the HTTPS protocol.
-https:
+https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 	@DAGU_CERT_FILE=${SERVER_CERT_FILE} \
 		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
 		go run . start-all
@@ -102,7 +102,7 @@ lint: golangci-lint
 swagger: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
-certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
+certs: ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} gencert-check
 
 # build build the binary.
 build: build-ui build-bin
@@ -163,35 +163,33 @@ gen-swagger:
 
 ########## Certificates ##########
 
-cert-dir:
-	@echo "${COLOR_GREEN}Creating cert directory...${COLOR_RESET}"
-	@mkdir -p ${CERT_DIR}
-
-gencerts-ca:
+${CA_CERT_FILE}:
 	@echo "${COLOR_GREEN}Generating CA certificates...${COLOR_RESET}"
 	@openssl req -x509 -newkey rsa:4096 \
 		-nodes -days 365 -keyout ${CA_KEY_FILE} \
 		-out ${CA_CERT_FILE} \
 		-subj "$(DEV_CERT_SUBJ_CA)"
 
-gencerts-server:
-	@echo "${COLOR_GREEN}Generating server certificates...${COLOR_RESET}"
+${SERVER_KEY_FILE}:
+	@echo "${COLOR_GREEN}Generating server key...${COLOR_RESET}"
 	@openssl req -newkey rsa:4096 -nodes -keyout ${SERVER_KEY_FILE} \
 		-out ${SERVER_CERT_REQ} \
 		-subj "$(DEV_CERT_SUBJ_SERVER)"
 
-	@echo "${COLOR_GREEN}Adding subjectAltName...${COLOR_RESET}"
+${SERVER_CERT_FILE}: ${CA_CERT_FILE} ${SERVER_KEY_FILE}
+	@echo "${COLOR_GREEN}Generating server certificate...${COLOR_RESET}"
 	@openssl x509 -req -in ${SERVER_CERT_REQ} -CA ${CA_CERT_FILE} -CAkey ${CA_KEY_FILE} \
 		-CAcreateserial -out ${SERVER_CERT_FILE} \
 		-extfile ${OPENSSL_CONF}
 
-gencerts-client:
-	@echo "${COLOR_GREEN}Generating client certificates...${COLOR_RESET}"
+${CLIENT_KEY_FILE}:
+	@echo "${COLOR_GREEN}Generating client key...${COLOR_RESET}"
 	@openssl req -newkey rsa:4096 -nodes -keyout ${CLIENT_KEY_FILE} \
 		-out ${CLIENT_CERT_REQ} \
 		-subj "$(DEV_CERT_SUBJ_CLIENT)"
 
-	@echo "${COLOR_GREEN}Adding subjectAltName...${COLOR_RESET}"
+${CLIENT_CERT_FILE}: ${CA_CERT_FILE} ${CLIENT_KEY_FILE}
+	@echo "${COLOR_GREEN}Generating client certificate...${COLOR_RESET}"
 	@openssl x509 -req -in ${CLIENT_CERT_REQ} -days 60 -CA ${CA_CERT_FILE} \
 		-CAkey ${CA_KEY_FILE} -CAcreateserial -out ${CLIENT_CERT_FILE} \
 		-extfile ${OPENSSL_CONF}
