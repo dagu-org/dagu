@@ -34,8 +34,9 @@ import (
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
 type Agent struct {
-	*NewAagentArgs
-
+	dag          *dag.DAG
+	dry          bool
+	retryTarget  *model.Status
 	dataStore    persistence.DataStoreFactory
 	engine       engine.Engine
 	scheduler    *scheduler.Scheduler
@@ -67,15 +68,23 @@ type NewAagentArgs struct {
 	RetryTarget *model.Status
 	// Default directory for writing log files.
 	LogDir string
+
+	Engine    engine.Engine
+	DataStore persistence.DataStoreFactory
 }
 
 // New creates a new Agent.
 func New(
-	config *NewAagentArgs,
-	eng engine.Engine,
-	dataStore persistence.DataStoreFactory,
+	args *NewAagentArgs,
 ) *Agent {
-	return &Agent{NewAagentArgs: config, engine: eng, dataStore: dataStore}
+	return &Agent{
+		dag:         args.DAG,
+		dry:         args.Dry,
+		retryTarget: args.RetryTarget,
+		logDir:      args.LogDir,
+		engine:      args.Engine,
+		dataStore:   args.DataStore,
+	}
 }
 
 var (
@@ -99,7 +108,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Handle dry execution.
-	if a.Dry {
+	if a.dry {
 		return a.dryRun()
 	}
 
@@ -170,7 +179,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			status := a.Status()
 			util.LogErr("write status", a.historyStore.Write(status))
 			util.LogErr(
-				"report step", a.reporter.reportStep(a.DAG, status, node),
+				"report step", a.reporter.reportStep(a.dag, status, node),
 			)
 		}
 	}()
@@ -187,7 +196,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	lastErr := a.scheduler.Schedule(
-		dag.NewContext(ctx, a.DAG, a.dataStore.NewDAGStore()),
+		dag.NewContext(ctx, a.dag, a.dataStore.NewDAGStore()),
 		a.graph,
 		done,
 	)
@@ -200,7 +209,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Send the execution report if necessary.
 	a.reporter.report(finishedStatus, lastErr)
 	util.LogErr(
-		"send email", a.reporter.send(a.DAG, finishedStatus, lastErr),
+		"send email", a.reporter.send(a.dag, finishedStatus, lastErr),
 	)
 
 	// Mark the agent finished.
@@ -225,15 +234,15 @@ func (a *Agent) Status() *model.Status {
 	// Create the status object to record the current status.
 	status := &model.Status{
 		RequestID:  a.reqID,
-		Name:       a.DAG.Name,
+		Name:       a.dag.Name,
 		Status:     schedulerStatus,
 		StatusText: schedulerStatus.String(),
 		Pid:        model.Pid(os.Getpid()),
-		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.DAG.Steps),
+		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.dag.Steps),
 		StartedAt:  model.FormatTime(a.graph.StartAt()),
 		FinishedAt: model.FormatTime(a.graph.FinishAt()),
 		Log:        a.logFile.Name(),
-		Params:     model.Params(a.DAG.Params),
+		Params:     model.Params(a.dag.Params),
 	}
 
 	// Collect the handler nodes.
@@ -311,10 +320,10 @@ func (a *Agent) setup() error {
 
 	a.scheduler = a.newScheduler()
 	a.reporter = newReporter(mailer.New(&mailer.NewMailerArgs{
-		Host:     a.DAG.SMTP.Host,
-		Port:     a.DAG.SMTP.Port,
-		Username: a.DAG.SMTP.Username,
-		Password: a.DAG.SMTP.Password,
+		Host:     a.dag.SMTP.Host,
+		Port:     a.dag.SMTP.Port,
+		Username: a.dag.SMTP.Username,
+		Password: a.dag.SMTP.Password,
 	}))
 
 	return a.setupGraph()
@@ -324,26 +333,26 @@ func (a *Agent) setup() error {
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,
-		MaxActiveRuns: a.DAG.MaxActiveRuns,
-		Delay:         a.DAG.Delay,
-		Dry:           a.Dry,
+		MaxActiveRuns: a.dag.MaxActiveRuns,
+		Delay:         a.dag.Delay,
+		Dry:           a.dry,
 		ReqID:         a.reqID,
 	}
 
-	if a.DAG.HandlerOn.Exit != nil {
-		cfg.OnExit = a.DAG.HandlerOn.Exit
+	if a.dag.HandlerOn.Exit != nil {
+		cfg.OnExit = a.dag.HandlerOn.Exit
 	}
 
-	if a.DAG.HandlerOn.Success != nil {
-		cfg.OnSuccess = a.DAG.HandlerOn.Success
+	if a.dag.HandlerOn.Success != nil {
+		cfg.OnSuccess = a.dag.HandlerOn.Success
 	}
 
-	if a.DAG.HandlerOn.Failure != nil {
-		cfg.OnFailure = a.DAG.HandlerOn.Failure
+	if a.dag.HandlerOn.Failure != nil {
+		cfg.OnFailure = a.dag.HandlerOn.Failure
 	}
 
-	if a.DAG.HandlerOn.Cancel != nil {
-		cfg.OnCancel = a.DAG.HandlerOn.Cancel
+	if a.dag.HandlerOn.Cancel != nil {
+		cfg.OnCancel = a.dag.HandlerOn.Cancel
 	}
 
 	return scheduler.New(cfg)
@@ -362,14 +371,14 @@ func (a *Agent) dryRun() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			_ = a.reporter.reportStep(a.DAG, status, node)
+			_ = a.reporter.reportStep(a.dag, status, node)
 		}
 	}()
 
 	log.Printf("***** Starting DRY-RUN *****")
 
 	lastErr := a.scheduler.Schedule(
-		dag.NewContext(context.Background(), a.DAG, a.dataStore.NewDAGStore()),
+		dag.NewContext(context.Background(), a.dag, a.dataStore.NewDAGStore()),
 		a.graph,
 		done,
 	)
@@ -394,7 +403,7 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	go func() {
 		a.scheduler.Signal(a.graph, sig, done, allowOverride)
 	}()
-	timeout := time.NewTimer(a.DAG.MaxCleanUpTime)
+	timeout := time.NewTimer(a.dag.MaxCleanUpTime)
 	tick := time.NewTimer(time.Second * 5)
 	defer timeout.Stop()
 	defer tick.Stop()
@@ -423,11 +432,11 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 // setupGraph setups the DAG graph. If is retry execution, it loads nodes
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph() error {
-	if a.RetryTarget != nil {
+	if a.retryTarget != nil {
 		log.Printf("setup for retry")
 		return a.setupGraphForRetry()
 	}
-	graph, err := scheduler.NewExecutionGraph(a.DAG.Steps...)
+	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
@@ -437,8 +446,8 @@ func (a *Agent) setupGraph() error {
 
 // setupGraphForRetry setsup the graph for retry.
 func (a *Agent) setupGraphForRetry() error {
-	nodes := make([]*scheduler.Node, 0, len(a.RetryTarget.Nodes))
-	for _, n := range a.RetryTarget.Nodes {
+	nodes := make([]*scheduler.Node, 0, len(a.retryTarget.Nodes))
+	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
 	graph, err := scheduler.NewExecutionGraphForRetry(nodes...)
@@ -463,18 +472,18 @@ func (a *Agent) setupReqID() error {
 // setup database prepare database connection and remove old history data.
 func (a *Agent) setupDatabase() error {
 	a.historyStore = a.dataStore.NewHistoryStore()
-	location, retentionDays := a.DAG.Location, a.DAG.HistRetentionDays
+	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(location, retentionDays); err != nil {
 		util.LogErr("clean old history data", err)
 	}
 
-	return a.historyStore.Open(a.DAG.Location, time.Now(), a.reqID)
+	return a.historyStore.Open(a.dag.Location, time.Now(), a.reqID)
 }
 
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer() error {
 	socketServer, err := sock.NewServer(&sock.Config{
-		Addr:        a.DAG.SockAddr(),
+		Addr:        a.dag.SockAddr(),
 		HandlerFunc: a.HandleHTTP,
 	})
 	if err != nil {
@@ -487,12 +496,12 @@ func (a *Agent) setupSocketServer() error {
 // checkPrecondition check if the preconditions are met. If not, it returns
 // error.
 func (a *Agent) checkPreconditions() error {
-	if len(a.DAG.Preconditions) == 0 {
+	if len(a.dag.Preconditions) == 0 {
 		return nil
 	}
-	log.Printf("checking preconditions for \"%s\"", a.DAG.Name)
+	log.Printf("checking preconditions for \"%s\"", a.dag.Name)
 	// If one of the conditions does not met, cancel the execution.
-	if err := dag.EvalConditions(a.DAG.Preconditions); err != nil {
+	if err := dag.EvalConditions(a.dag.Preconditions); err != nil {
 		a.scheduler.Cancel(a.graph)
 		return err
 	}
@@ -501,13 +510,13 @@ func (a *Agent) checkPreconditions() error {
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning() error {
-	status, err := a.engine.GetCurrentStatus(a.DAG)
+	status, err := a.engine.GetCurrentStatus(a.dag)
 	if err != nil {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
 		return fmt.Errorf(
-			"%w. socket=%s", errDAGIsAlreadyRunning, a.DAG.SockAddr(),
+			"%w. socket=%s", errDAGIsAlreadyRunning, a.dag.SockAddr(),
 		)
 	}
 	return nil
@@ -518,13 +527,13 @@ func (a *Agent) setupLog() error {
 	// Log directory is the directory where the execution logs are stored.
 	// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
 	// It is used to write the stdout and stderr of the steps.
-	if a.DAG.LogDir == "" {
-		a.logDir = a.NewAagentArgs.LogDir
+	if a.dag.LogDir == "" {
+		a.logDir = a.logDir
 	} else {
-		a.logDir = path.Join(a.NewAagentArgs.LogDir, util.ValidFilename(a.DAG.Name))
+		a.logDir = path.Join(a.logDir, util.ValidFilename(a.dag.Name))
 	}
 
-	absFilepath := filepath.Join(a.logDir, createLogfileName(a.DAG.Name, a.reqID, time.Now()))
+	absFilepath := filepath.Join(a.logDir, createLogfileName(a.dag.Name, a.reqID, time.Now()))
 
 	// Create the log directory
 	if err := os.MkdirAll(path.Dir(absFilepath), 0755); err != nil {

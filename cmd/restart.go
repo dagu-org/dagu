@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
@@ -53,7 +54,16 @@ func restartCmd() *cobra.Command {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			cobra.CheckErr(start(cmd.Context(), cfg, eng, dg, false))
+			dagAgent := agent.New(&agent.NewAagentArgs{
+				DAG: dg, Dry: false, LogDir: cfg.LogDir,
+				Engine:    eng,
+				DataStore: newDataStoreFactory(cfg),
+			})
+
+			listenSignals(cmd.Context(), dagAgent)
+			if err := dagAgent.Run(cmd.Context()); err != nil {
+				log.Fatalf("Failed to start DAG: %v", err)
+			}
 		},
 	}
 }
