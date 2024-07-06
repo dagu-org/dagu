@@ -52,7 +52,7 @@ func retryCmd() *cobra.Command {
 
 			eng := newEngine(cfg)
 
-			dagAgent := agent.New(&agent.Config{
+			dagAgent := agent.New(&agent.NewAagentArgs{
 				DAG:         loadedDAG,
 				RetryTarget: status.Status,
 				LogDir:      cfg.LogDir,

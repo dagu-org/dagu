@@ -58,7 +58,7 @@ func TestAgent_Run(t *testing.T) {
 		}()
 
 		dg := testLoadDAG(t, "run.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -85,7 +85,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Create a history file by running a DAG
 		dg := testLoadDAG(t, "simple.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -96,7 +96,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Set the retention days to 0 and run the DAG again
 		dg.HistRetentionDays = 0
-		dagAgent = agent.New(&agent.Config{
+		dagAgent = agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -114,7 +114,7 @@ func TestAgent_Run(t *testing.T) {
 		}()
 
 		dg := testLoadDAG(t, "is_running.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, df)
@@ -129,7 +129,7 @@ func TestAgent_Run(t *testing.T) {
 		require.NotNil(t, curStatus)
 		require.Equal(t, curStatus.Status, scheduler.StatusRunning)
 
-		dagAgent = agent.New(&agent.Config{
+		dagAgent = agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, df)
@@ -148,7 +148,7 @@ func TestAgent_Run(t *testing.T) {
 		// Precondition is not met
 		dg.Preconditions = []dag.Condition{{Condition: "`echo 1`", Expected: "0"}}
 
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -169,7 +169,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Run a DAG that fails
 		dagAgent := agent.New(
-			&agent.Config{
+			&agent.NewAagentArgs{
 				DAG:    testLoadDAG(t, "error.yaml"),
 				LogDir: cfg.LogDir,
 			},
@@ -191,7 +191,7 @@ func TestAgent_Run(t *testing.T) {
 		abortFunc := func(a *agent.Agent) { a.Signal(syscall.SIGTERM) }
 
 		dg := testLoadDAG(t, "sleep.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -223,7 +223,7 @@ func TestAgent_Run(t *testing.T) {
 		}()
 
 		dg := testLoadDAG(t, "on_exit.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -251,7 +251,7 @@ func TestAgent_DryRun(t *testing.T) {
 		}()
 
 		dg := testLoadDAG(t, "dry.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			Dry:    true,
 			LogDir: cfg.LogDir,
@@ -281,7 +281,7 @@ func TestAgent_Retry(t *testing.T) {
 		// retry.yaml has a DAG that fails
 		dg := testLoadDAG(t, "retry.yaml")
 
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -298,7 +298,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Retry the DAG and check if it is successful
-		dagAgent = agent.New(&agent.Config{
+		dagAgent = agent.New(&agent.NewAagentArgs{
 			DAG:         dg,
 			RetryTarget: status,
 			LogDir:      cfg.LogDir,
@@ -328,7 +328,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Start a long-running DAG
 		dg := testLoadDAG(t, "handle_http.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -373,7 +373,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Start a long-running DAG
 		dg := testLoadDAG(t, "handle_http2.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)
@@ -415,7 +415,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Start a long-running DAG
 		dg := testLoadDAG(t, "handle_http3.yaml")
-		dagAgent := agent.New(&agent.Config{
+		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
 		}, eng, dataStore)

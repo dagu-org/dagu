@@ -34,7 +34,7 @@ import (
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
 type Agent struct {
-	*Config
+	*NewAagentArgs
 
 	dataStore    persistence.DataStoreFactory
 	engine       engine.Engine
@@ -54,8 +54,8 @@ type Agent struct {
 	lock sync.RWMutex
 }
 
-// Config is the configuration for the Agent.
-type Config struct {
+// NewAagentArgs is the configuration for the Agent.
+type NewAagentArgs struct {
 	// DAG is the DAG to run.
 	DAG *dag.DAG
 	// Dry is a dry-run mode. It does not execute the actual command.
@@ -71,11 +71,11 @@ type Config struct {
 
 // New creates a new Agent.
 func New(
-	config *Config,
+	config *NewAagentArgs,
 	eng engine.Engine,
 	dataStore persistence.DataStoreFactory,
 ) *Agent {
-	return &Agent{Config: config, engine: eng, dataStore: dataStore}
+	return &Agent{NewAagentArgs: config, engine: eng, dataStore: dataStore}
 }
 
 var (
@@ -519,9 +519,9 @@ func (a *Agent) setupLog() error {
 	// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
 	// It is used to write the stdout and stderr of the steps.
 	if a.DAG.LogDir == "" {
-		a.logDir = a.Config.LogDir
+		a.logDir = a.NewAagentArgs.LogDir
 	} else {
-		a.logDir = path.Join(a.Config.LogDir, util.ValidFilename(a.DAG.Name))
+		a.logDir = path.Join(a.NewAagentArgs.LogDir, util.ValidFilename(a.DAG.Name))
 	}
 
 	absFilepath := filepath.Join(a.logDir, createLogfileName(a.DAG.Name, a.reqID, time.Now()))

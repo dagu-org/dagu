@@ -119,7 +119,7 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 
 	b.callBuilderFunc(b.buildEnvs)
 	b.callBuilderFunc(b.buildSchedule)
-	b.callBuilderFunc(b.buildMailOnConfig)
+	b.callBuilderFunc(b.buildMailOn)
 	b.callBuilderFunc(b.buildParams)
 
 	// If metadataOnly is set, return the DAG with the metadata.
@@ -221,7 +221,7 @@ func (b *builder) buildSchedule() error {
 	return err
 }
 
-func (b *builder) buildMailOnConfig() error {
+func (b *builder) buildMailOn() error {
 	if b.def.MailOn == nil {
 		return nil
 	}

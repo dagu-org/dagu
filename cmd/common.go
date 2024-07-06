@@ -48,7 +48,7 @@ func start(
 	dry bool,
 ) error {
 	dagAgent := agent.New(
-		&agent.Config{
+		&agent.NewAagentArgs{
 			DAG: dg, Dry: dry, LogDir: cfg.LogDir,
 		}, eng, newDataStoreFactory(cfg),
 	)
