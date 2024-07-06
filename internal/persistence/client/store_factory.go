@@ -9,9 +9,9 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
 )
 
-var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
+var _ persistence.DataStores = (*dataStores)(nil)
 
-type dataStoreFactoryImpl struct {
+type dataStores struct {
 	historyStore persistence.HistoryStore
 	dagStore     persistence.DAGStore
 
@@ -21,15 +21,15 @@ type dataStoreFactoryImpl struct {
 	latestStatusToday bool
 }
 
-type NewDataStoreFactoryArgs struct {
+type NewDataStoresArgs struct {
 	DAGs              string
 	DataDir           string
 	SuspendFlagsDir   string
 	LatestStatusToday bool
 }
 
-func NewDataStoreFactory(args *NewDataStoreFactoryArgs) persistence.DataStoreFactory {
-	dataStoreImpl := &dataStoreFactoryImpl{
+func NewDataStores(args *NewDataStoresArgs) persistence.DataStores {
+	dataStoreImpl := &dataStores{
 		dags:              args.DAGs,
 		dataDir:           args.DataDir,
 		suspendFlagsDir:   args.SuspendFlagsDir,
@@ -39,7 +39,7 @@ func NewDataStoreFactory(args *NewDataStoreFactoryArgs) persistence.DataStoreFac
 	return dataStoreImpl
 }
 
-func (f *dataStoreFactoryImpl) InitDagDir() error {
+func (f *dataStores) InitDagDir() error {
 	_, err := os.Stat(f.dags)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(f.dags, 0755); err != nil {
@@ -50,7 +50,7 @@ func (f *dataStoreFactoryImpl) InitDagDir() error {
 	return nil
 }
 
-func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
+func (f *dataStores) HistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
 		f.historyStore = jsondb.New(
@@ -59,13 +59,13 @@ func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 	return f.historyStore
 }
 
-func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
+func (f *dataStores) DAGStore() persistence.DAGStore {
 	if f.dagStore == nil {
 		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
 	}
 	return f.dagStore
 }
 
-func (f *dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
+func (f *dataStores) FlagStore() persistence.FlagStore {
 	return local.NewFlagStore(storage.NewStorage(f.suspendFlagsDir))
 }

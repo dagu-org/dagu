@@ -89,7 +89,7 @@ func setupTest(t *testing.T) (string, engine.Engine) {
 		SuspendFlagsDir: tmpDir,
 	}
 
-	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
+	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
 		DAGs:            cfg.DAGs,
 		DataDir:         cfg.DataDir,
 		SuspendFlagsDir: cfg.SuspendFlagsDir,

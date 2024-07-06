@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -16,10 +15,8 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("Restart a DAG", func(t *testing.T) {
-		tmpDir, eng, _, cfg := setupTest(t)
-		defer func() {
-			_ = os.RemoveAll(tmpDir)
-		}()
+		setup := setupTest(t)
+		defer setup.cleanup()
 
 		dagFile := testDAGFile("restart.yaml")
 
@@ -33,6 +30,7 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		time.Sleep(waitForStatusUpdate)
+		eng := setup.engine
 
 		// Wait for the DAG running.
 		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
@@ -58,10 +56,10 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dg, err := dag.Load(cfg.BaseConfig, dagFile, "")
+		dg, err := dag.Load(setup.cfg.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		recentHistory := newEngine(cfg).GetRecentHistory(dg, 2)
+		recentHistory := newEngine(setup.cfg).GetRecentHistory(dg, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

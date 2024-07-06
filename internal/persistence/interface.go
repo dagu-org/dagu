@@ -15,10 +15,10 @@ var (
 	ErrNoStatusData      = fmt.Errorf("no status data")
 )
 
-type DataStoreFactory interface {
-	NewHistoryStore() HistoryStore
-	NewDAGStore() DAGStore
-	NewFlagStore() FlagStore
+type DataStores interface {
+	HistoryStore() HistoryStore
+	DAGStore() DAGStore
+	FlagStore() FlagStore
 }
 
 type HistoryStore interface {
@@ -48,13 +48,13 @@ type DAGStore interface {
 	Find(name string) (*dag.DAG, error)
 }
 
-type FlagStore interface {
-	ToggleSuspend(id string, suspend bool) error
-	IsSuspended(id string) bool
-}
-
 type GrepResult struct {
 	Name    string
 	DAG     *dag.DAG
 	Matches []*grep.Match
+}
+
+type FlagStore interface {
+	ToggleSuspend(id string, suspend bool) error
+	IsSuspended(id string) bool
 }

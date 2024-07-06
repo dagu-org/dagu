@@ -37,7 +37,7 @@ type Agent struct {
 	dag          *dag.DAG
 	dry          bool
 	retryTarget  *model.Status
-	dataStore    persistence.DataStoreFactory
+	dataStore    persistence.DataStores
 	engine       engine.Engine
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
@@ -70,7 +70,7 @@ type NewAagentArgs struct {
 	LogDir string
 
 	Engine    engine.Engine
-	DataStore persistence.DataStoreFactory
+	DataStore persistence.DataStores
 }
 
 // New creates a new Agent.
@@ -196,7 +196,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	lastErr := a.scheduler.Schedule(
-		dag.NewContext(ctx, a.dag, a.dataStore.NewDAGStore()),
+		dag.NewContext(ctx, a.dag, a.dataStore.DAGStore()),
 		a.graph,
 		done,
 	)
@@ -378,7 +378,7 @@ func (a *Agent) dryRun() error {
 	log.Printf("***** Starting DRY-RUN *****")
 
 	lastErr := a.scheduler.Schedule(
-		dag.NewContext(context.Background(), a.dag, a.dataStore.NewDAGStore()),
+		dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore()),
 		a.graph,
 		done,
 	)
@@ -471,7 +471,7 @@ func (a *Agent) setupReqID() error {
 
 // setup database prepare database connection and remove old history data.
 func (a *Agent) setupDatabase() error {
-	a.historyStore = a.dataStore.NewHistoryStore()
+	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(location, retentionDays); err != nil {
 		util.LogErr("clean old history data", err)
@@ -527,9 +527,7 @@ func (a *Agent) setupLog() error {
 	// Log directory is the directory where the execution logs are stored.
 	// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
 	// It is used to write the stdout and stderr of the steps.
-	if a.dag.LogDir == "" {
-		a.logDir = a.logDir
-	} else {
+	if a.dag.LogDir != "" {
 		a.logDir = path.Join(a.logDir, util.ValidFilename(a.dag.Name))
 	}
 

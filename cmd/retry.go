@@ -28,8 +28,8 @@ func retryCmd() *cobra.Command {
 			}
 
 			// Read the specified DAG execution status from the history store.
-			dataStore := newDataStoreFactory(cfg)
-			historyStore := dataStore.NewHistoryStore()
+			dataStore := newDataStores(cfg)
+			historyStore := dataStore.HistoryStore()
 
 			absoluteFilePath, err := filepath.Abs(args[0])
 			if err != nil {

@@ -25,7 +25,7 @@ import (
 
 // setupTest sets temporary directories and loads the configuration.
 func setupTest(t *testing.T) (
-	string, engine.Engine, persistence.DataStoreFactory, *config.Config,
+	string, engine.Engine, persistence.DataStores, *config.Config,
 ) {
 	t.Helper()
 
@@ -36,7 +36,7 @@ func setupTest(t *testing.T) (
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
+	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 

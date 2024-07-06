@@ -29,19 +29,19 @@ var schedulerModule = fx.Options(
 var baseModule = fx.Options(
 	fx.Provide(newEngine),
 	fx.Provide(logger.NewSlogLogger),
-	fx.Provide(client.NewDataStoreFactory),
+	fx.Provide(client.NewDataStores),
 )
 
 func newEngine(cfg *config.Config) engine.Engine {
 	return engine.New(&engine.NewEngineArgs{
-		DataStore:  newDataStoreFactory(cfg),
+		DataStore:  newDataStores(cfg),
 		Executable: cfg.Executable,
 		WorkDir:    cfg.WorkDir,
 	})
 }
 
-func newDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
-	return client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
+func newDataStores(cfg *config.Config) persistence.DataStores {
+	return client.NewDataStores(&client.NewDataStoresArgs{
 		DAGs:              cfg.DAGs,
 		DataDir:           cfg.DataDir,
 		SuspendFlagsDir:   cfg.SuspendFlagsDir,

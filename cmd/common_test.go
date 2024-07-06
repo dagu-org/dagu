@@ -17,14 +17,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testSetup struct {
+	homeDir   string
+	engine    engine.Engine
+	dataStore persistence.DataStores
+	cfg       *config.Config
+}
+
+func (t testSetup) cleanup() {
+	_ = os.RemoveAll(t.homeDir)
+}
+
 // setupTest is a helper function to setup the test environment.
 // This function does the following:
 // 1. It creates a temporary directory and returns the path to it.
 // 2. Sets the home directory to the temporary directory.
 // 3. Creates a new data store factory and engine.
-func setupTest(t *testing.T) (
-	string, engine.Engine, persistence.DataStoreFactory, *config.Config,
-) {
+func setupTest(t *testing.T) testSetup {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
@@ -35,11 +44,14 @@ func setupTest(t *testing.T) (
 	require.NoError(t, err)
 
 	cfg.DataDir = path.Join(tmpDir, ".dagu", "data")
-	dataStore := newDataStoreFactory(cfg)
+	dataStore := newDataStores(cfg)
 
-	return tmpDir, engine.New(&engine.NewEngineArgs{
-		DataStore: dataStore,
-	}), dataStore, cfg
+	return testSetup{
+		homeDir:   tmpDir,
+		dataStore: dataStore,
+		engine:    newEngine(cfg),
+		cfg:       cfg,
+	}
 }
 
 // cmdTest is a helper struct to test commands.

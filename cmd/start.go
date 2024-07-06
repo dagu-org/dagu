@@ -37,7 +37,7 @@ func startCmd() *cobra.Command {
 			dagAgent := agent.New(&agent.NewAagentArgs{
 				DAG: dg, LogDir: cfg.LogDir,
 				Engine:    eng,
-				DataStore: newDataStoreFactory(cfg),
+				DataStore: newDataStores(cfg),
 			})
 
 			ctx := cmd.Context()

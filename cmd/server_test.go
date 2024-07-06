@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"net"
-	"os"
 	"testing"
 	"time"
 
@@ -12,10 +11,8 @@ import (
 
 func TestServerCommand(t *testing.T) {
 	t.Run("Start the server", func(t *testing.T) {
-		tmpDir, _, _, _ := setupTest(t)
-		defer func() {
-			_ = os.RemoveAll(tmpDir)
-		}()
+		setup := setupTest(t)
+		defer setup.cleanup()
 
 		go func() {
 			testRunCommand(t, serverCmd(), cmdTest{

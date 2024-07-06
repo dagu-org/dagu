@@ -57,7 +57,7 @@ func restartCmd() *cobra.Command {
 			dagAgent := agent.New(&agent.NewAagentArgs{
 				DAG: dg, Dry: false, LogDir: cfg.LogDir,
 				Engine:    eng,
-				DataStore: newDataStoreFactory(cfg),
+				DataStore: newDataStores(cfg),
 			})
 
 			listenSignals(cmd.Context(), dagAgent)

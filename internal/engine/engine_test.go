@@ -26,7 +26,7 @@ var testdataDir = path.Join(util.MustGetwd(), "./testdata")
 var lock sync.Mutex
 
 func setupTest(t *testing.T) (
-	string, engine.Engine, persistence.DataStoreFactory, *config.Config,
+	string, engine.Engine, persistence.DataStores, *config.Config,
 ) {
 	t.Helper()
 	lock.Lock()
@@ -36,7 +36,7 @@ func setupTest(t *testing.T) (
 	_ = os.Setenv("HOME", tmpDir)
 	cfg, _ := config.Load()
 
-	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
+	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    testdataDir,
 	})
@@ -52,14 +52,14 @@ func setupTest(t *testing.T) (
 
 func setupTestTmpDir(
 	t *testing.T,
-) (string, engine.Engine, persistence.DataStoreFactory, *config.Config) {
+) (string, engine.Engine, persistence.DataStores, *config.Config) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
 	_ = os.Setenv("HOME", tmpDir)
 	cfg, _ := config.Load()
 
-	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
+	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
 	})
@@ -139,7 +139,7 @@ func TestEngine_GetStatus(t *testing.T) {
 		dagStatus, err := eng.GetStatus(file)
 		require.NoError(t, err)
 
-		historyStore := dataStore.NewHistoryStore()
+		historyStore := dataStore.HistoryStore()
 
 		err = historyStore.Open(dagStatus.DAG.Location, now, requestID)
 		require.NoError(t, err)
