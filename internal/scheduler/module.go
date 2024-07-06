@@ -10,48 +10,31 @@ import (
 )
 
 var Module = fx.Options(
-	fx.Provide(EntryReaderProvider),
-	fx.Provide(JobFactoryProvider),
 	fx.Provide(New),
 )
 
 type Params struct {
 	fx.In
 
-	Config      *config.Config
-	Logger      dagulogger.Logger
-	EntryReader EntryReader
-}
-
-func EntryReaderProvider(
-	cfg *config.Config,
-	eng engine.Engine,
-	jf JobFactory,
-	logger dagulogger.Logger,
-) EntryReader {
-	return newEntryReader(newEntryReaderArgs{
-		Engine:     eng,
-		DagsDir:    cfg.DAGs,
-		JobFactory: jf,
-		Logger:     logger,
-	})
-}
-
-func JobFactoryProvider(
-	cfg *config.Config, eng engine.Engine,
-) JobFactory {
-	return &jobFactory{
-		WorkDir:    cfg.WorkDir,
-		Engine:     eng,
-		Executable: cfg.Executable,
-	}
+	Config *config.Config
+	Logger dagulogger.Logger
+	Engine engine.Engine
 }
 
 func New(params Params) *Scheduler {
 	return NewScheduler(NewSchedulerArgs{
-		EntryReader: params.EntryReader,
-		Logger:      params.Logger,
-		LogDir:      params.Config.LogDir,
+		EntryReader: newEntryReader(newEntryReaderArgs{
+			Engine:  params.Engine,
+			DagsDir: params.Config.DAGs,
+			JobFactory: &jobFactory{
+				WorkDir:    params.Config.WorkDir,
+				Engine:     params.Engine,
+				Executable: params.Config.Executable,
+			},
+			Logger: params.Logger,
+		}),
+		Logger: params.Logger,
+		LogDir: params.Config.LogDir,
 	})
 }
 
