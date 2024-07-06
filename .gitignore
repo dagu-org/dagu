@@ -3,9 +3,9 @@ bin/
 dist/
 
 # frontend assets
-internal/service/frontend/assets/fonts/*
-internal/service/frontend/assets/*
-!internal/service/frontend/assets/.gitkeep
+internal/frontend/assets/fonts/*
+internal/frontend/assets/*
+!internal/frontend/assets/.gitkeep
 
 # NVM
 .nvmrc

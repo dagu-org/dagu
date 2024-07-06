@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-openapi/runtime"
 
-	"github.com/dagu-dev/dagu/internal/service/frontend/gen/models"
+	"github.com/dagu-dev/dagu/internal/frontend/gen/models"
 )
 
 // PostDagActionOKCode is the HTTP code returned for type PostDagActionOK

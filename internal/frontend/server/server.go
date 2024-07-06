@@ -10,15 +10,15 @@ import (
 	"syscall"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	"github.com/dagu-dev/dagu/internal/service/frontend/gen/restapi"
 	"github.com/go-openapi/loads"
 	flags "github.com/jessevdk/go-flags"
 
-	"github.com/dagu-dev/dagu/internal/service/frontend/gen/restapi/operations"
+	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
 	// nolint
-	pkgmiddleware "github.com/dagu-dev/dagu/internal/service/frontend/middleware"
+	pkgmiddleware "github.com/dagu-dev/dagu/internal/frontend/middleware"
 
 	"github.com/go-chi/chi/v5"
 )

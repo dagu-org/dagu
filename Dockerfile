@@ -20,8 +20,8 @@ ARG TARGETARCH
 WORKDIR /app
 COPY . .
 
-RUN go mod download && rm -rf service/frontend/assets
-COPY --from=ui-builder /app/dist/ ./internal/service/frontend/assets/
+RUN go mod download && rm -rf frontend/assets
+COPY --from=ui-builder /app/dist/ ./internal/frontend/assets/
 
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/dagu .
 

@@ -3,10 +3,10 @@ package cmd
 import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/frontend"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/internal/service/frontend"
 	"github.com/dagu-dev/dagu/internal/service/scheduler"
 	"go.uber.org/fx"
 )

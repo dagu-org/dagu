@@ -29,7 +29,7 @@ PKG_gotestsum=gotest.tools/gotestsum
 COLOR_GREEN=\033[0;32m
 COLOR_RESET=\033[0m
 
-FE_DIR=./internal/service/frontend
+FE_DIR=./internal/frontend
 FE_GEN_DIR=${FE_DIR}/gen
 FE_ASSETS_DIR=${FE_DIR}/assets
 

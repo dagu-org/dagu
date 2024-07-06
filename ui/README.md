@@ -3,6 +3,7 @@
 ## Development Instructions
 
 ### 1. Starting the Backend Server
+
 The Dagu UI relies on a backend server that provides the necessary data for the UI to function properly. To start the backend server, navigate to the project root directory and execute the following command:
 
 ```bash
@@ -34,4 +35,4 @@ cd dagu
 make build-ui
 ```
 
-This command will build the `bundle.js` file and copy it to dagu/service/frontend/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.
+This command will build the `bundle.js` file and copy it to dagu/frontend/assets/js/bundle.js. This is necessary for the Go backend to include the JavaScript within the binary.

@@ -6,13 +6,13 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	pkgmiddleware "github.com/dagu-dev/dagu/internal/service/frontend/middleware"
+	pkgmiddleware "github.com/dagu-dev/dagu/internal/frontend/middleware"
 
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
 
-	"github.com/dagu-dev/dagu/internal/service/frontend/gen/restapi/operations"
+	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
 )
 
 //go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal any --exclude-main

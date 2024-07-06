@@ -5,8 +5,8 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/frontend/server"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/service/frontend/server"
 	"go.uber.org/fx"
 )
 

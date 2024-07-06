@@ -1,8 +1,8 @@
 package frontend
 
 import (
-	"github.com/dagu-dev/dagu/internal/service/frontend/dag"
-	"github.com/dagu-dev/dagu/internal/service/frontend/server"
+	"github.com/dagu-dev/dagu/internal/frontend/dag"
+	"github.com/dagu-dev/dagu/internal/frontend/server"
 )
 
 func NewServer(params Params) *server.Server {
