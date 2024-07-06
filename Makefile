@@ -47,9 +47,9 @@ GO_TEST_FLAGS=-v --race
 
 ########## Main Targets ##########
 
-# run starts the backend server.
+# run starts the frontend server and the scheduler.
 run: ${FE_BUNDLE_JS}
-	go run . server
+	go run . start-all
 
 # check if the frontend assets are built.
 ${FE_BUNDLE_JS}:
