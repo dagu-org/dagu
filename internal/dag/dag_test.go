@@ -24,8 +24,7 @@ func TestMain(m *testing.M) {
 
 func TestDAG_String(t *testing.T) {
 	t.Run("DefaltConfig", func(t *testing.T) {
-		loader := NewLoader()
-		dg, err := loader.Load("", path.Join(testdataDir, "default.yaml"), "")
+		dg, err := Load("", path.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 
 		ret := dg.String()

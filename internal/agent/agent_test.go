@@ -25,7 +25,7 @@ import (
 
 // setupTest sets temporary directories and loads the configuration.
 func setupTest(t *testing.T) (
-	string, engine.Engine, persistence.DataStoreFactory, *dag.Loader, *config.Config,
+	string, engine.Engine, persistence.DataStoreFactory, *config.Config,
 ) {
 	t.Helper()
 
@@ -40,26 +40,24 @@ func setupTest(t *testing.T) (
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 	})
 
-	loader := dag.NewLoader()
-
 	eng := engine.New(&engine.NewEngineArgs{
 		DataStore:  dataStore,
 		WorkDir:    cfg.WorkDir,
 		Executable: cfg.Executable,
 	})
 
-	return tmpDir, eng, dataStore, loader, cfg
+	return tmpDir, eng, dataStore, cfg
 }
 
 func TestAgent_Run(t *testing.T) {
 	t.Parallel()
 	t.Run("Run a DAG successfully", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
-		dg := testLoadDAG(t, "run.yaml", loader)
+		dg := testLoadDAG(t, "run.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -83,10 +81,10 @@ func TestAgent_Run(t *testing.T) {
 		}, time.Second*2, time.Millisecond*100)
 	})
 	t.Run("Old history files are deleted", func(t *testing.T) {
-		_, eng, dataStore, loader, cfg := setupTest(t)
+		_, eng, dataStore, cfg := setupTest(t)
 
 		// Create a history file by running a DAG
-		dg := testLoadDAG(t, "simple.yaml", loader)
+		dg := testLoadDAG(t, "simple.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -110,12 +108,12 @@ func TestAgent_Run(t *testing.T) {
 		require.Equal(t, 1, len(history))
 	})
 	t.Run("It should not run a DAG if it is already running", func(t *testing.T) {
-		tmpDir, eng, df, loader, cfg := setupTest(t)
+		tmpDir, eng, df, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
-		dg := testLoadDAG(t, "is_running.yaml", loader)
+		dg := testLoadDAG(t, "is_running.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -140,12 +138,12 @@ func TestAgent_Run(t *testing.T) {
 		require.Contains(t, err.Error(), "is already running")
 	})
 	t.Run("It should not run a DAG if the precondition is not met", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
-		dg := testLoadDAG(t, "multiple_steps.yaml", loader)
+		dg := testLoadDAG(t, "multiple_steps.yaml")
 
 		// Precondition is not met
 		dg.Preconditions = []dag.Condition{{Condition: "`echo 1`", Expected: "0"}}
@@ -164,7 +162,7 @@ func TestAgent_Run(t *testing.T) {
 		require.Equal(t, scheduler.NodeStatusNone, status.Nodes[1].Status)
 	})
 	t.Run("Run a DAG and finish with an error", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
@@ -172,7 +170,7 @@ func TestAgent_Run(t *testing.T) {
 		// Run a DAG that fails
 		dagAgent := agent.New(
 			&agent.Config{
-				DAG:    testLoadDAG(t, "error.yaml", loader),
+				DAG:    testLoadDAG(t, "error.yaml"),
 				LogDir: cfg.LogDir,
 			},
 			eng,
@@ -185,14 +183,14 @@ func TestAgent_Run(t *testing.T) {
 		require.Equal(t, scheduler.StatusError, dagAgent.Status().Status)
 	})
 	t.Run("Run a DAG and receive a signal", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
 		abortFunc := func(a *agent.Agent) { a.Signal(syscall.SIGTERM) }
 
-		dg := testLoadDAG(t, "sleep.yaml", loader)
+		dg := testLoadDAG(t, "sleep.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -219,12 +217,12 @@ func TestAgent_Run(t *testing.T) {
 		}, time.Second*1, time.Millisecond*100)
 	})
 	t.Run("Run a DAG and execute the exit handler", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
-		dg := testLoadDAG(t, "on_exit.yaml", loader)
+		dg := testLoadDAG(t, "on_exit.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -247,12 +245,12 @@ func TestAgent_Run(t *testing.T) {
 func TestAgent_DryRun(t *testing.T) {
 	t.Parallel()
 	t.Run("Dry-run a DAG successfully", func(t *testing.T) {
-		tmpDir, eng, df, loader, cfg := setupTest(t)
+		tmpDir, eng, df, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
-		dg := testLoadDAG(t, "dry.yaml", loader)
+		dg := testLoadDAG(t, "dry.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			Dry:    true,
@@ -275,13 +273,13 @@ func TestAgent_DryRun(t *testing.T) {
 func TestAgent_Retry(t *testing.T) {
 	t.Parallel()
 	t.Run("Retry a DAG", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
 		// retry.yaml has a DAG that fails
-		dg := testLoadDAG(t, "retry.yaml", loader)
+		dg := testLoadDAG(t, "retry.yaml")
 
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
@@ -323,13 +321,13 @@ func TestAgent_Retry(t *testing.T) {
 func TestAgent_HandleHTTP(t *testing.T) {
 	t.Parallel()
 	t.Run("Handle HTTP requests and return the status of the DAG", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
 		// Start a long-running DAG
-		dg := testLoadDAG(t, "handle_http.yaml", loader)
+		dg := testLoadDAG(t, "handle_http.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -368,13 +366,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 	})
 	t.Run("Handle invalid HTTP requests", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
 		// Start a long-running DAG
-		dg := testLoadDAG(t, "handle_http2.yaml", loader)
+		dg := testLoadDAG(t, "handle_http2.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -410,13 +408,13 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}, time.Second*2, time.Millisecond*100)
 	})
 	t.Run("Handle cancel request and stop the DAG", func(t *testing.T) {
-		tmpDir, eng, dataStore, loader, cfg := setupTest(t)
+		tmpDir, eng, dataStore, cfg := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
 		// Start a long-running DAG
-		dg := testLoadDAG(t, "handle_http3.yaml", loader)
+		dg := testLoadDAG(t, "handle_http3.yaml")
 		dagAgent := agent.New(&agent.Config{
 			DAG:    dg,
 			LogDir: cfg.LogDir,
@@ -479,9 +477,9 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 
 // testLoadDAG load the specified DAG file for testing
 // without base config or parameters.
-func testLoadDAG(t *testing.T, name string, loader *dag.Loader) *dag.DAG {
+func testLoadDAG(t *testing.T, name string) *dag.DAG {
 	file := path.Join(util.MustGetwd(), "testdata", name)
-	dg, err := loader.Load("", file, "")
+	dg, err := dag.Load("", file, "")
 	require.NoError(t, err)
 	return dg
 }

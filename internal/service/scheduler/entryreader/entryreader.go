@@ -30,7 +30,6 @@ type Params struct {
 }
 
 type EntryReader struct {
-	loader   *dag.Loader
 	dagsDir  string
 	dagsLock sync.Mutex
 	dags     map[string]*dag.DAG
@@ -39,9 +38,8 @@ type EntryReader struct {
 	engine   engine.Engine
 }
 
-func New(params Params, loader *dag.Loader) *EntryReader {
+func New(params Params) *EntryReader {
 	er := &EntryReader{
-		loader:   loader,
 		dagsDir:  params.DagsDir,
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},
@@ -100,7 +98,7 @@ func (er *EntryReader) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.Exts) {
-			dg, err := er.loader.LoadMetadata(
+			dg, err := dag.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
@@ -141,7 +139,7 @@ func (er *EntryReader) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dg, err := er.loader.LoadMetadata(
+				dg, err := dag.LoadMetadata(
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {

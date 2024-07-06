@@ -25,7 +25,7 @@ func restartCmd() *cobra.Command {
 
 			// Load the DAG file and stop the DAG if it is running.
 			dagFilePath := args[0]
-			dg, err := loadDAG(cfg, dagFilePath, "")
+			dg, err := dag.Load(cfg.BaseConfig, dagFilePath, "")
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
@@ -48,7 +48,7 @@ func restartCmd() *cobra.Command {
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			dg, err = loadDAG(cfg, dagFilePath, params)
+			dg, err = dag.Load(cfg.BaseConfig, dagFilePath, params)
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}

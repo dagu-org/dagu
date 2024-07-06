@@ -409,8 +409,7 @@ func TestLoad(t *testing.T) {
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		loader := NewLoader()
-		dg, err := loader.Load(cfg.BaseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
+		dg, err := Load(cfg.BaseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
@@ -422,8 +421,7 @@ func TestLoad(t *testing.T) {
 		require.NoError(t, err)
 
 		// no_overwrite.yaml does not have the MailOn key.
-		loader := NewLoader()
-		dg, err := loader.Load(cfg.BaseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
+		dg, err := Load(cfg.BaseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.
@@ -508,9 +506,7 @@ steps:
 
 func TestBuilder_BuildSignalOnStop(t *testing.T) {
 	t.Run("SignalOnStop", func(t *testing.T) {
-		loader := NewLoader()
-
-		ret, err := loader.LoadYAML([]byte(testSignalOnStop))
+		ret, err := LoadYAML([]byte(testSignalOnStop))
 		require.NoError(t, err)
 		if len(ret.Steps) != 1 {
 			t.Fatalf("expected 1 step, got %d", len(ret.Steps))
@@ -518,9 +514,7 @@ func TestBuilder_BuildSignalOnStop(t *testing.T) {
 		require.Equal(t, ret.Steps[0].SignalOnStop, "SIGINT")
 	})
 	t.Run("InvalidSignal", func(t *testing.T) {
-		loader := NewLoader()
-
-		_, err := loader.LoadYAML([]byte(testSignalOnStopInvalid))
+		_, err := LoadYAML([]byte(testSignalOnStopInvalid))
 		require.Error(t, err)
 	})
 }

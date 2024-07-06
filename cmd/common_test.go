@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 
 	"github.com/dagu-dev/dagu/internal/engine"
@@ -133,7 +134,7 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dg, err := loadDAG(cfg, dagFile, "")
+	dg, err := dag.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

@@ -3,7 +3,6 @@ package client
 import (
 	"os"
 
-	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/local"
@@ -20,7 +19,6 @@ type dataStoreFactoryImpl struct {
 	dataDir           string
 	suspendFlagsDir   string
 	latestStatusToday bool
-	loader            *dag.Loader
 }
 
 type NewDataStoreFactoryArgs struct {
@@ -28,7 +26,6 @@ type NewDataStoreFactoryArgs struct {
 	DataDir           string
 	SuspendFlagsDir   string
 	LatestStatusToday bool
-	Loader            *dag.Loader
 }
 
 func NewDataStoreFactory(args *NewDataStoreFactoryArgs) persistence.DataStoreFactory {
@@ -37,7 +34,6 @@ func NewDataStoreFactory(args *NewDataStoreFactoryArgs) persistence.DataStoreFac
 		dataDir:           args.DataDir,
 		suspendFlagsDir:   args.SuspendFlagsDir,
 		latestStatusToday: args.LatestStatusToday,
-		loader:            args.Loader,
 	}
 	_ = dataStoreImpl.InitDagDir()
 	return dataStoreImpl
@@ -65,10 +61,7 @@ func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
 
 func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
 	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{
-			Dir:    f.dags,
-			Loader: f.loader,
-		})
+		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
 	}
 	return f.dagStore
 }

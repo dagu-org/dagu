@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
@@ -47,6 +46,5 @@ func newDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
 		DataDir:           cfg.DataDir,
 		SuspendFlagsDir:   cfg.SuspendFlagsDir,
 		LatestStatusToday: cfg.LatestStatusToday,
-		Loader:            dag.NewLoader(),
 	})
 }

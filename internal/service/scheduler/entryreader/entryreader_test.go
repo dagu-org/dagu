@@ -48,7 +48,6 @@ func setupTest(t *testing.T) (string, engine.Engine, *config.Config) {
 		DAGs:            cfg.DAGs,
 		DataDir:         cfg.DataDir,
 		SuspendFlagsDir: cfg.SuspendFlagsDir,
-		Loader:          dag.NewLoader(),
 	})
 
 	return tmpDir, engine.New(&engine.NewEngineArgs{
@@ -63,14 +62,12 @@ func TestReadEntries(t *testing.T) {
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-	loader := dag.NewLoader()
-
 	entryReader := New(Params{
 		DagsDir:    path.Join(testdataDir, "invalid_directory"),
 		JobFactory: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
 		Engine:     eng,
-	}, loader)
+	})
 
 	entries, err := entryReader.Read(now)
 	require.NoError(t, err)
@@ -81,7 +78,7 @@ func TestReadEntries(t *testing.T) {
 		JobFactory: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
 		Engine:     eng,
-	}, loader)
+	})
 
 	done := make(chan any)
 	defer close(done)

@@ -7,8 +7,6 @@ import (
 	"os"
 	"path"
 
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -40,13 +38,6 @@ func setDefaultConfigPath() {
 		panic("could not determine home directory")
 	}
 	viper.AddConfigPath(path.Join(homeDir, configPath))
-}
-
-func loadDAG(
-	cfg *config.Config, dagFile, params string,
-) (dg *dag.DAG, err error) {
-	loader := dag.NewLoader()
-	return loader.Load(cfg.BaseConfig, dagFile, params)
 }
 
 func registerCommands() {

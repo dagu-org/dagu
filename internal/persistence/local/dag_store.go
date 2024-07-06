@@ -19,19 +19,16 @@ import (
 
 type dagStoreImpl struct {
 	dir       string
-	loader    *dag.Loader
 	metaCache *filecache.Cache[*dag.DAG]
 }
 
 type NewDAGStoreArgs struct {
-	Dir    string
-	Loader *dag.Loader
+	Dir string
 }
 
 func NewDAGStore(args *NewDAGStoreArgs) persistence.DAGStore {
 	dagStore := &dagStoreImpl{
 		dir:       args.Dir,
-		loader:    args.Loader,
 		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
 	dagStore.metaCache.StartEviction()
@@ -57,7 +54,7 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
 	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
-		return d.loader.LoadMetadata(loc)
+		return dag.LoadMetadata(loc)
 	})
 }
 
@@ -66,7 +63,7 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	dat, err := d.loader.LoadWithoutEval(loc)
+	dat, err := dag.LoadWithoutEval(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +87,7 @@ const defaultPerm os.FileMode = 0744
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	_, err := d.loader.LoadYAML(spec)
+	_, err := dag.LoadYAML(spec)
 	if err != nil {
 		return err
 	}
@@ -236,7 +233,7 @@ func (d *dagStoreImpl) Grep(
 				)
 				continue
 			}
-			dg, err := d.loader.LoadMetadata(file)
+			dg, err := dag.LoadMetadata(file)
 			if err != nil {
 				errs = append(
 					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
@@ -275,7 +272,7 @@ func (d *dagStoreImpl) Find(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	return d.loader.LoadWithoutEval(file)
+	return dag.LoadWithoutEval(file)
 }
 
 func (d *dagStoreImpl) resolve(name string) (string, error) {

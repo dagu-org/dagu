@@ -15,16 +15,16 @@ type Condition struct {
 	Expected  string // Expected value
 }
 
-var (
-	errConditionNotMet = errors.New("condition was not met")
-	errEvalCondition   = errors.New("failed to evaluate condition")
-)
-
 // eval evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
 func (c Condition) eval() (string, error) {
 	return substituteCommands(os.ExpandEnv(c.Condition))
 }
+
+var (
+	errConditionNotMet = errors.New("condition was not met")
+	errEvalCondition   = errors.New("failed to evaluate condition")
+)
 
 // evalCondition evaluates a single condition and checks the result.
 // It returns an error if the condition was not met.

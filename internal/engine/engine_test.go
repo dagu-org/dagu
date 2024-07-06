@@ -39,7 +39,6 @@ func setupTest(t *testing.T) (
 	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    testdataDir,
-		Loader:  dag.NewLoader(),
 	})
 
 	exec := path.Join(util.MustGetwd(), "../../bin/dagu")
@@ -63,7 +62,6 @@ func setupTestTmpDir(
 	dataStore := client.NewDataStoreFactory(&client.NewDataStoreFactoryArgs{
 		DataDir: path.Join(tmpDir, ".dagu", "data"),
 		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
-		Loader:  dag.NewLoader(),
 	})
 
 	exec := path.Join(util.MustGetwd(), "../../bin/dagu")
@@ -364,8 +362,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		loader := dag.NewLoader()
-		dg, err := loader.Load("",
+		dg, err := dag.Load("",
 			path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", dg.Name)

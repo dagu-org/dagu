@@ -45,8 +45,7 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			loader := NewLoader()
-			dg, err := loader.Load("", tt.file, "")
+			dg, err := Load("", tt.file, "")
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
@@ -60,8 +59,7 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Metadata", func(t *testing.T) {
-		loader := NewLoader()
-		dg, err := loader.LoadMetadata(path.Join(testdataDir, "default.yaml"))
+		dg, err := LoadMetadata(path.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
 
 		require.Equal(t, dg.Name, "default")
@@ -77,8 +75,7 @@ func Test_loadBaseConfig(t *testing.T) {
 		cfg, err := config.Load()
 		require.NoError(t, err)
 
-		loader := NewLoader()
-		dg, err := loader.loadBaseConfig(cfg.BaseConfig, buildOpts{})
+		dg, err := loadBaseConfig(cfg.BaseConfig, buildOpts{})
 		require.NotNil(t, dg)
 		require.NoError(t, err)
 	})
@@ -86,9 +83,8 @@ func Test_loadBaseConfig(t *testing.T) {
 
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
-		loader := NewLoader()
 		file := path.Join(testdataDir, "default.yaml")
-		dg, err := loader.Load("", file, "")
+		dg, err := Load("", file, "")
 
 		require.NoError(t, err)
 
@@ -118,8 +114,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
-		loader := NewLoader()
-		ret, err := loader.LoadYAML([]byte(testDAG))
+		ret, err := LoadYAML([]byte(testDAG))
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -128,8 +123,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
-		loader := NewLoader()
-		_, err := loader.LoadYAML([]byte(`invalidyaml`))
+		_, err := LoadYAML([]byte(`invalidyaml`))
 		require.Error(t, err)
 	})
 }

@@ -29,7 +29,7 @@ func runDAG(
 		log.Fatalf("Failed to get params: %v", err)
 	}
 
-	dg, err := loadDAG(cfg, args[0], removeQuotes(params))
+	dg, err := dag.Load(cfg.BaseConfig, args[0], params)
 	if err != nil {
 		log.Fatalf("Failed to load DAG: %v", err)
 	}

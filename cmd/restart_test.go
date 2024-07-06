@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +58,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dg, err := loadDAG(cfg, dagFile, "")
+		dg, err := dag.Load(cfg.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
 		recentHistory := newEngine(cfg).GetRecentHistory(dg, 2)

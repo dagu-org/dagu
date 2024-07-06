@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,7 @@ func retryCmd() *cobra.Command {
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			loadedDAG, err := loadDAG(cfg, args[0], status.Status.Params)
+			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}

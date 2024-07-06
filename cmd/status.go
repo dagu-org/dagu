@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,7 @@ func statusCmd() *cobra.Command {
 			}
 
 			// Load the DAG file and get the current running status.
-			loadedDAG, err := loadDAG(cfg, args[0], "")
+			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				// nolint
 				log.Fatalf("Failed to load DAG: %v", err)

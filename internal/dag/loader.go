@@ -22,17 +22,9 @@ var (
 	errReadFile           = errors.New("failed to read file")
 )
 
-// Loader creates a DAG from a configuration file.
-type Loader struct {
-}
-
-func NewLoader() *Loader {
-	return &Loader{}
-}
-
 // Load loads config from file.
-func (l *Loader) Load(base, dag, params string) (*DAG, error) {
-	return l.loadDAG(dag, buildOpts{
+func Load(base, dag, params string) (*DAG, error) {
+	return loadDAG(dag, buildOpts{
 		base:         base,
 		parameters:   params,
 		metadataOnly: false,
@@ -41,23 +33,23 @@ func (l *Loader) Load(base, dag, params string) (*DAG, error) {
 }
 
 // LoadWithoutEval loads config from file without evaluating env variables.
-func (l *Loader) LoadWithoutEval(dag string) (*DAG, error) {
-	return l.loadDAG(dag, buildOpts{
+func LoadWithoutEval(dag string) (*DAG, error) {
+	return loadDAG(dag, buildOpts{
 		metadataOnly: false,
 		noEval:       true,
 	})
 }
 
 // LoadMetadata loads config from file and returns only the headline data.
-func (l *Loader) LoadMetadata(dag string) (*DAG, error) {
-	return l.loadDAG(dag, buildOpts{
+func LoadMetadata(dag string) (*DAG, error) {
+	return loadDAG(dag, buildOpts{
 		metadataOnly: true,
 		noEval:       true,
 	})
 }
 
 // LoadYAML loads config from YAML data.
-func (l *Loader) LoadYAML(data []byte) (*DAG, error) {
+func LoadYAML(data []byte) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
@@ -74,7 +66,7 @@ func (l *Loader) LoadYAML(data []byte) (*DAG, error) {
 
 // loadBaseConfig loads the global configuration from the given file.
 // The global configuration can be overridden by the DAG configuration.
-func (l *Loader) loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
+func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 	// The base config is optional.
 	if !util.FileExists(file) {
 		return nil, nil
@@ -102,10 +94,10 @@ func (l *Loader) loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 }
 
 // loadDAG loads the DAG from the given file.
-func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
+func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Find the absolute path to the file.
 	// The file must be a YAML file.
-	file, err := l.prepareFilepath(dag)
+	file, err := craftFilePath(dag)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +105,7 @@ func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
 	// Load the base configuration unless only the metadata is required.
 	// If only the metadata is required, the base configuration is not loaded
 	// and the DAG is created with the default values.
-	dst, err := l.loadBaseConfigIfRequired(opts.base, opts)
+	dst, err := loadBaseConfigIfRequired(opts.base, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +141,7 @@ func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
 
 	// Set the name if not set.
 	if dst.Name == "" {
-		dst.Name = l.defaultName(file)
+		dst.Name = defaultName(file)
 	}
 
 	// Set the default values for the DAG.
@@ -162,13 +154,13 @@ func (l *Loader) loadDAG(dag string, opts buildOpts) (*DAG, error) {
 
 // defaultName returns the default name for the given file.
 // The default name is the filename without the extension.
-func (*Loader) defaultName(file string) string {
+func defaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
-// prepareFilepath prepares the filepath for the given file.
+// craftFilePath prepares the filepath for the given file.
 // The file must be a YAML file.
-func (l *Loader) prepareFilepath(file string) (string, error) {
+func craftFilePath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
 	}
@@ -183,11 +175,11 @@ func (l *Loader) prepareFilepath(file string) (string, error) {
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the
 // given options.
-func (l *Loader) loadBaseConfigIfRequired(
+func loadBaseConfigIfRequired(
 	baseConfig string, opts buildOpts,
 ) (*DAG, error) {
 	if !opts.metadataOnly && baseConfig != "" {
-		dag, err := l.loadBaseConfig(baseConfig, opts)
+		dag, err := loadBaseConfig(baseConfig, opts)
 		if err != nil {
 			return nil, err
 		}
