@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/models"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
+	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-dev/dagu/internal/frontend/server"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
@@ -58,69 +59,69 @@ func NewHandler(args *NewHandlerArgs) server.Handler {
 }
 
 func (h *Handler) Configure(api *operations.DaguAPI) {
-	api.ListDagsHandler = operations.ListDagsHandlerFunc(
-		func(params operations.ListDagsParams) middleware.Responder {
+	api.DagsListDagsHandler = dags.ListDagsHandlerFunc(
+		func(params dags.ListDagsParams) middleware.Responder {
 			resp, err := h.getList(params)
 			if err != nil {
-				return operations.NewListDagsDefault(err.Code).
+				return dags.NewListDagsDefault(err.Code).
 					WithPayload(err.APIError)
 			}
-			return operations.NewListDagsOK().WithPayload(resp)
+			return dags.NewListDagsOK().WithPayload(resp)
 		})
 
-	api.GetDagDetailsHandler = operations.GetDagDetailsHandlerFunc(
-		func(params operations.GetDagDetailsParams) middleware.Responder {
+	api.DagsGetDagDetailsHandler = dags.GetDagDetailsHandlerFunc(
+		func(params dags.GetDagDetailsParams) middleware.Responder {
 			resp, err := h.getDetail(params)
 			if err != nil {
-				return operations.NewGetDagDetailsDefault(err.Code).
+				return dags.NewGetDagDetailsDefault(err.Code).
 					WithPayload(err.APIError)
 			}
-			return operations.NewGetDagDetailsOK().WithPayload(resp)
+			return dags.NewGetDagDetailsOK().WithPayload(resp)
 		})
 
-	api.PostDagActionHandler = operations.PostDagActionHandlerFunc(
-		func(params operations.PostDagActionParams) middleware.Responder {
+	api.DagsPostDagActionHandler = dags.PostDagActionHandlerFunc(
+		func(params dags.PostDagActionParams) middleware.Responder {
 			resp, err := h.postAction(params)
 			if err != nil {
-				return operations.NewPostDagActionDefault(err.Code).
+				return dags.NewPostDagActionDefault(err.Code).
 					WithPayload(err.APIError)
 			}
-			return operations.NewPostDagActionOK().WithPayload(resp)
+			return dags.NewPostDagActionOK().WithPayload(resp)
 		})
 
-	api.CreateDagHandler = operations.CreateDagHandlerFunc(
-		func(params operations.CreateDagParams) middleware.Responder {
+	api.DagsCreateDagHandler = dags.CreateDagHandlerFunc(
+		func(params dags.CreateDagParams) middleware.Responder {
 			resp, err := h.createDAG(params)
 			if err != nil {
-				return operations.NewCreateDagDefault(err.Code).
+				return dags.NewCreateDagDefault(err.Code).
 					WithPayload(err.APIError)
 			}
-			return operations.NewCreateDagOK().WithPayload(resp)
+			return dags.NewCreateDagOK().WithPayload(resp)
 		})
 
-	api.DeleteDagHandler = operations.DeleteDagHandlerFunc(
-		func(params operations.DeleteDagParams) middleware.Responder {
+	api.DagsDeleteDagHandler = dags.DeleteDagHandlerFunc(
+		func(params dags.DeleteDagParams) middleware.Responder {
 			err := h.deleteDAG(params)
 			if err != nil {
-				return operations.NewDeleteDagDefault(err.Code).
+				return dags.NewDeleteDagDefault(err.Code).
 					WithPayload(err.APIError)
 			}
-			return operations.NewDeleteDagOK()
+			return dags.NewDeleteDagOK()
 		})
 
-	api.SearchDagsHandler = operations.SearchDagsHandlerFunc(
-		func(params operations.SearchDagsParams) middleware.Responder {
+	api.DagsSearchDagsHandler = dags.SearchDagsHandlerFunc(
+		func(params dags.SearchDagsParams) middleware.Responder {
 			resp, err := h.searchDAGs(params)
 			if err != nil {
-				return operations.NewSearchDagsDefault(err.Code).
+				return dags.NewSearchDagsDefault(err.Code).
 					WithPayload(err.APIError)
 			}
-			return operations.NewSearchDagsOK().WithPayload(resp)
+			return dags.NewSearchDagsOK().WithPayload(resp)
 		})
 }
 
 func (h *Handler) createDAG(
-	params operations.CreateDagParams,
+	params dags.CreateDagParams,
 ) (*models.CreateDagResponse, *codedError) {
 	if params.Body.Action == nil || params.Body.Value == nil {
 		return nil, newBadRequestError(errInvalidArgs)
@@ -138,9 +139,7 @@ func (h *Handler) createDAG(
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 }
-func (h *Handler) deleteDAG(
-	params operations.DeleteDagParams,
-) *codedError {
+func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 	dagStatus, err := h.engine.GetStatus(params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
@@ -153,9 +152,7 @@ func (h *Handler) deleteDAG(
 	return nil
 }
 
-func (h *Handler) getList(
-	_ operations.ListDagsParams,
-) (*models.ListDagsResponse, *codedError) {
+func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
 	dags, errs, err := h.engine.GetAllStatus()
 	if err != nil {
 		return nil, newInternalError(err)
@@ -212,7 +209,7 @@ func (h *Handler) getList(
 }
 
 func (h *Handler) getDetail(
-	params operations.GetDagDetailsParams,
+	params dags.GetDagDetailsParams,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	dagID := params.DagID
 
@@ -332,7 +329,7 @@ func (h *Handler) getDetail(
 
 func (h *Handler) processSchedulerLogRequest(
 	dg *dag.DAG,
-	params operations.GetDagDetailsParams,
+	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	var logFile string
@@ -368,7 +365,7 @@ func (h *Handler) processSchedulerLogRequest(
 
 func (h *Handler) processStepLogRequest(
 	dg *dag.DAG,
-	params operations.GetDagDetailsParams,
+	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	var status *model.Status
@@ -562,7 +559,7 @@ func addNodeStatus(
 
 // nolint // cognitive complexity
 func (h *Handler) postAction(
-	params operations.PostDagActionParams,
+	params dags.PostDagActionParams,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.Action == nil {
 		return nil, newBadRequestError(errInvalidArgs)
@@ -652,7 +649,7 @@ func (h *Handler) postAction(
 }
 
 func (h *Handler) processUpdateStatus(
-	params operations.PostDagActionParams,
+	params dags.PostDagActionParams,
 	dagStatus *engine.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
@@ -701,7 +698,7 @@ func (h *Handler) processUpdateStatus(
 }
 
 func (h *Handler) searchDAGs(
-	params operations.SearchDagsParams,
+	params dags.SearchDagsParams,
 ) (*models.SearchDagsResponse, *codedError) {
 	query := params.Q
 	if query == "" {

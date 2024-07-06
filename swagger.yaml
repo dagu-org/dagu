@@ -1,8 +1,13 @@
 ---
-swagger: '2.0'
+swagger: "2.0"
 info:
   version: 0.0.1
   title: Dagu
+  contact:
+    name: Dagu
+  description: |
+    Dagu is a simple DAG (Directed Acyclic Graph) runner.
+    It is a simple tool to run a series of tasks in a specific order
 consumes:
   - application/json
 produces:
@@ -11,6 +16,9 @@ basePath: "/api/v1"
 schemes:
   - http
 host: "localhost:8080"
+tags:
+  - name: dags
+    description: Operations about DAGs
 
 paths:
   /dags:
@@ -20,7 +28,7 @@ paths:
         - application/json
       operationId: listDags
       responses:
-        200:
+        "200":
           description: A successful response.
           schema:
             $ref: "#/definitions/listDagsResponse"
@@ -28,6 +36,8 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+      tags:
+        - dags
     post:
       description: Creates a new DAG.
       produces:
@@ -47,7 +57,7 @@ paths:
               - action
               - value
       responses:
-        200:
+        "200":
           description: A successful response.
           schema:
             $ref: "#/definitions/createDagResponse"
@@ -55,6 +65,8 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+      tags:
+        - dags
 
   /dags/{dagId}:
     get:
@@ -80,7 +92,7 @@ paths:
         - application/json
       operationId: getDagDetails
       responses:
-        200:
+        "200":
           description: A successful response.
           schema:
             $ref: "#/definitions/getDagDetailsResponse"
@@ -88,6 +100,8 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+      tags:
+        - dags
     post:
       description: Performs an action on a DAG.
       parameters:
@@ -125,14 +139,16 @@ paths:
         - application/json
       operationId: postDagAction
       responses:
-        200:
+        "200":
           description: A successful response.
           schema:
-            $ref: '#/definitions/postDagActionResponse'
+            $ref: "#/definitions/postDagActionResponse"
         default:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+      tags:
+        - dags
 
     delete:
       description: Deletes a DAG.
@@ -145,12 +161,14 @@ paths:
         - application/json
       operationId: deleteDag
       responses:
-        200:
+        "200":
           description: A successful response.
         default:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+      tags:
+        - dags
 
   /search:
     get:
@@ -164,7 +182,7 @@ paths:
           required: true
           type: string
       responses:
-        200:
+        "200":
           description: A successful response.
           schema:
             $ref: "#/definitions/searchDagsResponse"
@@ -172,6 +190,8 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/ApiError"
+      tags:
+        - dags
 
 definitions:
   ApiError:
@@ -191,7 +211,7 @@ definitions:
       DAGs:
         type: array
         items:
-          $ref: '#/definitions/dagListItem'
+          $ref: "#/definitions/dagListItem"
       Errors:
         type: array
         items:
@@ -219,9 +239,9 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: '#/definitions/dag'
+        $ref: "#/definitions/dag"
       Status:
-        $ref: '#/definitions/dagStatus'
+        $ref: "#/definitions/dagStatus"
       Suspended:
         type: boolean
       Error:
@@ -247,7 +267,7 @@ definitions:
       Schedule:
         type: array
         items:
-          $ref: '#/definitions/schedule'
+          $ref: "#/definitions/schedule"
       Description:
         type: string
       Params:
@@ -315,7 +335,7 @@ definitions:
       Title:
         type: string
       DAG:
-        $ref: '#/definitions/dagStatusWithDetails'
+        $ref: "#/definitions/dagStatusWithDetails"
       Tab:
         type: string
       Graph:
@@ -323,13 +343,13 @@ definitions:
       Definition:
         type: string
       LogData:
-        $ref: '#/definitions/dagLogResponse'
+        $ref: "#/definitions/dagLogResponse"
       LogUrl:
         type: string
       StepLog:
-        $ref: '#/definitions/dagStepLogResponse'
+        $ref: "#/definitions/dagStepLogResponse"
       ScLog:
-        $ref: '#/definitions/dagSchedulerLogResponse'
+        $ref: "#/definitions/dagSchedulerLogResponse"
       Errors:
         type: array
         items:
@@ -356,7 +376,7 @@ definitions:
     type: object
     properties:
       Step:
-        $ref: '#/definitions/statusNode'
+        $ref: "#/definitions/statusNode"
       LogFile:
         type: string
       Content:
@@ -383,11 +403,11 @@ definitions:
       GridData:
         type: array
         items:
-          $ref: '#/definitions/dagLogGridItem'
+          $ref: "#/definitions/dagLogGridItem"
       Logs:
         type: array
         items:
-          $ref: '#/definitions/dagStatusFile'
+          $ref: "#/definitions/dagStatusFile"
     required:
       - GridData
       - Logs
@@ -411,7 +431,7 @@ definitions:
       File:
         type: string
       Status:
-        $ref: '#/definitions/dagStatusDetail'
+        $ref: "#/definitions/dagStatusDetail"
     required:
       - File
 
@@ -423,9 +443,9 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: '#/definitions/dagDetail'
+        $ref: "#/definitions/dagDetail"
       Status:
-        $ref: '#/definitions/dagStatusDetail'
+        $ref: "#/definitions/dagStatusDetail"
       Suspended:
         type: boolean
       Error:
@@ -453,7 +473,7 @@ definitions:
       Schedule:
         type: array
         items:
-          $ref: '#/definitions/schedule'
+          $ref: "#/definitions/schedule"
       Description:
         type: string
       Env:
@@ -463,11 +483,11 @@ definitions:
       LogDir:
         type: string
       HandlerOn:
-        $ref: '#/definitions/handlerOn'
+        $ref: "#/definitions/handlerOn"
       Steps:
         type: array
         items:
-          $ref: '#/definitions/stepObject'
+          $ref: "#/definitions/stepObject"
       Delay:
         type: integer
       HistRetentionDays:
@@ -475,7 +495,7 @@ definitions:
       Preconditions:
         type: array
         items:
-          $ref: '#/definitions/condition'
+          $ref: "#/definitions/condition"
       MaxActiveRuns:
         type: integer
       Params:
@@ -510,13 +530,13 @@ definitions:
     type: object
     properties:
       Failure:
-        $ref: '#/definitions/stepObject'
+        $ref: "#/definitions/stepObject"
       Success:
-        $ref: '#/definitions/stepObject'
+        $ref: "#/definitions/stepObject"
       Cancel:
-        $ref: '#/definitions/stepObject'
+        $ref: "#/definitions/stepObject"
       Exit:
-        $ref: '#/definitions/stepObject'
+        $ref: "#/definitions/stepObject"
 
   dagStatusDetail:
     type: object
@@ -534,15 +554,15 @@ definitions:
       Nodes:
         type: array
         items:
-          $ref: '#/definitions/statusNode'
+          $ref: "#/definitions/statusNode"
       OnExit:
-        $ref: '#/definitions/statusNode'
+        $ref: "#/definitions/statusNode"
       OnSuccess:
-        $ref: '#/definitions/statusNode'
+        $ref: "#/definitions/statusNode"
       OnFailure:
-        $ref: '#/definitions/statusNode'
+        $ref: "#/definitions/statusNode"
       OnCancel:
-        $ref: '#/definitions/statusNode'
+        $ref: "#/definitions/statusNode"
       StartedAt:
         type: string
       FinishedAt:
@@ -571,7 +591,7 @@ definitions:
     type: object
     properties:
       Step:
-        $ref: '#/definitions/stepObject'
+        $ref: "#/definitions/stepObject"
       Log:
         type: string
       StartedAt:
@@ -637,13 +657,13 @@ definitions:
         items:
           type: string
       RepeatPolicy:
-        $ref: '#/definitions/repeatPolicy'
+        $ref: "#/definitions/repeatPolicy"
       MailOnError:
         type: boolean
       Preconditions:
         type: array
         items:
-          $ref: '#/definitions/condition'
+          $ref: "#/definitions/condition"
     required:
       - Name
       - Description
@@ -667,7 +687,7 @@ definitions:
       Results:
         type: array
         items:
-          $ref: '#/definitions/searchDagsResultItem'
+          $ref: "#/definitions/searchDagsResultItem"
       Errors:
         type: array
         items:
@@ -682,11 +702,11 @@ definitions:
       Name:
         type: string
       DAG:
-        $ref: '#/definitions/dag'
+        $ref: "#/definitions/dag"
       Matches:
         type: array
         items:
-          $ref: '#/definitions/searchDagsMatchItem'
+          $ref: "#/definitions/searchDagsMatchItem"
 
   searchDagsMatchItem:
     type: object

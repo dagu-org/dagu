@@ -13,6 +13,7 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
+	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations/dags"
 )
 
 //go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal any --exclude-main
@@ -39,9 +40,9 @@ func configureAPI(api *operations.DaguAPI) http.Handler {
 
 	api.JSONProducer = runtime.JSONProducer()
 
-	if api.ListDagsHandler == nil {
-		api.ListDagsHandler = operations.ListDagsHandlerFunc(
-			func(params operations.ListDagsParams) middleware.Responder {
+	if api.DagsListDagsHandler == nil {
+		api.DagsListDagsHandler = dags.ListDagsHandlerFunc(
+			func(params dags.ListDagsParams) middleware.Responder {
 				return middleware.NotImplemented(
 					"operation operations.ListDags has not yet been implemented",
 				)

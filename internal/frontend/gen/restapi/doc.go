@@ -2,11 +2,15 @@
 
 // Package restapi Dagu
 //
+//	Dagu is a simple DAG (Directed Acyclic Graph) runner.
+//	It is a simple tool to run a series of tasks in a specific order
+//
 //	Schemes:
 //	  http
 //	Host: localhost:8080
 //	BasePath: /api/v1
 //	Version: 0.0.1
+//	Contact: Dagu
 //
 //	Consumes:
 //	  - application/json

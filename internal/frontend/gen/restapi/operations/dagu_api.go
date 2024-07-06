@@ -18,6 +18,8 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
+
+	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations/dags"
 )
 
 // NewDaguAPI creates a new Dagu instance
@@ -42,28 +44,31 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 
 		JSONProducer: runtime.JSONProducer(),
 
-		CreateDagHandler: CreateDagHandlerFunc(func(params CreateDagParams) middleware.Responder {
-			return middleware.NotImplemented("operation CreateDag has not yet been implemented")
+		DagsCreateDagHandler: dags.CreateDagHandlerFunc(func(params dags.CreateDagParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.CreateDag has not yet been implemented")
 		}),
-		DeleteDagHandler: DeleteDagHandlerFunc(func(params DeleteDagParams) middleware.Responder {
-			return middleware.NotImplemented("operation DeleteDag has not yet been implemented")
+		DagsDeleteDagHandler: dags.DeleteDagHandlerFunc(func(params dags.DeleteDagParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.DeleteDag has not yet been implemented")
 		}),
-		GetDagDetailsHandler: GetDagDetailsHandlerFunc(func(params GetDagDetailsParams) middleware.Responder {
-			return middleware.NotImplemented("operation GetDagDetails has not yet been implemented")
+		DagsGetDagDetailsHandler: dags.GetDagDetailsHandlerFunc(func(params dags.GetDagDetailsParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.GetDagDetails has not yet been implemented")
 		}),
-		ListDagsHandler: ListDagsHandlerFunc(func(params ListDagsParams) middleware.Responder {
-			return middleware.NotImplemented("operation ListDags has not yet been implemented")
+		DagsListDagsHandler: dags.ListDagsHandlerFunc(func(params dags.ListDagsParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.ListDags has not yet been implemented")
 		}),
-		PostDagActionHandler: PostDagActionHandlerFunc(func(params PostDagActionParams) middleware.Responder {
-			return middleware.NotImplemented("operation PostDagAction has not yet been implemented")
+		DagsPostDagActionHandler: dags.PostDagActionHandlerFunc(func(params dags.PostDagActionParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.PostDagAction has not yet been implemented")
 		}),
-		SearchDagsHandler: SearchDagsHandlerFunc(func(params SearchDagsParams) middleware.Responder {
-			return middleware.NotImplemented("operation SearchDags has not yet been implemented")
+		DagsSearchDagsHandler: dags.SearchDagsHandlerFunc(func(params dags.SearchDagsParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.SearchDags has not yet been implemented")
 		}),
 	}
 }
 
-/*DaguAPI the dagu API */
+/*
+DaguAPI Dagu is a simple DAG (Directed Acyclic Graph) runner.
+It is a simple tool to run a series of tasks in a specific order
+*/
 type DaguAPI struct {
 	spec            *loads.Document
 	context         *middleware.Context
@@ -96,18 +101,18 @@ type DaguAPI struct {
 	//   - application/json
 	JSONProducer runtime.Producer
 
-	// CreateDagHandler sets the operation handler for the create dag operation
-	CreateDagHandler CreateDagHandler
-	// DeleteDagHandler sets the operation handler for the delete dag operation
-	DeleteDagHandler DeleteDagHandler
-	// GetDagDetailsHandler sets the operation handler for the get dag details operation
-	GetDagDetailsHandler GetDagDetailsHandler
-	// ListDagsHandler sets the operation handler for the list dags operation
-	ListDagsHandler ListDagsHandler
-	// PostDagActionHandler sets the operation handler for the post dag action operation
-	PostDagActionHandler PostDagActionHandler
-	// SearchDagsHandler sets the operation handler for the search dags operation
-	SearchDagsHandler SearchDagsHandler
+	// DagsCreateDagHandler sets the operation handler for the create dag operation
+	DagsCreateDagHandler dags.CreateDagHandler
+	// DagsDeleteDagHandler sets the operation handler for the delete dag operation
+	DagsDeleteDagHandler dags.DeleteDagHandler
+	// DagsGetDagDetailsHandler sets the operation handler for the get dag details operation
+	DagsGetDagDetailsHandler dags.GetDagDetailsHandler
+	// DagsListDagsHandler sets the operation handler for the list dags operation
+	DagsListDagsHandler dags.ListDagsHandler
+	// DagsPostDagActionHandler sets the operation handler for the post dag action operation
+	DagsPostDagActionHandler dags.PostDagActionHandler
+	// DagsSearchDagsHandler sets the operation handler for the search dags operation
+	DagsSearchDagsHandler dags.SearchDagsHandler
 
 	// ServeError is called when an error is received, there is a default handler
 	// but you can set your own with this
@@ -125,7 +130,7 @@ type DaguAPI struct {
 	CommandLineOptionsGroups []swag.CommandLineOptionsGroup
 
 	// User defined logger function.
-	Logger func(string, ...any)
+	Logger func(string, ...interface{})
 }
 
 // UseRedoc for documentation at /docs
@@ -185,23 +190,23 @@ func (o *DaguAPI) Validate() error {
 		unregistered = append(unregistered, "JSONProducer")
 	}
 
-	if o.CreateDagHandler == nil {
-		unregistered = append(unregistered, "CreateDagHandler")
+	if o.DagsCreateDagHandler == nil {
+		unregistered = append(unregistered, "dags.CreateDagHandler")
 	}
-	if o.DeleteDagHandler == nil {
-		unregistered = append(unregistered, "DeleteDagHandler")
+	if o.DagsDeleteDagHandler == nil {
+		unregistered = append(unregistered, "dags.DeleteDagHandler")
 	}
-	if o.GetDagDetailsHandler == nil {
-		unregistered = append(unregistered, "GetDagDetailsHandler")
+	if o.DagsGetDagDetailsHandler == nil {
+		unregistered = append(unregistered, "dags.GetDagDetailsHandler")
 	}
-	if o.ListDagsHandler == nil {
-		unregistered = append(unregistered, "ListDagsHandler")
+	if o.DagsListDagsHandler == nil {
+		unregistered = append(unregistered, "dags.ListDagsHandler")
 	}
-	if o.PostDagActionHandler == nil {
-		unregistered = append(unregistered, "PostDagActionHandler")
+	if o.DagsPostDagActionHandler == nil {
+		unregistered = append(unregistered, "dags.PostDagActionHandler")
 	}
-	if o.SearchDagsHandler == nil {
-		unregistered = append(unregistered, "SearchDagsHandler")
+	if o.DagsSearchDagsHandler == nil {
+		unregistered = append(unregistered, "dags.SearchDagsHandler")
 	}
 
 	if len(unregistered) > 0 {
@@ -294,27 +299,27 @@ func (o *DaguAPI) initHandlerCache() {
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
-	o.handlers["POST"]["/dags"] = NewCreateDag(o.context, o.CreateDagHandler)
+	o.handlers["POST"]["/dags"] = dags.NewCreateDag(o.context, o.DagsCreateDagHandler)
 	if o.handlers["DELETE"] == nil {
 		o.handlers["DELETE"] = make(map[string]http.Handler)
 	}
-	o.handlers["DELETE"]["/dags/{dagId}"] = NewDeleteDag(o.context, o.DeleteDagHandler)
+	o.handlers["DELETE"]["/dags/{dagId}"] = dags.NewDeleteDag(o.context, o.DagsDeleteDagHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/dags/{dagId}"] = NewGetDagDetails(o.context, o.GetDagDetailsHandler)
+	o.handlers["GET"]["/dags/{dagId}"] = dags.NewGetDagDetails(o.context, o.DagsGetDagDetailsHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/dags"] = NewListDags(o.context, o.ListDagsHandler)
+	o.handlers["GET"]["/dags"] = dags.NewListDags(o.context, o.DagsListDagsHandler)
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
-	o.handlers["POST"]["/dags/{dagId}"] = NewPostDagAction(o.context, o.PostDagActionHandler)
+	o.handlers["POST"]["/dags/{dagId}"] = dags.NewPostDagAction(o.context, o.DagsPostDagActionHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/search"] = NewSearchDags(o.context, o.SearchDagsHandler)
+	o.handlers["GET"]["/search"] = dags.NewSearchDags(o.context, o.DagsSearchDagsHandler)
 }
 
 // Serve creates a http handler to serve the API over HTTP

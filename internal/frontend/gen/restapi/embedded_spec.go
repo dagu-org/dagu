@@ -29,7 +29,11 @@ func init() {
   ],
   "swagger": "2.0",
   "info": {
+    "description": "Dagu is a simple DAG (Directed Acyclic Graph) runner.\nIt is a simple tool to run a series of tasks in a specific order\n",
     "title": "Dagu",
+    "contact": {
+      "name": "Dagu"
+    },
     "version": "0.0.1"
   },
   "host": "localhost:8080",
@@ -40,6 +44,9 @@ func init() {
         "description": "Returns a list of DAGs.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "listDags",
         "responses": {
@@ -61,6 +68,9 @@ func init() {
         "description": "Creates a new DAG.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "createDag",
         "parameters": [
@@ -106,6 +116,9 @@ func init() {
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "dags"
+        ],
         "operationId": "getDagDetails",
         "parameters": [
           {
@@ -149,6 +162,9 @@ func init() {
         "description": "Performs an action on a DAG.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "postDagAction",
         "parameters": [
@@ -216,6 +232,9 @@ func init() {
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "dags"
+        ],
         "operationId": "deleteDag",
         "parameters": [
           {
@@ -243,6 +262,9 @@ func init() {
         "description": "Searches for DAGs.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "searchDags",
         "parameters": [
@@ -1009,7 +1031,13 @@ func init() {
         }
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "description": "Operations about DAGs",
+      "name": "dags"
+    }
+  ]
 }`))
 	FlatSwaggerJSON = json.RawMessage([]byte(`{
   "consumes": [
@@ -1023,7 +1051,11 @@ func init() {
   ],
   "swagger": "2.0",
   "info": {
+    "description": "Dagu is a simple DAG (Directed Acyclic Graph) runner.\nIt is a simple tool to run a series of tasks in a specific order\n",
     "title": "Dagu",
+    "contact": {
+      "name": "Dagu"
+    },
     "version": "0.0.1"
   },
   "host": "localhost:8080",
@@ -1034,6 +1066,9 @@ func init() {
         "description": "Returns a list of DAGs.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "listDags",
         "responses": {
@@ -1055,6 +1090,9 @@ func init() {
         "description": "Creates a new DAG.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "createDag",
         "parameters": [
@@ -1100,6 +1138,9 @@ func init() {
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "dags"
+        ],
         "operationId": "getDagDetails",
         "parameters": [
           {
@@ -1143,6 +1184,9 @@ func init() {
         "description": "Performs an action on a DAG.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "postDagAction",
         "parameters": [
@@ -1210,6 +1254,9 @@ func init() {
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "dags"
+        ],
         "operationId": "deleteDag",
         "parameters": [
           {
@@ -1237,6 +1284,9 @@ func init() {
         "description": "Searches for DAGs.",
         "produces": [
           "application/json"
+        ],
+        "tags": [
+          "dags"
         ],
         "operationId": "searchDags",
         "parameters": [
@@ -2003,6 +2053,12 @@ func init() {
         }
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "description": "Operations about DAGs",
+      "name": "dags"
+    }
+  ]
 }`))
 }
