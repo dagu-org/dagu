@@ -42,13 +42,12 @@ func newMail(ctx context.Context, step dag.Step) (Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &mailer.Mailer{
-		Config: &mailer.Config{
-			Host:     dagCtx.DAG.SMTP.Host,
-			Port:     dagCtx.DAG.SMTP.Port,
-			Username: dagCtx.DAG.SMTP.Username,
-			Password: dagCtx.DAG.SMTP.Password,
-		}}
+	m := mailer.New(&mailer.NewMailerArgs{
+		Host:     dagCtx.DAG.SMTP.Host,
+		Port:     dagCtx.DAG.SMTP.Port,
+		Username: dagCtx.DAG.SMTP.Username,
+		Password: dagCtx.DAG.SMTP.Password,
+	})
 	exec.mailer = m
 
 	return exec, nil

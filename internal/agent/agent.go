@@ -310,7 +310,7 @@ func (a *Agent) setup() error {
 	}
 
 	a.scheduler = a.newScheduler()
-	a.reporter = newReporter(mailer.New(&mailer.Config{
+	a.reporter = newReporter(mailer.New(&mailer.NewMailerArgs{
 		Host:     a.DAG.SMTP.Host,
 		Port:     a.DAG.SMTP.Port,
 		Username: a.DAG.SMTP.Username,
