@@ -8,7 +8,6 @@ import (
 	"path"
 	"text/template"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/constants"
 )
 
@@ -22,7 +21,7 @@ func (srv *Server) useTemplate(
 ) func(http.ResponseWriter, any) {
 	files := append(baseTemplates(), path.Join(templatePath, layout))
 	tmpl, err := template.New(name).Funcs(
-		defaultFunctions(srv.cfg)).ParseFS(srv.assets, files...,
+		defaultFunctions(srv.funcsConfig)).ParseFS(srv.assets, files...,
 	)
 	if err != nil {
 		panic(err)
@@ -40,7 +39,13 @@ func (srv *Server) useTemplate(
 	}
 }
 
-func defaultFunctions(cfg *config.Config) template.FuncMap {
+type funcsConfig struct {
+	NavbarColor string
+	NavbarTitle string
+	APIBaseURL  string
+}
+
+func defaultFunctions(cfg funcsConfig) template.FuncMap {
 	return template.FuncMap{
 		"defTitle": func(ip any) string {
 			v, ok := ip.(string)

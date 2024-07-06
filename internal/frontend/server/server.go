@@ -24,19 +24,19 @@ import (
 )
 
 type Server struct {
-	cfg       *config.Config
-	host      string
-	port      int
-	basicAuth *BasicAuth
-	authToken *AuthToken
-	tls       *config.TLS
-	logger    logger.Logger
-	server    *restapi.Server
-	handlers  []Handler
-	assets    fs.FS
+	funcsConfig funcsConfig
+	host        string
+	port        int
+	basicAuth   *BasicAuth
+	authToken   *AuthToken
+	tls         *config.TLS
+	logger      logger.Logger
+	server      *restapi.Server
+	handlers    []Handler
+	assets      fs.FS
 }
 
-type Params struct {
+type NewServerArgs struct {
 	Host      string
 	Port      int
 	BasicAuth *BasicAuth
@@ -45,6 +45,11 @@ type Params struct {
 	Logger    logger.Logger
 	Handlers  []Handler
 	AssetsFS  fs.FS
+
+	// Configuration for the frontend
+	NavbarColor string
+	NavbarTitle string
+	APIBaseURL  string
 }
 
 type BasicAuth struct {
@@ -60,9 +65,8 @@ type Handler interface {
 	Configure(api *operations.DaguAPI)
 }
 
-func NewServer(params Params, cfg *config.Config) *Server {
+func New(params NewServerArgs) *Server {
 	return &Server{
-		cfg:       cfg,
 		host:      params.Host,
 		port:      params.Port,
 		basicAuth: params.BasicAuth,
@@ -71,6 +75,11 @@ func NewServer(params Params, cfg *config.Config) *Server {
 		logger:    params.Logger,
 		handlers:  params.Handlers,
 		assets:    params.AssetsFS,
+		funcsConfig: funcsConfig{
+			NavbarColor: params.NavbarColor,
+			NavbarTitle: params.NavbarTitle,
+			APIBaseURL:  params.APIBaseURL,
+		},
 	}
 }
 
