@@ -1,4 +1,4 @@
-package entryreader
+package scheduler
 
 import (
 	"os"
@@ -62,7 +62,7 @@ func TestReadEntries(t *testing.T) {
 	}()
 
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-	entryReader := New(Params{
+	entryReader := newEntryReader(newEntryReaderArgs{
 		DagsDir:    path.Join(testdataDir, "invalid_directory"),
 		JobFactory: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
@@ -73,7 +73,7 @@ func TestReadEntries(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, entries, 0)
 
-	entryReader = New(Params{
+	entryReader = newEntryReader(newEntryReaderArgs{
 		DagsDir:    testdataDir,
 		JobFactory: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),

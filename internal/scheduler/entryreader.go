@@ -1,4 +1,4 @@
-package entryreader
+package scheduler
 
 import (
 	"os"
@@ -18,18 +18,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type JobFactory interface {
-	NewJob(dg *dag.DAG, next time.Time) scheduler.Job
-}
-
-type Params struct {
-	DagsDir    string
-	JobFactory JobFactory
-	Logger     logger.Logger
-	Engine     engine.Engine
-}
-
-type EntryReader struct {
+type entryReader struct {
 	dagsDir  string
 	dagsLock sync.Mutex
 	dags     map[string]*dag.DAG
@@ -38,14 +27,25 @@ type EntryReader struct {
 	engine   engine.Engine
 }
 
-func New(params Params) *EntryReader {
-	er := &EntryReader{
-		dagsDir:  params.DagsDir,
+type newEntryReaderArgs struct {
+	DagsDir    string
+	JobFactory JobFactory
+	Logger     logger.Logger
+	Engine     engine.Engine
+}
+
+type JobFactory interface {
+	NewJob(dg *dag.DAG, next time.Time) scheduler.Job
+}
+
+func newEntryReader(args newEntryReaderArgs) *entryReader {
+	er := &entryReader{
+		dagsDir:  args.DagsDir,
 		dagsLock: sync.Mutex{},
 		dags:     map[string]*dag.DAG{},
-		jf:       params.JobFactory,
-		logger:   params.Logger,
-		engine:   params.Engine,
+		jf:       args.JobFactory,
+		logger:   args.Logger,
+		engine:   args.Engine,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("failed to init entryreader dags", tag.Error(err))
@@ -53,11 +53,11 @@ func New(params Params) *EntryReader {
 	return er
 }
 
-func (er *EntryReader) Start(done chan any) {
+func (er *entryReader) Start(done chan any) {
 	go er.watchDags(done)
 }
 
-func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
+func (er *entryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
@@ -86,7 +86,7 @@ func (er *EntryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 	return entries, nil
 }
 
-func (er *EntryReader) initDags() error {
+func (er *entryReader) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
@@ -114,7 +114,7 @@ func (er *EntryReader) initDags() error {
 	return nil
 }
 
-func (er *EntryReader) watchDags(done chan any) {
+func (er *entryReader) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		er.logger.Error("failed to init file watcher", tag.Error(err))
