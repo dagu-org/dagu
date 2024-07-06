@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -158,13 +157,20 @@ func (h *Handler) getList(
 		return nil, newInternalError(err)
 	}
 
-	_, _, hasErr := lo.FindIndexOf(dags, func(d *persistence.DAGStatus) bool {
-		return d.Error != nil
-	})
+	hasErr := len(errs) > 0
+	if !hasErr {
+		// Check if any DAG has an error
+		for _, d := range dags {
+			if d.Error != nil {
+				hasErr = true
+				break
+			}
+		}
+	}
 
 	resp := &models.ListDagsResponse{
 		Errors:   errs,
-		HasError: swag.Bool(hasErr || len(errs) > 0),
+		HasError: swag.Bool(hasErr),
 	}
 
 	for _, dagStatus := range dags {
@@ -190,9 +196,11 @@ func (h *Handler) getList(
 			Suspended: swag.Bool(dagStatus.Suspended),
 			DAG:       convertToDAG(dagStatus.DAG),
 		}
+
 		if dagStatus.Error != nil {
 			item.Error = swag.String(dagStatus.Error.Error())
 		}
+
 		resp.DAGs = append(resp.DAGs, item)
 	}
 
@@ -209,30 +217,33 @@ func (h *Handler) getDetail(
 		tab = *params.Tab
 	}
 
-	logFile := params.File
-	stepName := params.Step
-
 	dagStatus, err := h.engine.GetStatus(dagID)
 	if dagStatus == nil {
 		return nil, newNotFoundError(err)
 	}
 
-	dagHandlerOn := dagStatus.DAG.HandlerOn
-	handlerOn := &models.HandlerOn{}
-	if dagHandlerOn.Failure != nil {
-		handlerOn.Failure = convertToStepObject(*dagHandlerOn.Failure)
-	}
-	if dagHandlerOn.Success != nil {
-		handlerOn.Success = convertToStepObject(*dagHandlerOn.Success)
-	}
-	if dagHandlerOn.Cancel != nil {
-		handlerOn.Cancel = convertToStepObject(*dagHandlerOn.Cancel)
-	}
-	if dagHandlerOn.Exit != nil {
-		handlerOn.Exit = convertToStepObject(*dagHandlerOn.Exit)
+	dg := dagStatus.DAG
+
+	var steps []*models.StepObject
+	for _, step := range dg.Steps {
+		steps = append(steps, convertToStepObject(step))
 	}
 
-	dg := dagStatus.DAG
+	hdlrs := dagStatus.DAG.HandlerOn
+
+	handlerOn := &models.HandlerOn{}
+	if hdlrs.Failure != nil {
+		handlerOn.Failure = convertToStepObject(*hdlrs.Failure)
+	}
+	if hdlrs.Success != nil {
+		handlerOn.Success = convertToStepObject(*hdlrs.Success)
+	}
+	if hdlrs.Cancel != nil {
+		handlerOn.Cancel = convertToStepObject(*hdlrs.Cancel)
+	}
+	if hdlrs.Exit != nil {
+		handlerOn.Exit = convertToStepObject(*hdlrs.Exit)
+	}
 
 	var schedules []*models.Schedule
 	for _, s := range dg.Schedule {
@@ -247,11 +258,6 @@ func (h *Handler) getDetail(
 			Condition: p.Condition,
 			Expected:  p.Expected,
 		})
-	}
-
-	var steps []*models.StepObject
-	for _, step := range dg.Steps {
-		steps = append(steps, convertToStepObject(step))
 	}
 
 	dagDetail := &models.DagDetail{
@@ -301,43 +307,75 @@ func (h *Handler) getDetail(
 
 	switch tab {
 	case dagTabTypeStatus:
+		return resp, nil
+
 	case dagTabTypeSpec:
-		dagContent, err := h.engine.GetDAGSpec(dagID)
-		if err != nil {
-			return nil, newNotFoundError(err)
-		}
-		resp.Definition = swag.String(dagContent)
+		return h.processSpecRequest(dagID, resp)
 
 	case dagTabTypeHistory:
-		logs := h.engine.GetRecentHistory(dagStatus.DAG, 30)
-		h.processLogRequest(resp, logs)
+		return h.processLogRequest(resp, dg)
 
 	case dagTabTypeStepLog:
-		stepLog, err := h.getStepLog(
-			dagStatus.DAG, lo.FromPtr(logFile), lo.FromPtr(stepName),
-		)
-		if err != nil {
-			return nil, newNotFoundError(err)
-		}
-		resp.StepLog = stepLog
+		return h.processStepLogRequest(dg, params, resp)
 
 	case dagTabTypeSchedulerLog:
-		schedulerLog, err := h.readSchedulerLog(
-			dagStatus.DAG, lo.FromPtr(logFile),
-		)
-		if err != nil {
-			return nil, newNotFoundError(err)
-		}
-		resp.ScLog = schedulerLog
+		return h.processSchedulerLogRequest(dg, params, resp)
 
 	default:
 		return nil, newBadRequestError(errInvalidArgs)
 	}
+}
 
+func (h *Handler) processSchedulerLogRequest(
+	dg *dag.DAG,
+	params operations.GetDagDetailsParams,
+	resp *models.GetDagDetailsResponse,
+) (*models.GetDagDetailsResponse, *codedError) {
+	schedulerLog, err := h.readSchedulerLog(dg, lo.FromPtr(params.File))
+	if err != nil {
+		return nil, newNotFoundError(err)
+	}
+	resp.ScLog = schedulerLog
 	return resp, nil
 }
 
-func (h *Handler) processLogRequest(resp *models.GetDagDetailsResponse, logs []*model.StatusFile) {
+func (h *Handler) processStepLogRequest(
+	dg *dag.DAG,
+	params operations.GetDagDetailsParams,
+	resp *models.GetDagDetailsResponse,
+) (*models.GetDagDetailsResponse, *codedError) {
+	stepLog, err := h.getStepLog(
+		dg, lo.FromPtr(params.File), lo.FromPtr(params.Step),
+	)
+	if err != nil {
+		return nil, newNotFoundError(err)
+	}
+	resp.StepLog = stepLog
+	return resp, nil
+}
+
+func (h *Handler) processSpecRequest(
+	dagID string,
+	resp *models.GetDagDetailsResponse,
+) (*models.GetDagDetailsResponse, *codedError) {
+	dagContent, err := h.engine.GetDAGSpec(dagID)
+	if err != nil {
+		return nil, newNotFoundError(err)
+	}
+	resp.Definition = swag.String(dagContent)
+	return resp, nil
+}
+
+var (
+	defaultHistoryLimit = 30
+)
+
+func (h *Handler) processLogRequest(
+	resp *models.GetDagDetailsResponse,
+	dg *dag.DAG,
+) (*models.GetDagDetailsResponse, *codedError) {
+	logs := h.engine.GetRecentHistory(dg, defaultHistoryLimit)
+
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
 	for idx, log := range logs {
 		for _, node := range log.Status.Nodes {
@@ -418,6 +456,8 @@ func (h *Handler) processLogRequest(resp *models.GetDagDetailsResponse, logs []*
 		Logs:     lo.Reverse(logFileStatusList),
 		GridData: grid,
 	}
+
+	return resp, nil
 }
 
 func addNodeStatus(
@@ -437,33 +477,22 @@ func (h *Handler) getStepLog(
 	dg *dag.DAG,
 	logFile, stepName string,
 ) (*models.DagStepLogResponse, error) {
-	var stepByName = map[dag.HandlerType]*model.Node{
-		dag.HandlerOnSuccess: nil,
-		dag.HandlerOnFailure: nil,
-		dag.HandlerOnCancel:  nil,
-		dag.HandlerOnExit:    nil,
-	}
+	var (
+		status *model.Status
+		err    error
+	)
 
-	var status *model.Status
-
-	if logFile == "" {
-		latestStatus, err := h.engine.GetLatestStatus(dg)
-		if err != nil {
-			return nil, ErrFailedToReadStatus
-		}
-		status = latestStatus
-	} else {
-		unmarshalledStatus, err := jsondb.ParseFile(logFile)
+	if logFile != "" {
+		status, err = jsondb.ParseFile(logFile)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing %s: %w", logFile, err)
 		}
-		status = unmarshalledStatus
+	} else {
+		status, err = h.engine.GetLatestStatus(dg)
+		if err != nil {
+			return nil, ErrFailedToReadStatus
+		}
 	}
-
-	stepByName[dag.HandlerOnSuccess] = status.OnSuccess
-	stepByName[dag.HandlerOnFailure] = status.OnFailure
-	stepByName[dag.HandlerOnCancel] = status.OnCancel
-	stepByName[dag.HandlerOnExit] = status.OnExit
 
 	node, ok := lo.Find(status.Nodes, func(item *model.Node) bool {
 		return item.Name == stepName
