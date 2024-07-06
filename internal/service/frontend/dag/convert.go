@@ -5,7 +5,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/service/frontend/gen/models"
 	"github.com/go-openapi/swag"
-	"github.com/samber/lo"
 )
 
 func convertToDAG(dg *dag.DAG) *models.Dag {
@@ -28,7 +27,7 @@ func convertToDAG(dg *dag.DAG) *models.Dag {
 }
 
 func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
-	return &models.DagStatusDetail{
+	status := &models.DagStatusDetail{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),
 		Params:     swag.String(s.Params),
@@ -38,11 +37,23 @@ func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
 		FinishedAt: swag.String(s.FinishedAt),
 		Status:     swag.Int64(int64(s.Status)),
 		StatusText: swag.String(s.StatusText),
-		Nodes: lo.Map(
-			s.Nodes, func(item *model.Node, _ int) *models.StatusNode {
-				return convertToNode(item)
-			}),
 	}
+	for _, n := range s.Nodes {
+		status.Nodes = append(status.Nodes, convertToNode(n))
+	}
+	if s.OnSuccess != nil {
+		status.OnSuccess = convertToNode(s.OnSuccess)
+	}
+	if s.OnFailure != nil {
+		status.OnFailure = convertToNode(s.OnFailure)
+	}
+	if s.OnCancel != nil {
+		status.OnCancel = convertToNode(s.OnCancel)
+	}
+	if s.OnExit != nil {
+		status.OnExit = convertToNode(s.OnExit)
+	}
+	return status
 }
 
 func convertToNode(node *model.Node) *models.StatusNode {

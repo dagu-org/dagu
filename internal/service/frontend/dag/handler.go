@@ -344,12 +344,72 @@ func (h *Handler) processStepLogRequest(
 	params operations.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	stepLog, err := h.getStepLog(
-		dg, lo.FromPtr(params.File), lo.FromPtr(params.Step),
-	)
-	if err != nil {
-		return nil, newNotFoundError(err)
+	var status *model.Status
+
+	if params.Step == nil {
+		return nil, newBadRequestError(errInvalidArgs)
 	}
+
+	if params.File != nil {
+		s, err := jsondb.ParseFile(*params.File)
+		if err != nil {
+			return nil, newBadRequestError(err)
+		}
+		status = s
+	}
+
+	if status == nil {
+		s, err := h.engine.GetLatestStatus(dg)
+		if err != nil {
+			return nil, newInternalError(err)
+		}
+		status = s
+	}
+
+	// Find the step in the status to get the log file.
+	var node *model.Node
+
+	for _, n := range status.Nodes {
+		if n.Step.Name == *params.Step {
+			node = n
+		}
+	}
+
+	if node == nil {
+		if status.OnSuccess != nil && status.OnSuccess.Name == *params.Step {
+			node = status.OnSuccess
+		}
+		if status.OnFailure != nil && status.OnFailure.Name == *params.Step {
+			node = status.OnFailure
+		}
+		if status.OnCancel != nil && status.OnCancel.Name == *params.Step {
+			node = status.OnCancel
+		}
+		if status.OnExit != nil && status.OnExit.Name == *params.Step {
+			node = status.OnExit
+		}
+	}
+
+	if node == nil {
+		return nil, newNotFoundError(ErrStepNotFound)
+	}
+
+	var decoder *encoding.Decoder
+	if strings.ToLower(h.logEncodingCharset) == "euc-jp" {
+		decoder = japanese.EUCJP.NewDecoder()
+	}
+
+	logContent, err := readFileContent(node.Log, decoder)
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+
+	stepLog := &models.DagStepLogResponse{
+		LogFile: swag.String(node.Log),
+		Step:    convertToNode(node),
+		Content: swag.String(string(logContent)),
+	}
+
 	resp.StepLog = stepLog
 	return resp, nil
 }
@@ -494,10 +554,31 @@ func (h *Handler) getStepLog(
 		}
 	}
 
-	node, ok := lo.Find(status.Nodes, func(item *model.Node) bool {
-		return item.Name == stepName
-	})
-	if !ok {
+	// Find the step in the status to get the log file.
+	var node *model.Node
+
+	for _, n := range status.Nodes {
+		if n.Step.Name == stepName {
+			node = n
+		}
+	}
+
+	if node == nil {
+		if status.OnSuccess != nil && status.OnSuccess.Name == stepName {
+			node = status.OnSuccess
+		}
+		if status.OnFailure != nil && status.OnFailure.Name == stepName {
+			node = status.OnFailure
+		}
+		if status.OnCancel != nil && status.OnCancel.Name == stepName {
+			node = status.OnCancel
+		}
+		if status.OnExit != nil && status.OnExit.Name == stepName {
+			node = status.OnExit
+		}
+	}
+
+	if node == nil {
 		return nil, fmt.Errorf("%w: %s", ErrStepNotFound, stepName)
 	}
 
