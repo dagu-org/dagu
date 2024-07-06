@@ -17,26 +17,26 @@ import (
 )
 
 type Scheduler struct {
-	entryReader EntryReader
+	entryReader entryReader
 	logDir      string
 	stop        chan struct{}
 	running     atomic.Bool
 	logger      logger.Logger
 }
 
-type EntryReader interface {
+type entryReader interface {
 	Start(done chan any)
-	Read(now time.Time) ([]*Entry, error)
+	Read(now time.Time) ([]*entry, error)
 }
 
-type Entry struct {
+type entry struct {
 	Next      time.Time
-	Job       Job
-	EntryType EntryType
+	Job       job
+	EntryType entryType
 	Logger    logger.Logger
 }
 
-type Job interface {
+type job interface {
 	GetDAG() *dag.DAG
 	Start() error
 	Stop() error
@@ -44,15 +44,15 @@ type Job interface {
 	String() string
 }
 
-type EntryType int
+type entryType int
 
 const (
-	Start EntryType = iota
+	Start entryType = iota
 	Stop
 	Restart
 )
 
-func (e *Entry) Invoke() error {
+func (e *entry) Invoke() error {
 	if e.Job == nil {
 		return nil
 	}
@@ -88,13 +88,13 @@ func (e *Entry) Invoke() error {
 	return nil
 }
 
-type NewSchedulerArgs struct {
-	EntryReader EntryReader
+type newSchedulerArgs struct {
+	EntryReader entryReader
 	Logger      logger.Logger
 	LogDir      string
 }
 
-func NewScheduler(args NewSchedulerArgs) *Scheduler {
+func newScheduler(args newSchedulerArgs) *Scheduler {
 	return &Scheduler{
 		entryReader: args.EntryReader,
 		logDir:      args.LogDir,
@@ -171,7 +171,7 @@ func (s *Scheduler) run(now time.Time) {
 		if t.After(now) {
 			break
 		}
-		go func(e *Entry) {
+		go func(e *entry) {
 			err := e.Invoke()
 			if err != nil {
 				s.logger.Error(

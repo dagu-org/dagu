@@ -22,11 +22,11 @@ type Params struct {
 }
 
 func New(params Params) *Scheduler {
-	return NewScheduler(NewSchedulerArgs{
+	return newScheduler(newSchedulerArgs{
 		EntryReader: newEntryReader(newEntryReaderArgs{
 			Engine:  params.Engine,
 			DagsDir: params.Config.DAGs,
-			JobFactory: &jobFactory{
+			JobCreator: &jobCreatorImpl{
 				WorkDir:    params.Config.WorkDir,
 				Engine:     params.Engine,
 				Executable: params.Config.Executable,

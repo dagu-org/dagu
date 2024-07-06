@@ -16,7 +16,25 @@ var (
 	errJobFinished     = errors.New("job already finished")
 )
 
-var _ Job = (*jobImpl)(nil)
+var _ jobCreator = (*jobCreatorImpl)(nil)
+
+type jobCreatorImpl struct {
+	Executable string
+	WorkDir    string
+	Engine     engine.Engine
+}
+
+func (jf jobCreatorImpl) CreateJob(dg *dag.DAG, next time.Time) job {
+	return &jobImpl{
+		DAG:        dg,
+		Executable: jf.Executable,
+		WorkDir:    jf.WorkDir,
+		Next:       next,
+		Engine:     jf.Engine,
+	}
+}
+
+var _ job = (*jobImpl)(nil)
 
 type jobImpl struct {
 	DAG        *dag.DAG

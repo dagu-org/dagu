@@ -17,34 +17,36 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type entryReader struct {
-	dagsDir  string
-	dagsLock sync.Mutex
-	dags     map[string]*dag.DAG
-	jf       JobFactory
-	logger   logger.Logger
-	engine   engine.Engine
+var _ entryReader = (*entryReaderImpl)(nil)
+
+type entryReaderImpl struct {
+	dagsDir    string
+	dagsLock   sync.Mutex
+	dags       map[string]*dag.DAG
+	jobCreator jobCreator
+	logger     logger.Logger
+	engine     engine.Engine
 }
 
 type newEntryReaderArgs struct {
 	DagsDir    string
-	JobFactory JobFactory
+	JobCreator jobCreator
 	Logger     logger.Logger
 	Engine     engine.Engine
 }
 
-type JobFactory interface {
-	NewJob(dg *dag.DAG, next time.Time) Job
+type jobCreator interface {
+	CreateJob(dg *dag.DAG, next time.Time) job
 }
 
-func newEntryReader(args newEntryReaderArgs) *entryReader {
-	er := &entryReader{
-		dagsDir:  args.DagsDir,
-		dagsLock: sync.Mutex{},
-		dags:     map[string]*dag.DAG{},
-		jf:       args.JobFactory,
-		logger:   args.Logger,
-		engine:   args.Engine,
+func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
+	er := &entryReaderImpl{
+		dagsDir:    args.DagsDir,
+		dagsLock:   sync.Mutex{},
+		dags:       map[string]*dag.DAG{},
+		jobCreator: args.JobCreator,
+		logger:     args.Logger,
+		engine:     args.Engine,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("failed to init entryreader dags", tag.Error(err))
@@ -52,21 +54,21 @@ func newEntryReader(args newEntryReaderArgs) *entryReader {
 	return er
 }
 
-func (er *entryReader) Start(done chan any) {
+func (er *entryReaderImpl) Start(done chan any) {
 	go er.watchDags(done)
 }
 
-func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
+func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
-	var entries []*Entry
-	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e EntryType) {
+	var entries []*entry
+	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e entryType) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
-			entries = append(entries, &Entry{
+			entries = append(entries, &entry{
 				Next:      ss.Parsed.Next(now),
-				Job:       er.jf.NewJob(dg, next),
+				Job:       er.jobCreator.CreateJob(dg, next),
 				EntryType: e,
 				Logger:    er.logger,
 			})
@@ -85,7 +87,7 @@ func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 	return entries, nil
 }
 
-func (er *entryReader) initDags() error {
+func (er *entryReaderImpl) initDags() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
@@ -113,7 +115,7 @@ func (er *entryReader) initDags() error {
 	return nil
 }
 
-func (er *entryReader) watchDags(done chan any) {
+func (er *entryReaderImpl) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		er.logger.Error("failed to init file watcher", tag.Error(err))

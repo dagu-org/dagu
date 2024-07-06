@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
@@ -17,9 +16,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 )
 
-var (
-	testdataDir = path.Join(util.MustGetwd(), "testdata")
-)
+var testdataDir = path.Join(util.MustGetwd(), "testdata")
 
 func setupTest(t *testing.T) (string, engine.Engine, *config.Config) {
 	t.Helper()
@@ -55,7 +52,7 @@ func TestReadEntries(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 	entryReader := newEntryReader(newEntryReaderArgs{
 		DagsDir:    path.Join(testdataDir, "invalid_directory"),
-		JobFactory: &mockJobFactory{},
+		JobCreator: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
 		Engine:     eng,
 	})
@@ -66,7 +63,7 @@ func TestReadEntries(t *testing.T) {
 
 	entryReader = newEntryReader(newEntryReaderArgs{
 		DagsDir:    testdataDir,
-		JobFactory: &mockJobFactory{},
+		JobCreator: &mockJobFactory{},
 		Logger:     logger.NewSlogLogger(),
 		Engine:     eng,
 	})
@@ -83,7 +80,7 @@ func TestReadEntries(t *testing.T) {
 	require.Equal(t, now.Add(time.Second), next)
 
 	// suspend
-	var j Job
+	var j job
 	for _, e := range entries {
 		jj := e.Job
 		if jj.GetDAG().Name == "scheduled_job" {
@@ -99,12 +96,4 @@ func TestReadEntries(t *testing.T) {
 	lives, err := entryReader.Read(now)
 	require.NoError(t, err)
 	require.Equal(t, len(entries)-1, len(lives))
-}
-
-var _ JobFactory = (*mockJobFactory)(nil)
-
-type mockJobFactory struct{}
-
-func (f *mockJobFactory) NewJob(dg *dag.DAG, next time.Time) Job {
-	return newMockJob(dg)
 }
