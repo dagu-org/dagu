@@ -6,8 +6,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/entryreader"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/internal/scheduler/entryreader"
+	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 	"go.uber.org/fx"
 )
 

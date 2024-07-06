@@ -10,8 +10,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/filenotify"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/internal/scheduler/filenotify"
+	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/util"

@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/internal/service/scheduler"
+	"github.com/dagu-dev/dagu/internal/scheduler"
 	"go.uber.org/fx"
 )
 

@@ -5,8 +5,8 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/job"
-	"github.com/dagu-dev/dagu/internal/service/scheduler/scheduler"
+	"github.com/dagu-dev/dagu/internal/scheduler/job"
+	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 )
 
 type jobFactory struct {

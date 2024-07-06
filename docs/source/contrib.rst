@@ -58,8 +58,7 @@ Code Structure
   - ``scheduler``: Contains the code for running a DAG and steps.
   - ``sock``: Contains the code for interacting with the socket.
   - ``frontend``: Contains the code for the frontend Web UI.
-  - ``service``: Contains the internal code for the project.
-    - ``scheduler``: Contains the code for scheduler.
+  - ``scheduler``: Contains the code for scheduler.
 
 Setting up your local environment for front end development
 -------------------------------------------------------------
