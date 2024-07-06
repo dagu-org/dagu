@@ -46,8 +46,8 @@ GO_TEST_FLAGS=-v --race
 
 ########## Main Targets ##########
 
-# main starts the backend server.
-main: build-ui
+# run starts the backend server.
+run: build-ui
 	go run . server
 
 # https starts the server with the HTTPS protocol.
