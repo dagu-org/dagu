@@ -345,24 +345,6 @@ Example:
 
               Best regards,
 
-Command Execution over SSH
---------------------------
-
-The `ssh` executor allows us to execute commands on remote hosts over SSH.
-
-.. code-block:: yaml
-
-    steps:
-      - name: step1
-        executor: 
-          type: ssh
-          config:
-            user: dagu
-            ip: XXX.XXX.XXX.XXX
-            port: 22
-            key: /Users/dagu/.ssh/private.pem
-        command: /usr/sbin/ifconfig
-
 Command Substitution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -430,6 +412,24 @@ You can define functions in the DAG file and call them in steps. The ``params`` 
         args:
           param1: 1
           param2: 2
+
+Command Execution over SSH
+--------------------------
+
+The `ssh` executor allows us to execute commands on remote hosts over SSH.
+
+.. code-block:: yaml
+
+    steps:
+      - name: step1
+        executor: 
+          type: ssh
+          config:
+            user: dagu
+            ip: XXX.XXX.XXX.XXX
+            port: 22
+            key: /Users/dagu/.ssh/private.pem
+        command: /usr/sbin/ifconfig
 
 JSON Processing
 -----------------
