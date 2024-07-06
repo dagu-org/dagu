@@ -21,11 +21,6 @@ const (
 	StatusSuccess
 )
 
-var (
-	errUpstreamFailed  = fmt.Errorf("upstream failed")
-	errUpstreamSkipped = fmt.Errorf("upstream skipped")
-)
-
 func (s Status) String() string {
 	switch s {
 	case StatusRunning:
@@ -436,3 +431,8 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	}
 	return true
 }
+
+var (
+	errUpstreamFailed  = fmt.Errorf("upstream failed")
+	errUpstreamSkipped = fmt.Errorf("upstream skipped")
+)

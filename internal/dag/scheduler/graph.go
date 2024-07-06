@@ -23,11 +23,6 @@ type ExecutionGraph struct {
 	mu              sync.RWMutex
 }
 
-var (
-	errCycleDetected = errors.New("cycle detected")
-	errStepNotFound  = errors.New("step not found")
-)
-
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
@@ -275,3 +270,8 @@ func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	}
 	return nil, fmt.Errorf("%w: %s", errStepNotFound, name)
 }
+
+var (
+	errCycleDetected = errors.New("cycle detected")
+	errStepNotFound  = errors.New("step not found")
+)
