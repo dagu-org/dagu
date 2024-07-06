@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/executor"
+	"github.com/dagu-dev/dagu/internal/dag/executor"
 	"github.com/dagu-dev/dagu/internal/util"
 	"golang.org/x/sys/unix"
 )

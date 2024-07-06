@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/models"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
@@ -16,7 +17,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
-	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"
 	"github.com/samber/lo"

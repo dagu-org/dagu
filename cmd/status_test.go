@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/dag/scheduler"
 )
 
 func TestStatusCommand(t *testing.T) {
