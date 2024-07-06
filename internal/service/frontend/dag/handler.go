@@ -1,4 +1,4 @@
-package handlers
+package dag
 
 import (
 	"errors"
@@ -13,9 +13,9 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/service/frontend/dag/response"
 	"github.com/dagu-dev/dagu/internal/service/frontend/gen/models"
 	"github.com/dagu-dev/dagu/internal/service/frontend/gen/restapi/operations"
-	"github.com/dagu-dev/dagu/internal/service/frontend/handlers/response"
 	"github.com/dagu-dev/dagu/internal/service/frontend/server"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"
@@ -40,24 +40,25 @@ var (
 	ErrReadingLastStatus  = errors.New("error reading the last status")
 )
 
-type DAGHandler struct {
+// Handler is a handler for the DAG API.
+type Handler struct {
 	engine             engine.Engine
 	logEncodingCharset string
 }
 
-type NewDAGHandlerArgs struct {
+type NewHandlerArgs struct {
 	Engine             engine.Engine
 	LogEncodingCharset string
 }
 
-func NewDAGHandler(args *NewDAGHandlerArgs) server.Handler {
-	return &DAGHandler{
+func NewHandler(args *NewHandlerArgs) server.Handler {
+	return &Handler{
 		engine:             args.Engine,
 		logEncodingCharset: args.LogEncodingCharset,
 	}
 }
 
-func (h *DAGHandler) Configure(api *operations.DaguAPI) {
+func (h *Handler) Configure(api *operations.DaguAPI) {
 	api.ListDagsHandler = operations.ListDagsHandlerFunc(
 		func(params operations.ListDagsParams) middleware.Responder {
 			resp, err := h.GetList(params)
@@ -119,7 +120,7 @@ func (h *DAGHandler) Configure(api *operations.DaguAPI) {
 		})
 }
 
-func (h *DAGHandler) Create(
+func (h *Handler) Create(
 	params operations.CreateDagParams,
 ) (*models.CreateDagResponse, *response.CodedError) {
 	switch lo.FromPtr(params.Body.Action) {
@@ -134,7 +135,7 @@ func (h *DAGHandler) Create(
 		return nil, response.NewBadRequestError(errInvalidArgs)
 	}
 }
-func (h *DAGHandler) Delete(
+func (h *Handler) Delete(
 	params operations.DeleteDagParams,
 ) *response.CodedError {
 	dagStatus, err := h.engine.GetStatus(params.DagID)
@@ -149,7 +150,7 @@ func (h *DAGHandler) Delete(
 	return nil
 }
 
-func (h *DAGHandler) GetList(
+func (h *Handler) GetList(
 	_ operations.ListDagsParams,
 ) (*models.ListDagsResponse, *response.CodedError) {
 	dags, errs, err := h.engine.GetAllStatus()
@@ -168,7 +169,7 @@ func (h *DAGHandler) GetList(
 	return response.NewListDagResponse(dags, errs, hasErr), nil
 }
 
-func (h *DAGHandler) GetDetail(
+func (h *Handler) GetDetail(
 	params operations.GetDagDetailsParams,
 ) (*models.GetDagDetailsResponse, *response.CodedError) {
 	dagID := params.DagID
@@ -232,7 +233,7 @@ func (h *DAGHandler) GetDetail(
 	return resp, nil
 }
 
-func (h *DAGHandler) getStepLog(
+func (h *Handler) getStepLog(
 	dg *dag.DAG,
 	logFile, stepName string,
 ) (*models.DagStepLogResponse, error) {
@@ -305,7 +306,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *DAGHandler) readSchedulerLog(
+func (h *Handler) readSchedulerLog(
 	dg *dag.DAG,
 	statusFile string,
 ) (*models.DagSchedulerLogResponse, error) {
@@ -334,7 +335,7 @@ func (h *DAGHandler) readSchedulerLog(
 }
 
 // nolint // cognitive complexity
-func (h *DAGHandler) PostAction(
+func (h *Handler) PostAction(
 	params operations.PostDagActionParams,
 ) (*models.PostDagActionResponse, *response.CodedError) {
 	dagStatus, err := h.engine.GetStatus(params.DagID)
@@ -457,7 +458,7 @@ func (h *DAGHandler) PostAction(
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAGHandler) updateStatus(
+func (h *Handler) updateStatus(
 	dg *dag.DAG, reqID, step string, to scheduler.NodeStatus,
 ) error {
 	status, err := h.engine.GetStatusByRequestID(dg, reqID)
@@ -478,7 +479,7 @@ func (h *DAGHandler) updateStatus(
 	return h.engine.UpdateStatus(dg, status)
 }
 
-func (h *DAGHandler) Search(
+func (h *Handler) Search(
 	params operations.SearchDagsParams,
 ) (*models.SearchDagsResponse, *response.CodedError) {
 	query := params.Q

@@ -7,7 +7,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/service/frontend/handlers"
+	"github.com/dagu-dev/dagu/internal/service/frontend/dag"
 	"github.com/dagu-dev/dagu/internal/service/frontend/server"
 	"go.uber.org/fx"
 )
@@ -45,8 +45,8 @@ func NewServer(params Params) *server.Server {
 
 	var hs []server.Handler
 
-	hs = append(hs, handlers.NewDAGHandler(
-		&handlers.NewDAGHandlerArgs{
+	hs = append(hs, dag.NewHandler(
+		&dag.NewHandlerArgs{
 			Engine:             params.Engine,
 			LogEncodingCharset: params.Config.LogEncodingCharset,
 		},
