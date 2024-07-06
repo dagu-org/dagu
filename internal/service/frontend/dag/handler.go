@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/scheduler"
@@ -122,7 +123,11 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 func (h *Handler) createDAG(
 	params operations.CreateDagParams,
 ) (*models.CreateDagResponse, *codedError) {
-	switch lo.FromPtr(params.Body.Action) {
+	if params.Body.Action == nil || params.Body.Value == nil {
+		return nil, newBadRequestError(errInvalidArgs)
+	}
+
+	switch *params.Body.Action {
 	case "new":
 		name := *params.Body.Value
 		id, err := h.engine.CreateDAG(name)
@@ -456,8 +461,8 @@ func (h *Handler) processLogRequest(
 	}
 
 	sort.Slice(grid, func(i, c int) bool {
-		a := lo.FromPtr(grid[i].Name)
-		b := lo.FromPtr(grid[c].Name)
+		a := *grid[i].Name
+		b := *grid[c].Name
 		return strings.Compare(a, b) <= 0
 	})
 
@@ -674,58 +679,14 @@ func (h *Handler) postAction(
 		}
 
 	case "mark-success":
-		if dagStatus.Status.Status == scheduler.StatusRunning {
-			return nil, newBadRequestError(
-				fmt.Errorf("the DAG is still running: %w", errInvalidArgs),
-			)
-		}
-		if params.Body.RequestID == "" {
-			return nil, newBadRequestError(
-				fmt.Errorf("request-id is required: %w", errInvalidArgs),
-			)
-		}
-		if params.Body.Step == "" {
-			return nil, newBadRequestError(
-				fmt.Errorf("step name is required: %w", errInvalidArgs),
-			)
-		}
-
-		err = h.updateStatus(
-			dagStatus.DAG,
-			params.Body.RequestID,
-			params.Body.Step,
-			scheduler.NodeStatusSuccess,
+		return h.processUpdateStatus(
+			params, dagStatus, scheduler.NodeStatusSuccess,
 		)
-		if err != nil {
-			return nil, newInternalError(err)
-		}
 
 	case "mark-failed":
-		if dagStatus.Status.Status == scheduler.StatusRunning {
-			return nil, newBadRequestError(
-				fmt.Errorf("the DAG is still running: %w", errInvalidArgs),
-			)
-		}
-		if params.Body.RequestID == "" {
-			return nil, newBadRequestError(
-				fmt.Errorf("request-id is required: %w", errInvalidArgs),
-			)
-		}
-		if params.Body.Step == "" {
-			return nil, newBadRequestError(
-				fmt.Errorf("step name is required: %w", errInvalidArgs),
-			)
-		}
-
-		err = h.updateStatus(
-			dagStatus.DAG,
-			params.Body.RequestID,
-			params.Body.Step,
-			scheduler.NodeStatusError,
+		return h.processUpdateStatus(
+			params, dagStatus, scheduler.NodeStatusError,
 		)
-		if err != nil {
-			return nil, newInternalError(err)
-		}
 
 	case "save":
 		if err := h.engine.UpdateDAG(params.DagID, params.Body.Value); err != nil {
@@ -753,25 +714,53 @@ func (h *Handler) postAction(
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *Handler) updateStatus(
-	dg *dag.DAG, reqID, step string, to scheduler.NodeStatus,
-) error {
-	status, err := h.engine.GetStatusByRequestID(dg, reqID)
+func (h *Handler) processUpdateStatus(
+	params operations.PostDagActionParams,
+	dagStatus *persistence.DAGStatus, to scheduler.NodeStatus,
+) (*models.PostDagActionResponse, *codedError) {
+	if params.Body.RequestID == "" {
+		return nil, newBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
+	}
+
+	if params.Body.Step == "" {
+		return nil, newBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
+	}
+
+	// Do not allow updating the status if the DAG is still running.
+	if dagStatus.Status.Status == scheduler.StatusRunning {
+		return nil, newBadRequestError(
+			fmt.Errorf("the DAG is still running: %w", errInvalidArgs),
+		)
+	}
+
+	status, err := h.engine.GetStatusByRequestID(dagStatus.DAG, params.Body.RequestID)
 	if err != nil {
-		return err
+		return nil, newInternalError(err)
 	}
 
-	_, idx, ok := lo.FindIndexOf(status.Nodes, func(item *model.Node) bool {
-		return item.Step.Name == step
-	})
+	var (
+		idxToUpdate int
+		ok          bool
+	)
+
+	for idx, n := range status.Nodes {
+		if n.Step.Name == params.Body.Step {
+			idxToUpdate = idx
+			ok = true
+		}
+	}
 	if !ok {
-		return fmt.Errorf("%w: %s", ErrStepNotFound, step)
+		return nil, newBadRequestError(fmt.Errorf("step not found: %w", errInvalidArgs))
 	}
 
-	status.Nodes[idx].Status = to
-	status.Nodes[idx].StatusText = to.String()
+	status.Nodes[idxToUpdate].Status = to
+	status.Nodes[idxToUpdate].StatusText = to.String()
 
-	return h.engine.UpdateStatus(dg, status)
+	if err := h.engine.UpdateStatus(dagStatus.DAG, status); err != nil {
+		return nil, newInternalError(err)
+	}
+
+	return &models.PostDagActionResponse{}, nil
 }
 
 func (h *Handler) searchDAGs(
