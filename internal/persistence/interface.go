@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/grep"
+	"github.com/dagu-dev/dagu/internal/persistence/grep"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 )
 
