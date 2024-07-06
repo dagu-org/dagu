@@ -153,7 +153,7 @@ func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 }
 
 func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
-	dags, errs, err := h.engine.GetAllStatus()
+	dgs, errs, err := h.engine.GetAllStatus()
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -161,7 +161,7 @@ func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *cod
 	hasErr := len(errs) > 0
 	if !hasErr {
 		// Check if any DAG has an error
-		for _, d := range dags {
+		for _, d := range dgs {
 			if d.Error != nil {
 				hasErr = true
 				break
@@ -174,7 +174,7 @@ func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *cod
 		HasError: swag.Bool(hasErr),
 	}
 
-	for _, dagStatus := range dags {
+	for _, dagStatus := range dgs {
 		s := dagStatus.Status
 
 		status := &models.DagStatus{
