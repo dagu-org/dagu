@@ -111,11 +111,11 @@ func TestNextTick(t *testing.T) {
 	require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 }
 
+var _ EntryReader = (*mockEntryReader)(nil)
+
 type mockEntryReader struct {
 	Entries []*Entry
 }
-
-var _ EntryReader = (*mockEntryReader)(nil)
 
 func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 	return er.Entries, nil
@@ -123,8 +123,10 @@ func (er *mockEntryReader) Read(_ time.Time) ([]*Entry, error) {
 
 func (er *mockEntryReader) Start(chan any) {}
 
-// TODO: fix to use mock library
+var _ Job = (*mockJob)(nil)
+
 type mockJob struct {
+	DAG          *dag.DAG
 	Name         string
 	RunCount     atomic.Int32
 	StopCount    atomic.Int32
@@ -132,10 +134,15 @@ type mockJob struct {
 	Panic        error
 }
 
-var _ Job = (*mockJob)(nil)
+func newMockJob(dag *dag.DAG) *mockJob {
+	return &mockJob{
+		DAG:  dag,
+		Name: dag.Name,
+	}
+}
 
 func (j *mockJob) GetDAG() *dag.DAG {
-	return nil
+	return j.DAG
 }
 
 func (j *mockJob) String() string {

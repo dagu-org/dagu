@@ -7,7 +7,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	dagscheduler "github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
@@ -17,7 +16,7 @@ var (
 	errJobFinished     = errors.New("job already finished")
 )
 
-var _ scheduler.Job = (*jobImpl)(nil)
+var _ Job = (*jobImpl)(nil)
 
 type jobImpl struct {
 	DAG        *dag.DAG

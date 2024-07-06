@@ -11,7 +11,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/internal/scheduler/filenotify"
-	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/util"
@@ -35,7 +34,7 @@ type newEntryReaderArgs struct {
 }
 
 type JobFactory interface {
-	NewJob(dg *dag.DAG, next time.Time) scheduler.Job
+	NewJob(dg *dag.DAG, next time.Time) Job
 }
 
 func newEntryReader(args newEntryReaderArgs) *entryReader {
@@ -57,15 +56,15 @@ func (er *entryReader) Start(done chan any) {
 	go er.watchDags(done)
 }
 
-func (er *entryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
+func (er *entryReader) Read(now time.Time) ([]*Entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
-	var entries []*scheduler.Entry
-	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e scheduler.EntryType) {
+	var entries []*Entry
+	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e EntryType) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
-			entries = append(entries, &scheduler.Entry{
+			entries = append(entries, &Entry{
 				Next:      ss.Parsed.Next(now),
 				Job:       er.jf.NewJob(dg, next),
 				EntryType: e,
@@ -78,9 +77,9 @@ func (er *entryReader) Read(now time.Time) ([]*scheduler.Entry, error) {
 		if er.engine.IsSuspended(dg.Name) {
 			continue
 		}
-		addEntriesFn(dg, dg.Schedule, scheduler.Start)
-		addEntriesFn(dg, dg.StopSchedule, scheduler.Stop)
-		addEntriesFn(dg, dg.RestartSchedule, scheduler.Restart)
+		addEntriesFn(dg, dg.Schedule, Start)
+		addEntriesFn(dg, dg.StopSchedule, Stop)
+		addEntriesFn(dg, dg.RestartSchedule, Restart)
 	}
 
 	return entries, nil

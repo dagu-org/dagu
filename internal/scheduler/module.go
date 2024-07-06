@@ -6,7 +6,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 	"go.uber.org/fx"
 )
 
@@ -21,7 +20,7 @@ type Params struct {
 
 	Config      *config.Config
 	Logger      dagulogger.Logger
-	EntryReader scheduler.EntryReader
+	EntryReader EntryReader
 }
 
 func EntryReaderProvider(
@@ -29,7 +28,7 @@ func EntryReaderProvider(
 	eng engine.Engine,
 	jf JobFactory,
 	logger dagulogger.Logger,
-) scheduler.EntryReader {
+) EntryReader {
 	return newEntryReader(newEntryReaderArgs{
 		Engine:     eng,
 		DagsDir:    cfg.DAGs,
@@ -48,15 +47,15 @@ func JobFactoryProvider(
 	}
 }
 
-func New(params Params) *scheduler.Scheduler {
-	return scheduler.NewScheduler(scheduler.NewSchedulerArgs{
+func New(params Params) *Scheduler {
+	return NewScheduler(NewSchedulerArgs{
 		EntryReader: params.EntryReader,
 		Logger:      params.Logger,
 		LogDir:      params.Config.LogDir,
 	})
 }
 
-func LifetimeHooks(lc fx.Lifecycle, a *scheduler.Scheduler) {
+func LifetimeHooks(lc fx.Lifecycle, a *Scheduler) {
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) (err error) {
