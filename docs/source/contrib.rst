@@ -24,19 +24,13 @@ Setting up your local environment
 
    .. code-block:: sh
 
-      go run main.go
+      make run
 
 #. Now you can change the source code and build the binary by running the following command:
 
    .. code-block:: sh
 
       make build
-
-#. Run the following command to start the `Dagu` application:
-
-   .. code-block:: sh
-
-      ./bin/dagu
 
 Running Tests
 -------------
