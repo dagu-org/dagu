@@ -12,7 +12,7 @@
             "program": "${workspaceFolder}/main.go",
             "args": [
                 "server",
-                "--port=9090",
+                "--port=8080",
                 "-s",
                 "localhost"
             ]

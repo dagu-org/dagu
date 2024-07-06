@@ -61,8 +61,8 @@ issues:
     - .git
     - cert
     - bin
-    - internal/service/frontend/gen
-    - internal/service/scheduler/filenotify
+    - internal/frontend/gen
+    - internal/scheduler/filenotify
   exclude-rules:
     - path: _test\.go|tests/.+\.go
       linters:

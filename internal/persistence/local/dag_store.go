@@ -9,25 +9,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/filecache"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/grep"
-	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/dagu-dev/dagu/internal/persistence/grep"
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type dagStoreImpl struct {
-	cfg       *config.Config
 	dir       string
 	metaCache *filecache.Cache[*dag.DAG]
 }
 
-func NewDAGStore(cfg *config.Config, dir string) persistence.DAGStore {
+type NewDAGStoreArgs struct {
+	Dir string
+}
+
+func NewDAGStore(args *NewDAGStoreArgs) persistence.DAGStore {
 	dagStore := &dagStoreImpl{
-		cfg:       cfg,
-		dir:       dir,
+		dir:       args.Dir,
 		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
 	}
 	dagStore.metaCache.StartEviction()
@@ -52,9 +53,8 @@ func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	loader := dag.NewLoader(d.cfg)
 	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
-		return loader.LoadMetadata(loc)
+		return dag.LoadMetadata(loc)
 	})
 }
 
@@ -63,8 +63,7 @@ func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errInvalidName, name)
 	}
-	loader := dag.NewLoader(d.cfg)
-	dat, err := loader.LoadWithoutEval(loc)
+	dat, err := dag.LoadWithoutEval(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -88,8 +87,7 @@ const defaultPerm os.FileMode = 0744
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	loader := dag.NewLoader(d.cfg)
-	_, err := loader.LoadYAML(spec)
+	_, err := dag.LoadYAML(spec)
 	if err != nil {
 		return err
 	}
@@ -221,7 +219,7 @@ func (d *dagStoreImpl) Grep(
 
 	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), dag.EXTENSIONS) {
+		if util.MatchExtension(fi.Name(), dag.Exts) {
 			file := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(file)
 			if err != nil {
@@ -235,8 +233,7 @@ func (d *dagStoreImpl) Grep(
 				)
 				continue
 			}
-			loader := dag.NewLoader(d.cfg)
-			dg, err := loader.LoadMetadata(file)
+			dg, err := dag.LoadMetadata(file)
 			if err != nil {
 				errs = append(
 					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
@@ -275,8 +272,7 @@ func (d *dagStoreImpl) Find(name string) (*dag.DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-	loader := dag.NewLoader(d.cfg)
-	return loader.LoadWithoutEval(file)
+	return dag.LoadWithoutEval(file)
 }
 
 func (d *dagStoreImpl) resolve(name string) (string, error) {
@@ -315,7 +311,7 @@ func find(name string) (string, error) {
 	ext := path.Ext(name)
 	if ext == "" {
 		// try all supported extensions
-		for _, ext := range dag.EXTENSIONS {
+		for _, ext := range dag.Exts {
 			if util.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}

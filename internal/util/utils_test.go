@@ -15,7 +15,7 @@ import (
 )
 
 func Test_MustGetUserHomeDir(t *testing.T) {
-	t.Run("get home dir", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		err := os.Setenv("HOME", "/test")
 		if err != nil {
 			t.Fatal(err)
@@ -26,14 +26,14 @@ func Test_MustGetUserHomeDir(t *testing.T) {
 }
 
 func Test_MustGetwd(t *testing.T) {
-	t.Run("get working dir", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		wd, _ := os.Getwd()
 		require.Equal(t, util.MustGetwd(), wd)
 	})
 }
 
 func Test_FormatTime(t *testing.T) {
-	t.Run("format time", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location())
 		formatted := util.FormatTime(tm)
 		require.Equal(t, "2022-02-01 02:02:02", formatted)
@@ -48,19 +48,19 @@ func Test_FormatTime(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
-	t.Run("format time empty", func(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
 		// Test empty time
 		require.Equal(t, "-", util.FormatTime(time.Time{}))
 	})
 }
 
 func Test_ParseTime(t *testing.T) {
-	t.Run("parse time", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		parsed, err := util.ParseTime("2022-02-01 02:02:02")
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location()), parsed)
 	})
-	t.Run("parse empty time", func(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
 		parsed, err := util.ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
@@ -68,20 +68,20 @@ func Test_ParseTime(t *testing.T) {
 }
 
 func Test_SplitCommand(t *testing.T) {
-	t.Run("split command", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		cmd, args := util.SplitCommand("ls -al test/")
 		require.Equal(t, "ls", cmd)
 		require.Len(t, args, 2)
 		require.Equal(t, "-al", args[0])
 		require.Equal(t, "test/", args[1])
 	})
-	t.Run("split command with json", func(t *testing.T) {
+	t.Run("WithJSON", func(t *testing.T) {
 		cmd, args := util.SplitCommand(`echo {"key":"value"}`)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, `{"key":"value"}`, args[0])
 	})
-	t.Run("split command with quoted json", func(t *testing.T) {
+	t.Run("WithQuotedJSON", func(t *testing.T) {
 		cmd, args := util.SplitCommand(`echo "{\"key\":\"value\"}"`)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
@@ -90,19 +90,19 @@ func Test_SplitCommand(t *testing.T) {
 }
 
 func Test_SplitCommandWithParse(t *testing.T) {
-	t.Run("split command with command substitution", func(t *testing.T) {
+	t.Run("CommandSubstitution", func(t *testing.T) {
 		cmd, args := util.SplitCommandWithParse("echo `echo hello`")
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, "hello", args[0])
 	})
-	t.Run("split command with quoted command substitution", func(t *testing.T) {
+	t.Run("QuotedCommandSubstitution", func(t *testing.T) {
 		cmd, args := util.SplitCommandWithParse("echo `echo \"hello world\"`")
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, "hello world", args[0])
 	})
-	t.Run("split command with env variable", func(t *testing.T) {
+	t.Run("EnvVar", func(t *testing.T) {
 		os.Setenv("TEST_ARG", "hello")
 		cmd, args := util.SplitCommandWithParse("echo $TEST_ARG")
 		require.Equal(t, "echo", cmd)
@@ -112,7 +112,7 @@ func Test_SplitCommandWithParse(t *testing.T) {
 }
 
 func Test_FileExits(t *testing.T) {
-	t.Run("file exists", func(t *testing.T) {
+	t.Run("Exists", func(t *testing.T) {
 		if !util.FileExists("/") {
 			t.Fatal("file exists failed")
 		}
@@ -120,14 +120,14 @@ func Test_FileExits(t *testing.T) {
 }
 
 func Test_ValidFilename(t *testing.T) {
-	t.Run("valid filename", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		ret := util.ValidFilename("file\\name")
 		require.Equal(t, ret, "file_name")
 	})
 }
 
 func Test_OpenOrCreateFile(t *testing.T) {
-	t.Run("open or create file", func(t *testing.T) {
+	t.Run("OpenOrCreate", func(t *testing.T) {
 		tmp, err := os.MkdirTemp("", "open_or_create")
 		require.NoError(t, err)
 
@@ -144,7 +144,7 @@ func Test_OpenOrCreateFile(t *testing.T) {
 			t.Fatal("failed to create file")
 		}
 	})
-	t.Run("open or create file and write", func(t *testing.T) {
+	t.Run("OpenOrCreateThenWrite", func(t *testing.T) {
 		dir := util.MustTempDir("tempdir")
 		defer func() {
 			_ = os.RemoveAll(dir)
@@ -177,7 +177,7 @@ func Test_OpenOrCreateFile(t *testing.T) {
 }
 
 func Test_MustTempDir(t *testing.T) {
-	t.Run("temp dir", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		dir := util.MustTempDir("tempdir")
 		defer func() {
 			_ = os.RemoveAll(dir)
@@ -187,7 +187,7 @@ func Test_MustTempDir(t *testing.T) {
 }
 
 func Test_LogErr(t *testing.T) {
-	t.Run("log error", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		origStdout := os.Stdout
 		r, w, err := os.Pipe()
 		require.NoError(t, err)
@@ -214,7 +214,7 @@ func Test_LogErr(t *testing.T) {
 }
 
 func TestTruncString(t *testing.T) {
-	t.Run("trunc string", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		// Test empty string
 		require.Equal(t, "", util.TruncString("", 8))
 		// Test string with length less than limit
@@ -225,7 +225,7 @@ func TestTruncString(t *testing.T) {
 }
 
 func TestMatchExtension(t *testing.T) {
-	t.Run("match extension", func(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
 		// Test empty extension
 		require.False(t, util.MatchExtension("test.txt", []string{}))
 		// Test matching extension

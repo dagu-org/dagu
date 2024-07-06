@@ -1,6 +1,6 @@
 //go:build tools
 
-package dagu
+package tools
 
 // See for more details:
 // https://go.dev/wiki/Modules#how-can-i-track-tool-dependencies-for-a-module

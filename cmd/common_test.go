@@ -7,40 +7,51 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
 
+	"github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
+
+type testSetup struct {
+	homeDir   string
+	engine    engine.Engine
+	dataStore persistence.DataStores
+	cfg       *config.Config
+}
+
+func (t testSetup) cleanup() {
+	_ = os.RemoveAll(t.homeDir)
+}
 
 // setupTest is a helper function to setup the test environment.
 // This function does the following:
 // 1. It creates a temporary directory and returns the path to it.
 // 2. Sets the home directory to the temporary directory.
 // 3. Creates a new data store factory and engine.
-func setupTest(t *testing.T) (
-	string, engine.Engine, persistence.DataStoreFactory, *config.Config,
-) {
+func setupTest(t *testing.T) testSetup {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
-	dataStore := client.NewDataStoreFactory(&config.Config{
-		DataDir: path.Join(tmpDir, ".dagu", "data"),
-	})
-
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	return tmpDir, engine.New(
-		dataStore, new(engine.Config), cfg,
-	), dataStore, cfg
+	cfg.DataDir = path.Join(tmpDir, ".dagu", "data")
+	dataStore := newDataStores(cfg)
+
+	return testSetup{
+		homeDir:   tmpDir,
+		dataStore: dataStore,
+		engine:    newEngine(cfg),
+		cfg:       cfg,
+	}
 }
 
 // cmdTest is a helper struct to test commands.
@@ -135,7 +146,7 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dg, err := loadDAG(cfg, dagFile, "")
+	dg, err := dag.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

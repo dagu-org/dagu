@@ -7,13 +7,12 @@ import (
 	"os"
 	"path"
 
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
+	// cfgFile parameter
 	cfgFile string
 
 	// rootCmd represents the base command when called without any subcommands
@@ -33,43 +32,12 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-func init() {
-	rootCmd.PersistentFlags().
-		StringVar(
-			&cfgFile,
-			"config",
-			"",
-			"config file (default is $HOME/.dagu/admin.yaml)",
-		)
-
-	cobra.OnInitialize(initialize)
-
-	registerCommands()
-}
-
-func initialize() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		setDefaultConfigPath()
-		viper.SetConfigType("yaml")
-		viper.SetConfigName("admin")
-	}
-}
-
 func setDefaultConfigPath() {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		panic("could not determine home directory")
 	}
 	viper.AddConfigPath(path.Join(homeDir, configPath))
-}
-
-func loadDAG(
-	cfg *config.Config, dagFile, params string,
-) (dg *dag.DAG, err error) {
-	loader := dag.NewLoader(cfg)
-	return loader.Load(cfg.BaseConfig, dagFile, params)
 }
 
 func registerCommands() {
@@ -83,4 +51,27 @@ func registerCommands() {
 	rootCmd.AddCommand(schedulerCmd())
 	rootCmd.AddCommand(retryCmd())
 	rootCmd.AddCommand(startAllCmd())
+}
+
+func init() {
+	rootCmd.PersistentFlags().
+		StringVar(
+			&cfgFile, "config", "",
+			"config file (default is $HOME/.dagu/admin.yaml)",
+		)
+
+	cobra.OnInitialize(initialize)
+
+	registerCommands()
+}
+
+func initialize() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+		return
+	}
+
+	setDefaultConfigPath()
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("admin")
 }

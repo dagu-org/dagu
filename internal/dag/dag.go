@@ -8,51 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/util"
-
 	"github.com/robfig/cron/v3"
 )
-
-// Schedule contains the cron expression and the parsed cron schedule.
-type Schedule struct {
-	// Expression is the cron expression.
-	Expression string `json:"Expression"`
-	// Parsed is the parsed cron schedule.
-	Parsed cron.Schedule `json:"-"`
-}
-
-// HandlerOn contains the steps to be executed on different events in the DAG.
-type HandlerOn struct {
-	Failure *Step `json:"Failure"`
-	Success *Step `json:"Success"`
-	Cancel  *Step `json:"Cancel"`
-	Exit    *Step `json:"Exit"`
-}
-
-// MailOn contains the conditions to send mail.
-type MailOn struct {
-	Failure bool `json:"Failure"`
-	Success bool `json:"Success"`
-}
-
-// SMTPConfig contains the SMTP configuration.
-type SMTPConfig struct {
-	Host     string `json:"Host"`
-	Port     string `json:"Port"`
-	Username string `json:"Username"`
-	Password string `json:"Password"`
-}
-
-// MailConfig contains the mail configuration.
-type MailConfig struct {
-	From string `json:"From"`
-	To   string `json:"To"`
-	// Prefix is the prefix for the subject of the mail.
-	Prefix string `json:"Prefix"`
-	// AttachLogs is the flag to attach the logs in the mail.
-	AttachLogs bool `json:"AttachLogs"`
-}
 
 // DAG contains all information about a workflow.
 type DAG struct {
@@ -129,6 +86,46 @@ type DAG struct {
 	HistRetentionDays int `json:"HistRetentionDays"`
 }
 
+// Schedule contains the cron expression and the parsed cron schedule.
+type Schedule struct {
+	// Expression is the cron expression.
+	Expression string `json:"Expression"`
+	// Parsed is the parsed cron schedule.
+	Parsed cron.Schedule `json:"-"`
+}
+
+// HandlerOn contains the steps to be executed on different events in the DAG.
+type HandlerOn struct {
+	Failure *Step `json:"Failure"`
+	Success *Step `json:"Success"`
+	Cancel  *Step `json:"Cancel"`
+	Exit    *Step `json:"Exit"`
+}
+
+// MailOn contains the conditions to send mail.
+type MailOn struct {
+	Failure bool `json:"Failure"`
+	Success bool `json:"Success"`
+}
+
+// SMTPConfig contains the SMTP configuration.
+type SMTPConfig struct {
+	Host     string `json:"Host"`
+	Port     string `json:"Port"`
+	Username string `json:"Username"`
+	Password string `json:"Password"`
+}
+
+// MailConfig contains the mail configuration.
+type MailConfig struct {
+	From string `json:"From"`
+	To   string `json:"To"`
+	// Prefix is the prefix for the subject of the mail.
+	Prefix string `json:"Prefix"`
+	// AttachLogs is the flag to attach the logs in the mail.
+	AttachLogs bool `json:"AttachLogs"`
+}
+
 // HandlerType is the type of the handler.
 type HandlerType string
 
@@ -157,14 +154,13 @@ var (
 	}
 )
 
-// setup sets the default values for the DAG.
-func (d *DAG) setup(cfg *config.Config) {
-	// LogDir is the directory where the logs are stored.
-	// It is used to write the stdout and stderr of the steps.
-	if d.LogDir == "" {
-		d.LogDir = cfg.LogDir
-	}
+var (
+	defaultHistoryRetentionDays = 30
+	defaultMaxCleanUpTime       = time.Second * 60
+)
 
+// setup sets the default values for the DAG.
+func (d *DAG) setup() {
 	// The default history retention days is 30 days.
 	// It is the number of days to keep the history.
 	// The older history is deleted when the DAG is executed.
@@ -210,13 +206,6 @@ func (d *DAG) HasTag(tag string) bool {
 	}
 
 	return false
-}
-
-// GetLogDir returns the log directory for the DAG.
-// Log directory is the directory where the execution logs are stored.
-// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
-func (d *DAG) GetLogDir() string {
-	return path.Join(d.LogDir, util.ValidFilename(d.Name))
 }
 
 // SockAddr returns the unix socket address for the DAG.

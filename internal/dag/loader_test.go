@@ -18,38 +18,34 @@ func Test_Load(t *testing.T) {
 		expectedLocation string
 	}{
 		{
-			name:             "Load file with .yaml",
+			name:             "WithExt",
 			file:             path.Join(testdataDir, "loader_test.yaml"),
 			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
 		},
 		{
-			name:             "Load file without .yaml",
+			name:             "WithoutExt",
 			file:             path.Join(testdataDir, "loader_test"),
 			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
 		},
 		{
-			name:          "[Invalid] DAG file does not exist",
+			name:          "InvalidPath",
 			file:          path.Join(testdataDir, "not_existing_file.yaml"),
 			expectedError: "no such file or directory",
 		},
 		{
-			name:          "[Invalid] DAG file has invalid keys",
+			name:          "InvalidDAG",
 			file:          path.Join(testdataDir, "err_decode.yaml"),
 			expectedError: "has invalid keys: invalidkey",
 		},
 		{
-			name:          "[Invalid] DAG file cannot unmarshal",
+			name:          "InvalidYAML",
 			file:          path.Join(testdataDir, "err_parse.yaml"),
 			expectedError: "cannot unmarshal",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.Load()
-			require.NoError(t, err)
-
-			loader := NewLoader(cfg)
-			dg, err := loader.Load("", tt.file, "")
+			dg, err := Load("", tt.file, "")
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
@@ -62,12 +58,8 @@ func Test_Load(t *testing.T) {
 }
 
 func Test_LoadMetadata(t *testing.T) {
-	t.Run("Load metadata", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(cfg)
-		dg, err := loader.LoadMetadata(path.Join(testdataDir, "default.yaml"))
+	t.Run("Metadata", func(t *testing.T) {
+		dg, err := LoadMetadata(path.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
 
 		require.Equal(t, dg.Name, "default")
@@ -77,32 +69,27 @@ func Test_LoadMetadata(t *testing.T) {
 }
 
 func Test_loadBaseConfig(t *testing.T) {
-	t.Run("Load base config file", func(t *testing.T) {
+	t.Run("BaseConfigFile", func(t *testing.T) {
 		// The base config file is set on the global config
 		// This should be `testdata/home/.dagu/config.yaml`.
 		cfg, err := config.Load()
 		require.NoError(t, err)
 
-		loader := NewLoader(cfg)
-		dg, err := loader.loadBaseConfig(cfg.BaseConfig, buildOpts{})
+		dg, err := loadBaseConfig(cfg.BaseConfig, buildOpts{})
 		require.NotNil(t, dg)
 		require.NoError(t, err)
 	})
 }
 
 func Test_LoadDefaultConfig(t *testing.T) {
-	t.Run("Load default config without base config", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(cfg)
+	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
 		file := path.Join(testdataDir, "default.yaml")
-		dg, err := loader.Load("", file, "")
+		dg, err := Load("", file, "")
 
 		require.NoError(t, err)
 
 		// Check if the default values are set correctly
-		assert.Equal(t, path.Join(testHomeDir, "/.dagu/logs"), dg.LogDir)
+		assert.Equal(t, "", dg.LogDir)
 		assert.Equal(t, file, dg.Location)
 		assert.Equal(t, "default", dg.Name)
 		assert.Equal(t, time.Second*60, dg.MaxCleanUpTime)
@@ -126,12 +113,8 @@ steps:
 )
 
 func Test_LoadYAML(t *testing.T) {
-	t.Run("Load YAML data", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(cfg)
-		ret, err := loader.LoadYAML([]byte(testDAG))
+	t.Run("ValidYAMLData", func(t *testing.T) {
+		ret, err := LoadYAML([]byte(testDAG))
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -139,12 +122,8 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Name, "1")
 		require.Equal(t, step.Command, "true")
 	})
-	t.Run("[Invalid] Load invalid YAML data", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		loader := NewLoader(cfg)
-		_, err = loader.LoadYAML([]byte(`invalidyaml`))
+	t.Run("InvalidYAMLData", func(t *testing.T) {
+		_, err := LoadYAML([]byte(`invalidyaml`))
 		require.Error(t, err)
 	})
 }

@@ -14,15 +14,15 @@ func TestCondition_Eval(t *testing.T) {
 		wantErr   bool
 	}{
 		{
-			name:      "Condition with a command substitution",
+			name:      "CommandSubstitution",
 			condition: []Condition{{Condition: "`echo 1`", Expected: "1"}},
 		},
 		{
-			name:      "Condition with environment variable",
+			name:      "EnvVar",
 			condition: []Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
 		},
 		{
-			name: "Multiple conditions and all are met",
+			name: "MultipleCond",
 			condition: []Condition{
 				{
 					Condition: "`echo 1`",
@@ -35,7 +35,7 @@ func TestCondition_Eval(t *testing.T) {
 			},
 		},
 		{
-			name: "Multiple conditions and one is not met",
+			name: "MultipleCondOneMet",
 			condition: []Condition{
 				{
 					Condition: "`echo 1`",
@@ -49,7 +49,7 @@ func TestCondition_Eval(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "Invalid condition",
+			name: "InvalidCond",
 			condition: []Condition{
 				{
 					Condition: "`invalid`",

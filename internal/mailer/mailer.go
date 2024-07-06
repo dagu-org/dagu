@@ -14,19 +14,27 @@ import (
 
 // Mailer is a mailer that sends emails.
 type Mailer struct {
-	*Config
+	host     string
+	port     string
+	username string
+	password string
 }
 
-func New(cfg *Config) *Mailer {
-	return &Mailer{Config: cfg}
-}
-
-// Config is a config for SMTP mailer.
-type Config struct {
+// NewMailerArgs is a config for SMTP mailer.
+type NewMailerArgs struct {
 	Host     string
 	Port     string
 	Username string
 	Password string
+}
+
+func New(cfg *NewMailerArgs) *Mailer {
+	return &Mailer{
+		host:     cfg.Host,
+		port:     cfg.Port,
+		username: cfg.Username,
+		password: cfg.Password,
+	}
 }
 
 var (
@@ -38,7 +46,7 @@ var (
 )
 
 // SendMail sends an email.
-func (m *Mailer) SendMail(
+func (m *Mailer) Send(
 	from string,
 	to []string,
 	subject, body string,
@@ -49,7 +57,7 @@ func (m *Mailer) SendMail(
 		strings.Join(to, ","),
 		subject,
 	)
-	if m.Username == "" && m.Password == "" {
+	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}
 	return m.sendWithAuth(from, to, subject, body, attachments)
@@ -61,7 +69,7 @@ func (m *Mailer) sendWithNoAuth(
 	subject, body string,
 	attachments []string,
 ) error {
-	c, err := smtp.Dial(m.Host + ":" + m.Port)
+	c, err := smtp.Dial(m.host + ":" + m.port)
 	if err != nil {
 		return err
 	}
@@ -100,10 +108,10 @@ func (m *Mailer) sendWithAuth(
 	subject, body string,
 	attachments []string,
 ) error {
-	auth := smtp.PlainAuth("", m.Username, m.Password, m.Host)
+	auth := smtp.PlainAuth("", m.username, m.password, m.host)
 	body = newlineToBrTag(body)
 	return smtp.SendMail(
-		m.Host+":"+m.Port, auth, from, to,
+		m.host+":"+m.port, auth, from, to,
 		m.composeMail(to, from, subject, body, attachments),
 	)
 }

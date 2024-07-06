@@ -4,11 +4,11 @@ import (
 	"log"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 )
 
@@ -26,16 +26,12 @@ func restartCmd() *cobra.Command {
 
 			// Load the DAG file and stop the DAG if it is running.
 			dagFilePath := args[0]
-			dg, err := loadDAG(cfg, dagFilePath, "")
+			dg, err := dag.Load(cfg.BaseConfig, dagFilePath, "")
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			eng := engine.New(
-				client.NewDataStoreFactory(cfg),
-				engine.DefaultConfig(),
-				cfg,
-			)
+			eng := newEngine(cfg)
 
 			if err := stopDAGIfRunning(eng, dg); err != nil {
 				log.Fatalf("Failed to stop the DAG: %v", err)
@@ -53,12 +49,21 @@ func restartCmd() *cobra.Command {
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			dg, err = loadDAG(cfg, dagFilePath, params)
+			dg, err = dag.Load(cfg.BaseConfig, dagFilePath, params)
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			cobra.CheckErr(start(cmd.Context(), cfg, eng, dg, false))
+			dagAgent := agent.New(&agent.NewAagentArgs{
+				DAG: dg, Dry: false, LogDir: cfg.LogDir,
+				Engine:    eng,
+				DataStore: newDataStores(cfg),
+			})
+
+			listenSignals(cmd.Context(), dagAgent)
+			if err := dagAgent.Run(cmd.Context()); err != nil {
+				log.Fatalf("Failed to start DAG: %v", err)
+			}
 		},
 	}
 }

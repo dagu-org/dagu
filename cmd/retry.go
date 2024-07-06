@@ -6,8 +6,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +28,8 @@ func retryCmd() *cobra.Command {
 			}
 
 			// Read the specified DAG execution status from the history store.
-			dataStore := client.NewDataStoreFactory(cfg)
-			historyStore := dataStore.NewHistoryStore()
+			dataStore := newDataStores(cfg)
+			historyStore := dataStore.HistoryStore()
 
 			absoluteFilePath, err := filepath.Abs(args[0])
 			if err != nil {
@@ -46,16 +45,20 @@ func retryCmd() *cobra.Command {
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			loadedDAG, err := loadDAG(cfg, args[0], status.Status.Params)
+			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
 			if err != nil {
 				log.Fatalf("Failed to load DAG: %v", err)
 			}
 
-			dagAgent := agent.New(
-				&agent.Config{DAG: loadedDAG, RetryTarget: status.Status},
-				engine.New(dataStore, engine.DefaultConfig(), cfg),
-				dataStore,
-			)
+			eng := newEngine(cfg)
+
+			dagAgent := agent.New(&agent.NewAagentArgs{
+				DAG:         loadedDAG,
+				RetryTarget: status.Status,
+				LogDir:      cfg.LogDir,
+				Engine:      eng,
+				DataStore:   dataStore,
+			})
 
 			ctx := cmd.Context()
 			listenSignals(ctx, dagAgent)

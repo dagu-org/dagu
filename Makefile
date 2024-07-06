@@ -8,6 +8,7 @@ VERSION=
 
 # This Makefile's directory
 SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+LOCAL_DIR=$(SCRIPT_DIR)/local
 
 SRC_DIR=$(SCRIPT_DIR)
 DST_DIR=$(SRC_DIR)/internal
@@ -29,13 +30,24 @@ PKG_gotestsum=gotest.tools/gotestsum
 COLOR_GREEN=\033[0;32m
 COLOR_RESET=\033[0m
 
-FE_DIR=./internal/service/frontend
+FE_DIR=./internal/frontend
 FE_GEN_DIR=${FE_DIR}/gen
 FE_ASSETS_DIR=${FE_DIR}/assets
 
-CERT_DIR=${SCRIPT_DIR}/cert
+CERT_DIR=${LOCAL_DIR}/cert
+
+CA_CERT_FILE=${CERT_DIR}/ca-cert.pem
+CA_KEY_FILE=${CERT_DIR}/ca-key.pem
+SERVER_CERT_REQ=${CERT_DIR}/server-req.pem
+SERVER_CERT_FILE=${CERT_DIR}/server-cert.pem
+SERVER_KEY_FILE=${CERT_DIR}/server-key.pem
+CLIENT_CERT_REQ=${CERT_DIR}/client-req.pem
+CLIENT_CERT_FILE=${CERT_DIR}/client-cert.pem
+CLIENT_KEY_FILE=${CERT_DIR}/client-key.pem
+OPENSSL_CONF=${CERT_DIR}/openssl.conf
 
 FE_BUILD_DIR=./ui/dist
+FE_BUNDLE_JS=${FE_ASSETS_DIR}/bundle.js
 
 APP_NAME=dagu
 BIN_DIR=${SCRIPT_DIR}/bin
@@ -46,15 +58,19 @@ GO_TEST_FLAGS=-v --race
 
 ########## Main Targets ##########
 
-# main starts the backend server.
-main: build-ui
-	go run . server
+# run starts the frontend server and the scheduler.
+run: ${FE_BUNDLE_JS}
+	go run . start-all
+
+# check if the frontend assets are built.
+${FE_BUNDLE_JS}:
+	echo "Please run 'make build-ui' to build the frontend assets."
 
 # https starts the server with the HTTPS protocol.
-https:
-	@DAGU_CERT_FILE=${CERT_DIR}/server-cert.pem \
-		DAGU_KEY_FILE=${CERT_DIR}/server-key.pem \
-		go run . server
+https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
+	@DAGU_CERT_FILE=${SERVER_CERT_FILE} \
+		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
+		go run . start-all
 
 # watch starts development UI server.
 # The backend server should be running.
@@ -86,7 +102,7 @@ lint: golangci-lint
 swagger: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
-certs: cert-dir gencerts-ca gencerts-server gencerts-client gencert-check
+certs: ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} gencert-check
 
 # build build the binary.
 build: build-ui build-bin
@@ -147,40 +163,38 @@ gen-swagger:
 
 ########## Certificates ##########
 
-cert-dir:
-	@echo "${COLOR_GREEN}Creating cert directory...${COLOR_RESET}"
-	@mkdir -p ${CERT_DIR}
-
-gencerts-ca:
+${CA_CERT_FILE}:
 	@echo "${COLOR_GREEN}Generating CA certificates...${COLOR_RESET}"
 	@openssl req -x509 -newkey rsa:4096 \
-		-nodes -days 365 -keyout ${CERT_DIR}/ca-key.pem \
-		-out ${CERT_DIR}/ca-cert.pem \
+		-nodes -days 365 -keyout ${CA_KEY_FILE} \
+		-out ${CA_CERT_FILE} \
 		-subj "$(DEV_CERT_SUBJ_CA)"
 
-gencerts-server:
-	@echo "${COLOR_GREEN}Generating server certificates...${COLOR_RESET}"
-	@openssl req -newkey rsa:4096 -nodes -keyout ${CERT_DIR}/server-key.pem \
-		-out ${CERT_DIR}/server-req.pem \
+${SERVER_KEY_FILE}:
+	@echo "${COLOR_GREEN}Generating server key...${COLOR_RESET}"
+	@openssl req -newkey rsa:4096 -nodes -keyout ${SERVER_KEY_FILE} \
+		-out ${SERVER_CERT_REQ} \
 		-subj "$(DEV_CERT_SUBJ_SERVER)"
 
-	@echo "${COLOR_GREEN}Adding subjectAltName...${COLOR_RESET}"
-	@openssl x509 -req -in ${CERT_DIR}/server-req.pem -CA ${CERT_DIR}/ca-cert.pem -CAkey ${CERT_DIR}/ca-key.pem \
-		-CAcreateserial -out ${CERT_DIR}/server-cert.pem \
-		-extfile ${CERT_DIR}/openssl.conf
+${SERVER_CERT_FILE}: ${CA_CERT_FILE} ${SERVER_KEY_FILE}
+	@echo "${COLOR_GREEN}Generating server certificate...${COLOR_RESET}"
+	@openssl x509 -req -in ${SERVER_CERT_REQ} -CA ${CA_CERT_FILE} -CAkey ${CA_KEY_FILE} \
+		-CAcreateserial -out ${SERVER_CERT_FILE} \
+		-extfile ${OPENSSL_CONF}
 
-gencerts-client:
-	@echo "${COLOR_GREEN}Generating client certificates...${COLOR_RESET}"
-	@openssl req -newkey rsa:4096 -nodes -keyout cert/client-key.pem \
-		-out cert/client-req.pem \
+${CLIENT_KEY_FILE}:
+	@echo "${COLOR_GREEN}Generating client key...${COLOR_RESET}"
+	@openssl req -newkey rsa:4096 -nodes -keyout ${CLIENT_KEY_FILE} \
+		-out ${CLIENT_CERT_REQ} \
 		-subj "$(DEV_CERT_SUBJ_CLIENT)"
 
-	@echo "${COLOR_GREEN}Adding subjectAltName...${COLOR_RESET}"
-	@openssl x509 -req -in cert/client-req.pem -days 60 -CA cert/ca-cert.pem \
-		-CAkey cert/ca-key.pem -CAcreateserial -out cert/client-cert.pem \
-		-extfile cert/openssl.conf
+${CLIENT_CERT_FILE}: ${CA_CERT_FILE} ${CLIENT_KEY_FILE}
+	@echo "${COLOR_GREEN}Generating client certificate...${COLOR_RESET}"
+	@openssl x509 -req -in ${CLIENT_CERT_REQ} -days 60 -CA ${CA_CERT_FILE} \
+		-CAkey ${CA_KEY_FILE} -CAcreateserial -out ${CLIENT_CERT_FILE} \
+		-extfile ${OPENSSL_CONF}
 
 gencert-check:
 	@echo "${COLOR_GREEN}Checking CA certificate...${COLOR_RESET}"
-	@openssl x509 -in cert/server-cert.pem -noout -text
+	@openssl x509 -in ${SERVER_CERT_FILE} -noout -text
 

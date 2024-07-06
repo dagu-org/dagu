@@ -1,15 +1,12 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 )
 
 func TestStartCommand(t *testing.T) {
-	tmpDir, _, _, _ := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	setup := setupTest(t)
+	defer setup.cleanup()
 
 	tests := []cmdTest{
 		{

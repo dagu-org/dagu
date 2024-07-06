@@ -5,13 +5,39 @@ import (
 	"fmt"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
-var (
-	errNodeProcessing = errors.New("node processing error")
-)
+func FromSteps(steps []dag.Step) []*Node {
+	var ret []*Node
+	for _, s := range steps {
+		ret = append(ret, NewNode(s))
+	}
+	return ret
+}
+
+func FromNodes(nodes []scheduler.NodeData) []*Node {
+	var ret []*Node
+	for _, node := range nodes {
+		ret = append(ret, FromNode(node))
+	}
+	return ret
+}
+
+func FromNode(node scheduler.NodeData) *Node {
+	return &Node{
+		Step:       node.Step,
+		Log:        node.Log,
+		StartedAt:  util.FormatTime(node.StartedAt),
+		FinishedAt: util.FormatTime(node.FinishedAt),
+		Status:     node.Status,
+		StatusText: node.Status.String(),
+		RetryCount: node.RetryCount,
+		DoneCount:  node.DoneCount,
+		Error:      errText(node.Error),
+	}
+}
 
 type Node struct {
 	dag.Step   `json:"Step"`
@@ -39,19 +65,17 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
-func FromNode(node scheduler.NodeData) *Node {
+func NewNode(step dag.Step) *Node {
 	return &Node{
-		Step:       node.Step,
-		Log:        node.Log,
-		StartedAt:  util.FormatTime(node.StartedAt),
-		FinishedAt: util.FormatTime(node.FinishedAt),
-		Status:     node.Status,
-		StatusText: node.Status.String(),
-		RetryCount: node.RetryCount,
-		DoneCount:  node.DoneCount,
-		Error:      errText(node.Error),
+		Step:       step,
+		StartedAt:  "-",
+		FinishedAt: "-",
+		Status:     scheduler.NodeStatusNone,
+		StatusText: scheduler.NodeStatusNone.String(),
 	}
 }
+
+var errNodeProcessing = errors.New("node processing error")
 
 func errFromText(err string) error {
 	if err == "" {
@@ -65,30 +89,4 @@ func errText(err error) string {
 		return ""
 	}
 	return err.Error()
-}
-
-func FromNodes(nodes []scheduler.NodeData) []*Node {
-	var ret []*Node
-	for _, node := range nodes {
-		ret = append(ret, FromNode(node))
-	}
-	return ret
-}
-
-func FromSteps(steps []dag.Step) []*Node {
-	var ret []*Node
-	for _, s := range steps {
-		ret = append(ret, NewNode(s))
-	}
-	return ret
-}
-
-func NewNode(step dag.Step) *Node {
-	return &Node{
-		Step:       step,
-		StartedAt:  "-",
-		FinishedAt: "-",
-		Status:     scheduler.NodeStatusNone,
-		StatusText: scheduler.NodeStatusNone.String(),
-	}
 }

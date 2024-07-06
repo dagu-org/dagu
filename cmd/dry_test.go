@@ -1,17 +1,13 @@
 package cmd
 
 import (
-	"os"
 	"testing"
 )
 
 func TestDryCommand(t *testing.T) {
 	t.Run("Dry-run command should run", func(t *testing.T) {
-		tmpDir, _, _, _ := setupTest(t)
-
-		defer func() {
-			_ = os.RemoveAll(tmpDir)
-		}()
+		setup := setupTest(t)
+		defer setup.cleanup()
 
 		tests := []cmdTest{
 			{

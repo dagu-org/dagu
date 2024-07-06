@@ -384,13 +384,18 @@ It is often desirable to take action when a specific event happens, for example,
 .. code-block:: yaml
 
   handlerOn:
+    success:
+      command: echo "succeeded!"
+    cancel:
+      command: echo "cancelled!"
     failure:
-      command: notify_error.sh
+      command: echo "failed!"
     exit:
-      command: cleanup.sh
+      command: echo "exited!"
   steps:
-    - name: A task
-      command: main.sh
+    - name: step1
+      command: echo hello
+
 
 Repeat a Step
 ~~~~~~~~~~~~~~

@@ -3,9 +3,9 @@ package cmd
 import (
 	"log"
 
+	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
+	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/spf13/cobra"
 )
 
@@ -21,17 +21,32 @@ func startCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			runDAG(cmd.Context(),
-				cfg,
-				engine.New(
-					client.NewDataStoreFactory(cfg),
-					engine.DefaultConfig(),
-					cfg,
-				),
-				cmd,
-				args,
-				false,
-			)
+
+			params, err := cmd.Flags().GetString("params")
+			if err != nil {
+				log.Fatalf("Failed to get params: %v", err)
+			}
+
+			dg, err := dag.Load(cfg.BaseConfig, args[0], params)
+			if err != nil {
+				log.Fatalf("Failed to load DAG: %v", err)
+			}
+
+			eng := newEngine(cfg)
+
+			dagAgent := agent.New(&agent.NewAagentArgs{
+				DAG: dg, LogDir: cfg.LogDir,
+				Engine:    eng,
+				DataStore: newDataStores(cfg),
+			})
+
+			ctx := cmd.Context()
+
+			listenSignals(ctx, dagAgent)
+
+			if err := dagAgent.Run(ctx); err != nil {
+				log.Fatalf("Failed to start DAG: %v", err) // nolint // deep-exit
+			}
 		},
 	}
 

@@ -15,6 +15,10 @@ import (
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
+var ErrServerRequestedShutdown = errors.New(
+	"socket frontend is requested to shutdown",
+)
+
 // Server is a unix socket frontend that passes http requests to HandlerFunc.
 type Server struct {
 	*Config
@@ -35,12 +39,6 @@ type HTTPHandlerFunc func(w http.ResponseWriter, r *http.Request)
 func NewServer(c *Config) (*Server, error) {
 	return &Server{Config: c}, nil
 }
-
-var (
-	ErrServerRequestedShutdown = errors.New(
-		"socket frontend is requested to shutdown",
-	)
-)
 
 // Serve starts listening and serving requests.
 func (svr *Server) Serve(listen chan error) error {
@@ -94,13 +92,13 @@ func (svr *Server) Shutdown() error {
 	return nil
 }
 
+var _ http.ResponseWriter = (*httpResponseWriter)(nil)
+
 type httpResponseWriter struct {
 	conn       *net.Conn
 	header     http.Header
 	statusCode int
 }
-
-var _ http.ResponseWriter = (*httpResponseWriter)(nil)
 
 func newHTTPResponseWriter(conn *net.Conn) http.ResponseWriter {
 	return &httpResponseWriter{

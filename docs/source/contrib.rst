@@ -24,19 +24,13 @@ Setting up your local environment
 
    .. code-block:: sh
 
-      go run main.go
+      make run
 
 #. Now you can change the source code and build the binary by running the following command:
 
    .. code-block:: sh
 
       make build
-
-#. Run the following command to start the `Dagu` application:
-
-   .. code-block:: sh
-
-      ./bin/dagu
 
 Running Tests
 -------------
@@ -63,9 +57,8 @@ Code Structure
   - ``executor``: Contains the code for different types of executors.
   - ``scheduler``: Contains the code for running a DAG and steps.
   - ``sock``: Contains the code for interacting with the socket.
-  - ``service``: Contains the internal code for the project.
-    - ``frontend``: Contains the code for the frontend Web UI.
-    - ``scheduelr``: Contains the code for scheduler.
+  - ``frontend``: Contains the code for the frontend Web UI.
+  - ``scheduler``: Contains the code for scheduler.
 
 Setting up your local environment for front end development
 -------------------------------------------------------------

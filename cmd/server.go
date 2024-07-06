@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/service/frontend"
+	"github.com/dagu-dev/dagu/internal/frontend"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
@@ -33,6 +33,7 @@ func serverCmd() *cobra.Command {
 				fx.Provide(func() *config.Config { return cfg }),
 				fx.Invoke(frontend.LifetimeHooks),
 			)
+
 			if err := app.Start(cmd.Context()); err != nil {
 				// nolint
 				log.Fatalf("Failed to start server: %v", err)

@@ -39,7 +39,7 @@ jobs:
 
       - name: Copy web assets
         run: |
-          cp ui/dist/* ./internal/service/frontend/assets/
+          cp ui/dist/* ./internal/frontend/assets/
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2

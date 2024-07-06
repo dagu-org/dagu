@@ -3,31 +3,46 @@ package client
 import (
 	"os"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/jsondb"
 	"github.com/dagu-dev/dagu/internal/persistence/local"
 	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
 )
 
-type dataStoreFactoryImpl struct {
-	cfg          *config.Config
+var _ persistence.DataStores = (*dataStores)(nil)
+
+type dataStores struct {
 	historyStore persistence.HistoryStore
 	dagStore     persistence.DAGStore
+
+	dags              string
+	dataDir           string
+	suspendFlagsDir   string
+	latestStatusToday bool
 }
 
-var _ persistence.DataStoreFactory = (*dataStoreFactoryImpl)(nil)
+type NewDataStoresArgs struct {
+	DAGs              string
+	DataDir           string
+	SuspendFlagsDir   string
+	LatestStatusToday bool
+}
 
-func NewDataStoreFactory(cfg *config.Config) persistence.DataStoreFactory {
-	dataStoreImpl := &dataStoreFactoryImpl{cfg: cfg}
+func NewDataStores(args *NewDataStoresArgs) persistence.DataStores {
+	dataStoreImpl := &dataStores{
+		dags:              args.DAGs,
+		dataDir:           args.DataDir,
+		suspendFlagsDir:   args.SuspendFlagsDir,
+		latestStatusToday: args.LatestStatusToday,
+	}
 	_ = dataStoreImpl.InitDagDir()
 	return dataStoreImpl
 }
 
-func (f *dataStoreFactoryImpl) InitDagDir() error {
-	_, err := os.Stat(f.cfg.DAGs)
+func (f *dataStores) InitDagDir() error {
+	_, err := os.Stat(f.dags)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(f.cfg.DAGs, 0755); err != nil {
+		if err := os.MkdirAll(f.dags, 0755); err != nil {
 			return err
 		}
 	}
@@ -35,22 +50,22 @@ func (f *dataStoreFactoryImpl) InitDagDir() error {
 	return nil
 }
 
-func (f *dataStoreFactoryImpl) NewHistoryStore() persistence.HistoryStore {
+func (f *dataStores) HistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
 		f.historyStore = jsondb.New(
-			f.cfg.DataDir, f.cfg.DAGs, f.cfg.LatestStatusToday)
+			f.dataDir, f.dags, f.latestStatusToday)
 	}
 	return f.historyStore
 }
 
-func (f *dataStoreFactoryImpl) NewDAGStore() persistence.DAGStore {
+func (f *dataStores) DAGStore() persistence.DAGStore {
 	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(f.cfg, f.cfg.DAGs)
+		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
 	}
 	return f.dagStore
 }
 
-func (f *dataStoreFactoryImpl) NewFlagStore() persistence.FlagStore {
-	return local.NewFlagStore(storage.NewStorage(f.cfg.SuspendFlagsDir))
+func (f *dataStores) FlagStore() persistence.FlagStore {
+	return local.NewFlagStore(storage.NewStorage(f.suspendFlagsDir))
 }
