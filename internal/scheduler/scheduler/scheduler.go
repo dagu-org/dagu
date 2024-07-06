@@ -32,7 +32,7 @@ type EntryReader interface {
 type Entry struct {
 	Next      time.Time
 	Job       Job
-	EntryType Type
+	EntryType EntryType
 	Logger    logger.Logger
 }
 
@@ -44,10 +44,10 @@ type Job interface {
 	String() string
 }
 
-type Type int
+type EntryType int
 
 const (
-	Start Type = iota
+	Start EntryType = iota
 	Stop
 	Restart
 )
@@ -88,18 +88,18 @@ func (e *Entry) Invoke() error {
 	return nil
 }
 
-type Params struct {
+type NewSchedulerArgs struct {
 	EntryReader EntryReader
 	Logger      logger.Logger
 	LogDir      string
 }
 
-func New(params Params) *Scheduler {
+func NewScheduler(args NewSchedulerArgs) *Scheduler {
 	return &Scheduler{
-		entryReader: params.EntryReader,
-		logDir:      params.LogDir,
+		entryReader: args.EntryReader,
+		logDir:      args.LogDir,
 		stop:        make(chan struct{}),
-		logger:      params.Logger,
+		logger:      args.Logger,
 	}
 }
 

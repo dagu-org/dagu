@@ -49,7 +49,7 @@ func JobFactoryProvider(
 }
 
 func New(params Params) *scheduler.Scheduler {
-	return scheduler.New(scheduler.Params{
+	return scheduler.NewScheduler(scheduler.NewSchedulerArgs{
 		EntryReader: params.EntryReader,
 		Logger:      params.Logger,
 		LogDir:      params.Config.LogDir,

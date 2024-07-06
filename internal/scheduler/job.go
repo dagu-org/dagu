@@ -1,17 +1,25 @@
-package job
+package scheduler
 
 import (
 	"errors"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	dagscheduler "github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
-// TODO: write tests
-type Job struct {
+var (
+	errJobRunning      = errors.New("job already running")
+	errJobIsNotRunning = errors.New("job is not running")
+	errJobFinished     = errors.New("job already finished")
+)
+
+var _ scheduler.Job = (*jobImpl)(nil)
+
+type jobImpl struct {
 	DAG        *dag.DAG
 	Executable string
 	WorkDir    string
@@ -19,25 +27,19 @@ type Job struct {
 	Engine     engine.Engine
 }
 
-var (
-	ErrJobRunning      = errors.New("job already running")
-	ErrJobIsNotRunning = errors.New("job is not running")
-	ErrJobFinished     = errors.New("job already finished")
-)
-
-func (j *Job) GetDAG() *dag.DAG {
+func (j *jobImpl) GetDAG() *dag.DAG {
 	return j.DAG
 }
 
-func (j *Job) Start() error {
+func (j *jobImpl) Start() error {
 	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
 
-	if latestStatus.Status == scheduler.StatusRunning {
+	if latestStatus.Status == dagscheduler.StatusRunning {
 		// already running
-		return ErrJobRunning
+		return errJobRunning
 	}
 
 	// check the last execution time
@@ -45,28 +47,28 @@ func (j *Job) Start() error {
 	if err == nil {
 		lastExecTime = lastExecTime.Truncate(time.Second * 60)
 		if lastExecTime.After(j.Next) || j.Next.Equal(lastExecTime) {
-			return ErrJobFinished
+			return errJobFinished
 		}
 	}
 	// should not be here
 	return j.Engine.Start(j.DAG, "")
 }
 
-func (j *Job) Stop() error {
+func (j *jobImpl) Stop() error {
 	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
-	if latestStatus.Status != scheduler.StatusRunning {
-		return ErrJobIsNotRunning
+	if latestStatus.Status != dagscheduler.StatusRunning {
+		return errJobIsNotRunning
 	}
 	return j.Engine.Stop(j.DAG)
 }
 
-func (j *Job) Restart() error {
+func (j *jobImpl) Restart() error {
 	return j.Engine.Restart(j.DAG)
 }
 
-func (j *Job) String() string {
+func (j *jobImpl) String() string {
 	return j.DAG.Name
 }

@@ -52,7 +52,7 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	schedulerInstance := New(Params{
+	schedulerInstance := NewScheduler(NewSchedulerArgs{
 		EntryReader: er,
 		LogDir:      testHomeDir,
 		Logger:      logger.NewSlogLogger(),
@@ -84,7 +84,7 @@ func TestRestart(t *testing.T) {
 		},
 	}
 
-	schedulerInstance := New(Params{
+	schedulerInstance := NewScheduler(NewSchedulerArgs{
 		EntryReader: entryReader,
 		LogDir:      testHomeDir,
 		Logger:      logger.NewSlogLogger(),
@@ -102,7 +102,7 @@ func TestRestart(t *testing.T) {
 func TestNextTick(t *testing.T) {
 	now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 	setFixedTime(now)
-	schedulerInstance := New(Params{
+	schedulerInstance := NewScheduler(NewSchedulerArgs{
 		EntryReader: &mockEntryReader{},
 		LogDir:      testHomeDir,
 		Logger:      logger.NewSlogLogger(),

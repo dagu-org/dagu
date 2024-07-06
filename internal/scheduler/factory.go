@@ -5,7 +5,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/scheduler/job"
 	"github.com/dagu-dev/dagu/internal/scheduler/scheduler"
 )
 
@@ -16,7 +15,7 @@ type jobFactory struct {
 }
 
 func (jf jobFactory) NewJob(dg *dag.DAG, next time.Time) scheduler.Job {
-	return &job.Job{
+	return &jobImpl{
 		DAG:        dg,
 		Executable: jf.Executable,
 		WorkDir:    jf.WorkDir,
