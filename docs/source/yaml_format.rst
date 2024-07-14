@@ -226,6 +226,20 @@ Example Log output:
 
 .. image:: https://raw.githubusercontent.com/yohamta/dagu/main/examples/images/docker.png
 
+By default, Dagu will try to pull the Docker image. For images built locally this will fail. If you want to skip image pull, pass :code:`pull: false` in executor config.
+
+.. code-block:: yaml
+
+   steps:
+     - name: deno_hello_world
+       executor:
+         type: docker
+         config:
+           image: "denoland/deno:1.10.3"
+           pull: false
+           autoRemove: true
+       command: run https://examples.deno.land/hello-world.ts
+
 
 You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
 
