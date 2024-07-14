@@ -99,7 +99,7 @@ func (e *docker) Run() error {
 		ctx, resp.ID, types.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
-			Follow: true,
+			Follow:     true,
 		},
 	)
 	if err != nil {
