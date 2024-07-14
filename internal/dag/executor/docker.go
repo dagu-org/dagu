@@ -95,6 +95,22 @@ func (e *docker) Run() error {
 		}
 	}()
 
+	out, err := cli.ContainerLogs(
+		ctx, resp.ID, types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow: true,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
+		util.LogErr("docker executor: stdcopy", err)
+	}()
+
 	statusCh, errCh := cli.ContainerWait(
 		ctx, resp.ID, container.WaitConditionNotRunning,
 	)
@@ -108,16 +124,6 @@ func (e *docker) Run() error {
 			return fmt.Errorf("exit status %v", status.StatusCode)
 		}
 	}
-
-	out, err := cli.ContainerLogs(
-		ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true},
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
-	util.LogErr("docker executor: stdcopy", err)
 
 	return nil
 }
