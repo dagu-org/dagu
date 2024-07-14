@@ -20,6 +20,7 @@ import (
 
 type docker struct {
 	image           string
+	pull            bool
 	autoRemove      bool
 	step            dag.Step
 	containerConfig *container.Config
@@ -57,13 +58,15 @@ func (e *docker) Run() error {
 	}
 	defer cli.Close()
 
-	reader, err := cli.ImagePull(ctx, e.image, types.ImagePullOptions{})
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(e.stdout, reader)
-	if err != nil {
-		return err
+	if e.pull {
+		reader, err := cli.ImagePull(ctx, e.image, types.ImagePullOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(e.stdout, reader)
+		if err != nil {
+			return err
+		}
 	}
 
 	if e.image != "" {
@@ -167,7 +170,15 @@ func newDocker(
 		}
 	}
 
+	pull := true
+	if p, ok := execCfg.Config["pull"]; ok {
+		if p, ok := p.(bool); ok {
+			pull = p
+		}
+	}
+
 	exec := &docker{
+		pull:            pull,
 		step:            step,
 		stdout:          os.Stdout,
 		containerConfig: containerConfig,
