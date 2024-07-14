@@ -96,7 +96,10 @@ func (e *docker) Run() error {
 		if err != nil {
 			return err
 		}
-	case <-statusCh:
+	case status := <-statusCh:
+		if status.StatusCode != 0 {
+			return fmt.Errorf("exit status %v", status.StatusCode)
+		}
 	}
 
 	out, err := cli.ContainerLogs(
