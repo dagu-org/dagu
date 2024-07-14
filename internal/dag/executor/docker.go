@@ -88,6 +88,13 @@ func (e *docker) Run() error {
 		return err
 	}
 
+	defer func() {
+		if e.autoRemove {
+			err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
+			util.LogErr("docker executor: remove container", err)
+		}
+	}()
+
 	statusCh, errCh := cli.ContainerWait(
 		ctx, resp.ID, container.WaitConditionNotRunning,
 	)
@@ -111,11 +118,6 @@ func (e *docker) Run() error {
 
 	_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
 	util.LogErr("docker executor: stdcopy", err)
-
-	if e.autoRemove {
-		err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
-		util.LogErr("docker executor: remove container", err)
-	}
 
 	return nil
 }
