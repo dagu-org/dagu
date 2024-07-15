@@ -257,10 +257,10 @@ func (*Store) exists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-func (store *Store) Rename(oldName, newName string) error {
+func (store *Store) Rename(oldID, newID string) error {
 	// This is needed to ensure backward compatibility.
-	on := store.normalizeInternalName(oldName)
-	nn := store.normalizeInternalName(newName)
+	on := store.normalizeInternalName(oldID)
+	nn := store.normalizeInternalName(newID)
 
 	oldDir := store.directory(on, prefix(on))
 	newDir := store.directory(nn, prefix(nn))
