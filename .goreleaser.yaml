@@ -33,6 +33,7 @@ brews:
   - repository:
       owner: yohamta
       name: homebrew-tap
+    directory: Formula
     homepage: "https://github.com/dagu-dev/dagu"
     description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
@@ -47,6 +48,7 @@ brews:
   - repository:
       owner: dagu-dev
       name: homebrew-brew
+    directory: Formula
     homepage: "https://github.com/dagu-dev/dagu"
     description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
