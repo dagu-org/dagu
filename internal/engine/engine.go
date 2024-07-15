@@ -47,7 +47,6 @@ var (
 
 var (
 	errCreateDAGFile = errors.New("failed to create DAG file")
-	errRenameDAG     = errors.New("failed to rename DAG")
 	errGetStatus     = errors.New("failed to get status")
 	errDAGIsRunning  = errors.New("the DAG is running")
 )
@@ -73,16 +72,13 @@ func (e *engineImpl) Grep(pattern string) (
 	return dagStore.Grep(pattern)
 }
 
-func (e *engineImpl) Rename(oldName, newName string) error {
+func (e *engineImpl) Rename(oldID, newID string) error {
 	dagStore := e.dataStore.DAGStore()
-	if err := dagStore.Rename(oldName, newName); err != nil {
-		return fmt.Errorf("%w: %s", errRenameDAG, err)
+	if err := dagStore.Rename(oldID, newID); err != nil {
+		return err
 	}
 	historyStore := e.dataStore.HistoryStore()
-	if err := historyStore.Rename(oldName, newName); err != nil {
-		return fmt.Errorf("%w: %s", errRenameDAG, err)
-	}
-	return nil
+	return historyStore.Rename(oldID, newID)
 }
 
 func (*engineImpl) Stop(dg *dag.DAG) error {

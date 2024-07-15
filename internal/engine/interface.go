@@ -9,10 +9,10 @@ import (
 )
 
 type Engine interface {
-	CreateDAG(name string) (string, error)
+	CreateDAG(id string) (string, error)
 	GetDAGSpec(id string) (string, error)
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
-	Rename(oldDAGPath, newDAGPath string) error
+	Rename(oldID, newID string) error
 	Stop(dg *dag.DAG) error
 	StartAsync(dg *dag.DAG, params string)
 	Start(dg *dag.DAG, params string) error
@@ -24,7 +24,7 @@ type Engine interface {
 	GetRecentHistory(dg *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(dg *dag.DAG, status *model.Status) error
 	UpdateDAG(id string, spec string) error
-	DeleteDAG(name, loc string) error
+	DeleteDAG(id, loc string) error
 	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
 	GetStatus(dagLocation string) (*DAGStatus, error)
 	IsSuspended(id string) bool

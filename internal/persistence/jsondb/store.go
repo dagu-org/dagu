@@ -66,8 +66,8 @@ func New(dir, dagsDir string, latestStatusToday bool) *Store {
 	return s
 }
 
-func (store *Store) Update(dagFile, reqID string, s *model.Status) error {
-	f, err := store.FindByRequestID(dagFile, reqID)
+func (s *Store) Update(dagFile, reqID string, status *model.Status) error {
+	f, err := s.FindByRequestID(dagFile, reqID)
 	if err != nil {
 		return err
 	}
@@ -76,50 +76,50 @@ func (store *Store) Update(dagFile, reqID string, s *model.Status) error {
 		return err
 	}
 	defer func() {
-		store.cache.Invalidate(f.File)
+		s.cache.Invalidate(f.File)
 		_ = w.close()
 	}()
-	return w.write(s)
+	return w.write(status)
 }
 
-func (store *Store) Open(dagFile string, t time.Time, reqID string) error {
-	writer, _, err := store.newWriter(dagFile, t, reqID)
+func (s *Store) Open(dagFile string, t time.Time, reqID string) error {
+	writer, _, err := s.newWriter(dagFile, t, reqID)
 	if err != nil {
 		return err
 	}
 	if err := writer.open(); err != nil {
 		return err
 	}
-	store.writer = writer
+	s.writer = writer
 	return nil
 }
 
-func (store *Store) Write(s *model.Status) error {
-	return store.writer.write(s)
+func (s *Store) Write(status *model.Status) error {
+	return s.writer.write(status)
 }
 
-func (store *Store) Close() error {
-	if store.writer == nil {
+func (s *Store) Close() error {
+	if s.writer == nil {
 		return nil
 	}
 	defer func() {
-		_ = store.writer.close()
-		store.writer = nil
+		_ = s.writer.close()
+		s.writer = nil
 	}()
-	if err := store.Compact(
-		store.writer.dagFile, store.writer.target,
+	if err := s.Compact(
+		s.writer.dagFile, s.writer.target,
 	); err != nil {
 		return err
 	}
-	store.cache.Invalidate(store.writer.target)
-	return store.writer.close()
+	s.cache.Invalidate(s.writer.target)
+	return s.writer.close()
 }
 
 // NewWriter creates a new writer for a status.
-func (store *Store) newWriter(
+func (s *Store) newWriter(
 	dagFile string, t time.Time, reqID string,
 ) (*writer, string, error) {
-	f, err := store.newFile(dagFile, t, reqID)
+	f, err := s.newFile(dagFile, t, reqID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -128,13 +128,13 @@ func (store *Store) newWriter(
 }
 
 // ReadStatusRecent returns recent n status
-func (store *Store) ReadStatusRecent(
+func (s *Store) ReadStatusRecent(
 	dagFile string, n int,
 ) []*model.StatusFile {
 	var ret []*model.StatusFile
-	files := store.latest(store.pattern(dagFile)+"*.dat", n)
+	files := s.latest(s.globPattern(dagFile), n)
 	for _, file := range files {
-		status, err := store.cache.LoadLatest(
+		status, err := s.cache.LoadLatest(
 			file,
 			func() (*model.Status, error) {
 				return ParseFile(file)
@@ -152,26 +152,25 @@ func (store *Store) ReadStatusRecent(
 }
 
 // ReadStatusToday returns a list of status files.
-func (store *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
+func (s *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 	// TODO: let's fix below not to use config here
-	file, err := store.latestToday(dagFile, time.Now(), store.latestStatusToday)
+	file, err := s.latestToday(dagFile, time.Now(), s.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}
-	return store.cache.LoadLatest(file, func() (*model.Status, error) {
+	return s.cache.LoadLatest(file, func() (*model.Status, error) {
 		return ParseFile(file)
 	})
 }
 
 // FindByRequestID finds a status file by request ID
-func (store *Store) FindByRequestID(
+func (s *Store) FindByRequestID(
 	dagFile string, reqID string,
 ) (*model.StatusFile, error) {
 	if reqID == "" {
 		return nil, errRequestIDNotFound
 	}
-	pattern := store.pattern(dagFile) + "*.dat"
-	matches, err := filepath.Glob(pattern)
+	matches, err := filepath.Glob(s.globPattern(dagFile))
 	if len(matches) > 0 || err == nil {
 		sort.Slice(matches, func(i, j int) bool {
 			return strings.Compare(matches[i], matches[j]) >= 0
@@ -194,16 +193,15 @@ func (store *Store) FindByRequestID(
 }
 
 // RemoveAll removes all files in a directory.
-func (store *Store) RemoveAll(dagFile string) error {
-	return store.RemoveOld(dagFile, 0)
+func (s *Store) RemoveAll(dagFile string) error {
+	return s.RemoveOld(dagFile, 0)
 }
 
 // RemoveOld removes old files.
-func (store *Store) RemoveOld(dagFile string, retentionDays int) error {
-	pattern := store.pattern(dagFile) + "*.dat"
+func (s *Store) RemoveOld(dagFile string, retentionDays int) error {
 	var lastErr error
 	if retentionDays >= 0 {
-		matches, _ := filepath.Glob(pattern)
+		matches, _ := filepath.Glob(s.globPattern(dagFile))
 		ot := time.Now().AddDate(0, 0, -1*retentionDays)
 		for _, m := range matches {
 			info, err := os.Stat(m)
@@ -245,45 +243,38 @@ func (*Store) Compact(_, original string) error {
 	return os.Remove(original)
 }
 
-func (store *Store) normalizeInternalName(name string) string {
-	a := strings.TrimSuffix(name, ".yaml")
-	a = strings.TrimSuffix(a, ".yml")
-	a = path.Join(store.dagsDir, a)
-	return fmt.Sprintf("%s.yaml", a)
-}
-
 func (*Store) exists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
 
-func (store *Store) Rename(oldName, newName string) error {
+func (s *Store) Rename(oldID, newID string) error {
 	// This is needed to ensure backward compatibility.
-	on := store.normalizeInternalName(oldName)
-	nn := store.normalizeInternalName(newName)
+	on := util.AddYamlExtension(oldID)
+	nn := util.AddYamlExtension(newID)
 
-	oldDir := store.directory(on, prefix(on))
-	newDir := store.directory(nn, prefix(nn))
-	if !store.exists(oldDir) {
+	oldDir := s.getDirectory(on, prefix(on))
+	newDir := s.getDirectory(nn, prefix(nn))
+	if !s.exists(oldDir) {
 		// Nothing to do
 		return nil
 	}
-	if !store.exists(newDir) {
+	if !s.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
 			return fmt.Errorf(
 				"%w: %s : %s", errCreateNewDirectory, newDir, err.Error(),
 			)
 		}
 	}
-	matches, err := filepath.Glob(store.pattern(on) + "*.dat")
+	matches, err := filepath.Glob(s.globPattern(on))
 	if err != nil {
 		return err
 	}
-	oldPattern := path.Base(store.pattern(on))
-	newPattern := path.Base(store.pattern(nn))
+	oldPrefix := path.Base(s.prefixWithDirectory(on))
+	newPrefix := path.Base(s.prefixWithDirectory(nn))
 	for _, m := range matches {
 		base := path.Base(m)
-		f := strings.Replace(base, oldPattern, newPattern, 1)
+		f := strings.Replace(base, oldPrefix, newPrefix, 1)
 		_ = os.Rename(m, path.Join(newDir, f))
 	}
 	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
@@ -292,33 +283,28 @@ func (store *Store) Rename(oldName, newName string) error {
 	return nil
 }
 
-func (store *Store) directory(name string, prefix string) string {
+func (s *Store) getDirectory(name string, prefix string) string {
 	// nolint
 	h := md5.New()
 	_, _ = h.Write([]byte(name))
 	v := hex.EncodeToString(h.Sum(nil))
-	return filepath.Join(store.dir, fmt.Sprintf("%s-%s", prefix, v))
+	return filepath.Join(s.dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
-func (store *Store) newFile(
+const reqIDLenSafe = 8
+
+func (s *Store) newFile(
 	dagFile string, t time.Time, reqID string,
 ) (string, error) {
 	if dagFile == "" {
 		return "", errDAGFileEmpty
 	}
-	fileName := fmt.Sprintf(
+	return fmt.Sprintf(
 		"%s.%s.%s.dat",
-		store.pattern(dagFile),
+		s.prefixWithDirectory(dagFile),
 		t.Format("20060102.15:04:05.000"),
-		util.TruncString(reqID, 8),
-	)
-	return fileName, nil
-}
-
-func (store *Store) pattern(dagFile string) string {
-	p := prefix(dagFile)
-	dir := store.directory(dagFile, p)
-	return filepath.Join(dir, p)
+		util.TruncString(reqID, reqIDLenSafe),
+	), nil
 }
 
 // nolint
@@ -331,10 +317,10 @@ func (store *Store) latestToday(
 	pattern := ""
 	if latestStatusToday {
 		pattern = fmt.Sprintf(
-			"%s.%s*.*.dat", store.pattern(dagFile), day.Format("20060102"),
+			"%s.%s*.*.dat", store.prefixWithDirectory(dagFile), day.Format("20060102"),
 		)
 	} else {
-		pattern = fmt.Sprintf("%s.*.*.dat", store.pattern(dagFile))
+		pattern = fmt.Sprintf("%s.*.*.dat", store.prefixWithDirectory(dagFile))
 	}
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
@@ -355,6 +341,17 @@ func (*Store) latest(pattern string, n int) []string {
 		ret = filterLatest(matches, n)
 	}
 	return ret
+}
+
+const extDat = ".dat"
+
+func (s *Store) globPattern(dagFile string) string {
+	return s.prefixWithDirectory(dagFile) + "*" + extDat
+}
+
+func (s *Store) prefixWithDirectory(dagFile string) string {
+	p := prefix(dagFile)
+	return filepath.Join(s.getDirectory(dagFile, p), p)
 }
 
 func ParseFile(file string) (*model.Status, error) {
@@ -437,8 +434,5 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 }
 
 func prefix(dagFile string) string {
-	return strings.TrimSuffix(
-		filepath.Base(dagFile),
-		path.Ext(dagFile),
-	)
+	return strings.TrimSuffix(filepath.Base(dagFile), path.Ext(dagFile))
 }

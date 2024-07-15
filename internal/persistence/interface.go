@@ -42,7 +42,7 @@ type DAGStore interface {
 	GetDetails(name string) (*dag.DAG, error)
 	Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 	Load(name string) (*dag.DAG, error)
-	Rename(oldName, newName string) error
+	Rename(oldID, newID string) error
 	GetSpec(name string) (string, error)
 	UpdateSpec(name string, spec []byte) error
 	Find(name string) (*dag.DAG, error)
