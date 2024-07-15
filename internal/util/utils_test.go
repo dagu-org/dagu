@@ -234,3 +234,43 @@ func TestMatchExtension(t *testing.T) {
 		require.False(t, util.MatchExtension("test.txt", []string{".csv"}))
 	})
 }
+
+func TestAddYamlExtension(t *testing.T) {
+	type args struct {
+		file string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Empty",
+			args: args{
+				file: "",
+			},
+			want: ".yaml",
+		},
+		{
+			name: "WithExtension",
+			args: args{
+				file: "test.yml",
+			},
+			want: "test.yaml",
+		},
+		{
+			name: "WithoutExtension",
+			args: args{
+				file: "test",
+			},
+			want: "test.yaml",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := util.AddYamlExtension(tt.args.file); got != tt.want {
+				t.Errorf("AddYamlExtension() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

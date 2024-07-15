@@ -80,7 +80,7 @@ func TestWriteAndFindFiles(t *testing.T) {
 		testWriteStatus(t, db, d, status, data.Timestamp)
 	}
 
-	files := db.latest(db.prefix(d.Location)+"*.dat", 2)
+	files := db.latest(db.prefixWithDirectory(d.Location)+"*.dat", 2)
 	require.Equal(t, 2, len(files))
 }
 
@@ -168,12 +168,12 @@ func TestRemoveOldFiles(t *testing.T) {
 		testWriteStatus(t, db, d, data.Status, data.Timestamp)
 	}
 
-	files := db.latest(db.prefix(d.Location)+"*.dat", 3)
+	files := db.latest(db.prefixWithDirectory(d.Location)+"*.dat", 3)
 	require.Equal(t, 3, len(files))
 
 	_ = db.RemoveOld(d.Location, 0)
 
-	files = db.latest(db.prefix(d.Location)+"*.dat", 3)
+	files = db.latest(db.prefixWithDirectory(d.Location)+"*.dat", 3)
 	require.Equal(t, 0, len(files))
 
 	m := db.latest("invalid-pattern", 3)

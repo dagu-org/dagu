@@ -202,3 +202,16 @@ func MatchExtension(file string, exts []string) bool {
 	}
 	return false
 }
+
+// AddYamlExtension adds .yaml extension if not present
+// if it has .yml extension, replace it with .yaml
+func AddYamlExtension(file string) string {
+	ext := filepath.Ext(file)
+	if ext == "" {
+		return file + ".yaml"
+	}
+	if ext == ".yml" {
+		return strings.TrimSuffix(file, ext) + ".yaml"
+	}
+	return file
+}

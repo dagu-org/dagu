@@ -51,8 +51,8 @@ func TestWriteStatusToFile(t *testing.T) {
 	oldS := d.Location
 	newS := "text_write_status_new.yaml"
 
-	oldDir := db.directory(oldS, prefix(oldS))
-	newDir := db.directory(newS, prefix(newS))
+	oldDir := db.getDirectory(oldS, prefix(oldS))
+	newDir := db.getDirectory(newS, prefix(newS))
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 

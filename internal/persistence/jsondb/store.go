@@ -243,20 +243,6 @@ func (*Store) Compact(_, original string) error {
 	return os.Remove(original)
 }
 
-var yamlExts = []string{".yaml", ".yml"}
-
-const yamlExt = ".yaml"
-
-func (s *Store) normalizeInternalName(file string) string {
-	for _, ext := range yamlExts {
-		if strings.HasSuffix(file, ext) {
-			file = strings.TrimSuffix(file, ext)
-			break
-		}
-	}
-	return file + yamlExt
-}
-
 func (*Store) exists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
@@ -264,11 +250,11 @@ func (*Store) exists(file string) bool {
 
 func (s *Store) Rename(oldID, newID string) error {
 	// This is needed to ensure backward compatibility.
-	on := s.normalizeInternalName(oldID)
-	nn := s.normalizeInternalName(newID)
+	on := util.AddYamlExtension(oldID)
+	nn := util.AddYamlExtension(newID)
 
-	oldDir := s.directory(on, prefix(on))
-	newDir := s.directory(nn, prefix(nn))
+	oldDir := s.getDirectory(on, prefix(on))
+	newDir := s.getDirectory(nn, prefix(nn))
 	if !s.exists(oldDir) {
 		// Nothing to do
 		return nil
@@ -284,8 +270,8 @@ func (s *Store) Rename(oldID, newID string) error {
 	if err != nil {
 		return err
 	}
-	oldPrefix := path.Base(s.prefix(on))
-	newPrefix := path.Base(s.prefix(nn))
+	oldPrefix := path.Base(s.prefixWithDirectory(on))
+	newPrefix := path.Base(s.prefixWithDirectory(nn))
 	for _, m := range matches {
 		base := path.Base(m)
 		f := strings.Replace(base, oldPrefix, newPrefix, 1)
@@ -297,7 +283,7 @@ func (s *Store) Rename(oldID, newID string) error {
 	return nil
 }
 
-func (s *Store) directory(name string, prefix string) string {
+func (s *Store) getDirectory(name string, prefix string) string {
 	// nolint
 	h := md5.New()
 	_, _ = h.Write([]byte(name))
@@ -305,19 +291,20 @@ func (s *Store) directory(name string, prefix string) string {
 	return filepath.Join(s.dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
+const reqIDLenSafe = 8
+
 func (s *Store) newFile(
 	dagFile string, t time.Time, reqID string,
 ) (string, error) {
 	if dagFile == "" {
 		return "", errDAGFileEmpty
 	}
-	fileName := fmt.Sprintf(
+	return fmt.Sprintf(
 		"%s.%s.%s.dat",
-		s.prefix(dagFile),
+		s.prefixWithDirectory(dagFile),
 		t.Format("20060102.15:04:05.000"),
-		util.TruncString(reqID, 8),
-	)
-	return fileName, nil
+		util.TruncString(reqID, reqIDLenSafe),
+	), nil
 }
 
 // nolint
@@ -330,10 +317,10 @@ func (store *Store) latestToday(
 	pattern := ""
 	if latestStatusToday {
 		pattern = fmt.Sprintf(
-			"%s.%s*.*.dat", store.prefix(dagFile), day.Format("20060102"),
+			"%s.%s*.*.dat", store.prefixWithDirectory(dagFile), day.Format("20060102"),
 		)
 	} else {
-		pattern = fmt.Sprintf("%s.*.*.dat", store.prefix(dagFile))
+		pattern = fmt.Sprintf("%s.*.*.dat", store.prefixWithDirectory(dagFile))
 	}
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
@@ -359,13 +346,12 @@ func (*Store) latest(pattern string, n int) []string {
 const extDat = ".dat"
 
 func (s *Store) globPattern(dagFile string) string {
-	return s.prefix(dagFile) + "*" + extDat
+	return s.prefixWithDirectory(dagFile) + "*" + extDat
 }
 
-func (s *Store) prefix(dagFile string) string {
+func (s *Store) prefixWithDirectory(dagFile string) string {
 	p := prefix(dagFile)
-	dir := s.directory(dagFile, p)
-	return filepath.Join(dir, p)
+	return filepath.Join(s.getDirectory(dagFile, p), p)
 }
 
 func ParseFile(file string) (*model.Status, error) {
@@ -448,8 +434,5 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 }
 
 func prefix(dagFile string) string {
-	return strings.TrimSuffix(
-		filepath.Base(dagFile),
-		path.Ext(dagFile),
-	)
+	return strings.TrimSuffix(filepath.Base(dagFile), path.Ext(dagFile))
 }
