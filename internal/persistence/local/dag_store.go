@@ -135,22 +135,21 @@ func (d *dagStoreImpl) fileLocation(name string) (string, error) {
 		// this is for backward compatibility
 		return name, nil
 	}
-	loc := path.Join(d.dir, name)
-	return d.normalizeFilename(loc)
+	return d.normalizeFilename(path.Join(d.dir, name)), nil
 }
 
 var yamlExts = []string{".yaml", ".yml"}
 
 const yamlExt = ".yaml"
 
-func (d *dagStoreImpl) normalizeFilename(file string) (string, error) {
+func (d *dagStoreImpl) normalizeFilename(file string) string {
 	for _, ext := range yamlExts {
 		if strings.HasSuffix(file, ext) {
 			file = strings.TrimSuffix(file, ext)
 			break
 		}
 	}
-	return file + yamlExt, nil
+	return file + yamlExt
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {

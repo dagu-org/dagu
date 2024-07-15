@@ -243,11 +243,18 @@ func (*Store) Compact(_, original string) error {
 	return os.Remove(original)
 }
 
-func (s *Store) normalizeInternalName(name string) string {
-	a := strings.TrimSuffix(name, ".yaml")
-	a = strings.TrimSuffix(a, ".yml")
-	a = path.Join(s.dagsDir, a)
-	return fmt.Sprintf("%s.yaml", a)
+var yamlExts = []string{".yaml", ".yml"}
+
+const yamlExt = ".yaml"
+
+func (s *Store) normalizeInternalName(file string) string {
+	for _, ext := range yamlExts {
+		if strings.HasSuffix(file, ext) {
+			file = strings.TrimSuffix(file, ext)
+			break
+		}
+	}
+	return file + yamlExt
 }
 
 func (*Store) exists(file string) bool {
