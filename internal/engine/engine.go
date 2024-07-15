@@ -78,10 +78,7 @@ func (e *engineImpl) Rename(oldID, newID string) error {
 		return err
 	}
 	historyStore := e.dataStore.HistoryStore()
-	if err := historyStore.Rename(oldID, newID); err != nil {
-		return err
-	}
-	return nil
+	return historyStore.Rename(oldID, newID)
 }
 
 func (*engineImpl) Stop(dg *dag.DAG) error {
