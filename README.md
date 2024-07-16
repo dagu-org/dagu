@@ -10,7 +10,7 @@
     <img src="https://codecov.io/gh/dagu-dev/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
   </a>
   <a href="https://github.com/dagu-dev/dagu/releases">
-    <img src="https://img.shields.io/github/release/yohamta/dagu.svg" />
+    <img src="https://img.shields.io/github/release/dagu-dev/dagu.svg" />
   </a>
   <a href="https://godoc.org/github.com/dagu-dev/dagu">
     <img src="https://godoc.org/github.com/dagu-dev/dagu?status.svg" />
@@ -151,7 +151,7 @@ You can install Dagu quickly using Homebrew or by downloading the latest binary 
 ### Via Bash script
 
 ```sh
-curl -L https://raw.githubusercontent.com/yohamta/dagu/main/scripts/installer.sh | bash
+curl -L https://raw.githubusercontent.com/dagu-dev/dagu/main/scripts/installer.sh | bash
 ```
 
 ### Via GitHub Releases Page
