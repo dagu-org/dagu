@@ -12,7 +12,7 @@ func TestStatusCommand(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		dagFile := testDAGFile("status.yaml")
+		dagFile := testDAGFile("long.yaml")
 
 		// Start the DAG.
 		done := make(chan struct{})

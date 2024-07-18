@@ -13,7 +13,7 @@ func TestDryCommand(t *testing.T) {
 
 		tests := []cmdTest{
 			{
-				args:        []string{"dry", testDAGFile("dry.yaml")},
+				args:        []string{"dry", testDAGFile("success.yaml")},
 				expectedOut: []string{"Starting DRY-RUN"},
 			},
 		}

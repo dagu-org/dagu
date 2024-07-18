@@ -13,7 +13,7 @@ func TestStopCommand(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		dagFile := testDAGFile("stop.yaml")
+		dagFile := testDAGFile("long2.yaml")
 
 		// Start the DAG.
 		done := make(chan struct{})
