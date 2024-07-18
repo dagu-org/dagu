@@ -45,13 +45,13 @@ type TLS struct {
 	KeyFile  string
 }
 
-var lock sync.Mutex
+var configLock sync.Mutex
 
 const envPrefix = "DAGU"
 
 func Load() (*Config, error) {
-	lock.Lock()
-	defer lock.Unlock()
+	configLock.Lock()
+	defer configLock.Unlock()
 
 	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
@@ -92,9 +92,6 @@ func Load() (*Config, error) {
 const (
 	// Application name.
 	appName = "dagu"
-
-	// Default base config file.
-	baseConfig = "config.yaml"
 )
 
 func setupViper() error {
@@ -104,15 +101,15 @@ func setupViper() error {
 	// Set default values for config keys.
 
 	// Directories
-	defaultPaths := getBaseDirs()
-	viper.SetDefault("dags", defaultPaths.dags)
-	viper.SetDefault("suspendFlagsDir", defaultPaths.suspendFlags)
-	viper.SetDefault("dataDir", defaultPaths.data)
-	viper.SetDefault("logDir", defaultPaths.logs)
-	viper.SetDefault("adminLogsDir", defaultPaths.adminLogs)
+	baseDirs := getBaseDirs()
+	viper.SetDefault("dags", baseDirs.dags)
+	viper.SetDefault("suspendFlagsDir", baseDirs.suspendFlags)
+	viper.SetDefault("dataDir", baseDirs.data)
+	viper.SetDefault("logDir", baseDirs.logs)
+	viper.SetDefault("adminLogsDir", baseDirs.adminLogs)
 
 	// Base config file
-	viper.SetDefault("baseConfig", path.Join(defaultPaths.config, baseConfig))
+	viper.SetDefault("baseConfig", getBaseConfigPath(baseDirs))
 
 	// Other defaults
 	viper.SetDefault("host", "127.0.0.1")
@@ -203,6 +200,21 @@ func getHomeDir() string {
 		return ""
 	}
 	return dir
+}
+
+const (
+	// Base config file name for all DAGs.
+	baseConfig = "base.yaml"
+	// Legacy config path for backward compatibility.
+	legacyBaseConfig = "config.yaml"
+)
+
+func getBaseConfigPath(b baseDirs) string {
+	legacyPath := filepath.Join(b.config, legacyBaseConfig)
+	if _, err := os.Stat(legacyPath); err == nil {
+		return legacyPath
+	}
+	return filepath.Join(b.config, baseConfig)
 }
 
 func getLegacyConfigPath() (string, bool) {
