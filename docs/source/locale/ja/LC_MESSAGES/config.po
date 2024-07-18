@@ -95,10 +95,10 @@ msgstr ""
 
 #: ../../source/config.rst:26 5198113ba7f54794bbeb0077ec25bdc2
 msgid ""
-"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/config.yaml``): The path to the base "
+"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/base.yaml``): The path to the base "
 "configuration file."
 msgstr ""
-"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/config.yaml``): 基本設定ファイルへのパス。"
+"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/base.yaml``): 基本設定ファイルへのパス。"
 
 #: ../../source/config.rst:27 f185a5aa23a049b484202296d52e9272
 msgid ""

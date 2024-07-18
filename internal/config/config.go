@@ -206,7 +206,7 @@ const (
 	// Base config file name for all DAGs.
 	baseConfig = "base.yaml"
 	// Legacy config path for backward compatibility.
-	legacyBaseConfig = "config.yaml"
+	legacyBaseConfig = "base.yaml"
 )
 
 func getBaseConfigPath(b baseDirs) string {
