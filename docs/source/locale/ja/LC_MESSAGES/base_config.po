@@ -27,13 +27,13 @@ msgstr "すべてのDAGの基本設定"
 #: ../../source/base_config.rst:6 0f42fc55990a404f9e436073ba71ba93
 #, fuzzy
 msgid ""
-"Creating a base configuration (default path: ``~/.dagu/config.yaml``) is "
+"Creating a base configuration (default path: ``~/.config/dagu/config.yaml``) is "
 "a convenient way to organize shared settings among all workflows. The "
 "path to the base configuration file can be configured. See "
 ":ref:`Configuration Options` for more details."
 msgstr ""
 "基本設定（デフォルトのパス: "
-"``~/.dagu/config.yaml``）を作成することは、すべてのDAG間で共有設定を整理するのに便利な方法です。基本設定ファイルへのパスは設定可能です。詳細については、:ref:`Configuration"
+"``~/.config/dagu/config.yaml``）を作成することは、すべてのDAG間で共有設定を整理するのに便利な方法です。基本設定ファイルへのパスは設定可能です。詳細については、:ref:`Configuration"
 " Options` を参照してください。"
 
 #: ../../source/base_config.rst:8 b7458496869246558d3efeee58648edd
