@@ -8,7 +8,7 @@ import (
 )
 
 func TestStopCommand(t *testing.T) {
-	t.Run("Stop a DAG", func(t *testing.T) {
+	t.Run("StopDAG", func(t *testing.T) {
 		setup := setupTest(t)
 		defer setup.cleanup()
 

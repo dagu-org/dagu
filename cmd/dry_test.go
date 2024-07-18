@@ -5,7 +5,7 @@ import (
 )
 
 func TestDryCommand(t *testing.T) {
-	t.Run("Dry-run command should run", func(t *testing.T) {
+	t.Run("DryRun", func(t *testing.T) {
 		setup := setupTest(t)
 		defer setup.cleanup()
 

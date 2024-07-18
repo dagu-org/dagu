@@ -14,7 +14,7 @@ const (
 )
 
 func TestRestartCommand(t *testing.T) {
-	t.Run("Restart a DAG", func(t *testing.T) {
+	t.Run("RestartDAG", func(t *testing.T) {
 		setup := setupTest(t)
 		defer setup.cleanup()
 

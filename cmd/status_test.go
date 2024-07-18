@@ -7,7 +7,7 @@ import (
 )
 
 func TestStatusCommand(t *testing.T) {
-	t.Run("Status command should run", func(t *testing.T) {
+	t.Run("StatusDAG", func(t *testing.T) {
 		setup := setupTest(t)
 		defer setup.cleanup()
 

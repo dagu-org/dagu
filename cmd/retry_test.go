@@ -9,7 +9,7 @@ import (
 )
 
 func TestRetryCommand(t *testing.T) {
-	t.Run("Retry a DAG", func(t *testing.T) {
+	t.Run("RetryDAG", func(t *testing.T) {
 		setup := setupTest(t)
 		defer setup.cleanup()
 
