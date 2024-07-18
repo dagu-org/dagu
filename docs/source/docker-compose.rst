@@ -5,44 +5,40 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
 
 .. code-block:: yaml
 
-    version: "3.9"
-    services:
-
+  version: "3.9"
+  services:
       # init container updates permission
       init:
-        image: "ghcr.io/dagu-dev/dagu:latest"
-        user: root
-        volumes:
-          - dagu:/home/dagu/.dagu
-        command: chown -R dagu /home/dagu/.dagu/
-
+          image: "ghcr.io/dagu-dev/dagu:latest"
+          user: root
+          volumes:
+              - dagu_config:/home/dagu/.config/dagu
+              - dagu_data:/home/dagu/.local/share
+          command: chown -R dagu /home/dagu/.config/dagu/ /home/dagu/.local/share
       # ui server process
       server:
-        image: "ghcr.io/dagu-dev/dagu:latest"
-        environment:
-          - DAGU_PORT=8080
-          - DAGU_DAGS=/home/dagu/.dagu/dags
-        restart: unless-stopped
-        ports:
-          - "8080:8080"
-        volumes:
-          - dagu:/home/dagu/.dagu
-          - ./dags/:/home/dagu/.dagu/dags
-        depends_on:
-          - init
-
+          image: "ghcr.io/dagu-dev/dagu:latest"
+          environment:
+              - DAGU_PORT=8080
+          restart: unless-stopped
+          ports:
+              - "8080:8080"
+          volumes:
+              - dagu_config:/home/dagu/.config/dagu
+              - dagu_data:/home/dagu/.local/share
+          depends_on:
+              - init
       # scheduler process
       scheduler:
-        image: "ghcr.io/dagu-dev/dagu:latest"
-        environment:
-          - DAGU_DAGS=/home/dagu/.dagu/dags
-        restart: unless-stopped
-        volumes:
-          - dagu:/home/dagu/.dagu
-          - ./dags/:/home/dagu/.dagu/dags
-        command: dagu scheduler
-        depends_on:
-          - init
+          image: "ghcr.io/dagu-dev/dagu:latest"
+          restart: unless-stopped
+          volumes:
+              - dagu_config:/home/dagu/.config/dagu
+              - dagu_data:/home/dagu/.local/share
+          command: dagu scheduler
+          depends_on:
+              - init
+  volumes:
+      dagu_config: {}
+      dagu_data: {}
 
-    volumes:
-      dagu: {}
