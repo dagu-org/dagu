@@ -477,17 +477,17 @@ msgstr "``steps``: 要在 DAG 中执行的步骤列表。"
 
 #: ../../source/yaml_format.rst:482 8993958642c54df8af8f8feb63a61306
 msgid ""
-"In addition, a global configuration file, ``$DAGU_HOME/config.yaml``, can"
+"In addition, a global configuration file, ``$DAGU_HOME/base.yaml``, can"
 " be used to gather common settings, such as ``logDir`` or ``env``."
 msgstr ""
-"此外,可以使用全局配置文件 ``$DAGU_HOME/config.yaml`` 来收集常见设置,例如 ``logDir`` 或 ``env``。"
+"此外,可以使用全局配置文件 ``$DAGU_HOME/base.yaml`` 来收集常见设置,例如 ``logDir`` 或 ``env``。"
 
 #: ../../source/yaml_format.rst:484 bee44595f6004cc0b34f4e2bbfdb1217
 msgid ""
 "Note: If ``DAGU_HOME`` environment variable is not set, the default path "
-"is ``$HOME/.dagu/config.yaml``."
+"is ``$HOME/.dagu/base.yaml``."
 msgstr ""
-"注意:如果未设置 ``DAGU_HOME`` 环境变量,默认路径为 ``$HOME/.dagu/config.yaml``。"
+"注意:如果未设置 ``DAGU_HOME`` 环境变量,默认路径为 ``$HOME/.dagu/base.yaml``。"
 
 #: ../../source/yaml_format.rst:522 f7dc490d92784e0695de6deee2b84465
 msgid "Step"

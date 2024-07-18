@@ -1,8 +1,9 @@
 module github.com/dagu-dev/dagu
 
-go 1.22.0
+go 1.22.5
 
 require (
+	github.com/adrg/xdg v0.5.0
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-chi/chi/v5 v5.0.8
@@ -29,6 +30,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
+	github.com/yohamta/gomerger v0.0.1
 	go.uber.org/fx v1.20.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
@@ -261,6 +263,6 @@ require (
 	github.com/samber/lo v1.38.1
 	golang.org/x/crypto v0.24.0
 	golang.org/x/net v0.26.0
-	golang.org/x/sys v0.21.0
+	golang.org/x/sys v0.22.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

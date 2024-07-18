@@ -31,7 +31,7 @@ function Dashboard() {
       return;
     }
     const m = { ...defaultMetrics };
-    data.DAGs.forEach((wf) => {
+    data.DAGs?.forEach((wf) => {
       if (wf.Status && wf.Status.Status) {
         const status = wf.Status.Status;
         m[status] += 1;

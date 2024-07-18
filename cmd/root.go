@@ -4,9 +4,7 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"os"
-	"path"
-
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -23,21 +21,11 @@ var (
 	}
 )
 
-const configPath = ".dagu"
-
 // Execute adds all child commands to the root command and sets flags
 // appropriately. This is called by main.main(). It only needs to happen
 // once to the rootCmd.
 func Execute() error {
 	return rootCmd.Execute()
-}
-
-func setDefaultConfigPath() {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		panic("could not determine home directory")
-	}
-	viper.AddConfigPath(path.Join(homeDir, configPath))
 }
 
 func registerCommands() {
@@ -57,7 +45,7 @@ func init() {
 	rootCmd.PersistentFlags().
 		StringVar(
 			&cfgFile, "config", "",
-			"config file (default is $HOME/.dagu/admin.yaml)",
+			"config file (default is $HOME/.config/dagu/admin.yaml)",
 		)
 
 	cobra.OnInitialize(initialize)
@@ -71,7 +59,7 @@ func initialize() {
 		return
 	}
 
-	setDefaultConfigPath()
+	viper.AddConfigPath(config.ConfigDir)
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
 }

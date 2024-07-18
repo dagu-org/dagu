@@ -45,10 +45,10 @@ WORKDIR /home/${USER}
 
 COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 
-RUN mkdir -p .dagu/dags
+RUN mkdir -p .config/dagu/dags
 
 # Add the hello_world.yaml file
-COPY <<EOF .dagu/dags/hello_world.yaml
+COPY <<EOF .config/dagu/dags/hello_world.yaml
 schedule: "* * * * *"
 steps:
   - name: hello world

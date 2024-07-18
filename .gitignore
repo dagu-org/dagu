@@ -19,7 +19,5 @@ tmp/*
 # Goland
 .idea
 
-# local development
-!local/cert
-local/cert/*
-!local/cert/openssl.conf
+# Directory for local development
+local/

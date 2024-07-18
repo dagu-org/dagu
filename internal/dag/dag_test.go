@@ -1,8 +1,7 @@
 package dag
 
 import (
-	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-dev/dagu/internal/util"
@@ -10,21 +9,12 @@ import (
 )
 
 var (
-	testdataDir = path.Join(util.MustGetwd(), "testdata")
-	testHomeDir = path.Join(util.MustGetwd(), "testdata/home")
+	testdataDir = filepath.Join(util.MustGetwd(), "testdata")
 )
-
-func TestMain(m *testing.M) {
-	err := os.Setenv("HOME", testHomeDir)
-	if err != nil {
-		panic(err)
-	}
-	os.Exit(m.Run())
-}
 
 func TestDAG_String(t *testing.T) {
 	t.Run("DefaltConfig", func(t *testing.T) {
-		dg, err := Load("", path.Join(testdataDir, "default.yaml"), "")
+		dg, err := Load("", filepath.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 
 		ret := dg.String()

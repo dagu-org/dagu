@@ -67,6 +67,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 -   [**Documentation**](#documentation)
 -   [**Running as a daemon**](#running-as-a-daemon)
 -   [**Example DAG**](#example-dag)
+-   [**Docker-compose setting**](#docker-compose-setting)
 -   [**Motivation**](#motivation)
 -   [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
 -   [**How It Works**](#how-it-works)
@@ -176,11 +177,12 @@ brew upgrade dagu-dev/brew/dagu
 docker run \
 --rm \
 -p 8080:8080 \
--v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
--v $HOME/.dagu/data:/home/dagu/.dagu/data \
--v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
+-v $HOME/.config/dagu/dags:/home/dagu/.config/dagu/dags \
+-v $HOME/.local/share/dagu:/home/dagu/.local/share/dagu \
 ghcr.io/dagu-dev/dagu:latest dagu start-all
 ```
+
+See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
 
 ## **Quick Start Guide**
 
@@ -192,7 +194,7 @@ Start the server and scheduler with the command `dagu start-all` and browse to `
 
 Navigate to the DAG List page by clicking the menu in the left panel of the Web UI. Then create a DAG by clicking the `NEW` button at the top of the page. Enter `example` in the dialog.
 
-_Note: DAG (YAML) files will be placed in `~/.dagu/dags` by default. See [Configuration Options](https://dagu.readthedocs.io/en/latest/config.html) for more details._
+_Note: DAG (YAML) files will be placed in `~/.config/dagu/dags` by default. See [Configuration Options](https://dagu.readthedocs.io/en/latest/config.html) for more details._
 
 ### 3. Edit the DAG
 
@@ -386,6 +388,10 @@ steps:
       depends:
           - send_report
 ```
+
+## **Docker-compose setting**
+
+To run Dagu using Docker-compose, please take a look at the example: [docker-compose file](examples/docker-compose.yaml)
 
 ## **Motivation**
 

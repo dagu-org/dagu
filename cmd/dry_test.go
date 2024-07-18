@@ -2,16 +2,18 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/dagu-dev/dagu/internal/test"
 )
 
 func TestDryCommand(t *testing.T) {
-	t.Run("Dry-run command should run", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+	t.Run("DryRun", func(t *testing.T) {
+		setup := test.SetupTest(t)
+		defer setup.Cleanup()
 
 		tests := []cmdTest{
 			{
-				args:        []string{"dry", testDAGFile("dry.yaml")},
+				args:        []string{"dry", testDAGFile("success.yaml")},
 				expectedOut: []string{"Starting DRY-RUN"},
 			},
 		}

@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -223,8 +222,8 @@ func (*Store) Compact(_, original string) error {
 	}
 
 	newFile := fmt.Sprintf("%s_c.dat",
-		strings.TrimSuffix(filepath.Base(original), path.Ext(original)))
-	f := path.Join(filepath.Dir(original), newFile)
+		strings.TrimSuffix(filepath.Base(original), filepath.Ext(original)))
+	f := filepath.Join(filepath.Dir(original), newFile)
 	w := &writer{target: f}
 	if err := w.open(); err != nil {
 		return err
@@ -270,12 +269,12 @@ func (s *Store) Rename(oldID, newID string) error {
 	if err != nil {
 		return err
 	}
-	oldPrefix := path.Base(s.prefixWithDirectory(on))
-	newPrefix := path.Base(s.prefixWithDirectory(nn))
+	oldPrefix := filepath.Base(s.prefixWithDirectory(on))
+	newPrefix := filepath.Base(s.prefixWithDirectory(nn))
 	for _, m := range matches {
-		base := path.Base(m)
+		base := filepath.Base(m)
 		f := strings.Replace(base, oldPrefix, newPrefix, 1)
-		_ = os.Rename(m, path.Join(newDir, f))
+		_ = os.Rename(m, filepath.Join(newDir, f))
 	}
 	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
 		_ = os.Remove(oldDir)
@@ -434,5 +433,5 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 }
 
 func prefix(dagFile string) string {
-	return strings.TrimSuffix(filepath.Base(dagFile), path.Ext(dagFile))
+	return strings.TrimSuffix(filepath.Base(dagFile), filepath.Ext(dagFile))
 }

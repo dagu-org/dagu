@@ -3,7 +3,7 @@ package jsondb
 import (
 	"bufio"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -24,7 +24,7 @@ type writer struct {
 
 // Open opens the writer.
 func (w *writer) open() (err error) {
-	_ = os.MkdirAll(path.Dir(w.target), 0755)
+	_ = os.MkdirAll(filepath.Dir(w.target), 0755)
 	w.file, err = util.OpenOrCreateFile(w.target)
 	if err == nil {
 		w.writer = bufio.NewWriter(w.file)

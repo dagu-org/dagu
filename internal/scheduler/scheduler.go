@@ -1,10 +1,11 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
-	"path"
+	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -47,45 +48,45 @@ type job interface {
 type entryType int
 
 const (
-	Start entryType = iota
-	Stop
-	Restart
+	entryTypeStart entryType = iota
+	entryTypeStop
+	entryTypeRestart
 )
+
+func (e entryType) String() string {
+	switch e {
+	case entryTypeStart:
+		return "start"
+	case entryTypeStop:
+		return "stop"
+	case entryTypeRestart:
+		return "restart"
+	default:
+		return "unknown"
+	}
+}
 
 func (e *entry) Invoke() error {
 	if e.Job == nil {
 		return nil
 	}
+
+	logMsg := fmt.Sprintf("%s job", e.EntryType)
+	e.Logger.Info(logMsg,
+		"job", e.Job.String(),
+		"time", e.Next.Format(time.RFC3339),
+	)
+
 	switch e.EntryType {
-	case Start:
-		e.Logger.Info(
-			"start job",
-			"job",
-			e.Job.String(),
-			"time",
-			e.Next.Format("2006-01-02 15:04:05"),
-		)
+	case entryTypeStart:
 		return e.Job.Start()
-	case Stop:
-		e.Logger.Info(
-			"stop job",
-			"job",
-			e.Job.String(),
-			"time",
-			e.Next.Format("2006-01-02 15:04:05"),
-		)
+	case entryTypeStop:
 		return e.Job.Stop()
-	case Restart:
-		e.Logger.Info(
-			"restart job",
-			"job",
-			e.Job.String(),
-			"time",
-			e.Next.Format("2006-01-02 15:04:05"),
-		)
+	case entryTypeRestart:
 		return e.Job.Restart()
+	default:
+		return fmt.Errorf("unknown entry type: %v", e.EntryType)
 	}
-	return nil
 }
 
 type newSchedulerArgs struct {
@@ -103,7 +104,7 @@ func newScheduler(args newSchedulerArgs) *Scheduler {
 	}
 }
 
-func (s *Scheduler) Start() error {
+func (s *Scheduler) Start(ctx context.Context) error {
 	if err := s.setupLogFile(); err != nil {
 		return fmt.Errorf("setup log file: %w", err)
 	}
@@ -124,6 +125,8 @@ func (s *Scheduler) Start() error {
 			return
 		case <-sig:
 			s.Stop()
+		case <-ctx.Done():
+			s.Stop()
 		}
 	}()
 
@@ -133,28 +136,33 @@ func (s *Scheduler) Start() error {
 	return nil
 }
 
-func (s *Scheduler) setupLogFile() (err error) {
-	filename := path.Join(s.logDir, "scheduler.log")
-	dir := path.Dir(filename)
+func (s *Scheduler) setupLogFile() error {
+	filename := filepath.Join(s.logDir, "scheduler.log")
+	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+		return fmt.Errorf("create log directory: %w", err)
 	}
-	s.logger.Info("setup log", "filename", filename)
-	return err
+	s.logger.Info("Setup log", "filename", filename)
+	return nil
 }
 
 func (s *Scheduler) start() {
-	t := now().Truncate(time.Second * 60)
+	// TODO: refactor this to use a ticker
+	t := now().Truncate(time.Minute)
 	timer := time.NewTimer(0)
+
 	s.running.Store(true)
 	for {
 		select {
 		case <-timer.C:
 			s.run(t)
 			t = s.nextTick(t)
-			timer = time.NewTimer(t.Sub(now()))
-		case <-s.stop:
 			_ = timer.Stop()
+			timer.Reset(t.Sub(now()))
+		case <-s.stop:
+			if !timer.Stop() {
+				<-timer.C
+			}
 			return
 		}
 	}
@@ -194,28 +202,29 @@ func (s *Scheduler) Stop() {
 		return
 	}
 	if s.stop != nil {
-		s.stop <- struct{}{}
+		close(s.stop)
 	}
 	s.running.Store(false)
+	s.logger.Info("Scheduler stopped")
 }
 
 var (
 	fixedTime time.Time
-	lock      sync.RWMutex
+	timeLock  sync.RWMutex
 )
 
 // setFixedTime sets the fixed time.
 // This is used for testing.
 func setFixedTime(t time.Time) {
-	lock.Lock()
-	defer lock.Unlock()
+	timeLock.Lock()
+	defer timeLock.Unlock()
 	fixedTime = t
 }
 
 // now returns the current time.
 func now() time.Time {
-	lock.RLock()
-	defer lock.RUnlock()
+	timeLock.RLock()
+	defer timeLock.RUnlock()
 	if fixedTime.IsZero() {
 		return time.Now()
 	}

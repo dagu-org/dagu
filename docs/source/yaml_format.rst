@@ -520,9 +520,9 @@ This section provides a comprehensive list of available fields that can be used 
 - ``handlerOn``: The command to execute when a DAG or step succeeds, fails, cancels, or exits.
 - ``steps``: A list of steps to execute in the DAG.
 
-In addition, a global configuration file, ``$DAGU_HOME/config.yaml``, can be used to gather common settings, such as ``logDir`` or ``env``.
+In addition, a global configuration file, ``$DAGU_HOME/base.yaml``, can be used to gather common settings, such as ``logDir`` or ``env``.
 
-Note: If ``DAGU_HOME`` environment variable is not set, the default path is ``$HOME/.dagu/config.yaml``.
+Note: If ``DAGU_HOME`` environment variable is not set, the default path is ``$HOME/.dagu/base.yaml``.
 
 Example: 
 

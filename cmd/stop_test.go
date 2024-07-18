@@ -5,14 +5,15 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/test"
 )
 
 func TestStopCommand(t *testing.T) {
-	t.Run("Stop a DAG", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+	t.Run("StopDAG", func(t *testing.T) {
+		setup := test.SetupTest(t)
+		defer setup.Cleanup()
 
-		dagFile := testDAGFile("stop.yaml")
+		dagFile := testDAGFile("long2.yaml")
 
 		// Start the DAG.
 		done := make(chan struct{})
@@ -24,7 +25,12 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the DAG running.
-		testLastStatusEventual(t, setup.dataStore.HistoryStore(), dagFile, scheduler.StatusRunning)
+		testLastStatusEventual(
+			t,
+			setup.DataStore().HistoryStore(),
+			dagFile,
+			scheduler.StatusRunning,
+		)
 
 		// Stop the DAG.
 		testRunCommand(t, stopCmd(), cmdTest{
@@ -32,7 +38,9 @@ func TestStopCommand(t *testing.T) {
 			expectedOut: []string{"Stopping..."}})
 
 		// Check the last execution is cancelled.
-		testLastStatusEventual(t, setup.dataStore.HistoryStore(), dagFile, scheduler.StatusCancel)
+		testLastStatusEventual(
+			t, setup.DataStore().HistoryStore(), dagFile, scheduler.StatusCancel,
+		)
 		<-done
 	})
 }

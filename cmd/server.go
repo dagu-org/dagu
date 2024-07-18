@@ -47,7 +47,7 @@ func serverCmd() *cobra.Command {
 
 func bindServerCommandFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP(
-		"dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)",
+		"dags", "d", "", "location of DAG files (default is $HOME/.config/dagu/dags)",
 	)
 	cmd.Flags().StringP("host", "s", "", "server host (default is localhost)")
 	cmd.Flags().StringP("port", "p", "", "server port (default is 8080)")

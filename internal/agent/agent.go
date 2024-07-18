@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"sync"
@@ -528,13 +527,13 @@ func (a *Agent) setupLog() error {
 	// It is DAG.LogDir + DAG.Name (with invalid characters replaced with '_').
 	// It is used to write the stdout and stderr of the steps.
 	if a.dag.LogDir != "" {
-		a.logDir = path.Join(a.logDir, util.ValidFilename(a.dag.Name))
+		a.logDir = filepath.Join(a.logDir, util.ValidFilename(a.dag.Name))
 	}
 
 	absFilepath := filepath.Join(a.logDir, createLogfileName(a.dag.Name, a.reqID, time.Now()))
 
 	// Create the log directory
-	if err := os.MkdirAll(path.Dir(absFilepath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absFilepath), 0755); err != nil {
 		return err
 	}
 

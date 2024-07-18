@@ -1,11 +1,10 @@
 package dag
 
 import (
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,27 +18,27 @@ func Test_Load(t *testing.T) {
 	}{
 		{
 			name:             "WithExt",
-			file:             path.Join(testdataDir, "loader_test.yaml"),
-			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
+			file:             filepath.Join(testdataDir, "loader_test.yaml"),
+			expectedLocation: filepath.Join(testdataDir, "loader_test.yaml"),
 		},
 		{
 			name:             "WithoutExt",
-			file:             path.Join(testdataDir, "loader_test"),
-			expectedLocation: path.Join(testdataDir, "loader_test.yaml"),
+			file:             filepath.Join(testdataDir, "loader_test"),
+			expectedLocation: filepath.Join(testdataDir, "loader_test.yaml"),
 		},
 		{
 			name:          "InvalidPath",
-			file:          path.Join(testdataDir, "not_existing_file.yaml"),
+			file:          filepath.Join(testdataDir, "not_existing_file.yaml"),
 			expectedError: "no such file or directory",
 		},
 		{
 			name:          "InvalidDAG",
-			file:          path.Join(testdataDir, "err_decode.yaml"),
+			file:          filepath.Join(testdataDir, "err_decode.yaml"),
 			expectedError: "has invalid keys: invalidkey",
 		},
 		{
 			name:          "InvalidYAML",
-			file:          path.Join(testdataDir, "err_parse.yaml"),
+			file:          filepath.Join(testdataDir, "err_parse.yaml"),
 			expectedError: "cannot unmarshal",
 		},
 	}
@@ -59,7 +58,7 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Metadata", func(t *testing.T) {
-		dg, err := LoadMetadata(path.Join(testdataDir, "default.yaml"))
+		dg, err := LoadMetadata(filepath.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
 
 		require.Equal(t, dg.Name, "default")
@@ -69,13 +68,8 @@ func Test_LoadMetadata(t *testing.T) {
 }
 
 func Test_loadBaseConfig(t *testing.T) {
-	t.Run("BaseConfigFile", func(t *testing.T) {
-		// The base config file is set on the global config
-		// This should be `testdata/home/.dagu/config.yaml`.
-		cfg, err := config.Load()
-		require.NoError(t, err)
-
-		dg, err := loadBaseConfig(cfg.BaseConfig, buildOpts{})
+	t.Run("LoadBaseConfigFile", func(t *testing.T) {
+		dg, err := loadBaseConfig(filepath.Join(testdataDir, "base.yaml"), buildOpts{})
 		require.NotNil(t, dg)
 		require.NoError(t, err)
 	})
@@ -83,7 +77,7 @@ func Test_loadBaseConfig(t *testing.T) {
 
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
-		file := path.Join(testdataDir, "default.yaml")
+		file := filepath.Join(testdataDir, "default.yaml")
 		dg, err := Load("", file, "")
 
 		require.NoError(t, err)
@@ -99,7 +93,7 @@ func Test_LoadDefaultConfig(t *testing.T) {
 		require.Len(t, dg.Steps, 1)
 		assert.Equal(t, "1", dg.Steps[0].Name, "1")
 		assert.Equal(t, "true", dg.Steps[0].Command, "true")
-		assert.Equal(t, path.Dir(file), dg.Steps[0].Dir)
+		assert.Equal(t, filepath.Dir(file), dg.Steps[0].Dir)
 	})
 }
 

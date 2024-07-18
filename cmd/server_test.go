@@ -6,13 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestServerCommand(t *testing.T) {
-	t.Run("Start the server", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+	t.Run("StartServer", func(t *testing.T) {
+		setup := test.SetupTest(t)
+		defer setup.Cleanup()
 
 		go func() {
 			testRunCommand(t, serverCmd(), cmdTest{

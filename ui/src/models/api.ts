@@ -1,4 +1,12 @@
-import { DAG, DAGStatus, Node, NodeStatus, Schedule, SchedulerStatus, StatusFile } from './index';
+import {
+  DAG,
+  DAGStatus,
+  Node,
+  NodeStatus,
+  Schedule,
+  SchedulerStatus,
+  StatusFile,
+} from './index';
 
 export type GetDAGResponse = {
   Title: string;
@@ -47,8 +55,8 @@ export type GridData = {
 };
 
 export type ListWorkflowsResponse = {
-  DAGs: WorkflowListItem[];
-  Errors: string[];
+  DAGs?: WorkflowListItem[];
+  Errors?: string[];
   HasError: boolean;
 };
 

@@ -42,7 +42,7 @@ func LifetimeHooks(lc fx.Lifecycle, a *Scheduler) {
 	lc.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) (err error) {
-				return a.Start()
+				return a.Start(ctx)
 			},
 			OnStop: func(_ context.Context) error {
 				a.Stop()

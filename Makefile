@@ -1,99 +1,130 @@
-.PHONY: build server scheduler test proto certs swagger https
+.PHONY: run run-server run-server-https run-scheduler test lint build certs swagger
 
-########## Arguments ##########
+##############################################################################
+# Arguments
+##############################################################################
 
 VERSION=
 
-########## Variables ##########
+##############################################################################
+# Variables
+##############################################################################
 
 # This Makefile's directory
 SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+
+# Directories for miscellaneous files for the local environment
 LOCAL_DIR=$(SCRIPT_DIR)/local
+LOCAL_BIN_DIR=$(LOCAL_DIR)/bin
 
-SRC_DIR=$(SCRIPT_DIR)
-DST_DIR=$(SRC_DIR)/internal
+# Configuration directory
+CONFIG_DIR=$(SCRIPT_DIR)/config
 
+# Local build settings
+BIN_DIR=$(SCRIPT_DIR)/bin
 BUILD_VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 
+# Application name
+
+APP_NAME=dagu
+
+# Docker image build configuration
 DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm64/v8 --builder container --build-arg VERSION=$(VERSION) --push --no-cache
+
+# Arguments for the tests
+GOTESTSUM_ARGS=--format=standard-quiet
+GO_TEST_FLAGS=-v --race
+
+# Frontend directories
+
+FE_DIR=./internal/frontend
+FE_GEN_DIR=${FE_DIR}/gen
+FE_ASSETS_DIR=${FE_DIR}/assets
+FE_BUILD_DIR=./ui/dist
+FE_BUNDLE_JS=${FE_ASSETS_DIR}/bundle.js
+
+# Colors for the output
+
+COLOR_GREEN=\033[0;32m
+COLOR_RESET=\033[0m
+COLOR_RED=\033[0;31m
+
+# Go packages for the tools
+
+PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
+PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
+PKG_gotestsum=gotest.tools/gotestsum
+PKG_gomerger=github.com/yohamta/gomerger
+
+# Certificates for the development environment
+
+CERTS_DIR=${LOCAL_DIR}/certs
 
 DEV_CERT_SUBJ_CA="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=DAGU/CN=*.dagu.dev/emailAddress=ca@dev.com"
 DEV_CERT_SUBJ_SERVER="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=SERVER/CN=*.server.dev/emailAddress=server@dev.com"
 DEV_CERT_SUBJ_CLIENT="/C=TR/ST=ASIA/L=TOKYO/O=DEV/OU=CLIENT/CN=*.client.dev/emailAddress=client@dev.com"
 DEV_CERT_SUBJ_ALT="subjectAltName=DNS:localhost"
 
-PKG_SWAGGER=github.com/go-swagger/go-swagger/cmd/swagger
-PKG_GOLANGCI_LINT=github.com/golangci/golangci-lint/cmd/golangci-lint
-PKG_gotestsum=gotest.tools/gotestsum
+CA_CERT_FILE=${CERTS_DIR}/ca-cert.pem
+CA_KEY_FILE=${CERTS_DIR}/ca-key.pem
+SERVER_CERT_REQ=${CERTS_DIR}/server-req.pem
+SERVER_CERT_FILE=${CERTS_DIR}/server-cert.pem
+SERVER_KEY_FILE=${CERTS_DIR}/server-key.pem
+CLIENT_CERT_REQ=${CERTS_DIR}/client-req.pem
+CLIENT_CERT_FILE=${CERTS_DIR}/client-cert.pem
+CLIENT_KEY_FILE=${CERTS_DIR}/client-key.pem
+OPENSSL_CONF=${CONFIG_DIR}/openssl.local.conf
 
-COLOR_GREEN=\033[0;32m
-COLOR_RESET=\033[0m
-
-FE_DIR=./internal/frontend
-FE_GEN_DIR=${FE_DIR}/gen
-FE_ASSETS_DIR=${FE_DIR}/assets
-
-CERT_DIR=${LOCAL_DIR}/cert
-
-CA_CERT_FILE=${CERT_DIR}/ca-cert.pem
-CA_KEY_FILE=${CERT_DIR}/ca-key.pem
-SERVER_CERT_REQ=${CERT_DIR}/server-req.pem
-SERVER_CERT_FILE=${CERT_DIR}/server-cert.pem
-SERVER_KEY_FILE=${CERT_DIR}/server-key.pem
-CLIENT_CERT_REQ=${CERT_DIR}/client-req.pem
-CLIENT_CERT_FILE=${CERT_DIR}/client-cert.pem
-CLIENT_KEY_FILE=${CERT_DIR}/client-key.pem
-OPENSSL_CONF=${CERT_DIR}/openssl.conf
-
-FE_BUILD_DIR=./ui/dist
-FE_BUNDLE_JS=${FE_ASSETS_DIR}/bundle.js
-
-APP_NAME=dagu
-BIN_DIR=${SCRIPT_DIR}/bin
-
-# gotestsum args
-GOTESTSUM_ARGS=--format=standard-quiet
-GO_TEST_FLAGS=-v --race
-
-########## Main Targets ##########
+##############################################################################
+# Targets
+##############################################################################
 
 # run starts the frontend server and the scheduler.
 run: ${FE_BUNDLE_JS}
-	go run . start-all
+	@echo "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
+	@go run . start-all
+
+# server build the binary and start the server.
+run-server: golangci-lint build-bin
+	@echo "${COLOR_GREEN}Starting the server...${COLOR_RESET}"
+	${LOCAL_BIN_DIR}/${APP_NAME} server
+
+# scheduler build the binary and start the scheduler.
+run-scheduler: golangci-lint build-bin
+	@echo "${COLOR_GREEN}Starting the scheduler...${COLOR_RESET}"
+	${LOCAL_BIN_DIR}/${APP_NAME} scheduler
 
 # check if the frontend assets are built.
 ${FE_BUNDLE_JS}:
-	echo "Please run 'make build-ui' to build the frontend assets."
+	@echo "${COLOR_RED}Error: frontend assets are not built.${COLOR_RESET}"
+	@echo "${COLOR_RED}Please run 'make build-ui' before starting the server.${COLOR_RESET}"
 
 # https starts the server with the HTTPS protocol.
-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
+run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
+	@echo "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
 	@DAGU_CERT_FILE=${SERVER_CERT_FILE} \
 		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
 		go run . start-all
 
-# watch starts development UI server.
-# The backend server should be running.
-watch:
-	@echo "${COLOR_GREEN}Installing nodemon...${COLOR_RESET}"
-	@npm install -g nodemon
-	@nodemon --watch . --ext go,gohtml --verbose --signal SIGINT --exec 'make server'
-
 # test runs all tests.
 test:
-	@go install ${PKG_gotestsum}
-	@gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
+	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
 
 # test-coverage runs all tests with coverage.
 test-coverage:
-	@go install ${PKG_gotestsum}
-	@gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ./...
+	@echo "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ./...
 
 # test-clean cleans the test cache and run all tests.
 test-clean: build-bin
-	@go install ${PKG_gotestsum}
+	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache
-	@gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
+	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
 
 # lint runs the linter.
 lint: golangci-lint
@@ -102,7 +133,7 @@ lint: golangci-lint
 swagger: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
-certs: ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} gencert-check
+certs: ${CERTS_DIR} ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} certs-check
 
 # build build the binary.
 build: build-ui build-bin
@@ -112,30 +143,38 @@ build: build-ui build-bin
 # ```sh
 # make build-image VERSION={version}
 # ```
-# {version} should be the version number such as v1.13.0.
+# {version} should be the version number such as "1.13.0".
+
 build-image: build-image-version build-image-latest
 build-image-version:
 ifeq ($(VERSION),)
-	$(error "VERSION is null")
+	$(error "VERSION is not set")
 endif
+	echo "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
 	$(DOCKER_CMD) -t ghcr.io/dagu-dev/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 build-image-latest:
+	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
 	$(DOCKER_CMD) -t ghcr.io/dagu-dev/${APP_NAME}:latest .
 
-# server build the binary and start the server.
-server: golangci-lint build-bin
-	${BIN_DIR}/${APP_NAME} server
+gomerger: ${LOCAL_DIR}/merged
+	@echo "${COLOR_GREEN}Merging Go files...${COLOR_RESET}"
+	@rm -f ${LOCAL_DIR}/merged/merged_project.go
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gomerger}
+	@${LOCAL_BIN_DIR}/gomerger .
+	@mv merged_project.go ${LOCAL_DIR}/merged/
 
-# scheduler build the binary and start the scheduler.
-scheduler: golangci-lint build-bin
-	${BIN_DIR}/${APP_NAME} scheduler
+${LOCAL_DIR}/merged:
+	@mkdir -p ${LOCAL_DIR}/merged
 
-########## Tools ##########
+##############################################################################
+# Internal targets
+##############################################################################
 
 build-bin:
+	@echo "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} .
 
@@ -148,20 +187,25 @@ build-ui:
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 
 golangci-lint:
-	@go install $(PKG_GOLANGCI_LINT)
-	@golangci-lint run ./...
+	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
+	@${LOCAL_BIN_DIR}/golangci-lint run ./...
 
 clean-swagger:
+	@echo "${COLOR_GREEN}Cleaning the swagger files...${COLOR_RESET}"
 	@rm -rf ${FE_GEN_DIR}/restapi/models
 	@rm -rf ${FE_GEN_DIR}/restapi/operations
 
 gen-swagger:
-	@go install $(PKG_SWAGGER)
-	@swagger validate ./swagger.yaml
-	@swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./swagger.yaml
+	@echo "${COLOR_GREEN}Generating the swagger server code...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_swagger)
+	@${LOCAL_BIN_DIR}/swagger validate ./swagger.yaml
+	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./swagger.yaml
 	@go mod tidy
 
-########## Certificates ##########
+##############################################################################
+# Certificates
+##############################################################################
 
 ${CA_CERT_FILE}:
 	@echo "${COLOR_GREEN}Generating CA certificates...${COLOR_RESET}"
@@ -194,7 +238,10 @@ ${CLIENT_CERT_FILE}: ${CA_CERT_FILE} ${CLIENT_KEY_FILE}
 		-CAkey ${CA_KEY_FILE} -CAcreateserial -out ${CLIENT_CERT_FILE} \
 		-extfile ${OPENSSL_CONF}
 
-gencert-check:
+${CERTS_DIR}:
+	@echo "${COLOR_GREEN}Creating the certificates directory...${COLOR_RESET}"
+	@mkdir -p ${CERTS_DIR}
+
+certs-check:
 	@echo "${COLOR_GREEN}Checking CA certificate...${COLOR_RESET}"
 	@openssl x509 -in ${SERVER_CERT_FILE} -noout -text
-

@@ -28,8 +28,11 @@ type Cache[T any] struct {
 }
 
 func New[T any](cap int, ttl time.Duration) *Cache[T] {
-	c := &Cache[T]{capacity: cap, ttl: ttl}
-	return c
+	return &Cache[T]{
+		capacity: cap,
+		ttl:      ttl,
+		stopCh:   make(chan struct{}),
+	}
 }
 
 func (c *Cache[T]) Stop() {
@@ -56,6 +59,7 @@ func (c *Cache[T]) evict() {
 		entry := value.(Entry[T])
 		if time.Now().After(entry.ExpiresAt) {
 			c.entries.Delete(key)
+			c.items.Add(-1)
 		}
 		return true
 	})

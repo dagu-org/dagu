@@ -79,9 +79,9 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 		if er.engine.IsSuspended(dg.Name) {
 			continue
 		}
-		addEntriesFn(dg, dg.Schedule, Start)
-		addEntriesFn(dg, dg.StopSchedule, Stop)
-		addEntriesFn(dg, dg.RestartSchedule, Restart)
+		addEntriesFn(dg, dg.Schedule, entryTypeStart)
+		addEntriesFn(dg, dg.StopSchedule, entryTypeStop)
+		addEntriesFn(dg, dg.RestartSchedule, entryTypeRestart)
 	}
 
 	return entries, nil

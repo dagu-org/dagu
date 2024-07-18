@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"path"
+	"path/filepath"
 	"text/template"
 
 	"github.com/dagu-dev/dagu/internal/constants"
@@ -19,7 +19,7 @@ var (
 func (srv *Server) useTemplate(
 	layout string, name string,
 ) func(http.ResponseWriter, any) {
-	files := append(baseTemplates(), path.Join(templatePath, layout))
+	files := append(baseTemplates(), filepath.Join(templatePath, layout))
 	tmpl, err := template.New(name).Funcs(
 		defaultFunctions(srv.funcsConfig)).ParseFS(srv.assets, files...,
 	)
@@ -73,7 +73,7 @@ func baseTemplates() []string {
 	var templateFiles = []string{"base.gohtml"}
 	ret := make([]string, 0, len(templateFiles))
 	for _, t := range templateFiles {
-		ret = append(ret, path.Join(templatePath, t))
+		ret = append(ret, filepath.Join(templatePath, t))
 	}
 	return ret
 }

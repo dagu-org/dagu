@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -37,7 +38,7 @@ func TestScheduler(t *testing.T) {
 		})
 
 		go func() {
-			_ = schedulerInstance.Start()
+			_ = schedulerInstance.Start(context.Background())
 		}()
 
 		time.Sleep(time.Second + time.Millisecond*100)
@@ -53,7 +54,7 @@ func TestScheduler(t *testing.T) {
 		entryReader := &mockEntryReader{
 			Entries: []*entry{
 				{
-					EntryType: Restart,
+					EntryType: entryTypeRestart,
 					Job:       &mockJob{},
 					Next:      now,
 					Logger:    logger.NewSlogLogger(),
@@ -68,7 +69,7 @@ func TestScheduler(t *testing.T) {
 		})
 
 		go func() {
-			_ = schedulerInstance.Start()
+			_ = schedulerInstance.Start(context.Background())
 		}()
 		defer schedulerInstance.Stop()
 
