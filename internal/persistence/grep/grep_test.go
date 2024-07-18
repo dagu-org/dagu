@@ -2,7 +2,7 @@ package grep
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +11,7 @@ import (
 func TestGrep(t *testing.T) {
 	t.Parallel()
 	wd, _ := os.Getwd()
-	dir := path.Join(wd, "/testdata")
+	dir := filepath.Join(wd, "/testdata")
 	for _, tc := range []struct {
 		Name    string
 		File    string
@@ -22,7 +22,7 @@ func TestGrep(t *testing.T) {
 	}{
 		{
 			Name:    "simple",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "b",
 			Want: []*Match{
 				{
@@ -33,7 +33,7 @@ func TestGrep(t *testing.T) {
 		},
 		{
 			Name:    "regexp",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "^b.",
 			Opts: &Options{
 				IsRegexp: true,
@@ -47,7 +47,7 @@ func TestGrep(t *testing.T) {
 		},
 		{
 			Name:    "before",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "b",
 			Opts: &Options{
 				Before: 1,
@@ -61,7 +61,7 @@ func TestGrep(t *testing.T) {
 		},
 		{
 			Name:    "before+after",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "cc",
 			Opts: &Options{
 				Before: 2,
@@ -76,7 +76,7 @@ func TestGrep(t *testing.T) {
 		},
 		{
 			Name:    "before+after,firstline",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "aa",
 			Opts: &Options{
 				Before: 1,
@@ -91,7 +91,7 @@ func TestGrep(t *testing.T) {
 		},
 		{
 			Name:    "before+after,lastline",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "ee",
 			Opts: &Options{
 				Before: 1,
@@ -106,25 +106,25 @@ func TestGrep(t *testing.T) {
 		},
 		{
 			Name:    "no match",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "no match text",
 			IsErr:   true,
 		},
 		{
 			Name:    "no file",
-			File:    path.Join(dir, "dummy.txt"),
+			File:    filepath.Join(dir, "dummy.txt"),
 			Pattern: "aa",
 			IsErr:   true,
 		},
 		{
 			Name:    "no pattern",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "",
 			IsErr:   true,
 		},
 		{
 			Name:    "invalid regexp",
-			File:    path.Join(dir, "test.txt"),
+			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "(aa",
 			Opts: &Options{
 				IsRegexp: true,

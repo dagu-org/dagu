@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"syscall"
 	"testing"
 	"time"
@@ -46,7 +46,7 @@ func setupTest(t *testing.T) testSetup {
 	require.NoError(t, err)
 
 	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
-		DataDir: path.Join(tmpDir, ".dagu", "data"),
+		DataDir: filepath.Join(tmpDir, ".dagu", "data"),
 	})
 
 	eng := engine.New(&engine.NewEngineArgs{
@@ -507,7 +507,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 // testLoadDAG load the specified DAG file for testing
 // without base config or parameters.
 func testLoadDAG(t *testing.T, name string) *dag.DAG {
-	file := path.Join(util.MustGetwd(), "testdata", name)
+	file := filepath.Join(util.MustGetwd(), "testdata", name)
 	dg, err := dag.Load("", file, "")
 	require.NoError(t, err)
 	return dg

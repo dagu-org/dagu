@@ -86,7 +86,7 @@ func (o *GetDagDetailsParams) BindRequest(r *http.Request, route *middleware.Mat
 	return nil
 }
 
-// bindDagID binds and validates parameter DagID from path.
+// bindDagID binds and validates parameter DagID from filepath.
 func (o *GetDagDetailsParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {

@@ -4,7 +4,7 @@ import (
 	// nolint // gosec
 	"crypto/md5"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -177,7 +177,7 @@ func (d *DAG) setup() {
 	}
 
 	// set the default working directory for the steps if not set
-	dir := path.Dir(d.Location)
+	dir := filepath.Dir(d.Location)
 	for i := range d.Steps {
 		d.Steps[i].setup(dir)
 	}
@@ -214,7 +214,7 @@ func (d *DAG) HasTag(tag string) bool {
 // run in parallel.
 func (d *DAG) SockAddr() string {
 	s := strings.ReplaceAll(d.Location, " ", "_")
-	name := strings.Replace(path.Base(s), path.Ext(path.Base(s)), "", 1)
+	name := strings.Replace(filepath.Base(s), filepath.Ext(filepath.Base(s)), "", 1)
 	// nolint // gosec
 	h := md5.New()
 	_, _ = h.Write([]byte(s))
@@ -226,7 +226,7 @@ func (d *DAG) SockAddr() string {
 	if len(name) > lengthLimit {
 		name = name[:lengthLimit-1]
 	}
-	return path.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
+	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
 }
 
 // String implements the Stringer interface.

@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/dagu-dev/dagu/internal/util"
@@ -27,7 +27,7 @@ func TestTeeWriter(t *testing.T) {
 		}()
 
 		// Create a temporary file and tee the log to the file.
-		tmpLogFile := path.Join(util.MustTempDir("test-tee"), "test.log")
+		tmpLogFile := filepath.Join(util.MustTempDir("test-tee"), "test.log")
 		logFile, err := os.Create(tmpLogFile)
 		require.NoError(t, err)
 

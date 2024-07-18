@@ -3,7 +3,6 @@ package engine_test
 import (
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -22,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testdataDir = path.Join(util.MustGetwd(), "./testdata")
+var testdataDir = filepath.Join(util.MustGetwd(), "./testdata")
 var lock sync.Mutex
 
 func setupTest(t *testing.T) (
@@ -37,11 +36,11 @@ func setupTest(t *testing.T) (
 	cfg, _ := config.Load()
 
 	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
-		DataDir: path.Join(tmpDir, ".dagu", "data"),
+		DataDir: filepath.Join(tmpDir, ".dagu", "data"),
 		DAGs:    testdataDir,
 	})
 
-	exec := path.Join(util.MustGetwd(), "../../bin/dagu")
+	exec := filepath.Join(util.MustGetwd(), "../../bin/dagu")
 
 	return tmpDir,
 		engine.New(
@@ -60,11 +59,11 @@ func setupTestTmpDir(
 	cfg, _ := config.Load()
 
 	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
-		DataDir: path.Join(tmpDir, ".dagu", "data"),
-		DAGs:    path.Join(tmpDir, ".dagu", "dags"),
+		DataDir: filepath.Join(tmpDir, ".dagu", "data"),
+		DAGs:    filepath.Join(tmpDir, ".dagu", "dags"),
 	})
 
-	exec := path.Join(util.MustGetwd(), "../../bin/dagu")
+	exec := filepath.Join(util.MustGetwd(), "../../bin/dagu")
 
 	return tmpDir,
 		engine.New(
@@ -363,7 +362,7 @@ steps:
 
 		// Check if the new DAG is actually created.
 		dg, err := dag.Load("",
-			path.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
+			filepath.Join(tmpDir, ".dagu", "dags", id+".yaml"), "")
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", dg.Name)
 	})
@@ -376,7 +375,7 @@ steps:
 		// Create a DAG to rename.
 		id, err := eng.CreateDAG("old_name")
 		require.NoError(t, err)
-		_, err = eng.GetStatus(path.Join(tmpDir, ".dagu", "dags", id+".yaml"))
+		_, err = eng.GetStatus(filepath.Join(tmpDir, ".dagu", "dags", id+".yaml"))
 		require.NoError(t, err)
 
 		// Rename the file.
@@ -384,7 +383,7 @@ steps:
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
-		require.FileExists(t, path.Join(tmpDir, ".dagu", "dags", id+"_renamed.yaml"))
+		require.FileExists(t, filepath.Join(tmpDir, ".dagu", "dags", id+"_renamed.yaml"))
 	})
 }
 
@@ -411,7 +410,7 @@ func TestEngin_ReadHistory(t *testing.T) {
 		require.NoError(t, err)
 		require.Greater(t, len(allDagStatus), 0)
 
-		pattern := path.Join(testdataDir, "*.yaml")
+		pattern := filepath.Join(testdataDir, "*.yaml")
 		matches, err := filepath.Glob(pattern)
 		require.NoError(t, err)
 		if len(matches) != len(allDagStatus) {
@@ -421,7 +420,7 @@ func TestEngin_ReadHistory(t *testing.T) {
 }
 
 func testDAG(name string) string {
-	return path.Join(testdataDir, name)
+	return filepath.Join(testdataDir, name)
 }
 
 func testNewStatus(dg *dag.DAG, reqID string, status scheduler.Status,

@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -43,7 +43,7 @@ func setupTest(t *testing.T) testSetup {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	cfg.DataDir = path.Join(tmpDir, ".dagu", "data")
+	cfg.DataDir = filepath.Join(tmpDir, ".dagu", "data")
 	dataStore := newDataStores(cfg)
 
 	return testSetup{
@@ -128,8 +128,8 @@ func withSpool(t *testing.T, testFunction func()) string {
 */
 
 func testDAGFile(name string) string {
-	return path.Join(
-		path.Join(util.MustGetwd(), "testdata"),
+	return filepath.Join(
+		filepath.Join(util.MustGetwd(), "testdata"),
 		name,
 	)
 }

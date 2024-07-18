@@ -3,7 +3,6 @@ package dag
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -408,7 +407,7 @@ func TestLoad(t *testing.T) {
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		dg, err := Load(baseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
+		dg, err := Load(baseConfig, filepath.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
@@ -419,7 +418,7 @@ func TestLoad(t *testing.T) {
 		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
 		// no_overwrite.yaml does not have the MailOn key.
-		dg, err := Load(baseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
+		dg, err := Load(baseConfig, filepath.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.

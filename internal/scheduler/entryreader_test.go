@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -25,7 +25,7 @@ func TestReadEntries(t *testing.T) {
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(newEntryReaderArgs{
-			DagsDir:    path.Join(testdataDir, "invalid_directory"),
+			DagsDir:    filepath.Join(testdataDir, "invalid_directory"),
 			JobCreator: &mockJobFactory{},
 			Logger:     logger.NewSlogLogger(),
 			Engine:     eng,
@@ -73,7 +73,7 @@ func TestReadEntries(t *testing.T) {
 	})
 }
 
-var testdataDir = path.Join(util.MustGetwd(), "testdata")
+var testdataDir = filepath.Join(util.MustGetwd(), "testdata")
 
 func setupTest(t *testing.T) (string, engine.Engine) {
 	t.Helper()
@@ -84,7 +84,7 @@ func setupTest(t *testing.T) (string, engine.Engine) {
 	require.NoError(t, err)
 
 	cfg := &config.Config{
-		DataDir:         path.Join(tmpDir, ".dagu", "data"),
+		DataDir:         filepath.Join(tmpDir, ".dagu", "data"),
 		DAGs:            testdataDir,
 		SuspendFlagsDir: tmpDir,
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -150,11 +149,11 @@ func getBaseDirs() baseDirs {
 	logsDir := getLogsDir()
 	return baseDirs{
 		config:       ConfigDir,
-		dags:         path.Join(ConfigDir, dagsDir),
-		suspendFlags: path.Join(ConfigDir, suspendDir),
+		dags:         filepath.Join(ConfigDir, dagsDir),
+		suspendFlags: filepath.Join(ConfigDir, suspendDir),
 		data:         getDataDir(),
 		logs:         logsDir,
-		adminLogs:    path.Join(logsDir, "admin"),
+		adminLogs:    filepath.Join(logsDir, "admin"),
 	}
 }
 
