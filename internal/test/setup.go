@@ -66,6 +66,19 @@ func SetupTest(t *testing.T) Setup {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
+	// Set the executable path to the test binary.
+	cfg.Executable = filepath.Join(util.MustGetwd(), "../../bin/dagu")
+
+	// Set environment variables.
+	// This is required for some tests that run the executable
+	_ = os.Setenv("DAGU_DAGS_DIR", cfg.DAGs)
+	_ = os.Setenv("DAGU_WORK_DIR", cfg.WorkDir)
+	_ = os.Setenv("DAGU_BASE_CONFIG", cfg.BaseConfig)
+	_ = os.Setenv("DAGU_LOG_DIR", cfg.LogDir)
+	_ = os.Setenv("DAGU_DATA_DIR", cfg.DataDir)
+	_ = os.Setenv("DAGU_SUSPEND_FLAGS_DIR", cfg.SuspendFlagsDir)
+	_ = os.Setenv("DAGU_ADMIN_LOG_DIR", cfg.AdminLogsDir)
+
 	return Setup{
 		Config:  cfg,
 		homeDir: tmpDir,

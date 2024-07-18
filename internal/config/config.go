@@ -234,26 +234,39 @@ func getLegacyConfigPath() (string, bool) {
 }
 
 func bindEnvs() {
-	_ = viper.BindEnv("executable", "DAGU_EXECUTABLE")
-	_ = viper.BindEnv("dags", "DAGU_DAGS_DIR")
-	_ = viper.BindEnv("workDir", "DAGU_WORK_DIR")
+	// Server configurations
+	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
+	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
+	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
+
+	// Basic authentication
 	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
 	_ = viper.BindEnv("basicAuthUsername", "DAGU_BASICAUTH_USERNAME")
 	_ = viper.BindEnv("basicAuthPassword", "DAGU_BASICAUTH_PASSWORD")
-	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
+
+	// TLS configurations
+	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
+	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
+
+	// Auth Token
+	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
+	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
+
+	// Executables
+	_ = viper.BindEnv("executable", "DAGU_EXECUTABLE")
+
+	// Directories and files
+	_ = viper.BindEnv("dags", "DAGU_DAGS_DIR")
+	_ = viper.BindEnv("workDir", "DAGU_WORK_DIR")
 	_ = viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
 	_ = viper.BindEnv("logDir", "DAGU_LOG_DIR")
 	_ = viper.BindEnv("dataDir", "DAGU_DATA_DIR")
 	_ = viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
 	_ = viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
-	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
-	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
-	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
-	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
-	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
-	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
+
+	// Miscellaneous
 	_ = viper.BindEnv("latestStatusToday", "DAGU_LATEST_STATUS")
-	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
 }
 
 func loadLegacyEnvs(cfg *Config) {

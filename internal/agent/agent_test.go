@@ -20,8 +20,7 @@ import (
 )
 
 func TestAgent_Run(t *testing.T) {
-	t.Parallel()
-	t.Run("Run a DAG successfully", func(t *testing.T) {
+	t.Run("RunDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -51,7 +50,7 @@ func TestAgent_Run(t *testing.T) {
 			return status.Status == scheduler.StatusSuccess
 		}, time.Second*2, time.Millisecond*100)
 	})
-	t.Run("Old history files are deleted", func(t *testing.T) {
+	t.Run("DeleteOldHistory", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -84,7 +83,7 @@ func TestAgent_Run(t *testing.T) {
 		history = eng.GetRecentHistory(dg, 2)
 		require.Equal(t, 1, len(history))
 	})
-	t.Run("It should not run a DAG if it is already running", func(t *testing.T) {
+	t.Run("AlreadyRunning", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -117,7 +116,7 @@ func TestAgent_Run(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "is already running")
 	})
-	t.Run("It should not run a DAG if the precondition is not met", func(t *testing.T) {
+	t.Run("PreConditionNotMet", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -142,7 +141,7 @@ func TestAgent_Run(t *testing.T) {
 		require.Equal(t, scheduler.NodeStatusNone, status.Nodes[0].Status)
 		require.Equal(t, scheduler.NodeStatusNone, status.Nodes[1].Status)
 	})
-	t.Run("Run a DAG and finish with an error", func(t *testing.T) {
+	t.Run("FinishWithError", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -159,7 +158,7 @@ func TestAgent_Run(t *testing.T) {
 		// Check if the status is saved correctly
 		require.Equal(t, scheduler.StatusError, dagAgent.Status().Status)
 	})
-	t.Run("Run a DAG and receive a signal", func(t *testing.T) {
+	t.Run("ReceiveSignal", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -194,7 +193,7 @@ func TestAgent_Run(t *testing.T) {
 			return status.Status == scheduler.StatusCancel
 		}, time.Second*1, time.Millisecond*100)
 	})
-	t.Run("Run a DAG and execute the exit handler", func(t *testing.T) {
+	t.Run("ExitHandler", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -222,7 +221,7 @@ func TestAgent_Run(t *testing.T) {
 
 func TestAgent_DryRun(t *testing.T) {
 	t.Parallel()
-	t.Run("Dry-run a DAG successfully", func(t *testing.T) {
+	t.Run("DryRun", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -251,7 +250,7 @@ func TestAgent_DryRun(t *testing.T) {
 
 func TestAgent_Retry(t *testing.T) {
 	t.Parallel()
-	t.Run("Retry a DAG", func(t *testing.T) {
+	t.Run("RetryDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -302,7 +301,7 @@ func TestAgent_Retry(t *testing.T) {
 
 func TestAgent_HandleHTTP(t *testing.T) {
 	t.Parallel()
-	t.Run("Handle HTTP requests and return the status of the DAG", func(t *testing.T) {
+	t.Run("HTTP_Valid", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -348,7 +347,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}, time.Second*2, time.Millisecond*100)
 
 	})
-	t.Run("Handle invalid HTTP requests", func(t *testing.T) {
+	t.Run("HTTP_InvalidRequest", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
@@ -391,7 +390,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 			return status.Status == scheduler.StatusCancel
 		}, time.Second*2, time.Millisecond*100)
 	})
-	t.Run("Handle cancel request and stop the DAG", func(t *testing.T) {
+	t.Run("HTTP_HandleCancel", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
