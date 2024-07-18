@@ -32,7 +32,7 @@ function DAGs() {
 
   const merged = React.useMemo(() => {
     const ret: DAGItem[] = [];
-    if (data) {
+    if (data && data.DAGs) {
       for (const val of data.DAGs) {
         if (!val.ErrorT) {
           ret.push({
@@ -72,8 +72,8 @@ function DAGs() {
           {data && (
             <React.Fragment>
               <DAGErrors
-                DAGs={data.DAGs}
-                errors={data.Errors}
+                DAGs={data.DAGs || []}
+                errors={data.Errors || []}
                 hasError={data.HasError}
               ></DAGErrors>
               <DAGTable
