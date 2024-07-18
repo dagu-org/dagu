@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/test"
 )
 
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAG", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+		setup := test.Setup(t)
+		defer setup.Cleanup()
 
 		dagFile := testDAGFile("status.yaml")
 
@@ -20,7 +21,12 @@ func TestStatusCommand(t *testing.T) {
 			close(done)
 		}()
 
-		testLastStatusEventual(t, setup.dataStore.HistoryStore(), dagFile, scheduler.StatusRunning)
+		testLastStatusEventual(
+			t,
+			setup.DataStore().HistoryStore(),
+			dagFile,
+			scheduler.StatusRunning,
+		)
 
 		// Check the current status.
 		testRunCommand(t, statusCmd(), cmdTest{

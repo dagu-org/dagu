@@ -1,7 +1,6 @@
 package dag
 
 import (
-	"os"
 	"path"
 	"testing"
 
@@ -11,16 +10,7 @@ import (
 
 var (
 	testdataDir = path.Join(util.MustGetwd(), "testdata")
-	testHomeDir = path.Join(util.MustGetwd(), "testdata/home")
 )
-
-func TestMain(m *testing.M) {
-	err := os.Setenv("HOME", testHomeDir)
-	if err != nil {
-		panic(err)
-	}
-	os.Exit(m.Run())
-}
 
 func TestDAG_String(t *testing.T) {
 	t.Run("DefaltConfig", func(t *testing.T) {

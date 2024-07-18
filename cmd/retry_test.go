@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+		setup := test.Setup(t)
+		defer setup.Cleanup()
 
 		dagFile := testDAGFile("retry.yaml")
 
@@ -19,7 +20,7 @@ func TestRetryCommand(t *testing.T) {
 		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 		// Find the request ID.
-		eng := setup.engine
+		eng := setup.Engine()
 		status, err := eng.GetStatus(dagFile)
 		require.NoError(t, err)
 		require.Equal(t, status.Status.Status, scheduler.StatusSuccess)

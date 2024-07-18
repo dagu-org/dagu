@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,8 +16,8 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+		setup := test.Setup(t)
+		defer setup.Cleanup()
 
 		dagFile := testDAGFile("restart.yaml")
 
@@ -30,7 +31,7 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		time.Sleep(waitForStatusUpdate)
-		eng := setup.engine
+		eng := setup.Engine()
 
 		// Wait for the DAG running.
 		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
@@ -56,10 +57,10 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dg, err := dag.Load(setup.cfg.BaseConfig, dagFile, "")
+		dg, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		recentHistory := newEngine(setup.cfg).GetRecentHistory(dg, 2)
+		recentHistory := newEngine(setup.Config).GetRecentHistory(dg, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

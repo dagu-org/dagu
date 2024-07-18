@@ -2,10 +2,10 @@ package dag
 
 import (
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,13 +69,12 @@ func Test_LoadMetadata(t *testing.T) {
 }
 
 func Test_loadBaseConfig(t *testing.T) {
-	t.Run("BaseConfigFile", func(t *testing.T) {
+	t.Run("LoadBaseConfigFile", func(t *testing.T) {
 		// The base config file is set on the global config
 		// This should be `testdata/home/.dagu/config.yaml`.
-		cfg, err := config.Load()
-		require.NoError(t, err)
+		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
-		dg, err := loadBaseConfig(cfg.BaseConfig, buildOpts{})
+		dg, err := loadBaseConfig(baseConfig, buildOpts{})
 		require.NotNil(t, dg)
 		require.NoError(t, err)
 	})

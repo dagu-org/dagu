@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/dagu-dev/dagu/internal/test"
 )
 
 func TestStartCommand(t *testing.T) {
-	setup := setupTest(t)
-	defer setup.cleanup()
+	setup := test.Setup(t)
+	defer setup.Cleanup()
 
 	tests := []cmdTest{
 		{

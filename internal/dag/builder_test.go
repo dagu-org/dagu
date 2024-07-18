@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -403,25 +403,23 @@ schedule:
 func TestLoad(t *testing.T) {
 	// Base config has the following values:
 	// MailOn: {Failure: true, Success: false}
-	t.Run("WithBaseConfig", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
+	t.Run("OverrideBaseConfig", func(t *testing.T) {
+		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		dg, err := Load(cfg.BaseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
+		dg, err := Load(baseConfig, path.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
 		require.Equal(t, &MailOn{Failure: false, Success: false}, dg.MailOn)
 		require.Equal(t, dg.HistRetentionDays, 7)
 	})
-	t.Run("WithoutBaseConfig", func(t *testing.T) {
-		cfg, err := config.Load()
-		require.NoError(t, err)
+	t.Run("NoOverrideBaseConfig", func(t *testing.T) {
+		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
 		// no_overwrite.yaml does not have the MailOn key.
-		dg, err := Load(cfg.BaseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
+		dg, err := Load(baseConfig, path.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.

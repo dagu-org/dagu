@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/dagu-dev/dagu/internal/test"
 )
 
 func TestDryCommand(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
-		setup := setupTest(t)
-		defer setup.cleanup()
+		setup := test.Setup(t)
+		defer setup.Cleanup()
 
 		tests := []cmdTest{
 			{
