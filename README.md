@@ -67,6 +67,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 -   [**Documentation**](#documentation)
 -   [**Running as a daemon**](#running-as-a-daemon)
 -   [**Example DAG**](#example-dag)
+-   [**Docker-compose setting**](#docker-compose-setting)
 -   [**Motivation**](#motivation)
 -   [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
 -   [**How It Works**](#how-it-works)
@@ -177,8 +178,7 @@ docker run \
 --rm \
 -p 8080:8080 \
 -v $HOME/.config/dagu/dags:/home/dagu/.config/dagu/dags \
--v $HOME/.local/share/dagu:/home/dagu/.local/share/data \
--v $HOME/.local/state/dagu/logs:/home/.local/state/dagu/logs \
+-v $HOME/.local/share/dagu:/home/dagu/.local/share/dagu \
 ghcr.io/dagu-dev/dagu:latest dagu start-all
 ```
 
@@ -388,6 +388,10 @@ steps:
       depends:
           - send_report
 ```
+
+## **Docker-compose setting**
+
+To run Dagu using Docker-compose, please take a look at the example: [docker-compose file](examples/docker-compose.yaml)
 
 ## **Motivation**
 
