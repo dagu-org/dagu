@@ -39,7 +39,7 @@ func schedulerCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP(
-		"dags", "d", "", "location of DAG files (default is $HOME/.dagu/dags)",
+		"dags", "d", "", "location of DAG files (default is $HOME/.config/dagu/dags)",
 	)
 	_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
 

@@ -144,13 +144,17 @@ const (
 	suspendDir = "suspend"
 )
 
+var (
+	// Config directories
+	ConfigDir = getConfigDir()
+)
+
 func getBaseDirs() baseDirs {
-	configDir := getConfigDir()
 	logsDir := getLogsDir()
 	return baseDirs{
-		config:       configDir,
-		dags:         path.Join(configDir, dagsDir),
-		suspendFlags: path.Join(configDir, suspendDir),
+		config:       ConfigDir,
+		dags:         path.Join(ConfigDir, dagsDir),
+		suspendFlags: path.Join(ConfigDir, suspendDir),
 		data:         getDataDir(),
 		logs:         logsDir,
 		adminLogs:    path.Join(logsDir, "admin"),
@@ -189,7 +193,16 @@ func getConfigDir() string {
 	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
 		return filepath.Join(v, appName)
 	}
-	return filepath.Join(xdg.ConfigHome, appName)
+	return filepath.Join(getHomeDir(), ".config", appName)
+}
+
+func getHomeDir() string {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("could not determine home directory: %v", err)
+		return ""
+	}
+	return dir
 }
 
 func getLegacyConfigPath() (string, bool) {
@@ -199,7 +212,7 @@ func getLegacyConfigPath() (string, bool) {
 		return v, true
 	}
 	// If not, check if the legacyPath config directory exists.
-	legacyPath := filepath.Join(os.Getenv("HOME"), legacyConfigDir)
+	legacyPath := filepath.Join(getHomeDir(), legacyConfigDir)
 	if _, err := os.Stat(legacyPath); err == nil {
 		return legacyPath, true
 	}
