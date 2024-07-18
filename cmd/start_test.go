@@ -7,7 +7,7 @@ import (
 )
 
 func TestStartCommand(t *testing.T) {
-	setup := test.Setup(t)
+	setup := test.SetupTest(t)
 	defer setup.Cleanup()
 
 	tests := []cmdTest{

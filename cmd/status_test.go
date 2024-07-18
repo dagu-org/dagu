@@ -9,7 +9,7 @@ import (
 
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAG", func(t *testing.T) {
-		setup := test.Setup(t)
+		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
 		dagFile := testDAGFile("status.yaml")

@@ -11,7 +11,7 @@ import (
 
 func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
-		setup := test.Setup(t)
+		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
 		dagFile := testDAGFile("retry.yaml")

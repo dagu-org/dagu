@@ -12,7 +12,7 @@ import (
 
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
-		setup := test.Setup(t)
+		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
 		go func() {

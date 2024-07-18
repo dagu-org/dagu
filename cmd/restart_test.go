@@ -16,7 +16,7 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		setup := test.Setup(t)
+		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
 		dagFile := testDAGFile("restart.yaml")

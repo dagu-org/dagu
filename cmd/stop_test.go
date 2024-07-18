@@ -10,7 +10,7 @@ import (
 
 func TestStopCommand(t *testing.T) {
 	t.Run("StopDAG", func(t *testing.T) {
-		setup := test.Setup(t)
+		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
 		dagFile := testDAGFile("stop.yaml")

@@ -13,17 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type TestSetup struct {
+type Setup struct {
 	Config *config.Config
 
 	homeDir string
 }
 
-func (t TestSetup) Cleanup() {
+func (t Setup) Cleanup() {
 	_ = os.RemoveAll(t.homeDir)
 }
 
-func (t TestSetup) DataStore() persistence.DataStores {
+func (t Setup) DataStore() persistence.DataStores {
 	return client.NewDataStores(&client.NewDataStoresArgs{
 		DAGs:              t.Config.DAGs,
 		DataDir:           t.Config.DataDir,
@@ -32,7 +32,7 @@ func (t TestSetup) DataStore() persistence.DataStores {
 	})
 }
 
-func (t TestSetup) Engine() engine.Engine {
+func (t Setup) Engine() engine.Engine {
 	return engine.New(&engine.NewEngineArgs{
 		DataStore:  t.DataStore(),
 		Executable: t.Config.Executable,
@@ -41,7 +41,7 @@ func (t TestSetup) Engine() engine.Engine {
 
 }
 
-func Setup(t *testing.T) TestSetup {
+func SetupTest(t *testing.T) Setup {
 	tmpDir := util.MustTempDir("dagu_test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
@@ -53,13 +53,13 @@ func Setup(t *testing.T) TestSetup {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	return TestSetup{
+	return Setup{
 		Config:  cfg,
 		homeDir: tmpDir,
 	}
 }
 
-func SetupForDir(t *testing.T, dir string) TestSetup {
+func SetupForDir(t *testing.T, dir string) Setup {
 	tmpDir := util.MustTempDir("dagu_test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func SetupForDir(t *testing.T, dir string) TestSetup {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	return TestSetup{
+	return Setup{
 		Config:  cfg,
 		homeDir: tmpDir,
 	}
