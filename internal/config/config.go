@@ -141,19 +141,22 @@ const (
 )
 
 var (
-	// Config directories
+	// ConfigDir is the directory to store DAGs and other configuration files.
 	ConfigDir = getConfigDir()
+	// DataDir is the directory to store history data.
+	DataDir = getDataDir()
+	// LogsDir is the directory to store logs.
+	LogsDir = getLogsDir()
 )
 
 func getBaseDirs() baseDirs {
-	logsDir := getLogsDir()
 	return baseDirs{
 		config:       ConfigDir,
 		dags:         filepath.Join(ConfigDir, dagsDir),
 		suspendFlags: filepath.Join(ConfigDir, suspendDir),
-		data:         getDataDir(),
-		logs:         logsDir,
-		adminLogs:    filepath.Join(logsDir, "admin"),
+		data:         DataDir,
+		logs:         LogsDir,
+		adminLogs:    filepath.Join(LogsDir, "admin"),
 	}
 }
 

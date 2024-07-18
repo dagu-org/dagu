@@ -2,6 +2,8 @@ package test
 
 import (
 	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/dagu-dev/dagu/internal/config"
@@ -41,7 +43,14 @@ func (t Setup) Engine() engine.Engine {
 
 }
 
+var (
+	lock sync.Mutex
+)
+
 func SetupTest(t *testing.T) Setup {
+	lock.Lock()
+	defer lock.Unlock()
+
 	tmpDir := util.MustTempDir("dagu_test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
@@ -49,6 +58,10 @@ func SetupTest(t *testing.T) Setup {
 	viper.AddConfigPath(config.ConfigDir)
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
+
+	config.ConfigDir = filepath.Join(tmpDir, "config")
+	config.DataDir = filepath.Join(tmpDir, "data")
+	config.LogsDir = filepath.Join(tmpDir, "log")
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
@@ -60,6 +73,9 @@ func SetupTest(t *testing.T) Setup {
 }
 
 func SetupForDir(t *testing.T, dir string) Setup {
+	lock.Lock()
+	defer lock.Unlock()
+
 	tmpDir := util.MustTempDir("dagu_test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
