@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,43 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
-
-type testSetup struct {
-	homeDir   string
-	engine    engine.Engine
-	dataStore persistence.DataStores
-	cfg       *config.Config
-}
-
-func (t testSetup) cleanup() {
-	_ = os.RemoveAll(t.homeDir)
-}
-
-// setupTest is a helper function to setup the test environment.
-// This function does the following:
-// 1. It creates a temporary directory and returns the path to it.
-// 2. Sets the home directory to the temporary directory.
-// 3. Creates a new data store factory and engine.
-func setupTest(t *testing.T) testSetup {
-	t.Helper()
-
-	tmpDir := util.MustTempDir("dagu_test")
-	err := os.Setenv("HOME", tmpDir)
-	require.NoError(t, err)
-
-	cfg, err := config.Load()
-	require.NoError(t, err)
-
-	cfg.DataDir = filepath.Join(tmpDir, ".dagu", "data")
-	dataStore := newDataStores(cfg)
-
-	return testSetup{
-		homeDir:   tmpDir,
-		dataStore: dataStore,
-		engine:    newEngine(cfg),
-		cfg:       cfg,
-	}
-}
 
 // cmdTest is a helper struct to test commands.
 // It contains the arguments to the command and the expected output.
