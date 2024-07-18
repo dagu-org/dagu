@@ -175,7 +175,7 @@ func getLogsDir() string {
 		// For backward compatibility.
 		return filepath.Join(v, "logs")
 	}
-	return filepath.Join(xdg.StateHome, appName, "logs")
+	return filepath.Join(xdg.DataHome, appName, "logs")
 }
 
 func getDataDir() string {
