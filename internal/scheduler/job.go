@@ -24,9 +24,9 @@ type jobCreatorImpl struct {
 	Engine     engine.Engine
 }
 
-func (jf jobCreatorImpl) CreateJob(dg *dag.DAG, next time.Time) job {
+func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time) job {
 	return &jobImpl{
-		DAG:        dg,
+		DAG:        workflow,
 		Executable: jf.Executable,
 		WorkDir:    jf.WorkDir,
 		Next:       next,

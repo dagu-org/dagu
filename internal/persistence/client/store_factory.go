@@ -21,19 +21,21 @@ type dataStores struct {
 	latestStatusToday bool
 }
 
-type NewDataStoresArgs struct {
-	DAGs              string
-	DataDir           string
-	SuspendFlagsDir   string
+type DataStoreOptions struct {
 	LatestStatusToday bool
 }
 
-func NewDataStores(args *NewDataStoresArgs) persistence.DataStores {
+func NewDataStores(
+	dags string,
+	dataDir string,
+	suspendFlagsDir string,
+	opts DataStoreOptions,
+) persistence.DataStores {
 	dataStoreImpl := &dataStores{
-		dags:              args.DAGs,
-		dataDir:           args.DataDir,
-		suspendFlagsDir:   args.SuspendFlagsDir,
-		latestStatusToday: args.LatestStatusToday,
+		dags:              dags,
+		dataDir:           dataDir,
+		suspendFlagsDir:   suspendFlagsDir,
+		latestStatusToday: opts.LatestStatusToday,
 	}
 	_ = dataStoreImpl.InitDagDir()
 	return dataStoreImpl

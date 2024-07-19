@@ -57,10 +57,11 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dg, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
+		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		recentHistory := newEngine(setup.Config).GetRecentHistory(dg, 2)
+		ds := newDataStores(setup.Config)
+		recentHistory := newEngine(setup.Config, ds).GetRecentHistory(workflow, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

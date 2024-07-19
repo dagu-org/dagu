@@ -87,15 +87,17 @@ func setupTest(t *testing.T) (string, engine.Engine) {
 		DataDir:         filepath.Join(tmpDir, ".dagu", "data"),
 		DAGs:            testdataDir,
 		SuspendFlagsDir: tmpDir,
+		WorkDir:         tmpDir,
 	}
 
-	dataStore := client.NewDataStores(&client.NewDataStoresArgs{
-		DAGs:            cfg.DAGs,
-		DataDir:         cfg.DataDir,
-		SuspendFlagsDir: cfg.SuspendFlagsDir,
-	})
+	dataStore := client.NewDataStores(
+		cfg.DAGs,
+		cfg.DataDir,
+		cfg.SuspendFlagsDir,
+		client.DataStoreOptions{
+			LatestStatusToday: cfg.LatestStatusToday,
+		},
+	)
 
-	return tmpDir, engine.New(&engine.NewEngineArgs{
-		DataStore: dataStore,
-	})
+	return tmpDir, engine.New(dataStore, "", cfg.WorkDir)
 }

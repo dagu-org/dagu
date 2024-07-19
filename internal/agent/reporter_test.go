@@ -20,7 +20,7 @@ import (
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node,
+		t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -77,11 +77,11 @@ func TestReporter(t *testing.T) {
 	}
 }
 
-func testErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
-	dg.MailOn.Failure = true
-	dg.MailOn.Success = false
+func testErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+	workflow.MailOn.Failure = true
+	workflow.MailOn.Success = false
 
-	_ = rp.send(dg, &model.Status{
+	_ = rp.send(workflow, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -93,11 +93,11 @@ func testErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node)
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
-	dg.MailOn.Failure = false
-	dg.MailOn.Success = true
+func testNoErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+	workflow.MailOn.Failure = false
+	workflow.MailOn.Success = true
 
-	err := rp.send(dg, &model.Status{
+	err := rp.send(workflow, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -108,11 +108,11 @@ func testNoErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Nod
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
-	dg.MailOn.Failure = true
-	dg.MailOn.Success = true
+func testSuccessMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+	workflow.MailOn.Failure = true
+	workflow.MailOn.Success = true
 
-	err := rp.send(dg, &model.Status{
+	err := rp.send(workflow, &model.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -125,7 +125,7 @@ func testSuccessMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Nod
 	require.Equal(t, 1, mock.count)
 }
 
-func testReportSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
+func testReportSummary(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -153,18 +153,18 @@ func testReportSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.N
 	require.Contains(t, s, "test error")
 }
 
-func testRenderSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
+func testRenderSummary(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
 	status := &model.Status{
-		Name:   dg.Name,
+		Name:   workflow.Name,
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}
 	summary := renderSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
-	require.Contains(t, summary, dg.Name)
+	require.Contains(t, summary, workflow.Name)
 }
 
-func testRenderTable(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
+func testRenderTable(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
 	summary := renderTable(nodes)
 	require.Contains(t, summary, nodes[0].Name)
 	require.Contains(t, summary, nodes[0].Args[0])

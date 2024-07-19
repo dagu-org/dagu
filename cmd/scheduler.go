@@ -33,7 +33,9 @@ func schedulerCmd() *cobra.Command {
 			logger.Info("Starting the scheduler", "dags", cfg.DAGs)
 
 			ctx := cmd.Context()
-			sc := scheduler.New(cfg, logger, newEngine(cfg))
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
+			sc := scheduler.New(cfg, logger, eng)
 			if err := sc.Start(ctx); err != nil {
 				logger.Error("Failed to start scheduler", "error", err)
 				os.Exit(1)

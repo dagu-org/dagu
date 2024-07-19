@@ -262,22 +262,19 @@ func TestCompactFile(t *testing.T) {
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	dg := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
+	workflow := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
 	reqID := "request-id-1"
 
-	dw, _, err := db.newWriter(dg.Location, time.Now(), reqID)
+	dw, _, err := db.newWriter(workflow.Location, time.Now(), reqID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 
 	for _, data := range []struct {
 		Status *model.Status
 	}{
-		{model.NewStatus(
-			dg, nil, scheduler.StatusRunning, 10000, nil, nil)},
-		{model.NewStatus(
-			dg, nil, scheduler.StatusCancel, 10000, nil, nil)},
-		{model.NewStatus(
-			dg, nil, scheduler.StatusSuccess, 10000, nil, nil)},
+		{model.NewStatus(workflow, nil, scheduler.StatusRunning, 10000, nil, nil)},
+		{model.NewStatus(workflow, nil, scheduler.StatusCancel, 10000, nil, nil)},
+		{model.NewStatus(workflow, nil, scheduler.StatusSuccess, 10000, nil, nil)},
 	} {
 		require.NoError(t, dw.write(data.Status))
 	}
@@ -285,18 +282,18 @@ func TestCompactFile(t *testing.T) {
 	_ = dw.close()
 
 	var s *model.StatusFile
-	if h := db.ReadStatusRecent(dg.Location, 1); len(h) > 0 {
+	if h := db.ReadStatusRecent(workflow.Location, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
 
 	db2 := New(db.dir, "", true)
-	err = db2.Compact(dg.Location, s.File)
+	err = db2.Compact(workflow.Location, s.File)
 	require.False(t, util.FileExists(s.File))
 	require.NoError(t, err)
 
 	var s2 *model.StatusFile
-	if h := db2.ReadStatusRecent(dg.Location, 1); len(h) > 0 {
+	if h := db2.ReadStatusRecent(workflow.Location, 1); len(h) > 0 {
 		s2 = h[0]
 	}
 	require.NotNil(t, s2)
@@ -304,7 +301,7 @@ func TestCompactFile(t *testing.T) {
 	require.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
 	require.Equal(t, s.Status, s2.Status)
 
-	err = db2.Compact(dg.Location, "Invalid_file_name.dat")
+	err = db2.Compact(workflow.Location, "Invalid_file_name.dat")
 	require.Error(t, err)
 }
 
@@ -353,9 +350,15 @@ func TestErrorParseFile(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func testWriteStatus(t *testing.T, db *Store, dg *dag.DAG, status *model.Status, tm time.Time) {
+func testWriteStatus(
+	t *testing.T,
+	db *Store,
+	workflow *dag.DAG,
+	status *model.Status,
+	tm time.Time,
+) {
 	t.Helper()
-	dw, _, err := db.newWriter(dg.Location, tm, status.RequestID)
+	dw, _, err := db.newWriter(workflow.Location, tm, status.RequestID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 	defer func() {

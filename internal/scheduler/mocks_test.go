@@ -11,8 +11,8 @@ var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(dg *dag.DAG, next time.Time) job {
-	return newMockJob(dg)
+func (f *mockJobFactory) CreateJob(workflow *dag.DAG, next time.Time) job {
+	return newMockJob(workflow)
 }
 
 var _ entryReader = (*mockEntryReader)(nil)
@@ -38,10 +38,10 @@ type mockJob struct {
 	Panic        error
 }
 
-func newMockJob(dg *dag.DAG) *mockJob {
+func newMockJob(workflow *dag.DAG) *mockJob {
 	return &mockJob{
-		DAG:  dg,
-		Name: dg.Name,
+		DAG:  workflow,
+		Name: workflow.Name,
 	}
 }
 

@@ -41,13 +41,14 @@ func startCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			dg, err := dag.Load(cfg.BaseConfig, args[0], params)
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], params)
 			if err != nil {
 				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
-			eng := newEngine(cfg)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
 
 			requestID, err := generateRequestID()
 			if err != nil {
@@ -55,7 +56,7 @@ func startCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			logFile, err := openLogFileForDAG("start_", cfg.LogDir, dg, requestID)
+			logFile, err := openLogFile("start_", cfg.LogDir, workflow, requestID)
 			if err != nil {
 				initLogger.Error("Failed to open log file for DAG", "error", err)
 				os.Exit(1)
@@ -68,11 +69,11 @@ func startCmd() *cobra.Command {
 				Quiet:   quiet,
 			})
 
-			agentLogger.Info("Starting DAG", "dag", dg.Name)
+			agentLogger.Info("Starting DAG", "dag", workflow.Name)
 
 			dagAgent := agent.New(
 				requestID,
-				dg,
+				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),

@@ -51,13 +51,14 @@ func retryCmd() *cobra.Command {
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
 			if err != nil {
 				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
-			eng := newEngine(cfg)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
 
 			requestID, err := generateRequestID()
 			if err != nil {
@@ -65,7 +66,7 @@ func retryCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			logFile, err := openLogFileForDAG("dry_", cfg.LogDir, loadedDAG, requestID)
+			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, requestID)
 			if err != nil {
 				initLogger.Error("Failed to open log file for DAG", "error", err)
 				os.Exit(1)
@@ -77,11 +78,11 @@ func retryCmd() *cobra.Command {
 				LogFile: logFile,
 			})
 
-			agentLogger.Info("Retrying the DAG", "dag", loadedDAG.Name, "reqId", reqID)
+			agentLogger.Info("Retrying the DAG", "dag", workflow.Name, "reqId", reqID)
 
 			dagAgent := agent.New(
 				requestID,
-				loadedDAG,
+				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),

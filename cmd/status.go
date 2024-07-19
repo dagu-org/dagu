@@ -27,16 +27,17 @@ func statusCmd() *cobra.Command {
 			})
 
 			// Load the DAG file and get the current running status.
-			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				// nolint
 				logger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
-			eng := newEngine(cfg)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
 
-			curStatus, err := eng.GetCurrentStatus(loadedDAG)
+			curStatus, err := eng.GetCurrentStatus(workflow)
 
 			if err != nil {
 				// nolint

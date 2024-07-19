@@ -24,7 +24,7 @@ func TestPID(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	dg := &dag.DAG{
+	workflow := &dag.DAG{
 		HandlerOn: dag.HandlerOn{},
 		Steps: []dag.Step{
 			{
@@ -40,7 +40,7 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &dag.MailConfig{},
 		SMTP:      &dag.SMTPConfig{},
 	}
-	status := NewStatus(dg, nil, scheduler.StatusSuccess, 10000, &start, &end)
+	status := NewStatus(workflow, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
 	rawJSON, err := status.ToJSON()
 	require.NoError(t, err)
@@ -50,12 +50,12 @@ func TestStatusSerialization(t *testing.T) {
 
 	require.Equal(t, status.Name, unmarshalled.Name)
 	require.Equal(t, 1, len(unmarshalled.Nodes))
-	require.Equal(t, dg.Steps[0].Name, unmarshalled.Nodes[0].Name)
+	require.Equal(t, workflow.Steps[0].Name, unmarshalled.Nodes[0].Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	dg := &dag.DAG{Name: "test"}
-	status := NewStatus(dg, nil, scheduler.StatusRunning,
+	workflow := &dag.DAG{Name: "test"}
+	status := NewStatus(workflow, nil, scheduler.StatusRunning,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)

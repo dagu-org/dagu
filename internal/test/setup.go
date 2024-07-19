@@ -28,20 +28,18 @@ func (t Setup) Cleanup() {
 }
 
 func (t Setup) DataStore() persistence.DataStores {
-	return client.NewDataStores(&client.NewDataStoresArgs{
-		DAGs:              t.Config.DAGs,
-		DataDir:           t.Config.DataDir,
-		SuspendFlagsDir:   t.Config.SuspendFlagsDir,
-		LatestStatusToday: t.Config.LatestStatusToday,
-	})
+	return client.NewDataStores(
+		t.Config.DAGs,
+		t.Config.DataDir,
+		t.Config.SuspendFlagsDir,
+		client.DataStoreOptions{
+			LatestStatusToday: t.Config.LatestStatusToday,
+		},
+	)
 }
 
 func (t Setup) Engine() engine.Engine {
-	return engine.New(&engine.NewEngineArgs{
-		DataStore:  t.DataStore(),
-		Executable: t.Config.Executable,
-		WorkDir:    t.Config.WorkDir,
-	})
+	return engine.New(t.DataStore(), t.Config.Executable, t.Config.WorkDir)
 }
 
 var (

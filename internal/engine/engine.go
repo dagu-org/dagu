@@ -16,19 +16,17 @@ import (
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
-type NewEngineArgs struct {
-	DataStore  persistence.DataStores
-	Executable string
-	WorkDir    string
-}
-
 // New creates a new Engine instance.
 // The Engine is used to interact with the DAG execution engine.
-func New(args *NewEngineArgs) Engine {
+func New(
+	dataStore persistence.DataStores,
+	executable string,
+	workDir string,
+) Engine {
 	return &engineImpl{
-		dataStore:  args.DataStore,
-		executable: args.Executable,
-		workDir:    args.WorkDir,
+		dataStore:  dataStore,
+		executable: executable,
+		workDir:    workDir,
 	}
 }
 
@@ -81,21 +79,21 @@ func (e *engineImpl) Rename(oldID, newID string) error {
 	return historyStore.Rename(oldID, newID)
 }
 
-func (e *engineImpl) Stop(dg *dag.DAG) error {
+func (e *engineImpl) Stop(workflow *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.Client{Addr: dg.SockAddr()}
+	client := sock.Client{Addr: workflow.SockAddr()}
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *engineImpl) StartAsync(dg *dag.DAG, opts StartOptions) {
+func (e *engineImpl) StartAsync(workflow *dag.DAG, opts StartOptions) {
 	go func() {
-		err := e.Start(dg, opts)
+		err := e.Start(workflow, opts)
 		util.LogErr("starting a DAG", err)
 	}()
 }
 
-func (e *engineImpl) Start(dg *dag.DAG, opts StartOptions) error {
+func (e *engineImpl) Start(workflow *dag.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -104,7 +102,7 @@ func (e *engineImpl) Start(dg *dag.DAG, opts StartOptions) error {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, dg.Location)
+	args = append(args, workflow.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -120,12 +118,12 @@ func (e *engineImpl) Start(dg *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Restart(dg *dag.DAG, opts RestartOptions) error {
+func (e *engineImpl) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, dg.Location)
+	args = append(args, workflow.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -138,10 +136,10 @@ func (e *engineImpl) Restart(dg *dag.DAG, opts RestartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Retry(dg *dag.DAG, reqID string) error {
+func (e *engineImpl) Retry(workflow *dag.DAG, reqID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", reqID))
-	args = append(args, dg.Location)
+	args = append(args, workflow.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -154,28 +152,28 @@ func (e *engineImpl) Retry(dg *dag.DAG, reqID string) error {
 	return cmd.Wait()
 }
 
-func (*engineImpl) GetCurrentStatus(dg *dag.DAG) (*model.Status, error) {
-	client := sock.Client{Addr: dg.SockAddr()}
+func (*engineImpl) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
+	client := sock.Client{Addr: workflow.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(dg), nil
+		return model.NewStatusDefault(workflow), nil
 	}
 	return model.StatusFromJSON(ret)
 }
 
-func (e *engineImpl) GetStatusByRequestID(dg *dag.DAG, reqID string) (
+func (e *engineImpl) GetStatusByRequestID(workflow *dag.DAG, reqID string) (
 	*model.Status, error,
 ) {
 	ret, err := e.dataStore.HistoryStore().FindByRequestID(
-		dg.Location, reqID,
+		workflow.Location, reqID,
 	)
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetCurrentStatus(dg)
+	status, _ := e.GetCurrentStatus(workflow)
 	if status != nil && status.RequestID != reqID {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -183,8 +181,8 @@ func (e *engineImpl) GetStatusByRequestID(dg *dag.DAG, reqID string) (
 	return ret.Status, err
 }
 
-func (*engineImpl) currentStatus(dg *dag.DAG) (*model.Status, error) {
-	client := sock.Client{Addr: dg.SockAddr()}
+func (*engineImpl) currentStatus(workflow *dag.DAG) (*model.Status, error) {
+	client := sock.Client{Addr: workflow.SockAddr()}
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
@@ -192,29 +190,29 @@ func (*engineImpl) currentStatus(dg *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *engineImpl) GetLatestStatus(dg *dag.DAG) (*model.Status, error) {
-	currStatus, _ := e.currentStatus(dg)
+func (e *engineImpl) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
+	currStatus, _ := e.currentStatus(workflow)
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().ReadStatusToday(dg.Location)
+	status, err := e.dataStore.HistoryStore().ReadStatusToday(workflow.Location)
 	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
 		errors.Is(err, persistence.ErrNoStatusData) {
-		return model.NewStatusDefault(dg), nil
+		return model.NewStatusDefault(workflow), nil
 	}
 	if err != nil {
-		return model.NewStatusDefault(dg), err
+		return model.NewStatusDefault(workflow), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
 }
 
-func (e *engineImpl) GetRecentHistory(dg *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStore.HistoryStore().ReadStatusRecent(dg.Location, n)
+func (e *engineImpl) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
+	return e.dataStore.HistoryStore().ReadStatusRecent(workflow.Location, n)
 }
 
-func (e *engineImpl) UpdateStatus(dg *dag.DAG, status *model.Status) error {
-	client := sock.Client{Addr: dg.SockAddr()}
+func (e *engineImpl) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
+	client := sock.Client{Addr: workflow.SockAddr()}
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -228,7 +226,7 @@ func (e *engineImpl) UpdateStatus(dg *dag.DAG, status *model.Status) error {
 		}
 	}
 	return e.dataStore.HistoryStore().Update(
-		dg.Location, status.RequestID, status,
+		workflow.Location, status.RequestID, status,
 	)
 }
 
@@ -291,16 +289,16 @@ func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *engineImpl) readStatus(dg *dag.DAG) (*DAGStatus, error) {
-	latestStatus, err := e.GetLatestStatus(dg)
+func (e *engineImpl) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
+	latestStatus, err := e.GetLatestStatus(workflow)
 	return newDAGStatus(
-		dg, latestStatus, e.IsSuspended(dg.Name), err,
+		workflow, latestStatus, e.IsSuspended(workflow.Name), err,
 	), err
 }
 
-func (*engineImpl) emptyDAGIfNil(dg *dag.DAG, dagLocation string) *dag.DAG {
-	if dg != nil {
-		return dg
+func (*engineImpl) emptyDAGIfNil(workflow *dag.DAG, dagLocation string) *dag.DAG {
+	if workflow != nil {
+		return workflow
 	}
 	return &dag.DAG{Location: dagLocation}
 }

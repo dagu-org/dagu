@@ -55,30 +55,30 @@ type Status struct {
 	mu         sync.RWMutex
 }
 
-func NewStatusDefault(dg *dag.DAG) *Status {
+func NewStatusDefault(workflow *dag.DAG) *Status {
 	return NewStatus(
-		dg, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
+		workflow, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
 	)
 }
 
 func NewStatus(
-	dg *dag.DAG,
+	workflow *dag.DAG,
 	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
 	statusObj := &Status{
-		Name:       dg.Name,
+		Name:       workflow.Name,
 		Status:     status,
 		StatusText: status.String(),
 		PID:        PID(pid),
-		Nodes:      FromNodesOrSteps(nodes, dg.Steps),
-		OnExit:     nodeOrNil(dg.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(dg.HandlerOn.Success),
-		OnFailure:  nodeOrNil(dg.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(dg.HandlerOn.Cancel),
-		Params:     Params(dg.Params),
+		Nodes:      FromNodesOrSteps(nodes, workflow.Steps),
+		OnExit:     nodeOrNil(workflow.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(workflow.HandlerOn.Success),
+		OnFailure:  nodeOrNil(workflow.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(workflow.HandlerOn.Cancel),
+		Params:     Params(workflow.Params),
 	}
 	if startTime != nil {
 		statusObj.StartedAt = util.FormatTime(*startTime)

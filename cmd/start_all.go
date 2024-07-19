@@ -39,11 +39,13 @@ func startAllCmd() *cobra.Command {
 			}
 
 			ctx := cmd.Context()
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
 
 			go func() {
 				logger.Info("Starting the scheduler", "dags", cfg.DAGs)
 
-				sc := scheduler.New(cfg, logger, newEngine(cfg))
+				sc := scheduler.New(cfg, logger, eng)
 				if err := sc.Start(ctx); err != nil {
 					logger.Error("Failed to start scheduler", "error", err)
 					os.Exit(1)
@@ -52,7 +54,7 @@ func startAllCmd() *cobra.Command {
 
 			logger.Info("Starting the server", "host", cfg.Host, "port", cfg.Port)
 
-			server := frontend.New(cfg, logger, newEngine(cfg))
+			server := frontend.New(cfg, logger, eng)
 			if err := server.Serve(ctx); err != nil {
 				logger.Error("Failed to start server", "error", err)
 				os.Exit(1)

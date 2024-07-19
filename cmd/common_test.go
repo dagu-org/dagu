@@ -108,11 +108,11 @@ func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dg, err := dag.Load(cfg.BaseConfig, dagFile, "")
+	workflow, err := dag.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(dg)
+		status, err := e.GetCurrentStatus(workflow)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)

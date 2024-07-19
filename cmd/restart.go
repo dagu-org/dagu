@@ -39,24 +39,25 @@ func restartCmd() *cobra.Command {
 
 			// Load the DAG file and stop the DAG if it is running.
 			dagFilePath := args[0]
-			dg, err := dag.Load(cfg.BaseConfig, dagFilePath, "")
+			workflow, err := dag.Load(cfg.BaseConfig, dagFilePath, "")
 			if err != nil {
 				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
-			eng := newEngine(cfg)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
 
-			if err := stopDAGIfRunning(eng, dg, initLogger); err != nil {
+			if err := stopDAGIfRunning(eng, workflow, initLogger); err != nil {
 				initLogger.Error("Failed to stop the DAG", "error", err)
 				os.Exit(1)
 			}
 
 			// Wait for the specified amount of time before restarting.
-			waitForRestart(dg.RestartWait, initLogger)
+			waitForRestart(workflow.RestartWait, initLogger)
 
 			// Retrieve the parameter of the previous execution.
-			params, err := getPreviousExecutionParams(eng, dg)
+			params, err := getPreviousExecutionParams(eng, workflow)
 			if err != nil {
 				initLogger.Error("Failed to get previous execution params", "error", err)
 				os.Exit(1)
@@ -64,7 +65,7 @@ func restartCmd() *cobra.Command {
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			dg, err = dag.Load(cfg.BaseConfig, dagFilePath, params)
+			workflow, err = dag.Load(cfg.BaseConfig, dagFilePath, params)
 			if err != nil {
 				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
@@ -76,7 +77,7 @@ func restartCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			logFile, err := openLogFileForDAG("restart_", cfg.LogDir, dg, requestID)
+			logFile, err := openLogFile("restart_", cfg.LogDir, workflow, requestID)
 			if err != nil {
 				initLogger.Error("Failed to open log file for DAG", "error", err)
 				os.Exit(1)
@@ -89,11 +90,11 @@ func restartCmd() *cobra.Command {
 				Quiet:   quiet,
 			})
 
-			agentLogger.Info("Restarting DAG", "dag", dg.Name)
+			agentLogger.Info("Restarting DAG", "dag", workflow.Name)
 
 			dagAgent := agent.New(
 				requestID,
-				dg,
+				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
@@ -114,24 +115,24 @@ func restartCmd() *cobra.Command {
 
 // stopDAGIfRunning stops the DAG if it is running.
 // Otherwise, it does nothing.
-func stopDAGIfRunning(e engine.Engine, dg *dag.DAG, lg logger.Logger) error {
-	curStatus, err := e.GetCurrentStatus(dg)
+func stopDAGIfRunning(e engine.Engine, workflow *dag.DAG, lg logger.Logger) error {
+	curStatus, err := e.GetCurrentStatus(workflow)
 	if err != nil {
 		return err
 	}
 
 	if curStatus.Status == scheduler.StatusRunning {
-		lg.Info("Stopping DAG for restart", "dag", dg.Name)
-		cobra.CheckErr(stopRunningDAG(e, dg))
+		lg.Info("Stopping DAG for restart", "dag", workflow.Name)
+		cobra.CheckErr(stopRunningDAG(e, workflow))
 	}
 	return nil
 }
 
 // stopRunningDAG attempts to stop the running DAG
 // by sending a stop signal to the agent.
-func stopRunningDAG(e engine.Engine, dg *dag.DAG) error {
+func stopRunningDAG(e engine.Engine, workflow *dag.DAG) error {
 	for {
-		curStatus, err := e.GetCurrentStatus(dg)
+		curStatus, err := e.GetCurrentStatus(workflow)
 		if err != nil {
 			return err
 		}
@@ -141,7 +142,7 @@ func stopRunningDAG(e engine.Engine, dg *dag.DAG) error {
 			return nil
 		}
 
-		if err := e.Stop(dg); err != nil {
+		if err := e.Stop(workflow); err != nil {
 			return err
 		}
 
@@ -158,8 +159,8 @@ func waitForRestart(restartWait time.Duration, lg logger.Logger) {
 	}
 }
 
-func getPreviousExecutionParams(e engine.Engine, dg *dag.DAG) (string, error) {
-	latestStatus, err := e.GetLatestStatus(dg)
+func getPreviousExecutionParams(e engine.Engine, workflow *dag.DAG) (string, error) {
+	latestStatus, err := e.GetLatestStatus(workflow)
 	if err != nil {
 		return "", err
 	}

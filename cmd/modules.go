@@ -7,19 +7,17 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 )
 
-func newEngine(cfg *config.Config) engine.Engine {
-	return engine.New(&engine.NewEngineArgs{
-		DataStore:  newDataStores(cfg),
-		Executable: cfg.Executable,
-		WorkDir:    cfg.WorkDir,
-	})
+func newEngine(cfg *config.Config, ds persistence.DataStores) engine.Engine {
+	return engine.New(ds, cfg.Executable, cfg.WorkDir)
 }
 
 func newDataStores(cfg *config.Config) persistence.DataStores {
-	return client.NewDataStores(&client.NewDataStoresArgs{
-		DAGs:              cfg.DAGs,
-		DataDir:           cfg.DataDir,
-		SuspendFlagsDir:   cfg.SuspendFlagsDir,
-		LatestStatusToday: cfg.LatestStatusToday,
-	})
+	return client.NewDataStores(
+		cfg.DAGs,
+		cfg.DataDir,
+		cfg.SuspendFlagsDir,
+		client.DataStoreOptions{
+			LatestStatusToday: cfg.LatestStatusToday,
+		},
+	)
 }

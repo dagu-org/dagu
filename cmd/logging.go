@@ -10,11 +10,16 @@ import (
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
-// openLogFileForDAG opens a log file for the DAG.
-func openLogFileForDAG(prefix string, logDir string, dg *dag.DAG, reqID string) (*os.File, error) {
-	name := util.ValidFilename(dg.Name)
-	if dg.LogDir != "" {
-		logDir = filepath.Join(dg.LogDir, name)
+// openLogFile opens a log file for the workflow.
+func openLogFile(
+	prefix string,
+	logDir string,
+	workflow *dag.DAG,
+	reqID string,
+) (*os.File, error) {
+	name := util.ValidFilename(workflow.Name)
+	if workflow.LogDir != "" {
+		logDir = filepath.Join(workflow.LogDir, name)
 	}
 	// Check if the log directory exists
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {

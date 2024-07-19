@@ -35,7 +35,7 @@ type newEntryReaderArgs struct {
 }
 
 type jobCreator interface {
-	CreateJob(dg *dag.DAG, next time.Time) job
+	CreateJob(workflow *dag.DAG, next time.Time) job
 }
 
 func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
@@ -62,25 +62,25 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e entryType) {
+	addEntriesFn := func(workflow *dag.DAG, s []dag.Schedule, e entryType) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &entry{
 				Next:      ss.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(dg, next),
+				Job:       er.jobCreator.CreateJob(workflow, next),
 				EntryType: e,
 				Logger:    er.logger,
 			})
 		}
 	}
 
-	for _, dg := range er.dags {
-		if er.engine.IsSuspended(dg.Name) {
+	for _, workflow := range er.dags {
+		if er.engine.IsSuspended(workflow.Name) {
 			continue
 		}
-		addEntriesFn(dg, dg.Schedule, entryTypeStart)
-		addEntriesFn(dg, dg.StopSchedule, entryTypeStop)
-		addEntriesFn(dg, dg.RestartSchedule, entryTypeRestart)
+		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
+		addEntriesFn(workflow, workflow.StopSchedule, entryTypeStop)
+		addEntriesFn(workflow, workflow.RestartSchedule, entryTypeRestart)
 	}
 
 	return entries, nil
@@ -98,14 +98,14 @@ func (er *entryReaderImpl) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.Exts) {
-			dg, err := dag.LoadMetadata(
+			workflow, err := dag.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
 				er.logger.Error("Failed to load DAG", "dag", fi.Name())
 				continue
 			}
-			er.dags[fi.Name()] = dg
+			er.dags[fi.Name()] = workflow
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
@@ -139,13 +139,13 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dg, err := dag.LoadMetadata(
+				workflow, err := dag.LoadMetadata(
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
 					er.logger.Error("Failed to load DAG", "dag", filepath.Base(event.Name))
 				} else {
-					er.dags[filepath.Base(event.Name)] = dg
+					er.dags[filepath.Base(event.Name)] = workflow
 					er.logger.Info("Loaded DAG", "dag", filepath.Base(event.Name))
 				}
 			}

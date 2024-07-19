@@ -35,22 +35,22 @@ func newReporter(sender Sender, lg logger.Logger) *reporter {
 }
 
 // reportStep is a function that reports the status of a step.
-func (rp *reporter) reportStep(
-	dg *dag.DAG, status *model.Status, node *scheduler.Node,
+func (r *reporter) reportStep(
+	workflow *dag.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		rp.logger.Infof("Done %s (%s)", node.Data().Name, nodeStatus)
+		r.logger.Infof("Done %s (%s)", node.Data().Name, nodeStatus)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
-		return rp.sender.Send(
-			dg.ErrorMail.From,
-			[]string{dg.ErrorMail.To},
+		return r.sender.Send(
+			workflow.ErrorMail.From,
+			[]string{workflow.ErrorMail.To},
 			fmt.Sprintf(
-				"%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status,
+				"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
 			),
 			renderHTML(status.Nodes),
-			addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
+			addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
 		)
 	}
 	return nil
@@ -69,31 +69,31 @@ func (r *reporter) report(status *model.Status, err error) {
 }
 
 // send is a function that sends a report mail.
-func (rp *reporter) send(
-	dg *dag.DAG, status *model.Status, err error,
+func (r *reporter) send(
+	workflow *dag.DAG, status *model.Status, err error,
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if dg.MailOn != nil && dg.MailOn.Failure {
-			return rp.sender.Send(
-				dg.ErrorMail.From,
-				[]string{dg.ErrorMail.To},
+		if workflow.MailOn != nil && workflow.MailOn.Failure {
+			return r.sender.Send(
+				workflow.ErrorMail.From,
+				[]string{workflow.ErrorMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status,
+					"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
+				addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if dg.MailOn != nil && dg.MailOn.Success {
-			_ = rp.sender.Send(
-				dg.InfoMail.From,
-				[]string{dg.InfoMail.To},
+		if workflow.MailOn != nil && workflow.MailOn.Success {
+			_ = r.sender.Send(
+				workflow.InfoMail.From,
+				[]string{workflow.InfoMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", dg.InfoMail.Prefix, dg.Name, status.Status,
+					"%s %s (%s)", workflow.InfoMail.Prefix, workflow.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(dg.InfoMail.AttachLogs, status.Nodes),
+				addAttachmentList(workflow.InfoMail.AttachLogs, status.Nodes),
 			)
 		}
 	}

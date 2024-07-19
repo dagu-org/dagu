@@ -32,17 +32,18 @@ func stopCmd() *cobra.Command {
 				Quiet:  quiet,
 			})
 
-			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				logger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
-			logger.Info("Stopping the DAG", "dag", loadedDAG.Name)
+			logger.Info("Stopping the DAG", "dag", workflow.Name)
 
-			eng := newEngine(cfg)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds)
 
-			if err := eng.Stop(loadedDAG); err != nil {
+			if err := eng.Stop(workflow); err != nil {
 				logger.Error("Failed to stop the DAG", "error", err)
 				os.Exit(1)
 			}

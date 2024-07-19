@@ -302,10 +302,9 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		dg, err := dag.Load("",
-			filepath.Join(setup.Config.DAGs, id+".yaml"), "")
+		workflow, err := dag.Load("", filepath.Join(setup.Config.DAGs, id+".yaml"), "")
 		require.NoError(t, err)
-		require.Equal(t, "test-dag", dg.Name)
+		require.Equal(t, "test-dag", workflow.Name)
 	})
 	t.Run("Rename", func(t *testing.T) {
 		setup := test.SetupTest(t)
@@ -363,10 +362,10 @@ func testDAG(name string) string {
 	return filepath.Join(testdataDir, name)
 }
 
-func testNewStatus(dg *dag.DAG, reqID string, status scheduler.Status,
+func testNewStatus(workflow *dag.DAG, reqID string, status scheduler.Status,
 	nodeStatus scheduler.NodeStatus) *model.Status {
 	ret := model.NewStatus(
-		dg,
+		workflow,
 		[]scheduler.NodeData{
 			{
 				NodeState: scheduler.NodeState{Status: nodeStatus},
