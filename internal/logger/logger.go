@@ -7,7 +7,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dagu-dev/dagu/internal/config"
 	slogmulti "github.com/samber/slog-multi"
 )
 
@@ -44,14 +43,23 @@ type appLogger struct {
 }
 
 type NewLoggerArgs struct {
-	Config  *config.Config
-	LogFile *os.File
-	Quiet   bool
+	LogLevel  string
+	LogFormat string
+	LogFile   *os.File
+	Quiet     bool
 }
+
+var (
+	// Default is the default logger used by the application.
+	Default = NewLogger(NewLoggerArgs{
+		LogLevel:  "info",
+		LogFormat: "text",
+	})
+)
 
 func NewLogger(args NewLoggerArgs) Logger {
 	var level slog.Level
-	if err := level.UnmarshalText([]byte(args.Config.LogLevel)); err != nil {
+	if err := level.UnmarshalText([]byte(args.LogLevel)); err != nil {
 		level = slog.LevelInfo
 	}
 	opts := &slog.HandlerOptions{
@@ -66,11 +74,11 @@ func NewLogger(args NewLoggerArgs) Logger {
 		guardedHandler *guardedHandler
 	)
 	if !args.Quiet {
-		handlers = append(handlers, newHandler(os.Stderr, args.Config.LogFormat, opts))
+		handlers = append(handlers, newHandler(os.Stderr, args.LogFormat, opts))
 	}
 	if args.LogFile != nil {
 		guardedHandler = newGuardedHandler(
-			newHandler(args.LogFile, args.Config.LogFormat, opts), args.LogFile,
+			newHandler(args.LogFile, args.LogFormat, opts), args.LogFile,
 		)
 		handlers = append(handlers, guardedHandler)
 	}

@@ -39,7 +39,9 @@ func (t Setup) DataStore() persistence.DataStores {
 }
 
 func (t Setup) Engine() engine.Engine {
-	return engine.New(t.DataStore(), t.Config.Executable, t.Config.WorkDir)
+	return engine.New(
+		t.DataStore(), t.Config.Executable, t.Config.WorkDir, logger.Default,
+	)
 }
 
 var (
@@ -111,9 +113,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 
 func NewLogger() logger.Logger {
 	return logger.NewLogger(logger.NewLoggerArgs{
-		Config: &config.Config{
-			LogLevel:  "debug",
-			LogFormat: "text",
-		},
+		LogLevel:  "debug",
+		LogFormat: "text",
 	})
 }

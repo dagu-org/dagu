@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -61,7 +62,7 @@ func TestRestartCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		ds := newDataStores(setup.Config)
-		recentHistory := newEngine(setup.Config, ds).GetRecentHistory(workflow, 2)
+		recentHistory := newEngine(setup.Config, ds, logger.Default).GetRecentHistory(workflow, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

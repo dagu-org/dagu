@@ -319,6 +319,7 @@ func (a *Agent) setup() error {
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,
+		Logger:        a.logger,
 		MaxActiveRuns: a.dag.MaxActiveRuns,
 		Delay:         a.dag.Delay,
 		Dry:           a.dry,
@@ -422,7 +423,7 @@ func (a *Agent) setupGraph() error {
 		a.logger.Info("Retry execution", "reqId", a.reqID)
 		return a.setupGraphForRetry()
 	}
-	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
+	graph, err := scheduler.NewExecutionGraph(a.logger, a.dag.Steps...)
 	if err != nil {
 		return err
 	}
@@ -436,7 +437,7 @@ func (a *Agent) setupGraphForRetry() error {
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
-	graph, err := scheduler.NewExecutionGraphForRetry(nodes...)
+	graph, err := scheduler.NewExecutionGraphForRetry(a.logger, nodes...)
 	if err != nil {
 		return err
 	}

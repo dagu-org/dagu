@@ -10,6 +10,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/sock"
@@ -22,11 +23,13 @@ func New(
 	dataStore persistence.DataStores,
 	executable string,
 	workDir string,
+	logger logger.Logger,
 ) Engine {
 	return &engineImpl{
 		dataStore:  dataStore,
 		executable: executable,
 		workDir:    workDir,
+		logger:     logger,
 	}
 }
 
@@ -34,6 +37,7 @@ type engineImpl struct {
 	dataStore  persistence.DataStores
 	executable string
 	workDir    string
+	logger     logger.Logger
 }
 
 var (
@@ -276,7 +280,7 @@ func (e *engineImpl) GetStatus(id string) (*DAGStatus, error) {
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
-		_, err = scheduler.NewExecutionGraph(dg.Steps...)
+		_, err = scheduler.NewExecutionGraph(e.logger, dg.Steps...)
 	}
 	latestStatus, _ := e.GetLatestStatus(dg)
 	return newDAGStatus(

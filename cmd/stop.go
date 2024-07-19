@@ -28,8 +28,9 @@ func stopCmd() *cobra.Command {
 			}
 
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
-				Quiet:  quiet,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				Quiet:     quiet,
 			})
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
@@ -38,10 +39,10 @@ func stopCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			logger.Info("Stopping the workflow", "workflow", workflow.Name)
+			logger.Infof("Stopping workflow: %s", workflow.Name)
 
 			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
+			eng := newEngine(cfg, ds, logger)
 
 			if err := eng.Stop(workflow); err != nil {
 				logger.Error("Failed to stop the workflow", "error", err)

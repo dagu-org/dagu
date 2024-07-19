@@ -58,7 +58,7 @@ func (srv *Server) Serve(listen chan error) error {
 	if listen != nil {
 		listen <- err
 	}
-	srv.logger.Info("unix socket is running at \"%v\"\n", srv.addr)
+	srv.logger.Debug("Unix socket is listening", "addr", srv.addr)
 
 	defer func() {
 		_ = srv.Shutdown()
@@ -92,7 +92,7 @@ func (srv *Server) Shutdown() error {
 		if srv.listener != nil {
 			err := srv.listener.Close()
 			if err != nil && !errors.Is(err, os.ErrClosed) {
-				srv.logger.Error("close listener", err)
+				srv.logger.Error("close listener", "error", err)
 			}
 			return err
 		}

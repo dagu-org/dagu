@@ -23,7 +23,8 @@ func schedulerCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
 			})
 
 			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
@@ -34,7 +35,7 @@ func schedulerCmd() *cobra.Command {
 
 			ctx := cmd.Context()
 			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
+			eng := newEngine(cfg, ds, logger)
 			sc := scheduler.New(cfg, logger, eng)
 			if err := sc.Start(ctx); err != nil {
 				logger.Error("Failed to start scheduler", "error", err)

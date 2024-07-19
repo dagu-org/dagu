@@ -23,7 +23,8 @@ func statusCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
 			})
 
 			// Load the DAG file and get the current running status.
@@ -35,7 +36,7 @@ func statusCmd() *cobra.Command {
 			}
 
 			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
+			eng := newEngine(cfg, ds, logger)
 
 			curStatus, err := eng.GetCurrentStatus(workflow)
 

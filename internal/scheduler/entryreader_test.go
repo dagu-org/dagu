@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/dagu-dev/dagu/internal/util"
@@ -99,5 +100,5 @@ func setupTest(t *testing.T) (string, engine.Engine) {
 		},
 	)
 
-	return tmpDir, engine.New(dataStore, "", cfg.WorkDir)
+	return tmpDir, engine.New(dataStore, "", cfg.WorkDir, logger.Default)
 }

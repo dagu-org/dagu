@@ -3,12 +3,12 @@ package scheduler
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 )
 
 // ExecutionGraph represents a graph of steps.
@@ -21,16 +21,21 @@ type ExecutionGraph struct {
 	from            map[int][]int
 	to              map[int][]int
 	mu              sync.RWMutex
+	logger          logger.Logger
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
-func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
+func NewExecutionGraph(lg logger.Logger, steps ...dag.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		outputVariables: &dag.SyncMap{},
 		dict:            make(map[int]*Node),
 		from:            make(map[int][]int),
 		to:              make(map[int][]int),
 		nodes:           []*Node{},
+		logger:          lg,
+	}
+	if graph.logger == nil {
+		graph.logger = logger.Default
 	}
 	for _, step := range steps {
 		step.OutputVariables = graph.outputVariables
@@ -47,13 +52,14 @@ func NewExecutionGraph(steps ...dag.Step) (*ExecutionGraph, error) {
 
 // NewExecutionGraphForRetry creates a new execution graph for retry with
 // given nodes.
-func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
+func NewExecutionGraphForRetry(lg logger.Logger, nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
 		outputVariables: &dag.SyncMap{},
 		dict:            make(map[int]*Node),
 		from:            make(map[int][]int),
 		to:              make(map[int][]int),
 		nodes:           []*Node{},
+		logger:          lg,
 	}
 	for _, node := range nodes {
 		if node.data.Step.OutputVariables != nil {
@@ -70,7 +76,7 @@ func NewExecutionGraphForRetry(nodes ...*Node) (*ExecutionGraph, error) {
 				graph.outputVariables.Store(key, value)
 				err := os.Setenv(k, v[len(key.(string))+1:])
 				if err != nil {
-					log.Printf("set env error : %s", err.Error())
+					graph.logger.Error("Failed to set env", "error", err)
 				}
 				return true
 			})
@@ -187,7 +193,7 @@ func (g *ExecutionGraph) setupRetry() error {
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
-				log.Printf("clear node state: %s", g.dict[u].data.Step.Name)
+				g.logger.Info("clear node state", "step", g.dict[u].data.Step.Name)
 				g.dict[u].clearState()
 				retry[u] = true
 			}

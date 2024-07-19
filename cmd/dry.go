@@ -25,7 +25,8 @@ func dryCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
 			})
 
 			params, err := cmd.Flags().GetString("params")
@@ -39,9 +40,6 @@ func dryCmd() *cobra.Command {
 				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
-
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
 
 			requestID, err := generateRequestID()
 			if err != nil {
@@ -57,9 +55,13 @@ func dryCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config:  cfg,
-				LogFile: logFile,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				LogFile:   logFile,
 			})
+
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds, agentLogger)
 
 			dagAgent := agent.New(
 				requestID,

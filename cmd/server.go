@@ -29,13 +29,14 @@ func serverCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
 			})
 
 			logger.Info("Starting the server", "host", cfg.Host, "port", cfg.Port)
 
 			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
+			eng := newEngine(cfg, ds, logger)
 			server := frontend.New(cfg, logger, eng)
 			if err := server.Serve(cmd.Context()); err != nil {
 				// nolint

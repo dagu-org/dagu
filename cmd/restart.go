@@ -33,8 +33,9 @@ func restartCmd() *cobra.Command {
 			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
-				Quiet:  quiet,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				Quiet:     quiet,
 			})
 
 			// Load the DAG file and stop the DAG if it is running.
@@ -46,7 +47,7 @@ func restartCmd() *cobra.Command {
 			}
 
 			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
+			eng := newEngine(cfg, ds, initLogger)
 
 			if err := stopDAGIfRunning(eng, workflow, initLogger); err != nil {
 				initLogger.Error("Failed to stop the DAG", "error", err)
@@ -85,12 +86,13 @@ func restartCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config:  cfg,
-				LogFile: logFile,
-				Quiet:   quiet,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				LogFile:   logFile,
+				Quiet:     quiet,
 			})
 
-			agentLogger.Info("Restarting DAG", "workflow", workflow.Name)
+			agentLogger.Infof("Restarting: %s", workflow.Name)
 
 			dagAgent := agent.New(
 				requestID,
@@ -98,7 +100,7 @@ func restartCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
-				eng,
+				newEngine(cfg, ds, agentLogger),
 				newDataStores(cfg),
 				&agent.AgentOpts{Dry: false})
 
@@ -122,7 +124,7 @@ func stopDAGIfRunning(e engine.Engine, workflow *dag.DAG, lg logger.Logger) erro
 	}
 
 	if curStatus.Status == scheduler.StatusRunning {
-		lg.Info("Stopping workflow for restart", "workflow", workflow.Name)
+		lg.Infof("Stopping: %s", workflow.Name)
 		cobra.CheckErr(stopRunningDAG(e, workflow))
 	}
 	return nil

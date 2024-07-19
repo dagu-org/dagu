@@ -31,8 +31,9 @@ func startCmd() *cobra.Command {
 			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
-				Quiet:  quiet,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				Quiet:     quiet,
 			})
 
 			params, err := cmd.Flags().GetString("params")
@@ -46,9 +47,6 @@ func startCmd() *cobra.Command {
 				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
-
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
 
 			requestID, err := generateRequestID()
 			if err != nil {
@@ -64,12 +62,16 @@ func startCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config:  cfg,
-				LogFile: logFile,
-				Quiet:   quiet,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				LogFile:   logFile,
+				Quiet:     quiet,
 			})
 
-			agentLogger.Info("Starting workflow", "workflow", workflow.Name)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds, agentLogger)
+
+			agentLogger.Infof("Starting workflow: %s", workflow.Name)
 
 			dagAgent := agent.New(
 				requestID,

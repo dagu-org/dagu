@@ -24,7 +24,8 @@ func retryCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
 			})
 
 			reqID, err := cmd.Flags().GetString("req")
@@ -57,9 +58,6 @@ func retryCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
-
 			requestID, err := generateRequestID()
 			if err != nil {
 				initLogger.Error("Failed to generate request ID", "error", err)
@@ -74,11 +72,15 @@ func retryCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Config:  cfg,
-				LogFile: logFile,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+				LogFile:   logFile,
 			})
 
-			agentLogger.Info("Retrying the workflow", "workflow", workflow.Name, "reqId", reqID)
+			ds := newDataStores(cfg)
+			eng := newEngine(cfg, ds, agentLogger)
+
+			agentLogger.Infof("Retrying with request ID: %s", requestID)
 
 			dagAgent := agent.New(
 				requestID,

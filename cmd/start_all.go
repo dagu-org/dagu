@@ -31,7 +31,8 @@ func startAllCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Config: cfg,
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
 			})
 
 			if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
@@ -40,7 +41,7 @@ func startAllCmd() *cobra.Command {
 
 			ctx := cmd.Context()
 			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds)
+			eng := newEngine(cfg, ds, logger)
 
 			go func() {
 				logger.Info("Starting the scheduler", "dags", cfg.DAGs)
