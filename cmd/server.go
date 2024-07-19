@@ -9,7 +9,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 func serverCmd() *cobra.Command {
@@ -33,15 +32,10 @@ func serverCmd() *cobra.Command {
 				Config: cfg,
 			})
 
-			app := fx.New(
-				frontendModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(frontend.LifetimeHooks),
-			)
-
 			logger.Info("Starting the server", "host", cfg.Host, "port", cfg.Port)
 
-			if err := app.Start(cmd.Context()); err != nil {
+			server := frontend.New(cfg, logger, newEngine(cfg))
+			if err := server.Serve(cmd.Context()); err != nil {
 				// nolint
 				logger.Error("Failed to start server", "error", err)
 				os.Exit(1)

@@ -10,7 +10,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 func startAllCmd() *cobra.Command {
@@ -51,16 +50,10 @@ func startAllCmd() *cobra.Command {
 				}
 			}()
 
-			// Start the frontend server.
-			frontend := fx.New(
-				frontendModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(frontend.LifetimeHooks),
-			)
-
 			logger.Info("Starting the server", "host", cfg.Host, "port", cfg.Port)
 
-			if err := frontend.Start(ctx); err != nil {
+			server := frontend.New(cfg, logger, newEngine(cfg))
+			if err := server.Serve(ctx); err != nil {
 				logger.Error("Failed to start server", "error", err)
 				os.Exit(1)
 			}
