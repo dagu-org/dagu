@@ -9,32 +9,24 @@ import (
 	"go.uber.org/fx"
 )
 
-var Module = fx.Options(
-	fx.Provide(New),
-)
-
-type Params struct {
-	fx.In
-
-	Config *config.Config
-	Logger dagulogger.Logger
-	Engine engine.Engine
-}
-
-func New(params Params) *Scheduler {
+func New(
+	config *config.Config,
+	logger dagulogger.Logger,
+	engine engine.Engine,
+) *Scheduler {
 	return newScheduler(newSchedulerArgs{
 		EntryReader: newEntryReader(newEntryReaderArgs{
-			Engine:  params.Engine,
-			DagsDir: params.Config.DAGs,
+			Engine:  engine,
+			DagsDir: config.DAGs,
 			JobCreator: &jobCreatorImpl{
-				WorkDir:    params.Config.WorkDir,
-				Engine:     params.Engine,
-				Executable: params.Config.Executable,
+				WorkDir:    config.WorkDir,
+				Engine:     engine,
+				Executable: config.Executable,
 			},
-			Logger: params.Logger,
+			Logger: logger,
 		}),
-		Logger: params.Logger,
-		LogDir: params.Config.LogDir,
+		Logger: logger,
+		LogDir: config.LogDir,
 	})
 }
 

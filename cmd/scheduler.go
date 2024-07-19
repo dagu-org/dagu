@@ -9,7 +9,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 func schedulerCmd() *cobra.Command {
@@ -31,15 +30,11 @@ func schedulerCmd() *cobra.Command {
 				cfg.DAGs = dagsOpt
 			}
 
-			app := fx.New(
-				schedulerModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(scheduler.LifetimeHooks),
-			)
-
 			logger.Info("Starting the scheduler", "dags", cfg.DAGs)
 
-			if err := app.Start(cmd.Context()); err != nil {
+			ctx := cmd.Context()
+			sc := scheduler.New(cfg, logger, newEngine(cfg))
+			if err := sc.Start(ctx); err != nil {
 				logger.Error("Failed to start scheduler", "error", err)
 				os.Exit(1)
 			}

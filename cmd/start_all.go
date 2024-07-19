@@ -41,17 +41,11 @@ func startAllCmd() *cobra.Command {
 
 			ctx := cmd.Context()
 
-			// Start the scheduler process.
-			scheduler := fx.New(
-				schedulerModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(scheduler.LifetimeHooks),
-			)
-
 			go func() {
 				logger.Info("Starting the scheduler", "dags", cfg.DAGs)
-				err := scheduler.Start(ctx)
-				if err != nil {
+
+				sc := scheduler.New(cfg, logger, newEngine(cfg))
+				if err := sc.Start(ctx); err != nil {
 					logger.Error("Failed to start scheduler", "error", err)
 					os.Exit(1)
 				}
