@@ -1,45 +1,24 @@
 package scheduler
 
 import (
-	"context"
-
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	dagulogger "github.com/dagu-dev/dagu/internal/logger"
-	"go.uber.org/fx"
 )
 
-func New(
-	config *config.Config,
-	logger dagulogger.Logger,
-	engine engine.Engine,
-) *Scheduler {
+func New(cfg *config.Config, lg dagulogger.Logger, eng engine.Engine) *Scheduler {
 	return newScheduler(newSchedulerArgs{
 		EntryReader: newEntryReader(newEntryReaderArgs{
-			Engine:  engine,
-			DagsDir: config.DAGs,
+			Engine:  eng,
+			DagsDir: cfg.DAGs,
 			JobCreator: &jobCreatorImpl{
-				WorkDir:    config.WorkDir,
-				Engine:     engine,
-				Executable: config.Executable,
+				WorkDir:    cfg.WorkDir,
+				Engine:     eng,
+				Executable: cfg.Executable,
 			},
-			Logger: logger,
+			Logger: lg,
 		}),
-		Logger: logger,
-		LogDir: config.LogDir,
+		Logger: lg,
+		LogDir: cfg.LogDir,
 	})
-}
-
-func LifetimeHooks(lc fx.Lifecycle, a *Scheduler) {
-	lc.Append(
-		fx.Hook{
-			OnStart: func(ctx context.Context) (err error) {
-				return a.Start(ctx)
-			},
-			OnStop: func(_ context.Context) error {
-				a.Stop()
-				return nil
-			},
-		},
-	)
 }
