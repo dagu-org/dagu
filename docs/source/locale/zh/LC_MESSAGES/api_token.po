@@ -39,7 +39,7 @@ msgstr ""
 #: ../../source/api_token.rst:20 182bf8df72d74848bf46cb6296178070
 msgid ""
 "Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` "
-"directory (default: ``$HOME/.dagu/``) to override the default "
+"directory (default: ``$HOME/.config/dagu/``) to override the default "
 "configuration values."
 msgstr ""
 

@@ -425,9 +425,9 @@ msgstr ""
 #: ../../source/yaml_format.rst:470 ca626ae5aa5348658cae797a94d64637
 msgid ""
 "``logDir``: The directory where the standard output is written. The "
-"default value is ``${DAGU_HOME}/logs/dags``."
+"default value is ``${HOME}/.local/share/logs``."
 msgstr ""
-"``logDir``: 標準出力が書き込まれるディレクトリ。デフォルト値は ``${DAGU_HOME}/logs/dags`` です。"
+"``logDir``: 標準出力が書き込まれるディレクトリ。デフォルト値は ``${HOME}/.local/share/logs`` です。"
 
 #: ../../source/yaml_format.rst:471 c03259efcaab44bab4fa7ac28ec3b675
 msgid ""
@@ -493,19 +493,19 @@ msgstr "``steps``: DAGで実行するステップのリスト。"
 
 #: ../../source/yaml_format.rst:482 d2ef99deab3945e59788eee68e7d87f5
 msgid ""
-"In addition, a global configuration file, ``$DAGU_HOME/base.yaml``, can"
+"In addition, a global configuration file, ``$HOME/.config/dagu/base.yaml``, can"
 " be used to gather common settings, such as ``logDir`` or ``env``."
 msgstr ""
-"さらに、グローバル設定ファイル ``$DAGU_HOME/base.yaml`` を使用して、"
+"さらに、グローバル設定ファイル ``$HOME/.config/dagu/base.yaml`` を使用して、"
 "``logDir`` や ``env`` などの共通設定を集めることができます。"
 
 #: ../../source/yaml_format.rst:484 9a4859890b2f49c5a66923630d9282e6
 msgid ""
 "Note: If ``DAGU_HOME`` environment variable is not set, the default path "
-"is ``$HOME/.dagu/base.yaml``."
+"is ``$HOME/.config/dagu/base.yaml``."
 msgstr ""
 "注意: ``DAGU_HOME`` 環境変数が設定されていない場合、デフォルトのパスは"
-" ``$HOME/.dagu/base.yaml`` です。"
+" ``$HOME/.config/dagu/base.yaml`` です。"
 
 #: ../../source/yaml_format.rst:522 d8004407254d47db8fda9e238eadc212
 msgid "Step"

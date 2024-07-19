@@ -39,7 +39,7 @@ msgstr ""
 #: ../../source/auth.rst:21 6470a07f6c2342cab718402964635151
 msgid ""
 "Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` "
-"directory (default: ``$HOME/.dagu/``) to override the default "
+"directory (default: ``$HOME/.config/dagu/``) to override the default "
 "configuration values."
 msgstr ""
 

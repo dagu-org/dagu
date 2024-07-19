@@ -41,12 +41,10 @@ msgstr ""
 
 #: ../../source/api_token.rst:20 78c2d5cf82964069a52d6259ebc66280
 msgid ""
-"Alternatively, create an ``admin.yaml`` file in the ``$DAGU_HOME`` "
-"directory (default: ``$HOME/.dagu/``) to override the default "
+"Alternatively, create an ``admin.yaml`` file in ``$HOME/.config/dagu/`` to override the default "
 "configuration values."
 msgstr ""
-"または、デフォルトの設定値を上書きするために、``$DAGU_HOME`` ディレクトリ "
-"(デフォルト: ``$HOME/.dagu/``) に ``admin.yaml`` ファイルを作成します。"
+"または、デフォルトの設定値を上書きするために、``$HOME/.config/dagu/`` に ``admin.yaml`` ファイルを作成します。"
 
 #: ../../source/api_token.rst:28 6508c88d55714460a41a6aa8869d63dd
 msgid "You can enable HTTPS by configuring the following environment variables:"

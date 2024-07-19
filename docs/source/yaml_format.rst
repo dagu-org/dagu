@@ -508,7 +508,7 @@ This section provides a comprehensive list of available fields that can be used 
 - ``group``: The group name to organize DAGs, which is optional.
 - ``tags``: Free tags that can be used to categorize DAGs, separated by commas.
 - ``env``: Environment variables that can be accessed by the DAG and its steps.
-- ``logDir``: The directory where the standard output is written. The default value is ``${DAGU_HOME}/logs/dags``.
+- ``logDir``: The directory where the standard output is written. The default value is ``${HOME}/.local/share/logs``.
 - ``restartWaitSec``: The number of seconds to wait after the DAG process stops before restarting it.
 - ``histRetentionDays``: The number of days to retain execution history (not for log files).
 - ``delaySec``: The interval time in seconds between steps.
@@ -520,9 +520,7 @@ This section provides a comprehensive list of available fields that can be used 
 - ``handlerOn``: The command to execute when a DAG or step succeeds, fails, cancels, or exits.
 - ``steps``: A list of steps to execute in the DAG.
 
-In addition, a global configuration file, ``$DAGU_HOME/base.yaml``, can be used to gather common settings, such as ``logDir`` or ``env``.
-
-Note: If ``DAGU_HOME`` environment variable is not set, the default path is ``$HOME/.dagu/base.yaml``.
+In addition, a global configuration file, ``$HOME/.config/dagu/base.yaml``, can be used to gather common settings, such as ``logDir`` or ``env``.
 
 Example: 
 
