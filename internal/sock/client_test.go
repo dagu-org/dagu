@@ -2,8 +2,6 @@ package sock_test
 
 import (
 	"errors"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -56,10 +54,3 @@ func TestDialTimeout(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, errors.Is(err, sock.ErrTimeout))
 }
-
-type testTimeout struct{ error }
-
-var errTimeout net.Error = &testTimeout{error: fmt.Errorf("timeout")}
-
-func (t *testTimeout) Timeout() bool   { return true }
-func (t *testTimeout) Temporary() bool { return false }
