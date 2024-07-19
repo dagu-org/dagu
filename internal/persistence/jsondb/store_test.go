@@ -201,14 +201,14 @@ func TestReadLatestStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	status.Status = scheduler.StatusSuccess
-	status.Pid = 20000
+	status.PID = 20000
 	_ = dw.write(status)
 
 	ret, err := db.ReadStatusToday(d.Location)
 
 	require.NoError(t, err)
 	require.NotNil(t, ret)
-	require.Equal(t, int(status.Pid), int(ret.Pid))
+	require.Equal(t, int(status.PID), int(ret.PID))
 	require.Equal(t, status.Status, ret.Status)
 
 }

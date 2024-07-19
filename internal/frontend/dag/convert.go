@@ -31,7 +31,7 @@ func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),
 		Params:     swag.String(s.Params),
-		Pid:        swag.Int64(int64(s.Pid)),
+		Pid:        swag.Int64(int64(s.PID)),
 		RequestID:  swag.String(s.RequestID),
 		StartedAt:  swag.String(s.StartedAt),
 		FinishedAt: swag.String(s.FinishedAt),

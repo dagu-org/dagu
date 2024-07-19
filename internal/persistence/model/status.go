@@ -42,7 +42,7 @@ type Status struct {
 	Name       string           `json:"Name"`
 	Status     scheduler.Status `json:"Status"`
 	StatusText string           `json:"StatusText"`
-	Pid        Pid              `json:"Pid"`
+	PID        PID              `json:"Pid"`
 	Nodes      []*Node          `json:"Nodes"`
 	OnExit     *Node            `json:"OnExit"`
 	OnSuccess  *Node            `json:"OnSuccess"`
@@ -57,7 +57,7 @@ type Status struct {
 
 func NewStatusDefault(dg *dag.DAG) *Status {
 	return NewStatus(
-		dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil,
+		dg, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
 	)
 }
 
@@ -72,7 +72,7 @@ func NewStatus(
 		Name:       dg.Name,
 		Status:     status,
 		StatusText: status.String(),
-		Pid:        Pid(pid),
+		PID:        PID(pid),
 		Nodes:      FromNodesOrSteps(nodes, dg.Steps),
 		OnExit:     nodeOrNil(dg.HandlerOn.Exit),
 		OnSuccess:  nodeOrNil(dg.HandlerOn.Success),
@@ -121,19 +121,19 @@ func Params(params []string) string {
 	return strings.Join(params, " ")
 }
 
-type Pid int
+type PID int
 
-const PidNotRunning Pid = -1
+const pidNotRunning PID = -1
 
-func (p Pid) String() string {
-	if p == PidNotRunning {
+func (p PID) String() string {
+	if p == pidNotRunning {
 		return ""
 	}
 	return fmt.Sprintf("%d", p)
 }
 
-func (p Pid) IsRunning() bool {
-	return p != PidNotRunning
+func (p PID) IsRunning() bool {
+	return p != pidNotRunning
 }
 
 func nodeOrNil(s *dag.Step) *Node {

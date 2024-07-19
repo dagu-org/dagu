@@ -236,7 +236,7 @@ func (a *Agent) Status() *model.Status {
 		Name:       a.dag.Name,
 		Status:     schedulerStatus,
 		StatusText: schedulerStatus.String(),
-		Pid:        model.Pid(os.Getpid()),
+		PID:        model.PID(os.Getpid()),
 		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.dag.Steps),
 		StartedAt:  model.FormatTime(a.graph.StartAt()),
 		FinishedAt: model.FormatTime(a.graph.FinishAt()),

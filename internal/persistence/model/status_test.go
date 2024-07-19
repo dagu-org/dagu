@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPid(t *testing.T) {
-	if PidNotRunning.IsRunning() {
+func TestPID(t *testing.T) {
+	if pidNotRunning.IsRunning() {
 		t.Error()
 	}
-	var pid = Pid(-1)
+	var pid = PID(-1)
 	require.Equal(t, "", pid.String())
 
-	pid = Pid(12345)
+	pid = PID(12345)
 	require.Equal(t, "12345", pid.String())
 }
 

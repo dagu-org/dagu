@@ -37,7 +37,7 @@ func statusCmd() *cobra.Command {
 				log.Fatalf("Failed to get the current status: %v", err)
 			}
 
-			log.Printf("Pid=%d Status=%s", curStatus.Pid, curStatus.Status)
+			log.Printf("Pid=%d Status=%s", curStatus.PID, curStatus.Status)
 		},
 	}
 }
