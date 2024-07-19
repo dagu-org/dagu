@@ -14,8 +14,8 @@ type Engine interface {
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
 	Rename(oldID, newID string) error
 	Stop(dg *dag.DAG) error
-	StartAsync(dg *dag.DAG, params string)
-	Start(dg *dag.DAG, params string) error
+	StartAsync(dg *dag.DAG, opts StartOptions)
+	Start(dg *dag.DAG, opts StartOptions) error
 	Restart(dg *dag.DAG) error
 	Retry(dg *dag.DAG, reqID string) error
 	GetCurrentStatus(dg *dag.DAG) (*model.Status, error)
@@ -29,6 +29,10 @@ type Engine interface {
 	GetStatus(dagLocation string) (*DAGStatus, error)
 	IsSuspended(id string) bool
 	ToggleSuspend(id string, suspend bool) error
+}
+
+type StartOptions struct {
+	Params string
 }
 
 type DAGStatus struct {

@@ -88,18 +88,18 @@ func (*engineImpl) Stop(dg *dag.DAG) error {
 	return err
 }
 
-func (e *engineImpl) StartAsync(dg *dag.DAG, params string) {
+func (e *engineImpl) StartAsync(dg *dag.DAG, opts StartOptions) {
 	go func() {
-		err := e.Start(dg, params)
+		err := e.Start(dg, opts)
 		util.LogErr("starting a DAG", err)
 	}()
 }
 
-func (e *engineImpl) Start(dg *dag.DAG, params string) error {
+func (e *engineImpl) Start(dg *dag.DAG, opts StartOptions) error {
 	args := []string{"start"}
-	if params != "" {
+	if opts.Params != "" {
 		args = append(args, "-p")
-		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(params)))
+		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
 	}
 	args = append(args, dg.Location)
 	// nolint:gosec

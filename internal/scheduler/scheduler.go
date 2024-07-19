@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type Scheduler struct {
@@ -105,10 +103,6 @@ func newScheduler(args newSchedulerArgs) *Scheduler {
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
-	if err := s.setupLogFile(); err != nil {
-		return fmt.Errorf("setup log file: %w", err)
-	}
-
 	sig := make(chan os.Signal, 1)
 	done := make(chan any)
 	defer close(done)
@@ -132,16 +126,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 
 	s.start()
 
-	return nil
-}
-
-func (s *Scheduler) setupLogFile() error {
-	filename := filepath.Join(s.logDir, "scheduler.log")
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create log directory: %w", err)
-	}
-	s.logger.Info("Scheduler log file", "file", filename)
 	return nil
 }
 
@@ -169,7 +153,10 @@ func (s *Scheduler) start() {
 
 func (s *Scheduler) run(now time.Time) {
 	entries, err := s.entryReader.Read(now.Add(-time.Second))
-	util.LogErr("failed to read entries", err)
+	if err != nil {
+		s.logger.Error("Failed to read entries", "error", err)
+		return
+	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].Next.Before(entries[j].Next)
 	})
@@ -179,10 +166,9 @@ func (s *Scheduler) run(now time.Time) {
 			break
 		}
 		go func(e *entry) {
-			err := e.Invoke()
-			if err != nil {
+			if err := e.Invoke(); err != nil {
 				s.logger.Error(
-					"failed to invoke entryreader", "entryreader",
+					"Failed to invoke entryreader", "entryreader",
 					e.Job,
 					"error",
 					err,

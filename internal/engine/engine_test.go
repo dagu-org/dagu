@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/test"
@@ -147,7 +148,7 @@ func TestEngine_RunDAG(t *testing.T) {
 		dagStatus, err := eng.GetStatus(file)
 		require.NoError(t, err)
 
-		err = eng.Start(dagStatus.DAG, "")
+		err = eng.Start(dagStatus.DAG, engine.StartOptions{})
 		require.NoError(t, err)
 
 		status, err := eng.GetLatestStatus(dagStatus.DAG)
@@ -163,7 +164,7 @@ func TestEngine_RunDAG(t *testing.T) {
 		dagStatus, err := eng.GetStatus(file)
 		require.NoError(t, err)
 
-		eng.StartAsync(dagStatus.DAG, "")
+		eng.StartAsync(dagStatus.DAG, engine.StartOptions{})
 
 		require.Eventually(t, func() bool {
 			curStatus, _ := eng.GetCurrentStatus(dagStatus.DAG)
@@ -203,7 +204,9 @@ func TestEngine_RunDAG(t *testing.T) {
 		dagStatus, err := eng.GetStatus(file)
 		require.NoError(t, err)
 
-		err = eng.Start(dagStatus.DAG, "x y z")
+		err = eng.Start(dagStatus.DAG, engine.StartOptions{
+			Params: "x y z",
+		})
 		require.NoError(t, err)
 
 		status, err := eng.GetLatestStatus(dagStatus.DAG)

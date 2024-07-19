@@ -580,7 +580,9 @@ func (h *Handler) postAction(
 		if dagStatus.Status.Status == scheduler.StatusRunning {
 			return nil, newBadRequestError(errInvalidArgs)
 		}
-		h.engine.StartAsync(dagStatus.DAG, params.Body.Params)
+		h.engine.StartAsync(dagStatus.DAG, engine.StartOptions{
+			Params: params.Body.Params,
+		})
 		return &models.PostDagActionResponse{}, nil
 
 	case "suspend":

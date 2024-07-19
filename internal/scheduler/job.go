@@ -67,8 +67,7 @@ func (j *jobImpl) Start() error {
 			return errJobFinished
 		}
 	}
-	// should not be here
-	return j.Engine.Start(j.DAG, "")
+	return j.Engine.Start(j.DAG, engine.StartOptions{})
 }
 
 func (j *jobImpl) Stop() error {
