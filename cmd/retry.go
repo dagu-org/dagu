@@ -81,7 +81,7 @@ func retryCmd() *cobra.Command {
 
 			agentLogger.Infof("Retrying with request ID: %s", requestID)
 
-			ag := agent.New(
+			agt := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
@@ -93,9 +93,9 @@ func retryCmd() *cobra.Command {
 			)
 
 			ctx := cmd.Context()
-			listenSignals(ctx, ag)
+			listenSignals(ctx, agt)
 
-			if err := ag.Run(ctx); err != nil {
+			if err := agt.Run(ctx); err != nil {
 				agentLogger.Error("Failed to start workflow", "error", err)
 				os.Exit(1)
 			}

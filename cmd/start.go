@@ -73,7 +73,7 @@ func startCmd() *cobra.Command {
 
 			agentLogger.Infof("Starting workflow: %s", workflow.Name)
 
-			ag := agent.New(
+			agt := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
@@ -85,9 +85,9 @@ func startCmd() *cobra.Command {
 
 			ctx := cmd.Context()
 
-			listenSignals(ctx, ag)
+			listenSignals(ctx, agt)
 
-			if err := ag.Run(ctx); err != nil {
+			if err := agt.Run(ctx); err != nil {
 				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}

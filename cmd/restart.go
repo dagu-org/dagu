@@ -94,7 +94,7 @@ func restartCmd() *cobra.Command {
 
 			agentLogger.Infof("Restarting: %s", workflow.Name)
 
-			ag := agent.New(
+			agt := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
@@ -104,8 +104,8 @@ func restartCmd() *cobra.Command {
 				dataStore,
 				&agent.Options{Dry: false})
 
-			listenSignals(cmd.Context(), ag)
-			if err := ag.Run(cmd.Context()); err != nil {
+			listenSignals(cmd.Context(), agt)
+			if err := agt.Run(cmd.Context()); err != nil {
 				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
