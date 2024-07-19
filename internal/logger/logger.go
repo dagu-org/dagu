@@ -23,6 +23,10 @@ type (
 		Warnf(format string, v ...any)
 		Errorf(format string, v ...any)
 
+		With(attrs ...any) Logger
+		WithGroup(name string) Logger
+		WithPrefix(prefix string) Logger
+
 		// Write writes a free-form message to the logger.
 		// It writes to the standard output and to the log file if present.
 		// If the log file is not present, it writes only to the standard output.
@@ -35,6 +39,7 @@ var _ Logger = (*appLogger)(nil)
 type appLogger struct {
 	logger         *slog.Logger
 	guardedHandler *guardedHandler
+	prefix         string
 }
 
 type NewLoggerArgs struct {
@@ -136,42 +141,67 @@ func newHandler(f *os.File, format string, opts *slog.HandlerOptions) slog.Handl
 
 // Debugf implements logger.Logger.
 func (a *appLogger) Debugf(format string, v ...any) {
-	a.logger.Debug(fmt.Sprintf(format, v...))
+	a.logger.Debug(fmt.Sprintf(a.prefix+format, v...))
 }
 
 // Errorf implements logger.Logger.
 func (a *appLogger) Errorf(format string, v ...any) {
-	a.logger.Error(fmt.Sprintf(format, v...))
+	a.logger.Error(fmt.Sprintf(a.prefix+format, v...))
 }
 
 // Infof implements logger.Logger.
 func (a *appLogger) Infof(format string, v ...any) {
-	a.logger.Info(fmt.Sprintf(format, v...))
+	a.logger.Info(fmt.Sprintf(a.prefix+format, v...))
 }
 
 // Warnf implements logger.Logger.
 func (a *appLogger) Warnf(format string, v ...any) {
-	a.logger.Warn(fmt.Sprintf(format, v...))
+	a.logger.Warn(fmt.Sprintf(a.prefix+format, v...))
 }
 
 // Debug implements logger.Logger.
 func (a *appLogger) Debug(msg string, tags ...any) {
-	a.logger.Debug(msg, tags...)
+	a.logger.Debug(a.prefix+msg, tags...)
 }
 
 // Error implements logger.Logger.
 func (a *appLogger) Error(msg string, tags ...any) {
-	a.logger.Error(msg, tags...)
+	a.logger.Error(a.prefix+msg, tags...)
 }
 
 // Info implements logger.Logger.
 func (a *appLogger) Info(msg string, tags ...any) {
-	a.logger.Info(msg, tags...)
+	a.logger.Info(a.prefix+msg, tags...)
 }
 
 // Warn implements logger.Logger.
 func (a *appLogger) Warn(msg string, tags ...any) {
-	a.logger.Warn(msg, tags...)
+	a.logger.Warn(a.prefix+msg, tags...)
+}
+
+// With implements logger.Logger.
+func (a *appLogger) With(attrs ...any) Logger {
+	return &appLogger{
+		logger:         a.logger.With(attrs...),
+		guardedHandler: a.guardedHandler,
+	}
+}
+
+// WithGroup implements logger.Logger.
+func (a *appLogger) WithGroup(name string) Logger {
+	return &appLogger{
+		logger:         a.logger.WithGroup(name),
+		guardedHandler: a.guardedHandler,
+	}
+}
+
+// WithPrefix implements logger.Logger.
+func (a *appLogger) WithPrefix(prefix string) Logger {
+	return &appLogger{
+		logger:         a.logger,
+		guardedHandler: a.guardedHandler,
+		prefix:         prefix,
+	}
 }
 
 // Write implements logger.Logger.
