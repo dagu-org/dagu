@@ -194,7 +194,7 @@ func (s *Scheduler) run(now time.Time) {
 					s.logger.Info("Workflow is already running", "workflow", e.Job)
 				} else {
 					s.logger.Error(
-						"Worfklow execution failed",
+						"Workflow execution failed",
 						"workflow", e.Job,
 						"operation", e.EntryType.String(),
 						"error", err,
