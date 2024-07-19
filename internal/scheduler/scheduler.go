@@ -54,13 +54,13 @@ const (
 func (e entryType) String() string {
 	switch e {
 	case entryTypeStart:
-		return "start"
+		return "Start"
 	case entryTypeStop:
-		return "stop"
+		return "Stop"
 	case entryTypeRestart:
-		return "restart"
+		return "Restart"
 	default:
-		return "unknown"
+		return "Unknown"
 	}
 }
 
@@ -69,9 +69,9 @@ func (e *entry) Invoke() error {
 		return nil
 	}
 
-	logMsg := fmt.Sprintf("%s job", e.EntryType)
+	logMsg := e.EntryType.String()
 	e.Logger.Info(logMsg,
-		"job", e.Job.String(),
+		"dag", e.Job.String(),
 		"time", e.Next.Format(time.RFC3339),
 	)
 

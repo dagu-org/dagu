@@ -67,7 +67,9 @@ func (j *jobImpl) Start() error {
 			return errJobFinished
 		}
 	}
-	return j.Engine.Start(j.DAG, engine.StartOptions{})
+	return j.Engine.Start(j.DAG, engine.StartOptions{
+		Quiet: true,
+	})
 }
 
 func (j *jobImpl) Stop() error {
@@ -82,7 +84,9 @@ func (j *jobImpl) Stop() error {
 }
 
 func (j *jobImpl) Restart() error {
-	return j.Engine.Restart(j.DAG)
+	return j.Engine.Restart(j.DAG, engine.RestartOptions{
+		Quiet: true,
+	})
 }
 
 func (j *jobImpl) String() string {

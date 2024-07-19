@@ -11,18 +11,25 @@ import (
 )
 
 func stopCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "stop <DAG file>",
 		Short: "Stop the running DAG",
 		Long:  `dagu stop <DAG file>`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(_ *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
+
+			quiet, err := cmd.Flags().GetBool("quiet")
+			if err != nil {
+				log.Fatalf("Failed to get quiet flag: %v", err)
+			}
+
 			logger := logger.NewLogger(logger.NewLoggerArgs{
 				Config: cfg,
+				Quiet:  quiet,
 			})
 
 			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
@@ -41,4 +48,6 @@ func stopCmd() *cobra.Command {
 			}
 		},
 	}
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	return cmd
 }

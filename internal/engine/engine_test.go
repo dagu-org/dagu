@@ -187,7 +187,7 @@ func TestEngine_RunDAG(t *testing.T) {
 		dagStatus, err := eng.GetStatus(file)
 		require.NoError(t, err)
 
-		err = eng.Restart(dagStatus.DAG)
+		err = eng.Restart(dagStatus.DAG, engine.RestartOptions{})
 		require.NoError(t, err)
 
 		status, err := eng.GetLatestStatus(dagStatus.DAG)

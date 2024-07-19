@@ -16,7 +16,7 @@ type Engine interface {
 	Stop(dg *dag.DAG) error
 	StartAsync(dg *dag.DAG, opts StartOptions)
 	Start(dg *dag.DAG, opts StartOptions) error
-	Restart(dg *dag.DAG) error
+	Restart(dg *dag.DAG, opts RestartOptions) error
 	Retry(dg *dag.DAG, reqID string) error
 	GetCurrentStatus(dg *dag.DAG) (*model.Status, error)
 	GetStatusByRequestID(dg *dag.DAG, reqID string) (*model.Status, error)
@@ -33,6 +33,11 @@ type Engine interface {
 
 type StartOptions struct {
 	Params string
+	Quiet  bool
+}
+
+type RestartOptions struct {
+	Quiet bool
 }
 
 type DAGStatus struct {

@@ -55,7 +55,7 @@ func dryCmd() *cobra.Command {
 			}
 			defer logFile.Close()
 
-			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Config:  cfg,
 				LogFile: logFile,
 			})
@@ -63,7 +63,7 @@ func dryCmd() *cobra.Command {
 			dagAgent := agent.New(
 				requestID,
 				dg,
-				fileLogger,
+				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
@@ -75,7 +75,7 @@ func dryCmd() *cobra.Command {
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				fileLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},

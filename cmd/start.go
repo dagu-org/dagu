@@ -25,8 +25,14 @@ func startCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 
+			quiet, err := cmd.Flags().GetBool("quiet")
+			if err != nil {
+				log.Fatalf("Failed to get quiet flag: %v", err)
+			}
+
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Config: cfg,
+				Quiet:  quiet,
 			})
 
 			params, err := cmd.Flags().GetString("params")
@@ -56,17 +62,18 @@ func startCmd() *cobra.Command {
 			}
 			defer logFile.Close()
 
-			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Config:  cfg,
 				LogFile: logFile,
+				Quiet:   quiet,
 			})
 
-			fileLogger.Info("Starting DAG", "dag", dg.Name)
+			agentLogger.Info("Starting DAG", "dag", dg.Name)
 
 			dagAgent := agent.New(
 				requestID,
 				dg,
-				fileLogger,
+				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
@@ -78,12 +85,13 @@ func startCmd() *cobra.Command {
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				fileLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},
 	}
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
 }

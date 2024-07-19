@@ -40,11 +40,13 @@ type appLogger struct {
 	logger         *slog.Logger
 	guardedHandler *guardedHandler
 	prefix         string
+	quiet          bool
 }
 
 type NewLoggerArgs struct {
 	Config  *config.Config
 	LogFile *os.File
+	Quiet   bool
 }
 
 func NewLogger(args NewLoggerArgs) Logger {
@@ -63,7 +65,9 @@ func NewLogger(args NewLoggerArgs) Logger {
 		handlers       []slog.Handler
 		guardedHandler *guardedHandler
 	)
-	handlers = append(handlers, newHandler(os.Stderr, args.Config.LogFormat, opts))
+	if !args.Quiet {
+		handlers = append(handlers, newHandler(os.Stderr, args.Config.LogFormat, opts))
+	}
 	if args.LogFile != nil {
 		guardedHandler = newGuardedHandler(
 			newHandler(args.LogFile, args.Config.LogFormat, opts), args.LogFile,
@@ -75,6 +79,7 @@ func NewLogger(args NewLoggerArgs) Logger {
 			slogmulti.Fanout(handlers...),
 		),
 		guardedHandler: guardedHandler,
+		quiet:          args.Quiet,
 	}
 }
 
@@ -207,7 +212,9 @@ func (a *appLogger) WithPrefix(prefix string) Logger {
 // Write implements logger.Logger.
 func (a *appLogger) Write(msg string) {
 	// write to the standard output
-	_, _ = fmt.Fprintf(os.Stdout, "%s\n", msg)
+	if !a.quiet {
+		_, _ = fmt.Fprintf(os.Stdout, "%s\n", msg)
+	}
 	// If a guarded handler is present, write to the file
 	if a.guardedHandler == nil {
 		return

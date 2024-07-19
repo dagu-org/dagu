@@ -72,17 +72,17 @@ func retryCmd() *cobra.Command {
 			}
 			defer logFile.Close()
 
-			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Config:  cfg,
 				LogFile: logFile,
 			})
 
-			fileLogger.Info("Retrying the DAG", "dag", loadedDAG.Name, "reqId", reqID)
+			agentLogger.Info("Retrying the DAG", "dag", loadedDAG.Name, "reqId", reqID)
 
 			dagAgent := agent.New(
 				requestID,
 				loadedDAG,
-				fileLogger,
+				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
@@ -94,7 +94,7 @@ func retryCmd() *cobra.Command {
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				fileLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},

@@ -81,7 +81,7 @@ func (e *engineImpl) Rename(oldID, newID string) error {
 	return historyStore.Rename(oldID, newID)
 }
 
-func (*engineImpl) Stop(dg *dag.DAG) error {
+func (e *engineImpl) Stop(dg *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
 	client := sock.Client{Addr: dg.SockAddr()}
 	_, err := client.Request("POST", "/stop")
@@ -101,6 +101,9 @@ func (e *engineImpl) Start(dg *dag.DAG, opts StartOptions) error {
 		args = append(args, "-p")
 		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
 	}
+	if opts.Quiet {
+		args = append(args, "-q")
+	}
 	args = append(args, dg.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
@@ -117,8 +120,12 @@ func (e *engineImpl) Start(dg *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Restart(dg *dag.DAG) error {
-	args := []string{"restart", dg.Location}
+func (e *engineImpl) Restart(dg *dag.DAG, opts RestartOptions) error {
+	args := []string{"restart"}
+	if opts.Quiet {
+		args = append(args, "-q")
+	}
+	args = append(args, dg.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}

@@ -16,7 +16,7 @@ import (
 )
 
 func restartCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "restart <DAG file>",
 		Short: "Stop the running DAG and restart it",
 		Long:  `dagu restart <DAG file>`,
@@ -26,8 +26,15 @@ func restartCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
+
+			quiet, err := cmd.Flags().GetBool("quiet")
+			if err != nil {
+				log.Fatalf("Failed to get quiet flag: %v", err)
+			}
+
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Config: cfg,
+				Quiet:  quiet,
 			})
 
 			// Load the DAG file and stop the DAG if it is running.
@@ -76,17 +83,18 @@ func restartCmd() *cobra.Command {
 			}
 			defer logFile.Close()
 
-			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Config:  cfg,
 				LogFile: logFile,
+				Quiet:   quiet,
 			})
 
-			fileLogger.Info("Restarting DAG", "dag", dg.Name)
+			agentLogger.Info("Restarting DAG", "dag", dg.Name)
 
 			dagAgent := agent.New(
 				requestID,
 				dg,
-				fileLogger,
+				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
@@ -95,11 +103,13 @@ func restartCmd() *cobra.Command {
 
 			listenSignals(cmd.Context(), dagAgent)
 			if err := dagAgent.Run(cmd.Context()); err != nil {
-				fileLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},
 	}
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	return cmd
 }
 
 // stopDAGIfRunning stops the DAG if it is running.
