@@ -34,9 +34,8 @@ Via Docker
    docker run \
    --rm \
    -p 8080:8080 \
-   -v $HOME/.dagu/dags:/home/dagu/.dagu/dags \
-   -v $HOME/.dagu/data:/home/dagu/.dagu/data \
-   -v $HOME/.dagu/logs:/home/dagu/.dagu/logs \
+   -v $HOME/.config/dagu:/home/dagu/.config/dagu \
+   -v $HOME/.config/dagu/.local/share:/home/dagu/.local/share \
    ghcr.io/dagu-dev/dagu:latest
 
 Via GitHub Release Page

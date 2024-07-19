@@ -41,7 +41,7 @@ msgid "``DAGU_PORT`` (``8080``): The port to bind the server to."
 msgstr ""
 
 #: ../../source/config.rst:18 64811a27e1df4f82ab084b108e89bfc0
-msgid "``DAGU_DAGS`` (``$DAGU_HOME/dags``): The directory containing the DAGs."
+msgid "``DAGU_DAGS`` (``$HOME/.config/dagu/dags``): The directory containing the DAGs."
 msgstr ""
 
 #: ../../source/config.rst:19 43e9db342dc6464ab1060f29d20d5d87
@@ -62,31 +62,31 @@ msgstr ""
 
 #: ../../source/config.rst:22 58567f3b626d454b976332da5ca36385
 msgid ""
-"``DAGU_LOG_DIR`` (``$DAGU_HOME/logs``): The directory where logs will be "
+"``DAGU_LOG_DIR`` (``$HOME/.local/share``): The directory where logs will be "
 "stored."
 msgstr ""
 
 #: ../../source/config.rst:23 5239c7c715cf410c88da7545a4561cff
 msgid ""
-"``DAGU_DATA_DIR`` (``$DAGU_HOME/data``): The directory where application "
+"``DAGU_DATA_DIR`` (``$HOME/.local/share/history``): The directory where application "
 "data will be stored."
 msgstr ""
 
 #: ../../source/config.rst:24 53be617b094f46cdb8f5127ebab5b112
 msgid ""
-"``DAGU_SUSPEND_FLAGS_DIR`` (``$DAGU_HOME/suspend``): The directory "
+"``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): The directory "
 "containing DAG suspend flags."
 msgstr ""
 
 #: ../../source/config.rst:25 cd135430d1f84dd08448ccf0832f4e57
 msgid ""
-"``DAGU_ADMIN_LOG_DIR`` (``$DAGU_HOME/logs/admin``): The directory where "
+"``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): The directory where "
 "admin logs will be stored."
 msgstr ""
 
 #: ../../source/config.rst:26 2ab3dddd69504f17a31a31ec15cc5299
 msgid ""
-"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/base.yaml``): The path to the base "
+"``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): The path to the base "
 "configuration file."
 msgstr ""
 
@@ -131,7 +131,7 @@ msgstr ""
 #: ../../source/config.rst:38 01af2957c246414d9354371e0ff63d9d
 msgid ""
 "You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory "
-"(default: ``$HOME/.dagu/``) to override the default configuration values."
+"(default: ``$HOME/.config/dagu/``) to override the default configuration values."
 " The following configuration options are available:"
 msgstr ""
 

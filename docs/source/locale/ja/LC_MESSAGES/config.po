@@ -44,8 +44,8 @@ msgid "``DAGU_PORT`` (``8080``): The port to bind the server to."
 msgstr "``DAGU_PORT`` (``8080``): サーバーをバインドするポート。"
 
 #: ../../source/config.rst:18 e80d3dc5e40b4ff282387e798d040d8c
-msgid "``DAGU_DAGS`` (``$DAGU_HOME/dags``): The directory containing the DAGs."
-msgstr "``DAGU_DAGS`` (``$DAGU_HOME/dags``): DAGsを含むディレクトリ。"
+msgid "``DAGU_DAGS`` (``$HOME/.config/dagu/dags``): The directory containing the DAGs."
+msgstr "``DAGU_DAGS`` (``$HOME/.config/dagu/dags``): DAGsを含むディレクトリ。"
 
 #: ../../source/config.rst:19 a54ecf59e8604705b8bea083d7cfd29a
 msgid "``DAGU_IS_BASICAUTH`` (``0``): Set to 1 to enable basic authentication."
@@ -67,38 +67,38 @@ msgstr ""
 
 #: ../../source/config.rst:22 f456c2b6c30743018b25a5830752e9d1
 msgid ""
-"``DAGU_LOG_DIR`` (``$DAGU_HOME/logs``): The directory where logs will be "
+"``DAGU_LOG_DIR`` (``$HOME/.local/share``): The directory where logs will be "
 "stored."
 msgstr ""
-"``DAGU_LOG_DIR`` (``$DAGU_HOME/logs``): ログが保存されるディレクトリ。"
+"``DAGU_LOG_DIR`` (``$HOME/.local/share``): ログが保存されるディレクトリ。"
 
 #: ../../source/config.rst:23 67f71f1c2963462083598d0749ac6560
 msgid ""
-"``DAGU_DATA_DIR`` (``$DAGU_HOME/data``): The directory where application "
+"``DAGU_DATA_DIR`` (``$HOME/.local/share/history``): The directory where application "
 "data will be stored."
 msgstr ""
-"``DAGU_DATA_DIR`` (``$DAGU_HOME/data``): アプリケーションデータが保存されるディレクトリ。"
+"``DAGU_DATA_DIR`` (``$HOME/.local/share/history``): アプリケーションデータが保存されるディレクトリ。"
 
 #: ../../source/config.rst:24 7f0c7e1ebab142a299b5a62ce30890c3
 msgid ""
-"``DAGU_SUSPEND_FLAGS_DIR`` (``$DAGU_HOME/suspend``): The directory "
+"``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): The directory "
 "containing DAG suspend flags."
 msgstr ""
-"``DAGU_SUSPEND_FLAGS_DIR`` (``$DAGU_HOME/suspend``): DAGの中断フラグを含むディレクトリ。"
+"``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): DAGの中断フラグを含むディレクトリ。"
 
 #: ../../source/config.rst:25 487261cb389b4e4f95d0c004ece0ec8d
 msgid ""
-"``DAGU_ADMIN_LOG_DIR`` (``$DAGU_HOME/logs/admin``): The directory where "
+"``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): The directory where "
 "admin logs will be stored."
 msgstr ""
-"``DAGU_ADMIN_LOG_DIR`` (``$DAGU_HOME/logs/admin``): 管理者ログが保存されるディレクトリ。"
+"``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): 管理者ログが保存されるディレクトリ。"
 
 #: ../../source/config.rst:26 5198113ba7f54794bbeb0077ec25bdc2
 msgid ""
-"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/base.yaml``): The path to the base "
+"``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): The path to the base "
 "configuration file."
 msgstr ""
-"``DAGU_BASE_CONFIG`` (``$DAGU_HOME/base.yaml``): 基本設定ファイルへのパス。"
+"``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): 基本設定ファイルへのパス。"
 
 #: ../../source/config.rst:27 f185a5aa23a049b484202296d52e9272
 msgid ""
@@ -133,24 +133,16 @@ msgstr "``DAGU_CERT_FILE``: SSL証明書ファイルへのパス。"
 msgid "``DAGU_KEY_FILE`` : The path to the SSL key file."
 msgstr "``DAGU_KEY_FILE`` : SSLキーファイルへのパス。"
 
-#: ../../source/config.rst:33 9515dde2730b4a4f864ff4ebc5940a06
-msgid ""
-"Note: If ``DAGU_HOME`` environment variable is not set, the default value"
-" is ``$HOME/.dagu`` ."
-msgstr ""
-"注意: ``DAGU_HOME`` 環境変数が設定されていない場合、デフォルト値は ``$HOME/.dagu`` です。"
-
 #: ../../source/config.rst:36 4cc48596403d4b85b97722bbcfa1ec91
 msgid "Config File"
 msgstr "設定ファイル"
 
 #: ../../source/config.rst:38 1d2207d1143d420ca1b43592f00a7667
 msgid ""
-"You can create ``admin.yaml`` file in the ``$DAGU_HOME`` directory "
-"(default: ``$HOME/.dagu/``) to override the default configuration values."
+"You can create ``admin.yaml`` file in the ``$HOME/.config/dagu/`` to override the default configuration values."
 " The following configuration options are available:"
 msgstr ""
-"デフォルトの設定値を上書きするには、 ``$DAGU_HOME`` ディレクトリ(デフォルト: ``$HOME/.dagu/`` )に"
+"デフォルトの設定値を上書きするには、``$HOME/.config/dagu/`` に"
 "``admin.yaml``ファイルを作成します。以下の設定オプションが利用可能です:"
 
 #: ../../source/config.rst:78 5ee5b8591a8d4aa28bd914fa97b274c4
