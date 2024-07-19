@@ -29,6 +29,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -60,6 +61,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -73,6 +75,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent = agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -92,6 +95,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -109,6 +113,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent = agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -129,6 +134,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -149,6 +155,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       testLoadDAG(t, "error.yaml"),
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    setup.Engine(),
 			DataStore: setup.DataStore(),
 		})
@@ -169,6 +176,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -201,6 +209,7 @@ func TestAgent_Run(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    setup.Engine(),
 			DataStore: setup.DataStore(),
 		})
@@ -231,6 +240,7 @@ func TestAgent_DryRun(t *testing.T) {
 			DAG:       dg,
 			Dry:       true,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -261,6 +271,7 @@ func TestAgent_Retry(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -281,6 +292,7 @@ func TestAgent_Retry(t *testing.T) {
 			DAG:         dg,
 			RetryTarget: status,
 			LogDir:      setup.Config.LogDir,
+			Logger:      setup.Logger,
 			Engine:      eng,
 			DataStore:   setup.DataStore(),
 		})
@@ -311,6 +323,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -357,6 +370,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})
@@ -400,6 +414,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dagAgent := agent.New(&agent.NewAagentArgs{
 			DAG:       dg,
 			LogDir:    setup.Config.LogDir,
+			Logger:    setup.Logger,
 			Engine:    eng,
 			DataStore: setup.DataStore(),
 		})

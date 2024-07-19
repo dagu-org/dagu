@@ -1,6 +1,7 @@
 package test
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/util"
@@ -17,6 +19,7 @@ import (
 
 type Setup struct {
 	Config *config.Config
+	Logger logger.Logger
 
 	homeDir string
 }
@@ -40,7 +43,6 @@ func (t Setup) Engine() engine.Engine {
 		Executable: t.Config.Executable,
 		WorkDir:    t.Config.WorkDir,
 	})
-
 }
 
 var (
@@ -80,7 +82,9 @@ func SetupTest(t *testing.T) Setup {
 	_ = os.Setenv("DAGU_ADMIN_LOG_DIR", cfg.AdminLogsDir)
 
 	return Setup{
-		Config:  cfg,
+		Config: cfg,
+		Logger: NewLogger(),
+
 		homeDir: tmpDir,
 	}
 }
@@ -101,7 +105,16 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	require.NoError(t, err)
 
 	return Setup{
-		Config:  cfg,
+		Config: cfg,
+		Logger: NewLogger(),
+
 		homeDir: tmpDir,
 	}
+}
+
+func NewLogger() logger.Logger {
+	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	}))
 }

@@ -49,7 +49,7 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 		engine:     args.Engine,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entryreader dags", tag.Error(err))
+		er.logger.Error("failed to init entryreader dags", tag.Err, err)
 	}
 	return er
 }
@@ -103,7 +103,7 @@ func (er *entryReaderImpl) initDags() error {
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
-				er.logger.Error("failed to read DAG cfg", tag.Error(err))
+				er.logger.Error("failed to read DAG cfg", tag.Err, err)
 				continue
 			}
 			er.dags[fi.Name()] = dg
@@ -118,7 +118,7 @@ func (er *entryReaderImpl) initDags() error {
 func (er *entryReaderImpl) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		er.logger.Error("failed to init file watcher", tag.Error(err))
+		er.logger.Error("failed to init file watcher", tag.Err, err)
 		return
 	}
 
@@ -144,7 +144,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
-					er.logger.Error("failed to read DAG cfg", tag.Error(err))
+					er.logger.Error("failed to read DAG cfg", tag.Err, err)
 				} else {
 					er.dags[filepath.Base(event.Name)] = dg
 					er.logger.Info(
@@ -161,7 +161,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entryreader DAGs error", tag.Error(err))
+			er.logger.Error("watch entryreader DAGs error", tag.Err, err)
 		}
 	}
 

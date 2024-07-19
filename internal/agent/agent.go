@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -45,6 +46,7 @@ type Agent struct {
 	socketServer *sock.Server
 	logFile      *os.File
 	logDir       string
+	logger       logger.Logger
 
 	// reqID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
@@ -67,6 +69,7 @@ type NewAagentArgs struct {
 	RetryTarget *model.Status
 	// Default directory for writing log files.
 	LogDir string
+	Logger logger.Logger
 
 	Engine    engine.Engine
 	DataStore persistence.DataStores
@@ -81,6 +84,7 @@ func New(
 		dry:         args.Dry,
 		retryTarget: args.RetryTarget,
 		logDir:      args.LogDir,
+		logger:      args.Logger,
 		engine:      args.Engine,
 		dataStore:   args.DataStore,
 	}
@@ -124,7 +128,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	defer func() {
 		if err := a.historyStore.Close(); err != nil {
-			log.Printf("failed to close history store: %v", err)
+			a.logger.Error("failed to close history store", tag.Err, err)
 		}
 	}()
 
@@ -154,7 +158,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go func() {
 		err := a.socketServer.Serve(lnErr)
 		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
-			log.Printf("failed to start socket frontend %v", err)
+			a.logger.Error("failed to start socket frontend", tag.Err, err)
 		}
 	}()
 
@@ -202,7 +206,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	log.Println("schedule finished.")
+	a.logger.Info("schedule finished", tag.Status, finishedStatus.Status)
 	util.LogErr("write status", a.historyStore.Write(a.Status()))
 
 	// Send the execution report if necessary.
@@ -292,7 +296,7 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 		go func() {
-			log.Printf("stop request received. shutting down...")
+			a.logger.Info("stop request received. shutting down.")
 			a.signal(syscall.SIGTERM, true)
 		}()
 	default:
@@ -374,7 +378,7 @@ func (a *Agent) dryRun() error {
 		}
 	}()
 
-	log.Printf("***** Starting DRY-RUN *****")
+	a.logger.Info("dry-run started", tag.RequestID, a.reqID)
 
 	lastErr := a.scheduler.Schedule(
 		dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore()),
@@ -384,7 +388,7 @@ func (a *Agent) dryRun() error {
 
 	a.reporter.report(a.Status(), lastErr)
 
-	log.Printf("***** Finished DRY-RUN *****")
+	a.logger.Info("dry-run finished", tag.RequestID, a.reqID)
 
 	return lastErr
 }
@@ -397,7 +401,7 @@ func (a *Agent) dryRun() error {
 // process by sending a SIGKILL to force the process to be shutdown.
 // if processes do not terminate after MaxCleanUp time, it sends KILL signal.
 func (a *Agent) signal(sig os.Signal, allowOverride bool) {
-	log.Printf("Sending %s signal to running child processes.", sig)
+	a.logger.Info("sending signal to running child processes", tag.Signal, sig)
 	done := make(chan bool)
 	go func() {
 		a.scheduler.Signal(a.graph, sig, done, allowOverride)
@@ -410,19 +414,19 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	for {
 		select {
 		case <-done:
-			log.Printf("All child processes have been terminated.")
+			a.logger.Info("all child processes have been terminated")
 			return
 		case <-timeout.C:
-			log.Printf("Time reached to max cleanup time")
-			log.Printf("Sending KILL signal to running child processes.")
+			a.logger.Info("Time reached to max cleanup time")
+			a.logger.Info("Sending KILL signal to running child processes.")
 			a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
 			return
 		case <-tick.C:
-			log.Printf("Sending signal again")
+			a.logger.Info("Sending signal again")
 			a.scheduler.Signal(a.graph, sig, nil, false)
 			tick.Reset(time.Second * 5)
 		default:
-			log.Printf("Waiting for child processes to exit...")
+			a.logger.Info("Waiting for child processes to exit...")
 			time.Sleep(time.Second * 3)
 		}
 	}
@@ -432,7 +436,7 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph() error {
 	if a.retryTarget != nil {
-		log.Printf("setup for retry")
+		a.logger.Info("retry execution", tag.RequestID, a.reqID)
 		return a.setupGraphForRetry()
 	}
 	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
@@ -498,7 +502,7 @@ func (a *Agent) checkPreconditions() error {
 	if len(a.dag.Preconditions) == 0 {
 		return nil
 	}
-	log.Printf("checking preconditions for \"%s\"", a.dag.Name)
+	a.logger.Info("checking preconditions", tag.RequestID, a.reqID)
 	// If one of the conditions does not met, cancel the execution.
 	if err := dag.EvalConditions(a.dag.Preconditions); err != nil {
 		a.scheduler.Cancel(a.graph)

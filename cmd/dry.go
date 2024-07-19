@@ -35,7 +35,10 @@ func dryCmd() *cobra.Command {
 			eng := newEngine(cfg)
 
 			dagAgent := agent.New(&agent.NewAagentArgs{
-				DAG: dg, LogDir: cfg.LogDir, Dry: true,
+				DAG:       dg,
+				LogDir:    cfg.LogDir,
+				Logger:    newLogger(cfg),
+				Dry:       true,
 				Engine:    eng,
 				DataStore: newDataStores(cfg),
 			})

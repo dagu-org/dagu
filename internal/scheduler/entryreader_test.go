@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
+	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/dagu-dev/dagu/internal/util"
 
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ func TestReadEntries(t *testing.T) {
 		entryReader := newEntryReader(newEntryReaderArgs{
 			DagsDir:    filepath.Join(testdataDir, "invalid_directory"),
 			JobCreator: &mockJobFactory{},
-			Logger:     logger.NewSlogLogger(),
+			Logger:     test.NewLogger(),
 			Engine:     eng,
 		})
 
@@ -38,7 +38,7 @@ func TestReadEntries(t *testing.T) {
 		entryReader = newEntryReader(newEntryReaderArgs{
 			DagsDir:    testdataDir,
 			JobCreator: &mockJobFactory{},
-			Logger:     logger.NewSlogLogger(),
+			Logger:     test.NewLogger(),
 			Engine:     eng,
 		})
 

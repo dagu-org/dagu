@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/dagu-dev/dagu/internal/test"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,12 +21,12 @@ func TestScheduler(t *testing.T) {
 				{
 					Job:    &mockJob{},
 					Next:   now,
-					Logger: logger.NewSlogLogger(),
+					Logger: test.NewLogger(),
 				},
 				{
 					Job:    &mockJob{},
 					Next:   now.Add(time.Minute),
-					Logger: logger.NewSlogLogger(),
+					Logger: test.NewLogger(),
 				},
 			},
 		}
@@ -34,7 +34,7 @@ func TestScheduler(t *testing.T) {
 		schedulerInstance := newScheduler(newSchedulerArgs{
 			EntryReader: er,
 			LogDir:      testHomeDir,
-			Logger:      logger.NewSlogLogger(),
+			Logger:      test.NewLogger(),
 		})
 
 		go func() {
@@ -57,7 +57,7 @@ func TestScheduler(t *testing.T) {
 					EntryType: entryTypeRestart,
 					Job:       &mockJob{},
 					Next:      now,
-					Logger:    logger.NewSlogLogger(),
+					Logger:    test.NewLogger(),
 				},
 			},
 		}
@@ -65,7 +65,7 @@ func TestScheduler(t *testing.T) {
 		schedulerInstance := newScheduler(newSchedulerArgs{
 			EntryReader: entryReader,
 			LogDir:      testHomeDir,
-			Logger:      logger.NewSlogLogger(),
+			Logger:      test.NewLogger(),
 		})
 
 		go func() {
@@ -82,7 +82,7 @@ func TestScheduler(t *testing.T) {
 		schedulerInstance := newScheduler(newSchedulerArgs{
 			EntryReader: &mockEntryReader{},
 			LogDir:      testHomeDir,
-			Logger:      logger.NewSlogLogger(),
+			Logger:      test.NewLogger(),
 		})
 		next := schedulerInstance.nextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)

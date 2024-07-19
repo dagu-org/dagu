@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"log/slog"
+	"os"
+
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/frontend"
@@ -27,10 +30,30 @@ var schedulerModule = fx.Options(
 
 // baseModule is a common module for all commands.
 var baseModule = fx.Options(
+	fx.Provide(newLogger),
 	fx.Provide(newEngine),
-	fx.Provide(logger.NewSlogLogger),
 	fx.Provide(client.NewDataStores),
 )
+
+func newLogger(cfg *config.Config) logger.Logger {
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(cfg.LogLevel)); err != nil {
+		level = slog.LevelInfo
+	}
+	opts := &slog.HandlerOptions{
+		Level: level,
+	}
+	if level == slog.LevelDebug {
+		opts.AddSource = true
+	}
+	var handler slog.Handler
+	if cfg.LogFormat == "text" {
+		handler = slog.NewTextHandler(os.Stdout, opts)
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, opts)
+	}
+	return slog.New(handler)
+}
 
 func newEngine(cfg *config.Config) engine.Engine {
 	return engine.New(&engine.NewEngineArgs{
