@@ -114,7 +114,7 @@ func setupViper() error {
 
 	// Logging configurations
 	viper.SetDefault("logLevel", "info")
-	viper.SetDefault("logFormat", "json")
+	viper.SetDefault("logFormat", "text")
 
 	// Other defaults
 	viper.SetDefault("host", "127.0.0.1")

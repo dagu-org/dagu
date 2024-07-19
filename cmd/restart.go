@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/agent"
@@ -17,7 +18,7 @@ import (
 func restartCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart <DAG file>",
-		Short: "Restart the DAG",
+		Short: "Stop the running DAG and restart it",
 		Long:  `dagu restart <DAG file>`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -25,31 +26,32 @@ func restartCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			logger := logger.NewLogger(cfg)
+			initLogger := logger.NewLogger(logger.NewLoggerArgs{
+				Config: cfg,
+			})
 
 			// Load the DAG file and stop the DAG if it is running.
 			dagFilePath := args[0]
 			dg, err := dag.Load(cfg.BaseConfig, dagFilePath, "")
 			if err != nil {
-				logger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
 			eng := newEngine(cfg)
 
-			if err := stopDAGIfRunning(eng, dg, logger); err != nil {
-				logger.Error("Failed to stop the DAG", "error", err)
+			if err := stopDAGIfRunning(eng, dg, initLogger); err != nil {
+				initLogger.Error("Failed to stop the DAG", "error", err)
 				os.Exit(1)
 			}
 
 			// Wait for the specified amount of time before restarting.
-			waitForRestart(dg.RestartWait, logger)
+			waitForRestart(dg.RestartWait, initLogger)
 
 			// Retrieve the parameter of the previous execution.
-			logger.Info("Restarting DAG", "dag", dg.Name)
 			params, err := getPreviousExecutionParams(eng, dg)
 			if err != nil {
-				logger.Error("Failed to get previous execution params", "error", err)
+				initLogger.Error("Failed to get previous execution params", "error", err)
 				os.Exit(1)
 			}
 
@@ -57,22 +59,43 @@ func restartCmd() *cobra.Command {
 			// Need to reload the DAG file with the parameter.
 			dg, err = dag.Load(cfg.BaseConfig, dagFilePath, params)
 			if err != nil {
-				logger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
-			dagAgent := agent.New(&agent.NewAagentArgs{
-				DAG:       dg,
-				Dry:       false,
-				LogDir:    cfg.LogDir,
-				Logger:    logger,
-				Engine:    eng,
-				DataStore: newDataStores(cfg),
+			requestID, err := generateRequestID()
+			if err != nil {
+				initLogger.Error("Failed to generate request ID", "error", err)
+				os.Exit(1)
+			}
+
+			logFile, err := openLogFileForDAG("restart_", cfg.LogDir, dg, requestID)
+			if err != nil {
+				initLogger.Error("Failed to open log file for DAG", "error", err)
+				os.Exit(1)
+			}
+			defer logFile.Close()
+
+			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+				Config:  cfg,
+				LogFile: logFile,
 			})
+
+			fileLogger.Info("Restarting DAG", "dag", dg.Name)
+
+			dagAgent := agent.New(
+				requestID,
+				dg,
+				fileLogger,
+				filepath.Dir(logFile.Name()),
+				logFile.Name(),
+				eng,
+				newDataStores(cfg),
+				&agent.AgentOpts{Dry: false})
 
 			listenSignals(cmd.Context(), dagAgent)
 			if err := dagAgent.Run(cmd.Context()); err != nil {
-				logger.Error("Failed to start DAG", "error", err)
+				fileLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},

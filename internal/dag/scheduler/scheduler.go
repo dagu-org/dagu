@@ -194,7 +194,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
 			log.Printf("%s started", n.data.Step.Name)
+
+			n.mu.Lock()
 			n.data.Step.OutputVariables = g.outputVariables
+			n.mu.Unlock()
+
 			if err := sc.runHandlerNode(ctx, n); err != nil {
 				sc.setLastError(err)
 			}

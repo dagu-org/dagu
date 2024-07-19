@@ -112,8 +112,10 @@ func SetupForDir(t *testing.T, dir string) Setup {
 }
 
 func NewLogger() logger.Logger {
-	return logger.NewLogger(&config.Config{
-		LogLevel:  "debug",
-		LogFormat: "text",
+	return logger.NewLogger(logger.NewLoggerArgs{
+		Config: &config.Config{
+			LogLevel:  "debug",
+			LogFormat: "text",
+		},
 	})
 }

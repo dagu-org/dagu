@@ -27,10 +27,16 @@ var schedulerModule = fx.Options(
 
 // baseModule is a common module for all commands.
 var baseModule = fx.Options(
-	fx.Provide(logger.NewLogger),
+	fx.Provide(newLogger),
 	fx.Provide(newEngine),
 	fx.Provide(client.NewDataStores),
 )
+
+func newLogger(cfg *config.Config) logger.Logger {
+	return logger.NewLogger(logger.NewLoggerArgs{
+		Config: cfg,
+	})
+}
 
 func newEngine(cfg *config.Config) engine.Engine {
 	return engine.New(&engine.NewEngineArgs{

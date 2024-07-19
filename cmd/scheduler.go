@@ -23,7 +23,9 @@ func schedulerCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			logger := logger.NewLogger(cfg)
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				Config: cfg,
+			})
 
 			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
 				cfg.DAGs = dagsOpt

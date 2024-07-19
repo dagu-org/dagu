@@ -23,11 +23,13 @@ func retryCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			logger := logger.NewLogger(cfg)
+			initLogger := logger.NewLogger(logger.NewLoggerArgs{
+				Config: cfg,
+			})
 
 			reqID, err := cmd.Flags().GetString("req")
 			if err != nil {
-				logger.Error("Request ID is required", "error", err)
+				initLogger.Error("Request ID is required", "error", err)
 				os.Exit(1)
 			}
 
@@ -37,13 +39,13 @@ func retryCmd() *cobra.Command {
 
 			absoluteFilePath, err := filepath.Abs(args[0])
 			if err != nil {
-				logger.Error("Failed to get the absolute path of the DAG file", "error", err)
+				initLogger.Error("Failed to get the absolute path of the DAG file", "error", err)
 				os.Exit(1)
 			}
 
 			status, err := historyStore.FindByRequestID(absoluteFilePath, reqID)
 			if err != nil {
-				logger.Error("Failed to find the request", "error", err)
+				initLogger.Error("Failed to find the request", "error", err)
 				os.Exit(1)
 			}
 
@@ -51,28 +53,48 @@ func retryCmd() *cobra.Command {
 			// is being retried.
 			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
 			if err != nil {
-				logger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
 			eng := newEngine(cfg)
 
-			logger.Info("Retrying the DAG", "dag", loadedDAG.Name, "request-id", reqID)
+			requestID, err := generateRequestID()
+			if err != nil {
+				initLogger.Error("Failed to generate request ID", "error", err)
+				os.Exit(1)
+			}
 
-			dagAgent := agent.New(&agent.NewAagentArgs{
-				DAG:         loadedDAG,
-				RetryTarget: status.Status,
-				LogDir:      cfg.LogDir,
-				Logger:      logger,
-				Engine:      eng,
-				DataStore:   dataStore,
+			logFile, err := openLogFileForDAG("dry_", cfg.LogDir, loadedDAG, requestID)
+			if err != nil {
+				initLogger.Error("Failed to open log file for DAG", "error", err)
+				os.Exit(1)
+			}
+			defer logFile.Close()
+
+			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+				Config:  cfg,
+				LogFile: logFile,
 			})
+
+			fileLogger.Info("Retrying the DAG", "dag", loadedDAG.Name, "reqId", reqID)
+
+			dagAgent := agent.New(
+				requestID,
+				loadedDAG,
+				fileLogger,
+				filepath.Dir(logFile.Name()),
+				logFile.Name(),
+				eng,
+				newDataStores(cfg),
+				&agent.AgentOpts{RetryTarget: status.Status},
+			)
 
 			ctx := cmd.Context()
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				logger.Error("Failed to start DAG", "error", err)
+				fileLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},

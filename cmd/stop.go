@@ -21,7 +21,9 @@ func stopCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			logger := logger.NewLogger(cfg)
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				Config: cfg,
+			})
 
 			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {

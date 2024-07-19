@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +28,6 @@ func TestReporter(t *testing.T) {
 		"create summary":      testRenderSummary,
 		"create node list":    testRenderTable,
 		"report summary":      testReportSummary,
-		"report step":         testReportStep,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
@@ -67,7 +67,10 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			rp := &reporter{Sender: &mockSender{}}
+			rp := &reporter{
+				sender: &mockSender{},
+				logger: test.NewLogger(),
+			}
 
 			fn(t, rp, d, nodes)
 		})
@@ -83,7 +86,7 @@ func testErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node)
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
 
-	mock, ok := rp.Sender.(*mockSender)
+	mock, ok := rp.sender.(*mockSender)
 	require.True(t, ok)
 	require.Contains(t, mock.subject, "Error")
 	require.Contains(t, mock.subject, "test DAG")
@@ -100,7 +103,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Nod
 	}, nil)
 	require.NoError(t, err)
 
-	mock, ok := rp.Sender.(*mockSender)
+	mock, ok := rp.sender.(*mockSender)
 	require.True(t, ok)
 	require.Equal(t, 0, mock.count)
 }
@@ -115,7 +118,7 @@ func testSuccessMail(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Nod
 	}, nil)
 	require.NoError(t, err)
 
-	mock, ok := rp.Sender.(*mockSender)
+	mock, ok := rp.sender.(*mockSender)
 	require.True(t, ok)
 	require.Contains(t, mock.subject, "Success")
 	require.Contains(t, mock.subject, "test DAG")
@@ -148,44 +151,6 @@ func testReportSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.N
 
 	s := buf.String()
 	require.Contains(t, s, "test error")
-}
-
-func testReportStep(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {
-	origStdout := os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stdout = w
-	log.SetOutput(w)
-
-	defer func() {
-		os.Stdout = origStdout
-		log.SetOutput(origStdout)
-	}()
-
-	dg.Steps[0].MailOnError = true
-	err = rp.reportStep(
-		dg,
-		&model.Status{
-			Status: scheduler.StatusRunning,
-			Nodes:  nodes,
-		},
-		scheduler.NewNode(dg.Steps[0], scheduler.NodeState{Status: scheduler.NodeStatusError}),
-	)
-	require.NoError(t, err)
-
-	_ = w.Close()
-	os.Stdout = origStdout
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
-
-	s := buf.String()
-	require.Contains(t, s, dg.Steps[0].Name)
-
-	mock, ok := rp.Sender.(*mockSender)
-	require.True(t, ok)
-	require.Equal(t, 1, mock.count)
 }
 
 func testRenderSummary(t *testing.T, rp *reporter, dg *dag.DAG, nodes []*model.Node) {

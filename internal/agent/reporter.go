@@ -3,11 +3,11 @@ package agent
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -21,10 +21,17 @@ type Sender interface {
 
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
-type reporter struct{ Sender }
+type reporter struct {
+	sender Sender
 
-func newReporter(sender Sender) *reporter {
-	return &reporter{Sender: sender}
+	logger logger.Logger
+}
+
+func newReporter(sender Sender, lg logger.Logger) *reporter {
+	return &reporter{
+		sender: sender,
+		logger: lg,
+	}
 }
 
 // reportStep is a function that reports the status of a step.
@@ -33,10 +40,10 @@ func (rp *reporter) reportStep(
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
+		rp.logger.Infof("Done %s (%s)", node.Data().Name, nodeStatus)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
-		return rp.Send(
+		return rp.sender.Send(
 			dg.ErrorMail.From,
 			[]string{dg.ErrorMail.To},
 			fmt.Sprintf(
@@ -50,7 +57,7 @@ func (rp *reporter) reportStep(
 }
 
 // report is a function that reports the status of the scheduler.
-func (*reporter) report(status *model.Status, err error) {
+func (r *reporter) report(status *model.Status, err error) {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -58,7 +65,7 @@ func (*reporter) report(status *model.Status, err error) {
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Details ->\n"))
 	_, _ = buf.Write([]byte(renderTable(status.Nodes)))
-	log.Print(buf.String())
+	r.logger.Write(buf.String())
 }
 
 // send is a function that sends a report mail.
@@ -67,7 +74,7 @@ func (rp *reporter) send(
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if dg.MailOn != nil && dg.MailOn.Failure {
-			return rp.Send(
+			return rp.sender.Send(
 				dg.ErrorMail.From,
 				[]string{dg.ErrorMail.To},
 				fmt.Sprintf(
@@ -79,7 +86,7 @@ func (rp *reporter) send(
 		}
 	} else if status.Status == scheduler.StatusSuccess {
 		if dg.MailOn != nil && dg.MailOn.Success {
-			_ = rp.Send(
+			_ = rp.sender.Send(
 				dg.InfoMail.From,
 				[]string{dg.InfoMail.To},
 				fmt.Sprintf(

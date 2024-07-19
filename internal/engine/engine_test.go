@@ -198,7 +198,7 @@ func TestEngine_RunDAG(t *testing.T) {
 		defer setup.Cleanup()
 
 		eng := setup.Engine()
-		file := testDAG("success.yaml")
+		file := testDAG("retry.yaml")
 
 		dagStatus, err := eng.GetStatus(file)
 		require.NoError(t, err)

@@ -29,7 +29,9 @@ func serverCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			logger := logger.NewLogger(cfg)
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				Config: cfg,
+			})
 
 			app := fx.New(
 				frontendModule,

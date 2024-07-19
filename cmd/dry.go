@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
@@ -23,37 +24,58 @@ func dryCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
-			logger := logger.NewLogger(cfg)
+			initLogger := logger.NewLogger(logger.NewLoggerArgs{
+				Config: cfg,
+			})
 
 			params, err := cmd.Flags().GetString("params")
 			if err != nil {
-				logger.Error("Failed to get params", "error", err)
+				initLogger.Error("Failed to get params", "error", err)
 				os.Exit(1)
 			}
 
 			dg, err := dag.Load(cfg.BaseConfig, args[0], params)
 			if err != nil {
-				logger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Failed to load DAG", "error", err)
 				os.Exit(1)
 			}
 
 			eng := newEngine(cfg)
 
-			dagAgent := agent.New(&agent.NewAagentArgs{
-				DAG:       dg,
-				LogDir:    cfg.LogDir,
-				Logger:    logger,
-				Dry:       true,
-				Engine:    eng,
-				DataStore: newDataStores(cfg),
+			requestID, err := generateRequestID()
+			if err != nil {
+				initLogger.Error("Failed to generate request ID", "error", err)
+				os.Exit(1)
+			}
+
+			logFile, err := openLogFileForDAG("dry_", cfg.LogDir, dg, requestID)
+			if err != nil {
+				initLogger.Error("Failed to open log file for DAG", "error", err)
+				os.Exit(1)
+			}
+			defer logFile.Close()
+
+			fileLogger := logger.NewLogger(logger.NewLoggerArgs{
+				Config:  cfg,
+				LogFile: logFile,
 			})
+
+			dagAgent := agent.New(
+				requestID,
+				dg,
+				fileLogger,
+				filepath.Dir(logFile.Name()),
+				logFile.Name(),
+				eng,
+				newDataStores(cfg),
+				&agent.AgentOpts{Dry: true})
 
 			ctx := cmd.Context()
 
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				logger.Error("Failed to start DAG", "error", err)
+				fileLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}
 		},
