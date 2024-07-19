@@ -30,16 +30,16 @@ func TestEngine_GetStatus(t *testing.T) {
 		require.NoError(t, err)
 
 		socketServer, _ := sock.NewServer(
-			&sock.Config{
-				Addr: dagStatus.DAG.SockAddr(),
-				HandlerFunc: func(w http.ResponseWriter, _ *http.Request) {
-					status := model.NewStatus(dagStatus.DAG, nil,
-						scheduler.StatusRunning, 0, nil, nil)
-					w.WriteHeader(http.StatusOK)
-					b, _ := status.ToJSON()
-					_, _ = w.Write(b)
-				},
-			})
+			dagStatus.DAG.SockAddr(),
+			func(w http.ResponseWriter, _ *http.Request) {
+				status := model.NewStatus(dagStatus.DAG, nil,
+					scheduler.StatusRunning, 0, nil, nil)
+				w.WriteHeader(http.StatusOK)
+				b, _ := status.ToJSON()
+				_, _ = w.Write(b)
+			},
+			test.NewLogger(),
+		)
 
 		go func() {
 			_ = socketServer.Serve(nil)

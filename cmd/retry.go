@@ -14,9 +14,9 @@ import (
 
 func retryCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "retry --req=<request-id> <DAG file>",
+		Use:   "retry --req=<request-id> /path/to/spec.yaml",
 		Short: "Retry the DAG execution",
-		Long:  `dagu retry --req=<request-id> <DAG file>`,
+		Long:  `dagu retry --req=<request-id> /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
@@ -78,7 +78,7 @@ func retryCmd() *cobra.Command {
 				LogFile: logFile,
 			})
 
-			agentLogger.Info("Retrying the DAG", "dag", workflow.Name, "reqId", reqID)
+			agentLogger.Info("Retrying the workflow", "workflow", workflow.Name, "reqId", reqID)
 
 			dagAgent := agent.New(
 				requestID,
@@ -95,7 +95,7 @@ func retryCmd() *cobra.Command {
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				agentLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Failed to start workflow", "error", err)
 				os.Exit(1)
 			}
 		},

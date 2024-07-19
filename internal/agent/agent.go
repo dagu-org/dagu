@@ -457,10 +457,11 @@ func (a *Agent) setupDatabase() error {
 
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer() error {
-	socketServer, err := sock.NewServer(&sock.Config{
-		Addr:        a.dag.SockAddr(),
-		HandlerFunc: a.HandleHTTP,
-	})
+	socketServer, err := sock.NewServer(
+		a.dag.SockAddr(),
+		a.HandleHTTP,
+		a.logger,
+	)
 	if err != nil {
 		return err
 	}

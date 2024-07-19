@@ -81,7 +81,7 @@ func (e *engineImpl) Rename(oldID, newID string) error {
 
 func (e *engineImpl) Stop(workflow *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.Client{Addr: workflow.SockAddr()}
+	client := sock.NewClient(workflow.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
@@ -153,7 +153,7 @@ func (e *engineImpl) Retry(workflow *dag.DAG, reqID string) error {
 }
 
 func (*engineImpl) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.Client{Addr: workflow.SockAddr()}
+	client := sock.NewClient(workflow.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -182,7 +182,7 @@ func (e *engineImpl) GetStatusByRequestID(workflow *dag.DAG, reqID string) (
 }
 
 func (*engineImpl) currentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.Client{Addr: workflow.SockAddr()}
+	client := sock.NewClient(workflow.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
@@ -212,7 +212,7 @@ func (e *engineImpl) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusF
 }
 
 func (e *engineImpl) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
-	client := sock.Client{Addr: workflow.SockAddr()}
+	client := sock.NewClient(workflow.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {

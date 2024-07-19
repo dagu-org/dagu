@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -186,12 +187,17 @@ func (s *Scheduler) run(now time.Time) {
 		}
 		go func(e *entry) {
 			if err := e.Invoke(); err != nil {
-				s.logger.Error(
-					"Failed to invoke entryreader", "entryreader",
-					e.Job,
-					"error",
-					err,
-				)
+				if errors.Is(err, errJobFinished) {
+					s.logger.Info("Job already finished", "job", e.Job)
+				} else if errors.Is(err, errJobRunning) {
+					s.logger.Info("Job already running", "job", e.Job)
+				} else {
+					s.logger.Error(
+						"Failed to invoke entryreader",
+						"job", e.Job,
+						"error", err,
+					)
+				}
 			}
 		}(e)
 	}

@@ -17,9 +17,9 @@ import (
 
 func restartCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "restart <DAG file>",
+		Use:   "restart /path/to/spec.yaml",
 		Short: "Stop the running DAG and restart it",
-		Long:  `dagu restart <DAG file>`,
+		Long:  `dagu restart /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
@@ -90,7 +90,7 @@ func restartCmd() *cobra.Command {
 				Quiet:   quiet,
 			})
 
-			agentLogger.Info("Restarting DAG", "dag", workflow.Name)
+			agentLogger.Info("Restarting DAG", "workflow", workflow.Name)
 
 			dagAgent := agent.New(
 				requestID,
@@ -122,7 +122,7 @@ func stopDAGIfRunning(e engine.Engine, workflow *dag.DAG, lg logger.Logger) erro
 	}
 
 	if curStatus.Status == scheduler.StatusRunning {
-		lg.Info("Stopping DAG for restart", "dag", workflow.Name)
+		lg.Info("Stopping workflow for restart", "workflow", workflow.Name)
 		cobra.CheckErr(stopRunningDAG(e, workflow))
 	}
 	return nil

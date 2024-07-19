@@ -14,9 +14,9 @@ import (
 
 func startCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [flags] <DAG file>",
+		Use:   "start [flags] /path/to/spec.yaml",
 		Short: "Runs the DAG",
-		Long:  `dagu start [--params="param1 param2"] <DAG file>`,
+		Long:  `dagu start [--params="param1 param2"] /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
@@ -69,7 +69,7 @@ func startCmd() *cobra.Command {
 				Quiet:   quiet,
 			})
 
-			agentLogger.Info("Starting DAG", "dag", workflow.Name)
+			agentLogger.Info("Starting workflow", "workflow", workflow.Name)
 
 			dagAgent := agent.New(
 				requestID,

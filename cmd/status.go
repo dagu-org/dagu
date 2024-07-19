@@ -12,9 +12,9 @@ import (
 
 func statusCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status <DAG file>",
+		Use:   "status /path/to/spec.yaml",
 		Short: "Display current status of the DAG",
-		Long:  `dagu status <DAG file>`,
+		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(_ *cobra.Command, args []string) {
 			cfg, err := config.Load()

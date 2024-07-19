@@ -14,9 +14,9 @@ import (
 
 func dryCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dry [flags] <DAG file>",
+		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",
-		Long:  `dagu dry [--params="param1 param2"] <DAG file>`,
+		Long:  `dagu dry [--params="param1 param2"] /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()

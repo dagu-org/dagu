@@ -1,4 +1,4 @@
-package sock
+package sock_test
 
 import (
 	"errors"
@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/sock"
+	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,17 +28,17 @@ func TestStartAndShutdownServer(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
-	unixServer, err := NewServer(
-		&Config{
-			Addr: tmpFile.Name(),
-			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte("OK"))
-			},
-		})
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("OK"))
+		},
+		test.NewLogger(),
+	)
 	require.NoError(t, err)
 
-	client := Client{Addr: tmpFile.Name()}
+	client := sock.NewClient(tmpFile.Name())
 	listen := make(chan error)
 	go func() {
 		for range listen {
@@ -45,7 +47,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	go func() {
 		err := unixServer.Serve(listen)
-		require.True(t, errors.Is(ErrServerRequestedShutdown, err))
+		require.True(t, errors.Is(sock.ErrServerRequestedShutdown, err))
 	}()
 
 	time.Sleep(time.Millisecond * 50)
@@ -66,16 +68,16 @@ func TestNoResponse(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
-	unixServer, err := NewServer(
-		&Config{
-			Addr: tmpFile.Name(),
-			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusForbidden)
-			},
-		})
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		},
+		test.NewLogger(),
+	)
 	require.NoError(t, err)
 
-	client := Client{Addr: tmpFile.Name()}
+	client := sock.NewClient(tmpFile.Name())
 	listen := make(chan error)
 	go func() {
 		for range listen {
@@ -100,14 +102,14 @@ func TestErrorResponse(t *testing.T) {
 		_ = os.Remove(tmpFile.Name())
 	}()
 
-	unixServer, err := NewServer(
-		&Config{
-			Addr:        tmpFile.Name(),
-			HandlerFunc: func(w http.ResponseWriter, r *http.Request) {},
-		})
+	unixServer, err := sock.NewServer(
+		tmpFile.Name(),
+		func(w http.ResponseWriter, r *http.Request) {},
+		test.NewLogger(),
+	)
 	require.NoError(t, err)
 
-	client := Client{Addr: tmpFile.Name()}
+	client := sock.NewClient(tmpFile.Name())
 	listen := make(chan error)
 	go func() {
 		for range listen {
@@ -123,9 +125,4 @@ func TestErrorResponse(t *testing.T) {
 
 	_, err = client.Request(http.MethodGet, "/")
 	require.Error(t, err)
-}
-
-func TestResponseWriter(t *testing.T) {
-	w := newHTTPResponseWriter(nil)
-	require.Equal(t, make(http.Header), w.Header())
 }
