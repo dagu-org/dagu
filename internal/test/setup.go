@@ -1,7 +1,6 @@
 package test
 
 import (
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -113,8 +112,8 @@ func SetupForDir(t *testing.T, dir string) Setup {
 }
 
 func NewLogger() logger.Logger {
-	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:     slog.LevelDebug,
-		AddSource: true,
-	}))
+	return logger.NewLogger(&config.Config{
+		LogLevel:  "debug",
+		LogFormat: "text",
+	})
 }

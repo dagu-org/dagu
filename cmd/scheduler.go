@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,6 +23,7 @@ func schedulerCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
+			logger := logger.NewLogger(cfg)
 
 			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
 				cfg.DAGs = dagsOpt
@@ -33,7 +36,8 @@ func schedulerCmd() *cobra.Command {
 			)
 
 			if err := app.Start(cmd.Context()); err != nil {
-				log.Fatalf("Failed to start scheduler: %v", err)
+				logger.Error("Failed to start scheduler", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

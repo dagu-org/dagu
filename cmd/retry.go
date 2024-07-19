@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/dagu-dev/dagu/internal/agent"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -21,10 +23,12 @@ func retryCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
+			logger := logger.NewLogger(cfg)
 
 			reqID, err := cmd.Flags().GetString("req")
 			if err != nil {
-				log.Fatalf("Request ID is required: %v", err)
+				logger.Error("Request ID is required", "error", err)
+				os.Exit(1)
 			}
 
 			// Read the specified DAG execution status from the history store.
@@ -33,21 +37,22 @@ func retryCmd() *cobra.Command {
 
 			absoluteFilePath, err := filepath.Abs(args[0])
 			if err != nil {
-				log.Fatalf(
-					"Failed to get the absolute path of the DAG file: %v", err,
-				)
+				logger.Error("Failed to get the absolute path of the DAG file", "error", err)
+				os.Exit(1)
 			}
 
 			status, err := historyStore.FindByRequestID(absoluteFilePath, reqID)
 			if err != nil {
-				log.Fatalf("Failed to find the request: %v", err)
+				logger.Error("Failed to find the request", "error", err)
+				os.Exit(1)
 			}
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
 			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
 			if err != nil {
-				log.Fatalf("Failed to load DAG: %v", err)
+				logger.Error("Failed to load DAG", "error", err)
+				os.Exit(1)
 			}
 
 			eng := newEngine(cfg)
@@ -56,7 +61,7 @@ func retryCmd() *cobra.Command {
 				DAG:         loadedDAG,
 				RetryTarget: status.Status,
 				LogDir:      cfg.LogDir,
-				Logger:      newLogger(cfg),
+				Logger:      logger,
 				Engine:      eng,
 				DataStore:   dataStore,
 			})
@@ -65,7 +70,8 @@ func retryCmd() *cobra.Command {
 			listenSignals(ctx, dagAgent)
 
 			if err := dagAgent.Run(ctx); err != nil {
-				log.Fatalf("Failed to start the DAG: %v", err)
+				logger.Error("Failed to start DAG", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

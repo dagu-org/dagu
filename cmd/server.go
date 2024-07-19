@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/frontend"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
@@ -27,6 +29,7 @@ func serverCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
+			logger := logger.NewLogger(cfg)
 
 			app := fx.New(
 				frontendModule,
@@ -36,7 +39,8 @@ func serverCmd() *cobra.Command {
 
 			if err := app.Start(cmd.Context()); err != nil {
 				// nolint
-				log.Fatalf("Failed to start server: %v", err)
+				logger.Error("Failed to start server", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -19,18 +21,21 @@ func stopCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Failed to load config: %v", err)
 			}
+			logger := logger.NewLogger(cfg)
 
 			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
-				log.Fatalf("Failed to load DAG: %v", err)
+				logger.Error("Failed to load DAG", "error", err)
+				os.Exit(1)
 			}
 
-			log.Printf("Stopping...")
+			logger.Info("Stopping the DAG", "dag", loadedDAG.Name)
 
 			eng := newEngine(cfg)
 
 			if err := eng.Stop(loadedDAG); err != nil {
-				log.Fatalf("Failed to stop the DAG: %v", err)
+				logger.Error("Failed to stop the DAG", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

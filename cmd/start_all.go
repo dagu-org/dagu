@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/frontend"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,6 +31,7 @@ func startAllCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
+			logger := logger.NewLogger(cfg)
 
 			if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 				cfg.DAGs = dagsDir
@@ -46,7 +49,8 @@ func startAllCmd() *cobra.Command {
 			go func() {
 				err := scheduler.Start(ctx)
 				if err != nil {
-					log.Fatal(err) // nolint // deep-exit
+					logger.Error("Failed to start scheduler", "error", err)
+					os.Exit(1)
 				}
 			}()
 
@@ -58,7 +62,8 @@ func startAllCmd() *cobra.Command {
 			)
 
 			if err := frontend.Start(ctx); err != nil {
-				log.Fatalf("Failed to start server: %v", err)
+				logger.Error("Failed to start server", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -20,12 +22,14 @@ func statusCmd() *cobra.Command {
 				// nolint
 				log.Fatalf("Failed to load config: %v", err)
 			}
+			logger := logger.NewLogger(cfg)
 
 			// Load the DAG file and get the current running status.
 			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load DAG: %v", err)
+				logger.Error("Failed to load DAG", "error", err)
+				os.Exit(1)
 			}
 
 			eng := newEngine(cfg)
@@ -34,10 +38,11 @@ func statusCmd() *cobra.Command {
 
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to get the current status: %v", err)
+				logger.Error("Failed to get the current status", "error", err)
+				os.Exit(1)
 			}
 
-			log.Printf("Pid=%d Status=%s", curStatus.PID, curStatus.Status)
+			logger.Info("Current status", "pid", curStatus.PID, "status", curStatus.Status)
 		},
 	}
 }
