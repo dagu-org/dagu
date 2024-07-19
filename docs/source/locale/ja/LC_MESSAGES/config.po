@@ -67,10 +67,10 @@ msgstr ""
 
 #: ../../source/config.rst:22 f456c2b6c30743018b25a5830752e9d1
 msgid ""
-"``DAGU_LOG_DIR`` (``$HOME/.local/share``): The directory where logs will be "
+"``DAGU_LOG_DIR`` (``$HOME/.local/share/logs``): The directory where logs will be "
 "stored."
 msgstr ""
-"``DAGU_LOG_DIR`` (``$HOME/.local/share``): ログが保存されるディレクトリ。"
+"``DAGU_LOG_DIR`` (``$HOME/.local/share/logs``): ログが保存されるディレクトリ。"
 
 #: ../../source/config.rst:23 67f71f1c2963462083598d0749ac6560
 msgid ""

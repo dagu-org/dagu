@@ -62,7 +62,7 @@ msgstr ""
 
 #: ../../source/config.rst:22 58567f3b626d454b976332da5ca36385
 msgid ""
-"``DAGU_LOG_DIR`` (``$HOME/.local/share``): The directory where logs will be "
+"``DAGU_LOG_DIR`` (``$HOME/.local/share/logs``): The directory where logs will be "
 "stored."
 msgstr ""
 
