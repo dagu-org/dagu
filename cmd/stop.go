@@ -41,8 +41,8 @@ func stopCmd() *cobra.Command {
 
 			logger.Infof("Stopping workflow: %s", workflow.Name)
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, logger)
+			dataStore := newDataStores(cfg)
+			eng := newEngine(cfg, dataStore, logger)
 
 			if err := eng.Stop(workflow); err != nil {
 				logger.Error("Failed to stop the workflow", "error", err)

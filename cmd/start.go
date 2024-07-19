@@ -68,26 +68,26 @@ func startCmd() *cobra.Command {
 				Quiet:     quiet,
 			})
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, agentLogger)
+			dataStore := newDataStores(cfg)
+			eng := newEngine(cfg, dataStore, agentLogger)
 
 			agentLogger.Infof("Starting workflow: %s", workflow.Name)
 
-			dagAgent := agent.New(
+			ag := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
-				newDataStores(cfg),
+				dataStore,
 				&agent.Options{})
 
 			ctx := cmd.Context()
 
-			listenSignals(ctx, dagAgent)
+			listenSignals(ctx, ag)
 
-			if err := dagAgent.Run(ctx); err != nil {
+			if err := ag.Run(ctx); err != nil {
 				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}

@@ -46,8 +46,8 @@ func restartCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, initLogger)
+			dataStore := newDataStores(cfg)
+			eng := newEngine(cfg, dataStore, initLogger)
 
 			if err := stopDAGIfRunning(eng, workflow, initLogger); err != nil {
 				initLogger.Error("Failed to stop the DAG", "error", err)
@@ -94,18 +94,18 @@ func restartCmd() *cobra.Command {
 
 			agentLogger.Infof("Restarting: %s", workflow.Name)
 
-			dagAgent := agent.New(
+			ag := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
-				newEngine(cfg, ds, agentLogger),
-				newDataStores(cfg),
+				newEngine(cfg, dataStore, agentLogger),
+				dataStore,
 				&agent.Options{Dry: false})
 
-			listenSignals(cmd.Context(), dagAgent)
-			if err := dagAgent.Run(cmd.Context()); err != nil {
+			listenSignals(cmd.Context(), ag)
+			if err := ag.Run(cmd.Context()); err != nil {
 				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}

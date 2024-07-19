@@ -77,26 +77,25 @@ func retryCmd() *cobra.Command {
 				LogFile:   logFile,
 			})
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, agentLogger)
+			eng := newEngine(cfg, dataStore, agentLogger)
 
 			agentLogger.Infof("Retrying with request ID: %s", requestID)
 
-			dagAgent := agent.New(
+			ag := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
-				newDataStores(cfg),
+				dataStore,
 				&agent.Options{RetryTarget: status.Status},
 			)
 
 			ctx := cmd.Context()
-			listenSignals(ctx, dagAgent)
+			listenSignals(ctx, ag)
 
-			if err := dagAgent.Run(ctx); err != nil {
+			if err := ag.Run(ctx); err != nil {
 				agentLogger.Error("Failed to start workflow", "error", err)
 				os.Exit(1)
 			}

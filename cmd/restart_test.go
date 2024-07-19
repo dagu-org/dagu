@@ -61,8 +61,12 @@ func TestRestartCommand(t *testing.T) {
 		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		ds := newDataStores(setup.Config)
-		recentHistory := newEngine(setup.Config, ds, logger.Default).GetRecentHistory(workflow, 2)
+		dataStore := newDataStores(setup.Config)
+		recentHistory := newEngine(
+			setup.Config,
+			dataStore,
+			logger.Default,
+		).GetRecentHistory(workflow, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

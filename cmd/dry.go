@@ -60,24 +60,24 @@ func dryCmd() *cobra.Command {
 				LogFile:   logFile,
 			})
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, agentLogger)
+			dataStore := newDataStores(cfg)
+			eng := newEngine(cfg, dataStore, agentLogger)
 
-			dagAgent := agent.New(
+			ag := agent.New(
 				requestID,
 				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
 				eng,
-				newDataStores(cfg),
+				dataStore,
 				&agent.Options{Dry: true})
 
 			ctx := cmd.Context()
 
-			listenSignals(ctx, dagAgent)
+			listenSignals(ctx, ag)
 
-			if err := dagAgent.Run(ctx); err != nil {
+			if err := ag.Run(ctx); err != nil {
 				agentLogger.Error("Failed to start DAG", "error", err)
 				os.Exit(1)
 			}

@@ -40,8 +40,8 @@ func startAllCmd() *cobra.Command {
 			}
 
 			ctx := cmd.Context()
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, logger)
+			dataStore := newDataStores(cfg)
+			eng := newEngine(cfg, dataStore, logger)
 
 			go func() {
 				logger.Info("Starting the scheduler", "dags", cfg.DAGs)

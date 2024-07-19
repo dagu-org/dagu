@@ -35,8 +35,8 @@ func statusCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			ds := newDataStores(cfg)
-			eng := newEngine(cfg, ds, logger)
+			dataStore := newDataStores(cfg)
+			eng := newEngine(cfg, dataStore, logger)
 
 			curStatus, err := eng.GetCurrentStatus(workflow)
 
