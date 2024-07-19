@@ -140,9 +140,9 @@ func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Retry(workflow *dag.DAG, reqID string) error {
+func (e *client) Retry(workflow *dag.DAG, requestID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--req=%s", reqID))
+	args = append(args, fmt.Sprintf("--req=%s", requestID))
 	args = append(args, workflow.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
@@ -168,17 +168,17 @@ func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetStatusByRequestID(workflow *dag.DAG, reqID string) (
+func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
 	*model.Status, error,
 ) {
 	ret, err := e.dataStore.HistoryStore().FindByRequestID(
-		workflow.Location, reqID,
+		workflow.Location, requestID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	status, _ := e.GetCurrentStatus(workflow)
-	if status != nil && status.RequestID != reqID {
+	if status != nil && status.RequestID != requestID {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
 	}

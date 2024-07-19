@@ -32,13 +32,13 @@ func TestNewDataFile(t *testing.T) {
 
 	d := &dag.DAG{Location: "test_new_data_file.yaml"}
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
-	reqID := "request-id-1"
-	f, err := db.newFile(d.Location, timestamp, reqID)
+	requestID := "request-id-1"
+	f, err := db.newFile(d.Location, timestamp, requestID)
 	require.NoError(t, err)
 	p := util.ValidFilename(strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location)))
-	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, reqID[:8]), f)
+	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestID[:8]), f)
 
-	_, err = db.newFile("", timestamp, reqID)
+	_, err = db.newFile("", timestamp, requestID)
 	require.Error(t, err)
 }
 
@@ -186,9 +186,9 @@ func TestReadLatestStatus(t *testing.T) {
 	}()
 
 	d := &dag.DAG{Location: "test_config_status_reader.yaml"}
-	reqID := "request-id-1"
+	requestID := "request-id-1"
 
-	dw, _, err := db.newWriter(d.Location, time.Now(), reqID)
+	dw, _, err := db.newWriter(d.Location, time.Now(), requestID)
 	require.NoError(t, err)
 	err = dw.open()
 	require.NoError(t, err)
@@ -263,9 +263,9 @@ func TestCompactFile(t *testing.T) {
 	}()
 
 	workflow := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
-	reqID := "request-id-1"
+	requestID := "request-id-1"
 
-	dw, _, err := db.newWriter(workflow.Location, time.Now(), reqID)
+	dw, _, err := db.newWriter(workflow.Location, time.Now(), requestID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 

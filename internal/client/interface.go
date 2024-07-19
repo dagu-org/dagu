@@ -17,9 +17,9 @@ type Client interface {
 	StartAsync(workflow *dag.DAG, opts StartOptions)
 	Start(workflow *dag.DAG, opts StartOptions) error
 	Restart(workflow *dag.DAG, opts RestartOptions) error
-	Retry(workflow *dag.DAG, reqID string) error
+	Retry(workflow *dag.DAG, requestID string) error
 	GetCurrentStatus(workflow *dag.DAG) (*model.Status, error)
-	GetStatusByRequestID(workflow *dag.DAG, reqID string) (*model.Status, error)
+	GetStatusByRequestID(workflow *dag.DAG, requestID string) (*model.Status, error)
 	GetLatestStatus(workflow *dag.DAG) (*model.Status, error)
 	GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile
 	UpdateStatus(workflow *dag.DAG, status *model.Status) error

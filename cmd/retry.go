@@ -28,7 +28,7 @@ func retryCmd() *cobra.Command {
 				LogFormat: cfg.LogFormat,
 			})
 
-			reqID, err := cmd.Flags().GetString("req")
+			requestID, err := cmd.Flags().GetString("req")
 			if err != nil {
 				initLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
@@ -47,11 +47,11 @@ func retryCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			status, err := historyStore.FindByRequestID(absoluteFilePath, reqID)
+			status, err := historyStore.FindByRequestID(absoluteFilePath, requestID)
 			if err != nil {
 				initLogger.Error("Historical execution retrieval failed",
 					"error", err,
-					"requestID", reqID,
+					"requestID", requestID,
 					"file", absoluteFilePath)
 				os.Exit(1)
 			}
@@ -92,7 +92,7 @@ func retryCmd() *cobra.Command {
 
 			agentLogger.Info("Workflow retry initiated",
 				"workflow", workflow.Name,
-				"originalRequestID", reqID,
+				"originalRequestID", requestID,
 				"newRequestID", newRequestID,
 				"logFile", logFile.Name())
 

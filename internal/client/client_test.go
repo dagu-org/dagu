@@ -362,7 +362,7 @@ func testDAG(name string) string {
 	return filepath.Join(testdataDir, name)
 }
 
-func testNewStatus(workflow *dag.DAG, reqID string, status scheduler.Status,
+func testNewStatus(workflow *dag.DAG, requestID string, status scheduler.Status,
 	nodeStatus scheduler.NodeStatus) *model.Status {
 	ret := model.NewStatus(
 		workflow,
@@ -376,6 +376,6 @@ func testNewStatus(workflow *dag.DAG, reqID string, status scheduler.Status,
 		model.Time(time.Now()),
 		nil,
 	)
-	ret.RequestID = reqID
+	ret.RequestID = requestID
 	return ret
 }

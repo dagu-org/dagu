@@ -44,10 +44,10 @@ type Agent struct {
 	logFile      string
 	logger       logger.Logger
 
-	// reqID is request ID to identify DAG execution uniquely.
+	// requestID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
-	reqID    string
-	finished atomic.Bool
+	requestID string
+	finished  atomic.Bool
 
 	lock sync.RWMutex
 }
@@ -65,7 +65,7 @@ type Options struct {
 
 // New creates a new Agent.
 func New(
-	reqID string,
+	requestID string,
 	workflow *dag.DAG,
 	lg logger.Logger,
 	logDir, logFile string,
@@ -74,7 +74,7 @@ func New(
 	opts *Options,
 ) *Agent {
 	return &Agent{
-		reqID:       reqID,
+		requestID:   requestID,
 		dag:         workflow,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
@@ -227,7 +227,7 @@ func (a *Agent) Status() *model.Status {
 
 	// Create the status object to record the current status.
 	status := &model.Status{
-		RequestID:  a.reqID,
+		RequestID:  a.requestID,
 		Name:       a.dag.Name,
 		Status:     schedulerStatus,
 		StatusText: schedulerStatus.String(),
@@ -326,7 +326,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		MaxActiveRuns: a.dag.MaxActiveRuns,
 		Delay:         a.dag.Delay,
 		Dry:           a.dry,
-		ReqID:         a.reqID,
+		ReqID:         a.requestID,
 	}
 
 	if a.dag.HandlerOn.Exit != nil {
@@ -365,7 +365,7 @@ func (a *Agent) dryRun() error {
 		}
 	}()
 
-	a.logger.Info("Dry-run started", "reqId", a.reqID)
+	a.logger.Info("Dry-run started", "reqId", a.requestID)
 
 	lastErr := a.scheduler.Schedule(
 		dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore()),
@@ -375,7 +375,7 @@ func (a *Agent) dryRun() error {
 
 	a.reporter.report(a.Status(), lastErr)
 
-	a.logger.Info("Dry-run finished", "reqId", a.reqID)
+	a.logger.Info("Dry-run finished", "reqId", a.requestID)
 
 	return lastErr
 }
@@ -423,7 +423,7 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 // from the retry node so that it runs the same DAG as the previous run.
 func (a *Agent) setupGraph() error {
 	if a.retryTarget != nil {
-		a.logger.Info("Retry execution", "reqId", a.reqID)
+		a.logger.Info("Retry execution", "reqId", a.requestID)
 		return a.setupGraphForRetry()
 	}
 	graph, err := scheduler.NewExecutionGraph(a.logger, a.dag.Steps...)
@@ -456,7 +456,7 @@ func (a *Agent) setupDatabase() error {
 		a.logger.Error("History data cleanup failed", "error", err)
 	}
 
-	return a.historyStore.Open(a.dag.Location, time.Now(), a.reqID)
+	return a.historyStore.Open(a.dag.Location, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.

@@ -49,7 +49,7 @@ type Scheduler struct {
 	onSuccess     *dag.Step
 	onFailure     *dag.Step
 	onCancel      *dag.Step
-	reqID         string
+	requestID     string
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -73,7 +73,7 @@ func New(cfg *Config) *Scheduler {
 		onSuccess:     cfg.OnSuccess,
 		onFailure:     cfg.OnFailure,
 		onCancel:      cfg.OnCancel,
-		reqID:         cfg.ReqID,
+		requestID:     cfg.ReqID,
 	}
 }
 
@@ -247,7 +247,7 @@ func (sc *Scheduler) setLastError(err error) {
 
 func (sc *Scheduler) setupNode(node *Node) error {
 	if !sc.dry {
-		return node.setup(sc.logDir, sc.reqID)
+		return node.setup(sc.logDir, sc.requestID)
 	}
 	return nil
 }
@@ -378,7 +378,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 	node.setStatus(NodeStatusRunning)
 
 	if !sc.dry {
-		err := node.setup(sc.logDir, sc.reqID)
+		err := node.setup(sc.logDir, sc.requestID)
 		if err != nil {
 			node.setStatus(NodeStatusError)
 			return nil

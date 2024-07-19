@@ -405,12 +405,12 @@ func genRequestID() string {
 
 func newAgent(
 	setup test.Setup,
-	reqID string,
+	requestID string,
 	workflow *dag.DAG,
 	opts *agent.Options,
 ) *agent.Agent {
 	return agent.New(
-		reqID,
+		requestID,
 		workflow,
 		test.NewLogger(),
 		setup.Config.LogDir,

@@ -15,7 +15,7 @@ func openLogFile(
 	prefix string,
 	logDir string,
 	workflow *dag.DAG,
-	reqID string,
+	requestID string,
 ) (*os.File, error) {
 	name := util.ValidFilename(workflow.Name)
 	if workflow.LogDir != "" {
@@ -32,7 +32,7 @@ func openLogFile(
 		prefix,
 		name,
 		time.Now().Format("20060102.15:04:05.000"),
-		util.TruncString(reqID, 8),
+		util.TruncString(requestID, 8),
 	))
 	// Open or create the log file
 	return os.OpenFile(
