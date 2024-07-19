@@ -95,6 +95,7 @@ func (svr *Server) Shutdown() {
 func (svr *Server) Serve(ctx context.Context) (err error) {
 	middlewareOptions := &pkgmiddleware.Options{
 		Handler: svr.defaultRoutes(chi.NewRouter()),
+		Logger:  svr.logger,
 	}
 	if svr.authToken != nil {
 		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{

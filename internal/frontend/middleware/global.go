@@ -5,13 +5,18 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 	next := cors(handler)
 	next = middleware.RequestID(next)
-	next = middleware.Logger(next)
+	if appLogger != nil {
+		next = logging(next)
+	} else {
+		next = middleware.Logger(next)
+	}
 	next = middleware.Recoverer(next)
 
 	if authToken != nil {
@@ -51,12 +56,14 @@ var (
 	defaultHandler http.Handler
 	authBasic      *AuthBasic
 	authToken      *AuthToken
+	appLogger      logger.Logger
 )
 
 type Options struct {
 	Handler   http.Handler
 	AuthBasic *AuthBasic
 	AuthToken *AuthToken
+	Logger    logger.Logger
 }
 
 type AuthBasic struct {
@@ -72,6 +79,7 @@ func Setup(opts *Options) {
 	defaultHandler = opts.Handler
 	authBasic = opts.AuthBasic
 	authToken = opts.AuthToken
+	appLogger = opts.Logger
 }
 
 func prefixChecker(next http.Handler) http.Handler {
