@@ -9,8 +9,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/persistence"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -102,17 +102,17 @@ const (
 )
 
 // testStatusEventual tests the status of a DAG to be the expected status.
-func testStatusEventual(t *testing.T, e engine.Engine, dagFile string, expected scheduler.Status) {
+func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected scheduler.Status) {
 	t.Helper()
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dg, err := dag.Load(cfg.BaseConfig, dagFile, "")
+	workflow, err := dag.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(dg)
+		status, err := e.GetCurrentStatus(workflow)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)

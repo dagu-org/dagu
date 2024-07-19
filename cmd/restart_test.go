@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -31,10 +32,10 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		time.Sleep(waitForStatusUpdate)
-		eng := setup.Engine()
+		cli := setup.Client()
 
 		// Wait for the DAG running.
-		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
+		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
 
 		// Restart the DAG.
 		done := make(chan struct{})
@@ -46,7 +47,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG running again.
-		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
+		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
 		testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
@@ -54,13 +55,18 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG is stopped.
-		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
+		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dg, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
+		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		recentHistory := newEngine(setup.Config).GetRecentHistory(dg, 2)
+		dataStore := newDataStores(setup.Config)
+		recentHistory := newClient(
+			setup.Config,
+			dataStore,
+			logger.Default,
+		).GetRecentHistory(workflow, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

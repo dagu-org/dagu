@@ -260,7 +260,7 @@ func (n *Node) cancel() {
 	}
 }
 
-func (n *Node) setup(logDir string, reqID string) error {
+func (n *Node) setup(logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -268,7 +268,7 @@ func (n *Node) setup(logDir string, reqID string) error {
 	n.data.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		util.ValidFilename(n.data.Step.Name),
 		n.data.StartedAt.Format("20060102.15:04:05.000"),
-		util.TruncString(reqID, 8),
+		util.TruncString(requestID, 8),
 	))
 	for _, fn := range []func() error{
 		n.setupLog,

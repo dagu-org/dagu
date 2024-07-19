@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,7 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/dagu-dev/dagu/internal/logger"
 )
 
 var ErrServerRequestedShutdown = errors.New(
@@ -21,30 +20,35 @@ var ErrServerRequestedShutdown = errors.New(
 
 // Server is a unix socket frontend that passes http requests to HandlerFunc.
 type Server struct {
-	*Config
-	listener net.Listener
-	quit     atomic.Bool
-	mu       sync.Mutex
-}
-
-type Config struct {
-	Addr        string
-	HandlerFunc HTTPHandlerFunc
+	addr        string
+	handlerFunc HTTPHandlerFunc
+	listener    net.Listener
+	quit        atomic.Bool
+	mu          sync.Mutex
+	logger      logger.Logger
 }
 
 // HTTPHandlerFunc is a function that handles HTTP requests.
 type HTTPHandlerFunc func(w http.ResponseWriter, r *http.Request)
 
 // NewServer creates a new unix socket frontend.
-func NewServer(c *Config) (*Server, error) {
-	return &Server{Config: c}, nil
+func NewServer(
+	addr string,
+	handlerFunc HTTPHandlerFunc,
+	lg logger.Logger,
+) (*Server, error) {
+	return &Server{
+		addr:        addr,
+		handlerFunc: handlerFunc,
+		logger:      lg,
+	}, nil
 }
 
 // Serve starts listening and serving requests.
-func (svr *Server) Serve(listen chan error) error {
-	_ = os.Remove(svr.Addr)
+func (srv *Server) Serve(listen chan error) error {
+	_ = os.Remove(srv.addr)
 	var err error
-	svr.listener, err = net.Listen("unix", svr.Addr)
+	srv.listener, err = net.Listen("unix", srv.addr)
 	if err != nil {
 		if listen != nil {
 			listen <- err
@@ -54,22 +58,24 @@ func (svr *Server) Serve(listen chan error) error {
 	if listen != nil {
 		listen <- err
 	}
-	log.Printf("unix socket is running at \"%v\"\n", svr.Addr)
+	srv.logger.Debug("Unix socket is listening", "addr", srv.addr)
+
 	defer func() {
-		_ = svr.Shutdown()
-		_ = os.Remove(svr.Addr)
+		_ = srv.Shutdown()
+		_ = os.Remove(srv.addr)
 	}()
 	for {
-		conn, err := svr.listener.Accept()
-		if svr.quit.Load() {
+		conn, err := srv.listener.Accept()
+		if srv.quit.Load() {
 			return ErrServerRequestedShutdown
 		}
 		if err == nil {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
-				util.LogErr("read request", err)
-				if err == nil {
-					svr.HandlerFunc(newHTTPResponseWriter(&conn), request)
+				if err != nil {
+					srv.logger.Error("read request", "error", err)
+				} else {
+					srv.handlerFunc(newHTTPResponseWriter(&conn), request)
 				}
 				_ = conn.Close()
 			}()
@@ -78,14 +84,16 @@ func (svr *Server) Serve(listen chan error) error {
 }
 
 // Shutdown stops the frontend.
-func (svr *Server) Shutdown() error {
-	svr.mu.Lock()
-	defer svr.mu.Unlock()
-	if !svr.quit.Load() {
-		svr.quit.Store(true)
-		if svr.listener != nil {
-			err := svr.listener.Close()
-			util.LogErr("close listener", err)
+func (srv *Server) Shutdown() error {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if !srv.quit.Load() {
+		srv.quit.Store(true)
+		if srv.listener != nil {
+			err := srv.listener.Close()
+			if err != nil && !errors.Is(err, os.ErrClosed) {
+				srv.logger.Error("close listener", "error", err)
+			}
 			return err
 		}
 	}

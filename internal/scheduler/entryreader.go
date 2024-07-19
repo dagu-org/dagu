@@ -7,9 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/internal/scheduler/filenotify"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -25,18 +24,18 @@ type entryReaderImpl struct {
 	dags       map[string]*dag.DAG
 	jobCreator jobCreator
 	logger     logger.Logger
-	engine     engine.Engine
+	client     client.Client
 }
 
 type newEntryReaderArgs struct {
 	DagsDir    string
 	JobCreator jobCreator
 	Logger     logger.Logger
-	Engine     engine.Engine
+	Client     client.Client
 }
 
 type jobCreator interface {
-	CreateJob(dg *dag.DAG, next time.Time) job
+	CreateJob(workflow *dag.DAG, next time.Time) job
 }
 
 func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
@@ -46,10 +45,10 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 		dags:       map[string]*dag.DAG{},
 		jobCreator: args.JobCreator,
 		logger:     args.Logger,
-		engine:     args.Engine,
+		client:     args.Client,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entryreader dags", tag.Error(err))
+		er.logger.Error("DAG initialization failed", "error", err)
 	}
 	return er
 }
@@ -63,25 +62,25 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(dg *dag.DAG, s []dag.Schedule, e entryType) {
+	addEntriesFn := func(workflow *dag.DAG, s []dag.Schedule, e entryType) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &entry{
 				Next:      ss.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(dg, next),
+				Job:       er.jobCreator.CreateJob(workflow, next),
 				EntryType: e,
 				Logger:    er.logger,
 			})
 		}
 	}
 
-	for _, dg := range er.dags {
-		if er.engine.IsSuspended(dg.Name) {
+	for _, workflow := range er.dags {
+		if er.client.IsSuspended(workflow.Name) {
 			continue
 		}
-		addEntriesFn(dg, dg.Schedule, entryTypeStart)
-		addEntriesFn(dg, dg.StopSchedule, entryTypeStop)
-		addEntriesFn(dg, dg.RestartSchedule, entryTypeRestart)
+		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
+		addEntriesFn(workflow, workflow.StopSchedule, entryTypeStop)
+		addEntriesFn(workflow, workflow.RestartSchedule, entryTypeRestart)
 	}
 
 	return entries, nil
@@ -99,26 +98,30 @@ func (er *entryReaderImpl) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.Exts) {
-			dg, err := dag.LoadMetadata(
+			workflow, err := dag.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
-				er.logger.Error("failed to read DAG cfg", tag.Error(err))
+				er.logger.Error(
+					"Workflow load failed",
+					"error", err,
+					"workflow", fi.Name(),
+				)
 				continue
 			}
-			er.dags[fi.Name()] = dg
+			er.dags[fi.Name()] = workflow
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
 
-	er.logger.Info("init backend dags", "files", strings.Join(fileNames, ","))
+	er.logger.Info("Scheduler initialized", "specs", strings.Join(fileNames, ","))
 	return nil
 }
 
 func (er *entryReaderImpl) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		er.logger.Error("failed to init file watcher", tag.Error(err))
+		er.logger.Error("Watcher creation failed", "error", err)
 		return
 	}
 
@@ -140,28 +143,32 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dg, err := dag.LoadMetadata(
+				workflow, err := dag.LoadMetadata(
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
-					er.logger.Error("failed to read DAG cfg", tag.Error(err))
-				} else {
-					er.dags[filepath.Base(event.Name)] = dg
-					er.logger.Info(
-						"reload DAG entryreader", "file", event.Name,
+					er.logger.Error(
+						"Workflow load failed",
+						"error",
+						err,
+						"file",
+						event.Name,
 					)
+				} else {
+					er.dags[filepath.Base(event.Name)] = workflow
+					er.logger.Info("Workflow added/updated", "workflow", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("remove DAG entryreader", "file", event.Name)
+				er.logger.Info("Workflow removed", "workflow", filepath.Base(event.Name))
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entryreader DAGs error", tag.Error(err))
+			er.logger.Error("Watcher error", "error", err)
 		}
 	}
 

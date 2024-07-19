@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/frontend"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 func startAllCmd() *cobra.Command {
@@ -27,38 +28,37 @@ func startAllCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+			})
 
 			if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 				cfg.DAGs = dagsDir
 			}
 
 			ctx := cmd.Context()
-
-			// Start the scheduler process.
-			scheduler := fx.New(
-				schedulerModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(scheduler.LifetimeHooks),
-			)
+			dataStore := newDataStores(cfg)
+			cli := newClient(cfg, dataStore, logger)
 
 			go func() {
-				err := scheduler.Start(ctx)
-				if err != nil {
-					log.Fatal(err) // nolint // deep-exit
+				logger.Info("Scheduler initialization", "dags", cfg.DAGs)
+
+				sc := scheduler.New(cfg, logger, cli)
+				if err := sc.Start(ctx); err != nil {
+					logger.Error("Scheduler initialization failed", "error", err, "dags", cfg.DAGs)
+					os.Exit(1)
 				}
 			}()
 
-			// Start the frontend server.
-			frontend := fx.New(
-				frontendModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(frontend.LifetimeHooks),
-			)
+			logger.Info("Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-			if err := frontend.Start(ctx); err != nil {
-				log.Fatalf("Failed to start server: %v", err)
+			server := frontend.New(cfg, logger, cli)
+			if err := server.Serve(ctx); err != nil {
+				logger.Error("Server initialization failed", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

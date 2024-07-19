@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/frontend"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 func serverCmd() *cobra.Command {
@@ -25,18 +26,22 @@ func serverCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+			})
 
-			app := fx.New(
-				frontendModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(frontend.LifetimeHooks),
-			)
+			logger.Info("Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-			if err := app.Start(cmd.Context()); err != nil {
+			dataStore := newDataStores(cfg)
+			cli := newClient(cfg, dataStore, logger)
+			server := frontend.New(cfg, logger, cli)
+			if err := server.Serve(cmd.Context()); err != nil {
 				// nolint
-				log.Fatalf("Failed to start server: %v", err)
+				logger.Error("Server initialization failed", "error", err)
+				os.Exit(1)
 			}
 		},
 	}

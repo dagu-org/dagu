@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -34,13 +35,16 @@ func TestMain(m *testing.M) {
 
 func TestScheduler(t *testing.T) {
 	g, err := NewExecutionGraph(
+		logger.Default,
 		step("1", testCommand),
 		step("2", testCommand, "1"),
 		step("3", testCommandFail, "2"),
 		step("4", testCommand, "3"),
 	)
 	require.NoError(t, err)
-	sc := New(&Config{MaxActiveRuns: 1, LogDir: testHomeDir})
+	sc := New(&Config{
+		MaxActiveRuns: 1, LogDir: testHomeDir, Logger: logger.Default,
+	})
 
 	var counter atomic.Int64
 	done := make(chan *Node)
@@ -62,7 +66,7 @@ func TestScheduler(t *testing.T) {
 }
 
 func TestSchedulerParallel(t *testing.T) {
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{MaxActiveRuns: 1000, LogDir: testHomeDir},
 		step("1", testCommand),
 		step("2", testCommand),
@@ -146,11 +150,12 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 func TestSchedulerCancel(t *testing.T) {
 
 	g, _ := NewExecutionGraph(
+		logger.Default,
 		step("1", testCommand),
 		step("2", "sleep 1000", "1"),
 		step("3", testCommandFail, "2"),
 	)
-	sc := &Scheduler{Config: &Config{MaxActiveRuns: 1, LogDir: testHomeDir}}
+	sc := New(&Config{MaxActiveRuns: 1, LogDir: testHomeDir})
 
 	go func() {
 		time.Sleep(time.Millisecond * 300)
@@ -214,7 +219,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(tmpDir)
 
-	g, sc := newTestSchedule(
+	g, sc := newTestScheduler(
 		t, &Config{MaxActiveRuns: 2, LogDir: tmpDir},
 		step("1", testCommand),
 		dag.Step{
@@ -318,7 +323,7 @@ func TestStepPreCondition(t *testing.T) {
 
 func TestSchedulerOnExit(t *testing.T) {
 	onExitStep := step("onExit", testCommand)
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{OnExit: &onExitStep, LogDir: testHomeDir},
 		step("1", testCommand),
 		step("2", testCommand, "1"),
@@ -340,7 +345,7 @@ func TestSchedulerOnExit(t *testing.T) {
 
 func TestSchedulerOnExitOnFail(t *testing.T) {
 	onExitStep := step("onExit", testCommand)
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{OnExit: &onExitStep, LogDir: testHomeDir},
 		step("1", testCommandFail),
 		step("2", testCommand, "1"),
@@ -359,12 +364,12 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
-	g, _ := NewExecutionGraph(dag.Step{
+	g, _ := NewExecutionGraph(logger.Default, dag.Step{
 		Name:    "1",
 		Command: "sleep",
 		Args:    []string{"10"},
 	})
-	sc := &Scheduler{Config: &Config{LogDir: testHomeDir}}
+	sc := New(&Config{LogDir: testHomeDir})
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 50)
@@ -387,7 +392,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 	onSuccessStep := step("onSuccess", testCommand)
 	onFailureStep := step("onFailure", testCommand)
 	onCancelStep := step("onCancel", testCommand)
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{
 			OnSuccess: &onSuccessStep,
 			OnFailure: &onFailureStep,
@@ -423,7 +428,7 @@ func TestSchedulerOnSuccess(t *testing.T) {
 	onExit := step("onExit", testCommand)
 	onSuccess := step("onSuccess", testCommand)
 	onFailure := step("onFailure", testCommand)
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{
 			OnExit:    &onExit,
 			OnSuccess: &onSuccess,
@@ -448,7 +453,7 @@ func TestSchedulerOnFailure(t *testing.T) {
 	onSuccess := step("onSuccess", testCommand)
 	onFailure := step("onFailure", testCommand)
 	onCancel := step("onCancel", testCommand)
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{
 			OnExit:    &onExit,
 			OnSuccess: &onSuccess,
@@ -472,6 +477,7 @@ func TestSchedulerOnFailure(t *testing.T) {
 
 func TestRepeat(t *testing.T) {
 	g, _ := NewExecutionGraph(
+		logger.Default,
 		dag.Step{
 			Name:    "1",
 			Command: "sleep",
@@ -482,7 +488,7 @@ func TestRepeat(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{LogDir: testHomeDir}}
+	sc := New(&Config{LogDir: testHomeDir})
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 3000)
@@ -503,6 +509,7 @@ func TestRepeat(t *testing.T) {
 
 func TestRepeatFail(t *testing.T) {
 	g, _ := NewExecutionGraph(
+		logger.Default,
 		dag.Step{
 			Name:    "1",
 			Command: testCommandFail,
@@ -512,7 +519,7 @@ func TestRepeatFail(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{LogDir: testHomeDir}}
+	sc := New(&Config{LogDir: testHomeDir})
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 
@@ -524,6 +531,7 @@ func TestRepeatFail(t *testing.T) {
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
 	g, _ := NewExecutionGraph(
+		logger.Default,
 		dag.Step{
 			Name:    "1",
 			Command: "sleep",
@@ -534,7 +542,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 			},
 		},
 	)
-	sc := &Scheduler{Config: &Config{LogDir: testHomeDir}}
+	sc := New(&Config{LogDir: testHomeDir})
 
 	done := make(chan bool)
 	go func() {
@@ -580,6 +588,7 @@ func TestSchedulerStatusText(t *testing.T) {
 
 func TestNodeSetupFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
+		logger.Default,
 		dag.Step{
 			Name:    "1",
 			Command: "sh",
@@ -587,7 +596,7 @@ func TestNodeSetupFailure(t *testing.T) {
 			Script:  "echo 1",
 		},
 	)
-	sc := &Scheduler{Config: &Config{LogDir: testHomeDir}}
+	sc := New(&Config{LogDir: testHomeDir})
 	err := sc.Schedule(context.Background(), g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), StatusError)
@@ -599,13 +608,14 @@ func TestNodeSetupFailure(t *testing.T) {
 
 func TestNodeTeardownFailure(t *testing.T) {
 	g, _ := NewExecutionGraph(
+		logger.Default,
 		dag.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
 		},
 	)
-	sc := &Scheduler{Config: &Config{LogDir: testHomeDir}}
+	sc := New(&Config{LogDir: testHomeDir})
 
 	nodes := g.Nodes()
 	go func() {
@@ -632,7 +642,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	s2.Script = "echo $PREV_OUT"
 	s2.Output = "TOOK_PREV_OUT"
 
-	g, sc := newTestSchedule(t, &Config{LogDir: testHomeDir}, s1, s2)
+	g, sc := newTestScheduler(t, &Config{LogDir: testHomeDir}, s1, s2)
 	err := sc.Schedule(context.Background(), g, nil)
 	require.NoError(t, err)
 
@@ -657,7 +667,7 @@ func testSchedule(t *testing.T, steps ...dag.Step) (
 	*ExecutionGraph, *Scheduler, error,
 ) {
 	t.Helper()
-	g, sc := newTestSchedule(t,
+	g, sc := newTestScheduler(t,
 		&Config{
 			MaxActiveRuns: 2,
 			LogDir:        testHomeDir,
@@ -665,11 +675,11 @@ func testSchedule(t *testing.T, steps ...dag.Step) (
 	return g, sc, sc.Schedule(context.Background(), g, nil)
 }
 
-func newTestSchedule(t *testing.T, cfg *Config, steps ...dag.Step) (
+func newTestScheduler(t *testing.T, cfg *Config, steps ...dag.Step) (
 	*ExecutionGraph, *Scheduler,
 ) {
 	t.Helper()
-	g, err := NewExecutionGraph(steps...)
+	g, err := NewExecutionGraph(logger.Default, steps...)
 	require.NoError(t, err)
-	return g, &Scheduler{Config: cfg}
+	return g, New(cfg)
 }

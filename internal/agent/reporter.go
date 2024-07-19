@@ -3,11 +3,11 @@ package agent
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -21,36 +21,45 @@ type Sender interface {
 
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
-type reporter struct{ Sender }
+type reporter struct {
+	sender Sender
+	logger logger.Logger
+}
 
-func newReporter(sender Sender) *reporter {
-	return &reporter{Sender: sender}
+func newReporter(sender Sender, lg logger.Logger) *reporter {
+	return &reporter{
+		sender: sender,
+		logger: lg,
+	}
 }
 
 // reportStep is a function that reports the status of a step.
-func (rp *reporter) reportStep(
-	dg *dag.DAG, status *model.Status, node *scheduler.Node,
+func (r *reporter) reportStep(
+	workflow *dag.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		log.Printf("%s %s", node.Data().Step.Name, status.StatusText)
+		r.logger.Info("Step execution finished",
+			"step", node.Data().Name,
+			"status", nodeStatus,
+		)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
-		return rp.Send(
-			dg.ErrorMail.From,
-			[]string{dg.ErrorMail.To},
+		return r.sender.Send(
+			workflow.ErrorMail.From,
+			[]string{workflow.ErrorMail.To},
 			fmt.Sprintf(
-				"%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status,
+				"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
 			),
 			renderHTML(status.Nodes),
-			addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
+			addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
 		)
 	}
 	return nil
 }
 
 // report is a function that reports the status of the scheduler.
-func (*reporter) report(status *model.Status, err error) {
+func (r *reporter) report(status *model.Status, err error) {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -58,35 +67,35 @@ func (*reporter) report(status *model.Status, err error) {
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Details ->\n"))
 	_, _ = buf.Write([]byte(renderTable(status.Nodes)))
-	log.Print(buf.String())
+	r.logger.Write(buf.String())
 }
 
 // send is a function that sends a report mail.
-func (rp *reporter) send(
-	dg *dag.DAG, status *model.Status, err error,
+func (r *reporter) send(
+	workflow *dag.DAG, status *model.Status, err error,
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if dg.MailOn != nil && dg.MailOn.Failure {
-			return rp.Send(
-				dg.ErrorMail.From,
-				[]string{dg.ErrorMail.To},
+		if workflow.MailOn != nil && workflow.MailOn.Failure {
+			return r.sender.Send(
+				workflow.ErrorMail.From,
+				[]string{workflow.ErrorMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", dg.ErrorMail.Prefix, dg.Name, status.Status,
+					"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(dg.ErrorMail.AttachLogs, status.Nodes),
+				addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if dg.MailOn != nil && dg.MailOn.Success {
-			_ = rp.Send(
-				dg.InfoMail.From,
-				[]string{dg.InfoMail.To},
+		if workflow.MailOn != nil && workflow.MailOn.Success {
+			_ = r.sender.Send(
+				workflow.InfoMail.From,
+				[]string{workflow.InfoMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", dg.InfoMail.Prefix, dg.Name, status.Status,
+					"%s %s (%s)", workflow.InfoMail.Prefix, workflow.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(dg.InfoMail.AttachLogs, status.Nodes),
+				addAttachmentList(workflow.InfoMail.AttachLogs, status.Nodes),
 			)
 		}
 	}
@@ -95,7 +104,7 @@ func (rp *reporter) send(
 
 func renderSummary(status *model.Status, err error) string {
 	t := table.NewWriter()
-	var errText = ""
+	var errText string
 	if err != nil {
 		errText = err.Error()
 	}
@@ -178,7 +187,7 @@ func renderHTML(nodes []*model.Node) string {
 		<tbody>
 	`)
 	addStatusFunc := func(status scheduler.NodeStatus) {
-		style := ""
+		var style string
 		if status == scheduler.NodeStatusError {
 			style = "color: #D01117;font-weight:bold;"
 		}

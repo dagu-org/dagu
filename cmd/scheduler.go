@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/fx"
 )
 
 func schedulerCmd() *cobra.Command {
@@ -19,21 +20,35 @@ func schedulerCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+			})
 
 			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
 				cfg.DAGs = dagsOpt
 			}
 
-			app := fx.New(
-				schedulerModule,
-				fx.Provide(func() *config.Config { return cfg }),
-				fx.Invoke(scheduler.LifetimeHooks),
-			)
+			logger.Info("Scheduler initialization",
+				"specsDirectory", cfg.DAGs,
+				"logLevel", cfg.LogLevel,
+				"logFormat", cfg.LogFormat)
 
-			if err := app.Start(cmd.Context()); err != nil {
-				log.Fatalf("Failed to start scheduler: %v", err)
+			ctx := cmd.Context()
+			dataStore := newDataStores(cfg)
+			cli := newClient(cfg, dataStore, logger)
+			sc := scheduler.New(cfg, logger, cli)
+			if err := sc.Start(ctx); err != nil {
+				logger.Error(
+					"Scheduler initialization failed",
+					"error",
+					err,
+					"specsDirectory",
+					cfg.DAGs,
+				)
+				os.Exit(1)
 			}
 		},
 	}

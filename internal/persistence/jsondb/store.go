@@ -65,8 +65,8 @@ func New(dir, dagsDir string, latestStatusToday bool) *Store {
 	return s
 }
 
-func (s *Store) Update(dagFile, reqID string, status *model.Status) error {
-	f, err := s.FindByRequestID(dagFile, reqID)
+func (s *Store) Update(dagFile, requestID string, status *model.Status) error {
+	f, err := s.FindByRequestID(dagFile, requestID)
 	if err != nil {
 		return err
 	}
@@ -81,8 +81,8 @@ func (s *Store) Update(dagFile, reqID string, status *model.Status) error {
 	return w.write(status)
 }
 
-func (s *Store) Open(dagFile string, t time.Time, reqID string) error {
-	writer, _, err := s.newWriter(dagFile, t, reqID)
+func (s *Store) Open(dagFile string, t time.Time, requestID string) error {
+	writer, _, err := s.newWriter(dagFile, t, requestID)
 	if err != nil {
 		return err
 	}
@@ -116,9 +116,9 @@ func (s *Store) Close() error {
 
 // NewWriter creates a new writer for a status.
 func (s *Store) newWriter(
-	dagFile string, t time.Time, reqID string,
+	dagFile string, t time.Time, requestID string,
 ) (*writer, string, error) {
-	f, err := s.newFile(dagFile, t, reqID)
+	f, err := s.newFile(dagFile, t, requestID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -164,9 +164,9 @@ func (s *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 
 // FindByRequestID finds a status file by request ID
 func (s *Store) FindByRequestID(
-	dagFile string, reqID string,
+	dagFile string, requestID string,
 ) (*model.StatusFile, error) {
-	if reqID == "" {
+	if requestID == "" {
 		return nil, errRequestIDNotFound
 	}
 	matches, err := filepath.Glob(s.globPattern(dagFile))
@@ -180,7 +180,7 @@ func (s *Store) FindByRequestID(
 				log.Printf("parsing failed %s : %s", f, err)
 				continue
 			}
-			if status != nil && status.RequestID == reqID {
+			if status != nil && status.RequestID == requestID {
 				return &model.StatusFile{
 					File:   f,
 					Status: status,
@@ -188,7 +188,7 @@ func (s *Store) FindByRequestID(
 			}
 		}
 	}
-	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, reqID)
+	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
 }
 
 // RemoveAll removes all files in a directory.
@@ -290,10 +290,10 @@ func (s *Store) getDirectory(name string, prefix string) string {
 	return filepath.Join(s.dir, fmt.Sprintf("%s-%s", prefix, v))
 }
 
-const reqIDLenSafe = 8
+const requestIDLenSafe = 8
 
 func (s *Store) newFile(
-	dagFile string, t time.Time, reqID string,
+	dagFile string, t time.Time, requestID string,
 ) (string, error) {
 	if dagFile == "" {
 		return "", errDAGFileEmpty
@@ -302,7 +302,7 @@ func (s *Store) newFile(
 		"%s.%s.%s.dat",
 		s.prefixWithDirectory(dagFile),
 		t.Format("20060102.15:04:05.000"),
-		util.TruncString(reqID, reqIDLenSafe),
+		util.TruncString(requestID, requestIDLenSafe),
 	), nil
 }
 
@@ -312,8 +312,10 @@ func (store *Store) latestToday(
 	day time.Time,
 	latestStatusToday bool,
 ) (string, error) {
-	var ret []string
-	pattern := ""
+	var (
+		ret     []string
+		pattern string
+	)
 	if latestStatusToday {
 		pattern = fmt.Sprintf(
 			"%s.%s*.*.dat", store.prefixWithDirectory(dagFile), day.Format("20060102"),

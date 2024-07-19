@@ -6,10 +6,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
+	dsclient "github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,7 @@ import (
 
 type Setup struct {
 	Config *config.Config
+	Logger logger.Logger
 
 	homeDir string
 }
@@ -26,21 +28,20 @@ func (t Setup) Cleanup() {
 }
 
 func (t Setup) DataStore() persistence.DataStores {
-	return client.NewDataStores(&client.NewDataStoresArgs{
-		DAGs:              t.Config.DAGs,
-		DataDir:           t.Config.DataDir,
-		SuspendFlagsDir:   t.Config.SuspendFlagsDir,
-		LatestStatusToday: t.Config.LatestStatusToday,
-	})
+	return dsclient.NewDataStores(
+		t.Config.DAGs,
+		t.Config.DataDir,
+		t.Config.SuspendFlagsDir,
+		dsclient.DataStoreOptions{
+			LatestStatusToday: t.Config.LatestStatusToday,
+		},
+	)
 }
 
-func (t Setup) Engine() engine.Engine {
-	return engine.New(&engine.NewEngineArgs{
-		DataStore:  t.DataStore(),
-		Executable: t.Config.Executable,
-		WorkDir:    t.Config.WorkDir,
-	})
-
+func (t Setup) Client() client.Client {
+	return client.New(
+		t.DataStore(), t.Config.Executable, t.Config.WorkDir, logger.Default,
+	)
 }
 
 var (
@@ -80,7 +81,9 @@ func SetupTest(t *testing.T) Setup {
 	_ = os.Setenv("DAGU_ADMIN_LOG_DIR", cfg.AdminLogsDir)
 
 	return Setup{
-		Config:  cfg,
+		Config: cfg,
+		Logger: NewLogger(),
+
 		homeDir: tmpDir,
 	}
 }
@@ -101,7 +104,16 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	require.NoError(t, err)
 
 	return Setup{
-		Config:  cfg,
+		Config: cfg,
+		Logger: NewLogger(),
+
 		homeDir: tmpDir,
 	}
+}
+
+func NewLogger() logger.Logger {
+	return logger.NewLogger(logger.NewLoggerArgs{
+		LogLevel:  "debug",
+		LogFormat: "text",
+	})
 }

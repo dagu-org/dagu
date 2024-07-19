@@ -2,42 +2,51 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
 func statusCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status <DAG file>",
+		Use:   "status /path/to/spec.yaml",
 		Short: "Display current status of the DAG",
-		Long:  `dagu status <DAG file>`,
+		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(_ *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
+			logger := logger.NewLogger(logger.NewLoggerArgs{
+				LogLevel:  cfg.LogLevel,
+				LogFormat: cfg.LogFormat,
+			})
 
 			// Load the DAG file and get the current running status.
-			loadedDAG, err := dag.Load(cfg.BaseConfig, args[0], "")
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load DAG: %v", err)
+				logger.Error("Workflow load failed", "error", err, "file", args[0])
+				os.Exit(1)
 			}
 
-			eng := newEngine(cfg)
+			dataStore := newDataStores(cfg)
+			cli := newClient(cfg, dataStore, logger)
 
-			curStatus, err := eng.GetCurrentStatus(loadedDAG)
+			curStatus, err := cli.GetCurrentStatus(workflow)
 
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to get the current status: %v", err)
+				logger.Error("Current status retrieval failed", "error", err)
+				os.Exit(1)
 			}
 
-			log.Printf("Pid=%d Status=%s", curStatus.Pid, curStatus.Status)
+			logger.Info("Current status", "pid", curStatus.PID, "status", curStatus.Status)
 		},
 	}
 }

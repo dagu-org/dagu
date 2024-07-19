@@ -37,6 +37,8 @@ type Config struct {
 	AuthToken          string   // Auth token for API
 	LatestStatusToday  bool     // Show latest status today or the latest status
 	APIBaseURL         string   // Base URL for API
+	LogLevel           string   // Log level
+	LogFormat          string   // Log format
 }
 
 type TLS struct {
@@ -109,6 +111,10 @@ func setupViper() error {
 
 	// Base config file
 	viper.SetDefault("baseConfig", getBaseConfigPath(baseDirs))
+
+	// Logging configurations
+	viper.SetDefault("logLevel", "info")
+	viper.SetDefault("logFormat", "text")
 
 	// Other defaults
 	viper.SetDefault("host", "127.0.0.1")

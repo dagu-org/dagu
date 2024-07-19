@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"io"
-	"log"
 	"net/http"
 	"path/filepath"
 	"text/template"
@@ -30,7 +29,7 @@ func (srv *Server) useTemplate(
 	return func(w http.ResponseWriter, data any) {
 		var buf bytes.Buffer
 		if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
-			log.Printf("ERR: %v\n", err)
+			srv.logger.Error("Template execution failed", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

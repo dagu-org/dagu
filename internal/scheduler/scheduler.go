@@ -2,19 +2,20 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/client"
+	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/util"
 )
 
 type Scheduler struct {
@@ -23,6 +24,23 @@ type Scheduler struct {
 	stop        chan struct{}
 	running     atomic.Bool
 	logger      logger.Logger
+}
+
+func New(cfg *config.Config, lg logger.Logger, cli client.Client) *Scheduler {
+	return newScheduler(newSchedulerArgs{
+		EntryReader: newEntryReader(newEntryReaderArgs{
+			Client:  cli,
+			DagsDir: cfg.DAGs,
+			JobCreator: &jobCreatorImpl{
+				WorkDir:    cfg.WorkDir,
+				Client:     cli,
+				Executable: cfg.Executable,
+			},
+			Logger: lg,
+		}),
+		Logger: lg,
+		LogDir: cfg.LogDir,
+	})
 }
 
 type entryReader interface {
@@ -56,13 +74,13 @@ const (
 func (e entryType) String() string {
 	switch e {
 	case entryTypeStart:
-		return "start"
+		return "Start"
 	case entryTypeStop:
-		return "stop"
+		return "Stop"
 	case entryTypeRestart:
-		return "restart"
+		return "Restart"
 	default:
-		return "unknown"
+		return "Unknown"
 	}
 }
 
@@ -71,10 +89,11 @@ func (e *entry) Invoke() error {
 		return nil
 	}
 
-	logMsg := fmt.Sprintf("%s job", e.EntryType)
-	e.Logger.Info(logMsg,
-		"job", e.Job.String(),
-		"time", e.Next.Format(time.RFC3339),
+	e.Logger.Info(
+		"Workflow operation started",
+		"operation", e.EntryType.String(),
+		"workflow", e.Job.String(),
+		"next", e.Next.Format(time.RFC3339),
 	)
 
 	switch e.EntryType {
@@ -105,10 +124,6 @@ func newScheduler(args newSchedulerArgs) *Scheduler {
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
-	if err := s.setupLogFile(); err != nil {
-		return fmt.Errorf("setup log file: %w", err)
-	}
-
 	sig := make(chan os.Signal, 1)
 	done := make(chan any)
 	defer close(done)
@@ -130,19 +145,8 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.logger.Info("starting scheduler")
 	s.start()
 
-	return nil
-}
-
-func (s *Scheduler) setupLogFile() error {
-	filename := filepath.Join(s.logDir, "scheduler.log")
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("create log directory: %w", err)
-	}
-	s.logger.Info("Setup log", "filename", filename)
 	return nil
 }
 
@@ -170,7 +174,10 @@ func (s *Scheduler) start() {
 
 func (s *Scheduler) run(now time.Time) {
 	entries, err := s.entryReader.Read(now.Add(-time.Second))
-	util.LogErr("failed to read entries", err)
+	if err != nil {
+		s.logger.Error("Scheduler failed to read workflow entries", "error", err)
+		return
+	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].Next.Before(entries[j].Next)
 	})
@@ -180,14 +187,19 @@ func (s *Scheduler) run(now time.Time) {
 			break
 		}
 		go func(e *entry) {
-			err := e.Invoke()
-			if err != nil {
-				s.logger.Error(
-					"failed to invoke entryreader", "entryreader",
-					e.Job,
-					"error",
-					err,
-				)
+			if err := e.Invoke(); err != nil {
+				if errors.Is(err, errJobFinished) {
+					s.logger.Info("Workflow is already finished", "workflow", e.Job)
+				} else if errors.Is(err, errJobRunning) {
+					s.logger.Info("Workflow is already running", "workflow", e.Job)
+				} else {
+					s.logger.Error(
+						"Workflow execution failed",
+						"workflow", e.Job,
+						"operation", e.EntryType.String(),
+						"error", err,
+					)
+				}
 			}
 		}(e)
 	}

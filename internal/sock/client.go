@@ -17,47 +17,53 @@ var (
 // Client is a unix socket client that can send requests
 // to the frontend over HTTP.
 type Client struct {
-	Addr string
+	addr string
 }
 
-var timeout = time.Millisecond * 3000
+func NewClient(addr string) *Client {
+	return &Client{addr: addr}
+}
+
+const (
+	defaultTimeout = time.Millisecond * 3000
+)
 
 // Request sends a request to the frontend and returns the response.
 func (cl *Client) Request(method, url string) (string, error) {
-	conn, err := net.DialTimeout("unix", cl.Addr, timeout)
+	conn, err := net.DialTimeout("unix", cl.addr, defaultTimeout)
 	if err != nil {
-		return "", procError("dial to socket", err)
+		return "", fmt.Errorf("dial failed: %w", err)
 	}
 
 	defer func() {
 		_ = conn.Close()
 	}()
 
-	_ = conn.SetDeadline((time.Now().Add(timeout)))
+	if err := conn.SetDeadline((time.Now().Add(defaultTimeout))); err != nil {
+		return "", fmt.Errorf("set deadline failed: %w", err)
+	}
 
 	request, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		return "", procError("new request", err)
+		return "", fmt.Errorf("create request failed: %w", err)
 	}
 
-	_ = request.Write(conn)
+	if err := request.Write(conn); err != nil {
+		return "", fmt.Errorf("write request failed: %w", err)
+	}
 
 	response, err := http.ReadResponse(bufio.NewReader(conn), request)
 	if err != nil {
-		return "", procError("read response", err)
+		if err, ok := err.(net.Error); ok && err.Timeout() {
+			return "", fmt.Errorf("request timeout: %w", ErrTimeout)
+		}
+		return "", fmt.Errorf("read response failed: %w", err)
 	}
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", procError("read response body", err)
+		return "", fmt.Errorf("read body failed: %w", err)
 	}
 
 	return string(body), nil
-}
-
-func procError(action string, err error) error {
-	if err, ok := err.(net.Error); ok && err.Timeout() {
-		return fmt.Errorf("%s timeout %w: %s", action, ErrTimeout, err.Error())
-	}
-	return fmt.Errorf("%s failed: %w", action, err)
 }

@@ -42,7 +42,7 @@ type Status struct {
 	Name       string           `json:"Name"`
 	Status     scheduler.Status `json:"Status"`
 	StatusText string           `json:"StatusText"`
-	Pid        Pid              `json:"Pid"`
+	PID        PID              `json:"Pid"`
 	Nodes      []*Node          `json:"Nodes"`
 	OnExit     *Node            `json:"OnExit"`
 	OnSuccess  *Node            `json:"OnSuccess"`
@@ -55,30 +55,30 @@ type Status struct {
 	mu         sync.RWMutex
 }
 
-func NewStatusDefault(dg *dag.DAG) *Status {
+func NewStatusDefault(workflow *dag.DAG) *Status {
 	return NewStatus(
-		dg, nil, scheduler.StatusNone, int(PidNotRunning), nil, nil,
+		workflow, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
 	)
 }
 
 func NewStatus(
-	dg *dag.DAG,
+	workflow *dag.DAG,
 	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
 	statusObj := &Status{
-		Name:       dg.Name,
+		Name:       workflow.Name,
 		Status:     status,
 		StatusText: status.String(),
-		Pid:        Pid(pid),
-		Nodes:      FromNodesOrSteps(nodes, dg.Steps),
-		OnExit:     nodeOrNil(dg.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(dg.HandlerOn.Success),
-		OnFailure:  nodeOrNil(dg.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(dg.HandlerOn.Cancel),
-		Params:     Params(dg.Params),
+		PID:        PID(pid),
+		Nodes:      FromNodesOrSteps(nodes, workflow.Steps),
+		OnExit:     nodeOrNil(workflow.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(workflow.HandlerOn.Success),
+		OnFailure:  nodeOrNil(workflow.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(workflow.HandlerOn.Cancel),
+		Params:     Params(workflow.Params),
 	}
 	if startTime != nil {
 		statusObj.StartedAt = util.FormatTime(*startTime)
@@ -121,19 +121,19 @@ func Params(params []string) string {
 	return strings.Join(params, " ")
 }
 
-type Pid int
+type PID int
 
-const PidNotRunning Pid = -1
+const pidNotRunning PID = -1
 
-func (p Pid) String() string {
-	if p == PidNotRunning {
+func (p PID) String() string {
+	if p == pidNotRunning {
 		return ""
 	}
 	return fmt.Sprintf("%d", p)
 }
 
-func (p Pid) IsRunning() bool {
-	return p != PidNotRunning
+func (p PID) IsRunning() bool {
+	return p != pidNotRunning
 }
 
 func nodeOrNil(s *dag.Step) *Node {

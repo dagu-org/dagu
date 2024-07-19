@@ -3,12 +3,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/dagu-dev/dagu/internal/logger"
 )
 
 type Status int
@@ -40,7 +40,16 @@ func (s Status) String() string {
 
 // Scheduler is a scheduler that runs a graph of steps.
 type Scheduler struct {
-	*Config
+	logDir        string
+	logger        logger.Logger
+	maxActiveRuns int
+	delay         time.Duration
+	dry           bool
+	onExit        *dag.Step
+	onSuccess     *dag.Step
+	onFailure     *dag.Step
+	onCancel      *dag.Step
+	requestID     string
 
 	canceled  int32
 	mu        sync.RWMutex
@@ -50,11 +59,27 @@ type Scheduler struct {
 }
 
 func New(cfg *Config) *Scheduler {
-	return &Scheduler{Config: cfg}
+	lg := cfg.Logger
+	if lg == nil {
+		lg = logger.Default
+	}
+	return &Scheduler{
+		logDir:        cfg.LogDir,
+		logger:        lg,
+		maxActiveRuns: cfg.MaxActiveRuns,
+		delay:         cfg.Delay,
+		dry:           cfg.Dry,
+		onExit:        cfg.OnExit,
+		onSuccess:     cfg.OnSuccess,
+		onFailure:     cfg.OnFailure,
+		onCancel:      cfg.OnCancel,
+		requestID:     cfg.ReqID,
+	}
 }
 
 type Config struct {
 	LogDir        string
+	Logger        logger.Logger
 	MaxActiveRuns int
 	Delay         time.Duration
 	Dry           bool
@@ -88,14 +113,14 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			if sc.isCanceled() {
 				break NodesIteration
 			}
-			if sc.MaxActiveRuns > 0 && sc.runningCount(g) >= sc.MaxActiveRuns {
+			if sc.maxActiveRuns > 0 && sc.runningCount(g) >= sc.maxActiveRuns {
 				continue NodesIteration
 			}
 			// Check preconditions
 			if len(node.data.Step.Preconditions) > 0 {
-				log.Printf("checking pre conditions for \"%s\"", node.data.Step.Name)
+				sc.logger.Infof("Checking pre conditions for \"%s\"", node.data.Step.Name)
 				if err := dag.EvalConditions(node.data.Step.Preconditions); err != nil {
-					log.Printf("%s", err.Error())
+					sc.logger.Infof("Pre conditions failed for \"%s\"", node.data.Step.Name)
 					node.setStatus(NodeStatusSkipped)
 					node.SetError(err)
 					continue NodesIteration
@@ -103,7 +128,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			}
 			wg.Add(1)
 
-			log.Printf("start running: %s", node.data.Step.Name)
+			sc.logger.Info("Step execution started", "step", node.data.Step.Name)
 			node.setStatus(NodeStatusRunning)
 			go func(node *Node) {
 				defer func() {
@@ -133,9 +158,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 							sc.setLastError(execErr)
 						case node.data.Step.RetryPolicy != nil && node.data.Step.RetryPolicy.Limit > node.getRetryCount():
 							// retry
-							log.Printf("%s failed but scheduled for retry", node.data.Step.Name)
 							node.incRetryCount()
-							log.Printf("sleep %s for retry", node.data.Step.RetryPolicy.Interval)
+							sc.logger.Info(
+								"Step execution failed. Retrying...",
+								"step", node.data.Step.Name,
+								"error", execErr,
+								"retry", node.getRetryCount(),
+							)
 							time.Sleep(node.data.Step.RetryPolicy.Interval)
 							node.setRetriedAt(time.Now())
 							node.setStatus(NodeStatusNone)
@@ -175,7 +204,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 					done <- node
 				}
 			}(node)
-			time.Sleep(sc.Delay)
+			time.Sleep(sc.delay)
 		}
 		time.Sleep(sc.pause)
 	}
@@ -193,8 +222,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	handlers = append(handlers, dag.HandlerOnExit)
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
-			log.Printf("%s started", n.data.Step.Name)
+			sc.logger.Info("Handler execution started", "handler", n.data.Step.Name)
+
+			n.mu.Lock()
 			n.data.Step.OutputVariables = g.outputVariables
+			n.mu.Unlock()
+
 			if err := sc.runHandlerNode(ctx, n); err != nil {
 				sc.setLastError(err)
 			}
@@ -213,21 +246,21 @@ func (sc *Scheduler) setLastError(err error) {
 }
 
 func (sc *Scheduler) setupNode(node *Node) error {
-	if !sc.Dry {
-		return node.setup(sc.LogDir, sc.ReqID)
+	if !sc.dry {
+		return node.setup(sc.logDir, sc.requestID)
 	}
 	return nil
 }
 
 func (sc *Scheduler) teardownNode(node *Node) error {
-	if !sc.Dry {
+	if !sc.dry {
 		return node.teardown()
 	}
 	return nil
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, n *Node) error {
-	if !sc.Dry {
+	if !sc.dry {
 		return n.Execute(ctx)
 	}
 	return nil
@@ -344,8 +377,8 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 
 	node.setStatus(NodeStatusRunning)
 
-	if !sc.Dry {
-		err := node.setup(sc.LogDir, sc.ReqID)
+	if !sc.dry {
+		err := node.setup(sc.logDir, sc.requestID)
 		if err != nil {
 			node.setStatus(NodeStatusError)
 			return nil
@@ -368,27 +401,27 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 
 func (sc *Scheduler) setup() (err error) {
 	sc.pause = time.Millisecond * 100
-	if !sc.Dry {
-		if err = os.MkdirAll(sc.LogDir, 0755); err != nil {
+	if !sc.dry {
+		if err = os.MkdirAll(sc.logDir, 0755); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)
 			return err
 		}
 	}
 	sc.handlers = map[dag.HandlerType]*Node{}
-	if sc.OnExit != nil {
-		sc.handlers[dag.HandlerOnExit] = &Node{data: NodeData{Step: *sc.OnExit}}
+	if sc.onExit != nil {
+		sc.handlers[dag.HandlerOnExit] = &Node{data: NodeData{Step: *sc.onExit}}
 	}
-	if sc.OnSuccess != nil {
+	if sc.onSuccess != nil {
 		sc.handlers[dag.HandlerOnSuccess] =
-			&Node{data: NodeData{Step: *sc.OnSuccess}}
+			&Node{data: NodeData{Step: *sc.onSuccess}}
 	}
-	if sc.OnFailure != nil {
+	if sc.onFailure != nil {
 		sc.handlers[dag.HandlerOnFailure] =
-			&Node{data: NodeData{Step: *sc.OnFailure}}
+			&Node{data: NodeData{Step: *sc.onFailure}}
 	}
-	if sc.OnCancel != nil {
+	if sc.onCancel != nil {
 		sc.handlers[dag.HandlerOnCancel] =
-			&Node{data: NodeData{Step: *sc.OnCancel}}
+			&Node{data: NodeData{Step: *sc.onCancel}}
 	}
 	return err
 }
