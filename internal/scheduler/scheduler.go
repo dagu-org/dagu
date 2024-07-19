@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 )
 
@@ -26,14 +26,14 @@ type Scheduler struct {
 	logger      logger.Logger
 }
 
-func New(cfg *config.Config, lg logger.Logger, eng engine.Engine) *Scheduler {
+func New(cfg *config.Config, lg logger.Logger, cli client.Client) *Scheduler {
 	return newScheduler(newSchedulerArgs{
 		EntryReader: newEntryReader(newEntryReaderArgs{
-			Engine:  eng,
+			Client:  cli,
 			DagsDir: cfg.DAGs,
 			JobCreator: &jobCreatorImpl{
 				WorkDir:    cfg.WorkDir,
-				Engine:     eng,
+				Client:     cli,
 				Executable: cfg.Executable,
 			},
 			Logger: lg,

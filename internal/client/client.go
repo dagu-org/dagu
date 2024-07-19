@@ -1,4 +1,4 @@
-package engine
+package client
 
 import (
 	"errors"
@@ -17,15 +17,15 @@ import (
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
-// New creates a new Engine instance.
-// The Engine is used to interact with the DAG execution engine.
+// New creates a new Client instance.
+// The Client is used to interact with the DAG.
 func New(
 	dataStore persistence.DataStores,
 	executable string,
 	workDir string,
 	lg logger.Logger,
-) Engine {
-	return &engineImpl{
+) Client {
+	return &client{
 		dataStore:  dataStore,
 		executable: executable,
 		workDir:    workDir,
@@ -33,7 +33,7 @@ func New(
 	}
 }
 
-type engineImpl struct {
+type client struct {
 	dataStore  persistence.DataStores
 	executable string
 	workDir    string
@@ -53,12 +53,12 @@ var (
 	errDAGIsRunning  = errors.New("the DAG is running")
 )
 
-func (e *engineImpl) GetDAGSpec(id string) (string, error) {
+func (e *client) GetDAGSpec(id string) (string, error) {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.GetSpec(id)
 }
 
-func (e *engineImpl) CreateDAG(name string) (string, error) {
+func (e *client) CreateDAG(name string) (string, error) {
 	dagStore := e.dataStore.DAGStore()
 	id, err := dagStore.Create(name, dagTemplate)
 	if err != nil {
@@ -67,14 +67,14 @@ func (e *engineImpl) CreateDAG(name string) (string, error) {
 	return id, nil
 }
 
-func (e *engineImpl) Grep(pattern string) (
+func (e *client) Grep(pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.Grep(pattern)
 }
 
-func (e *engineImpl) Rename(oldID, newID string) error {
+func (e *client) Rename(oldID, newID string) error {
 	dagStore := e.dataStore.DAGStore()
 	if err := dagStore.Rename(oldID, newID); err != nil {
 		return err
@@ -83,21 +83,21 @@ func (e *engineImpl) Rename(oldID, newID string) error {
 	return historyStore.Rename(oldID, newID)
 }
 
-func (e *engineImpl) Stop(workflow *dag.DAG) error {
+func (e *client) Stop(workflow *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
 	client := sock.NewClient(workflow.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *engineImpl) StartAsync(workflow *dag.DAG, opts StartOptions) {
+func (e *client) StartAsync(workflow *dag.DAG, opts StartOptions) {
 	go func() {
 		err := e.Start(workflow, opts)
 		util.LogErr("starting a DAG", err)
 	}()
 }
 
-func (e *engineImpl) Start(workflow *dag.DAG, opts StartOptions) error {
+func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -122,7 +122,7 @@ func (e *engineImpl) Start(workflow *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Restart(workflow *dag.DAG, opts RestartOptions) error {
+func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -140,7 +140,7 @@ func (e *engineImpl) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *engineImpl) Retry(workflow *dag.DAG, reqID string) error {
+func (e *client) Retry(workflow *dag.DAG, reqID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", reqID))
 	args = append(args, workflow.Location)
@@ -156,7 +156,7 @@ func (e *engineImpl) Retry(workflow *dag.DAG, reqID string) error {
 	return cmd.Wait()
 }
 
-func (*engineImpl) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
+func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
 	client := sock.NewClient(workflow.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -168,7 +168,7 @@ func (*engineImpl) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *engineImpl) GetStatusByRequestID(workflow *dag.DAG, reqID string) (
+func (e *client) GetStatusByRequestID(workflow *dag.DAG, reqID string) (
 	*model.Status, error,
 ) {
 	ret, err := e.dataStore.HistoryStore().FindByRequestID(
@@ -185,7 +185,7 @@ func (e *engineImpl) GetStatusByRequestID(workflow *dag.DAG, reqID string) (
 	return ret.Status, err
 }
 
-func (*engineImpl) currentStatus(workflow *dag.DAG) (*model.Status, error) {
+func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
 	client := sock.NewClient(workflow.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -194,7 +194,7 @@ func (*engineImpl) currentStatus(workflow *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *engineImpl) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
+func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 	currStatus, _ := e.currentStatus(workflow)
 	if currStatus != nil {
 		return currStatus, nil
@@ -211,11 +211,11 @@ func (e *engineImpl) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 	return status, nil
 }
 
-func (e *engineImpl) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
+func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
 	return e.dataStore.HistoryStore().ReadStatusRecent(workflow.Location, n)
 }
 
-func (e *engineImpl) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
+func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
 	client := sock.NewClient(workflow.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
@@ -234,12 +234,12 @@ func (e *engineImpl) UpdateStatus(workflow *dag.DAG, status *model.Status) error
 	)
 }
 
-func (e *engineImpl) UpdateDAG(id string, spec string) error {
+func (e *client) UpdateDAG(id string, spec string) error {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.UpdateSpec(id, []byte(spec))
 }
 
-func (e *engineImpl) DeleteDAG(name, loc string) error {
+func (e *client) DeleteDAG(name, loc string) error {
 	err := e.dataStore.HistoryStore().RemoveAll(loc)
 	if err != nil {
 		return err
@@ -248,7 +248,7 @@ func (e *engineImpl) DeleteDAG(name, loc string) error {
 	return dagStore.Delete(name)
 }
 
-func (e *engineImpl) GetAllStatus() (
+func (e *client) GetAllStatus() (
 	statuses []*DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
@@ -266,13 +266,13 @@ func (e *engineImpl) GetAllStatus() (
 	return ret, errs, err
 }
 
-func (e *engineImpl) getDAG(name string) (*dag.DAG, error) {
+func (e *client) getDAG(name string) (*dag.DAG, error) {
 	dagStore := e.dataStore.DAGStore()
 	dagDetail, err := dagStore.GetDetails(name)
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *engineImpl) GetStatus(id string) (*DAGStatus, error) {
+func (e *client) GetStatus(id string) (*DAGStatus, error) {
 	dg, err := e.getDAG(id)
 	if dg == nil {
 		// TODO: fix not to use location
@@ -288,26 +288,26 @@ func (e *engineImpl) GetStatus(id string) (*DAGStatus, error) {
 	), err
 }
 
-func (e *engineImpl) ToggleSuspend(id string, suspend bool) error {
+func (e *client) ToggleSuspend(id string, suspend bool) error {
 	flagStore := e.dataStore.FlagStore()
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *engineImpl) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
+func (e *client) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
 	latestStatus, err := e.GetLatestStatus(workflow)
 	return newDAGStatus(
 		workflow, latestStatus, e.IsSuspended(workflow.Name), err,
 	), err
 }
 
-func (*engineImpl) emptyDAGIfNil(workflow *dag.DAG, dagLocation string) *dag.DAG {
+func (*client) emptyDAGIfNil(workflow *dag.DAG, dagLocation string) *dag.DAG {
 	if workflow != nil {
 		return workflow
 	}
 	return &dag.DAG{Location: dagLocation}
 }
 
-func (e *engineImpl) IsSuspended(id string) bool {
+func (e *client) IsSuspended(id string) bool {
 	flagStore := e.dataStore.FlagStore()
 	return flagStore.IsSuspended(id)
 }

@@ -1,19 +1,19 @@
 package frontend
 
 import (
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/frontend/dag"
 	"github.com/dagu-dev/dagu/internal/frontend/server"
 	"github.com/dagu-dev/dagu/internal/logger"
 )
 
-func New(cfg *config.Config, lg logger.Logger, eng engine.Engine) *server.Server {
+func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server {
 	var hs []server.Handler
 
 	hs = append(hs, dag.NewHandler(
 		&dag.NewHandlerArgs{
-			Engine:             eng,
+			Client:             cli,
 			LogEncodingCharset: cfg.LogEncodingCharset,
 		},
 	))

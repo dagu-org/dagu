@@ -32,10 +32,10 @@ func TestRestartCommand(t *testing.T) {
 		}()
 
 		time.Sleep(waitForStatusUpdate)
-		eng := setup.Engine()
+		cli := setup.Client()
 
 		// Wait for the DAG running.
-		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
+		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
 
 		// Restart the DAG.
 		done := make(chan struct{})
@@ -47,7 +47,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG running again.
-		testStatusEventual(t, eng, dagFile, scheduler.StatusRunning)
+		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
 		testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
@@ -55,14 +55,14 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG is stopped.
-		testStatusEventual(t, eng, dagFile, scheduler.StatusNone)
+		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
 		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
 		dataStore := newDataStores(setup.Config)
-		recentHistory := newEngine(
+		recentHistory := newClient(
 			setup.Config,
 			dataStore,
 			logger.Default,

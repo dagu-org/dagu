@@ -6,11 +6,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
+	dsclient "github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -28,18 +28,18 @@ func (t Setup) Cleanup() {
 }
 
 func (t Setup) DataStore() persistence.DataStores {
-	return client.NewDataStores(
+	return dsclient.NewDataStores(
 		t.Config.DAGs,
 		t.Config.DataDir,
 		t.Config.SuspendFlagsDir,
-		client.DataStoreOptions{
+		dsclient.DataStoreOptions{
 			LatestStatusToday: t.Config.LatestStatusToday,
 		},
 	)
 }
 
-func (t Setup) Engine() engine.Engine {
-	return engine.New(
+func (t Setup) Client() client.Client {
+	return client.New(
 		t.DataStore(), t.Config.Executable, t.Config.WorkDir, logger.Default,
 	)
 }

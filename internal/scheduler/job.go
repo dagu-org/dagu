@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/dag"
 	dagscheduler "github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/util"
 )
 
@@ -21,7 +21,7 @@ var _ jobCreator = (*jobCreatorImpl)(nil)
 type jobCreatorImpl struct {
 	Executable string
 	WorkDir    string
-	Engine     engine.Engine
+	Client     client.Client
 }
 
 func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time) job {
@@ -30,7 +30,7 @@ func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time) job {
 		Executable: jf.Executable,
 		WorkDir:    jf.WorkDir,
 		Next:       next,
-		Engine:     jf.Engine,
+		Client:     jf.Client,
 	}
 }
 
@@ -41,7 +41,7 @@ type jobImpl struct {
 	Executable string
 	WorkDir    string
 	Next       time.Time
-	Engine     engine.Engine
+	Client     client.Client
 }
 
 func (j *jobImpl) GetDAG() *dag.DAG {
@@ -49,7 +49,7 @@ func (j *jobImpl) GetDAG() *dag.DAG {
 }
 
 func (j *jobImpl) Start() error {
-	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
+	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
@@ -67,24 +67,24 @@ func (j *jobImpl) Start() error {
 			return errJobFinished
 		}
 	}
-	return j.Engine.Start(j.DAG, engine.StartOptions{
+	return j.Client.Start(j.DAG, client.StartOptions{
 		Quiet: true,
 	})
 }
 
 func (j *jobImpl) Stop() error {
-	latestStatus, err := j.Engine.GetLatestStatus(j.DAG)
+	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
 	if err != nil {
 		return err
 	}
 	if latestStatus.Status != dagscheduler.StatusRunning {
 		return errJobIsNotRunning
 	}
-	return j.Engine.Stop(j.DAG)
+	return j.Client.Stop(j.DAG)
 }
 
 func (j *jobImpl) Restart() error {
-	return j.Engine.Restart(j.DAG, engine.RestartOptions{
+	return j.Client.Restart(j.DAG, client.RestartOptions{
 		Quiet: true,
 	})
 }

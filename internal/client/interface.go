@@ -1,4 +1,4 @@
-package engine
+package client
 
 import (
 	"path/filepath"
@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 )
 
-type Engine interface {
+type Client interface {
 	CreateDAG(id string) (string, error)
 	GetDAGSpec(id string) (string, error)
 	Grep(pattern string) ([]*persistence.GrepResult, []string, error)

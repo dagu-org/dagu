@@ -61,7 +61,7 @@ func dryCmd() *cobra.Command {
 			})
 
 			dataStore := newDataStores(cfg)
-			eng := newEngine(cfg, dataStore, agentLogger)
+			cli := newClient(cfg, dataStore, agentLogger)
 
 			ag := agent.New(
 				requestID,
@@ -69,7 +69,7 @@ func dryCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
-				eng,
+				cli,
 				dataStore,
 				&agent.Options{Dry: true})
 

@@ -69,7 +69,7 @@ func startCmd() *cobra.Command {
 			})
 
 			dataStore := newDataStores(cfg)
-			eng := newEngine(cfg, dataStore, agentLogger)
+			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Infof("Starting workflow: %s", workflow.Name)
 
@@ -79,7 +79,7 @@ func startCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
-				eng,
+				cli,
 				dataStore,
 				&agent.Options{})
 

@@ -52,10 +52,8 @@ Code Structure
   - ``agent``: Contains the code for running the DAGs.
   - ``config``: Contains the code for loading the configuration.
   - ``dag``: Contains the code for parsing the DAG definition.
-  - ``engine``: Contains the code for managing the DAGs.
+  - ``client``: Contains the code for managing the DAGs.
   - ``persistence``: Contains the code for interacting with the database.
-  - ``executor``: Contains the code for different types of executors.
-  - ``scheduler``: Contains the code for running a DAG and steps.
   - ``sock``: Contains the code for interacting with the socket.
   - ``frontend``: Contains the code for the frontend Web UI.
   - ``scheduler``: Contains the code for scheduler.

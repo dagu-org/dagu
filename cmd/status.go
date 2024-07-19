@@ -36,9 +36,9 @@ func statusCmd() *cobra.Command {
 			}
 
 			dataStore := newDataStores(cfg)
-			eng := newEngine(cfg, dataStore, logger)
+			cli := newClient(cfg, dataStore, logger)
 
-			curStatus, err := eng.GetCurrentStatus(workflow)
+			curStatus, err := cli.GetCurrentStatus(workflow)
 
 			if err != nil {
 				// nolint

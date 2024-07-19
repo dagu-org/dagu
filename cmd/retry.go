@@ -77,7 +77,7 @@ func retryCmd() *cobra.Command {
 				LogFile:   logFile,
 			})
 
-			eng := newEngine(cfg, dataStore, agentLogger)
+			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Infof("Retrying with request ID: %s", requestID)
 
@@ -87,7 +87,7 @@ func retryCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
-				eng,
+				cli,
 				dataStore,
 				&agent.Options{RetryTarget: status.Status},
 			)

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/persistence/client"
+	dsclient "github.com/dagu-dev/dagu/internal/persistence/client"
 	"github.com/dagu-dev/dagu/internal/test"
 	"github.com/dagu-dev/dagu/internal/util"
 
@@ -19,7 +19,7 @@ import (
 
 func TestReadEntries(t *testing.T) {
 	t.Run("ReadEntries", func(t *testing.T) {
-		tmpDir, eng := setupTest(t)
+		tmpDir, cli := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
@@ -29,7 +29,7 @@ func TestReadEntries(t *testing.T) {
 			DagsDir:    filepath.Join(testdataDir, "invalid_directory"),
 			JobCreator: &mockJobFactory{},
 			Logger:     test.NewLogger(),
-			Engine:     eng,
+			Client:     cli,
 		})
 
 		entries, err := entryReader.Read(now)
@@ -40,7 +40,7 @@ func TestReadEntries(t *testing.T) {
 			DagsDir:    testdataDir,
 			JobCreator: &mockJobFactory{},
 			Logger:     test.NewLogger(),
-			Engine:     eng,
+			Client:     cli,
 		})
 
 		done := make(chan any)
@@ -64,7 +64,7 @@ func TestReadEntries(t *testing.T) {
 			}
 		}
 
-		err = eng.ToggleSuspend(j.GetDAG().Name, true)
+		err = cli.ToggleSuspend(j.GetDAG().Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended
@@ -76,7 +76,7 @@ func TestReadEntries(t *testing.T) {
 
 var testdataDir = filepath.Join(util.MustGetwd(), "testdata")
 
-func setupTest(t *testing.T) (string, engine.Engine) {
+func setupTest(t *testing.T) (string, client.Client) {
 	t.Helper()
 
 	tmpDir := util.MustTempDir("dagu_test")
@@ -91,14 +91,14 @@ func setupTest(t *testing.T) (string, engine.Engine) {
 		WorkDir:         tmpDir,
 	}
 
-	dataStore := client.NewDataStores(
+	dataStore := dsclient.NewDataStores(
 		cfg.DAGs,
 		cfg.DataDir,
 		cfg.SuspendFlagsDir,
-		client.DataStoreOptions{
+		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},
 	)
 
-	return tmpDir, engine.New(dataStore, "", cfg.WorkDir, logger.Default)
+	return tmpDir, client.New(dataStore, "", cfg.WorkDir, logger.Default)
 }

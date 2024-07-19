@@ -1,4 +1,4 @@
-package engine_test
+package client_test
 
 import (
 	"net/http"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/sock"
 	"github.com/dagu-dev/dagu/internal/test"
@@ -18,15 +18,15 @@ import (
 
 var testdataDir = filepath.Join(util.MustGetwd(), "./testdata")
 
-func TestEngine_GetStatus(t *testing.T) {
+func TestClient_GetStatus(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
 		file := testDAG("sleep1.yaml")
 
-		eng := setup.Engine()
-		dagStatus, err := eng.GetStatus(file)
+		cli := setup.Client()
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
 		socketServer, _ := sock.NewServer(
@@ -47,13 +47,13 @@ func TestEngine_GetStatus(t *testing.T) {
 		}()
 
 		time.Sleep(time.Millisecond * 100)
-		curStatus, err := eng.GetCurrentStatus(dagStatus.DAG)
+		curStatus, err := cli.GetCurrentStatus(dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, curStatus.Status)
 
 		_ = socketServer.Shutdown()
 
-		curStatus, err = eng.GetCurrentStatus(dagStatus.DAG)
+		curStatus, err = cli.GetCurrentStatus(dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusNone, curStatus.Status)
 	})
@@ -61,9 +61,9 @@ func TestEngine_GetStatus(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 
-		dagStatus, err := eng.GetStatus(testDAG("invalid_dag"))
+		dagStatus, err := cli.GetStatus(testDAG("invalid_dag"))
 		require.Error(t, err)
 		require.NotNil(t, dagStatus)
 
@@ -78,10 +78,10 @@ func TestEngine_GetStatus(t *testing.T) {
 			file      = testDAG("success.yaml")
 			requestID = "test-update-status"
 			now       = time.Now()
-			eng       = setup.Engine()
+			cli       = setup.Client()
 		)
 
-		dagStatus, err := eng.GetStatus(file)
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
 		historyStore := setup.DataStore().HistoryStore()
@@ -98,17 +98,17 @@ func TestEngine_GetStatus(t *testing.T) {
 
 		time.Sleep(time.Millisecond * 100)
 
-		status, err = eng.GetStatusByRequestID(dagStatus.DAG, requestID)
+		status, err = cli.GetStatusByRequestID(dagStatus.DAG, requestID)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
 
 		newStatus := scheduler.NodeStatusError
 		status.Nodes[0].Status = newStatus
 
-		err = eng.UpdateStatus(dagStatus.DAG, status)
+		err = cli.UpdateStatus(dagStatus.DAG, status)
 		require.NoError(t, err)
 
-		statusByRequestID, err := eng.GetStatusByRequestID(dagStatus.DAG, requestID)
+		statusByRequestID, err := cli.GetStatusByRequestID(dagStatus.DAG, requestID)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(status.Nodes))
@@ -119,12 +119,12 @@ func TestEngine_GetStatus(t *testing.T) {
 		defer setup.Cleanup()
 
 		var (
-			eng        = setup.Engine()
+			cli        = setup.Client()
 			file       = testDAG("sleep1.yaml")
 			wrongReqID = "invalid-request-id"
 		)
 
-		dagStatus, err := eng.GetStatus(file)
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
 		// update with invalid request id
@@ -132,26 +132,26 @@ func TestEngine_GetStatus(t *testing.T) {
 			scheduler.NodeStatusError)
 
 		// Check if the update fails.
-		err = eng.UpdateStatus(dagStatus.DAG, status)
+		err = cli.UpdateStatus(dagStatus.DAG, status)
 		require.Error(t, err)
 	})
 }
 
 // nolint // paralleltest
-func TestEngine_RunDAG(t *testing.T) {
+func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 		file := testDAG("success.yaml")
-		dagStatus, err := eng.GetStatus(file)
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
-		err = eng.Start(dagStatus.DAG, engine.StartOptions{})
+		err = cli.Start(dagStatus.DAG, client.StartOptions{})
 		require.NoError(t, err)
 
-		status, err := eng.GetLatestStatus(dagStatus.DAG)
+		status, err := cli.GetLatestStatus(dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 	})
@@ -159,22 +159,22 @@ func TestEngine_RunDAG(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 		file := testDAG("sleep10.yaml")
-		dagStatus, err := eng.GetStatus(file)
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
-		eng.StartAsync(dagStatus.DAG, engine.StartOptions{})
+		cli.StartAsync(dagStatus.DAG, client.StartOptions{})
 
 		require.Eventually(t, func() bool {
-			curStatus, _ := eng.GetCurrentStatus(dagStatus.DAG)
+			curStatus, _ := cli.GetCurrentStatus(dagStatus.DAG)
 			return curStatus.Status == scheduler.StatusRunning
 		}, time.Millisecond*1500, time.Millisecond*100)
 
-		_ = eng.Stop(dagStatus.DAG)
+		_ = cli.Stop(dagStatus.DAG)
 
 		require.Eventually(t, func() bool {
-			latestStatus, _ := eng.GetLatestStatus(dagStatus.DAG)
+			latestStatus, _ := cli.GetLatestStatus(dagStatus.DAG)
 			return latestStatus.Status == scheduler.StatusCancel
 		}, time.Millisecond*1500, time.Millisecond*100)
 	})
@@ -182,15 +182,15 @@ func TestEngine_RunDAG(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 		file := testDAG("success.yaml")
-		dagStatus, err := eng.GetStatus(file)
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
-		err = eng.Restart(dagStatus.DAG, engine.RestartOptions{})
+		err = cli.Restart(dagStatus.DAG, client.RestartOptions{})
 		require.NoError(t, err)
 
-		status, err := eng.GetLatestStatus(dagStatus.DAG)
+		status, err := cli.GetLatestStatus(dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess, status.Status)
 	})
@@ -198,49 +198,49 @@ func TestEngine_RunDAG(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 		file := testDAG("retry.yaml")
 
-		dagStatus, err := eng.GetStatus(file)
+		dagStatus, err := cli.GetStatus(file)
 		require.NoError(t, err)
 
-		err = eng.Start(dagStatus.DAG, engine.StartOptions{
+		err = cli.Start(dagStatus.DAG, client.StartOptions{
 			Params: "x y z",
 		})
 		require.NoError(t, err)
 
-		status, err := eng.GetLatestStatus(dagStatus.DAG)
+		status, err := cli.GetLatestStatus(dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess, status.Status)
 
 		requestID := status.RequestID
 		params := status.Params
 
-		err = eng.Retry(dagStatus.DAG, requestID)
+		err = cli.Retry(dagStatus.DAG, requestID)
 		require.NoError(t, err)
-		status, err = eng.GetLatestStatus(dagStatus.DAG)
+		status, err = cli.GetLatestStatus(dagStatus.DAG)
 		require.NoError(t, err)
 
 		require.Equal(t, scheduler.StatusSuccess, status.Status)
 		require.Equal(t, params, status.Params)
 
-		statusByRequestID, err := eng.GetStatusByRequestID(
+		statusByRequestID, err := cli.GetStatusByRequestID(
 			dagStatus.DAG, status.RequestID)
 		require.NoError(t, err)
 		require.Equal(t, status, statusByRequestID)
 
-		recentStatuses := eng.GetRecentHistory(dagStatus.DAG, 1)
+		recentStatuses := cli.GetRecentHistory(dagStatus.DAG, 1)
 		require.Equal(t, status, recentStatuses[0].Status)
 	})
 }
 
-func TestEngine_UpdateDAG(t *testing.T) {
+func TestClient_UpdateDAG(t *testing.T) {
 	t.Parallel()
 	t.Run("Update", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 
 		// valid DAG
 		validDAG := `name: test DAG
@@ -249,19 +249,19 @@ steps:
     command: "true"
 `
 		// Update Error: the DAG does not exist
-		err := eng.UpdateDAG("non-existing-dag", validDAG)
+		err := cli.UpdateDAG("non-existing-dag", validDAG)
 		require.Error(t, err)
 
 		// create a new DAG file
-		id, err := eng.CreateDAG("new-dag-file")
+		id, err := cli.CreateDAG("new-dag-file")
 		require.NoError(t, err)
 
 		// Update the DAG
-		err = eng.UpdateDAG(id, validDAG)
+		err = cli.UpdateDAG(id, validDAG)
 		require.NoError(t, err)
 
 		// Check the content of the DAG file
-		spec, err := eng.GetDAGSpec(id)
+		spec, err := cli.GetDAGSpec(id)
 		require.NoError(t, err)
 		require.Equal(t, validDAG, spec)
 	})
@@ -269,36 +269,36 @@ steps:
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 
 		spec := `name: test DAG
 steps:
   - name: "1"
     command: "true"
 `
-		id, err := eng.CreateDAG("test")
+		id, err := cli.CreateDAG("test")
 		require.NoError(t, err)
-		err = eng.UpdateDAG(id, spec)
+		err = cli.UpdateDAG(id, spec)
 		require.NoError(t, err)
 
 		// check file
-		newSpec, err := eng.GetDAGSpec(id)
+		newSpec, err := cli.GetDAGSpec(id)
 		require.NoError(t, err)
 		require.Equal(t, spec, newSpec)
 
-		status, _ := eng.GetStatus(id)
+		status, _ := cli.GetStatus(id)
 
 		// delete
-		err = eng.DeleteDAG(id, status.DAG.Location)
+		err = cli.DeleteDAG(id, status.DAG.Location)
 		require.NoError(t, err)
 	})
 	t.Run("Create", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 
-		id, err := eng.CreateDAG("test-dag")
+		id, err := cli.CreateDAG("test-dag")
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
@@ -310,16 +310,16 @@ steps:
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 
 		// Create a DAG to rename.
-		id, err := eng.CreateDAG("old_name")
+		id, err := cli.CreateDAG("old_name")
 		require.NoError(t, err)
-		_, err = eng.GetStatus(filepath.Join(setup.Config.DAGs, id+".yaml"))
+		_, err = cli.GetStatus(filepath.Join(setup.Config.DAGs, id+".yaml"))
 		require.NoError(t, err)
 
 		// Rename the file.
-		err = eng.Rename(id, id+"_renamed")
+		err = cli.Rename(id, id+"_renamed")
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
@@ -327,32 +327,32 @@ steps:
 	})
 }
 
-func TestEngine_ReadHistory(t *testing.T) {
-	t.Run("TestEngine_Empty", func(t *testing.T) {
+func TestClient_ReadHistory(t *testing.T) {
+	t.Run("TestClient_Empty", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 		file := testDAG("success.yaml")
 
-		_, err := eng.GetStatus(file)
+		_, err := cli.GetStatus(file)
 		require.NoError(t, err)
 	})
-	t.Run("TestEngine_All", func(t *testing.T) {
+	t.Run("TestClient_All", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		eng := setup.Engine()
+		cli := setup.Client()
 
 		// Create a DAG
-		_, err := eng.CreateDAG("test-dag1")
+		_, err := cli.CreateDAG("test-dag1")
 		require.NoError(t, err)
 
-		_, err = eng.CreateDAG("test-dag2")
+		_, err = cli.CreateDAG("test-dag2")
 		require.NoError(t, err)
 
 		// Get all statuses.
-		allDagStatus, _, err := eng.GetAllStatus()
+		allDagStatus, _, err := cli.GetAllStatus()
 		require.NoError(t, err)
 		require.Equal(t, 2, len(allDagStatus))
 	})

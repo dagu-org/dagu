@@ -15,9 +15,9 @@ import (
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/mailer"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/sock"
@@ -35,7 +35,7 @@ type Agent struct {
 	dry          bool
 	retryTarget  *model.Status
 	dataStore    persistence.DataStores
-	engine       engine.Engine
+	client       client.Client
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	reporter     *reporter
@@ -70,7 +70,7 @@ func New(
 	workflow *dag.DAG,
 	lg logger.Logger,
 	logDir, logFile string,
-	eng engine.Engine,
+	cli client.Client,
 	dataStore persistence.DataStores,
 	opts *Options,
 ) *Agent {
@@ -82,7 +82,7 @@ func New(
 		logDir:      logDir,
 		logFile:     logFile,
 		logger:      lg,
-		engine:      eng,
+		client:      cli,
 		dataStore:   dataStore,
 	}
 }
@@ -487,7 +487,7 @@ func (a *Agent) checkPreconditions() error {
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning() error {
-	status, err := a.engine.GetCurrentStatus(a.dag)
+	status, err := a.client.GetCurrentStatus(a.dag)
 	if err != nil {
 		return err
 	}

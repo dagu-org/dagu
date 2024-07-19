@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/dagu-dev/dagu/internal/agent"
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -47,9 +47,9 @@ func restartCmd() *cobra.Command {
 			}
 
 			dataStore := newDataStores(cfg)
-			eng := newEngine(cfg, dataStore, initLogger)
+			cli := newClient(cfg, dataStore, initLogger)
 
-			if err := stopDAGIfRunning(eng, workflow, initLogger); err != nil {
+			if err := stopDAGIfRunning(cli, workflow, initLogger); err != nil {
 				initLogger.Error("Failed to stop the DAG", "error", err)
 				os.Exit(1)
 			}
@@ -58,7 +58,7 @@ func restartCmd() *cobra.Command {
 			waitForRestart(workflow.RestartWait, initLogger)
 
 			// Retrieve the parameter of the previous execution.
-			params, err := getPreviousExecutionParams(eng, workflow)
+			params, err := getPreviousExecutionParams(cli, workflow)
 			if err != nil {
 				initLogger.Error("Failed to get previous execution params", "error", err)
 				os.Exit(1)
@@ -100,7 +100,7 @@ func restartCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
-				newEngine(cfg, dataStore, agentLogger),
+				newClient(cfg, dataStore, agentLogger),
 				dataStore,
 				&agent.Options{Dry: false})
 
@@ -117,7 +117,7 @@ func restartCmd() *cobra.Command {
 
 // stopDAGIfRunning stops the DAG if it is running.
 // Otherwise, it does nothing.
-func stopDAGIfRunning(e engine.Engine, workflow *dag.DAG, lg logger.Logger) error {
+func stopDAGIfRunning(e client.Client, workflow *dag.DAG, lg logger.Logger) error {
 	curStatus, err := e.GetCurrentStatus(workflow)
 	if err != nil {
 		return err
@@ -132,7 +132,7 @@ func stopDAGIfRunning(e engine.Engine, workflow *dag.DAG, lg logger.Logger) erro
 
 // stopRunningDAG attempts to stop the running DAG
 // by sending a stop signal to the agent.
-func stopRunningDAG(e engine.Engine, workflow *dag.DAG) error {
+func stopRunningDAG(e client.Client, workflow *dag.DAG) error {
 	for {
 		curStatus, err := e.GetCurrentStatus(workflow)
 		if err != nil {
@@ -161,7 +161,7 @@ func waitForRestart(restartWait time.Duration, lg logger.Logger) {
 	}
 }
 
-func getPreviousExecutionParams(e engine.Engine, workflow *dag.DAG) (string, error) {
+func getPreviousExecutionParams(e client.Client, workflow *dag.DAG) (string, error) {
 	latestStatus, err := e.GetLatestStatus(workflow)
 	if err != nil {
 		return "", err

@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/models"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations/dags"
@@ -42,18 +42,18 @@ var (
 
 // Handler is a handler for the DAG API.
 type Handler struct {
-	engine             engine.Engine
+	client             client.Client
 	logEncodingCharset string
 }
 
 type NewHandlerArgs struct {
-	Engine             engine.Engine
+	Client             client.Client
 	LogEncodingCharset string
 }
 
 func NewHandler(args *NewHandlerArgs) server.Handler {
 	return &Handler{
-		engine:             args.Engine,
+		client:             args.Client,
 		logEncodingCharset: args.LogEncodingCharset,
 	}
 }
@@ -130,7 +130,7 @@ func (h *Handler) createDAG(
 	switch *params.Body.Action {
 	case "new":
 		name := *params.Body.Value
-		id, err := h.engine.CreateDAG(name)
+		id, err := h.client.CreateDAG(name)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -140,11 +140,11 @@ func (h *Handler) createDAG(
 	}
 }
 func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
-	dagStatus, err := h.engine.GetStatus(params.DagID)
+	dagStatus, err := h.client.GetStatus(params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
 	}
-	if err := h.engine.DeleteDAG(
+	if err := h.client.DeleteDAG(
 		params.DagID, dagStatus.DAG.Location,
 	); err != nil {
 		return newInternalError(err)
@@ -153,7 +153,7 @@ func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 }
 
 func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
-	dgs, errs, err := h.engine.GetAllStatus()
+	dgs, errs, err := h.client.GetAllStatus()
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -218,7 +218,7 @@ func (h *Handler) getDetail(
 		tab = *params.Tab
 	}
 
-	dagStatus, err := h.engine.GetStatus(dagID)
+	dagStatus, err := h.client.GetStatus(dagID)
 	if dagStatus == nil {
 		return nil, newNotFoundError(err)
 	}
@@ -343,7 +343,7 @@ func (h *Handler) processSchedulerLogRequest(
 	}
 
 	if logFile == "" {
-		lastStatus, err := h.engine.GetLatestStatus(workflow)
+		lastStatus, err := h.client.GetLatestStatus(workflow)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -383,7 +383,7 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if status == nil {
-		s, err := h.engine.GetLatestStatus(workflow)
+		s, err := h.client.GetLatestStatus(workflow)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -442,7 +442,7 @@ func (h *Handler) processSpecRequest(
 	dagID string,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	dagContent, err := h.engine.GetDAGSpec(dagID)
+	dagContent, err := h.client.GetDAGSpec(dagID)
 	if err != nil {
 		return nil, newNotFoundError(err)
 	}
@@ -458,7 +458,7 @@ func (h *Handler) processLogRequest(
 	resp *models.GetDagDetailsResponse,
 	workflow *dag.DAG,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	logs := h.engine.GetRecentHistory(workflow, defaultHistoryLimit)
+	logs := h.client.GetRecentHistory(workflow, defaultHistoryLimit)
 
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
 	for idx, log := range logs {
@@ -565,10 +565,10 @@ func (h *Handler) postAction(
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
-	var dagStatus *engine.DAGStatus
+	var dagStatus *client.DAGStatus
 
 	if *params.Body.Action != "save" {
-		s, err := h.engine.GetStatus(params.DagID)
+		s, err := h.client.GetStatus(params.DagID)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
@@ -580,13 +580,13 @@ func (h *Handler) postAction(
 		if dagStatus.Status.Status == scheduler.StatusRunning {
 			return nil, newBadRequestError(errInvalidArgs)
 		}
-		h.engine.StartAsync(dagStatus.DAG, engine.StartOptions{
+		h.client.StartAsync(dagStatus.DAG, client.StartOptions{
 			Params: params.Body.Params,
 		})
 		return &models.PostDagActionResponse{}, nil
 
 	case "suspend":
-		_ = h.engine.ToggleSuspend(params.DagID, params.Body.Value == "true")
+		_ = h.client.ToggleSuspend(params.DagID, params.Body.Value == "true")
 		return &models.PostDagActionResponse{}, nil
 
 	case "stop":
@@ -595,7 +595,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("the DAG is not running: %w", errInvalidArgs),
 			)
 		}
-		if err := h.engine.Stop(dagStatus.DAG); err != nil {
+		if err := h.client.Stop(dagStatus.DAG); err != nil {
 			return nil, newBadRequestError(
 				fmt.Errorf("error trying to stop the DAG: %w", err),
 			)
@@ -608,7 +608,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("request-id is required: %w", errInvalidArgs),
 			)
 		}
-		if err := h.engine.Retry(dagStatus.DAG, params.Body.RequestID); err != nil {
+		if err := h.client.Retry(dagStatus.DAG, params.Body.RequestID); err != nil {
 			return nil, newInternalError(
 				fmt.Errorf("error trying to retry the DAG: %w", err),
 			)
@@ -626,7 +626,7 @@ func (h *Handler) postAction(
 		)
 
 	case "save":
-		if err := h.engine.UpdateDAG(params.DagID, params.Body.Value); err != nil {
+		if err := h.client.UpdateDAG(params.DagID, params.Body.Value); err != nil {
 			return nil, newInternalError(err)
 		}
 		return &models.PostDagActionResponse{}, nil
@@ -638,7 +638,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("new name is required: %w", errInvalidArgs),
 			)
 		}
-		if err := h.engine.Rename(params.DagID, newName); err != nil {
+		if err := h.client.Rename(params.DagID, newName); err != nil {
 			return nil, newInternalError(err)
 		}
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
@@ -652,7 +652,7 @@ func (h *Handler) postAction(
 
 func (h *Handler) processUpdateStatus(
 	params dags.PostDagActionParams,
-	dagStatus *engine.DAGStatus, to scheduler.NodeStatus,
+	dagStatus *client.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
 		return nil, newBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
@@ -669,7 +669,7 @@ func (h *Handler) processUpdateStatus(
 		)
 	}
 
-	status, err := h.engine.GetStatusByRequestID(dagStatus.DAG, params.Body.RequestID)
+	status, err := h.client.GetStatusByRequestID(dagStatus.DAG, params.Body.RequestID)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -692,7 +692,7 @@ func (h *Handler) processUpdateStatus(
 	status.Nodes[idxToUpdate].Status = to
 	status.Nodes[idxToUpdate].StatusText = to.String()
 
-	if err := h.engine.UpdateStatus(dagStatus.DAG, status); err != nil {
+	if err := h.client.UpdateStatus(dagStatus.DAG, status); err != nil {
 		return nil, newInternalError(err)
 	}
 
@@ -707,7 +707,7 @@ func (h *Handler) searchDAGs(
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
-	ret, errs, err := h.engine.Grep(query)
+	ret, errs, err := h.client.Grep(query)
 	if err != nil {
 		return nil, newInternalError(err)
 	}

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/engine"
+	"github.com/dagu-dev/dagu/internal/client"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/scheduler/filenotify"
 
@@ -24,14 +24,14 @@ type entryReaderImpl struct {
 	dags       map[string]*dag.DAG
 	jobCreator jobCreator
 	logger     logger.Logger
-	engine     engine.Engine
+	client     client.Client
 }
 
 type newEntryReaderArgs struct {
 	DagsDir    string
 	JobCreator jobCreator
 	Logger     logger.Logger
-	Engine     engine.Engine
+	Client     client.Client
 }
 
 type jobCreator interface {
@@ -45,7 +45,7 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 		dags:       map[string]*dag.DAG{},
 		jobCreator: args.JobCreator,
 		logger:     args.Logger,
-		engine:     args.Engine,
+		client:     args.Client,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("Failed to initialize DAGs", "error", err)
@@ -75,7 +75,7 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	}
 
 	for _, workflow := range er.dags {
-		if er.engine.IsSuspended(workflow.Name) {
+		if er.client.IsSuspended(workflow.Name) {
 			continue
 		}
 		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
