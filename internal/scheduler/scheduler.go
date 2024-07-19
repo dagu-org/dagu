@@ -89,10 +89,11 @@ func (e *entry) Invoke() error {
 		return nil
 	}
 
-	logMsg := e.EntryType.String()
-	e.Logger.Info(logMsg,
-		"dag", e.Job.String(),
-		"time", e.Next.Format(time.RFC3339),
+	e.Logger.Info(
+		"Workflow operation started",
+		"operation", e.EntryType.String(),
+		"workflow", e.Job.String(),
+		"next", e.Next.Format(time.RFC3339),
 	)
 
 	switch e.EntryType {
@@ -174,7 +175,7 @@ func (s *Scheduler) start() {
 func (s *Scheduler) run(now time.Time) {
 	entries, err := s.entryReader.Read(now.Add(-time.Second))
 	if err != nil {
-		s.logger.Error("Failed to read entries", "error", err)
+		s.logger.Error("Scheduler failed to read workflow entries", "error", err)
 		return
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -188,13 +189,14 @@ func (s *Scheduler) run(now time.Time) {
 		go func(e *entry) {
 			if err := e.Invoke(); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("Job already finished", "job", e.Job)
+					s.logger.Info("Workflow is already finished", "workflow", e.Job)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("Job already running", "job", e.Job)
+					s.logger.Info("Workflow is already running", "workflow", e.Job)
 				} else {
 					s.logger.Error(
-						"Failed to invoke entryreader",
-						"job", e.Job,
+						"Worfklow execution failed",
+						"workflow", e.Job,
+						"operation", e.EntryType.String(),
 						"error", err,
 					)
 				}

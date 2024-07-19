@@ -48,7 +48,7 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 		client:     args.Client,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("Failed to initialize DAGs", "error", err)
+		er.logger.Error("DAG initialization failed", "error", err)
 	}
 	return er
 }
@@ -102,7 +102,11 @@ func (er *entryReaderImpl) initDags() error {
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
-				er.logger.Error("Failed to load DAG", "dag", fi.Name())
+				er.logger.Error(
+					"Workflow load failed",
+					"error", err,
+					"workflow", fi.Name(),
+				)
 				continue
 			}
 			er.dags[fi.Name()] = workflow
@@ -110,14 +114,14 @@ func (er *entryReaderImpl) initDags() error {
 		}
 	}
 
-	er.logger.Info("Loaded DAGs", "files", strings.Join(fileNames, ","))
+	er.logger.Info("Scheduler initialized", "specs", strings.Join(fileNames, ","))
 	return nil
 }
 
 func (er *entryReaderImpl) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		er.logger.Error("Failed to create watcher", "error", err)
+		er.logger.Error("Watcher creation failed", "error", err)
 		return
 	}
 
@@ -143,15 +147,21 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
-					er.logger.Error("Failed to load DAG", "dag", filepath.Base(event.Name))
+					er.logger.Error(
+						"Workflow load failed",
+						"error",
+						err,
+						"file",
+						event.Name,
+					)
 				} else {
 					er.dags[filepath.Base(event.Name)] = workflow
-					er.logger.Info("Loaded DAG", "dag", filepath.Base(event.Name))
+					er.logger.Info("Workflow added/updated", "workflow", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("Removed DAG", "dag", filepath.Base(event.Name))
+				er.logger.Info("Workflow removed", "workflow", filepath.Base(event.Name))
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
