@@ -81,7 +81,7 @@ func startCmd() *cobra.Command {
 				logFile.Name(),
 				eng,
 				newDataStores(cfg),
-				&agent.AgentOpts{})
+				&agent.Options{})
 
 			ctx := cmd.Context()
 

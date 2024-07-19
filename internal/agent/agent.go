@@ -53,8 +53,8 @@ type Agent struct {
 	lock sync.RWMutex
 }
 
-// AgentOpts is the configuration for the Agent.
-type AgentOpts struct {
+// Options is the configuration for the Agent.
+type Options struct {
 	// Dry is a dry-run mode. It does not execute the actual command.
 	// Dry run does not create history data.
 	Dry bool
@@ -72,7 +72,7 @@ func New(
 	logDir, logFile string,
 	engine engine.Engine,
 	dataStore persistence.DataStores,
-	opts *AgentOpts,
+	opts *Options,
 ) *Agent {
 	return &Agent{
 		reqID:       reqID,

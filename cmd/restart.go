@@ -102,7 +102,7 @@ func restartCmd() *cobra.Command {
 				logFile.Name(),
 				newEngine(cfg, ds, agentLogger),
 				newDataStores(cfg),
-				&agent.AgentOpts{Dry: false})
+				&agent.Options{Dry: false})
 
 			listenSignals(cmd.Context(), dagAgent)
 			if err := dagAgent.Run(cmd.Context()); err != nil {

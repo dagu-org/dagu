@@ -90,7 +90,7 @@ func retryCmd() *cobra.Command {
 				logFile.Name(),
 				eng,
 				newDataStores(cfg),
-				&agent.AgentOpts{RetryTarget: status.Status},
+				&agent.Options{RetryTarget: status.Status},
 			)
 
 			ctx := cmd.Context()

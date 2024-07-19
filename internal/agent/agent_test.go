@@ -27,7 +27,7 @@ func TestAgent_Run(t *testing.T) {
 
 		workflow := testLoadDAG(t, "run.yaml")
 		eng := setup.Engine()
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 
 		latestStatus, err := eng.GetLatestStatus(workflow)
 		require.NoError(t, err)
@@ -53,7 +53,7 @@ func TestAgent_Run(t *testing.T) {
 		// Create a history file by running a DAG
 		workflow := testLoadDAG(t, "simple.yaml")
 		eng := setup.Engine()
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 
 		err := dagAgent.Run(context.Background())
 		require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Set the retention days to 0 and run the DAG again
 		workflow.HistRetentionDays = 0
-		dagAgent = newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent = newAgent(setup, newReqID(), workflow, &agent.Options{})
 		err = dagAgent.Run(context.Background())
 		require.NoError(t, err)
 
@@ -75,7 +75,7 @@ func TestAgent_Run(t *testing.T) {
 		defer setup.Cleanup()
 
 		workflow := testLoadDAG(t, "is_running.yaml")
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 
 		go func() {
 			_ = dagAgent.Run(context.Background())
@@ -87,7 +87,7 @@ func TestAgent_Run(t *testing.T) {
 		require.NotNil(t, curStatus)
 		require.Equal(t, curStatus.Status, scheduler.StatusRunning)
 
-		dagAgent = newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent = newAgent(setup, newReqID(), workflow, &agent.Options{})
 		err := dagAgent.Run(context.Background())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "is already running")
@@ -101,7 +101,7 @@ func TestAgent_Run(t *testing.T) {
 		// Precondition is not met
 		workflow.Preconditions = []dag.Condition{{Condition: "`echo 1`", Expected: "0"}}
 
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 		err := dagAgent.Run(context.Background())
 		require.Error(t, err)
 
@@ -117,7 +117,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// Run a DAG that fails
 		errDAG := testLoadDAG(t, "error.yaml")
-		dagAgent := newAgent(setup, newReqID(), errDAG, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), errDAG, &agent.Options{})
 		err := dagAgent.Run(context.Background())
 		require.Error(t, err)
 
@@ -132,7 +132,7 @@ func TestAgent_Run(t *testing.T) {
 
 		workflow := testLoadDAG(t, "sleep.yaml")
 		eng := setup.Engine()
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 
 		go func() {
 			_ = dagAgent.Run(context.Background())
@@ -159,7 +159,7 @@ func TestAgent_Run(t *testing.T) {
 		defer setup.Cleanup()
 
 		workflow := testLoadDAG(t, "on_exit.yaml")
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 		err := dagAgent.Run(context.Background())
 		require.NoError(t, err)
 
@@ -182,7 +182,7 @@ func TestAgent_DryRun(t *testing.T) {
 		defer setup.Cleanup()
 
 		workflow := testLoadDAG(t, "dry.yaml")
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{
 			Dry: true,
 		})
 
@@ -209,7 +209,7 @@ func TestAgent_Retry(t *testing.T) {
 		// retry.yaml has a DAG that fails
 		workflow := testLoadDAG(t, "retry.yaml")
 
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 		err := dagAgent.Run(context.Background())
 		require.Error(t, err)
 
@@ -223,7 +223,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Retry the DAG and check if it is successful
-		dagAgent = newAgent(setup, newReqID(), workflow, &agent.AgentOpts{
+		dagAgent = newAgent(setup, newReqID(), workflow, &agent.Options{
 			RetryTarget: status,
 		})
 		err = dagAgent.Run(context.Background())
@@ -249,7 +249,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Start a long-running DAG
 		workflow := testLoadDAG(t, "handle_http.yaml")
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 		go func() {
 			err := dagAgent.Run(context.Background())
 			require.NoError(t, err)
@@ -290,7 +290,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Start a long-running DAG
 		workflow := testLoadDAG(t, "handle_http2.yaml")
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 
 		go func() {
 			err := dagAgent.Run(context.Background())
@@ -328,7 +328,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Start a long-running DAG
 		workflow := testLoadDAG(t, "handle_http3.yaml")
-		dagAgent := newAgent(setup, newReqID(), workflow, &agent.AgentOpts{})
+		dagAgent := newAgent(setup, newReqID(), workflow, &agent.Options{})
 
 		go func() {
 			err := dagAgent.Run(context.Background())
@@ -407,7 +407,7 @@ func newAgent(
 	setup test.Setup,
 	reqID string,
 	workflow *dag.DAG,
-	opts *agent.AgentOpts,
+	opts *agent.Options,
 ) *agent.Agent {
 	return agent.New(
 		reqID,

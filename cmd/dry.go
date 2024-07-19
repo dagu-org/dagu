@@ -71,7 +71,7 @@ func dryCmd() *cobra.Command {
 				logFile.Name(),
 				eng,
 				newDataStores(cfg),
-				&agent.AgentOpts{Dry: true})
+				&agent.Options{Dry: true})
 
 			ctx := cmd.Context()
 
