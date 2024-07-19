@@ -312,8 +312,10 @@ func (store *Store) latestToday(
 	day time.Time,
 	latestStatusToday bool,
 ) (string, error) {
-	var ret []string
-	pattern := ""
+	var (
+		ret     []string
+		pattern string
+	)
 	if latestStatusToday {
 		pattern = fmt.Sprintf(
 			"%s.%s*.*.dat", store.prefixWithDirectory(dagFile), day.Format("20060102"),

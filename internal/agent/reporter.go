@@ -23,7 +23,6 @@ type Sender interface {
 // to the user.
 type reporter struct {
 	sender Sender
-
 	logger logger.Logger
 }
 
@@ -102,7 +101,7 @@ func (r *reporter) send(
 
 func renderSummary(status *model.Status, err error) string {
 	t := table.NewWriter()
-	var errText = ""
+	var errText string
 	if err != nil {
 		errText = err.Error()
 	}
@@ -185,7 +184,7 @@ func renderHTML(nodes []*model.Node) string {
 		<tbody>
 	`)
 	addStatusFunc := func(status scheduler.NodeStatus) {
-		style := ""
+		var style string
 		if status == scheduler.NodeStatusError {
 			style = "color: #D01117;font-weight:bold;"
 		}
