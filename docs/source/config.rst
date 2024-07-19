@@ -19,7 +19,7 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_IS_BASICAUTH`` (``0``): Set to 1 to enable basic authentication.
 - ``DAGU_BASICAUTH_USERNAME`` (``""``): The username to use for basic authentication.
 - ``DAGU_BASICAUTH_PASSWORD`` (``""``): The password to use for basic authentication.
-- ``DAGU_LOG_DIR`` (``$HOME/.local/share``): The directory where logs will be stored.
+- ``DAGU_LOG_DIR`` (``$HOME/.local/share/logs``): The directory where logs will be stored.
 - ``DAGU_DATA_DIR`` (``$HOME/.local/share/history``): The directory where application data will be stored.
 - ``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): The directory containing DAG suspend flags.
 - ``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): The directory where admin logs will be stored.
