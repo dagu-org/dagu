@@ -67,22 +67,22 @@ type Options struct {
 // New creates a new Agent.
 func New(
 	reqID string,
-	dag *dag.DAG,
-	logger logger.Logger,
+	workflow *dag.DAG,
+	lg logger.Logger,
 	logDir, logFile string,
-	engine engine.Engine,
+	eng engine.Engine,
 	dataStore persistence.DataStores,
 	opts *Options,
 ) *Agent {
 	return &Agent{
 		reqID:       reqID,
-		dag:         dag,
+		dag:         workflow,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
 		logDir:      logDir,
 		logFile:     logFile,
-		logger:      logger,
-		engine:      engine,
+		logger:      lg,
+		engine:      eng,
 		dataStore:   dataStore,
 	}
 }

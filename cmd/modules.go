@@ -8,8 +8,8 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence/client"
 )
 
-func newEngine(cfg *config.Config, ds persistence.DataStores, logger logger.Logger) engine.Engine {
-	return engine.New(ds, cfg.Executable, cfg.WorkDir, logger)
+func newEngine(cfg *config.Config, ds persistence.DataStores, lg logger.Logger) engine.Engine {
+	return engine.New(ds, cfg.Executable, cfg.WorkDir, lg)
 }
 
 func newDataStores(cfg *config.Config) persistence.DataStores {
