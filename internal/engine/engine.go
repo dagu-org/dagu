@@ -23,13 +23,13 @@ func New(
 	dataStore persistence.DataStores,
 	executable string,
 	workDir string,
-	logger logger.Logger,
+	lg logger.Logger,
 ) Engine {
 	return &engineImpl{
 		dataStore:  dataStore,
 		executable: executable,
 		workDir:    workDir,
-		logger:     logger,
+		logger:     lg,
 	}
 }
 
