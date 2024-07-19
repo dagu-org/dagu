@@ -115,6 +115,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		return err
 	}
 	api := operations.NewDaguAPI(swaggerSpec)
+	api.Logger = svr.logger.Infof
 	for _, h := range svr.handlers {
 		h.Configure(api)
 	}
