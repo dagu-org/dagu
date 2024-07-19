@@ -112,7 +112,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 
 	swaggerSpec, err := loads.Analyzed(restapi.SwaggerJSON, "")
 	if err != nil {
-		svr.logger.Error("failed to load API spec", "error", err)
+		svr.logger.Error("Failed to load API spec", "error", err)
 		return err
 	}
 	api := operations.NewDaguAPI(swaggerSpec)
@@ -142,7 +142,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		// Trigger graceful shutdown
 		err := svr.server.Shutdown()
 		if err != nil {
-			svr.logger.Error("server shutdown error", "error", err)
+			svr.logger.Error("Server shutdown", "error", err)
 		}
 		serverStopCtx()
 	}()
@@ -158,13 +158,13 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	// Run the server
 	err = svr.server.Serve()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		svr.logger.Error("server error", "error", err)
+		svr.logger.Error("Server error", "error", err)
 	}
 
 	// Wait for server context to be stopped
 	<-serverCtx.Done()
 
-	svr.logger.Info("server closed")
+	svr.logger.Info("Server stopped")
 
 	return nil
 }

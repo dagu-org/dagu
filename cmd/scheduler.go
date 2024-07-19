@@ -35,6 +35,8 @@ func schedulerCmd() *cobra.Command {
 				fx.Invoke(scheduler.LifetimeHooks),
 			)
 
+			logger.Info("Starting the scheduler", "dags", cfg.DAGs)
+
 			if err := app.Start(cmd.Context()); err != nil {
 				logger.Error("Failed to start scheduler", "error", err)
 				os.Exit(1)

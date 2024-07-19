@@ -48,7 +48,7 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 		engine:     args.Engine,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entryreader dags", "error", err)
+		er.logger.Error("Failed to initialize DAGs", "error", err)
 	}
 	return er
 }
@@ -102,7 +102,7 @@ func (er *entryReaderImpl) initDags() error {
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
-				er.logger.Error("failed to read DAG cfg", "error", err)
+				er.logger.Error("Failed to load DAG", "dag", fi.Name())
 				continue
 			}
 			er.dags[fi.Name()] = dg
@@ -110,14 +110,14 @@ func (er *entryReaderImpl) initDags() error {
 		}
 	}
 
-	er.logger.Info("init backend dags", "files", strings.Join(fileNames, ","))
+	er.logger.Info("Loaded DAGs", "files", strings.Join(fileNames, ","))
 	return nil
 }
 
 func (er *entryReaderImpl) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		er.logger.Error("failed to init file watcher", "error", err)
+		er.logger.Error("Failed to create watcher", "error", err)
 		return
 	}
 
@@ -143,24 +143,22 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
-					er.logger.Error("failed to read DAG cfg", "error", err)
+					er.logger.Error("Failed to load DAG", "dag", filepath.Base(event.Name))
 				} else {
 					er.dags[filepath.Base(event.Name)] = dg
-					er.logger.Info(
-						"reload DAG entryreader", "file", event.Name,
-					)
+					er.logger.Info("Loaded DAG", "dag", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("remove DAG entryreader", "file", event.Name)
+				er.logger.Info("Removed DAG", "dag", filepath.Base(event.Name))
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entryreader DAGs error", "error", err)
+			er.logger.Error("Watcher error", "error", err)
 		}
 	}
 

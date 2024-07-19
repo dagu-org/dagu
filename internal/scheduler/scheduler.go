@@ -130,7 +130,6 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.logger.Info("starting scheduler")
 	s.start()
 
 	return nil
@@ -142,7 +141,7 @@ func (s *Scheduler) setupLogFile() error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("create log directory: %w", err)
 	}
-	s.logger.Info("Setup log", "filename", filename)
+	s.logger.Info("Scheduler log file", "file", filename)
 	return nil
 }
 

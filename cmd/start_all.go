@@ -47,6 +47,7 @@ func startAllCmd() *cobra.Command {
 			)
 
 			go func() {
+				logger.Info("Starting the scheduler", "dags", cfg.DAGs)
 				err := scheduler.Start(ctx)
 				if err != nil {
 					logger.Error("Failed to start scheduler", "error", err)
@@ -60,6 +61,8 @@ func startAllCmd() *cobra.Command {
 				fx.Provide(func() *config.Config { return cfg }),
 				fx.Invoke(frontend.LifetimeHooks),
 			)
+
+			logger.Info("Starting the server", "host", cfg.Host, "port", cfg.Port)
 
 			if err := frontend.Start(ctx); err != nil {
 				logger.Error("Failed to start server", "error", err)
