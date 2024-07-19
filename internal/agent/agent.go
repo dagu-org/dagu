@@ -21,7 +21,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/mailer"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // Agent is responsible for running the DAG and handling communication
@@ -182,7 +181,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		util.LogErr("write status", a.historyStore.Write(a.Status()))
+		if err := a.historyStore.Write(a.Status()); err != nil {
+			a.logger.Error("Status write failed", "error", err)
+		}
 	}()
 
 	// Start the DAG execution.
@@ -194,14 +195,16 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	a.logger.Info("Schedule finished", "status", finishedStatus.Status)
-	util.LogErr("write status", a.historyStore.Write(a.Status()))
+	a.logger.Info("Workflow execution finished", "status", finishedStatus.Status)
+	if err := a.historyStore.Write(a.Status()); err != nil {
+		a.logger.Error("Status write failed", "error", err)
+	}
 
 	// Send the execution report if necessary.
 	a.reporter.report(finishedStatus, lastErr)
-	util.LogErr(
-		"send email", a.reporter.send(a.dag, finishedStatus, lastErr),
-	)
+	if err := a.reporter.send(a.dag, finishedStatus, lastErr); err != nil {
+		a.logger.Error("Mail notification failed", "error", err)
+	}
 
 	// Mark the agent finished.
 	a.finished.Store(true)
@@ -284,7 +287,7 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 		go func() {
-			a.logger.Info("Stop request received. shutting down.")
+			a.logger.Info("Stop request received")
 			a.signal(syscall.SIGTERM, true)
 		}()
 	default:
@@ -450,7 +453,7 @@ func (a *Agent) setupDatabase() error {
 	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(location, retentionDays); err != nil {
-		util.LogErr("clean old history data", err)
+		a.logger.Error("History data cleanup failed", "error", err)
 	}
 
 	return a.historyStore.Open(a.dag.Location, time.Now(), a.reqID)
@@ -476,9 +479,9 @@ func (a *Agent) checkPreconditions() error {
 	if len(a.dag.Preconditions) == 0 {
 		return nil
 	}
-	a.logger.Info("Checking preconditions", "reqId", a.reqID)
 	// If one of the conditions does not met, cancel the execution.
 	if err := dag.EvalConditions(a.dag.Preconditions); err != nil {
+		a.logger.Error("Preconditions are not met", "error", err)
 		a.scheduler.Cancel(a.graph)
 		return err
 	}

@@ -128,7 +128,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			}
 			wg.Add(1)
 
-			sc.logger.Infof("Start running: %s", node.data.Step.Name)
+			sc.logger.Info("Step execution started", "step", node.data.Step.Name)
 			node.setStatus(NodeStatusRunning)
 			go func(node *Node) {
 				defer func() {
@@ -158,9 +158,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 							sc.setLastError(execErr)
 						case node.data.Step.RetryPolicy != nil && node.data.Step.RetryPolicy.Limit > node.getRetryCount():
 							// retry
-							sc.logger.Infof("Step %s failed but scheduled for retry", node.data.Step.Name)
 							node.incRetryCount()
-							sc.logger.Infof("Retry count: %d", node.getRetryCount())
+							sc.logger.Info(
+								"Step execution failed. Retrying...",
+								"step", node.data.Step.Name,
+								"error", execErr,
+								"retry", node.getRetryCount(),
+							)
 							time.Sleep(node.data.Step.RetryPolicy.Interval)
 							node.setRetriedAt(time.Now())
 							node.setStatus(NodeStatusNone)
@@ -218,7 +222,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	handlers = append(handlers, dag.HandlerOnExit)
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
-			sc.logger.Infof("Handler %s started", n.data.Step.Name)
+			sc.logger.Info("Handler execution started", "handler", n.data.Step.Name)
 
 			n.mu.Lock()
 			n.data.Step.OutputVariables = g.outputVariables

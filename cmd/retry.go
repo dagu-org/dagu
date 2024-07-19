@@ -21,7 +21,7 @@ func retryCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
 				LogLevel:  cfg.LogLevel,
@@ -30,7 +30,7 @@ func retryCmd() *cobra.Command {
 
 			reqID, err := cmd.Flags().GetString("req")
 			if err != nil {
-				initLogger.Error("Request ID is required", "error", err)
+				initLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
 			}
 
@@ -38,35 +38,46 @@ func retryCmd() *cobra.Command {
 			dataStore := newDataStores(cfg)
 			historyStore := dataStore.HistoryStore()
 
-			absoluteFilePath, err := filepath.Abs(args[0])
+			specFilePath := args[0]
+			absoluteFilePath, err := filepath.Abs(specFilePath)
 			if err != nil {
-				initLogger.Error("Failed to get the absolute path of the DAG file", "error", err)
+				initLogger.Error("Absolute path resolution failed",
+					"error", err,
+					"file", specFilePath)
 				os.Exit(1)
 			}
 
 			status, err := historyStore.FindByRequestID(absoluteFilePath, reqID)
 			if err != nil {
-				initLogger.Error("Failed to find the request", "error", err)
+				initLogger.Error("Historical execution retrieval failed",
+					"error", err,
+					"requestID", reqID,
+					"file", absoluteFilePath)
 				os.Exit(1)
 			}
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], status.Status.Params)
+			workflow, err := dag.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
 			if err != nil {
-				initLogger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Workflow specification load failed",
+					"error", err,
+					"file", specFilePath,
+					"params", status.Status.Params)
 				os.Exit(1)
 			}
 
-			requestID, err := generateRequestID()
+			newRequestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Failed to generate request ID", "error", err)
+				initLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
 			}
 
-			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, requestID)
+			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, newRequestID)
 			if err != nil {
-				initLogger.Error("Failed to open log file for DAG", "error", err)
+				initLogger.Error("Log file creation failed",
+					"error", err,
+					"workflow", workflow.Name)
 				os.Exit(1)
 			}
 			defer logFile.Close()
@@ -79,10 +90,14 @@ func retryCmd() *cobra.Command {
 
 			cli := newClient(cfg, dataStore, agentLogger)
 
-			agentLogger.Infof("Retrying with request ID: %s", requestID)
+			agentLogger.Info("Workflow retry initiated",
+				"workflow", workflow.Name,
+				"originalRequestID", reqID,
+				"newRequestID", newRequestID,
+				"logFile", logFile.Name())
 
 			agt := agent.New(
-				requestID,
+				newRequestID,
 				workflow,
 				agentLogger,
 				filepath.Dir(logFile.Name()),

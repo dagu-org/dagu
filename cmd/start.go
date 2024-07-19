@@ -22,12 +22,12 @@ func startCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
 
 			quiet, err := cmd.Flags().GetBool("quiet")
 			if err != nil {
-				log.Fatalf("Failed to get quiet flag: %v", err)
+				log.Fatalf("Flag retrieval failed (quiet): %v", err)
 			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
@@ -38,25 +38,31 @@ func startCmd() *cobra.Command {
 
 			params, err := cmd.Flags().GetString("params")
 			if err != nil {
-				initLogger.Error("Failed to get params", "error", err)
+				initLogger.Error("Parameter retrieval failed", "error", err)
 				os.Exit(1)
 			}
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], params)
 			if err != nil {
-				initLogger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
 			}
 
 			requestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Failed to generate request ID", "error", err)
+				initLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
 			}
 
 			logFile, err := openLogFile("start_", cfg.LogDir, workflow, requestID)
 			if err != nil {
-				initLogger.Error("Failed to open log file for DAG", "error", err)
+				initLogger.Error(
+					"Log file creation failed",
+					"error",
+					err,
+					"workflow",
+					workflow.Name,
+				)
 				os.Exit(1)
 			}
 			defer logFile.Close()
@@ -71,7 +77,10 @@ func startCmd() *cobra.Command {
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, agentLogger)
 
-			agentLogger.Infof("Starting workflow: %s", workflow.Name)
+			agentLogger.Info("Workflow execution initiated",
+				"workflow", workflow.Name,
+				"requestID", requestID,
+				"logFile", logFile.Name())
 
 			agt := agent.New(
 				requestID,
@@ -88,7 +97,10 @@ func startCmd() *cobra.Command {
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {
-				agentLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Workflow execution failed",
+					"error", err,
+					"workflow", workflow.Name,
+					"requestID", requestID)
 				os.Exit(1)
 			}
 		},

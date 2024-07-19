@@ -19,12 +19,12 @@ func stopCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
 
 			quiet, err := cmd.Flags().GetBool("quiet")
 			if err != nil {
-				log.Fatalf("Failed to get quiet flag: %v", err)
+				log.Fatalf("Flag retrieval failed (quiet): %v", err)
 			}
 
 			logger := logger.NewLogger(logger.NewLoggerArgs{
@@ -35,17 +35,23 @@ func stopCmd() *cobra.Command {
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
-				logger.Error("Failed to load workflow", "error", err)
+				logger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
 			}
 
-			logger.Infof("Stopping workflow: %s", workflow.Name)
+			logger.Info("Workflow stop initiated", "workflow", workflow.Name)
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, logger)
 
 			if err := cli.Stop(workflow); err != nil {
-				logger.Error("Failed to stop the workflow", "error", err)
+				logger.Error(
+					"Workflow stop operation failed",
+					"error",
+					err,
+					"workflow",
+					workflow.Name,
+				)
 				os.Exit(1)
 			}
 		},

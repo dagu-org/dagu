@@ -14,7 +14,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/model"
 	"github.com/dagu-dev/dagu/internal/sock"
-	"github.com/dagu-dev/dagu/internal/util"
 )
 
 // New creates a new Client instance.
@@ -92,8 +91,9 @@ func (e *client) Stop(workflow *dag.DAG) error {
 
 func (e *client) StartAsync(workflow *dag.DAG, opts StartOptions) {
 	go func() {
-		err := e.Start(workflow, opts)
-		util.LogErr("starting a DAG", err)
+		if err := e.Start(workflow, opts); err != nil {
+			e.logger.Error("Workflow start operation failed", "error", err)
+		}
 	}()
 }
 

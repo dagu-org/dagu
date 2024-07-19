@@ -39,7 +39,10 @@ func (r *reporter) reportStep(
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		r.logger.Infof("Done %s (%s)", node.Data().Name, nodeStatus)
+		r.logger.Info("Step execution finished",
+			"step", node.Data().Name,
+			"status", nodeStatus,
+		)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
 		return r.sender.Send(

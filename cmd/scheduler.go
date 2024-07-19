@@ -20,7 +20,7 @@ func schedulerCmd() *cobra.Command {
 			cfg, err := config.Load()
 			if err != nil {
 				// nolint
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
 				LogLevel:  cfg.LogLevel,
@@ -31,14 +31,23 @@ func schedulerCmd() *cobra.Command {
 				cfg.DAGs = dagsOpt
 			}
 
-			logger.Info("Starting the scheduler", "dags", cfg.DAGs)
+			logger.Info("Scheduler initialization",
+				"specsDirectory", cfg.DAGs,
+				"logLevel", cfg.LogLevel,
+				"logFormat", cfg.LogFormat)
 
 			ctx := cmd.Context()
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, logger)
 			sc := scheduler.New(cfg, logger, cli)
 			if err := sc.Start(ctx); err != nil {
-				logger.Error("Failed to start scheduler", "error", err)
+				logger.Error(
+					"Scheduler initialization failed",
+					"error",
+					err,
+					"specsDirectory",
+					cfg.DAGs,
+				)
 				os.Exit(1)
 			}
 		},

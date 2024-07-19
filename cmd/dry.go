@@ -31,25 +31,31 @@ func dryCmd() *cobra.Command {
 
 			params, err := cmd.Flags().GetString("params")
 			if err != nil {
-				initLogger.Error("Failed to get params", "error", err)
+				initLogger.Error("Parameter retrieval failed", "error", err)
 				os.Exit(1)
 			}
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], params)
 			if err != nil {
-				initLogger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
 			}
 
 			requestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Failed to generate request ID", "error", err)
+				initLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
 			}
 
 			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, requestID)
 			if err != nil {
-				initLogger.Error("Failed to open log file for DAG", "error", err)
+				initLogger.Error(
+					"Log file creation failed",
+					"error",
+					err,
+					"workflow",
+					workflow.Name,
+				)
 				os.Exit(1)
 			}
 			defer logFile.Close()
@@ -78,7 +84,10 @@ func dryCmd() *cobra.Command {
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {
-				agentLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Workflow execution failed",
+					"error", err,
+					"workflow", workflow.Name,
+					"requestID", requestID)
 				os.Exit(1)
 			}
 		},

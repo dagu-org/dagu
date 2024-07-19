@@ -24,12 +24,12 @@ func restartCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				log.Fatalf("Failed to load config: %v", err)
+				log.Fatalf("Configuration load failed: %v", err)
 			}
 
 			quiet, err := cmd.Flags().GetBool("quiet")
 			if err != nil {
-				log.Fatalf("Failed to get quiet flag: %v", err)
+				log.Fatalf("Flag retrieval failed (quiet): %v", err)
 			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
@@ -39,10 +39,10 @@ func restartCmd() *cobra.Command {
 			})
 
 			// Load the DAG file and stop the DAG if it is running.
-			dagFilePath := args[0]
-			workflow, err := dag.Load(cfg.BaseConfig, dagFilePath, "")
+			specFilePath := args[0]
+			workflow, err := dag.Load(cfg.BaseConfig, specFilePath, "")
 			if err != nil {
-				initLogger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
 			}
 
@@ -50,7 +50,9 @@ func restartCmd() *cobra.Command {
 			cli := newClient(cfg, dataStore, initLogger)
 
 			if err := stopDAGIfRunning(cli, workflow, initLogger); err != nil {
-				initLogger.Error("Failed to stop the DAG", "error", err)
+				initLogger.Error("Workflow stop operation failed",
+					"error", err,
+					"workflow", workflow.Name)
 				os.Exit(1)
 			}
 
@@ -60,27 +62,34 @@ func restartCmd() *cobra.Command {
 			// Retrieve the parameter of the previous execution.
 			params, err := getPreviousExecutionParams(cli, workflow)
 			if err != nil {
-				initLogger.Error("Failed to get previous execution params", "error", err)
+				initLogger.Error("Previous execution parameter retrieval failed",
+					"error", err,
+					"workflow", workflow.Name)
 				os.Exit(1)
 			}
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			workflow, err = dag.Load(cfg.BaseConfig, dagFilePath, params)
+			workflow, err = dag.Load(cfg.BaseConfig, specFilePath, params)
 			if err != nil {
-				initLogger.Error("Failed to load DAG", "error", err)
+				initLogger.Error("Workflow reload failed",
+					"error", err,
+					"file", specFilePath,
+					"params", params)
 				os.Exit(1)
 			}
 
 			requestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Failed to generate request ID", "error", err)
+				initLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
 			}
 
 			logFile, err := openLogFile("restart_", cfg.LogDir, workflow, requestID)
 			if err != nil {
-				initLogger.Error("Failed to open log file for DAG", "error", err)
+				initLogger.Error("Log file creation failed",
+					"error", err,
+					"workflow", workflow.Name)
 				os.Exit(1)
 			}
 			defer logFile.Close()
@@ -92,7 +101,10 @@ func restartCmd() *cobra.Command {
 				Quiet:     quiet,
 			})
 
-			agentLogger.Infof("Restarting: %s", workflow.Name)
+			agentLogger.Info("Workflow restart initiated",
+				"workflow", workflow.Name,
+				"requestID", requestID,
+				"logFile", logFile.Name())
 
 			agt := agent.New(
 				requestID,
@@ -106,7 +118,10 @@ func restartCmd() *cobra.Command {
 
 			listenSignals(cmd.Context(), agt)
 			if err := agt.Run(cmd.Context()); err != nil {
-				agentLogger.Error("Failed to start DAG", "error", err)
+				agentLogger.Error("Workflow restart failed",
+					"error", err,
+					"workflow", workflow.Name,
+					"requestID", requestID)
 				os.Exit(1)
 			}
 		},
