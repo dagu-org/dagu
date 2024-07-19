@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-dev/dagu/internal/engine"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/dagu-dev/dagu/internal/scheduler/filenotify"
 
 	"github.com/dagu-dev/dagu/internal/dag"
@@ -49,7 +48,7 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 		engine:     args.Engine,
 	}
 	if err := er.initDags(); err != nil {
-		er.logger.Error("failed to init entryreader dags", tag.Err, err)
+		er.logger.Error("failed to init entryreader dags", "error", err)
 	}
 	return er
 }
@@ -103,7 +102,7 @@ func (er *entryReaderImpl) initDags() error {
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
-				er.logger.Error("failed to read DAG cfg", tag.Err, err)
+				er.logger.Error("failed to read DAG cfg", "error", err)
 				continue
 			}
 			er.dags[fi.Name()] = dg
@@ -118,7 +117,7 @@ func (er *entryReaderImpl) initDags() error {
 func (er *entryReaderImpl) watchDags(done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		er.logger.Error("failed to init file watcher", tag.Err, err)
+		er.logger.Error("failed to init file watcher", "error", err)
 		return
 	}
 
@@ -144,7 +143,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
-					er.logger.Error("failed to read DAG cfg", tag.Err, err)
+					er.logger.Error("failed to read DAG cfg", "error", err)
 				} else {
 					er.dags[filepath.Base(event.Name)] = dg
 					er.logger.Info(
@@ -161,7 +160,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			er.logger.Error("watch entryreader DAGs error", tag.Err, err)
+			er.logger.Error("watch entryreader DAGs error", "error", err)
 		}
 	}
 

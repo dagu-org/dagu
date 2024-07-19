@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi"
 	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/logger/tag"
 	"github.com/go-openapi/loads"
 	flags "github.com/jessevdk/go-flags"
 
@@ -89,7 +88,7 @@ func (svr *Server) Shutdown() {
 	}
 	err := svr.server.Shutdown()
 	if err != nil {
-		svr.logger.Warn("Server shutdown", tag.Err, err)
+		svr.logger.Warn("Server shutdown", "error", err)
 	}
 }
 
@@ -112,7 +111,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 
 	swaggerSpec, err := loads.Analyzed(restapi.SwaggerJSON, "")
 	if err != nil {
-		svr.logger.Error("failed to load API spec", tag.Err, err)
+		svr.logger.Error("failed to load API spec", "error", err)
 		return err
 	}
 	api := operations.NewDaguAPI(swaggerSpec)
@@ -141,7 +140,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		// Trigger graceful shutdown
 		err := svr.server.Shutdown()
 		if err != nil {
-			svr.logger.Error("server shutdown error", tag.Err, err)
+			svr.logger.Error("server shutdown error", "error", err)
 		}
 		serverStopCtx()
 	}()
@@ -157,7 +156,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	// Run the server
 	err = svr.server.Serve()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		svr.logger.Error("server error", tag.Err, err)
+		svr.logger.Error("server error", "error", err)
 	}
 
 	// Wait for server context to be stopped
