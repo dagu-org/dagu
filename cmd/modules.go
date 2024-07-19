@@ -3,24 +3,9 @@ package cmd
 import (
 	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/engine"
-	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/dagu-dev/dagu/internal/persistence"
 	"github.com/dagu-dev/dagu/internal/persistence/client"
-	"go.uber.org/fx"
 )
-
-// baseModule is a common module for all commands.
-var baseModule = fx.Options(
-	fx.Provide(newLogger),
-	fx.Provide(newEngine),
-	fx.Provide(client.NewDataStores),
-)
-
-func newLogger(cfg *config.Config) logger.Logger {
-	return logger.NewLogger(logger.NewLoggerArgs{
-		Config: cfg,
-	})
-}
 
 func newEngine(cfg *config.Config) engine.Engine {
 	return engine.New(&engine.NewEngineArgs{
