@@ -36,7 +36,7 @@ esac
 
 # Create a temporary directory for the download
 TMPDIR=$(mktemp -d)
-export TAR_FILE="${TMPDIR}/${FILE_BASENAME}_$(shell uname -s)_${ARCHITECTURE}.tar.gz"
+export TAR_FILE="${TMPDIR}/${FILE_BASENAME}_$(uname -s)_${ARCHITECTURE}.tar.gz"
 
 # Download the binary
 echo "Downloading Dagu $VERSION..."
