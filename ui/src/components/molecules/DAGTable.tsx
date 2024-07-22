@@ -369,11 +369,14 @@ const defaultColumns = [
       if (data.Type == DAGDataType.Group) {
         return null;
       }
+
+      const name = data.DAGStatus.File.replace(/.yaml$/, '');
+
       return (
         <DAGActions
           dag={data.DAGStatus.DAG}
           status={data.DAGStatus.Status}
-          name={data.DAGStatus.DAG.Name}
+          name={name}
           label={false}
           refresh={props.table.options.meta?.refreshFn}
         />
