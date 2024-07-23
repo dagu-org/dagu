@@ -1,6 +1,6 @@
 coverage:
   ignore:
-    - "internal/web/handlers"
+    - "internal/frontend"
   status:
     project:
       default:
@@ -8,4 +8,4 @@ coverage:
         threshold: 5%
     patch: off
 github_checks:
-    annotations: false
+  annotations: false
