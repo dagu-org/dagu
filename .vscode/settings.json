@@ -1,29 +1,18 @@
 {
     "editor.formatOnSave": true,
-    "[go]": {
-        "editor.insertSpaces": true,
-        "editor.formatOnSave": true,
-        "editor.defaultFormatter": "golang.go"
-    },
-    "editor.rulers": [
-        80
-    ],
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.renderWhitespace": "all",
+    "files.associations": {
+        "*.gohtml": "html"
+    },
+    "go.formatTool": "gofmt",
     "go.lintTool": "golangci-lint",
     "go.lintFlags": [
         "--fast"
     ],
-    "go.formatTool": "gofmt",
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "files.associations": {
-        "*.gohtml": "html"
-    },
-    "emeraldwalk.runonsave": {
-        "commands": [
-            {
-                "match": "\\.go$",
-                "cmd": "golines ${file} -w"
-            }
-        ]
+    "[go]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "golang.go",
+        "editor.insertSpaces": true,
     },
 }

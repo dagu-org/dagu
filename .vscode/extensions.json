@@ -6,7 +6,5 @@
     "dbaeumer.vscode-eslint",
     // Prettier
     "esbenp.prettier-vscode",
-    // Run on save
-    "emeraldwalk.runonsave",
   ]
 }
