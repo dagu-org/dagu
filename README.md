@@ -15,7 +15,7 @@
   <a href="https://godoc.org/github.com/dagu-dev/dagu">
     <img src="https://godoc.org/github.com/dagu-dev/dagu?status.svg" />
   </a>
-  <img src="https://github.com/dagu-dev/dagu/actions/workflows/test.yaml/badge.svg" />
+  <img src="https://github.com/dagu-dev/dagu/actions/workflows/ci.yaml/badge.svg" />
 </p>
 
 <div align="center">
