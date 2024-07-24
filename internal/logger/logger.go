@@ -16,11 +16,13 @@ type (
 		Info(msg string, tags ...any)
 		Warn(msg string, tags ...any)
 		Error(msg string, tags ...any)
+		Fatal(msg string, tags ...any)
 
 		Debugf(format string, v ...any)
 		Infof(format string, v ...any)
 		Warnf(format string, v ...any)
 		Errorf(format string, v ...any)
+		Fatalf(format string, v ...any)
 
 		With(attrs ...any) Logger
 		WithGroup(name string) Logger
@@ -172,6 +174,12 @@ func (a *appLogger) Warnf(format string, v ...any) {
 	a.logger.Warn(fmt.Sprintf(a.prefix+format, v...))
 }
 
+// Fatalf implements logger.Logger.
+func (a *appLogger) Fatalf(format string, v ...any) {
+	a.logger.Error(fmt.Sprintf(a.prefix+format, v...))
+	os.Exit(1)
+}
+
 // Debug implements logger.Logger.
 func (a *appLogger) Debug(msg string, tags ...any) {
 	a.logger.Debug(a.prefix+msg, tags...)
@@ -190,6 +198,12 @@ func (a *appLogger) Info(msg string, tags ...any) {
 // Warn implements logger.Logger.
 func (a *appLogger) Warn(msg string, tags ...any) {
 	a.logger.Warn(a.prefix+msg, tags...)
+}
+
+// Fatal implements logger.Logger.
+func (a *appLogger) Fatal(msg string, tags ...any) {
+	a.logger.Error(a.prefix+msg, tags...)
+	os.Exit(1)
 }
 
 // With implements logger.Logger.

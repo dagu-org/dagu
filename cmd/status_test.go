@@ -17,7 +17,7 @@ func TestStatusCommand(t *testing.T) {
 		// Start the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, startCmd(), cmdTest{args: []string{"start", dagFile}})
+			testRunCommand(t, startCommand(), cmdTest{args: []string{"start", dagFile}})
 			close(done)
 		}()
 

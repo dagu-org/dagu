@@ -17,7 +17,7 @@ func TestRetryCommand(t *testing.T) {
 		dagFile := testDAGFile("retry.yaml")
 
 		// Run a DAG.
-		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+		testRunCommand(t, startCommand(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 		// Find the request ID.
 		cli := setup.Client()

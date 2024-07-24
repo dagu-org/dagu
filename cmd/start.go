@@ -1,62 +1,42 @@
 package main
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/dagu-dev/dagu/internal/agent"
-	"github.com/dagu-dev/dagu/internal/config"
 	"github.com/dagu-dev/dagu/internal/dag"
 	"github.com/dagu-dev/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
-func startCmd() *cobra.Command {
+func startCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [flags] /path/to/spec.yaml",
-		Short: "Runs the DAG",
-		Long:  `dagu start [--params="param1 param2"] /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
+		Use:   "start [flags] -n <workflow name>",
+		Short: "Runs the workflow",
+		Long:  `dagu start [--params="param1 param2"] <workflow name>`,
+		Args:  cobra.ArbitraryArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				// nolint
-				log.Fatalf("Configuration load failed: %v", err)
-			}
+			initialize(cmd)
 
-			quiet, err := cmd.Flags().GetBool("quiet")
-			if err != nil {
-				log.Fatalf("Flag retrieval failed (quiet): %v", err)
-			}
+			name := cmd.Flag("name").Value.String()
+			params := cmd.Flag("params").Value.String()
 
-			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				Quiet:     quiet,
-			})
-
-			params, err := cmd.Flags().GetString("params")
+			workflow, err := dag.Load(appConfig.BaseConfig, name, params)
 			if err != nil {
-				initLogger.Error("Parameter retrieval failed", "error", err)
-				os.Exit(1)
-			}
-
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], params)
-			if err != nil {
-				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
+				appLogger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
 			}
 
 			requestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
+				appLogger.Error("Request ID generation failed", "error", err)
 				os.Exit(1)
 			}
 
-			logFile, err := openLogFile("start_", cfg.LogDir, workflow, requestID)
+			logFile, err := openLogFile("start_", appConfig.LogDir, workflow, requestID)
 			if err != nil {
-				initLogger.Error(
+				appLogger.Error(
 					"Log file creation failed",
 					"error",
 					err,
@@ -68,14 +48,14 @@ func startCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
+				LogLevel:  appConfig.LogLevel,
+				LogFormat: appConfig.LogFormat,
 				LogFile:   logFile,
 				Quiet:     quiet,
 			})
 
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, agentLogger)
+			dataStore := newDataStores(appConfig)
+			cli := newClient(appConfig, dataStore, agentLogger)
 
 			agentLogger.Info("Workflow execution initiated",
 				"workflow", workflow.Name,
@@ -107,6 +87,11 @@ func startCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	cmd.Flags().StringP("name", "n", "", "workflow name")
+	if err := cmd.MarkFlagRequired("name"); err != nil {
+		appLogger.Error("Flag marking failed", "error", err)
+		os.Exit(1)
+	}
+
 	return cmd
 }

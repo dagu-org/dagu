@@ -30,6 +30,6 @@ func TestStartCommand(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		testRunCommand(t, startCmd(), tc)
+		testRunCommand(t, startCommand(), tc)
 	}
 }

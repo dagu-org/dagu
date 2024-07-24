@@ -14,7 +14,8 @@
                 "start",
                 "--config",
                 "${workspaceFolder}/config/config.local.yaml",
-                "${workspaceFolder}/examples/hello_world.yaml",
+                "--name",
+                "hello_world",
             ]
         },
         {

@@ -26,7 +26,7 @@ func TestRestartCommand(t *testing.T) {
 		go func() {
 			testRunCommand(
 				t,
-				startCmd(),
+				startCommand(),
 				cmdTest{args: []string{"start", `--params="foo"`, dagFile}},
 			)
 		}()
