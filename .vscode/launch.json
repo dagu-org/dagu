@@ -5,11 +5,24 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Start Workflow",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd",
+            "args": [
+                "start",
+                "--config",
+                "${workspaceFolder}/config/config.local.yaml",
+                "${workspaceFolder}/examples/hello_world.yaml",
+            ]
+        },
+        {
             "name": "Server",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/main.go",
+            "program": "${workspaceFolder}/cmd/main.go",
             "args": [
                 "server",
                 "--port=8080",
@@ -17,16 +30,5 @@
                 "localhost"
             ]
         },
-        {
-            "name": "Hello World",
-            "type": "go",
-            "request": "launch",
-            "mode": "auto",
-            "program": "${workspaceFolder}/main.go",
-            "args": [
-                "start",
-                "${workspaceFolder}/examples/hello_world.yaml"
-            ]
-        }
     ]
 }

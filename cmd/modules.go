@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"github.com/dagu-dev/dagu/internal/client"

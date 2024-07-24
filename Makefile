@@ -23,7 +23,7 @@ CONFIG_DIR=$(SCRIPT_DIR)/config
 # Local build settings
 BIN_DIR=$(SCRIPT_DIR)/bin
 BUILD_VERSION=$(shell date +'%y%m%d%H%M%S')
-LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
+LDFLAGS=-X 'cmd.version=$(BUILD_VERSION)'
 
 # Application name
 
