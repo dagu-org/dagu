@@ -151,13 +151,13 @@ ifeq ($(VERSION),)
 	$(error "VERSION is not set")
 endif
 	echo "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
-	$(DOCKER_CMD) -t ghcr.io/dagu-dev/${APP_NAME}:$(VERSION) .
+	$(DOCKER_CMD) -t ghcr.io/daguflow/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 build-image-latest:
 	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
-	$(DOCKER_CMD) -t ghcr.io/dagu-dev/${APP_NAME}:latest .
+	$(DOCKER_CMD) -t ghcr.io/daguflow/${APP_NAME}:latest .
 
 gomerger: ${LOCAL_DIR}/merged
 	@echo "${COLOR_GREEN}Merging Go files...${COLOR_RESET}"

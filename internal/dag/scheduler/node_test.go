@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag"
 	"github.com/stretchr/testify/require"
 )
 

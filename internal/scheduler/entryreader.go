@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/client"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/scheduler/filenotify"
+	"github.com/daguflow/dagu/internal/client"
+	"github.com/daguflow/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/scheduler/filenotify"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
 

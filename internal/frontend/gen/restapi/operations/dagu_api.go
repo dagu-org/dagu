@@ -19,7 +19,7 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 
-	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
 )
 
 // NewDaguAPI creates a new Dagu instance

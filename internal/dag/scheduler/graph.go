@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/logger"
 )
 
 // ExecutionGraph represents a graph of steps.

@@ -11,20 +11,20 @@ Via Homebrew
 
 .. code-block:: bash
 
-   brew install dagu-dev/brew/dagu
+   brew install daguflow/brew/dagu
 
 Upgrade to the latest version:
 
 .. code-block:: bash
 
-   brew upgrade dagu-dev/brew/dagu
+   brew upgrade daguflow/brew/dagu
 
 Via Bash script
 ---------------
 
 .. code-block:: bash
 
-   curl -L https://raw.githubusercontent.com/dagu-dev/dagu/main/scripts/installer.sh | bash
+   curl -L https://raw.githubusercontent.com/daguflow/dagu/main/scripts/installer.sh | bash
 
 Via Docker
 ----------
@@ -36,9 +36,9 @@ Via Docker
    -p 8080:8080 \
    -v $HOME/.config/dagu:/home/dagu/.config/dagu \
    -v $HOME/.config/dagu/.local/share:/home/dagu/.local/share \
-   ghcr.io/dagu-dev/dagu:latest
+   ghcr.io/daguflow/dagu:latest
 
 Via GitHub Release Page
 -----------------------
 
-Download the latest binary from the `Releases page <https://github.com/dagu-dev/dagu/releases>`_ and place it in your ``$PATH`` (e.g. ``/usr/local/bin``).
+Download the latest binary from the `Releases page <https://github.com/daguflow/dagu/releases>`_ and place it in your ``$PATH`` (e.g. ``/usr/local/bin``).

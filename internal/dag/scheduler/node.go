@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/dag/executor"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag/executor"
+	"github.com/daguflow/dagu/internal/util"
 	"golang.org/x/sys/unix"
 )
 

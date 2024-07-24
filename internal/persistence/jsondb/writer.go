@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/persistence/model"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/util"
 )
 
 // Writer is the interface to write status to local file.

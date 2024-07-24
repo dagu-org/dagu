@@ -4,7 +4,7 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"github.com/dagu-dev/dagu/internal/config"
+	"github.com/daguflow/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

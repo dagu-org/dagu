@@ -3,8 +3,8 @@ package scheduler
 import (
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/logger"
 	"github.com/stretchr/testify/require"
 )
 

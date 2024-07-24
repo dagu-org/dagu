@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/util"
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
 
