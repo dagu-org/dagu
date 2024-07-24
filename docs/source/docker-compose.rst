@@ -9,7 +9,7 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
   services:
       # init container updates permission
       init:
-          image: "ghcr.io/dagu-dev/dagu:latest"
+          image: "ghcr.io/daguflow/dagu:latest"
           user: root
           volumes:
               - dagu_config:/home/dagu/.config/dagu
@@ -17,7 +17,7 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
           command: chown -R dagu /home/dagu/.config/dagu/ /home/dagu/.local/share
       # ui server process
       server:
-          image: "ghcr.io/dagu-dev/dagu:latest"
+          image: "ghcr.io/daguflow/dagu:latest"
           environment:
               - DAGU_PORT=8080
           restart: unless-stopped
@@ -30,7 +30,7 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
               - init
       # scheduler process
       scheduler:
-          image: "ghcr.io/dagu-dev/dagu:latest"
+          image: "ghcr.io/daguflow/dagu:latest"
           restart: unless-stopped
           volumes:
               - dagu_config:/home/dagu/.config/dagu

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag"
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
 )

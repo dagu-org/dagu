@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/scheduler"
+	"github.com/daguflow/dagu/internal/config"
+	"github.com/daguflow/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

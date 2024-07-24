@@ -3,9 +3,9 @@ package client
 import (
 	"path/filepath"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/persistence"
+	"github.com/daguflow/dagu/internal/persistence/model"
 )
 
 type Client interface {

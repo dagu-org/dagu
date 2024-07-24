@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag"
 	"github.com/go-resty/resty/v2"
 	"github.com/mitchellh/mapstructure"
 )

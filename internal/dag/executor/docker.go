@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/util"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag"
 	"github.com/itchyny/gojq"
 	"github.com/mitchellh/mapstructure"
 )

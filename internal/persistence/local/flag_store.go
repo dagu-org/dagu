@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/local/storage"
+	"github.com/daguflow/dagu/internal/persistence"
+	"github.com/daguflow/dagu/internal/persistence/local/storage"
 )
 
 type flagStoreImpl struct {

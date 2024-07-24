@@ -224,7 +224,7 @@ In the example below, it pulls and runs `Deno's docker image <https://hub.docker
 
 Example Log output:
 
-.. image:: https://raw.githubusercontent.com/dagu-dev/dagu/main/examples/images/docker.png
+.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/docker.png
 
 By default, Dagu will try to pull the Docker image. For images built locally this will fail. If you want to skip image pull, pass :code:`pull: false` in executor config.
 

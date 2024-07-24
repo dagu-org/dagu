@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/logger"
 	"github.com/go-chi/chi/v5/middleware"
 )
 

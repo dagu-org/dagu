@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 

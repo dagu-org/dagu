@@ -4,10 +4,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/client"
-	"github.com/dagu-dev/dagu/internal/dag"
-	dagscheduler "github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/client"
+	"github.com/daguflow/dagu/internal/dag"
+	dagscheduler "github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/util"
 )
 
 var (

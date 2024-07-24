@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/util"
 	"go.uber.org/goleak"
 )
 

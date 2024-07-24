@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/test"
+	"github.com/daguflow/dagu/internal/test"
 )
 
 func TestDryCommand(t *testing.T) {

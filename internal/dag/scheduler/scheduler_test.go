@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 

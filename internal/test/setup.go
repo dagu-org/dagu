@@ -6,12 +6,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dagu-dev/dagu/internal/client"
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/persistence"
-	dsclient "github.com/dagu-dev/dagu/internal/persistence/client"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/client"
+	"github.com/daguflow/dagu/internal/config"
+	"github.com/daguflow/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/persistence"
+	dsclient "github.com/daguflow/dagu/internal/persistence/client"
+	"github.com/daguflow/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )

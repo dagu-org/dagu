@@ -24,7 +24,7 @@ import (
 	flags "github.com/jessevdk/go-flags"
 	"golang.org/x/net/netutil"
 
-	"github.com/dagu-dev/dagu/internal/frontend/gen/restapi/operations"
+	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
 )
 
 const (

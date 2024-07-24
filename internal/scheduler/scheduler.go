@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/client"
-	"github.com/dagu-dev/dagu/internal/config"
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/client"
+	"github.com/daguflow/dagu/internal/config"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/logger"
 )
 
 type Scheduler struct {

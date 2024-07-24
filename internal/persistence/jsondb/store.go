@@ -16,12 +16,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/filecache"
+	"github.com/daguflow/dagu/internal/persistence"
+	"github.com/daguflow/dagu/internal/persistence/filecache"
 
-	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/persistence/model"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/util"
 )
 
 // Store is the interface to store dags status in local.

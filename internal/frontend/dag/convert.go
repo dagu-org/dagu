@@ -1,9 +1,9 @@
 package dag
 
 import (
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/frontend/gen/models"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/frontend/gen/models"
+	"github.com/daguflow/dagu/internal/persistence/model"
 	"github.com/go-openapi/swag"
 )
 

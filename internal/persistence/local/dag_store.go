@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/persistence"
-	"github.com/dagu-dev/dagu/internal/persistence/filecache"
+	"github.com/daguflow/dagu/internal/persistence"
+	"github.com/daguflow/dagu/internal/persistence/filecache"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/persistence/grep"
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/persistence/grep"
+	"github.com/daguflow/dagu/internal/util"
 )
 
 type dagStoreImpl struct {

@@ -6,8 +6,8 @@ package main
 import (
 	"os"
 
-	"github.com/dagu-dev/dagu/cmd"
-	"github.com/dagu-dev/dagu/internal/constants"
+	"github.com/daguflow/dagu/cmd"
+	"github.com/daguflow/dagu/internal/constants"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/test"
+	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/test"
 )
 
 func TestStopCommand(t *testing.T) {

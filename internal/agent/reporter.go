@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 

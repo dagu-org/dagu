@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/dagu-dev/dagu/internal/constants"
+	"github.com/daguflow/dagu/internal/constants"
 )
 
 var (

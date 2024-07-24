@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/persistence/grep"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/persistence/grep"
+	"github.com/daguflow/dagu/internal/persistence/model"
 )
 
 var (

@@ -12,15 +12,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-dev/dagu/internal/logger"
-	"github.com/dagu-dev/dagu/internal/persistence"
+	"github.com/daguflow/dagu/internal/logger"
+	"github.com/daguflow/dagu/internal/persistence"
 
-	"github.com/dagu-dev/dagu/internal/client"
-	"github.com/dagu-dev/dagu/internal/dag"
-	"github.com/dagu-dev/dagu/internal/dag/scheduler"
-	"github.com/dagu-dev/dagu/internal/mailer"
-	"github.com/dagu-dev/dagu/internal/persistence/model"
-	"github.com/dagu-dev/dagu/internal/sock"
+	"github.com/daguflow/dagu/internal/client"
+	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/mailer"
+	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/daguflow/dagu/internal/sock"
 )
 
 // Agent is responsible for running the DAG and handling communication

@@ -9,9 +9,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dagu-dev/dagu/internal/util"
+	"github.com/daguflow/dagu/internal/util"
 
-	"github.com/dagu-dev/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/dag"
 )
 
 type commandExecutor struct {
