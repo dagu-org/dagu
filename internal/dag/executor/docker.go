@@ -46,9 +46,9 @@ func (e *docker) Kill(_ os.Signal) error {
 }
 
 func (e *docker) Run() error {
-	ctx, fn := context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	e.context = ctx
-	e.cancel = fn
+	e.cancel = cancelFunc
 
 	cli, err := client.NewClientWithOpts(
 		client.FromEnv, client.WithAPIVersionNegotiation(),
@@ -82,18 +82,31 @@ func (e *docker) Run() error {
 		return err
 	}
 
+	removing := false
+	removeContainer := func() {
+		if !e.autoRemove || removing {
+			return
+		}
+		removing = true
+		err := cli.ContainerRemove(
+			ctx, resp.ID, types.ContainerRemoveOptions{
+				Force: true,
+			},
+		)
+		util.LogErr("docker executor: remove container", err)
+	}
+
+	defer removeContainer()
+	e.cancel = func() {
+		removeContainer()
+		cancelFunc()
+	}
+
 	if err := cli.ContainerStart(
 		ctx, resp.ID, types.ContainerStartOptions{},
 	); err != nil {
 		return err
 	}
-
-	defer func() {
-		if e.autoRemove {
-			err := cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{})
-			util.LogErr("docker executor: remove container", err)
-		}
-	}()
 
 	out, err := cli.ContainerLogs(
 		ctx, resp.ID, types.ContainerLogsOptions{
