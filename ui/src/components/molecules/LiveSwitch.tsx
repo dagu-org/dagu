@@ -40,7 +40,7 @@ function LiveSwitch({ DAG, refresh, inputProps }: Props) {
     const enabled = !checked;
     setChecked(enabled);
     onSubmit({
-      name: DAG.DAG.Name,
+      name: DAG.File.replace(/.yaml$/, ''),
       action: 'suspend',
       value: enabled ? 'false' : 'true',
     });
