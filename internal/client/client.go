@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -284,7 +285,7 @@ func (e *client) GetStatus(id string) (*DAGStatus, error) {
 	}
 	latestStatus, _ := e.GetLatestStatus(dg)
 	return newDAGStatus(
-		dg, latestStatus, e.IsSuspended(dg.Name), err,
+		dg, latestStatus, e.IsSuspended(id), err,
 	), err
 }
 
@@ -295,8 +296,13 @@ func (e *client) ToggleSuspend(id string, suspend bool) error {
 
 func (e *client) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
 	latestStatus, err := e.GetLatestStatus(workflow)
+	id := strings.TrimSuffix(
+		filepath.Base(workflow.Location),
+		filepath.Ext(workflow.Location),
+	)
+
 	return newDAGStatus(
-		workflow, latestStatus, e.IsSuspended(workflow.Name), err,
+		workflow, latestStatus, e.IsSuspended(id), err,
 	), err
 }
 

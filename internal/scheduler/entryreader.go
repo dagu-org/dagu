@@ -75,7 +75,12 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	}
 
 	for _, workflow := range er.dags {
-		if er.client.IsSuspended(workflow.Name) {
+		id := strings.TrimSuffix(
+			filepath.Base(workflow.Location),
+			filepath.Ext(workflow.Location),
+		)
+
+		if er.client.IsSuspended(id) {
 			continue
 		}
 		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
