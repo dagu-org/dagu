@@ -35,7 +35,7 @@ func dryCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], params)
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
 				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
