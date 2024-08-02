@@ -56,7 +56,8 @@ func SetupTest(t *testing.T) Setup {
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
-	viper.AddConfigPath(config.ConfigDir)
+	configDir := filepath.Join(tmpDir, "config")
+	viper.AddConfigPath(configDir)
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
 
