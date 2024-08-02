@@ -150,6 +150,14 @@ func TestBuilder_BuildParams(t *testing.T) {
 			},
 		},
 		{
+			name:   "QuotedParams",
+			params: `x="1" y="2"`,
+			expected: map[string]string{
+				"x": "1",
+				"y": "2",
+			},
+		},
+		{
 			name:   "ComplexParams",
 			params: "first P1=foo P2=${FOO} P3=`/bin/echo BAR` X=bar Y=${P1} Z=\"A B C\"",
 			env:    "FOO: BAR",
@@ -173,11 +181,17 @@ func TestBuilder_BuildParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dg, err := unmarshalData([]byte(fmt.Sprintf(`
-env:
-  - %s
+			var data string
+			if tt.env != "" {
+				data = fmt.Sprintf(`env:
+- %s
 params: %s
-  	`, tt.env, tt.params)))
+`, tt.env, tt.params)
+			} else {
+				data = fmt.Sprintf(`params: %s
+`, tt.params)
+			}
+			dg, err := unmarshalData([]byte(data))
 			require.NoError(t, err)
 
 			def, err := decode(dg)

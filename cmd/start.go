@@ -42,7 +42,7 @@ func startCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], params)
+			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
 				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
@@ -109,4 +109,12 @@ func startCmd() *cobra.Command {
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
+}
+
+// removeQuotes removes the surrounding quotes from the string.
+func removeQuotes(s string) string {
+	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
