@@ -1,3 +1,18 @@
+// Copyright (C) 2024 The Daguflow/Dagu Authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package agent
 
 import (
@@ -125,7 +140,7 @@ func testSuccessMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*mod
 	require.Equal(t, 1, mock.count)
 }
 
-func testReportSummary(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -153,7 +168,7 @@ func testReportSummary(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*m
 	require.Contains(t, s, "test error")
 }
 
-func testRenderSummary(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, workflow *dag.DAG, nodes []*model.Node) {
 	status := &model.Status{
 		Name:   workflow.Name,
 		Status: scheduler.StatusError,
@@ -164,7 +179,7 @@ func testRenderSummary(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*m
 	require.Contains(t, summary, workflow.Name)
 }
 
-func testRenderTable(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *dag.DAG, nodes []*model.Node) {
 	summary := renderTable(nodes)
 	require.Contains(t, summary, nodes[0].Name)
 	require.Contains(t, summary, nodes[0].Args[0])

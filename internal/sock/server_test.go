@@ -1,3 +1,18 @@
+// Copyright (C) 2024 The Daguflow/Dagu Authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package sock_test
 
 import (
@@ -30,7 +45,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
-		func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 		},
@@ -70,7 +85,7 @@ func TestNoResponse(t *testing.T) {
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
-		func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
 		},
 		test.NewLogger(),
@@ -104,7 +119,7 @@ func TestErrorResponse(t *testing.T) {
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
-		func(w http.ResponseWriter, r *http.Request) {},
+		func(_ http.ResponseWriter, _ *http.Request) {},
 		test.NewLogger(),
 	)
 	require.NoError(t, err)
