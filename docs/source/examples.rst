@@ -1,7 +1,7 @@
-.. _examples:
+.. _Example DAGs:
 
-Examples
-========
+Example DAGs
+============
 
 .. contents::
     :local:
@@ -84,10 +84,9 @@ Running a Docker Container
       executor: 
         type: docker
         config:
-          image: "denoland/deno:1.10.3"
-          host:
-            autoRemove: true
-      command: run https://examples.deno.land/hello-world.ts
+          image: "denoland/deno:latest"
+          autoRemove: true
+      command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
 
 See :ref:`docker executor` for more details.
 
