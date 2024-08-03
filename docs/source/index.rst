@@ -35,7 +35,10 @@ Quick Start
 :ref:`YAML Format`
    Writing DAGs.
 
-:ref:`examples`
+:ref:`Executors`
+   Various Executors.
+
+:ref:`Example DAGs`
    Examples of DAGs.
 
 :ref:`Configuration Options`
@@ -62,6 +65,7 @@ Quick Start
    :hidden:
 
    yaml_format
+   executors
    base_config
    examples
 
