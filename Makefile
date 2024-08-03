@@ -26,7 +26,6 @@ BUILD_VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 
 # Application name
-
 APP_NAME=dagu
 
 # Docker image build configuration
@@ -160,6 +159,7 @@ build-image-latest:
 	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
 	$(DOCKER_CMD) -t ghcr.io/daguflow/${APP_NAME}:latest .
 
+# gomerger merges all go files into a single file.
 gomerger: ${LOCAL_DIR}/merged
 	@echo "${COLOR_GREEN}Merging Go files...${COLOR_RESET}"
 	@rm -f ${LOCAL_DIR}/merged/merged_project.go
@@ -170,6 +170,7 @@ gomerger: ${LOCAL_DIR}/merged
 ${LOCAL_DIR}/merged:
 	@mkdir -p ${LOCAL_DIR}/merged
 
+# addlicnese adds license header to all files.
 addlicense:
 	@echo "${COLOR_GREEN}Adding license headers...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_addlicense}
@@ -179,11 +180,13 @@ addlicense:
 # Internal targets
 ##############################################################################
 
+# build-bin builds the go application.
 build-bin:
 	@echo "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
 	@mkdir -p ${BIN_DIR}
 	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} .
 
+# build-ui builds the frontend codes.
 build-ui:
 	@echo "${COLOR_GREEN}Building UI...${COLOR_RESET}"
 	@cd ui; \
@@ -192,16 +195,19 @@ build-ui:
 	@rm -f ${FE_ASSETS_DIR}/*
 	@cp ${FE_BUILD_DIR}/* ${FE_ASSETS_DIR}
 
+# golangci-lint run linting tool.
 golangci-lint:
 	@echo "${COLOR_GREEN}Running linter...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_golangci_lint)
 	@${LOCAL_BIN_DIR}/golangci-lint run ./...
 
+# clean-swagger removes generated go files for swagger.
 clean-swagger:
 	@echo "${COLOR_GREEN}Cleaning the swagger files...${COLOR_RESET}"
 	@rm -rf ${FE_GEN_DIR}/restapi/models
 	@rm -rf ${FE_GEN_DIR}/restapi/operations
 
+# gen-swagger generates go files for the API schema.
 gen-swagger:
 	@echo "${COLOR_GREEN}Generating the swagger server code...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_swagger)
