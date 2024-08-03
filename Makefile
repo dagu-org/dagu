@@ -174,7 +174,26 @@ ${LOCAL_DIR}/merged:
 addlicense:
 	@echo "${COLOR_GREEN}Adding license headers...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_addlicense}
-	@${LOCAL_BIN_DIR}/addlicense -f scripts/header.txt -c "The Dagu Authors" .
+	@${LOCAL_BIN_DIR}/addlicense \
+		-ignore "**/node_modules/**" \
+		-ignore "./**/gen/**" \
+		-ignore "Dockerfile" \
+		-ignore "ui/*" \
+		-ignore "ui/**/*" \
+		-ignore "bin/*" \
+		-ignore "local/*" \
+		-ignore "docs/**" \
+		-ignore "**/examples/*" \
+		-ignore ".github/*" \
+		-ignore ".github/**/*" \
+		-ignore ".*" \
+		-ignore "**/*.yml" \
+		-ignore "**/*.yaml" \
+		-ignore "**/filenotify/*" \
+		-ignore "**/testdata/**" \
+		-c "The Dagu Authors" \
+		-f scripts/header.txt \
+		.
 
 ##############################################################################
 # Internal targets
