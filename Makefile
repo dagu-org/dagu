@@ -56,6 +56,7 @@ PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
 PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_gomerger=github.com/yohamta/gomerger
+PKG_addlicense=github.com/google/addlicense
 
 # Certificates for the development environment
 
@@ -168,6 +169,11 @@ gomerger: ${LOCAL_DIR}/merged
 
 ${LOCAL_DIR}/merged:
 	@mkdir -p ${LOCAL_DIR}/merged
+
+addlicense:
+	@echo "${COLOR_GREEN}Adding license headers...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_addlicense}
+	@${LOCAL_BIN_DIR}/addlicense -f scripts/header.txt -c "The Dagu Authors" .
 
 ##############################################################################
 # Internal targets
