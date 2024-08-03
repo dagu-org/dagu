@@ -6,14 +6,6 @@ Executors
 .. contents::
     :local:
 
-.. _Executors:
-
-Executors
-==========================
-
-.. contents::
-    :local:
-
 Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/daguflow/dagu/tree/main/internal/dag/executor>`_ are very welcome.
 
 .. _docker executor:
