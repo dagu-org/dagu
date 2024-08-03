@@ -11,7 +11,7 @@ var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(workflow *dag.DAG, next time.Time) job {
+func (f *mockJobFactory) CreateJob(workflow *dag.DAG, _ time.Time) job {
 	return newMockJob(workflow)
 }
 

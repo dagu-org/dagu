@@ -30,7 +30,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
-		func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 		},
@@ -70,7 +70,7 @@ func TestNoResponse(t *testing.T) {
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
-		func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
 		},
 		test.NewLogger(),
@@ -104,7 +104,7 @@ func TestErrorResponse(t *testing.T) {
 
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
-		func(w http.ResponseWriter, r *http.Request) {},
+		func(_ http.ResponseWriter, _ *http.Request) {},
 		test.NewLogger(),
 	)
 	require.NoError(t, err)

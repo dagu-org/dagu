@@ -1,72 +1,72 @@
 # https://golangci-lint.run/usage/configuration/#config-file
+# Linters: https://golangci-lint.run/usage/linters/
 linters:
   disable-all: true
   enable:
+    # enabled by default
     - errcheck
-    - goimports
-    - revive
-    - staticcheck
-    - govet
-    - forbidigo
-    - exhaustive
-    - godox
     - gosimple
+    - govet
     - ineffassign
+    - staticcheck
     - typecheck
     - unused
-    - misspell
+    # additional
+    - bodyclose
+    - goheader
+    - goimports
     - gosec
+    - misspell
+    - exhaustive
+    - revive
+
+issues:
+  exclude-use-default: true
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+  exclude-dirs:
+    - .github
+    - .vscode
+    - local
+    - config
+    - scripts
+    - ui
+    - docs
+    - gen
+
 linters-settings:
-  godox:
-    keywords:
-      - FIXME # marks TODOs that must be fixed before merging
   revive:
     severity: error
     confidence: 0.8
-    enable-all-rules: true
+    enable-all-rules: false
     rules:
-      # Disabled rules
-      - name: add-constant
-        disabled: true
-      - name: max-public-structs
-        disabled: true
-      - name: cognitive-complexity
-        disabled: true
-      - name: unchecked-type-assertion
-        disabled: true
-      - name: cyclomatic
-        disabled: true
-      - name: empty-lines
-        disabled: true
-      - name: confusing-naming
-        disabled: true
-      - name: bare-return
-        disabled: true
-      - name: flag-parameter
-        disabled: true
-      - name: unused-receiver
-        disabled: true
-      - name: function-length
-        disabled: true
-      - name: unused-parameter
-        disabled: true
-      - name: deep-exit
-        disabled: true
-      - name: line-length-limit
-        disabled: true
-issues:
-  exclude-dirs:
-    - ui
-    - assets
-    - .git
-    - cert
-    - bin
-    - internal/frontend/gen
-    - internal/scheduler/filenotify
-  exclude-rules:
-    - path: _test\.go|tests/.+\.go
-      linters:
-        - err113 # like err = errors.New("test error")
-        - gosec
-        - add-constant
-        - revive
+      - name: "unused-parameter"
+        disabled: false
+      - name: "import-alias-naming"
+        disabled: false
+      - name: "if-return"
+        disabled: false
+      - name: "error-return"
+        disabled: false
+      - name: "dot-imports"
+        disabled: false
+      - name: "struct-tag"
+        disabled: false
+      - name: "function-result-limit"
+        disabled: false
+      - name: "atomic"
+        disabled: false
+      - name: "use-any"
+        disabled: false
+      - name: "redundant-import-alias"
+        disabled: false
+      - name: "enforce-map-style"
+        disabled: false
+      - name: "enforce-slice-style"
+        disabled: false
+
+run:
+  allow-parallel-runners: true
+  go: "1.22"

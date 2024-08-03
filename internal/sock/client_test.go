@@ -33,7 +33,7 @@ func TestDialTimeout(t *testing.T) {
 
 	srv, err := sock.NewServer(
 		f.Name(),
-		func(w http.ResponseWriter, r *http.Request) {
+		func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(time.Second * 3100)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))

@@ -10,7 +10,7 @@ import (
 
 func TestBasicAuth(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter,
-		r *http.Request) {
+		_ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("OK"))
 		require.NoError(t, err)
@@ -60,14 +60,19 @@ func TestBasicAuth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := http.NewRequest("GET", "/test", nil)
 			require.NoError(t, err)
+
 			r.Header.Add("Authorization", tc.authHeader)
+
 			w := httptest.NewRecorder()
 			authToken = tc.authToken
-			BasicAuth(
-				"restricted",
-				incorrectCreds,
-			)(testHandler).ServeHTTP(w, r)
-			require.Equal(t, tc.httpStatus, w.Result().StatusCode)
+
+			BasicAuth("restricted", incorrectCreds)(testHandler).ServeHTTP(w, r)
+
+			res := w.Result()
+			defer func() {
+				_ = res.Body.Close()
+			}()
+			require.Equal(t, tc.httpStatus, res.StatusCode)
 		})
 	}
 }

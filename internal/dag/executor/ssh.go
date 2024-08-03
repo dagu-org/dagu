@@ -29,7 +29,7 @@ type sshExecConfig struct {
 	StrictHostKeyChecking bool
 }
 
-func newSSHExec(ctx context.Context, step dag.Step) (Executor, error) {
+func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 	cfg := new(sshExecConfig)
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{Result: cfg},
