@@ -15,8 +15,7 @@ func serverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Start the server",
-		// nolint:line-length-limit
-		Long: `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
+		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			_ = viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 			_ = viper.BindPFlag("host", cmd.Flags().Lookup("host"))

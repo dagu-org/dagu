@@ -1,6 +1,3 @@
-/*
-Copyright © 2023 Dagu Yota Hamada
-*/
 package main
 
 import (
