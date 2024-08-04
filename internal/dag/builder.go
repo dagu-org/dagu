@@ -86,7 +86,6 @@ var (
 		"call must specify a functions that exists",
 	)
 	errNumberOfParamsMismatch = errors.New(
-		// nolint
 		"the number of parameters defined in the function does not match the number of parameters given",
 	)
 	errRequiredParameterNotFound = errors.New(
@@ -362,7 +361,6 @@ func (b *builder) buildMiscs() (err error) {
 // Case 2: env is an array of maps.
 // Case 3: is recommended because the order of the environment variables is
 // preserved.
-// nolint // cognitive complexity
 func loadVariables(strVariables any, opts buildOpts) (
 	map[string]string, error,
 ) {
@@ -471,7 +469,6 @@ type stepBuilder struct {
 }
 
 // buildStep builds a step from the step definition.
-// nolint // cognitive complexity
 func (b *stepBuilder) buildStep(
 	variables []string, def *stepDef, fns []*funcDef,
 ) (*Step, error) {

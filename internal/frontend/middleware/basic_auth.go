@@ -26,7 +26,6 @@ const (
 	authHeaderKey = "Authorization"
 )
 
-// nolint:revive
 func BasicAuth(realm string, creds map[string]string) func(
 	next http.Handler,
 ) http.Handler {

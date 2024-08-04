@@ -244,7 +244,6 @@ func (n *Node) setErr(err error) {
 	n.data.Status = NodeStatusError
 }
 
-// nolint
 func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()

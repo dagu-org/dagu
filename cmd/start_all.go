@@ -29,11 +29,9 @@ import (
 
 func startAllCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "start-all",
-		// nolint
+		Use:   "start-all",
 		Short: "Launches both the Dagu web UI server and the scheduler process.",
-		// nolint
-		Long: `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
+		Long:  `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		PreRun: func(cmd *cobra.Command, _ []string) {
 			_ = viper.BindPFlag("port", cmd.Flags().Lookup("port"))
 			_ = viper.BindPFlag("host", cmd.Flags().Lookup("host"))
@@ -42,7 +40,6 @@ func startAllCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, _ []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				// nolint
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{

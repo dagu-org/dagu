@@ -572,7 +572,6 @@ func addNodeStatus(
 	data[nodeName][logIdx] = status
 }
 
-// nolint // cognitive complexity
 func (h *Handler) postAction(
 	params dags.PostDagActionParams,
 ) (*models.PostDagActionResponse, *codedError) {

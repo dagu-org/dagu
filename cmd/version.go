@@ -26,7 +26,6 @@ func versionCmd() *cobra.Command {
 		Short: "Display the binary version",
 		Long:  `dagu version`,
 		Run: func(_ *cobra.Command, _ []string) {
-			// nolint // forbidgo
 			println(constants.Version)
 		},
 	}

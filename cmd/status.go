@@ -34,7 +34,6 @@ func statusCmd() *cobra.Command {
 		Run: func(_ *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				// nolint
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
@@ -45,7 +44,6 @@ func statusCmd() *cobra.Command {
 			// Load the DAG file and get the current running status.
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
-				// nolint
 				logger.Error("Workflow load failed", "error", err, "file", args[0])
 				os.Exit(1)
 			}
@@ -56,7 +54,6 @@ func statusCmd() *cobra.Command {
 			curStatus, err := cli.GetCurrentStatus(workflow)
 
 			if err != nil {
-				// nolint
 				logger.Error("Current status retrieval failed", "error", err)
 				os.Exit(1)
 			}

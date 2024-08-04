@@ -66,7 +66,6 @@ func parseSchedules(values []string) ([]Schedule, error) {
 //	  - "0 18 * * *"
 //
 // ```
-// nolint // cognitive complexity
 func parseScheduleMap(
 	scheduleMap map[any]any, starts, stops, restarts *[]string,
 ) error {
@@ -187,7 +186,6 @@ func parseParamValue(
 	input string, executeCommandSubstitution bool,
 ) ([]paramPair, error) {
 	paramRegex := regexp.MustCompile(
-		// nolint
 		`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
 	)
 	matches := paramRegex.FindAllStringSubmatch(input, -1)

@@ -152,7 +152,6 @@ func TestClient_GetStatus(t *testing.T) {
 	})
 }
 
-// nolint // paralleltest
 func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)

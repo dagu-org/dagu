@@ -31,7 +31,6 @@ import (
 	flags "github.com/jessevdk/go-flags"
 
 	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
-	// nolint
 	pkgmiddleware "github.com/daguflow/dagu/internal/frontend/middleware"
 
 	"github.com/go-chi/chi/v5"
