@@ -16,7 +16,6 @@
 package cmd
 
 import (
-	"github.com/daguflow/dagu/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -70,8 +69,4 @@ func initialize() {
 		viper.SetConfigFile(cfgFile)
 		return
 	}
-
-	viper.AddConfigPath(config.ConfigDir)
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("admin")
 }

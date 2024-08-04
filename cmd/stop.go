@@ -43,9 +43,9 @@ func stopCmd() *cobra.Command {
 			}
 
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				Quiet:     quiet,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
+				Quiet:  quiet,
 			})
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")

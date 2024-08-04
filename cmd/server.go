@@ -43,8 +43,8 @@ func serverCmd() *cobra.Command {
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
 			})
 
 			logger.Info("Server initialization", "host", cfg.Host, "port", cfg.Port)

@@ -38,8 +38,8 @@ func schedulerCmd() *cobra.Command {
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
 			})
 
 			if dagsOpt, _ := cmd.Flags().GetString("dags"); dagsOpt != "" {
@@ -48,7 +48,6 @@ func schedulerCmd() *cobra.Command {
 
 			logger.Info("Scheduler initialization",
 				"specsDirectory", cfg.DAGs,
-				"logLevel", cfg.LogLevel,
 				"logFormat", cfg.LogFormat)
 
 			ctx := cmd.Context()

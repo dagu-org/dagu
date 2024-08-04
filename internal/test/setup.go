@@ -76,12 +76,15 @@ func SetupTest(t *testing.T) Setup {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
 
-	config.ConfigDir = filepath.Join(tmpDir, "config")
-	config.DataDir = filepath.Join(tmpDir, "data")
-	config.LogsDir = filepath.Join(tmpDir, "log")
-
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
+	cfg.DAGs = filepath.Join(tmpDir, "dags")
+	cfg.WorkDir = tmpDir
+	cfg.BaseConfig = filepath.Join(tmpDir, "config", "base.yaml")
+	cfg.DataDir = filepath.Join(tmpDir, "data")
+	cfg.LogDir = filepath.Join(tmpDir, "log")
+	cfg.AdminLogsDir = filepath.Join(tmpDir, "log", "admin")
 
 	// Set the executable path to the test binary.
 	cfg.Executable = filepath.Join(util.MustGetwd(), "../../bin/dagu")
@@ -129,7 +132,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 
 func NewLogger() logger.Logger {
 	return logger.NewLogger(logger.NewLoggerArgs{
-		LogLevel:  "debug",
-		LogFormat: "text",
+		Debug:  true,
+		Format: "text",
 	})
 }

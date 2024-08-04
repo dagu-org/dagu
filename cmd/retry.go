@@ -39,8 +39,8 @@ func retryCmd() *cobra.Command {
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
 			})
 
 			requestID, err := cmd.Flags().GetString("req")
@@ -98,9 +98,9 @@ func retryCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				LogFile:   logFile,
+				Debug:   cfg.Debug,
+				Format:  cfg.LogFormat,
+				LogFile: logFile,
 			})
 
 			cli := newClient(cfg, dataStore, agentLogger)
