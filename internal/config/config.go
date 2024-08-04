@@ -63,14 +63,9 @@ type TLS struct {
 
 var configLock sync.Mutex
 
-const envPrefix = "DAGU"
-
 func Load() (*Config, error) {
 	configLock.Lock()
 	defer configLock.Unlock()
-
-	viper.SetEnvPrefix(envPrefix)
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	// Set default values for config keys.
 	if err := setupViper(); err != nil {
@@ -110,22 +105,39 @@ const (
 	appName = "dagu"
 )
 
+var (
+	envPrefix = strings.ToUpper(appName)
+)
+
 func setupViper() error {
+	homeDir := getHomeDir()
+
+	var xdgCfg XDGConfig
+	xdgCfg.DataHome = xdg.DataHome
+	xdgCfg.ConfigHome = filepath.Join(homeDir, ".config")
+	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
+		xdgCfg.ConfigHome = v
+	}
+
+	r := newResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgCfg)
+
+	viper.AddConfigPath(r.configDir)
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("admin")
+
+	viper.SetEnvPrefix(envPrefix)
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+
 	// Bind environment variables with config keys.
 	bindEnvs()
 
 	// Set default values for config keys.
-
-	// Directories
-	baseDirs := getBaseDirs()
-	viper.SetDefault("dags", baseDirs.dags)
-	viper.SetDefault("suspendFlagsDir", baseDirs.suspendFlags)
-	viper.SetDefault("dataDir", baseDirs.data)
-	viper.SetDefault("logDir", baseDirs.logs)
-	viper.SetDefault("adminLogsDir", baseDirs.adminLogs)
-
-	// Base config file
-	viper.SetDefault("baseConfig", getBaseConfigPath(baseDirs))
+	viper.SetDefault("dags", r.dagsDir)
+	viper.SetDefault("suspendFlagsDir", r.suspendFlagsDir)
+	viper.SetDefault("dataDir", r.dataDir)
+	viper.SetDefault("logDir", r.logsDir)
+	viper.SetDefault("adminLogsDir", r.adminLogsDir)
+	viper.SetDefault("baseConfig", r.baseConfigFile)
 
 	// Logging configurations
 	viper.SetDefault("logLevel", "info")
@@ -142,45 +154,6 @@ func setupViper() error {
 	return setExecutableDefault()
 }
 
-type baseDirs struct {
-	config       string
-	dags         string
-	suspendFlags string
-	data         string
-	logs         string
-	adminLogs    string
-}
-
-const (
-	// Constants for config.
-	legacyConfigDir       = ".dagu"
-	legacyConfigDirEnvKey = "DAGU_HOME"
-
-	// default directories
-	dagsDir    = "dags"
-	suspendDir = "suspend"
-)
-
-var (
-	// ConfigDir is the directory to store DAGs and other configuration files.
-	ConfigDir = getConfigDir()
-	// DataDir is the directory to store history data.
-	DataDir = getDataDir()
-	// LogsDir is the directory to store logs.
-	LogsDir = getLogsDir()
-)
-
-func getBaseDirs() baseDirs {
-	return baseDirs{
-		config:       ConfigDir,
-		dags:         filepath.Join(ConfigDir, dagsDir),
-		suspendFlags: filepath.Join(ConfigDir, suspendDir),
-		data:         DataDir,
-		logs:         LogsDir,
-		adminLogs:    filepath.Join(LogsDir, "admin"),
-	}
-}
-
 func setExecutableDefault() error {
 	executable, err := os.Executable()
 	if err != nil {
@@ -188,70 +161,6 @@ func setExecutableDefault() error {
 	}
 	viper.SetDefault("executable", executable)
 	return nil
-}
-
-func getLogsDir() string {
-	if v, ok := getLegacyConfigPath(); ok {
-		// For backward compatibility.
-		return filepath.Join(v, "logs")
-	}
-	return filepath.Join(xdg.DataHome, appName, "logs")
-}
-
-func getDataDir() string {
-	if v, ok := getLegacyConfigPath(); ok {
-		// For backward compatibility.
-		return filepath.Join(v, "data")
-	}
-	return filepath.Join(xdg.DataHome, appName, "history")
-}
-
-func getConfigDir() string {
-	if v, ok := getLegacyConfigPath(); ok {
-		return v
-	}
-	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
-		return filepath.Join(v, appName)
-	}
-	return filepath.Join(getHomeDir(), ".config", appName)
-}
-
-func getHomeDir() string {
-	dir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("could not determine home directory: %v", err)
-		return ""
-	}
-	return dir
-}
-
-const (
-	// Base config file name for all DAGs.
-	baseConfig = "base.yaml"
-	// Legacy config path for backward compatibility.
-	legacyBaseConfig = "base.yaml"
-)
-
-func getBaseConfigPath(b baseDirs) string {
-	legacyPath := filepath.Join(b.config, legacyBaseConfig)
-	if _, err := os.Stat(legacyPath); err == nil {
-		return legacyPath
-	}
-	return filepath.Join(b.config, baseConfig)
-}
-
-func getLegacyConfigPath() (string, bool) {
-	// For backward compatibility.
-	// If the environment variable is set, use it.
-	if v := os.Getenv(legacyConfigDirEnvKey); v != "" {
-		return v, true
-	}
-	// If not, check if the legacyPath config directory exists.
-	legacyPath := filepath.Join(getHomeDir(), legacyConfigDir)
-	if _, err := os.Stat(legacyPath); err == nil {
-		return legacyPath, true
-	}
-	return "", false
 }
 
 func bindEnvs() {
