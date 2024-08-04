@@ -48,9 +48,9 @@ func restartCmd() *cobra.Command {
 			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				Quiet:     quiet,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
+				Quiet:  quiet,
 			})
 
 			// Load the DAG file and stop the DAG if it is running.
@@ -110,10 +110,10 @@ func restartCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				LogFile:   logFile,
-				Quiet:     quiet,
+				Debug:   cfg.Debug,
+				Format:  cfg.LogFormat,
+				LogFile: logFile,
+				Quiet:   quiet,
 			})
 
 			agentLogger.Info("Workflow restart initiated",

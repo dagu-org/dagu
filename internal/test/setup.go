@@ -129,7 +129,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 
 func NewLogger() logger.Logger {
 	return logger.NewLogger(logger.NewLoggerArgs{
-		LogLevel:  "debug",
-		LogFormat: "text",
+		Debug:  true,
+		Format: "text",
 	})
 }

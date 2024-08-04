@@ -46,9 +46,9 @@ func startCmd() *cobra.Command {
 			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				Quiet:     quiet,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
+				Quiet:  quiet,
 			})
 
 			params, err := cmd.Flags().GetString("params")
@@ -83,10 +83,10 @@ func startCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				LogFile:   logFile,
-				Quiet:     quiet,
+				Debug:   cfg.Debug,
+				Format:  cfg.LogFormat,
+				LogFile: logFile,
+				Quiet:   quiet,
 			})
 
 			dataStore := newDataStores(cfg)

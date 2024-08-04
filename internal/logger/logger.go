@@ -39,7 +39,6 @@ type (
 
 		With(attrs ...any) Logger
 		WithGroup(name string) Logger
-		WithPrefix(prefix string) Logger
 
 		// Write writes a free-form message to the logger.
 		// It writes to the standard output and to the log file if present.
@@ -58,28 +57,31 @@ type appLogger struct {
 }
 
 type NewLoggerArgs struct {
-	LogLevel  string
-	LogFormat string
-	LogFile   *os.File
-	Quiet     bool
+	Debug   bool
+	Format  string
+	LogFile *os.File
+	Quiet   bool
 }
 
 var (
 	// Default is the default logger used by the application.
 	Default = NewLogger(NewLoggerArgs{
-		LogLevel:  "info",
-		LogFormat: "text",
+		Format: "text",
 	})
 )
 
 func NewLogger(args NewLoggerArgs) Logger {
 	var level slog.Level
-	if err := level.UnmarshalText([]byte(args.LogLevel)); err != nil {
+	if args.Debug {
+		level = slog.LevelDebug
+	} else {
 		level = slog.LevelInfo
 	}
+
 	opts := &slog.HandlerOptions{
 		Level: level,
 	}
+
 	if level == slog.LevelDebug {
 		opts.AddSource = true
 	}
@@ -88,15 +90,18 @@ func NewLogger(args NewLoggerArgs) Logger {
 		handlers       []slog.Handler
 		guardedHandler *guardedHandler
 	)
+
 	if !args.Quiet {
-		handlers = append(handlers, newHandler(os.Stderr, args.LogFormat, opts))
+		handlers = append(handlers, newHandler(os.Stderr, args.Format, opts))
 	}
+
 	if args.LogFile != nil {
 		guardedHandler = newGuardedHandler(
-			newHandler(args.LogFile, args.LogFormat, opts), args.LogFile,
+			newHandler(args.LogFile, args.Format, opts), args.LogFile,
 		)
 		handlers = append(handlers, guardedHandler)
 	}
+
 	return &appLogger{
 		logger: slog.New(
 			slogmulti.Fanout(handlers...),
@@ -220,15 +225,6 @@ func (a *appLogger) WithGroup(name string) Logger {
 	return &appLogger{
 		logger:         a.logger.WithGroup(name),
 		guardedHandler: a.guardedHandler,
-	}
-}
-
-// WithPrefix implements logger.Logger.
-func (a *appLogger) WithPrefix(prefix string) Logger {
-	return &appLogger{
-		logger:         a.logger,
-		guardedHandler: a.guardedHandler,
-		prefix:         prefix,
 	}
 }
 

@@ -52,7 +52,7 @@ type Config struct {
 	AuthToken          string   // Auth token for API
 	LatestStatusToday  bool     // Show latest status today or the latest status
 	APIBaseURL         string   // Base URL for API
-	LogLevel           string   // Log level
+	Debug              bool     // Enable debug mode (verbose logging)
 	LogFormat          string   // Log format
 }
 

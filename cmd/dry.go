@@ -40,8 +40,8 @@ func dryCmd() *cobra.Command {
 				log.Fatalf("Failed to load config: %v", err)
 			}
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
 			})
 
 			params, err := cmd.Flags().GetString("params")
@@ -76,9 +76,9 @@ func dryCmd() *cobra.Command {
 			defer logFile.Close()
 
 			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
-				LogFile:   logFile,
+				Debug:   cfg.Debug,
+				Format:  cfg.LogFormat,
+				LogFile: logFile,
 			})
 
 			dataStore := newDataStores(cfg)

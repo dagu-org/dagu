@@ -46,8 +46,8 @@ func startAllCmd() *cobra.Command {
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
-				LogLevel:  cfg.LogLevel,
-				LogFormat: cfg.LogFormat,
+				Debug:  cfg.Debug,
+				Format: cfg.LogFormat,
 			})
 
 			if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
