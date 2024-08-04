@@ -25,7 +25,7 @@ type definition struct {
 	Schedule          any
 	LogDir            string
 	Env               any
-	HandlerOn         handerOnDef
+	HandlerOn         handlerOnDef
 	Functions         []*funcDef
 	Steps             []*stepDef
 	SMTP              smtpConfigDef
@@ -47,7 +47,7 @@ type conditionDef struct {
 	Expected  string
 }
 
-type handerOnDef struct {
+type handlerOnDef struct {
 	Failure *stepDef
 	Success *stepDef
 	Cancel  *stepDef
