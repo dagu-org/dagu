@@ -1,0 +1,11 @@
+steps:
+  - name: foreach
+    foreach: "[1, 2, 3]"
+    command: sh
+    output: "foreach-$1.txt"
+    script: |
+      echo "Hello, world! $1"
+  - name: merge
+    command: sh
+    script: |
+      cat foreach-*.txt

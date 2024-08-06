@@ -1,0 +1,2 @@
+env:
+  - VAR: "`invalid command`"

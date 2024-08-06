@@ -1,0 +1,5 @@
+schedule: "1"
+
+steps:
+  - command: echo 1
+    name: step 1

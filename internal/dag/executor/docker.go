@@ -166,7 +166,6 @@ func newDocker(
 	execCfg := step.ExecutorConfig
 
 	if cfg, ok := execCfg.Config["container"]; ok {
-		// nolint
 		// See https://pkg.go.dev/github.com/docker/docker/api/types/container#Config
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			Result: containerConfig,
@@ -182,7 +181,6 @@ func newDocker(
 	}
 
 	if cfg, ok := execCfg.Config["host"]; ok {
-		// nolint
 		// See https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			Result: hostConfig,

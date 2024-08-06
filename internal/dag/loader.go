@@ -64,7 +64,17 @@ func LoadMetadata(dag string) (*DAG, error) {
 }
 
 // LoadYAML loads config from YAML data.
+// It does not evaluate the environment variables.
+// This is used to validate the YAML data.
 func LoadYAML(data []byte) (*DAG, error) {
+	return loadYAML(data, buildOpts{
+		metadataOnly: false,
+		noEval:       true,
+	})
+}
+
+// LoadYAML loads config from YAML data.
+func loadYAML(data []byte, opts buildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
@@ -75,7 +85,7 @@ func LoadYAML(data []byte) (*DAG, error) {
 		return nil, err
 	}
 
-	b := &builder{opts: buildOpts{metadataOnly: false, noEval: true}}
+	b := &builder{opts: opts}
 	return b.build(def, nil)
 }
 

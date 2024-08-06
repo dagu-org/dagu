@@ -66,7 +66,6 @@ func parseSchedules(values []string) ([]Schedule, error) {
 //	  - "0 18 * * *"
 //
 // ```
-// nolint // cognitive complexity
 func parseScheduleMap(
 	scheduleMap map[any]any, starts, stops, restarts *[]string,
 ) error {
@@ -187,7 +186,6 @@ func parseParamValue(
 	input string, executeCommandSubstitution bool,
 ) ([]paramPair, error) {
 	paramRegex := regexp.MustCompile(
-		// nolint
 		`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
 	)
 	matches := paramRegex.FindAllStringSubmatch(input, -1)
@@ -225,9 +223,7 @@ func parseParamValue(
 				)
 
 				if cmdErr != nil {
-					return nil, fmt.Errorf(
-						"error evaluating '%s': %w", value, cmdErr,
-					)
+					return nil, fmt.Errorf("%w: %s", errInvalidParamValue, cmdErr)
 				}
 			}
 		}
@@ -253,9 +249,12 @@ func parseKeyValue(m map[any]any, pairs *[]pair) error {
 			return errInvalidKeyType
 		}
 
-		val, ok := v.(string)
-		if !ok {
-			return errInvalidEnvValue
+		var val string
+		switch v := v.(type) {
+		case string:
+			val = v
+		default:
+			val = fmt.Sprintf("%v", v)
 		}
 
 		*pairs = append(*pairs, pair{key: key, val: val})
@@ -348,13 +347,27 @@ func parseKey(value any) (string, error) {
 
 // parseTags builds a list of tags from the value.
 // It converts the tags to lowercase and trims the whitespace.
-func parseTags(value string) []string {
-	ret := []string{}
+func parseTags(value any) []string {
+	var ret []string
 
-	for _, v := range strings.Split(value, ",") {
-		tag := strings.ToLower(strings.TrimSpace(v))
-		if tag != "" {
-			ret = append(ret, tag)
+	switch v := value.(type) {
+	case string:
+		for _, v := range strings.Split(v, ",") {
+			tag := strings.ToLower(strings.TrimSpace(v))
+			if tag != "" {
+				ret = append(ret, tag)
+			}
+		}
+	case []any:
+		for _, v := range v {
+			switch v := v.(type) {
+			case string:
+				ret = append(ret, strings.ToLower(strings.TrimSpace(v)))
+			default:
+				ret = append(ret, strings.ToLower(
+					strings.TrimSpace(fmt.Sprintf("%v", v))),
+				)
+			}
 		}
 	}
 

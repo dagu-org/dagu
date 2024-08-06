@@ -298,7 +298,7 @@ func (s *Store) Rename(oldID, newID string) error {
 }
 
 func (s *Store) getDirectory(name string, prefix string) string {
-	// nolint
+	// nolint: gosec
 	h := md5.New()
 	_, _ = h.Write([]byte(name))
 	v := hex.EncodeToString(h.Sum(nil))
@@ -321,7 +321,6 @@ func (s *Store) newFile(
 	), nil
 }
 
-// nolint
 func (store *Store) latestToday(
 	dagFile string,
 	day time.Time,

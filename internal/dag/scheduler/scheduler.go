@@ -106,7 +106,6 @@ type Config struct {
 }
 
 // Schedule runs the graph of steps.
-// nolint // cognitive complexity
 func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan *Node) error {
 	if err := sc.setup(); err != nil {
 		return err
@@ -233,6 +232,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 		handlers = append(handlers, dag.HandlerOnFailure)
 	case StatusCancel:
 		handlers = append(handlers, dag.HandlerOnCancel)
+	case StatusNone:
+	case StatusRunning:
 	}
 	handlers = append(handlers, dag.HandlerOnExit)
 	for _, h := range handlers {
@@ -285,7 +286,6 @@ func (sc *Scheduler) execNode(ctx context.Context, n *Node) error {
 // for a node with repeat policy, it does not stop the node and
 // wait to finish current run.
 func (sc *Scheduler) Signal(
-	// nolint
 	g *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
 ) {
 	if !sc.isCanceled() {

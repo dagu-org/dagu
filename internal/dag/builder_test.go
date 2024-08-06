@@ -16,422 +16,320 @@
 package dag
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuilder_BuildErrors(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
+func TestBuilder_Build(t *testing.T) {
+	tests := []testCase{
 		{
-			name: "NoName",
-			input: `
-steps:
-  - command: echo 1`,
+			Name:        "NoName",
+			InputFile:   "no_name.yaml",
+			ExpectedErr: errStepNameRequired,
 		},
 		{
-			name: "NoCommand",
-			input: `
-steps:
-  - name: step 1`,
+			Name:        "NoCommand",
+			InputFile:   "no_command.yaml",
+			ExpectedErr: errStepCommandOrCallRequired,
 		},
 		{
-			name: "InvalidEnv",
-			input: fmt.Sprintf(`
-env: 
-  - VAR: %q`, "`invalid`"),
+			Name:        "InvalidEnv",
+			InputFile:   "invalid_env.yaml",
+			ExpectedErr: errInvalidEnvValue,
 		},
 		{
-			name:  "InvalidParams",
-			input: fmt.Sprintf(`params: %q`, "`invalid`"),
+			Name:        "InvalidParams",
+			InputFile:   "invalid_params.yaml",
+			ExpectedErr: errInvalidParamValue,
 		},
 		{
-			name:  "InvalidSchedule",
-			input: `schedule: "1"`,
+			Name:        "InvalidSchedule",
+			InputFile:   "invalid_schedule.yaml",
+			ExpectedErr: errInvalidSchedule,
+		},
+		{
+			Name:      "ValidEnv",
+			InputFile: "valid_env.yaml",
+			Expected: map[string]any{
+				"env": map[string]string{"FOO": "123"},
+			},
+		},
+		{
+			Name:      "ValidEnvWithSubstitution",
+			InputFile: "valid_env_substitution.yaml",
+			Expected: map[string]any{
+				"env": map[string]string{"VAR": "123"},
+			},
+		},
+		{
+			Name:      "ValidEnvWithSubstitutionAndEnv",
+			InputFile: "valid_env_substitution_and_env.yaml",
+			Expected: map[string]any{
+				"env": map[string]string{"FOO": "BAR:BAZ:BAR:FOO"},
+			},
+		},
+		{
+			Name:      "ValidCommand",
+			InputFile: "valid_command.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"command": "echo",
+						"args":    []string{"1"},
+						"name":    "step 1",
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidCommandInArray",
+			InputFile: "valid_command_in_array.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"command": "echo",
+						"args":    []string{"1"},
+						"name":    "step 1",
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidCommandInList",
+			InputFile: "valid_command_in_list.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"command": "echo",
+						"args":    []string{"1"},
+						"name":    "step 1",
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidTags",
+			InputFile: "valid_tags.yaml",
+			Expected: map[string]any{
+				"tags": []string{"daily", "monthly"},
+			},
+		},
+		{
+			Name:      "ValidTagsList",
+			InputFile: "valid_tags_list.yaml",
+			Expected: map[string]any{
+				"tags": []string{"daily", "monthly"},
+			},
+		},
+		{
+			Name:      "ValidSchedule",
+			InputFile: "valid_schedule.yaml",
+			Expected: map[string]any{
+				"schedule": map[string][]string{
+					"start":   {"0 1 * * *"},
+					"stop":    {"0 2 * * *"},
+					"restart": {"0 12 * * *"},
+				},
+			},
+		},
+		{
+			Name:      "ScheduleWithMultipleValues",
+			InputFile: "schedule_with_multiple_values.yaml",
+			Expected: map[string]any{
+				"schedule": map[string][]string{
+					"start": {
+						"0 1 * * *",
+						"0 18 * * *",
+					},
+					"stop": {
+						"0 2 * * *",
+						"0 20 * * *",
+					},
+					"restart": {
+						"0 12 * * *",
+						"0 22 * * *",
+					},
+				},
+			},
+		},
+		{
+			Name:      "HTTPExecutor",
+			InputFile: "http_executor.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"executor": "http",
+					},
+				},
+			},
+		},
+		{
+			Name:      "HTTPExecutorWithConfig",
+			InputFile: "http_executor_with_config.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"executor": "http",
+						"executorConfig": map[string]any{
+							"key": "value",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:      "SignalOnStop",
+			InputFile: "signal_on_stop.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"signalOnStop": "SIGINT",
+					},
+				},
+			},
+		},
+		{
+			Name:      "ParamsWithSubstitution",
+			InputFile: "params_with_substitution.yaml",
+			Expected: map[string]any{
+				"env": map[string]string{
+					"1": "x",
+					"2": "x",
+				},
+			},
+		},
+		{
+			Name:      "ParamsWithQuotedValues",
+			InputFile: "params_with_quoted_values.yaml",
+			Expected: map[string]any{
+				"env": map[string]string{
+					"x": "a b c",
+					"y": "d e f",
+				},
+			},
+		},
+		{
+			Name:      "ParamsWithComplexValues",
+			InputFile: "params_with_complex_values.yaml",
+			Expected: map[string]any{
+				"env": map[string]string{
+					"P1": "foo",
+					"P2": "BAR",
+					"P3": "BAR",
+					"X":  "bar",
+					"Y":  "foo",
+					"Z":  "A B C",
+					"1":  "first",
+					"2":  `P1=foo`,
+					"3":  `P2=BAR`,
+					"4":  `P3=BAR`,
+					"5":  `X=bar`,
+					"6":  `Y=foo`,
+					"7":  `Z=A B C`,
+				},
+			},
+		},
+		{
+			Name:      "ValidHandlers",
+			InputFile: "valid_handlers.yaml",
+			Expected: map[string]any{
+				"handlers": map[string]stepTestCase{
+					"exit": {
+						"name":    "onExit",
+						"command": "echo",
+						"args":    []string{"exit"},
+					},
+					"success": {
+						"name":    "onSuccess",
+						"command": "echo",
+						"args":    []string{"success"},
+					},
+					"failure": {
+						"name":    "onFailure",
+						"command": "echo",
+						"args":    []string{"failure"},
+					},
+					"cancel": {
+						"name":    "onCancel",
+						"command": "echo",
+						"args":    []string{"cancel"},
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidMailConfig",
+			InputFile: "valid_mail_config.yaml",
+			Expected: map[string]any{
+				"smtp": map[string]string{
+					"host":     "smtp.example.com",
+					"port":     "587",
+					"username": "user@example.com",
+					"password": "password",
+				},
+				"errorMail": map[string]any{
+					"from":       "error@example.com",
+					"to":         "admin@example.com",
+					"prefix":     "[ERROR]",
+					"attachLogs": true,
+				},
+				"infoMail": map[string]any{
+					"from":       "info@example.com",
+					"to":         "user@example.com",
+					"prefix":     "[INFO]",
+					"attachLogs": false,
+				},
+			},
+		},
+		{
+			Name:      "ValidSubWorkflow",
+			InputFile: "valid_subworkflow.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"name":     "sub_workflow_step",
+						"command":  "run",
+						"args":     []string{"sub_dag", "param1=value1 param2=value2"},
+						"executor": "subworkflow",
+						"subWorkflow": map[string]string{
+							"name":   "sub_dag",
+							"params": "param1=value1 param2=value2",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidMiscs",
+			InputFile: "valid_miscs.yaml",
+			Expected: map[string]any{
+				"histRetentionDays": 7,
+				"maxActiveRuns":     3,
+				"maxCleanUpTime":    time.Duration(300 * time.Second),
+				"preconditions": []Condition{
+					{Condition: "test -f file.txt", Expected: "true"},
+				},
+			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dg, err := unmarshalData([]byte(tt.input))
-			require.NoError(t, err)
-
-			def, err := decode(dg)
-			require.NoError(t, err)
-
-			_, err = new(builder).build(def, nil)
-			require.Error(t, err)
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			runTest(t, tc)
 		})
 	}
 }
 
-func TestBuilder_BuildEnvs(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected map[string]string
-	}{
-		{
-			name: "ValidEnv",
-			input: `
-env: 
-  "1": "123"
-`,
-			expected: map[string]string{"1": "123"},
-		},
-		{
-			name: "ValidEnvWithSubstitution",
-			input: `
-env: 
-  VAR: "` + "`echo 1`" + `"
-`,
-			expected: map[string]string{"VAR": "1"},
-		},
-		{
-			name: "ValidEnvWithSubstitutionAndEnv",
-			input: `
-env: 
-  - "FOO": "BAR"
-  - "FOO": "${FOO}:BAZ"
-  - "FOO": "${FOO}:BAR"
-  - "FOO": "${FOO}:FOO"
-`,
-			expected: map[string]string{"FOO": "BAR:BAZ:BAR:FOO"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dg, err := unmarshalData([]byte(tt.input))
-			require.NoError(t, err)
-
-			def, err := decode(dg)
-			require.NoError(t, err)
-
-			_, err = new(builder).build(def, nil)
-			require.NoError(t, err)
-
-			for k, v := range tt.expected {
-				require.Equal(t, v, os.Getenv(k))
-			}
-		})
-	}
-}
-
-func TestBuilder_BuildParams(t *testing.T) {
-	tests := []struct {
-		name     string
-		params   string
-		env      string
-		expected map[string]string
-	}{
-		{
-			name:   "ValidParams",
-			params: "x",
-			expected: map[string]string{
-				"1": "x",
-			},
-		},
-		{
-			name:   "TwoParams",
-			params: "x y",
-			expected: map[string]string{
-				"1": "x",
-				"2": "y",
-			},
-		},
-		{
-			name:   "ThreeParams",
-			params: "x yy zzz",
-			expected: map[string]string{
-				"1": "x",
-				"2": "yy",
-				"3": "zzz",
-			},
-		},
-		{
-			name:   "ParamsWithSubstitution",
-			params: "x $1",
-			expected: map[string]string{
-				"1": "x",
-				"2": "x",
-			},
-		},
-		{
-			name:   "QuotedParams",
-			params: `x="1" y="2"`,
-			expected: map[string]string{
-				"x": "1",
-				"y": "2",
-			},
-		},
-		{
-			name:   "ComplexParams",
-			params: "first P1=foo P2=${FOO} P3=`/bin/echo BAR` X=bar Y=${P1} Z=\"A B C\"",
-			env:    "FOO: BAR",
-			expected: map[string]string{
-				"P1": "foo",
-				"P2": "BAR",
-				"P3": "BAR",
-				"X":  "bar",
-				"Y":  "foo",
-				"Z":  "A B C",
-				"1":  "first",
-				"2":  `P1=foo`,
-				"3":  `P2=BAR`,
-				"4":  `P3=BAR`,
-				"5":  `X=bar`,
-				"6":  `Y=foo`,
-				"7":  `Z=A B C`,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var data string
-			if tt.env != "" {
-				data = fmt.Sprintf(`env:
-- %s
-params: %s
-`, tt.env, tt.params)
-			} else {
-				data = fmt.Sprintf(`params: %s
-`, tt.params)
-			}
-			dg, err := unmarshalData([]byte(data))
-			require.NoError(t, err)
-
-			def, err := decode(dg)
-			require.NoError(t, err)
-
-			_, err = new(builder).build(def, nil)
-			require.NoError(t, err)
-
-			for k, v := range tt.expected {
-				require.Equal(t, v, os.Getenv(k))
-			}
-		})
-	}
-}
-
-func TestBuilder_BuildCommand(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{
-			name: "ValidCommand",
-			input: `
-steps:
-  - name: step1
-    command: echo 1`,
-		},
-		{
-			name: "ValidCommandInArray",
-			input: `
-steps:
-  - name: step1
-    command: ['echo', '1']`,
-		},
-		{
-			name: "ValidCommandInJSONArray",
-			input: `
-steps:
-  - name: step1
-    command: [echo, 1]`,
-		},
-		{
-			name: "ValidCommandInYAMLArray",
-			input: `
-steps:
-  - name: step1
-    command:
-      - echo
-      - 1`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dg, err := unmarshalData([]byte(tt.input))
-			require.NoError(t, err)
-
-			def, err := decode(dg)
-			require.NoError(t, err)
-
-			dag, err := new(builder).build(def, nil)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if len(dag.Steps) != 1 {
-				t.Fatalf("expected 1 step, got %d", len(dag.Steps))
-			}
-
-			step := dag.Steps[0]
-			require.Equal(t, "echo", step.Command)
-			require.Equal(t, []string{"1"}, step.Args)
-		})
-	}
-}
-
-func Test_expandEnv(t *testing.T) {
-	t.Run("ExpandEnv", func(t *testing.T) {
-		_ = os.Setenv("FOO", "BAR")
-		require.Equal(t, expandEnv("${FOO}", false), "BAR")
-		require.Equal(t, expandEnv("${FOO}", true), "${FOO}")
-	})
-}
-
-func TestBuilder_BuildTags(t *testing.T) {
-	t.Run("ValidTags", func(t *testing.T) {
-		input := `tags: Daily, Monthly`
-		expected := []string{"daily", "monthly"}
-
-		m, err := unmarshalData([]byte(input))
-		require.NoError(t, err)
-
-		def, err := decode(m)
-		require.NoError(t, err)
-
-		dg, err := new(builder).build(def, nil)
-		require.NoError(t, err)
-
-		for _, tag := range expected {
-			require.True(t, dg.HasTag(tag))
-		}
-
-		require.False(t, dg.HasTag("weekly"))
-	})
-}
-
-func TestBuilder_BuildSchedule(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		wantErr  bool
-		expected map[string][]string
-	}{
-		{
-			name: "ValidSchedule",
-			input: `
-schedule:
-  start: "0 1 * * *"
-  stop: "0 2 * * *"
-  restart: "0 12 * * *"
-`,
-			expected: map[string][]string{
-				"start":   {"0 1 * * *"},
-				"stop":    {"0 2 * * *"},
-				"restart": {"0 12 * * *"},
-			},
-		},
-		{
-			name: "OnlyStartSchedule",
-			input: `
-schedule:
-  start: "0 1 * * *"
-`,
-			expected: map[string][]string{
-				"start": {"0 1 * * *"},
-			},
-		},
-		{
-			name: "OnlyStopSchedule",
-			input: `schedule:
-  stop: "0 1 * * *"
-`,
-			expected: map[string][]string{
-				"stop": {"0 1 * * *"},
-			},
-		},
-		{
-			name: "MultipleSchedules",
-			input: `
-schedule:
-  start: 
-    - "0 1 * * *"
-    - "0 18 * * *"
-  stop:
-    - "0 2 * * *"
-    - "0 20 * * *"
-`,
-			expected: map[string][]string{
-				"start": {"0 1 * * *", "0 18 * * *"},
-				"stop":  {"0 2 * * *", "0 20 * * *"},
-			},
-		},
-		{
-			name: "InvalidCronExp",
-			input: `
-schedule:
-  stop: "* * * * * * *"
-`,
-			wantErr: true,
-		},
-		{
-			name: "InvalidKey",
-			input: `
-schedule:
-  invalid: "* * * * * * *"
-`,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m, err := unmarshalData([]byte(tt.input))
-			require.NoError(t, err)
-
-			def, err := decode(m)
-			require.NoError(t, err)
-
-			dg, err := new(builder).build(def, nil)
-
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-
-			for k, v := range tt.expected {
-				var actual []Schedule
-				switch scheduleKey(k) {
-				case scheduleKeyStart:
-					actual = dg.Schedule
-				case scheduleKeyStop:
-					actual = dg.StopSchedule
-				case scheduleKeyRestart:
-					actual = dg.RestartSchedule
-				}
-
-				if len(actual) != len(v) {
-					t.Errorf("expected %d schedules, got %d", len(v), len(actual))
-				}
-
-				for i, s := range actual {
-					if s.Expression != v[i] {
-						t.Errorf("expected %s, got %s", v[i], s.Expression)
-					}
-				}
-			}
-		})
-	}
-}
-
-func TestLoad(t *testing.T) {
+func TestOverrideBaseConfig(t *testing.T) {
 	// Base config has the following values:
 	// MailOn: {Failure: true, Success: false}
-	t.Run("OverrideBaseConfig", func(t *testing.T) {
+	t.Run("Override", func(t *testing.T) {
 		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
 		// Overwrite the base config with the following values:
@@ -443,7 +341,7 @@ func TestLoad(t *testing.T) {
 		require.Equal(t, &MailOn{Failure: false, Success: false}, dg.MailOn)
 		require.Equal(t, dg.HistRetentionDays, 7)
 	})
-	t.Run("NoOverrideBaseConfig", func(t *testing.T) {
+	t.Run("WithoutOverride", func(t *testing.T) {
 		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
 		// no_overwrite.yaml does not have the MailOn key.
@@ -456,190 +354,173 @@ func TestLoad(t *testing.T) {
 	})
 }
 
-func TestBuilder_BuildExecutor(t *testing.T) {
-	tests := []struct {
-		name           string
-		input          string
-		expectedExec   string
-		expectedConfig map[string]any
-	}{
-		{
-			name: "HTTPExecutor",
-			input: `
-steps:
-  - name: S1
-    command: echo 1
-    executor: http
-`,
-			expectedExec:   "http",
-			expectedConfig: nil,
-		},
-		{
-			name: "HTTPExecutorWithConfig",
-			input: `
-steps:
-  - name: S1
-    command: echo 1
-    executor:
-      type: http
-      config:
-        key: value
-`,
-			expectedExec: "http",
-			expectedConfig: map[string]any{
-				"key": "value",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dg, err := unmarshalData([]byte(tt.input))
-			require.NoError(t, err)
-
-			def, err := decode(dg)
-			require.NoError(t, err)
-
-			dag, err := new(builder).build(def, nil)
-			require.NoError(t, err)
-
-			if len(dag.Steps) != 1 {
-				t.Errorf("expected 1 step, got %d", len(dag.Steps))
-			}
-
-			require.Equal(t, tt.expectedExec, dag.Steps[0].ExecutorConfig.Type)
-			if tt.expectedConfig != nil {
-				require.Equal(t, tt.expectedConfig, dag.Steps[0].ExecutorConfig.Config)
-			}
-		})
-	}
+type testCase struct {
+	Name        string
+	InputFile   string
+	Expected    map[string]any
+	ExpectedErr error
 }
 
-const (
-	testSignalOnStop = `
-steps:
-  - name: "1"
-    command: "true"
-    signalOnStop: "SIGINT"
-`
-	testSignalOnStopInvalid = `
-steps:
-  - name: "1"
-    command: "true"
-    signalOnStop: 1000
-`
-)
+type stepTestCase map[string]any
 
-func TestBuilder_BuildSignalOnStop(t *testing.T) {
-	t.Run("SignalOnStop", func(t *testing.T) {
-		ret, err := LoadYAML([]byte(testSignalOnStop))
-		require.NoError(t, err)
-		if len(ret.Steps) != 1 {
-			t.Fatalf("expected 1 step, got %d", len(ret.Steps))
-		}
-		require.Equal(t, ret.Steps[0].SignalOnStop, "SIGINT")
-	})
-	t.Run("InvalidSignal", func(t *testing.T) {
-		_, err := LoadYAML([]byte(testSignalOnStopInvalid))
-		require.Error(t, err)
-	})
-}
-
-func Test_convertMap(t *testing.T) {
-	t.Run("ValidMap", func(t *testing.T) {
-		data := map[string]any{
-			"key1": "value1",
-			"map": map[any]any{
-				"key2": "value2",
-				"map": map[any]any{
-					"key3": "value3",
-				},
-			},
-		}
-
-		err := convertMap(data)
-		require.NoError(t, err)
-
-		m1 := data["map"]
-		k1 := reflect.TypeOf(m1).Key().Kind()
-		require.True(t, k1 == reflect.String)
-
-		m2 := data["map"].(map[string]any)["map"]
-		k2 := reflect.TypeOf(m2).Key().Kind()
-		require.True(t, k2 == reflect.String)
-
-		expected := map[string]any{
-			"key1": "value1",
-			"map": map[string]any{
-				"key2": "value2",
-				"map": map[string]any{
-					"key3": "value3",
-				},
-			},
-		}
-		require.Equal(t, expected, data)
-	})
-	t.Run("InvalidMap", func(t *testing.T) {
-		data := map[string]any{
-			"key1": "value1",
-			"map": map[any]any{
-				1: "value2",
-			},
-		}
-
-		err := convertMap(data)
-		require.Error(t, err)
-	})
-}
-
-func Test_evaluateValue(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "EnvVar",
-			input:    "${TEST_VAR}",
-			expected: "test",
-		},
-		{
-			name:     "CommandSubstitution",
-			input:    "`echo test`",
-			expected: "test",
-		},
-		{
-			name:    "InvalidCommand",
-			input:   "`ech test`",
-			wantErr: true,
-		},
-	}
-
-	// Set the environment variable for the tests
-	err := os.Setenv("TEST_VAR", "test")
+func readTestFile(t *testing.T, filename string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(testdataDir, filename))
 	require.NoError(t, err)
+	return data
+}
 
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			r, err := substituteCommands(os.ExpandEnv(tt.input))
-			if tt.wantErr {
-				require.Error(t, err)
-				return
+func runTest(t *testing.T, tc testCase) {
+	t.Helper()
+	dag, err := loadYAML(readTestFile(t, tc.InputFile), buildOpts{})
+
+	if tc.ExpectedErr != nil {
+		assert.Error(t, err)
+		if errs, ok := err.(*errorList); ok && len(*errs) > 0 {
+			// check if the error is in the list of errors
+			found := false
+			for _, e := range *errs {
+				if errors.Is(e, tc.ExpectedErr) {
+					found = true
+					break
+				}
 			}
-			require.NoError(t, err)
-			require.Equal(t, tt.expected, r)
-		})
+			if !found {
+				t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
+			}
+		} else if !errors.Is(err, tc.ExpectedErr) {
+			t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
+		}
+		return
+	}
+
+	require.NoError(t, err)
+	for k, v := range tc.Expected {
+		switch k {
+		case "steps":
+			stepTestCases := v.([]stepTestCase)
+			require.Len(t, dag.Steps, len(stepTestCases))
+			for i, step := range dag.Steps {
+				testStep(t, step, stepTestCases[i])
+			}
+		case "env":
+			for envKey, envVal := range v.(map[string]string) {
+				assert.Equal(t, envVal, os.Getenv(envKey))
+			}
+		case "tags":
+			for _, tag := range v.([]string) {
+				assert.True(t, dag.HasTag(tag))
+			}
+		case "schedule":
+			schedules := v.(map[string][]string)
+			for scheduleType, expressions := range schedules {
+				var actual []Schedule
+				switch scheduleKey(scheduleType) {
+				case scheduleKeyStart:
+					actual = dag.Schedule
+				case scheduleKeyStop:
+					actual = dag.StopSchedule
+				case scheduleKeyRestart:
+					actual = dag.RestartSchedule
+				}
+				assert.Len(t, actual, len(expressions))
+				for i, expr := range expressions {
+					assert.Equal(t, expr, actual[i].Expression)
+				}
+			}
+		case "histRetentionDays":
+			assert.Equal(t, v.(int), dag.HistRetentionDays)
+		case "maxActiveRuns":
+			assert.Equal(t, v.(int), dag.MaxActiveRuns)
+		case "maxCleanUpTime":
+			assert.Equal(t, v.(time.Duration), dag.MaxCleanUpTime)
+		case "preconditions":
+			assert.Equal(t, v.([]Condition), dag.Preconditions)
+		case "handlers":
+			for handlerName, handler := range v.(map[string]stepTestCase) {
+				switch handlerName {
+				case "exit":
+					testStep(t, *dag.HandlerOn.Exit, handler)
+				case "success":
+					testStep(t, *dag.HandlerOn.Success, handler)
+				case "failure":
+					testStep(t, *dag.HandlerOn.Failure, handler)
+				case "cancel":
+					testStep(t, *dag.HandlerOn.Cancel, handler)
+				default:
+					panic("unexpected handler: " + handlerName)
+				}
+			}
+		case "smtp":
+			for key, val := range v.(map[string]string) {
+				switch key {
+				case "host":
+					assert.Equal(t, val, dag.SMTP.Host)
+				case "port":
+					assert.Equal(t, val, dag.SMTP.Port)
+				case "username":
+					assert.Equal(t, val, dag.SMTP.Username)
+				case "password":
+					assert.Equal(t, val, dag.SMTP.Password)
+				default:
+					panic("unexpected smtp key: " + key)
+				}
+			}
+		case "errorMail":
+			testMailConfig(t, *dag.ErrorMail, v.(map[string]any))
+		case "infoMail":
+			testMailConfig(t, *dag.InfoMail, v.(map[string]any))
+		default:
+			panic("unexpected key: " + k)
+		}
 	}
 }
 
-func Test_parseParams(t *testing.T) {
-	t.Run("ParamsWithCommandSubstitution", func(t *testing.T) {
-		val := "QUESTION=\"what is your favorite activity?\""
-		ret, err := parseParamValue(val, true)
-		require.NoError(t, err)
-		require.Equal(t, 1, len(ret))
-		require.Equal(t, ret[0].name, "QUESTION")
-		require.Equal(t, ret[0].value, "what is your favorite activity?")
-	})
+func testMailConfig(t *testing.T, mailConfig MailConfig, tc map[string]any) {
+	for key, val := range tc {
+		switch key {
+		case "from":
+			assert.Equal(t, val, mailConfig.From)
+		case "to":
+			assert.Equal(t, val, mailConfig.To)
+		case "prefix":
+			assert.Equal(t, val, mailConfig.Prefix)
+		case "attachLogs":
+			assert.Equal(t, val, mailConfig.AttachLogs)
+		default:
+			t.Errorf("unexpected mail key: %s", key)
+		}
+	}
+}
+
+func testStep(t *testing.T, step Step, tc stepTestCase) {
+	for k, v := range tc {
+		switch k {
+		case "name":
+			assert.Equal(t, v.(string), step.Name)
+		case "command":
+			assert.Equal(t, v.(string), step.Command)
+		case "args":
+			assert.Equal(t, v.([]string), step.Args)
+		case "executorConfig":
+			assert.Equal(t, v.(map[string]any), step.ExecutorConfig.Config)
+		case "executor":
+			assert.Equal(t, v.(string), step.ExecutorConfig.Type)
+		case "signalOnStop":
+			assert.Equal(t, v.(string), step.SignalOnStop)
+		case "subWorkflow":
+			for k, val := range v.(map[string]string) {
+				switch k {
+				case "name":
+					assert.Equal(t, val, step.SubWorkflow.Name)
+				case "params":
+					assert.Equal(t, val, step.SubWorkflow.Params)
+				default:
+					panic("unexpected subworkflow key: " + k)
+				}
+			}
+		default:
+			panic("unexpected key: " + k)
+		}
+	}
 }

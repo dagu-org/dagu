@@ -39,7 +39,6 @@ func serverCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, _ []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				// nolint
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{
@@ -53,7 +52,6 @@ func serverCmd() *cobra.Command {
 			cli := newClient(cfg, dataStore, logger)
 			server := frontend.New(cfg, logger, cli)
 			if err := server.Serve(cmd.Context()); err != nil {
-				// nolint
 				logger.Error("Server initialization failed", "error", err)
 				os.Exit(1)
 			}

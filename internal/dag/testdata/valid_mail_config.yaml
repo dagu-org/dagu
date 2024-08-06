@@ -1,0 +1,20 @@
+# SMTP server settings
+smtp:
+  host: "smtp.example.com"
+  port: "587"
+  username: user@example.com
+  password: password
+
+# Error mail configuration
+errorMail:
+  from: "error@example.com"
+  to: "admin@example.com"
+  prefix: "[ERROR]"
+  attachLogs: true
+
+# Info mail configuration
+infoMail:
+  from: "info@example.com"
+  to: "user@example.com"
+  prefix: "[INFO]"
+  attachLogs: false

@@ -36,7 +36,7 @@ type subWorkflow struct {
 
 var errWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
-func newSubworkflow(
+func newSubWorkflow(
 	ctx context.Context, step dag.Step,
 ) (Executor, error) {
 	executable, err := os.Executable()
@@ -113,5 +113,5 @@ func (e *subWorkflow) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(dag.ExecutorTypeSubWorkflow, newSubworkflow)
+	Register(dag.ExecutorTypeSubWorkflow, newSubWorkflow)
 }

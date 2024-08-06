@@ -36,7 +36,6 @@ func startCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				// nolint
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 

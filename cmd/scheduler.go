@@ -34,7 +34,6 @@ func schedulerCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, _ []string) {
 			cfg, err := config.Load()
 			if err != nil {
-				// nolint
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 			logger := logger.NewLogger(logger.NewLoggerArgs{

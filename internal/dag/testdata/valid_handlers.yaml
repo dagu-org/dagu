@@ -1,0 +1,9 @@
+handlerOn:
+  success:
+    command: "echo success"
+  failure:
+    command: "echo failure"
+  cancel:
+    command: "echo cancel"
+  exit:
+    command: "echo exit"
