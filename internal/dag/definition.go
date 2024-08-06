@@ -39,7 +39,7 @@ type definition struct {
 	MaxActiveRuns     int
 	Params            string
 	MaxCleanUpTimeSec *int
-	Tags              string
+	Tags              any
 }
 
 type conditionDef struct {

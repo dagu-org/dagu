@@ -1,0 +1,3 @@
+params: first P1=foo P2=${FOO} P3=`/bin/echo BAR` X=bar Y=${P1} Z="A B C"
+env:
+  - FOO: BAR

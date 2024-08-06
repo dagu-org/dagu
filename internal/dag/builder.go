@@ -82,6 +82,7 @@ var (
 	errStepCommandMustBeArrayOrString = errors.New(
 		"step command must be an array of strings or a string",
 	)
+	errInvalidParamValue    = errors.New("invalid parameter value")
 	errCallFunctionNotFound = errors.New(
 		"call must specify a functions that exists",
 	)

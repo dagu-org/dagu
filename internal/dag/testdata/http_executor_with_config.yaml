@@ -1,0 +1,7 @@
+steps:
+  - command: http://example.com
+    name: step 1
+    executor:
+      type: http
+      config:
+        key: value

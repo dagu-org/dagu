@@ -64,7 +64,7 @@ func LoadMetadata(dag string) (*DAG, error) {
 }
 
 // LoadYAML loads config from YAML data.
-func LoadYAML(data []byte) (*DAG, error) {
+func LoadYAML(data []byte, opts buildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func LoadYAML(data []byte) (*DAG, error) {
 		return nil, err
 	}
 
-	b := &builder{opts: buildOpts{metadataOnly: false, noEval: true}}
+	b := &builder{opts: opts}
 	return b.build(def, nil)
 }
 

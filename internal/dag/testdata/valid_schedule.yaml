@@ -1,0 +1,4 @@
+schedule:
+  start: "0 1 * * *"
+  stop: "0 2 * * *"
+  restart: "0 12 * * *"
