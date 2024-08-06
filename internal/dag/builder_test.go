@@ -190,6 +190,9 @@ func TestBuilder_Build(t *testing.T) {
 						"executor": "http",
 						"executorConfig": map[string]any{
 							"key": "value",
+							"map": map[string]any{
+								"foo": "bar",
+							},
 						},
 					},
 				},
