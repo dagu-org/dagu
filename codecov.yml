@@ -13,8 +13,10 @@ coverage:
       default:
         if_ci_failed: success
         threshold: 5%
+
 github_checks:
   annotations: false
-comment: #this is a top-level key
-  layout: "diff, flags, files"
+
+comment:
+  layout: "reach, diff, flags, files, footer"
   behavior: new
