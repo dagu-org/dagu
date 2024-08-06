@@ -13,9 +13,8 @@ coverage:
       default:
         if_ci_failed: success
         threshold: 5%
-    patch: off
 github_checks:
   annotations: false
 comment: #this is a top-level key
-  layout: " diff, flags, files"
+  layout: "diff, flags, files"
   behavior: default
