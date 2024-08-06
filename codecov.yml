@@ -17,4 +17,4 @@ github_checks:
   annotations: false
 comment: #this is a top-level key
   layout: "diff, flags, files"
-  behavior: default
+  behavior: new
