@@ -1,7 +1,6 @@
 package config
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 
@@ -59,13 +58,4 @@ func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) resolver {
 	}
 
 	return r
-}
-
-func getHomeDir() string {
-	dir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("could not determine home directory: %v", err)
-		return ""
-	}
-	return dir
 }
