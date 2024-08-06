@@ -1,0 +1,6 @@
+histRetentionDays: 7
+maxActiveRuns: 3
+maxCleanUpTimeSec: 300
+preconditions:
+  - condition: "test -f file.txt"
+    expected: "true"

@@ -123,7 +123,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
-		ret, err := LoadYAML([]byte(testDAG), buildOpts{})
+		ret, err := loadYAML([]byte(testDAG), buildOpts{})
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -132,7 +132,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
-		_, err := LoadYAML([]byte(`invalidyaml`), buildOpts{})
+		_, err := loadYAML([]byte(`invalidyaml`), buildOpts{})
 		require.Error(t, err)
 	})
 }

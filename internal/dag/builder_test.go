@@ -20,107 +20,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type testCase struct {
-	Name        string
-	InputFile   string
-	Expected    map[string]any
-	ExpectedErr error
-}
-
-type stepTestCase map[string]any
-
-func readTestFile(t *testing.T, filename string) []byte {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(testdataDir, filename))
-	require.NoError(t, err)
-	return data
-}
-
-func runTest(t *testing.T, tc testCase) {
-	t.Helper()
-	dag, err := LoadYAML(readTestFile(t, tc.InputFile), buildOpts{})
-
-	if tc.ExpectedErr != nil {
-		assert.Error(t, err)
-		if errs, ok := err.(*errorList); ok && len(*errs) > 0 {
-			// check if the error is in the list of errors
-			found := false
-			for _, e := range *errs {
-				if errors.Is(e, tc.ExpectedErr) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
-			}
-		} else if !errors.Is(err, tc.ExpectedErr) {
-			t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
-		}
-		return
-	}
-
-	require.NoError(t, err)
-	for k, v := range tc.Expected {
-		switch k {
-		case "steps":
-			stepTestCases := v.([]stepTestCase)
-			require.Len(t, dag.Steps, len(stepTestCases))
-			for i, step := range dag.Steps {
-				testStep(t, step, stepTestCases[i])
-			}
-		case "env":
-			for envKey, envVal := range v.(map[string]string) {
-				assert.Equal(t, envVal, os.Getenv(envKey))
-			}
-		case "tags":
-			for _, tag := range v.([]string) {
-				assert.True(t, dag.HasTag(tag))
-			}
-		case "schedule":
-			schedules := v.(map[string][]string)
-			for scheduleType, expressions := range schedules {
-				var actual []Schedule
-				switch scheduleKey(scheduleType) {
-				case scheduleKeyStart:
-					actual = dag.Schedule
-				case scheduleKeyStop:
-					actual = dag.StopSchedule
-				case scheduleKeyRestart:
-					actual = dag.RestartSchedule
-				}
-				assert.Len(t, actual, len(expressions))
-				for i, expr := range expressions {
-					assert.Equal(t, expr, actual[i].Expression)
-				}
-			}
-		}
-	}
-}
-
-func testStep(t *testing.T, step Step, tc stepTestCase) {
-	for k, v := range tc {
-		switch k {
-		case "name":
-			assert.Equal(t, v.(string), step.Name)
-		case "command":
-			assert.Equal(t, v.(string), step.Command)
-		case "args":
-			assert.Equal(t, v.([]string), step.Args)
-		case "executorConfig":
-			assert.Equal(t, v.(map[string]any), step.ExecutorConfig.Config)
-		case "executor":
-			assert.Equal(t, v.(string), step.ExecutorConfig.Type)
-		case "signalOnStop":
-			assert.Equal(t, v.(string), step.SignalOnStop)
-		}
-	}
-}
 
 func TestBuilder_Build(t *testing.T) {
 	tests := []testCase{
@@ -331,6 +235,88 @@ func TestBuilder_Build(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:      "ValidHandlers",
+			InputFile: "valid_handlers.yaml",
+			Expected: map[string]any{
+				"handlers": map[string]stepTestCase{
+					"exit": {
+						"name":    "onExit",
+						"command": "echo",
+						"args":    []string{"exit"},
+					},
+					"success": {
+						"name":    "onSuccess",
+						"command": "echo",
+						"args":    []string{"success"},
+					},
+					"failure": {
+						"name":    "onFailure",
+						"command": "echo",
+						"args":    []string{"failure"},
+					},
+					"cancel": {
+						"name":    "onCancel",
+						"command": "echo",
+						"args":    []string{"cancel"},
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidMailConfig",
+			InputFile: "valid_mail_config.yaml",
+			Expected: map[string]any{
+				"smtp": map[string]string{
+					"host":     "smtp.example.com",
+					"port":     "587",
+					"username": "user@example.com",
+					"password": "password",
+				},
+				"errorMail": map[string]any{
+					"from":       "error@example.com",
+					"to":         "admin@example.com",
+					"prefix":     "[ERROR]",
+					"attachLogs": true,
+				},
+				"infoMail": map[string]any{
+					"from":       "info@example.com",
+					"to":         "user@example.com",
+					"prefix":     "[INFO]",
+					"attachLogs": false,
+				},
+			},
+		},
+		{
+			Name:      "ValidSubWorkflow",
+			InputFile: "valid_subworkflow.yaml",
+			Expected: map[string]any{
+				"steps": []stepTestCase{
+					{
+						"name":     "sub_workflow_step",
+						"command":  "run",
+						"args":     []string{"sub_dag", "param1=value1 param2=value2"},
+						"executor": "subworkflow",
+						"subWorkflow": map[string]string{
+							"name":   "sub_dag",
+							"params": "param1=value1 param2=value2",
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:      "ValidMiscs",
+			InputFile: "valid_miscs.yaml",
+			Expected: map[string]any{
+				"histRetentionDays": 7,
+				"maxActiveRuns":     3,
+				"maxCleanUpTime":    time.Duration(300 * time.Second),
+				"preconditions": []Condition{
+					{Condition: "test -f file.txt", Expected: "true"},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -366,4 +352,175 @@ func TestOverrideBaseConfig(t *testing.T) {
 		require.Equal(t, &MailOn{Failure: true, Success: false}, dg.MailOn)
 		require.Equal(t, dg.HistRetentionDays, 30)
 	})
+}
+
+type testCase struct {
+	Name        string
+	InputFile   string
+	Expected    map[string]any
+	ExpectedErr error
+}
+
+type stepTestCase map[string]any
+
+func readTestFile(t *testing.T, filename string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(testdataDir, filename))
+	require.NoError(t, err)
+	return data
+}
+
+func runTest(t *testing.T, tc testCase) {
+	t.Helper()
+	dag, err := loadYAML(readTestFile(t, tc.InputFile), buildOpts{})
+
+	if tc.ExpectedErr != nil {
+		assert.Error(t, err)
+		if errs, ok := err.(*errorList); ok && len(*errs) > 0 {
+			// check if the error is in the list of errors
+			found := false
+			for _, e := range *errs {
+				if errors.Is(e, tc.ExpectedErr) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
+			}
+		} else if !errors.Is(err, tc.ExpectedErr) {
+			t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
+		}
+		return
+	}
+
+	require.NoError(t, err)
+	for k, v := range tc.Expected {
+		switch k {
+		case "steps":
+			stepTestCases := v.([]stepTestCase)
+			require.Len(t, dag.Steps, len(stepTestCases))
+			for i, step := range dag.Steps {
+				testStep(t, step, stepTestCases[i])
+			}
+		case "env":
+			for envKey, envVal := range v.(map[string]string) {
+				assert.Equal(t, envVal, os.Getenv(envKey))
+			}
+		case "tags":
+			for _, tag := range v.([]string) {
+				assert.True(t, dag.HasTag(tag))
+			}
+		case "schedule":
+			schedules := v.(map[string][]string)
+			for scheduleType, expressions := range schedules {
+				var actual []Schedule
+				switch scheduleKey(scheduleType) {
+				case scheduleKeyStart:
+					actual = dag.Schedule
+				case scheduleKeyStop:
+					actual = dag.StopSchedule
+				case scheduleKeyRestart:
+					actual = dag.RestartSchedule
+				}
+				assert.Len(t, actual, len(expressions))
+				for i, expr := range expressions {
+					assert.Equal(t, expr, actual[i].Expression)
+				}
+			}
+		case "histRetentionDays":
+			assert.Equal(t, v.(int), dag.HistRetentionDays)
+		case "maxActiveRuns":
+			assert.Equal(t, v.(int), dag.MaxActiveRuns)
+		case "maxCleanUpTime":
+			assert.Equal(t, v.(time.Duration), dag.MaxCleanUpTime)
+		case "preconditions":
+			assert.Equal(t, v.([]Condition), dag.Preconditions)
+		case "handlers":
+			for handlerName, handler := range v.(map[string]stepTestCase) {
+				switch handlerName {
+				case "exit":
+					testStep(t, *dag.HandlerOn.Exit, handler)
+				case "success":
+					testStep(t, *dag.HandlerOn.Success, handler)
+				case "failure":
+					testStep(t, *dag.HandlerOn.Failure, handler)
+				case "cancel":
+					testStep(t, *dag.HandlerOn.Cancel, handler)
+				default:
+					panic("unexpected handler: " + handlerName)
+				}
+			}
+		case "smtp":
+			for key, val := range v.(map[string]string) {
+				switch key {
+				case "host":
+					assert.Equal(t, val, dag.SMTP.Host)
+				case "port":
+					assert.Equal(t, val, dag.SMTP.Port)
+				case "username":
+					assert.Equal(t, val, dag.SMTP.Username)
+				case "password":
+					assert.Equal(t, val, dag.SMTP.Password)
+				default:
+					panic("unexpected smtp key: " + key)
+				}
+			}
+		case "errorMail":
+			testMailConfig(t, *dag.ErrorMail, v.(map[string]any))
+		case "infoMail":
+			testMailConfig(t, *dag.InfoMail, v.(map[string]any))
+		default:
+			panic("unexpected key: " + k)
+		}
+	}
+}
+
+func testMailConfig(t *testing.T, mailConfig MailConfig, tc map[string]any) {
+	for key, val := range tc {
+		switch key {
+		case "from":
+			assert.Equal(t, val, mailConfig.From)
+		case "to":
+			assert.Equal(t, val, mailConfig.To)
+		case "prefix":
+			assert.Equal(t, val, mailConfig.Prefix)
+		case "attachLogs":
+			assert.Equal(t, val, mailConfig.AttachLogs)
+		default:
+			t.Errorf("unexpected mail key: %s", key)
+		}
+	}
+}
+
+func testStep(t *testing.T, step Step, tc stepTestCase) {
+	for k, v := range tc {
+		switch k {
+		case "name":
+			assert.Equal(t, v.(string), step.Name)
+		case "command":
+			assert.Equal(t, v.(string), step.Command)
+		case "args":
+			assert.Equal(t, v.([]string), step.Args)
+		case "executorConfig":
+			assert.Equal(t, v.(map[string]any), step.ExecutorConfig.Config)
+		case "executor":
+			assert.Equal(t, v.(string), step.ExecutorConfig.Type)
+		case "signalOnStop":
+			assert.Equal(t, v.(string), step.SignalOnStop)
+		case "subWorkflow":
+			for k, val := range v.(map[string]string) {
+				switch k {
+				case "name":
+					assert.Equal(t, val, step.SubWorkflow.Name)
+				case "params":
+					assert.Equal(t, val, step.SubWorkflow.Params)
+				default:
+					panic("unexpected subworkflow key: " + k)
+				}
+			}
+		default:
+			panic("unexpected key: " + k)
+		}
+	}
 }
