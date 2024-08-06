@@ -1,11 +1,22 @@
 coverage:
   ignore:
+    # Ignore frontend code for now
     - "internal/frontend"
+    # Test code
+    - "internal/test"
+    # Executor code does not measure coverage for now
+    - "internal/dag/executor"
+    # The filenotify is a third party library
+    - "internal/scheduler/filenotify"
   status:
     project:
       default:
         if_ci_failed: success
         threshold: 5%
-    patch: off
+
 github_checks:
   annotations: false
+
+comment:
+  layout: "reach, diff, flags, files, footer"
+  behavior: new

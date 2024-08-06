@@ -139,6 +139,18 @@ func TestBuilder_Build(t *testing.T) {
 			},
 		},
 		{
+			Name:      "ScheduleInList",
+			InputFile: "schedule_in_list.yaml",
+			Expected: map[string]any{
+				"schedule": map[string][]string{
+					"start": {
+						"0 1 * * *",
+						"0 18 * * *",
+					},
+				},
+			},
+		},
+		{
 			Name:      "ScheduleWithMultipleValues",
 			InputFile: "schedule_with_multiple_values.yaml",
 			Expected: map[string]any{
@@ -178,6 +190,9 @@ func TestBuilder_Build(t *testing.T) {
 						"executor": "http",
 						"executorConfig": map[string]any{
 							"key": "value",
+							"map": map[string]any{
+								"foo": "bar",
+							},
 						},
 					},
 				},

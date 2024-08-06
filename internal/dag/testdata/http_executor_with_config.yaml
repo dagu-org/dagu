@@ -5,3 +5,5 @@ steps:
       type: http
       config:
         key: value
+        map:
+          foo: bar

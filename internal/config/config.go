@@ -154,6 +154,15 @@ func setupViper() error {
 	return setExecutableDefault()
 }
 
+func getHomeDir() string {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("could not determine home directory: %v", err)
+		return ""
+	}
+	return dir
+}
+
 func setExecutableDefault() error {
 	executable, err := os.Executable()
 	if err != nil {
