@@ -1,6 +1,13 @@
 coverage:
   ignore:
+    # Ignore frontend code for now
     - "internal/frontend"
+    # Test code
+    - "internal/test"
+    # Executor code does not measure coverage for now
+    - "internal/dag/executor"
+    # The filenotify is a third party library
+    - "internal/scheduler/filenotify"
   status:
     project:
       default:

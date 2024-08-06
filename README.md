@@ -7,7 +7,7 @@
     <img src="https://goreportcard.com/badge/github.com/daguflow/dagu" />
   </a>
   <a href="https://codecov.io/gh/daguflow/dagu">
-    <img src="https://codecov.io/gh/dagu-dev/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
+    <img src="https://codecov.io/gh/daguflow/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
   </a>
   <a href="https://github.com/daguflow/dagu/releases">
     <img src="https://img.shields.io/github/release/daguflow/dagu.svg" />
