@@ -58,6 +58,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Clear Go module cache
+        run: |
+          go clean -modcache
+          rm -rf ~/.cache/go-build
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
