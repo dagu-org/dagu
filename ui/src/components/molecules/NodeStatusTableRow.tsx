@@ -22,7 +22,7 @@ function NodeStatusTableRow({
   file,
   onRequireModal,
 }: Props) {
-  const url = `/dags/${name}/log?file=${file}&step=${node.Step.Name}`;
+  const url = `/dags/${name}/log?file=${file}&step=${encodeURIComponent(node.Step.Name)}`;
   const buttonStyle = {
     margin: '0px',
     padding: '0px',
