@@ -28,23 +28,29 @@ type Finder interface {
 
 // Context contains the current DAG and Finder.
 type Context struct {
-	DAG    *DAG
-	Finder Finder
+	DAG                  *DAG
+	Finder               Finder
+	DaguSchedulerLogPath string
+	DaguExecutionLogPath string
+	DaguRequestID        string
 }
 
 // ctxKey is used as the key for storing the DAG in the context.
 type ctxKey struct{}
 
-// NewContext creates a new context with the DAG and Finder.
-func NewContext(ctx context.Context, dag *DAG, finder Finder) context.Context {
-	return context.WithValue(ctx, ctxKey{}, Context{
-		DAG:    dag,
-		Finder: finder,
-	})
+// NewContext creates a new context with the DAG and Finder and RequestIDEnvKey.
+func NewContext(ctx context.Context, dagCtx Context) context.Context {
+	return context.WithValue(ctx, ctxKey{}, dagCtx)
 }
 
 var (
 	errFailedCtxAssertion = errors.New("failed to assert DAG context")
+)
+
+const (
+	ExecutionLogPathEnvKey = "DAGU_EXECUTION_LOG_PATH"
+	SchedulerLogPathEnvKey = "DAGU_SCHEDULER_LOG_PATH"
+	RequestIDEnvKey        = "DAGU_REQUEST_ID"
 )
 
 // GetContext returns the DAG Context from the context.
