@@ -129,6 +129,10 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
+	if err := n.setUpBuildInContextEnv(ctx); err != nil {
+		return err
+	}
+
 	cmd, err := n.setupExec(ctx)
 	if err != nil {
 		return err
@@ -372,6 +376,27 @@ func (n *Node) setupLog() error {
 	}
 	n.logWriter = bufio.NewWriter(n.logFile)
 	return nil
+}
+
+func (n *Node) setUpBuildInContextEnv(ctx context.Context) error {
+	var (
+		dagCtx dag.Context
+		err    error
+	)
+
+	if dagCtx, err = dag.GetContext(ctx); err != nil {
+		return err
+	}
+
+	if err = os.Setenv(dag.ExecutionLogPathEnvKey, n.data.Log); err != nil {
+		return err
+	}
+
+	if err = os.Setenv(dag.SchedulerLogPathEnvKey, dagCtx.DaguSchedulerLogPath); err != nil {
+		return err
+	}
+
+	return os.Setenv(dag.RequestIDEnvKey, dagCtx.DaguRequestID)
 }
 
 func (n *Node) teardown() error {
