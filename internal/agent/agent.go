@@ -203,7 +203,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	lastErr := a.scheduler.Schedule(
-		dag.NewContext(ctx, a.dag, a.dataStore.DAGStore()),
+		dag.NewContext(ctx, dag.Context{
+			DAG:                  a.dag,
+			Finder:               a.dataStore.DAGStore(),
+			DaguRequestID:        a.requestID,
+			DaguSchedulerLogPath: a.logFile,
+		}),
 		a.graph,
 		done,
 	)
@@ -384,7 +389,12 @@ func (a *Agent) dryRun() error {
 	a.logger.Info("Dry-run started", "reqId", a.requestID)
 
 	lastErr := a.scheduler.Schedule(
-		dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore()),
+		dag.NewContext(context.Background(), dag.Context{
+			DAG:                  a.dag,
+			Finder:               a.dataStore.DAGStore(),
+			DaguRequestID:        a.requestID,
+			DaguSchedulerLogPath: a.logDir,
+		}),
 		a.graph,
 		done,
 	)
