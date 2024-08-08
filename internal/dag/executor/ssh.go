@@ -23,9 +23,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/dag"
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/daguflow/dagu/internal/dag"
 )
 
 type sshExec struct {
@@ -41,7 +42,29 @@ type sshExecConfig struct {
 	IP                    string
 	Port                  int
 	Key                   string
+	Password              string
 	StrictHostKeyChecking bool
+}
+
+// selectSSHAuthMethod selects the authentication method based on the configuration.
+// If the key is provided, it will use the public key authentication method.
+// Otherwise, it will use the password authentication method.
+func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
+	var (
+		signer ssh.Signer
+		err    error
+	)
+
+	if len(cfg.Key) != 0 {
+		// Create the Signer for this private key.
+		if signer, err = getPublicKeySigner(cfg.Key); err != nil {
+			return nil, err
+		}
+
+		return ssh.PublicKeys(signer), nil
+	}
+
+	return ssh.Password(cfg.Password), nil
 }
 
 func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
@@ -66,8 +89,8 @@ func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 		return nil, errStrictHostKey
 	}
 
-	// Create the Signer for this private key.
-	signer, err := getPublicKeySigner(cfg.Key)
+	// Select the authentication method.
+	authMethod, err := selectSSHAuthMethod(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +98,7 @@ func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 	sshConfig := &ssh.ClientConfig{
 		User: cfg.User,
 		Auth: []ssh.AuthMethod{
-			// Use the PublicKeys method for remote authentication.
-			ssh.PublicKeys(signer),
+			authMethod,
 		},
 		// nolint: gosec
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
