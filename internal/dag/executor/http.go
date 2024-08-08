@@ -49,7 +49,7 @@ type httpConfig struct {
 	Json    bool              `json:"json"`
 }
 
-type HttpJSONResult struct {
+type httpJSONResult struct {
 	StatusCode int                 `json:"status_code"`
 	Headers    map[string][]string `json:"headers"`
 	Body       map[string]any      `json:"body"`
@@ -117,21 +117,21 @@ var errHTTPStatusCode = errors.New("http status code not 2xx")
 
 func (e *http) writeJSONResult(rsp *resty.Response) error {
 	var (
-		httpJSONResult      = &HttpJSONResult{}
+		httpJSONResultData  = &httpJSONResult{}
 		err                 error
 		httpJSONResultBytes []byte
 	)
 
 	if !rsp.IsSuccess() || !e.cfg.Silent {
-		httpJSONResult.Headers = rsp.Header()
-		httpJSONResult.StatusCode = rsp.StatusCode()
+		httpJSONResultData.Headers = rsp.Header()
+		httpJSONResultData.StatusCode = rsp.StatusCode()
 	}
 
-	if err = json.Unmarshal(rsp.Body(), &httpJSONResult.Body); err != nil {
+	if err = json.Unmarshal(rsp.Body(), &httpJSONResultData.Body); err != nil {
 		return err
 	}
 
-	if httpJSONResultBytes, err = json.MarshalIndent(httpJSONResult, "", " "); err != nil {
+	if httpJSONResultBytes, err = json.MarshalIndent(httpJSONResultData, "", " "); err != nil {
 		return err
 	}
 
