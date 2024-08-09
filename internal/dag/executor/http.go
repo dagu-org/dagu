@@ -52,7 +52,7 @@ type httpConfig struct {
 type httpJSONResult struct {
 	StatusCode int                 `json:"status_code"`
 	Headers    map[string][]string `json:"headers"`
-	Body       map[string]any      `json:"body"`
+	Body       any                 `json:"body"`
 }
 
 func newHTTP(ctx context.Context, step dag.Step) (Executor, error) {
