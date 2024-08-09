@@ -21,3 +21,4 @@ tmp/*
 
 # Directory for local development
 local/
+.local/

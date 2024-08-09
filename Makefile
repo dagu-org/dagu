@@ -14,7 +14,7 @@ VERSION=
 SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # Directories for miscellaneous files for the local environment
-LOCAL_DIR=$(SCRIPT_DIR)/local
+LOCAL_DIR=$(SCRIPT_DIR)/.local
 LOCAL_BIN_DIR=$(LOCAL_DIR)/bin
 
 # Configuration directory
