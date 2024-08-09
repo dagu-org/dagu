@@ -46,6 +46,13 @@ type httpConfig struct {
 	Body    string            `json:"body"`
 	Silent  bool              `json:"silent"`
 	Debug   bool              `json:"debug"`
+	Json    bool              `json:"json"`
+}
+
+type httpJSONResult struct {
+	StatusCode int                 `json:"status_code"`
+	Headers    map[string][]string `json:"headers"`
+	Body       any                 `json:"body"`
 }
 
 func newHTTP(ctx context.Context, step dag.Step) (Executor, error) {
@@ -108,15 +115,35 @@ func (e *http) Kill(_ os.Signal) error {
 
 var errHTTPStatusCode = errors.New("http status code not 2xx")
 
-func (e *http) Run() error {
-	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
-	if err != nil {
+func (e *http) writeJSONResult(rsp *resty.Response) error {
+	var (
+		httpJSONResultData  = &httpJSONResult{}
+		err                 error
+		httpJSONResultBytes []byte
+	)
+
+	if !rsp.IsSuccess() || !e.cfg.Silent {
+		httpJSONResultData.Headers = rsp.Header()
+		httpJSONResultData.StatusCode = rsp.StatusCode()
+	}
+
+	if err = json.Unmarshal(rsp.Body(), &httpJSONResultData.Body); err != nil {
 		return err
 	}
 
-	resCode := rsp.StatusCode()
-	isErr := resCode < 200 || resCode > 299
-	if isErr || !e.cfg.Silent {
+	if httpJSONResultBytes, err = json.MarshalIndent(httpJSONResultData, "", " "); err != nil {
+		return err
+	}
+
+	if _, err = e.stdout.Write(httpJSONResultBytes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *http) writeTextResult(rsp *resty.Response) error {
+	if !rsp.IsSuccess() || !e.cfg.Silent {
 		if _, err := e.stdout.Write([]byte(rsp.Status() + "\n")); err != nil {
 			return err
 		}
@@ -124,10 +151,33 @@ func (e *http) Run() error {
 			return err
 		}
 	}
+
 	if _, err := e.stdout.Write(rsp.Body()); err != nil {
 		return err
 	}
-	if isErr {
+
+	return nil
+}
+
+func (e *http) Run() error {
+	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
+	if err != nil {
+		return err
+	}
+
+	resCode := rsp.StatusCode()
+
+	if e.cfg.Json {
+		if err = e.writeJSONResult(rsp); err != nil {
+			return err
+		}
+	} else {
+		if err = e.writeTextResult(rsp); err != nil {
+			return err
+		}
+	}
+
+	if !rsp.IsSuccess() {
 		return fmt.Errorf("%w: %d", errHTTPStatusCode, resCode)
 	}
 	return nil
