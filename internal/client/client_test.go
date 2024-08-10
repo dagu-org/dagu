@@ -382,7 +382,7 @@ func testNewStatus(workflow *dag.DAG, requestID string, status scheduler.Status,
 		workflow,
 		[]scheduler.NodeData{
 			{
-				NodeState: scheduler.NodeState{Status: nodeStatus},
+				State: scheduler.NodeState{Status: nodeStatus},
 			},
 		},
 		status,

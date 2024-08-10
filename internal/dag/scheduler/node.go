@@ -56,11 +56,11 @@ type Node struct {
 }
 
 type NodeData struct {
-	dag.Step
-	NodeState
+	Step  dag.Step
+	State NodeState
 }
 
-// NodeState is the state of a node.
+// NodeState contains the state of a node.
 type NodeState struct {
 	Status     NodeStatus
 	Log        string
@@ -72,6 +72,7 @@ type NodeState struct {
 	Error      error
 }
 
+// NodeStatus represents the status of a node.
 type NodeStatus int
 
 const (
@@ -104,7 +105,7 @@ func (s NodeStatus) String() string {
 
 func NewNode(step dag.Step, state NodeState) *Node {
 	return &Node{
-		data: NodeData{Step: step, NodeState: state},
+		data: NodeData{Step: step, State: state},
 	}
 }
 
@@ -117,13 +118,13 @@ func (n *Node) Data() NodeData {
 func (n *Node) SetError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.Error = err
+	n.data.State.Error = err
 }
 
 func (n *Node) State() NodeState {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.data.NodeState
+	return n.data.State
 }
 
 // Execute runs the command synchronously and returns error if any.
@@ -146,13 +147,13 @@ func (n *Node) Execute(ctx context.Context) error {
 		)
 	}
 
-	return n.data.Error
+	return n.data.State.Error
 }
 
 func (n *Node) finish() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.FinishedAt = time.Now()
+	n.data.State.FinishedAt = time.Now()
 }
 
 func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
@@ -212,42 +213,42 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 func (n *Node) getRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.data.RetryCount
+	return n.data.State.RetryCount
 }
 
 func (n *Node) setRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.RetriedAt = retriedAt
+	n.data.State.RetriedAt = retriedAt
 }
 
 func (n *Node) getDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.data.DoneCount
+	return n.data.State.DoneCount
 }
 
 func (n *Node) clearState() {
-	n.data.NodeState = NodeState{}
+	n.data.State = NodeState{}
 }
 
 func (n *Node) setStatus(status NodeStatus) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.Status = status
+	n.data.State.Status = status
 }
 
 func (n *Node) setErr(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.Error = err
-	n.data.Status = NodeStatusError
+	n.data.State.Error = err
+	n.data.State.Status = NodeStatusError
 }
 
 func (n *Node) signal(sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.data.Status
+	status := n.data.State.Status
 	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
 		if allowOverride && n.data.Step.SignalOnStop != "" {
@@ -257,16 +258,16 @@ func (n *Node) signal(sig os.Signal, allowOverride bool) {
 		util.LogErr("sending signal", n.cmd.Kill(sigsig))
 	}
 	if status == NodeStatusRunning {
-		n.data.Status = NodeStatusCancel
+		n.data.State.Status = NodeStatusCancel
 	}
 }
 
 func (n *Node) cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.data.Status
+	status := n.data.State.Status
 	if status == NodeStatusRunning {
-		n.data.Status = NodeStatusCancel
+		n.data.State.Status = NodeStatusCancel
 	}
 	if n.cancelFunc != nil {
 		log.Printf("canceling node: %s", n.data.Step.Name)
@@ -278,10 +279,10 @@ func (n *Node) setup(logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.data.StartedAt = time.Now()
-	n.data.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
+	n.data.State.StartedAt = time.Now()
+	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		util.ValidFilename(n.data.Step.Name),
-		n.data.StartedAt.Format("20060102.15:04:05.000"),
+		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
 		util.TruncString(requestID, 8),
 	))
 	if err := n.setupLog(); err != nil {
@@ -326,7 +327,7 @@ func (n *Node) setupStdout() error {
 		var err error
 		n.stdoutFile, err = util.OpenOrCreateFile(f)
 		if err != nil {
-			n.data.Error = err
+			n.data.State.Error = err
 			return err
 		}
 		n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
@@ -343,7 +344,7 @@ func (n *Node) setupStderr() error {
 		var err error
 		n.stderrFile, err = util.OpenOrCreateFile(f)
 		if err != nil {
-			n.data.Error = err
+			n.data.State.Error = err
 			return err
 		}
 		n.stderrWriter = bufio.NewWriter(n.stderrFile)
@@ -352,15 +353,15 @@ func (n *Node) setupStderr() error {
 }
 
 func (n *Node) setupLog() error {
-	if n.data.Log == "" {
+	if n.data.State.Log == "" {
 		return nil
 	}
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 	var err error
-	n.logFile, err = util.OpenOrCreateFile(n.data.Log)
+	n.logFile, err = util.OpenOrCreateFile(n.data.State.Log)
 	if err != nil {
-		n.data.Error = err
+		n.data.State.Error = err
 		return err
 	}
 	n.logWriter = bufio.NewWriter(n.logFile)
@@ -395,7 +396,7 @@ func (n *Node) teardown() error {
 		_ = os.Remove(n.scriptFile.Name())
 	}
 	if lastErr != nil {
-		n.data.Error = lastErr
+		n.data.State.Error = lastErr
 	}
 	return lastErr
 }
@@ -403,13 +404,13 @@ func (n *Node) teardown() error {
 func (n *Node) incRetryCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.RetryCount++
+	n.data.State.RetryCount++
 }
 
 func (n *Node) incDoneCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.data.DoneCount++
+	n.data.State.DoneCount++
 }
 
 var (

@@ -44,7 +44,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "1", Command: "true"},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusSuccess,
 				},
 			},
@@ -52,7 +52,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "2", Command: "true", Depends: []string{"1"}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusError,
 				},
 			},
@@ -60,7 +60,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "3", Command: "true", Depends: []string{"2"}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusCancel,
 				},
 			},
@@ -68,7 +68,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "4", Command: "true", Depends: []string{}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusSkipped,
 				},
 			},
@@ -76,7 +76,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "5", Command: "true", Depends: []string{"4"}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusError,
 				},
 			},
@@ -84,7 +84,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "6", Command: "true", Depends: []string{"5"}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusSuccess,
 				},
 			},
@@ -92,7 +92,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "7", Command: "true", Depends: []string{"6"}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusSkipped,
 				},
 			},
@@ -100,7 +100,7 @@ func TestRetryExecution(t *testing.T) {
 		{
 			data: NodeData{
 				Step: dag.Step{Name: "8", Command: "true", Depends: []string{}},
-				NodeState: NodeState{
+				State: NodeState{
 					Status: NodeStatusSkipped,
 				},
 			},

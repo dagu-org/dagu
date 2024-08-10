@@ -194,7 +194,7 @@ func (g *ExecutionGraph) setupRetry() error {
 	dict := map[int]NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
-		dict[node.id] = node.data.Status
+		dict[node.id] = node.data.State.Status
 		retry[node.id] = false
 	}
 	var frontier []int

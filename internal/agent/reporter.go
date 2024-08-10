@@ -55,7 +55,7 @@ func (r *reporter) reportStep(
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
 		r.logger.Info("Step execution finished",
-			"step", node.Data().Name,
+			"step", node.Data().Step.Name,
 			"status", nodeStatus,
 		)
 	}
