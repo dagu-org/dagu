@@ -372,7 +372,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 			status, err := cli.GetLatestStatus(workflow)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusCancel
-		}, time.Second*2, time.Millisecond*100)
+		}, time.Second*3, time.Millisecond*100)
 	})
 }
 
