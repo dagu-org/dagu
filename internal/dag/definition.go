@@ -37,7 +37,7 @@ type definition struct {
 	HistRetentionDays *int
 	Preconditions     []*conditionDef
 	MaxActiveRuns     int
-	Params            string
+	Params            []string
 	MaxCleanUpTimeSec *int
 	Tags              any
 }
