@@ -55,7 +55,7 @@ func FromNode(node scheduler.NodeData) *Node {
 }
 
 type Node struct {
-	dag.Step   `json:"Step"`
+	Step       dag.Step             `json:"Step"`
 	Log        string               `json:"Log"`
 	StartedAt  string               `json:"StartedAt"`
 	FinishedAt string               `json:"FinishedAt"`

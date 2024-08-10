@@ -65,7 +65,7 @@ func TestStatusSerialization(t *testing.T) {
 
 	require.Equal(t, status.Name, unmarshalled.Name)
 	require.Equal(t, 1, len(unmarshalled.Nodes))
-	require.Equal(t, workflow.Steps[0].Name, unmarshalled.Nodes[0].Name)
+	require.Equal(t, workflow.Steps[0].Name, unmarshalled.Nodes[0].Step.Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {

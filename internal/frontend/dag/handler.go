@@ -415,16 +415,16 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if node == nil {
-		if status.OnSuccess != nil && status.OnSuccess.Name == *params.Step {
+		if status.OnSuccess != nil && status.OnSuccess.Step.Name == *params.Step {
 			node = status.OnSuccess
 		}
-		if status.OnFailure != nil && status.OnFailure.Name == *params.Step {
+		if status.OnFailure != nil && status.OnFailure.Step.Name == *params.Step {
 			node = status.OnFailure
 		}
-		if status.OnCancel != nil && status.OnCancel.Name == *params.Step {
+		if status.OnCancel != nil && status.OnCancel.Step.Name == *params.Step {
 			node = status.OnCancel
 		}
-		if status.OnExit != nil && status.OnExit.Name == *params.Step {
+		if status.OnExit != nil && status.OnExit.Step.Name == *params.Step {
 			node = status.OnExit
 		}
 	}
@@ -478,7 +478,7 @@ func (h *Handler) processLogRequest(
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
 	for idx, log := range logs {
 		for _, node := range log.Status.Nodes {
-			addNodeStatus(nodeNameToStatusList, len(logs), idx, node.Name, node.Status)
+			addNodeStatus(nodeNameToStatusList, len(logs), idx, node.Step.Name, node.Status)
 		}
 	}
 
@@ -504,23 +504,23 @@ func (h *Handler) processLogRequest(
 	for idx, log := range logs {
 		if n := log.Status.OnSuccess; n != nil {
 			addNodeStatus(
-				handlerToStatusList, len(logs), idx, n.Name, n.Status,
+				handlerToStatusList, len(logs), idx, n.Step.Name, n.Status,
 			)
 		}
 		if n := log.Status.OnFailure; n != nil {
 			addNodeStatus(
-				handlerToStatusList, len(logs), idx, n.Name, n.Status,
+				handlerToStatusList, len(logs), idx, n.Step.Name, n.Status,
 			)
 		}
 		if n := log.Status.OnCancel; n != nil {
 			n := log.Status.OnCancel
 			addNodeStatus(
-				handlerToStatusList, len(logs), idx, n.Name, n.Status,
+				handlerToStatusList, len(logs), idx, n.Step.Name, n.Status,
 			)
 		}
 		if n := log.Status.OnExit; n != nil {
 			addNodeStatus(
-				handlerToStatusList, len(logs), idx, n.Name, n.Status,
+				handlerToStatusList, len(logs), idx, n.Step.Name, n.Status,
 			)
 		}
 	}
