@@ -34,6 +34,44 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Node is a node in a DAG. It executes a command.
+type Node struct {
+	data NodeData
+
+	id           int
+	mu           sync.RWMutex
+	logLock      sync.Mutex
+	cmd          executor.Executor
+	cancelFunc   func()
+	logFile      *os.File
+	logWriter    *bufio.Writer
+	stdoutFile   *os.File
+	stdoutWriter *bufio.Writer
+	stderrFile   *os.File
+	stderrWriter *bufio.Writer
+	outputWriter *os.File
+	outputReader *os.File
+	scriptFile   *os.File
+	done         bool
+}
+
+type NodeData struct {
+	dag.Step
+	NodeState
+}
+
+// NodeState is the state of a node.
+type NodeState struct {
+	Status     NodeStatus
+	Log        string
+	StartedAt  time.Time
+	FinishedAt time.Time
+	RetryCount int
+	RetriedAt  time.Time
+	DoneCount  int
+	Error      error
+}
+
 type NodeStatus int
 
 const (
@@ -70,48 +108,10 @@ func NewNode(step dag.Step, state NodeState) *Node {
 	}
 }
 
-type NodeData struct {
-	dag.Step
-	NodeState
-}
-
-// Node is a node in a DAG. It executes a command.
-type Node struct {
-	data NodeData
-
-	id           int
-	mu           sync.RWMutex
-	logLock      sync.Mutex
-	cmd          executor.Executor
-	cancelFunc   func()
-	logFile      *os.File
-	logWriter    *bufio.Writer
-	stdoutFile   *os.File
-	stdoutWriter *bufio.Writer
-	stderrFile   *os.File
-	stderrWriter *bufio.Writer
-	outputWriter *os.File
-	outputReader *os.File
-	scriptFile   *os.File
-	done         bool
-}
-
-// NodeState is the state of a node.
-type NodeState struct {
-	Status     NodeStatus
-	Log        string
-	StartedAt  time.Time
-	FinishedAt time.Time
-	RetryCount int
-	RetriedAt  time.Time
-	DoneCount  int
-	Error      error
-}
-
-func (n *Node) finish() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.data.FinishedAt = time.Now()
+func (n *Node) Data() NodeData {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.data
 }
 
 func (n *Node) SetError(err error) {
@@ -147,6 +147,12 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	return n.data.Error
+}
+
+func (n *Node) finish() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.FinishedAt = time.Now()
 }
 
 func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
@@ -201,12 +207,6 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	}
 
 	return cmd, nil
-}
-
-func (n *Node) Data() NodeData {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.data
 }
 
 func (n *Node) getRetryCount() int {
@@ -284,18 +284,16 @@ func (n *Node) setup(logDir string, requestID string) error {
 		n.data.StartedAt.Format("20060102.15:04:05.000"),
 		util.TruncString(requestID, 8),
 	))
-	for _, fn := range []func() error{
-		n.setupLog,
-		n.setupStdout,
-		n.setupStderr,
-		n.setupScript,
-	} {
-		if err := fn(); err != nil {
-			n.data.Error = err
-			return err
-		}
+	if err := n.setupLog(); err != nil {
+		return err
 	}
-	return nil
+	if err := n.setupStdout(); err != nil {
+		return err
+	}
+	if err := n.setupStderr(); err != nil {
+		return err
+	}
+	return n.setupScript()
 }
 
 var (
