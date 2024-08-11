@@ -189,6 +189,31 @@ func TestSchedulerCancel(t *testing.T) {
 	require.Equal(t, NodeStatusNone, nodes[2].State().Status)
 }
 
+func TestSchedulerTimeout(t *testing.T) {
+	g, _ := NewExecutionGraph(
+		logger.Default,
+		step("1", "sleep 1"),
+		step("2", "sleep 1"),
+		step("3", "sleep 3"),
+		step("4", "sleep 10"),
+		step("5", "sleep 1", "2"),
+		step("6", "sleep 1", "5"),
+	)
+	sc := New(&Config{Timeout: time.Second * 2, LogDir: testHomeDir})
+
+	err := sc.Schedule(context.Background(), g, nil)
+	require.Error(t, err)
+	require.Equal(t, sc.Status(g), StatusError)
+
+	nodes := g.Nodes()
+	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
+	require.Equal(t, NodeStatusCancel, nodes[2].State().Status)
+	require.Equal(t, NodeStatusCancel, nodes[3].State().Status)
+	require.Equal(t, NodeStatusCancel, nodes[4].State().Status)
+	require.Equal(t, NodeStatusCancel, nodes[5].State().Status)
+}
+
 func TestSchedulerRetryFail(t *testing.T) {
 	cmd := filepath.Join(util.MustGetwd(), "testdata/testfile.sh")
 	g, sc, err := testSchedule(t,

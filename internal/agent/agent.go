@@ -339,6 +339,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 		LogDir:        a.logDir,
 		Logger:        a.logger,
 		MaxActiveRuns: a.dag.MaxActiveRuns,
+		Timeout:       a.dag.Timeout,
 		Delay:         a.dag.Delay,
 		Dry:           a.dry,
 		ReqID:         a.requestID,

@@ -139,6 +139,20 @@ func TestAgent_Run(t *testing.T) {
 		// Check if the status is saved correctly
 		require.Equal(t, scheduler.StatusError, agt.Status().Status)
 	})
+	t.Run("FinishWithTimeout", func(t *testing.T) {
+		setup := test.SetupTest(t)
+		defer setup.Cleanup()
+
+		// Run a DAG that timeout
+		timeoutDAG := testLoadDAG(t, "timeout.yaml")
+		agt := newAgent(setup, genRequestID(), timeoutDAG, &agent.Options{})
+		ctx := context.Background()
+		err := agt.Run(ctx)
+		require.Error(t, err)
+
+		// Check if the status is saved correctly
+		require.Equal(t, scheduler.StatusError, agt.Status().Status)
+	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
