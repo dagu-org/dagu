@@ -86,6 +86,8 @@ type DAG struct {
 	// MailOn contains the conditions to send mail.
 	MailOn *MailOn `json:"MailOn"`
 
+	// Timeout is a field to specify the maximum execution time of the DAG task
+	Timeout time.Duration `json:"Timeout"`
 	// Misc configuration for DAG execution.
 	// Delay is the delay before starting the DAG.
 	Delay time.Duration `json:"Delay"`
