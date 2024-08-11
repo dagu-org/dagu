@@ -343,7 +343,7 @@ Example:
       - PATH: /usr/local/bin:${PATH}
     logDir: ${LOG_DIR}                   
     restartWaitSec: 60                   
-    histRetentionDays: 3                 
+    histRetentionDays: 3
     timeout: 3600
     delaySec: 1                          
     maxActiveRuns: 1                     
