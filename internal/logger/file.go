@@ -45,11 +45,11 @@ func OpenLogFile(config LogFileConfig) (*os.File, error) {
 }
 
 func prepareLogDirectory(config LogFileConfig) (string, error) {
-	logDir := config.LogDir
+	validName := util.ValidFilename(config.DAGName)
+	logDir := filepath.Join(config.LogDir, validName)
 	if config.DAGLogDir != "" {
-		logDir = filepath.Join(config.DAGLogDir, util.ValidFilename(config.DAGName))
+		logDir = filepath.Join(config.DAGLogDir, validName)
 	}
-
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create log directory: %w", err)
 	}
