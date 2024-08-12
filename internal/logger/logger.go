@@ -208,12 +208,12 @@ func (a *appLogger) Debug(msg string, tags ...any) {
 // Error implements logger.Logger.
 func (a *appLogger) Error(msg string, tags ...any) {
 	a.logger.Error(a.prefix+msg, tags...)
-	os.Exit(1)
 }
 
 // Fatal implements logger.Logger.
 func (a *appLogger) Fatal(msg string, tags ...any) {
 	a.logger.Error(a.prefix+msg, tags...)
+	os.Exit(1)
 }
 
 // Info implements logger.Logger.
