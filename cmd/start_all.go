@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 
 	"github.com/daguflow/dagu/internal/config"
 	"github.com/daguflow/dagu/internal/frontend"
@@ -60,8 +59,7 @@ func startAllCmd() *cobra.Command {
 
 				sc := scheduler.New(cfg, logger, cli)
 				if err := sc.Start(ctx); err != nil {
-					logger.Error("Scheduler initialization failed", "error", err, "dags", cfg.DAGs)
-					os.Exit(1)
+					logger.Fatal("Scheduler initialization failed", "error", err, "dags", cfg.DAGs)
 				}
 			}()
 
@@ -69,8 +67,7 @@ func startAllCmd() *cobra.Command {
 
 			server := frontend.New(cfg, logger, cli)
 			if err := server.Serve(ctx); err != nil {
-				logger.Error("Server initialization failed", "error", err)
-				os.Exit(1)
+				logger.Fatal("Server initialization failed", "error", err)
 			}
 		},
 	}

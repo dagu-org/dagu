@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 
 	"github.com/daguflow/dagu/internal/config"
 	"github.com/daguflow/dagu/internal/logger"
@@ -54,14 +53,13 @@ func schedulerCmd() *cobra.Command {
 			cli := newClient(cfg, dataStore, logger)
 			sc := scheduler.New(cfg, logger, cli)
 			if err := sc.Start(ctx); err != nil {
-				logger.Error(
+				logger.Fatal(
 					"Scheduler initialization failed",
 					"error",
 					err,
 					"specsDirectory",
 					cfg.DAGs,
 				)
-				os.Exit(1)
 			}
 		},
 	}

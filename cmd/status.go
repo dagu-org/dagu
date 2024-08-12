@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 
 	"github.com/daguflow/dagu/internal/config"
 	"github.com/daguflow/dagu/internal/dag"
@@ -44,8 +43,7 @@ func statusCmd() *cobra.Command {
 			// Load the DAG file and get the current running status.
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
-				logger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
+				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
 			dataStore := newDataStores(cfg)
@@ -54,8 +52,7 @@ func statusCmd() *cobra.Command {
 			curStatus, err := cli.GetCurrentStatus(workflow)
 
 			if err != nil {
-				logger.Error("Current status retrieval failed", "error", err)
-				os.Exit(1)
+				logger.Fatal("Current status retrieval failed", "error", err)
 			}
 
 			logger.Info("Current status", "pid", curStatus.PID, "status", curStatus.Status)

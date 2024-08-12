@@ -56,44 +56,45 @@ func retryCmd() *cobra.Command {
 			specFilePath := args[0]
 			absoluteFilePath, err := filepath.Abs(specFilePath)
 			if err != nil {
-				initLogger.Error("Absolute path resolution failed",
+				initLogger.Fatal("Absolute path resolution failed",
 					"error", err,
 					"file", specFilePath)
-				os.Exit(1)
 			}
 
 			status, err := historyStore.FindByRequestID(absoluteFilePath, requestID)
 			if err != nil {
-				initLogger.Error("Historical execution retrieval failed",
+				initLogger.Fatal("Historical execution retrieval failed",
 					"error", err,
 					"requestID", requestID,
 					"file", absoluteFilePath)
-				os.Exit(1)
 			}
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
 			workflow, err := dag.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
 			if err != nil {
-				initLogger.Error("Workflow specification load failed",
+				initLogger.Fatal("Workflow specification load failed",
 					"error", err,
 					"file", specFilePath,
 					"params", status.Status.Params)
-				os.Exit(1)
 			}
 
 			newRequestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
-				os.Exit(1)
+				initLogger.Fatal("Request ID generation failed", "error", err)
 			}
 
-			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, newRequestID)
+			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
+				Prefix:    "retry_",
+				LogDir:    cfg.LogDir,
+				DAGLogDir: workflow.LogDir,
+				DAGName:   workflow.Name,
+				RequestID: newRequestID,
+			})
 			if err != nil {
-				initLogger.Error("Log file creation failed",
+				initLogger.Fatal("Log file creation failed",
 					"error", err,
 					"workflow", workflow.Name)
-				os.Exit(1)
 			}
 			defer logFile.Close()
 
@@ -126,8 +127,7 @@ func retryCmd() *cobra.Command {
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {
-				agentLogger.Error("Failed to start workflow", "error", err)
-				os.Exit(1)
+				agentLogger.Fatal("Failed to start workflow", "error", err)
 			}
 		},
 	}

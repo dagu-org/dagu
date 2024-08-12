@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -57,18 +56,16 @@ func restartCmd() *cobra.Command {
 			specFilePath := args[0]
 			workflow, err := dag.Load(cfg.BaseConfig, specFilePath, "")
 			if err != nil {
-				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
+				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, initLogger)
 
 			if err := stopDAGIfRunning(cli, workflow, initLogger); err != nil {
-				initLogger.Error("Workflow stop operation failed",
+				initLogger.Fatal("Workflow stop operation failed",
 					"error", err,
 					"workflow", workflow.Name)
-				os.Exit(1)
 			}
 
 			// Wait for the specified amount of time before restarting.
@@ -77,35 +74,37 @@ func restartCmd() *cobra.Command {
 			// Retrieve the parameter of the previous execution.
 			params, err := getPreviousExecutionParams(cli, workflow)
 			if err != nil {
-				initLogger.Error("Previous execution parameter retrieval failed",
+				initLogger.Fatal("Previous execution parameter retrieval failed",
 					"error", err,
 					"workflow", workflow.Name)
-				os.Exit(1)
 			}
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
 			workflow, err = dag.Load(cfg.BaseConfig, specFilePath, params)
 			if err != nil {
-				initLogger.Error("Workflow reload failed",
+				initLogger.Fatal("Workflow reload failed",
 					"error", err,
 					"file", specFilePath,
 					"params", params)
-				os.Exit(1)
 			}
 
 			requestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
-				os.Exit(1)
+				initLogger.Fatal("Request ID generation failed", "error", err)
 			}
 
-			logFile, err := openLogFile("restart_", cfg.LogDir, workflow, requestID)
+			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
+				Prefix:    "restart_",
+				LogDir:    cfg.LogDir,
+				DAGLogDir: workflow.LogDir,
+				DAGName:   workflow.Name,
+				RequestID: requestID,
+			})
 			if err != nil {
-				initLogger.Error("Log file creation failed",
+				initLogger.Fatal("Log file creation failed",
 					"error", err,
 					"workflow", workflow.Name)
-				os.Exit(1)
 			}
 			defer logFile.Close()
 
@@ -133,11 +132,10 @@ func restartCmd() *cobra.Command {
 
 			listenSignals(cmd.Context(), agt)
 			if err := agt.Run(cmd.Context()); err != nil {
-				agentLogger.Error("Workflow restart failed",
+				agentLogger.Fatal("Workflow restart failed",
 					"error", err,
 					"workflow", workflow.Name,
 					"requestID", requestID)
-				os.Exit(1)
 			}
 		},
 	}

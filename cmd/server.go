@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 
 	"github.com/daguflow/dagu/internal/config"
 	"github.com/daguflow/dagu/internal/frontend"
@@ -52,8 +51,7 @@ func serverCmd() *cobra.Command {
 			cli := newClient(cfg, dataStore, logger)
 			server := frontend.New(cfg, logger, cli)
 			if err := server.Serve(cmd.Context()); err != nil {
-				logger.Error("Server initialization failed", "error", err)
-				os.Exit(1)
+				logger.Fatal("Server initialization failed", "error", err)
 			}
 		},
 	}
