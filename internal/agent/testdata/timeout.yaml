@@ -1,0 +1,6 @@
+timeout: 2
+steps:
+  - name: "1"
+    command: "sleep 1"
+  - name: "2"
+    command: "sleep 2"

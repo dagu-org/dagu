@@ -58,6 +58,7 @@ type Scheduler struct {
 	logDir        string
 	logger        logger.Logger
 	maxActiveRuns int
+	timeout       time.Duration
 	delay         time.Duration
 	dry           bool
 	onExit        *dag.Step
@@ -82,6 +83,7 @@ func New(cfg *Config) *Scheduler {
 		logDir:        cfg.LogDir,
 		logger:        lg,
 		maxActiveRuns: cfg.MaxActiveRuns,
+		timeout:       cfg.Timeout,
 		delay:         cfg.Delay,
 		dry:           cfg.Dry,
 		onExit:        cfg.OnExit,
@@ -96,6 +98,7 @@ type Config struct {
 	LogDir        string
 	Logger        logger.Logger
 	MaxActiveRuns int
+	Timeout       time.Duration
 	Delay         time.Duration
 	Dry           bool
 	OnExit        *dag.Step
@@ -114,6 +117,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	defer g.Finish()
 
 	var wg = sync.WaitGroup{}
+
+	var cancel context.CancelFunc
+	if sc.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, sc.timeout)
+		defer cancel()
+	}
 
 	for !sc.isFinished(g) {
 		if sc.isCanceled() {
@@ -168,6 +177,14 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 						switch {
 						case status == NodeStatusSuccess || status == NodeStatusCancel:
 							// do nothing
+						case sc.isTimeout(g.startedAt):
+							sc.logger.Info(
+								"Step execution deadline exceeded",
+								"step", node.data.Step.Name,
+								"error", execErr,
+							)
+							node.setStatus(NodeStatusCancel)
+							sc.setLastError(execErr)
 						case sc.isCanceled():
 							sc.setLastError(execErr)
 						case node.data.Step.RetryPolicy != nil && node.data.Step.RetryPolicy.Limit > node.getRetryCount():
@@ -478,6 +495,10 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 		return false
 	}
 	return true
+}
+
+func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
+	return sc.timeout > 0 && time.Since(startedAt) > sc.timeout
 }
 
 var (
