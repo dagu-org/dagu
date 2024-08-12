@@ -46,7 +46,7 @@ func OpenLogFile(config LogFileConfig) (*os.File, error) {
 
 func prepareLogDirectory(config LogFileConfig) (string, error) {
 	logDir := config.LogDir
-	if config.LogDir != "" {
+	if config.DAGLogDir != "" {
 		logDir = filepath.Join(config.DAGLogDir, util.ValidFilename(config.DAGName))
 	}
 
