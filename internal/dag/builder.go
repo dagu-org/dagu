@@ -126,7 +126,7 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 		Name:        def.Name,
 		Group:       def.Group,
 		Description: def.Description,
-		Timeout:     time.Second * time.Duration(def.Timeout),
+		Timeout:     time.Second * time.Duration(def.TimeoutSec),
 		Delay:       time.Second * time.Duration(def.DelaySec),
 		RestartWait: time.Second * time.Duration(def.RestartWaitSec),
 		Tags:        parseTags(def.Tags),
