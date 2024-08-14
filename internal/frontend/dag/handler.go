@@ -133,6 +133,16 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			}
 			return dags.NewSearchDagsOK().WithPayload(resp)
 		})
+
+	api.DagsListTagsHandler = dags.ListTagsHandlerFunc(
+		func(params dags.ListTagsParams) middleware.Responder {
+			tags, err := h.getTagList(params)
+			if err != nil {
+				return dags.NewListTagsDefault(err.Code).
+					WithPayload(err.APIError)
+			}
+			return dags.NewListTagsOK().WithPayload(tags)
+		})
 }
 
 func (h *Handler) createDAG(
@@ -167,8 +177,8 @@ func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 	return nil
 }
 
-func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
-	dgs, errs, err := h.client.GetAllStatus()
+func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
+	dgs, paceCount, errs, err := h.client.GetAllStatusPagination(params)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -185,8 +195,9 @@ func (h *Handler) getList(_ dags.ListDagsParams) (*models.ListDagsResponse, *cod
 	}
 
 	resp := &models.ListDagsResponse{
-		Errors:   errs,
-		HasError: swag.Bool(hasErr),
+		Errors:    errs,
+		PageCount: swag.Int64(int64(paceCount)),
+		HasError:  swag.Bool(hasErr),
 	}
 
 	for _, dagStatus := range dgs {
@@ -765,4 +776,15 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	tr := transform.NewReader(r, decoder)
 	ret, err := io.ReadAll(tr)
 	return ret, err
+}
+
+func (h *Handler) getTagList(_ dags.ListTagsParams) (*models.ListTagResponse, *codedError) {
+	tags, errs, err := h.client.GetTagList()
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+	return &models.ListTagResponse{
+		Errors: errs,
+		Tags:   tags,
+	}, nil
 }

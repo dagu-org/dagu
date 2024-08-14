@@ -18,6 +18,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/daguflow/dagu/internal/logger"
 	"github.com/daguflow/dagu/internal/persistence"
 	"github.com/daguflow/dagu/internal/persistence/model"
@@ -282,6 +284,40 @@ func (e *client) GetAllStatus() (
 	return ret, errs, err
 }
 
+func (e *client) getPageCount(total int64, limit int64) int {
+	pageCount := int(math.Ceil(float64(total) / float64(limit)))
+	if pageCount == 0 {
+		pageCount = 1
+	}
+
+	return pageCount
+}
+
+func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, int, []string, error) {
+	var (
+		dagList       []*dag.DAG
+		errList       []string
+		err           error
+		dagStore      = e.dataStore.DAGStore()
+		dagStatusList = make([]*DAGStatus, 0)
+		currentStatus *DAGStatus
+		totalCount    int64
+	)
+
+	if dagList, totalCount, errList, err = dagStore.ListPagination(params); err != nil {
+		return dagStatusList, 1, errList, err
+	}
+
+	for _, currentDag := range dagList {
+		if currentStatus, err = e.readStatus(currentDag); err != nil {
+			errList = append(errList, err.Error())
+		}
+		dagStatusList = append(dagStatusList, currentStatus)
+	}
+
+	return dagStatusList, e.getPageCount(totalCount, params.Limit), errList, nil
+}
+
 func (e *client) getDAG(name string) (*dag.DAG, error) {
 	dagStore := e.dataStore.DAGStore()
 	dagDetail, err := dagStore.GetDetails(name)
@@ -347,4 +383,8 @@ func escapeArg(input string) string {
 	}
 
 	return escaped.String()
+}
+
+func (e *client) GetTagList() ([]string, []string, error) {
+	return e.dataStore.DAGStore().TagList()
 }
