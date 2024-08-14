@@ -178,12 +178,12 @@ func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 }
 
 func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
-	dgs, paceCount, errs, err := h.client.GetAllStatusPagination(params)
+	dgs, result, err := h.client.GetAllStatusPagination(params)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
 
-	hasErr := len(errs) > 0
+	hasErr := len(result.ErrorList) > 0
 	if !hasErr {
 		// Check if any DAG has an error
 		for _, d := range dgs {
@@ -195,8 +195,8 @@ func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse,
 	}
 
 	resp := &models.ListDagsResponse{
-		Errors:    errs,
-		PageCount: swag.Int64(int64(paceCount)),
+		Errors:    result.ErrorList,
+		PageCount: swag.Int64(int64(result.PageCount)),
 		HasError:  swag.Bool(hasErr),
 	}
 

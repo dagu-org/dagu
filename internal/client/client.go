@@ -270,10 +270,10 @@ func (e *client) GetAllStatus() (
 	statuses []*DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
-	dags, errs, err := dagStore.List()
+	dagList, errs, err := dagStore.List()
 
 	var ret []*DAGStatus
-	for _, d := range dags {
+	for _, d := range dagList {
 		status, err := e.readStatus(d)
 		if err != nil {
 			errs = append(errs, err.Error())
@@ -293,29 +293,30 @@ func (e *client) getPageCount(total int64, limit int64) int {
 	return pageCount
 }
 
-func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, int, []string, error) {
+func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
 	var (
-		dagList       []*dag.DAG
-		errList       []string
-		err           error
-		dagStore      = e.dataStore.DAGStore()
-		dagStatusList = make([]*DAGStatus, 0)
-		currentStatus *DAGStatus
-		totalCount    int64
+		dagListPaginationResult *persistence.DagListPaginationResult
+		err                     error
+		dagStore                = e.dataStore.DAGStore()
+		dagStatusList           = make([]*DAGStatus, 0)
+		currentStatus           *DAGStatus
 	)
 
-	if dagList, totalCount, errList, err = dagStore.ListPagination(params); err != nil {
-		return dagStatusList, 1, errList, err
+	if dagListPaginationResult, err = dagStore.ListPagination(params); err != nil {
+		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
 	}
 
-	for _, currentDag := range dagList {
+	for _, currentDag := range dagListPaginationResult.DagList {
 		if currentStatus, err = e.readStatus(currentDag); err != nil {
-			errList = append(errList, err.Error())
+			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
 		}
 		dagStatusList = append(dagStatusList, currentStatus)
 	}
 
-	return dagStatusList, e.getPageCount(totalCount, params.Limit), errList, nil
+	return dagStatusList, &DagListPaginationSummaryResult{
+		PageCount: e.getPageCount(dagListPaginationResult.Count, params.Limit),
+		ErrorList: dagListPaginationResult.ErrorList,
+	}, nil
 }
 
 func (e *client) getDAG(name string) (*dag.DAG, error) {

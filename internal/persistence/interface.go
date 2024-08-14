@@ -54,7 +54,7 @@ type DAGStore interface {
 	Create(name string, spec []byte) (string, error)
 	Delete(name string) error
 	List() (ret []*dag.DAG, errs []string, err error)
-	ListPagination(params dags.ListDagsParams) ([]*dag.DAG, int64, []string, error)
+	ListPagination(params dags.ListDagsParams) (*DagListPaginationResult, error)
 	GetMetadata(name string) (*dag.DAG, error)
 	GetDetails(name string) (*dag.DAG, error)
 	Grep(pattern string) (ret []*GrepResult, errs []string, err error)
@@ -70,6 +70,12 @@ type GrepResult struct {
 	Name    string
 	DAG     *dag.DAG
 	Matches []*grep.Match
+}
+
+type DagListPaginationResult struct {
+	DagList   []*dag.DAG
+	Count     int64
+	ErrorList []string
 }
 
 type FlagStore interface {

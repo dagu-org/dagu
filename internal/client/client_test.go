@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/daguflow/dagu/internal/client"
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/scheduler"
@@ -31,7 +33,6 @@ import (
 	"github.com/daguflow/dagu/internal/sock"
 	"github.com/daguflow/dagu/internal/test"
 	"github.com/daguflow/dagu/internal/util"
-	"github.com/stretchr/testify/require"
 )
 
 var testdataDir = filepath.Join(util.MustGetwd(), "./testdata")
@@ -382,11 +383,11 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 
 		cli := setup.Client()
 
-		_, pageCount, _, err := cli.GetAllStatusPagination(dags.ListDagsParams{
+		_, result, err := cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit: 10,
 			Page:  1,
 		})
-		require.Equal(t, 1, pageCount)
+		require.Equal(t, 1, result.PageCount)
 		require.NoError(t, err)
 	})
 
@@ -404,29 +405,29 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		}
 
 		// Get all statuses.
-		allDagStatus, pageCount, _, err := cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err := cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit: 10,
 			Page:  1,
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit: 10,
 			Page:  2,
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit: 10,
 			Page:  3,
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 	})
 
 	t.Run("TestClient_WithTags", func(t *testing.T) {
@@ -453,113 +454,113 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		}
 
 		// Get all statuses.
-		allDagStatus, pageCount, _, err := cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err := cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      1,
 			SearchTag: swag.String("tag1"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      2,
 			SearchTag: swag.String("tag1"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      3,
 			SearchTag: swag.String("tag1"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      1,
 			SearchTag: swag.String("tag2"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      2,
 			SearchTag: swag.String("tag2"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      3,
 			SearchTag: swag.String("tag2"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      4,
 			SearchTag: swag.String("tag2"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      5,
 			SearchTag: swag.String("tag2"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      1,
 			SearchTag: swag.String("tag3"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      2,
 			SearchTag: swag.String("tag3"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      3,
 			SearchTag: swag.String("tag3"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:     10,
 			Page:      1,
 			SearchTag: swag.String("tag4"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 1, pageCount)
+		require.Equal(t, 1, result.PageCount)
 	})
 
 	t.Run("TestClient_WithName", func(t *testing.T) {
@@ -580,113 +581,113 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		}
 
 		// Get all statuses.
-		allDagStatus, pageCount, _, err := cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err := cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("1test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       2,
 			SearchName: swag.String("1test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       3,
 			SearchName: swag.String("1test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("2test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       2,
 			SearchName: swag.String("2test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       3,
 			SearchName: swag.String("2test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       2,
 			SearchName: swag.String("test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       3,
 			SearchName: swag.String("test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       4,
 			SearchName: swag.String("test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       5,
 			SearchName: swag.String("test-dag-pagination"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("not-exist"),
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 1, pageCount)
+		require.Equal(t, 1, result.PageCount)
 	})
 
 	t.Run("TestClient_WithTagsAndName", func(t *testing.T) {
@@ -712,7 +713,7 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		}
 
 		// Get all statuses.
-		allDagStatus, pageCount, _, err := cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err := cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -720,9 +721,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       2,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -730,9 +731,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       3,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -740,9 +741,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -750,9 +751,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       2,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -760,9 +761,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       3,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -770,9 +771,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       4,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -780,9 +781,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       5,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -790,9 +791,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 4, pageCount)
+		require.Equal(t, 4, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -800,9 +801,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       2,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -810,9 +811,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 10, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       3,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -820,9 +821,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 2, pageCount)
+		require.Equal(t, 2, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("not-exist"),
@@ -830,9 +831,9 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 1, pageCount)
+		require.Equal(t, 1, result.PageCount)
 
-		allDagStatus, pageCount, _, err = cli.GetAllStatusPagination(dags.ListDagsParams{
+		allDagStatus, result, err = cli.GetAllStatusPagination(dags.ListDagsParams{
 			Limit:      10,
 			Page:       1,
 			SearchName: swag.String("1test-dag-pagination"),
@@ -840,7 +841,7 @@ func TestClient_GetAllStatusPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, len(allDagStatus))
-		require.Equal(t, 1, pageCount)
+		require.Equal(t, 1, result.PageCount)
 	})
 }
 

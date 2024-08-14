@@ -42,7 +42,7 @@ type Client interface {
 	UpdateDAG(id string, spec string) error
 	DeleteDAG(id, loc string) error
 	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
-	GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, int, []string, error)
+	GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
 	GetStatus(dagLocation string) (*DAGStatus, error)
 	IsSuspended(id string) bool
 	ToggleSuspend(id string, suspend bool) error
@@ -66,6 +66,11 @@ type DAGStatus struct {
 	Suspended bool
 	Error     error
 	ErrorT    *string
+}
+
+type DagListPaginationSummaryResult struct {
+	PageCount int
+	ErrorList []string
 }
 
 func newDAGStatus(

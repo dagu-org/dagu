@@ -199,9 +199,9 @@ func (d *dagStoreImpl) getTagList(tagSet map[string]struct{}) []string {
 	return tagList
 }
 
-func (d *dagStoreImpl) ListPagination(params dags.ListDagsParams) ([]*dag.DAG, int64, []string, error) {
+func (d *dagStoreImpl) ListPagination(params dags.ListDagsParams) (*persistence.DagListPaginationResult, error) {
 	var (
-		dagList    []*dag.DAG
+		dagList    = make([]*dag.DAG, 0)
 		errList    = make([]string, 0)
 		count      int64
 		currentDag *dag.DAG
@@ -231,10 +231,18 @@ func (d *dagStoreImpl) ListPagination(params dags.ListDagsParams) ([]*dag.DAG, i
 
 		return nil
 	}); err != nil {
-		return nil, 0, append(errList, err.Error()), err
+		return &persistence.DagListPaginationResult{
+			DagList:   dagList,
+			Count:     count,
+			ErrorList: append(errList, err.Error()),
+		}, err
 	}
 
-	return dagList, count, errList, nil
+	return &persistence.DagListPaginationResult{
+		DagList:   dagList,
+		Count:     count,
+		ErrorList: errList,
+	}, nil
 }
 
 func (d *dagStoreImpl) List() (ret []*dag.DAG, errs []string, err error) {
