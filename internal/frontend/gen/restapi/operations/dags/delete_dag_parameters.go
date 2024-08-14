@@ -56,7 +56,7 @@ func (o *DeleteDagParams) BindRequest(r *http.Request, route *middleware.Matched
 	return nil
 }
 
-// bindDagID binds and validates parameter DagID from filepath.
+// bindDagID binds and validates parameter DagID from path.
 func (o *DeleteDagParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {

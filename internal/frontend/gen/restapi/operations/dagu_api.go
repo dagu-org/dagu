@@ -56,6 +56,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		DagsListDagsHandler: dags.ListDagsHandlerFunc(func(params dags.ListDagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.ListDags has not yet been implemented")
 		}),
+		DagsListTagsHandler: dags.ListTagsHandlerFunc(func(params dags.ListTagsParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.ListTags has not yet been implemented")
+		}),
 		DagsPostDagActionHandler: dags.PostDagActionHandlerFunc(func(params dags.PostDagActionParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.PostDagAction has not yet been implemented")
 		}),
@@ -109,6 +112,8 @@ type DaguAPI struct {
 	DagsGetDagDetailsHandler dags.GetDagDetailsHandler
 	// DagsListDagsHandler sets the operation handler for the list dags operation
 	DagsListDagsHandler dags.ListDagsHandler
+	// DagsListTagsHandler sets the operation handler for the list tags operation
+	DagsListTagsHandler dags.ListTagsHandler
 	// DagsPostDagActionHandler sets the operation handler for the post dag action operation
 	DagsPostDagActionHandler dags.PostDagActionHandler
 	// DagsSearchDagsHandler sets the operation handler for the search dags operation
@@ -201,6 +206,9 @@ func (o *DaguAPI) Validate() error {
 	}
 	if o.DagsListDagsHandler == nil {
 		unregistered = append(unregistered, "dags.ListDagsHandler")
+	}
+	if o.DagsListTagsHandler == nil {
+		unregistered = append(unregistered, "dags.ListTagsHandler")
 	}
 	if o.DagsPostDagActionHandler == nil {
 		unregistered = append(unregistered, "dags.PostDagActionHandler")
@@ -312,6 +320,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/dags"] = dags.NewListDags(o.context, o.DagsListDagsHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/tags"] = dags.NewListTags(o.context, o.DagsListTagsHandler)
 	if o.handlers["POST"] == nil {
 		o.handlers["POST"] = make(map[string]http.Handler)
 	}
