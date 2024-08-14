@@ -31,6 +31,10 @@ type ListDagsResponse struct {
 	// has error
 	// Required: true
 	HasError *bool `json:"HasError"`
+
+	// page count
+	// Required: true
+	PageCount *int64 `json:"PageCount"`
 }
 
 // Validate validates this list dags response
@@ -46,6 +50,10 @@ func (m *ListDagsResponse) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateHasError(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validatePageCount(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -94,6 +102,15 @@ func (m *ListDagsResponse) validateErrors(formats strfmt.Registry) error {
 func (m *ListDagsResponse) validateHasError(formats strfmt.Registry) error {
 
 	if err := validate.Required("HasError", "body", m.HasError); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *ListDagsResponse) validatePageCount(formats strfmt.Registry) error {
+
+	if err := validate.Required("PageCount", "body", m.PageCount); err != nil {
 		return err
 	}
 

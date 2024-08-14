@@ -27,6 +27,23 @@ paths:
       produces:
         - application/json
       operationId: listDags
+      parameters:
+        - name: page
+          in: query
+          required: true
+          type: integer
+        - name: limit
+          in: query
+          required: true
+          type: integer
+        - name: searchName
+          in: query
+          required: false
+          type: string
+        - name: searchTag
+          in: query
+          required: false
+          type: string
       responses:
         "200":
           description: A successful response.
@@ -192,6 +209,23 @@ paths:
             $ref: "#/definitions/ApiError"
       tags:
         - dags
+  /tags:
+    get:
+      description: Returns a list of tags.
+      produces:
+        - application/json
+      operationId: listTags
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/listTagResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
 
 definitions:
   ApiError:
@@ -218,10 +252,13 @@ definitions:
           type: string
       HasError:
         type: boolean
+      PageCount:
+        type: integer
     required:
       - DAGs
       - Errors
       - HasError
+      - PageCount
 
   createDagResponse:
     type: object
@@ -733,3 +770,18 @@ definitions:
         type: boolean
       Interval:
         type: integer
+
+  listTagResponse:
+    type: object
+    properties:
+      Tags:
+        type: array
+        items:
+          type: string
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Tags
+      - Errors

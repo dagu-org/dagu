@@ -49,6 +49,30 @@ func init() {
           "dags"
         ],
         "operationId": "listDags",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "page",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "name": "limit",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "searchName",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "searchTag",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -280,6 +304,32 @@ func init() {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/searchDagsResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "description": "Returns a list of tags.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "dags"
+        ],
+        "operationId": "listTags",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/listTagResponse"
             }
           },
           "default": {
@@ -801,7 +851,8 @@ func init() {
       "required": [
         "DAGs",
         "Errors",
-        "HasError"
+        "HasError",
+        "PageCount"
       ],
       "properties": {
         "DAGs": {
@@ -818,6 +869,30 @@ func init() {
         },
         "HasError": {
           "type": "boolean"
+        },
+        "PageCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "listTagResponse": {
+      "type": "object",
+      "required": [
+        "Tags",
+        "Errors"
+      ],
+      "properties": {
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1071,6 +1146,30 @@ func init() {
           "dags"
         ],
         "operationId": "listDags",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "page",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "name": "limit",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "name": "searchName",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "name": "searchTag",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "A successful response.",
@@ -1302,6 +1401,32 @@ func init() {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/searchDagsResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "description": "Returns a list of tags.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "dags"
+        ],
+        "operationId": "listTags",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/listTagResponse"
             }
           },
           "default": {
@@ -1823,7 +1948,8 @@ func init() {
       "required": [
         "DAGs",
         "Errors",
-        "HasError"
+        "HasError",
+        "PageCount"
       ],
       "properties": {
         "DAGs": {
@@ -1840,6 +1966,30 @@ func init() {
         },
         "HasError": {
           "type": "boolean"
+        },
+        "PageCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "listTagResponse": {
+      "type": "object",
+      "required": [
+        "Tags",
+        "Errors"
+      ],
+      "properties": {
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

@@ -215,13 +215,13 @@ func (s *Server) Serve() (err error) {
 
 		servers = append(servers, httpServer)
 		wg.Add(1)
-		s.Logf("Serving frontend at http://%s", s.httpServerL.Addr())
+		s.Logf("Serving dagu at http://%s", s.httpServerL.Addr())
 		go func(l net.Listener) {
 			defer wg.Done()
 			if err := httpServer.Serve(l); err != nil && err != http.ErrServerClosed {
 				s.Fatalf("%v", err)
 			}
-			s.Logf("Stopped serving frontend at http://%s", l.Addr())
+			s.Logf("Stopped serving dagu at http://%s", l.Addr())
 		}(s.httpServerL)
 	}
 
@@ -308,13 +308,13 @@ func (s *Server) Serve() (err error) {
 
 		servers = append(servers, httpsServer)
 		wg.Add(1)
-		s.Logf("Serving frontend at https://%s", s.httpsServerL.Addr())
+		s.Logf("Serving dagu at https://%s", s.httpsServerL.Addr())
 		go func(l net.Listener) {
 			defer wg.Done()
 			if err := httpsServer.Serve(l); err != nil && err != http.ErrServerClosed {
 				s.Fatalf("%v", err)
 			}
-			s.Logf("Stopped serving frontend at https://%s", l.Addr())
+			s.Logf("Stopped serving dagu at https://%s", l.Addr())
 		}(tls.NewListener(s.httpsServerL, httpsServer.TLSConfig))
 	}
 

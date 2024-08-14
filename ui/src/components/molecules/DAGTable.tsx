@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   flexRender,
   useReactTable,
@@ -27,7 +27,7 @@ import {
   TableRow,
   TextField,
 } from '@mui/material';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   getFirstTag,
   getStatus,
@@ -48,11 +48,17 @@ import moment from 'moment';
 import 'moment-duration-format';
 import Ticker from '../atoms/Ticker';
 import VisuallyHidden from '../atoms/VisuallyHidden';
+import useSWR from 'swr';
+import { GetListTagsResponse } from '../../models/api';
 
 type Props = {
   DAGs: DAGItem[];
   group: string;
   refreshFn: () => void;
+  searchText: string;
+  handleSearchTextChange: (searchText: string) => void;
+  searchTag: string;
+  handleSearchTagChange: (tag: string) => void;
 };
 
 type DAGRow = DAGItem & { subRows?: DAGItem[] };
@@ -385,7 +391,7 @@ const defaultColumns = [
   }),
 ];
 
-function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
+function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTextChange, searchTag, handleSearchTagChange }: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
@@ -399,41 +405,6 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
       desc: false,
     },
   ]);
-
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    const searchText = searchParams.get('search');
-    if (searchText) {
-      instance.getColumn('Name')?.setFilterValue(searchText);
-    }
-    const t = searchParams.get('tag');
-    if (t) {
-      instance.getColumn('Tags')?.setFilterValue(t);
-    }
-  }, []);
-
-  const addSearchParam = React.useCallback(
-    (key: string, value: string) => {
-      const ret: { [key: string]: string } = {};
-      searchParams.forEach((v, k) => {
-        if (v && k !== key) {
-          ret[k] = v;
-        }
-      });
-      if (value) {
-        ret[key] = value;
-      }
-      setSearchParams(ret);
-    },
-    [searchParams, setSearchParams]
-  );
-
-  const selectedTag = React.useMemo(() => {
-    return (
-      (columnFilters.find((filter) => filter.id == 'Tags')?.value as string) ||
-      ''
-    );
-  }, [columnFilters]);
 
   const [expanded, setExpanded] = React.useState<ExpandedState>({});
 
@@ -472,18 +443,11 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
     ];
   }, [DAGs, group]);
 
-  const tagOptions = React.useMemo(() => {
-    const map: { [key: string]: boolean } = { '': true };
-    DAGs.forEach((data) => {
-      if (data.Type == DAGDataType.DAG) {
-        data.DAGStatus.DAG.Tags?.forEach((tag) => {
-          map[tag] = true;
-        });
-      }
-    });
-    const ret = Object.keys(map).sort();
-    return ret;
-  }, []);
+  const tagsRes = useSWR<GetListTagsResponse>('/tags', null, {
+    refreshInterval: 10000,
+  });
+
+  const tagOptions = tagsRes.data?.Tags || [];
 
   const instance = useReactTable({
     data,
@@ -528,11 +492,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
           size="small"
           variant="filled"
           InputProps={{
-            value: instance.getColumn('Name')?.getFilterValue(),
+            value: searchText,
             onChange: (e) => {
               const value = e.target.value || '';
-              addSearchParam('search', value);
-              instance.getColumn('Name')?.setFilterValue(value);
+              handleSearchTextChange(value);
             },
             type: 'search',
           }}
@@ -540,12 +503,11 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
         <Autocomplete<string>
           size="small"
           limitTags={1}
-          value={selectedTag}
+          value={searchTag}
           options={tagOptions}
           onChange={(_, value) => {
             const v = value || '';
-            addSearchParam('tag', v);
-            instance.getColumn('Tags')?.setFilterValue(v);
+            handleSearchTagChange(v);
           }}
           renderInput={(params) => (
             <TextField {...params} variant="filled" label="Search Tag" />
@@ -589,9 +551,9 @@ function DAGTable({ DAGs = [], group = '', refreshFn }: Props) {
                           {header.isPlaceholder
                             ? null
                             : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
                           {{
                             asc: (
                               <ArrowUpward

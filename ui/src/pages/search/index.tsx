@@ -69,18 +69,30 @@ function Search() {
         </Stack>
 
         <Box mt={2}>
-          {!data && !error ? <LoadingIndicator /> : null}
-          {data && data.Results.length == 0 ? (
-            <Box>No results found</Box>
-          ) : null}
-          {data && data.Results.length > 0 ? (
-            <Box>
-              <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
-                {data.Results.length} results found
-              </Typography>
-              <SearchResult results={data?.Results} />
-            </Box>
-          ) : null}
+          {
+            (() => {
+              if (!data && !error) {
+                return <LoadingIndicator />;
+              }
+
+              if (data && data.Results && data.Results.length > 0) {
+                return (
+                  <Box>
+                    <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
+                      {data.Results.length} results found
+                    </Typography>
+                    <SearchResult results={data?.Results} />
+                  </Box>
+                );
+              }
+
+              if ((data && !data.Results) || (data && data.Results && data.Results.length === 0)) {
+                return <Box>No results found</Box>;
+              }
+
+              return null
+            })()
+          }
         </Box>
       </Grid>
     </Grid>
