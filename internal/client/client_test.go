@@ -17,12 +17,12 @@ package client_test
 
 import (
 	"fmt"
-	"github.com/go-openapi/swag"
 	"net/http"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-openapi/swag"
 	"github.com/stretchr/testify/require"
 
 	"github.com/daguflow/dagu/internal/client"
