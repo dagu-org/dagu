@@ -11,10 +11,14 @@ function CreateDAGButton() {
       }}
       onClick={async () => {
         const name = window.prompt('Please input the new DAG name', '');
-        if (name == '') {
+        if (name === null) {
           return;
         }
-        if (name?.indexOf(' ') != -1) {
+        if (name === '') {
+          alert('File name cannot be empty');
+          return;
+        }
+        if (name.indexOf(' ') != -1) {
           alert('File name cannot contain space');
           return;
         }
