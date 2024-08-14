@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/daguflow/dagu/internal/persistence/grep"
 	"github.com/daguflow/dagu/internal/persistence/model"
 )
@@ -53,6 +54,7 @@ type DAGStore interface {
 	Create(name string, spec []byte) (string, error)
 	Delete(name string) error
 	List() (ret []*dag.DAG, errs []string, err error)
+	ListPagination(params dags.ListDagsParams) ([]*dag.DAG, int64, []string, error)
 	GetMetadata(name string) (*dag.DAG, error)
 	GetDetails(name string) (*dag.DAG, error)
 	Grep(pattern string) (ret []*GrepResult, errs []string, err error)
@@ -61,6 +63,7 @@ type DAGStore interface {
 	GetSpec(name string) (string, error)
 	UpdateSpec(name string, spec []byte) error
 	Find(name string) (*dag.DAG, error)
+	TagList() ([]string, []string, error)
 }
 
 type GrepResult struct {
