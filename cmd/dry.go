@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/daguflow/dagu/internal/agent"
@@ -45,32 +44,35 @@ func dryCmd() *cobra.Command {
 
 			params, err := cmd.Flags().GetString("params")
 			if err != nil {
-				initLogger.Error("Parameter retrieval failed", "error", err)
-				os.Exit(1)
+				initLogger.Fatal("Parameter retrieval failed", "error", err)
 			}
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
-				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
+				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
 			requestID, err := generateRequestID()
 			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
-				os.Exit(1)
+				initLogger.Fatal("Request ID generation failed", "error", err)
 			}
 
-			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, requestID)
+			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
+				Prefix:    "dry_",
+				LogDir:    cfg.LogDir,
+				DAGLogDir: workflow.LogDir,
+				DAGName:   workflow.Name,
+				RequestID: requestID,
+			})
+
 			if err != nil {
-				initLogger.Error(
+				initLogger.Fatal(
 					"Log file creation failed",
 					"error",
 					err,
 					"workflow",
 					workflow.Name,
 				)
-				os.Exit(1)
 			}
 			defer logFile.Close()
 
@@ -98,11 +100,10 @@ func dryCmd() *cobra.Command {
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {
-				agentLogger.Error("Workflow execution failed",
+				agentLogger.Fatal("Workflow execution failed",
 					"error", err,
 					"workflow", workflow.Name,
 					"requestID", requestID)
-				os.Exit(1)
 			}
 		},
 	}

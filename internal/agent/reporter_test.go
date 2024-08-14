@@ -181,8 +181,8 @@ func testRenderSummary(t *testing.T, _ *reporter, workflow *dag.DAG, nodes []*mo
 
 func testRenderTable(t *testing.T, _ *reporter, _ *dag.DAG, nodes []*model.Node) {
 	summary := renderTable(nodes)
-	require.Contains(t, summary, nodes[0].Name)
-	require.Contains(t, summary, nodes[0].Args[0])
+	require.Contains(t, summary, nodes[0].Step.Name)
+	require.Contains(t, summary, nodes[0].Step.Args[0])
 }
 
 type mockSender struct {

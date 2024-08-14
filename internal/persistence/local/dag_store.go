@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/daguflow/dagu/internal/persistence"
 	"github.com/daguflow/dagu/internal/persistence/filecache"
 	"github.com/daguflow/dagu/internal/persistence/grep"
@@ -163,10 +162,6 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
-func (d *dagStoreImpl) getFileNameDagMeta() {
-
-}
-
 func (d *dagStoreImpl) searchName(fileName string, searchText *string) bool {
 	if searchText == nil {
 		return true
@@ -199,15 +194,15 @@ func (d *dagStoreImpl) getTagList(tagSet map[string]struct{}) []string {
 	return tagList
 }
 
-func (d *dagStoreImpl) ListPagination(params dags.ListDagsParams) (*persistence.DagListPaginationResult, error) {
+func (d *dagStoreImpl) ListPagination(params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
 	var (
 		dagList    = make([]*dag.DAG, 0)
 		errList    = make([]string, 0)
-		count      int64
+		count      int
 		currentDag *dag.DAG
 	)
 
-	if err := filepath.WalkDir(d.dir, func(path string, dir fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(d.dir, func(_ string, dir fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -220,12 +215,12 @@ func (d *dagStoreImpl) ListPagination(params dags.ListDagsParams) (*persistence.
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dir.Name(), err))
 		}
 
-		if !d.searchName(dir.Name(), params.SearchName) || currentDag == nil || !d.searchTags(currentDag.Tags, params.SearchTag) {
+		if !d.searchName(dir.Name(), params.Name) || currentDag == nil || !d.searchTags(currentDag.Tags, params.Tag) {
 			return nil
 		}
 
 		count++
-		if count > (params.Page-1)*params.Limit && int64(len(dagList)) < params.Limit {
+		if count > (params.Page-1)*params.Limit && len(dagList) < params.Limit {
 			dagList = append(dagList, currentDag)
 		}
 
@@ -332,11 +327,6 @@ func (d *dagStoreImpl) Grep(
 	return ret, errs, nil
 }
 
-func (d *dagStoreImpl) Load(name string) (*dag.DAG, error) {
-	// TODO implement me
-	panic("implement me")
-}
-
 func (d *dagStoreImpl) Rename(oldID, newID string) error {
 	oldLoc, err := d.fileLocation(oldID)
 	if err != nil {
@@ -413,7 +403,7 @@ func (d *dagStoreImpl) TagList() ([]string, []string, error) {
 		err        error
 	)
 
-	if err = filepath.WalkDir(d.dir, func(path string, dir fs.DirEntry, err error) error {
+	if err = filepath.WalkDir(d.dir, func(_ string, dir fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

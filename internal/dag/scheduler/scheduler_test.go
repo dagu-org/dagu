@@ -544,7 +544,7 @@ func TestRepeat(t *testing.T) {
 
 	require.Equal(t, sc.Status(g), StatusCancel)
 	require.Equal(t, NodeStatusCancel, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.DoneCount, 2)
+	require.Equal(t, nodes[0].data.State.DoneCount, 2)
 }
 
 func TestRepeatFail(t *testing.T) {
@@ -566,7 +566,7 @@ func TestRepeatFail(t *testing.T) {
 	nodes := g.Nodes()
 	require.Equal(t, sc.Status(g), StatusError)
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.DoneCount, 1)
+	require.Equal(t, nodes[0].data.State.DoneCount, 1)
 }
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
@@ -600,7 +600,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 
 	require.Equal(t, sc.Status(g), StatusSuccess)
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.DoneCount, 1)
+	require.Equal(t, nodes[0].data.State.DoneCount, 1)
 }
 
 func TestSchedulerStatusText(t *testing.T) {
@@ -643,7 +643,7 @@ func TestNodeSetupFailure(t *testing.T) {
 
 	nodes := g.Nodes()
 	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.DoneCount, 0)
+	require.Equal(t, nodes[0].data.State.DoneCount, 0)
 }
 
 func TestNodeTeardownFailure(t *testing.T) {

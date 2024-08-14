@@ -14,7 +14,7 @@ VERSION=
 SCRIPT_DIR=$(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 # Directories for miscellaneous files for the local environment
-LOCAL_DIR=$(SCRIPT_DIR)/local
+LOCAL_DIR=$(SCRIPT_DIR)/.local
 LOCAL_BIN_DIR=$(LOCAL_DIR)/bin
 
 # Configuration directory
@@ -111,6 +111,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 test:
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
+	@go clean -testcache
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
 
 # test-coverage runs all tests with coverage.
@@ -118,13 +119,6 @@ test-coverage:
 	@echo "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ./...
-
-# test-clean cleans the test cache and run all tests.
-test-clean: build-bin
-	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
-	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
-	@go clean -testcache
-	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} ./...
 
 # lint runs the linter.
 lint: golangci-lint

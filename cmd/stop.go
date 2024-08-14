@@ -17,7 +17,6 @@ package cmd
 
 import (
 	"log"
-	"os"
 
 	"github.com/daguflow/dagu/internal/config"
 	"github.com/daguflow/dagu/internal/dag"
@@ -50,8 +49,7 @@ func stopCmd() *cobra.Command {
 
 			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
-				logger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
+				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
 			logger.Info("Workflow stop initiated", "workflow", workflow.Name)
@@ -60,14 +58,13 @@ func stopCmd() *cobra.Command {
 			cli := newClient(cfg, dataStore, logger)
 
 			if err := cli.Stop(workflow); err != nil {
-				logger.Error(
+				logger.Fatal(
 					"Workflow stop operation failed",
 					"error",
 					err,
 					"workflow",
 					workflow.Name,
 				)
-				os.Exit(1)
 			}
 		},
 	}

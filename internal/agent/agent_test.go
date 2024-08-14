@@ -248,7 +248,7 @@ func TestAgent_Retry(t *testing.T) {
 
 		// Modify the DAG to make it successful
 		for _, node := range status.Nodes {
-			node.CmdWithArgs = "true"
+			node.Step.CmdWithArgs = "true"
 		}
 
 		// Retry the DAG and check if it is successful

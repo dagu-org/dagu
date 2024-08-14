@@ -31,11 +31,13 @@ type (
 		Info(msg string, tags ...any)
 		Warn(msg string, tags ...any)
 		Error(msg string, tags ...any)
+		Fatal(msg string, tags ...any)
 
 		Debugf(format string, v ...any)
 		Infof(format string, v ...any)
 		Warnf(format string, v ...any)
 		Errorf(format string, v ...any)
+		Fatalf(format string, v ...any)
 
 		With(attrs ...any) Logger
 		WithGroup(name string) Logger
@@ -52,7 +54,6 @@ var _ Logger = (*appLogger)(nil)
 type appLogger struct {
 	logger         *slog.Logger
 	guardedHandler *guardedHandler
-	prefix         string
 	quiet          bool
 }
 
@@ -174,42 +175,54 @@ func newHandler(f *os.File, format string, opts *slog.HandlerOptions) slog.Handl
 
 // Debugf implements logger.Logger.
 func (a *appLogger) Debugf(format string, v ...any) {
-	a.logger.Debug(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Debug(fmt.Sprintf(format, v...))
 }
 
 // Errorf implements logger.Logger.
 func (a *appLogger) Errorf(format string, v ...any) {
-	a.logger.Error(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Error(fmt.Sprintf(format, v...))
+}
+
+// Fatalf implements logger.Logger.
+func (a *appLogger) Fatalf(format string, v ...any) {
+	a.logger.Error(fmt.Sprintf(format, v...))
+	os.Exit(1)
 }
 
 // Infof implements logger.Logger.
 func (a *appLogger) Infof(format string, v ...any) {
-	a.logger.Info(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Info(fmt.Sprintf(format, v...))
 }
 
 // Warnf implements logger.Logger.
 func (a *appLogger) Warnf(format string, v ...any) {
-	a.logger.Warn(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Warn(fmt.Sprintf(format, v...))
 }
 
 // Debug implements logger.Logger.
 func (a *appLogger) Debug(msg string, tags ...any) {
-	a.logger.Debug(a.prefix+msg, tags...)
+	a.logger.Debug(msg, tags...)
 }
 
 // Error implements logger.Logger.
 func (a *appLogger) Error(msg string, tags ...any) {
-	a.logger.Error(a.prefix+msg, tags...)
+	a.logger.Error(msg, tags...)
+}
+
+// Fatal implements logger.Logger.
+func (a *appLogger) Fatal(msg string, tags ...any) {
+	a.logger.Error(msg, tags...)
+	os.Exit(1)
 }
 
 // Info implements logger.Logger.
 func (a *appLogger) Info(msg string, tags ...any) {
-	a.logger.Info(a.prefix+msg, tags...)
+	a.logger.Info(msg, tags...)
 }
 
 // Warn implements logger.Logger.
 func (a *appLogger) Warn(msg string, tags ...any) {
-	a.logger.Warn(a.prefix+msg, tags...)
+	a.logger.Warn(msg, tags...)
 }
 
 // With implements logger.Logger.

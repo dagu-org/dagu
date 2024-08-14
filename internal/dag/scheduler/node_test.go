@@ -36,7 +36,7 @@ func TestExecute(t *testing.T) {
 			OutputVariables: &dag.SyncMap{},
 		}}}
 	require.NoError(t, n.Execute(context.Background()))
-	require.Nil(t, n.data.Error)
+	require.Nil(t, n.data.State.Error)
 }
 
 func TestError(t *testing.T) {
@@ -47,7 +47,7 @@ func TestError(t *testing.T) {
 		}}}
 	err := n.Execute(context.Background())
 	require.True(t, err != nil)
-	require.Equal(t, n.data.Error, err)
+	require.Equal(t, n.data.State.Error, err)
 }
 
 func TestSignal(t *testing.T) {
@@ -369,13 +369,13 @@ func TestTeardown(t *testing.T) {
 	// no error since done flag is true
 	err := n.teardown()
 	require.NoError(t, err)
-	require.NoError(t, n.data.Error)
+	require.NoError(t, n.data.State.Error)
 
 	// error
 	n.done = false
 	err = n.teardown()
 	require.Error(t, err)
-	require.Error(t, n.data.Error)
+	require.Error(t, n.data.State.Error)
 }
 
 func runTestNode(t *testing.T, n *Node) {

@@ -55,7 +55,7 @@ func (r *reporter) reportStep(
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
 		r.logger.Info("Step execution finished",
-			"step", node.Data().Name,
+			"step", node.Data().Step.Name,
 			"status", nodeStatus,
 		)
 	}
@@ -160,15 +160,15 @@ func renderTable(nodes []*model.Node) string {
 		},
 	)
 	for i, n := range nodes {
-		var command = n.Command
-		if n.Args != nil {
+		var command = n.Step.Command
+		if n.Step.Args != nil {
 			command = strings.Join(
-				[]string{n.Command, strings.Join(n.Args, " ")}, " ",
+				[]string{n.Step.Command, strings.Join(n.Step.Args, " ")}, " ",
 			)
 		}
 		t.AppendRow(table.Row{
 			fmt.Sprintf("%d", i+1),
-			n.Name,
+			n.Step.Name,
 			n.StartedAt,
 			n.FinishedAt,
 			n.StatusText,
@@ -215,7 +215,7 @@ func renderHTML(nodes []*model.Node) string {
 	}
 	for _, n := range nodes {
 		_, _ = buffer.WriteString("<tr>")
-		addValFunc(n.Name)
+		addValFunc(n.Step.Name)
 		addValFunc(n.StartedAt)
 		addValFunc(n.FinishedAt)
 		addStatusFunc(n.Status)

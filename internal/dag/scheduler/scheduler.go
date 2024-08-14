@@ -404,7 +404,7 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 
 func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 	defer func() {
-		node.data.FinishedAt = time.Now()
+		node.data.State.FinishedAt = time.Now()
 	}()
 
 	node.setStatus(NodeStatusRunning)

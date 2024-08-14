@@ -43,19 +43,19 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 func FromNode(node scheduler.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
-		Log:        node.Log,
-		StartedAt:  util.FormatTime(node.StartedAt),
-		FinishedAt: util.FormatTime(node.FinishedAt),
-		Status:     node.Status,
-		StatusText: node.Status.String(),
-		RetryCount: node.RetryCount,
-		DoneCount:  node.DoneCount,
-		Error:      errText(node.Error),
+		Log:        node.State.Log,
+		StartedAt:  util.FormatTime(node.State.StartedAt),
+		FinishedAt: util.FormatTime(node.State.FinishedAt),
+		Status:     node.State.Status,
+		StatusText: node.State.Status.String(),
+		RetryCount: node.State.RetryCount,
+		DoneCount:  node.State.DoneCount,
+		Error:      errText(node.State.Error),
 	}
 }
 
 type Node struct {
-	dag.Step   `json:"Step"`
+	Step       dag.Step             `json:"Step"`
 	Log        string               `json:"Log"`
 	StartedAt  string               `json:"StartedAt"`
 	FinishedAt string               `json:"FinishedAt"`

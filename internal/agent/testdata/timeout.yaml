@@ -1,4 +1,4 @@
-timeout: 2
+timeoutSec: 2
 steps:
   - name: "1"
     command: "sleep 1"

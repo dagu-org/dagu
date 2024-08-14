@@ -32,7 +32,7 @@ type definition struct {
 	MailOn            *mailOnDef
 	ErrorMail         mailConfigDef
 	InfoMail          mailConfigDef
-	Timeout           int
+	TimeoutSec        int
 	DelaySec          int
 	RestartWaitSec    int
 	HistRetentionDays *int

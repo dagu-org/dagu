@@ -302,7 +302,12 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 		currentStatus           *DAGStatus
 	)
 
-	if dagListPaginationResult, err = dagStore.ListPagination(params); err != nil {
+	if dagListPaginationResult, err = dagStore.ListPagination(persistence.DAGListPaginationArgs{
+		Page:  int(params.Page),
+		Limit: int(params.Limit),
+		Name:  params.SearchName,
+		Tag:   params.SearchTag,
+	}); err != nil {
 		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
 	}
 
@@ -314,7 +319,7 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 	}
 
 	return dagStatusList, &DagListPaginationSummaryResult{
-		PageCount: e.getPageCount(dagListPaginationResult.Count, params.Limit),
+		PageCount: e.getPageCount(int64(dagListPaginationResult.Count), params.Limit),
 		ErrorList: dagListPaginationResult.ErrorList,
 	}, nil
 }

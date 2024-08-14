@@ -317,7 +317,7 @@ This section provides a comprehensive list of available fields that can be used 
 - ``logDir``: The directory where the standard output is written. The default value is ``${HOME}/.local/share/logs``.
 - ``restartWaitSec``: The number of seconds to wait after the DAG process stops before restarting it.
 - ``histRetentionDays``: The number of days to retain execution history (not for log files).
-- ``timeout``: The timeout of the DAG, which is optional. Unit is seconds.
+- ``timeoutSec``: The timeout of the DAG, which is optional. Unit is seconds.
 - ``delaySec``: The interval time in seconds between steps.
 - ``maxActiveRuns``: The maximum number of parallel running steps.
 - ``params``: The default parameters that can be referred to by ``$1``, ``$2``, and so on.
@@ -344,7 +344,7 @@ Example:
     logDir: ${LOG_DIR}                   
     restartWaitSec: 60                   
     histRetentionDays: 3
-    timeout: 3600
+    timeoutSec: 3600
     delaySec: 1                          
     maxActiveRuns: 1                     
     params: param1 param2                
