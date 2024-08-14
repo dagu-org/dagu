@@ -84,9 +84,13 @@ function Search() {
                     <SearchResult results={data?.Results} />
                   </Box>
                 );
-              } else {
+              }
+
+              if ((data && !data.Results) || (data && data.Results && data.Results.length === 0)) {
                 return <Box>No results found</Box>;
               }
+
+              return null
             })()
           }
         </Box>
