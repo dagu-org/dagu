@@ -163,10 +163,6 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
-func (d *dagStoreImpl) getFileNameDagMeta() {
-
-}
-
 func (d *dagStoreImpl) searchName(fileName string, searchText *string) bool {
 	if searchText == nil {
 		return true
@@ -207,7 +203,7 @@ func (d *dagStoreImpl) ListPagination(params dags.ListDagsParams) (*persistence.
 		currentDag *dag.DAG
 	)
 
-	if err := filepath.WalkDir(d.dir, func(path string, dir fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(d.dir, func(_ string, dir fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -330,11 +326,6 @@ func (d *dagStoreImpl) Grep(
 		}
 	}
 	return ret, errs, nil
-}
-
-func (d *dagStoreImpl) Load(name string) (*dag.DAG, error) {
-	// TODO implement me
-	panic("implement me")
 }
 
 func (d *dagStoreImpl) Rename(oldID, newID string) error {
