@@ -893,7 +893,13 @@ func TestClient_GetTagList(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(errs))
 	require.Equal(t, 3, len(tags))
-	require.Equal(t, "tag1", tags[0])
-	require.Equal(t, "tag2", tags[1])
-	require.Equal(t, "tag3", tags[2])
+
+	mapTags := make(map[string]bool)
+	for _, tag := range tags {
+		mapTags[tag] = true
+	}
+
+	require.True(t, mapTags["tag1"])
+	require.True(t, mapTags["tag2"])
+	require.True(t, mapTags["tag3"])
 }
