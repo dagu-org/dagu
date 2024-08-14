@@ -28,7 +28,7 @@ function DAGs() {
   const endPoint =`/dags?${new URLSearchParams(
     {
       page: page.toString(),
-      limit: '5',
+      limit: '50',
       searchName: apiSearchText,
       searchTag: apiSearchTag,
     }
