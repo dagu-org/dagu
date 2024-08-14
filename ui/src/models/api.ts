@@ -58,6 +58,7 @@ export type ListWorkflowsResponse = {
   DAGs?: WorkflowListItem[];
   Errors?: string[];
   HasError: boolean;
+  PageCount: number;
 };
 
 export type WorkflowListItem = {
@@ -89,4 +90,9 @@ export type WorkflowStatus = {
   FinishedAt: string;
   Log: string;
   Params: string;
+};
+
+export type GetListTagsResponse = {
+  Tags: string[];
+  Errors: string[];
 };

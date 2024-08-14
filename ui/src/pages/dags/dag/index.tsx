@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, useParams, Routes, Route, useLocation } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { GetDAGResponse } from '../../../models/api';
 import DAGSpecErrors from '../../../components/molecules/DAGSpecErrors';
 import DAGStatus from '../../../components/organizations/DAGStatus';
@@ -13,7 +13,7 @@ import DAGActions from '../../../components/molecules/DAGActions';
 import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
 import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import useSWR, { useSWRConfig } from 'swr';
+import useSWR from 'swr';
 
 type Params = {
   name: string;

@@ -18,6 +18,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/daguflow/dagu/internal/logger"
 	"github.com/daguflow/dagu/internal/persistence"
 	"github.com/daguflow/dagu/internal/persistence/model"
@@ -268,10 +270,10 @@ func (e *client) GetAllStatus() (
 	statuses []*DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
-	dags, errs, err := dagStore.List()
+	dagList, errs, err := dagStore.List()
 
 	var ret []*DAGStatus
-	for _, d := range dags {
+	for _, d := range dagList {
 		status, err := e.readStatus(d)
 		if err != nil {
 			errs = append(errs, err.Error())
@@ -280,6 +282,41 @@ func (e *client) GetAllStatus() (
 	}
 
 	return ret, errs, err
+}
+
+func (e *client) getPageCount(total int64, limit int64) int {
+	pageCount := int(math.Ceil(float64(total) / float64(limit)))
+	if pageCount == 0 {
+		pageCount = 1
+	}
+
+	return pageCount
+}
+
+func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
+	var (
+		dagListPaginationResult *persistence.DagListPaginationResult
+		err                     error
+		dagStore                = e.dataStore.DAGStore()
+		dagStatusList           = make([]*DAGStatus, 0)
+		currentStatus           *DAGStatus
+	)
+
+	if dagListPaginationResult, err = dagStore.ListPagination(params); err != nil {
+		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
+	}
+
+	for _, currentDag := range dagListPaginationResult.DagList {
+		if currentStatus, err = e.readStatus(currentDag); err != nil {
+			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
+		}
+		dagStatusList = append(dagStatusList, currentStatus)
+	}
+
+	return dagStatusList, &DagListPaginationSummaryResult{
+		PageCount: e.getPageCount(dagListPaginationResult.Count, params.Limit),
+		ErrorList: dagListPaginationResult.ErrorList,
+	}, nil
 }
 
 func (e *client) getDAG(name string) (*dag.DAG, error) {
@@ -347,4 +384,8 @@ func escapeArg(input string) string {
 	}
 
 	return escaped.String()
+}
+
+func (e *client) GetTagList() ([]string, []string, error) {
+	return e.dataStore.DAGStore().TagList()
 }
