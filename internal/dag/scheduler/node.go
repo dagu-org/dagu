@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/daguflow/dagu/internal/constants"
 	"io"
 	"log"
 	"os"
@@ -29,10 +28,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
+	"github.com/daguflow/dagu/internal/constants"
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/executor"
 	"github.com/daguflow/dagu/internal/util"
-	"golang.org/x/sys/unix"
 )
 
 // Node is a node in a DAG. It executes a command.
