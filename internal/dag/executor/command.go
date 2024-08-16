@@ -24,9 +24,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/daguflow/dagu/internal/util"
-
+	"github.com/daguflow/dagu/internal/constants"
 	"github.com/daguflow/dagu/internal/dag"
+	"github.com/daguflow/dagu/internal/util"
 )
 
 type commandExecutor struct {
@@ -40,9 +40,11 @@ func newCommand(ctx context.Context, step dag.Step) (Executor, error) {
 	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
 		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
 	}
+	stepSpecialExecutionLogPathKey := util.GenerateStepSpecialExecutionLogPathKey(step.NodeID)
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
+	cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", constants.StepDaguExecutionLogPathKeySuffix, os.Getenv(stepSpecialExecutionLogPathKey)))
 	step.OutputVariables.Range(func(_, value any) bool {
 		cmd.Env = append(cmd.Env, value.(string))
 		return true
