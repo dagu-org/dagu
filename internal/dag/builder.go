@@ -482,10 +482,10 @@ func (b *stepBuilder) buildStep(
 		Name:           def.Name,
 		Description:    def.Description,
 		Script:         def.Script,
-		Stdout:         expandEnv(def.Stdout, b.noEval),
-		Stderr:         expandEnv(def.Stderr, b.noEval),
+		Stdout:         def.Stdout,
+		Stderr:         def.Stderr,
 		Output:         def.Output,
-		Dir:            expandEnv(def.Dir, b.noEval),
+		Dir:            def.Dir,
 		Variables:      variables,
 		Depends:        def.Depends,
 		MailOnError:    def.MailOnError,
@@ -504,16 +504,6 @@ func (b *stepBuilder) buildStep(
 	}
 
 	return step, nil
-}
-
-// expandEnv expands the environment variables in the value if the noEval
-// option is false.
-func expandEnv(val string, noEval bool) string {
-	if noEval {
-		return val
-	}
-
-	return os.ExpandEnv(val)
 }
 
 // buildMailConfig builds a MailConfig from the definition.
