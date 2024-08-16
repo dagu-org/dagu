@@ -443,12 +443,6 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
     ];
   }, [DAGs, group]);
 
-  const tagsRes = useSWR<GetListTagsResponse>('/tags', null, {
-    refreshInterval: 10000,
-  });
-
-  const tagOptions = tagsRes.data?.Tags || [];
-
   const instance = useReactTable({
     data,
     columns,
@@ -500,11 +494,26 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
             type: 'search',
           }}
         />
-        <Autocomplete<string>
+        <Autocomplete<string, false, false, true>
           size="small"
           limitTags={1}
           value={searchTag}
-          options={tagOptions}
+          freeSolo
+          options={
+            DAGs.reduce<string[]>((acc, dag) => {
+              if (dag.Type == DAGDataType.DAG) {
+                const tags = dag.DAGStatus.DAG.Tags;
+                if (tags) {
+                  tags.forEach((tag) => {
+                    if (!acc.includes(tag)) {
+                      acc.push(tag);
+                    }
+                  });
+                }
+              }
+              return acc;
+            }, [])
+          }
           onChange={(_, value) => {
             const v = value || '';
             handleSearchTagChange(v);
