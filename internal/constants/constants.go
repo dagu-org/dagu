@@ -16,5 +16,9 @@
 package constants
 
 var (
-	Version = "0.0.1"
+	Version                           = "0.0.1"
+	StepDaguExecutionLogPathKeySuffix = "DAGU_EXECUTION_LOG_PATH"
+	StepDaguExecutionLogPathKeyPrefix = "STEP"
+	DaguSchedulerLogPathKey           = "DAGU_SCHEDULER_LOG_PATH"
+	DaguRequestIDKey                  = "DAGU_REQUEST_ID"
 )
