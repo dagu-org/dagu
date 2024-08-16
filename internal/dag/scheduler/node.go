@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/daguflow/dagu/internal/constants"
 	"io"
 	"log"
 	"os"
@@ -359,6 +360,9 @@ func (n *Node) setupLog() error {
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 	var err error
+	if err = os.Setenv(util.GenerateStepSpecialExecutionLogPathKey(n.id), n.data.State.Log); err != nil {
+		return err
+	}
 	n.logFile, err = util.OpenOrCreateFile(n.data.State.Log)
 	if err != nil {
 		n.data.State.Error = err
@@ -432,6 +436,14 @@ func (n *Node) init() {
 		return
 	}
 	n.id = getNextNodeID()
+	n.data.Step.NodeID = n.id
+
+	n.data.Step.CmdWithArgs = strings.ReplaceAll(
+		n.data.Step.CmdWithArgs,
+		constants.StepDaguExecutionLogPathKeySuffix,
+		util.GenerateStepSpecialExecutionLogPathKey(n.id),
+	)
+
 	if n.data.Step.Variables == nil {
 		n.data.Step.Variables = []string{}
 	}
