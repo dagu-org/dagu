@@ -29,21 +29,19 @@ import (
 )
 
 func TestWriteStatusToFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{
 		Name:     "test_write_status",
 		Location: "test_write_status.yaml",
 	}
-	dw, file, err := db.newWriter(d.Location, time.Now(), "request-id-1")
+	dw, file, err := te.JSONDB.newWriter(d.Location, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 	defer func() {
 		_ = dw.close()
-		_ = db.RemoveOld(d.Location, 0)
+		_ = te.JSONDB.RemoveOld(d.Location, 0)
 	}()
 
 	status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
@@ -66,29 +64,27 @@ func TestWriteStatusToFile(t *testing.T) {
 	oldS := d.Location
 	newS := "text_write_status_new.yaml"
 
-	oldDir := db.getDirectory(oldS, prefix(oldS))
-	newDir := db.getDirectory(newS, prefix(newS))
+	oldDir := te.JSONDB.getDirectory(oldS, prefix(oldS))
+	newDir := te.JSONDB.getDirectory(newS, prefix(newS))
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 
-	err = db.Rename(oldS, newS)
+	err = te.JSONDB.Rename(oldS, newS)
 	require.NoError(t, err)
 	require.NoDirExists(t, oldDir)
 	require.DirExists(t, newDir)
 
-	ret := db.ReadStatusRecent(newS, 1)
+	ret := te.JSONDB.ReadStatusRecent(newS, 1)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, status.RequestID, ret[0].Status.RequestID)
 }
 
 func TestWriteStatusToExistingFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
-	dw, file, err := db.newWriter(d.Location, time.Now(), "request-id-1")
+	dw, file, err := te.JSONDB.newWriter(d.Location, time.Now(), "request-id-1")
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 
@@ -97,7 +93,7 @@ func TestWriteStatusToExistingFile(t *testing.T) {
 	require.NoError(t, dw.write(status))
 	_ = dw.close()
 
-	data, err := db.FindByRequestID(d.Location, status.RequestID)
+	data, err := te.JSONDB.FindByRequestID(d.Location, status.RequestID)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.StatusCancel)
 	require.Equal(t, file, data.File)
@@ -108,7 +104,7 @@ func TestWriteStatusToExistingFile(t *testing.T) {
 	require.NoError(t, dw.write(status))
 	_ = dw.close()
 
-	data, err = db.FindByRequestID(d.Location, status.RequestID)
+	data, err = te.JSONDB.FindByRequestID(d.Location, status.RequestID)
 	require.NoError(t, err)
 	require.Equal(t, data.Status.Status, scheduler.StatusSuccess)
 	require.Equal(t, file, data.File)

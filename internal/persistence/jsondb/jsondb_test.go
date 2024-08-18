@@ -29,39 +29,80 @@ import (
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/scheduler"
 	"github.com/daguflow/dagu/internal/util"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTest(t *testing.T) (string, *JSONDB) {
-	tmpDir, err := os.MkdirTemp("", "test-persistence")
-	require.NoError(t, err)
-	db := New(tmpDir, true)
-	return tmpDir, db
+// testEnv encapsulates the test environment
+type testEnv struct {
+	JSONDB *JSONDB
+	TmpDir string
 }
 
-func TestNewDataFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+// setup creates a new test environment
+func setup(t *testing.T) testEnv {
+	tmpDir, err := os.MkdirTemp("", "test-persistence")
+	require.NoError(t, err)
+	return testEnv{
+		JSONDB: New(tmpDir, true),
+		TmpDir: tmpDir,
+	}
+}
 
-	d := &dag.DAG{Location: "test_new_data_file.yaml"}
+// cleanup removes the temporary directory
+func (te testEnv) cleanup() {
+	_ = os.RemoveAll(te.TmpDir)
+}
+
+// createTestDAG creates a test DAG with the given name and location
+func createTestDAG(name, location string) *dag.DAG {
+	return &dag.DAG{
+		Name:     name,
+		Location: location,
+	}
+}
+
+// createTestStatus creates a test Status with the given DAG, status, and PID
+func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *model.Status {
+	return model.NewStatus(d, nil, status, pid, nil, nil)
+}
+
+// writeTestStatus writes a test status to the database
+func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *model.Status, tm time.Time) {
+	dw, _, err := db.newWriter(d.Location, tm, status.RequestID)
+	require.NoError(t, err)
+	require.NoError(t, dw.open())
+	defer func() {
+		_ = dw.close()
+	}()
+	require.NoError(t, dw.write(status))
+}
+
+// TestNewDataFile tests the newFile function
+func TestNewDataFile(t *testing.T) {
+	te := setup(t)
+	defer te.cleanup()
+
+	d := createTestDAG("test_new_data_file", "test_new_data_file.yaml")
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
 	requestID := "request-id-1"
-	f, err := db.newFile(d.Location, timestamp, requestID)
-	require.NoError(t, err)
-	p := util.ValidFilename(strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location)))
-	require.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestID[:8]), f)
 
-	_, err = db.newFile("", timestamp, requestID)
-	require.Error(t, err)
+	t.Run("ValidFile", func(t *testing.T) {
+		f, err := te.JSONDB.newFile(d.Location, timestamp, requestID)
+		require.NoError(t, err)
+		p := util.ValidFilename(strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location)))
+		assert.Regexp(t, fmt.Sprintf("%s.*/%s.20220101.00:00:00.000.%s.dat", p, p, requestID[:8]), f)
+	})
+
+	t.Run("EmptyLocation", func(t *testing.T) {
+		_, err := te.JSONDB.newFile("", timestamp, requestID)
+		assert.Error(t, err)
+	})
 }
 
 func TestWriteAndFindFiles(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{
 		Name:     "test_read_status_n",
@@ -91,27 +132,21 @@ func TestWriteAndFindFiles(t *testing.T) {
 	} {
 		status := data.Status
 		status.RequestID = data.ReqID
-		testWriteStatus(t, db, d, status, data.Timestamp)
+		testWriteStatus(t, te.JSONDB, d, status, data.Timestamp)
 	}
 
-	files := db.latest(db.prefixWithDirectory(d.Location)+"*.dat", 2)
+	files := te.JSONDB.latest(te.JSONDB.prefixWithDirectory(d.Location)+"*.dat", 2)
 	require.Equal(t, 2, len(files))
 }
 
 func TestWriteAndFindByRequestID(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{
 		Name:     "test_find_by_request_id",
 		Location: "test_find_by_request_id.yaml",
 	}
-
-	defer func() {
-		_ = db.RemoveAll(d.Location)
-	}()
 
 	for _, data := range []struct {
 		Status    *model.Status
@@ -136,23 +171,21 @@ func TestWriteAndFindByRequestID(t *testing.T) {
 	} {
 		status := data.Status
 		status.RequestID = data.ReqID
-		testWriteStatus(t, db, d, status, data.Timestamp)
+		testWriteStatus(t, te.JSONDB, d, status, data.Timestamp)
 	}
 
-	status, err := db.FindByRequestID(d.Location, "request-id-2")
+	status, err := te.JSONDB.FindByRequestID(d.Location, "request-id-2")
 	require.NoError(t, err)
 	require.Equal(t, status.Status.RequestID, "request-id-2")
 
-	status, err = db.FindByRequestID(d.Location, "request-id-10000")
+	status, err = te.JSONDB.FindByRequestID(d.Location, "request-id-10000")
 	require.Error(t, err)
 	require.Nil(t, status)
 }
 
 func TestRemoveOldFiles(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{Location: "test_remove_old.yaml"}
 
@@ -179,31 +212,29 @@ func TestRemoveOldFiles(t *testing.T) {
 	} {
 		status := data.Status
 		status.RequestID = data.ReqID
-		testWriteStatus(t, db, d, data.Status, data.Timestamp)
+		testWriteStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
 	}
 
-	files := db.latest(db.prefixWithDirectory(d.Location)+"*.dat", 3)
+	files := te.JSONDB.latest(te.JSONDB.prefixWithDirectory(d.Location)+"*.dat", 3)
 	require.Equal(t, 3, len(files))
 
-	_ = db.RemoveOld(d.Location, 0)
+	_ = te.JSONDB.RemoveOld(d.Location, 0)
 
-	files = db.latest(db.prefixWithDirectory(d.Location)+"*.dat", 3)
+	files = te.JSONDB.latest(te.JSONDB.prefixWithDirectory(d.Location)+"*.dat", 3)
 	require.Equal(t, 0, len(files))
 
-	m := db.latest("invalid-pattern", 3)
+	m := te.JSONDB.latest("invalid-pattern", 3)
 	require.Equal(t, 0, len(m))
 }
 
 func TestReadLatestStatus(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{Location: "test_config_status_reader.yaml"}
 	requestID := "request-id-1"
 
-	dw, _, err := db.newWriter(d.Location, time.Now(), requestID)
+	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
 	require.NoError(t, err)
 	err = dw.open()
 	require.NoError(t, err)
@@ -219,7 +250,7 @@ func TestReadLatestStatus(t *testing.T) {
 	status.PID = 20000
 	_ = dw.write(status)
 
-	ret, err := db.ReadStatusToday(d.Location)
+	ret, err := te.JSONDB.ReadStatusToday(d.Location)
 
 	require.NoError(t, err)
 	require.NotNil(t, ret)
@@ -229,10 +260,8 @@ func TestReadLatestStatus(t *testing.T) {
 }
 
 func TestReadStatusN(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	d := &dag.DAG{Name: "test_read_status_n", Location: "test_config_status_reader_hist.yaml"}
 
@@ -259,12 +288,12 @@ func TestReadStatusN(t *testing.T) {
 	} {
 		status := data.Status
 		status.RequestID = data.ReqID
-		testWriteStatus(t, db, d, data.Status, data.Timestamp)
+		testWriteStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
 	}
 
 	recordMax := 2
 
-	ret := db.ReadStatusRecent(d.Location, recordMax)
+	ret := te.JSONDB.ReadStatusRecent(d.Location, recordMax)
 
 	require.Equal(t, recordMax, len(ret))
 	require.Equal(t, d.Name, ret[0].Status.Name)
@@ -272,15 +301,13 @@ func TestReadStatusN(t *testing.T) {
 }
 
 func TestCompactFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	workflow := &dag.DAG{Name: "test_compact_file", Location: "test_compact_file.yaml"}
 	requestID := "request-id-1"
 
-	dw, _, err := db.newWriter(workflow.Location, time.Now(), requestID)
+	dw, _, err := te.JSONDB.newWriter(workflow.Location, time.Now(), requestID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())
 
@@ -297,12 +324,12 @@ func TestCompactFile(t *testing.T) {
 	_ = dw.close()
 
 	var s *model.StatusFile
-	if h := db.ReadStatusRecent(workflow.Location, 1); len(h) > 0 {
+	if h := te.JSONDB.ReadStatusRecent(workflow.Location, 1); len(h) > 0 {
 		s = h[0]
 	}
 	require.NotNil(t, s)
 
-	db2 := New(db.location, true)
+	db2 := New(te.JSONDB.location, true)
 	err = db2.Compact(workflow.Location, s.File)
 	require.False(t, util.FileExists(s.File))
 	require.NoError(t, err)
@@ -321,21 +348,19 @@ func TestCompactFile(t *testing.T) {
 }
 
 func TestErrorReadFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	te := setup(t)
+	defer te.cleanup()
 
 	_, err := ParseFile("invalid_file.dat")
 	require.Error(t, err)
 
-	_, _, err = db.newWriter("", time.Now(), "")
+	_, _, err = te.JSONDB.newWriter("", time.Now(), "")
 	require.Error(t, err)
 
-	_, err = db.ReadStatusToday("invalid_file.yaml")
+	_, err = te.JSONDB.ReadStatusToday("invalid_file.yaml")
 	require.Error(t, err)
 
-	_, err = db.FindByRequestID("invalid_file.yaml", "invalid_id")
+	_, err = te.JSONDB.FindByRequestID("invalid_file.yaml", "invalid_id")
 	require.Error(t, err)
 }
 
