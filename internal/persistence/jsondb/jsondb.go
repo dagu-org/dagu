@@ -39,17 +39,11 @@ import (
 	"github.com/daguflow/dagu/internal/util"
 )
 
-// Store is the interface to store dags status in local.
-// It stores status in JSON format in a directory as per each dagFile.
-// Multiple JSON data can be stored in a single file and each data
-// is separated by newline.
-// When a data is updated, it appends a new line to the file.
-// Only the latest data in a single file can be read.
-// When Compact is called, it removes old data.
-// Compact must be called only once per file.
-type Store struct {
-	dir               string
-	dagsDir           string
+var _ persistence.HistoryStore = (*JSONDB)(nil)
+
+// JSONDB manages dags status files in local.
+type JSONDB struct {
+	location          string
 	writer            *writer
 	cache             *filecache.Cache[*model.Status]
 	latestStatusToday bool
@@ -64,13 +58,10 @@ var (
 
 const defaultCacheSize = 300
 
-// New creates a new Store with default configuration.
-func New(dir, dagsDir string, latestStatusToday bool) *Store {
-	// dagsDir is used to calculate the directory that is compatible with the
-	// old version.
-	s := &Store{
-		dir:     dir,
-		dagsDir: dagsDir,
+// New creates a new JSONDB with default configuration.
+func New(location string, latestStatusToday bool) *JSONDB {
+	s := &JSONDB{
+		location: location,
 		cache: filecache.New[*model.Status](
 			defaultCacheSize, time.Hour*3,
 		),
@@ -80,7 +71,7 @@ func New(dir, dagsDir string, latestStatusToday bool) *Store {
 	return s
 }
 
-func (s *Store) Update(dagFile, requestID string, status *model.Status) error {
+func (s *JSONDB) Update(dagFile, requestID string, status *model.Status) error {
 	f, err := s.FindByRequestID(dagFile, requestID)
 	if err != nil {
 		return err
@@ -96,7 +87,7 @@ func (s *Store) Update(dagFile, requestID string, status *model.Status) error {
 	return w.write(status)
 }
 
-func (s *Store) Open(dagFile string, t time.Time, requestID string) error {
+func (s *JSONDB) Open(dagFile string, t time.Time, requestID string) error {
 	writer, _, err := s.newWriter(dagFile, t, requestID)
 	if err != nil {
 		return err
@@ -108,11 +99,11 @@ func (s *Store) Open(dagFile string, t time.Time, requestID string) error {
 	return nil
 }
 
-func (s *Store) Write(status *model.Status) error {
+func (s *JSONDB) Write(status *model.Status) error {
 	return s.writer.write(status)
 }
 
-func (s *Store) Close() error {
+func (s *JSONDB) Close() error {
 	if s.writer == nil {
 		return nil
 	}
@@ -130,7 +121,7 @@ func (s *Store) Close() error {
 }
 
 // NewWriter creates a new writer for a status.
-func (s *Store) newWriter(
+func (s *JSONDB) newWriter(
 	dagFile string, t time.Time, requestID string,
 ) (*writer, string, error) {
 	f, err := s.newFile(dagFile, t, requestID)
@@ -142,7 +133,7 @@ func (s *Store) newWriter(
 }
 
 // ReadStatusRecent returns recent n status
-func (s *Store) ReadStatusRecent(
+func (s *JSONDB) ReadStatusRecent(
 	dagFile string, n int,
 ) []*model.StatusFile {
 	var ret []*model.StatusFile
@@ -166,7 +157,7 @@ func (s *Store) ReadStatusRecent(
 }
 
 // ReadStatusToday returns a list of status files.
-func (s *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
+func (s *JSONDB) ReadStatusToday(dagFile string) (*model.Status, error) {
 	// TODO: let's fix below not to use config here
 	file, err := s.latestToday(dagFile, time.Now(), s.latestStatusToday)
 	if err != nil {
@@ -178,7 +169,7 @@ func (s *Store) ReadStatusToday(dagFile string) (*model.Status, error) {
 }
 
 // FindByRequestID finds a status file by request ID
-func (s *Store) FindByRequestID(
+func (s *JSONDB) FindByRequestID(
 	dagFile string, requestID string,
 ) (*model.StatusFile, error) {
 	if requestID == "" {
@@ -207,12 +198,12 @@ func (s *Store) FindByRequestID(
 }
 
 // RemoveAll removes all files in a directory.
-func (s *Store) RemoveAll(dagFile string) error {
+func (s *JSONDB) RemoveAll(dagFile string) error {
 	return s.RemoveOld(dagFile, 0)
 }
 
 // RemoveOld removes old files.
-func (s *Store) RemoveOld(dagFile string, retentionDays int) error {
+func (s *JSONDB) RemoveOld(dagFile string, retentionDays int) error {
 	var lastErr error
 	if retentionDays >= 0 {
 		matches, _ := filepath.Glob(s.globPattern(dagFile))
@@ -230,7 +221,7 @@ func (s *Store) RemoveOld(dagFile string, retentionDays int) error {
 }
 
 // Compact creates a new file with only the latest data and removes old data.
-func (*Store) Compact(_, original string) error {
+func (*JSONDB) Compact(_, original string) error {
 	status, err := ParseFile(original)
 	if err != nil {
 		return err
@@ -257,12 +248,12 @@ func (*Store) Compact(_, original string) error {
 	return os.Remove(original)
 }
 
-func (*Store) exists(file string) bool {
+func (*JSONDB) exists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
 
-func (s *Store) Rename(oldID, newID string) error {
+func (s *JSONDB) Rename(oldID, newID string) error {
 	// This is needed to ensure backward compatibility.
 	on := util.AddYamlExtension(oldID)
 	nn := util.AddYamlExtension(newID)
@@ -297,17 +288,17 @@ func (s *Store) Rename(oldID, newID string) error {
 	return nil
 }
 
-func (s *Store) getDirectory(name string, prefix string) string {
+func (s *JSONDB) getDirectory(name string, prefix string) string {
 	// nolint: gosec
 	h := md5.New()
 	_, _ = h.Write([]byte(name))
 	v := hex.EncodeToString(h.Sum(nil))
-	return filepath.Join(s.dir, fmt.Sprintf("%s-%s", prefix, v))
+	return filepath.Join(s.location, fmt.Sprintf("%s-%s", prefix, v))
 }
 
 const requestIDLenSafe = 8
 
-func (s *Store) newFile(
+func (s *JSONDB) newFile(
 	dagFile string, t time.Time, requestID string,
 ) (string, error) {
 	if dagFile == "" {
@@ -321,7 +312,7 @@ func (s *Store) newFile(
 	), nil
 }
 
-func (store *Store) latestToday(
+func (store *JSONDB) latestToday(
 	dagFile string,
 	day time.Time,
 	latestStatusToday bool,
@@ -349,7 +340,7 @@ func (store *Store) latestToday(
 	return ret[0], err
 }
 
-func (*Store) latest(pattern string, n int) []string {
+func (*JSONDB) latest(pattern string, n int) []string {
 	matches, err := filepath.Glob(pattern)
 	var ret = []string{}
 	if err == nil || len(matches) >= 0 {
@@ -360,11 +351,11 @@ func (*Store) latest(pattern string, n int) []string {
 
 const extDat = ".dat"
 
-func (s *Store) globPattern(dagFile string) string {
+func (s *JSONDB) globPattern(dagFile string) string {
 	return s.prefixWithDirectory(dagFile) + "*" + extDat
 }
 
-func (s *Store) prefixWithDirectory(dagFile string) string {
+func (s *JSONDB) prefixWithDirectory(dagFile string) string {
 	p := prefix(dagFile)
 	return filepath.Join(s.getDirectory(dagFile, p), p)
 }

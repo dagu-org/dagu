@@ -32,10 +32,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTest(t *testing.T) (string, *Store) {
+func setupTest(t *testing.T) (string, *JSONDB) {
 	tmpDir, err := os.MkdirTemp("", "test-persistence")
 	require.NoError(t, err)
-	db := New(tmpDir, "", true)
+	db := New(tmpDir, true)
 	return tmpDir, db
 }
 
@@ -302,7 +302,7 @@ func TestCompactFile(t *testing.T) {
 	}
 	require.NotNil(t, s)
 
-	db2 := New(db.dir, "", true)
+	db2 := New(db.location, true)
 	err = db2.Compact(workflow.Location, s.File)
 	require.False(t, util.FileExists(s.File))
 	require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestErrorParseFile(t *testing.T) {
 
 func testWriteStatus(
 	t *testing.T,
-	db *Store,
+	db *JSONDB,
 	workflow *dag.DAG,
 	status *model.Status,
 	tm time.Time,
