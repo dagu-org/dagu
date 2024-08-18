@@ -4,4 +4,4 @@ skip = .git,*.svg,go.mod,go.sum,*.lock,*.css,.codespellrc
 check-hidden = true
 # ignore-regex = 
 # short variables close to typos are often used
-ignore-words-list = ot
+ignore-words-list = ot,te
