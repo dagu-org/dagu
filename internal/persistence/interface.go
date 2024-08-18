@@ -51,6 +51,7 @@ type HistoryStore interface {
 	Update(dagFile, requestID string, st *model.Status) error
 	ReadStatusRecent(dagFile string, n int) []*model.StatusFile
 	ReadStatusToday(dagFile string) (*model.Status, error)
+	ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error)
 	FindByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
 	RemoveAll(dagFile string) error
 	RemoveOld(dagFile string, retentionDays int) error

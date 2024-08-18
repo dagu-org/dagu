@@ -37,8 +37,6 @@ import (
 
 var (
 	_ persistence.HistoryStore = (*JSONDB)(nil)
-
-	rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
 )
 
 const (
@@ -537,6 +535,54 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 		return "", fmt.Errorf("no status files found for %s", indexFile)
 	}
 	return files[0], nil
+}
+
+func (s *JSONDB) ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error) {
+	indexDir := craftIndexDataDir(s.baseDir, dagID)
+	dateStr := date.Format(dateFormat)
+	pattern := filepath.Join(indexDir, normalizedID(dagID)+"*"+dateStr+"*.dat")
+
+	indexFiles, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list index files: %w", err)
+	}
+
+	var statusFiles []*model.StatusFile
+	for _, indexFile := range indexFiles {
+		statusFilePattern, err := indexFileToStatusFilePattern(s.baseDir, indexFile)
+		if err != nil {
+			s.logger.Errorf("failed to convert index file to status file pattern: %v", err)
+			continue
+		}
+
+		matches, err := filepath.Glob(statusFilePattern)
+		if err != nil {
+			s.logger.Errorf("failed to list status files: %v", err)
+			continue
+		}
+
+		for _, statusFile := range matches {
+			status, err := s.cache.LoadLatest(statusFile, func() (*model.Status, error) {
+				return ParseStatusFile(statusFile)
+			})
+			if err != nil {
+				s.logger.Errorf("failed to parse file %s: %v", statusFile, err)
+				continue
+			}
+
+			statusFiles = append(statusFiles, &model.StatusFile{
+				File:   statusFile,
+				Status: status,
+			})
+		}
+	}
+
+	// Sort status files by timestamp in descending order
+	sort.Slice(statusFiles, func(i, j int) bool {
+		return strings.Compare(statusFiles[i].Status.StartedAt, statusFiles[j].Status.StartedAt) > 0
+	})
+
+	return statusFiles, nil
 }
 
 func pathExists(path string) bool {

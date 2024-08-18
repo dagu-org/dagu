@@ -549,4 +549,53 @@ func TestJSONDB_craftCompactedFileName(t *testing.T) {
 	require.Error(t, err)
 }
 
-// Add more tests as needed...
+func TestJSONDB_ReadStatusForDate(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-jsondb")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	logger := logger.Default
+	db := New(tmpDir, logger, true)
+
+	dagID := "test-dag"
+	date := time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC)
+
+	// Create some test data
+	for i := 0; i < 3; i++ {
+		requestID := fmt.Sprintf("request-id-%d", i)
+		timestamp := date.Add(time.Duration(i) * time.Hour)
+
+		err := db.Open(dagID, timestamp, requestID)
+		require.NoError(t, err)
+
+		status := &model.Status{
+			Name:      dagID,
+			RequestID: requestID,
+			StartedAt: timestamp.Format(time.RFC3339),
+			Status:    scheduler.StatusRunning,
+		}
+		err = db.Write(status)
+		require.NoError(t, err)
+
+		err = db.Close()
+		require.NoError(t, err)
+	}
+
+	// Test reading status for the date
+	statusFiles, err := db.ReadStatusForDate(dagID, date)
+	require.NoError(t, err)
+	assert.Len(t, statusFiles, 3)
+
+	// Check if status files are sorted by timestamp in descending order
+	for i := 0; i < len(statusFiles)-1; i++ {
+		t1, _ := time.Parse(time.RFC3339, statusFiles[i].Status.StartedAt)
+		t2, _ := time.Parse(time.RFC3339, statusFiles[i+1].Status.StartedAt)
+		assert.True(t, t1.After(t2))
+	}
+
+	// Test reading status for a date with no data
+	emptyDate := date.AddDate(0, 0, 1)
+	emptyStatusFiles, err := db.ReadStatusForDate(dagID, emptyDate)
+	require.NoError(t, err)
+	assert.Empty(t, emptyStatusFiles)
+}
