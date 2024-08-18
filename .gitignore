@@ -21,3 +21,6 @@ tmp/*
 
 # Directory for local development
 .local/
+
+# Coverage files
+coverage.*

@@ -279,6 +279,12 @@ func (n *Node) setup(logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	// Expand environment variables in the step
+	n.data.Step.Stdout = os.ExpandEnv(n.data.Step.Stdout)
+	n.data.Step.Stderr = os.ExpandEnv(n.data.Step.Stderr)
+	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
+
+	// Set the working directory if not set
 	n.data.State.StartedAt = time.Now()
 	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		util.ValidFilename(n.data.Step.Name),

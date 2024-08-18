@@ -91,8 +91,3 @@ export type WorkflowStatus = {
   Log: string;
   Params: string;
 };
-
-export type GetListTagsResponse = {
-  Tags: string[];
-  Errors: string[];
-};

@@ -71,7 +71,7 @@ func (f *dataStores) HistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
 		f.historyStore = jsondb.New(
-			f.dataDir, f.dags, f.latestStatusToday)
+			f.dataDir, f.latestStatusToday)
 	}
 	return f.historyStore
 }
