@@ -113,7 +113,7 @@ func (s *JSONDB) Close() error {
 		_ = s.writer.close()
 		s.writer = nil
 	}()
-	if err := s.Compact(s.writer.dagFile, s.writer.target); err != nil {
+	if err := s.Compact(s.writer.target); err != nil {
 		return err
 	}
 	s.cache.Invalidate(s.writer.target)
@@ -210,8 +210,11 @@ func (s *JSONDB) RemoveOld(dagFile string, retentionDays int) error {
 	return lastErr
 }
 
-func (s *JSONDB) Compact(_, original string) error {
+func (s *JSONDB) Compact(original string) error {
 	status, err := ParseFile(original)
+	if err == io.EOF {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
