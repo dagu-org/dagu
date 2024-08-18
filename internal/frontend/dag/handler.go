@@ -361,7 +361,7 @@ func (h *Handler) processSchedulerLogRequest(
 	var logFile string
 
 	if params.File != nil {
-		status, err := jsondb.ParseFile(*params.File)
+		status, err := jsondb.ParseStatusFile(*params.File)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
@@ -401,7 +401,7 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if params.File != nil {
-		s, err := jsondb.ParseFile(*params.File)
+		s, err := jsondb.ParseStatusFile(*params.File)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}

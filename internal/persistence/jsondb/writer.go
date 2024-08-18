@@ -17,7 +17,7 @@ package jsondb
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -26,19 +26,23 @@ import (
 	"github.com/daguflow/dagu/internal/util"
 )
 
-var (
-	ErrWriterClosed  = errors.New("writer is closed")
-	ErrWriterNotOpen = errors.New("writer is not open")
-)
-
 // writer manages writing status to a local file.
 type writer struct {
-	target  string
-	dagFile string
-	writer  *bufio.Writer
-	file    *os.File
-	mu      sync.Mutex
-	closed  bool
+	statusFile string
+	writer     *bufio.Writer
+	file       *os.File
+	mu         sync.Mutex
+	closed     bool
+}
+
+func newWriter(target string) (*writer, error) {
+	w := &writer{
+		statusFile: target,
+	}
+	if err := w.open(); err != nil {
+		return nil, err
+	}
+	return w, nil
 }
 
 // open opens the writer.
@@ -46,15 +50,11 @@ func (w *writer) open() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed {
-		return ErrWriterClosed
-	}
-
-	if err := os.MkdirAll(filepath.Dir(w.target), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(w.statusFile), 0755); err != nil {
 		return err
 	}
 
-	file, err := util.OpenOrCreateFile(w.target)
+	file, err := util.OpenOrCreateFile(w.statusFile)
 	if err != nil {
 		return err
 	}
@@ -66,16 +66,12 @@ func (w *writer) open() error {
 
 // write appends the status to the local file.
 func (w *writer) write(st *model.Status) error {
+	if w.writer == nil {
+		return fmt.Errorf("writer is not open")
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	if w.closed {
-		return ErrWriterClosed
-	}
-
-	if w.writer == nil {
-		return ErrWriterNotOpen
-	}
 
 	jsonb, err := json.Marshal(st)
 	if err != nil {

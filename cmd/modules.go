@@ -27,11 +27,12 @@ func newClient(cfg *config.Config, ds persistence.DataStores, lg logger.Logger) 
 	return client.New(ds, cfg.Executable, cfg.WorkDir, lg)
 }
 
-func newDataStores(cfg *config.Config) persistence.DataStores {
+func newDataStores(cfg *config.Config, logger logger.Logger) persistence.DataStores {
 	return dsclient.NewDataStores(
 		cfg.DAGs,
 		cfg.DataDir,
 		cfg.SuspendFlagsDir,
+		logger,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},

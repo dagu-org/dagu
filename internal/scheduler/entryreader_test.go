@@ -110,6 +110,7 @@ func setupTest(t *testing.T) (string, client.Client) {
 		cfg.DAGs,
 		cfg.DataDir,
 		cfg.SuspendFlagsDir,
+		logger.Default,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},

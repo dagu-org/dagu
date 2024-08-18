@@ -89,7 +89,7 @@ func startCmd() *cobra.Command {
 				Quiet:   quiet,
 			})
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, agentLogger)
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Info("Workflow execution initiated",

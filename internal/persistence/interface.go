@@ -16,6 +16,7 @@
 package persistence
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -28,6 +29,13 @@ var (
 	ErrRequestIDNotFound = fmt.Errorf("request id not found")
 	ErrNoStatusDataToday = fmt.Errorf("no status data today")
 	ErrNoStatusData      = fmt.Errorf("no status data")
+
+	// HistoryStore errors
+	ErrReqIDNotFound   = errors.New("request ID not found")
+	ErrCreateDir       = errors.New("failed to create new directory")
+	ErrConflict        = errors.New("conflict")
+	ErrFileIsCompacted = errors.New("file is already compacted")
+	ErrWriterOpen      = errors.New("writer is already open")
 )
 
 type DataStores interface {

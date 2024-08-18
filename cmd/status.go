@@ -46,7 +46,7 @@ func statusCmd() *cobra.Command {
 				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 
 			curStatus, err := cli.GetCurrentStatus(workflow)

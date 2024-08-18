@@ -82,7 +82,7 @@ func dryCmd() *cobra.Command {
 				LogFile: logFile,
 			})
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, agentLogger)
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agt := agent.New(

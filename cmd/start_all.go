@@ -51,7 +51,7 @@ func startAllCmd() *cobra.Command {
 			}
 
 			ctx := cmd.Context()
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 
 			go func() {

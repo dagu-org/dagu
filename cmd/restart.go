@@ -59,7 +59,7 @@ func restartCmd() *cobra.Command {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, initLogger)
 			cli := newClient(cfg, dataStore, initLogger)
 
 			if err := stopDAGIfRunning(cli, workflow, initLogger); err != nil {
@@ -119,6 +119,8 @@ func restartCmd() *cobra.Command {
 				"workflow", workflow.Name,
 				"requestID", requestID,
 				"logFile", logFile.Name())
+
+			dataStore = newDataStores(cfg, agentLogger)
 
 			agt := agent.New(
 				requestID,

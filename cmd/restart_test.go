@@ -76,7 +76,7 @@ func TestRestartCommand(t *testing.T) {
 		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		dataStore := newDataStores(setup.Config)
+		dataStore := newDataStores(setup.Config, logger.Default)
 		recentHistory := newClient(
 			setup.Config,
 			dataStore,

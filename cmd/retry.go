@@ -50,7 +50,7 @@ func retryCmd() *cobra.Command {
 			}
 
 			// Read the specified DAG execution status from the history store.
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, initLogger)
 			historyStore := dataStore.HistoryStore()
 
 			specFilePath := args[0]
@@ -104,6 +104,7 @@ func retryCmd() *cobra.Command {
 				LogFile: logFile,
 			})
 
+			dataStore = newDataStores(cfg, agentLogger)
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Info("Workflow retry initiated",

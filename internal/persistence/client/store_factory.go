@@ -18,6 +18,7 @@ package client
 import (
 	"os"
 
+	"github.com/daguflow/dagu/internal/logger"
 	"github.com/daguflow/dagu/internal/persistence"
 	"github.com/daguflow/dagu/internal/persistence/jsondb"
 	"github.com/daguflow/dagu/internal/persistence/local"
@@ -34,6 +35,7 @@ type dataStores struct {
 	dataDir           string
 	suspendFlagsDir   string
 	latestStatusToday bool
+	logger            logger.Logger
 }
 
 type DataStoreOptions struct {
@@ -44,6 +46,7 @@ func NewDataStores(
 	dags string,
 	dataDir string,
 	suspendFlagsDir string,
+	logger logger.Logger,
 	opts DataStoreOptions,
 ) persistence.DataStores {
 	dataStoreImpl := &dataStores{
@@ -51,6 +54,7 @@ func NewDataStores(
 		dataDir:           dataDir,
 		suspendFlagsDir:   suspendFlagsDir,
 		latestStatusToday: opts.LatestStatusToday,
+		logger:            logger,
 	}
 	_ = dataStoreImpl.InitDagDir()
 	return dataStoreImpl
@@ -71,7 +75,7 @@ func (f *dataStores) HistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
 		f.historyStore = jsondb.New(
-			f.dataDir, f.latestStatusToday)
+			f.dataDir, f.logger, f.latestStatusToday)
 	}
 	return f.historyStore
 }
