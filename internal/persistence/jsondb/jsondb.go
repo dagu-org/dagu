@@ -241,6 +241,10 @@ func (s *JSONDB) Rename(oldID, newID string) error {
 	on := util.AddYamlExtension(oldID)
 	nn := util.AddYamlExtension(newID)
 
+	if !filepath.IsAbs(on) || !filepath.IsAbs(nn) {
+		return fmt.Errorf("invalid path: %s -> %s", on, nn)
+	}
+
 	oldDir := s.getDirectory(on, prefix(on))
 	newDir := s.getDirectory(nn, prefix(nn))
 	if !s.exists(oldDir) {

@@ -48,10 +48,10 @@ func (te testEnv) cleanup() {
 	_ = os.RemoveAll(te.TmpDir)
 }
 
-func createTestDAG(name, location string) *dag.DAG {
+func createTestDAG(te testEnv, name, location string) *dag.DAG {
 	return &dag.DAG{
 		Name:     name,
-		Location: location,
+		Location: filepath.Join(te.TmpDir, location),
 	}
 }
 
@@ -71,7 +71,7 @@ func TestNewDataFile(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_new_data_file", "test_new_data_file.yaml")
+	d := createTestDAG(te, "test_new_data_file", "test_new_data_file.yaml")
 	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
 	requestID := "request-id-1"
 
@@ -92,7 +92,7 @@ func TestWriteAndFindFiles(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_read_status_n", "test_data_files_n.yaml")
+	d := createTestDAG(te, "test_read_status_n", "test_data_files_n.yaml")
 
 	testData := []struct {
 		Status    *model.Status
@@ -117,7 +117,7 @@ func TestWriteAndFindByRequestID(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_find_by_request_id", "test_find_by_request_id.yaml")
+	d := createTestDAG(te, "test_find_by_request_id", "test_find_by_request_id.yaml")
 
 	testData := []struct {
 		Status    *model.Status
@@ -151,7 +151,7 @@ func TestRemoveOldFiles(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_remove_old", "test_remove_old.yaml")
+	d := createTestDAG(te, "test_remove_old", "test_remove_old.yaml")
 
 	testData := []struct {
 		Status    *model.Status
@@ -184,7 +184,7 @@ func TestReadLatestStatus(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_read_latest_status", "test_config_status_reader.yaml")
+	d := createTestDAG(te, "test_read_latest_status", "test_config_status_reader.yaml")
 	requestID := "request-id-1"
 
 	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
@@ -210,7 +210,7 @@ func TestReadStatusN(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_read_status_n", "test_config_status_reader_hist.yaml")
+	d := createTestDAG(te, "test_read_status_n", "test_config_status_reader_hist.yaml")
 
 	testData := []struct {
 		Status    *model.Status
@@ -240,7 +240,7 @@ func TestCompactFile(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_compact_file", "test_compact_file.yaml")
+	d := createTestDAG(te, "test_compact_file", "test_compact_file.yaml")
 	requestID := "request-id-1"
 
 	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
@@ -399,7 +399,7 @@ func TestRename(t *testing.T) {
 
 	oldID := "old_dag"
 	newID := "new_dag"
-	d := createTestDAG(oldID, oldID+".yaml")
+	d := createTestDAG(te, oldID, oldID+".yaml")
 
 	// Create some test data
 	testData := []struct {
@@ -416,22 +416,27 @@ func TestRename(t *testing.T) {
 		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
 	}
 
+	oldPath := d.Location
+	newPath := filepath.Join(filepath.Dir(d.Location), newID+".yaml")
+
 	// Perform rename
-	err := te.JSONDB.Rename(oldID, newID)
+	err := te.JSONDB.Rename(d.Location, filepath.Join(filepath.Dir(d.Location), newID+".yaml"))
 	require.NoError(t, err)
 
 	// Check that old files are gone and new files exist
-	oldFiles, err := filepath.Glob(filepath.Join(te.TmpDir, "*", oldID+"*.dat"))
+	oldDir := te.JSONDB.getDirectory(oldPath, oldID)
+	oldFiles, err := filepath.Glob(filepath.Join(oldDir, "*"))
 	require.NoError(t, err)
 	require.Empty(t, oldFiles)
 
-	newFiles, err := filepath.Glob(filepath.Join(te.TmpDir, "*", newID+"*.dat"))
+	newDir := te.JSONDB.getDirectory(newPath, newID)
+	newFiles, err := filepath.Glob(filepath.Join(newDir, "*"))
 	require.NoError(t, err)
 	require.Len(t, newFiles, 2)
 
 	// Verify content of new files
 	d.Name = newID
-	d.Location = newID + ".yaml"
+	d.Location = newPath
 	statusFiles := te.JSONDB.ReadStatusRecent(d.Location, 2)
 	require.Len(t, statusFiles, 2)
 	for i, sf := range statusFiles {
@@ -455,7 +460,7 @@ func TestJSONDBOpen(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_open", "test_open.yaml")
+	d := createTestDAG(te, "test_open", "test_open.yaml")
 	requestID := "request-id-1"
 	now := time.Now()
 
@@ -471,7 +476,7 @@ func TestJSONDBWrite(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_write", "test_write.yaml")
+	d := createTestDAG(te, "test_write", "test_write.yaml")
 	requestID := "request-id-1"
 	now := time.Now()
 
@@ -495,7 +500,7 @@ func TestJSONDBUpdate(t *testing.T) {
 	te := setup(t)
 	defer te.cleanup()
 
-	d := createTestDAG("test_update", "test_update.yaml")
+	d := createTestDAG(te, "test_update", "test_update.yaml")
 	requestID := "request-id-1"
 	now := time.Now()
 

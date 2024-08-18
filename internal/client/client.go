@@ -93,11 +93,19 @@ func (e *client) Grep(pattern string) (
 
 func (e *client) Rename(oldID, newID string) error {
 	dagStore := e.dataStore.DAGStore()
+	oldDAG, err := dagStore.Find(oldID)
+	if err != nil {
+		return err
+	}
 	if err := dagStore.Rename(oldID, newID); err != nil {
 		return err
 	}
+	newDAG, err := dagStore.Find(newID)
+	if err != nil {
+		return err
+	}
 	historyStore := e.dataStore.HistoryStore()
-	return historyStore.Rename(oldID, newID)
+	return historyStore.Rename(oldDAG.Location, newDAG.Location)
 }
 
 func (e *client) Stop(workflow *dag.DAG) error {

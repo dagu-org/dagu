@@ -133,8 +133,10 @@ func TestWriterRename(t *testing.T) {
 	newName := "test_rename_new"
 	d := &dag.DAG{
 		Name:     oldName,
-		Location: oldName + ".yaml",
+		Location: filepath.Join(te.TmpDir, oldName+".yaml"),
 	}
+	oldPath := d.Location
+	newPath := filepath.Join(te.TmpDir, newName+".yaml")
 
 	// Create a file
 	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), "request-id-1")
@@ -144,19 +146,19 @@ func TestWriterRename(t *testing.T) {
 	require.NoError(t, dw.write(status))
 	require.NoError(t, dw.close())
 
-	oldDir := te.JSONDB.getDirectory(oldName+".yaml", prefix(oldName+".yaml"))
-	newDir := te.JSONDB.getDirectory(newName+".yaml", prefix(newName+".yaml"))
+	oldDir := te.JSONDB.getDirectory(oldPath, oldName)
+	newDir := te.JSONDB.getDirectory(newPath, newName)
 
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 
-	err = te.JSONDB.Rename(oldName, newName)
+	err = te.JSONDB.Rename(oldPath, newPath)
 	require.NoError(t, err)
 
 	require.NoDirExists(t, oldDir)
 	require.DirExists(t, newDir)
 
-	ret := te.JSONDB.ReadStatusRecent(newName+".yaml", 1)
+	ret := te.JSONDB.ReadStatusRecent(newPath, 1)
 	require.Len(t, ret, 1)
 	assert.Equal(t, status.RequestID, ret[0].Status.RequestID)
 }
