@@ -1,4 +1,4 @@
-.PHONY: run run-server run-server-https run-scheduler test lint build certs swagger
+.PHONY: run run-server run-server-https run-scheduler test test-coverage lint build certs swagger
 
 ##############################################################################
 # Arguments
@@ -119,6 +119,10 @@ test-coverage:
 	@echo "${COLOR_GREEN}Running tests with coverage...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@${LOCAL_BIN_DIR}/gotestsum ${GOTESTSUM_ARGS} -- ${GO_TEST_FLAGS} -coverprofile="coverage.txt" -covermode=atomic ./...
+
+# open-coverage opens the coverage file
+open-coverage:
+	@go tool cover -html=coverage.txt
 
 # lint runs the linter.
 lint: golangci-lint
