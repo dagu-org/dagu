@@ -18,8 +18,6 @@ import (
 	"bufio"
 	"sync"
 
-	// nolint: gosec
-
 	"fmt"
 	"io"
 	"log"
