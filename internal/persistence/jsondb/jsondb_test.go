@@ -549,7 +549,7 @@ func TestJSONDB_craftCompactedFileName(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestJSONDB_ReadStatusForDate(t *testing.T) {
+func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "test-jsondb")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
@@ -557,47 +557,84 @@ func TestJSONDB_ReadStatusForDate(t *testing.T) {
 	logger := logger.Default
 	db := New(tmpDir, logger, true)
 
-	dagID := "test-dag"
-	date := time.Date(2023, 5, 15, 0, 0, 0, 0, time.UTC)
+	// Use local timezone for the test
+	loc, err := time.LoadLocation("Local")
+	require.NoError(t, err)
+	date := time.Date(2023, 5, 15, 0, 0, 0, 0, loc)
 
-	// Create some test data
-	for i := 0; i < 3; i++ {
-		requestID := fmt.Sprintf("request-id-%d", i)
-		timestamp := date.Add(time.Duration(i) * time.Hour)
+	// Create test data for multiple DAGs
+	dags := []string{"dag1", "dag2", "dag3"}
+	totalEntries := 0
 
-		err := db.OpenEntry(dagID, timestamp, requestID)
-		require.NoError(t, err)
+	for _, dagID := range dags {
+		for i := 0; i < 3; i++ {
+			requestID := fmt.Sprintf("%s-request-id-%d", dagID, i)
+			timestamp := date.Add(time.Duration(i) * time.Hour)
 
-		status := &model.Status{
-			Name:      dagID,
-			RequestID: requestID,
-			StartedAt: timestamp.Format(time.RFC3339),
-			Status:    scheduler.StatusRunning,
+			err := db.OpenEntry(dagID, timestamp, requestID)
+			require.NoError(t, err)
+
+			status := &model.Status{
+				Name:      dagID,
+				RequestID: requestID,
+				StartedAt: timestamp.Format(time.RFC3339),
+				Status:    scheduler.StatusRunning,
+			}
+			err = db.WriteStatus(status)
+			require.NoError(t, err)
+
+			err = db.CloseEntry()
+			require.NoError(t, err)
+
+			totalEntries++
 		}
-		err = db.WriteStatus(status)
-		require.NoError(t, err)
-
-		err = db.CloseEntry()
-		require.NoError(t, err)
 	}
 
 	// Test reading status for the date
-	statusFiles, err := db.ListStatusesByDate(dagID, date)
+	statusFiles, err := db.ListStatusesByDate(date)
 	require.NoError(t, err)
-	assert.Len(t, statusFiles, 3)
+	assert.Len(t, statusFiles, totalEntries)
 
 	// Check if status files are sorted by timestamp in descending order
 	for i := 0; i < len(statusFiles)-1; i++ {
 		t1, _ := time.Parse(time.RFC3339, statusFiles[i].Status.StartedAt)
 		t2, _ := time.Parse(time.RFC3339, statusFiles[i+1].Status.StartedAt)
-		assert.True(t, t1.After(t2))
+		// equal is allowed since multiple statuses can have the same timestamp
+		assert.True(t, t1.Equal(t2) || t1.After(t2))
 	}
+
+	// Verify that statuses are from different DAGs
+	dagSet := make(map[string]bool)
+	for _, status := range statusFiles {
+		dagSet[status.Status.Name] = true
+	}
+	assert.Equal(t, len(dags), len(dagSet), "Statuses should be from all DAGs")
 
 	// Test reading status for a date with no data
 	emptyDate := date.AddDate(0, 0, 1)
-	emptyStatusFiles, err := db.ListStatusesByDate(dagID, emptyDate)
+	emptyStatusFiles, err := db.ListStatusesByDate(emptyDate)
 	require.NoError(t, err)
 	assert.Empty(t, emptyStatusFiles)
+
+	// Test reading status for a date at the edge of timezone change
+	edgeDate := time.Date(2023, 3, 26, 1, 30, 0, 0, loc) // A date near daylight saving time change
+	err = db.OpenEntry("edge-dag", edgeDate, "edge-request")
+	require.NoError(t, err)
+	edgeStatus := &model.Status{
+		Name:      "edge-dag",
+		RequestID: "edge-request",
+		StartedAt: edgeDate.Format(time.RFC3339),
+		Status:    scheduler.StatusRunning,
+	}
+	err = db.WriteStatus(edgeStatus)
+	require.NoError(t, err)
+	err = db.CloseEntry()
+	require.NoError(t, err)
+
+	edgeStatusFiles, err := db.ListStatusesByDate(edgeDate)
+	require.NoError(t, err)
+	assert.Len(t, edgeStatusFiles, 1)
+	assert.Equal(t, "edge-dag", edgeStatusFiles[0].Status.Name)
 }
 
 func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {

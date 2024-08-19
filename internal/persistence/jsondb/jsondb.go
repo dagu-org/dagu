@@ -590,32 +590,35 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 	return files[0], nil
 }
 
-// ListStatusesByDate retrieves all status files for a given DAG on a specific date.
-func (s *JSONDB) ListStatusesByDate(dagID string, date time.Time) ([]*model.StatusFile, error) {
-	indexDir := craftIndexDataDir(s.baseDir, dagID)
-	dateStr := date.Format(dateFormat)
-	pattern := filepath.Join(indexDir, dateStr+"*."+normalizedID(dagID)+".*.dat")
+// ListStatusesByDate retrieves all status files for a specific date across all DAGs, using local timezone.
+func (s *JSONDB) ListStatusesByDate(date time.Time) ([]*model.StatusFile, error) {
+	// Ensure the date is in the local timezone
+	localDate := date.Local()
 
-	indexFiles, err := filepath.Glob(pattern)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list index files: %w", err)
-	}
+	// Get the start and end of the day in local time
+	startOfDay := time.Date(localDate.Year(), localDate.Month(), localDate.Day(), 0, 0, 0, 0, time.Local)
+	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	var statusFiles []*model.StatusFile
-	for _, indexFile := range indexFiles {
-		statusFilePattern, err := indexFileToStatusFilePattern(s.baseDir, indexFile)
+	var result []*model.StatusFile
+
+	// Iterate through each hour of the day
+	for t := startOfDay; t.Before(endOfDay); t = t.Add(time.Hour) {
+		year, month, day := t.Date()
+		hour := t.Hour()
+
+		statusDir := filepath.Join(s.baseDir, "status",
+			fmt.Sprintf("%04d", year),
+			fmt.Sprintf("%02d", month),
+			fmt.Sprintf("%02d", day))
+
+		pattern := filepath.Join(statusDir, fmt.Sprintf("%04d%02d%02d.%02d*.dat", year, month, day, hour))
+		statusFiles, err := filepath.Glob(pattern)
 		if err != nil {
-			s.logger.Errorf("failed to convert index file to status file pattern: %v", err)
+			s.logger.Errorf("failed to list status files for %s: %v", t.Format("2006-01-02 15:04"), err)
 			continue
 		}
 
-		matches, err := filepath.Glob(statusFilePattern)
-		if err != nil {
-			s.logger.Errorf("failed to list status files: %v", err)
-			continue
-		}
-
-		for _, statusFile := range matches {
+		for _, statusFile := range statusFiles {
 			status, err := s.cache.LoadLatest(statusFile, func() (*model.Status, error) {
 				return ParseStatusFile(statusFile)
 			})
@@ -624,7 +627,17 @@ func (s *JSONDB) ListStatusesByDate(dagID string, date time.Time) ([]*model.Stat
 				continue
 			}
 
-			statusFiles = append(statusFiles, &model.StatusFile{
+			// Check if the status is within the desired day
+			statusTime, err := time.Parse(time.RFC3339, status.StartedAt)
+			if err != nil {
+				s.logger.Errorf("failed to parse status time %s: %v", status.StartedAt, err)
+				continue
+			}
+			if statusTime.Before(startOfDay) || statusTime.After(endOfDay) {
+				continue
+			}
+
+			result = append(result, &model.StatusFile{
 				File:   statusFile,
 				Status: status,
 			})
@@ -632,11 +645,11 @@ func (s *JSONDB) ListStatusesByDate(dagID string, date time.Time) ([]*model.Stat
 	}
 
 	// Sort status files by timestamp in descending order
-	sort.Slice(statusFiles, func(i, j int) bool {
-		return strings.Compare(statusFiles[i].Status.StartedAt, statusFiles[j].Status.StartedAt) > 0
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Status.StartedAt > result[j].Status.StartedAt
 	})
 
-	return statusFiles, nil
+	return result, nil
 }
 
 // pathExists checks if a given path exists.
