@@ -105,15 +105,15 @@ func TestClient_GetStatus(t *testing.T) {
 
 		historyStore := setup.DataStore().HistoryStore()
 
-		err = historyStore.Open(dagStatus.DAG.Location, now, requestID)
+		err = historyStore.OpenEntry(dagStatus.DAG.Location, now, requestID)
 		require.NoError(t, err)
 
 		status := testNewStatus(dagStatus.DAG, requestID,
 			scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
-		err = historyStore.Write(status)
+		err = historyStore.WriteStatus(status)
 		require.NoError(t, err)
-		_ = historyStore.Close()
+		_ = historyStore.CloseEntry()
 
 		time.Sleep(time.Millisecond * 100)
 

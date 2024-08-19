@@ -48,30 +48,30 @@ type DataStores interface {
 
 // HistoryStore interface defines methods for managing DAG execution history.
 type HistoryStore interface {
-	// Open initializes a new history entry for a DAG execution
-	Open(dagFile string, t time.Time, requestID string) error
-	// Write records a new status for the current DAG execution
-	Write(status *model.Status) error
-	// Close finalizes the current history entry
-	Close() error
-	// Update modifies an existing history entry
-	Update(dagFile, requestID string, st *model.Status) error
-	// ReadStatusRecent retrieves the n most recent status entries for a DAG
-	ReadStatusRecent(dagFile string, n int) []*model.StatusFile
-	// ReadStatusToday retrieves the latest status entry for today
-	ReadStatusToday(dagFile string) (*model.Status, error)
-	// ReadStatusForDate retrieves all status entries for a specific date
-	ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error)
+	// OpenEntry initializes a new history entry for a DAG execution
+	OpenEntry(dagFile string, t time.Time, requestID string) error
+	// WriteStatus records a new status for the current DAG execution
+	WriteStatus(status *model.Status) error
+	// CloseEntry finalizes the current history entry
+	CloseEntry() error
+	// UpdateStatus modifies an existing history entry
+	UpdateStatus(dagFile, requestID string, st *model.Status) error
+	// ListRecentStatuses retrieves the n most recent status entries for a DAG
+	ListRecentStatuses(dagFile string, n int) []*model.StatusFile
+	// GetTodayStatus retrieves the latest status entry for today
+	GetTodayStatus(dagFile string) (*model.Status, error)
+	// ListStatusesByDate retrieves all status entries for a specific date
+	ListStatusesByDate(dagID string, date time.Time) ([]*model.StatusFile, error)
 	// ListRecentStatusAllDAGs retrieves the n most recent status files across all DAGs.
 	ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error)
-	// FindByRequestID locates a specific history entry by its request ID
-	FindByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
-	// RemoveAll deletes all history entries for a DAG
-	RemoveAll(dagFile string) error
-	// RemoveOld deletes history entries older than the specified retention period
-	RemoveOld(dagFile string, retentionDays int) error
-	// Rename updates the DAG identifier in history entries
-	Rename(oldName, newName string) error
+	// GetStatusByRequestID locates a specific history entry by its request ID
+	GetStatusByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
+	// DeleteAllStatuses deletes all history entries for a DAG
+	DeleteAllStatuses(dagFile string) error
+	// DeleteOldStatuses deletes history entries older than the specified retention period
+	DeleteOldStatuses(dagFile string, retentionDays int) error
+	// RenameDAG updates the DAG identifier in history entries
+	RenameDAG(oldID, newID string) error
 }
 
 // DAGStore interface defines methods for managing DAG definitions and metadata.

@@ -105,7 +105,7 @@ func (e *client) Rename(oldID, newID string) error {
 		return err
 	}
 	historyStore := e.dataStore.HistoryStore()
-	return historyStore.Rename(oldDAG.Location, newDAG.Location)
+	return historyStore.RenameDAG(oldDAG.Location, newDAG.Location)
 }
 
 func (e *client) Stop(workflow *dag.DAG) error {
@@ -197,7 +197,7 @@ func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
 func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
 	*model.Status, error,
 ) {
-	ret, err := e.dataStore.HistoryStore().FindByRequestID(
+	ret, err := e.dataStore.HistoryStore().GetStatusByRequestID(
 		workflow.Location, requestID,
 	)
 	if err != nil {
@@ -225,7 +225,7 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().ReadStatusToday(workflow.Location)
+	status, err := e.dataStore.HistoryStore().GetTodayStatus(workflow.Location)
 	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
 		errors.Is(err, persistence.ErrNoStatusData) {
 		return model.NewStatusDefault(workflow), nil
@@ -238,7 +238,7 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 }
 
 func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStore.HistoryStore().ReadStatusRecent(workflow.Location, n)
+	return e.dataStore.HistoryStore().ListRecentStatuses(workflow.Location, n)
 }
 
 func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
@@ -255,7 +255,7 @@ func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStore.HistoryStore().Update(
+	return e.dataStore.HistoryStore().UpdateStatus(
 		workflow.Location, status.RequestID, status,
 	)
 }
@@ -266,7 +266,7 @@ func (e *client) UpdateDAG(id string, spec string) error {
 }
 
 func (e *client) DeleteDAG(name, loc string) error {
-	err := e.dataStore.HistoryStore().RemoveAll(loc)
+	err := e.dataStore.HistoryStore().DeleteAllStatuses(loc)
 	if err != nil {
 		return err
 	}

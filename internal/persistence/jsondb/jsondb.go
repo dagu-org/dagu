@@ -69,9 +69,9 @@ func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 	return s
 }
 
-// Update updates the status of a specific DAG execution.
-func (s *JSONDB) Update(dagID, reqID string, status *model.Status) error {
-	f, err := s.FindByRequestID(dagID, reqID)
+// UpdateStatus updates the status of a specific DAG execution.
+func (s *JSONDB) UpdateStatus(dagID, reqID string, status *model.Status) error {
+	f, err := s.GetStatusByRequestID(dagID, reqID)
 	if err != nil {
 		return err
 	}
@@ -89,8 +89,8 @@ func (s *JSONDB) Update(dagID, reqID string, status *model.Status) error {
 	return w.write(status)
 }
 
-// Open initializes a new writer for a DAG execution.
-func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
+// OpenEntry initializes a new writer for a DAG execution.
+func (s *JSONDB) OpenEntry(dagID string, t time.Time, requestID string) error {
 	if s.writer != nil {
 		return persistence.ErrWriterOpen
 	}
@@ -134,16 +134,16 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	return nil
 }
 
-// Write writes the current status to the active writer.
-func (s *JSONDB) Write(status *model.Status) error {
+// WriteStatus writes the current status to the active writer.
+func (s *JSONDB) WriteStatus(status *model.Status) error {
 	if err := s.writer.write(status); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
 	}
 	return nil
 }
 
-// Close finalizes the current writer and compacts the status file.
-func (s *JSONDB) Close() error {
+// CloseEntry finalizes the current writer and compacts the status file.
+func (s *JSONDB) CloseEntry() error {
 	s.writerLock.Lock()
 
 	if s.writer == nil {
@@ -174,8 +174,8 @@ func (s *JSONDB) Close() error {
 	return nil
 }
 
-// ReadStatusRecent retrieves the n most recent status files for a given DAG.
-func (s *JSONDB) ReadStatusRecent(dagID string, n int) []*model.StatusFile {
+// ListRecentStatuses retrieves the n most recent status files for a given DAG.
+func (s *JSONDB) ListRecentStatuses(dagID string, n int) []*model.StatusFile {
 	// Read the latest n status files for the given DAG.
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 
@@ -374,8 +374,8 @@ func listFilesSorted(path string, reverse bool) ([]string, error) {
 	return files, nil
 }
 
-// ReadStatusToday retrieves the latest status file for today for a given DAG.
-func (s *JSONDB) ReadStatusToday(dagID string) (*model.Status, error) {
+// GetTodayStatus retrieves the latest status file for today for a given DAG.
+func (s *JSONDB) GetTodayStatus(dagID string) (*model.Status, error) {
 	file, err := s.latestToday(dagID, time.Now(), s.latestStatusToday)
 	if err != nil {
 		return nil, err
@@ -386,8 +386,8 @@ func (s *JSONDB) ReadStatusToday(dagID string) (*model.Status, error) {
 	})
 }
 
-// FindByRequestID finds a status file by its request ID.
-func (s *JSONDB) FindByRequestID(dagID string, reqID string) (*model.StatusFile, error) {
+// GetStatusByRequestID finds a status file by its request ID.
+func (s *JSONDB) GetStatusByRequestID(dagID string, reqID string) (*model.StatusFile, error) {
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", persistence.ErrRequestIDNotFound)
 	}
@@ -431,13 +431,13 @@ func (s *JSONDB) FindByRequestID(dagID string, reqID string) (*model.StatusFile,
 	return nil, fmt.Errorf("%w: %s", persistence.ErrRequestIDNotFound, reqID)
 }
 
-// RemoveAll removes all status files for a given DAG.
-func (s *JSONDB) RemoveAll(dagID string) error {
-	return s.RemoveOld(dagID, 0)
+// DeleteAllStatuses removes all status files for a given DAG.
+func (s *JSONDB) DeleteAllStatuses(dagID string) error {
+	return s.DeleteOldStatuses(dagID, 0)
 }
 
-// RemoveOld removes status files older than the specified retention period.
-func (s *JSONDB) RemoveOld(dagID string, retentionDays int) error {
+// DeleteOldStatuses removes status files older than the specified retention period.
+func (s *JSONDB) DeleteOldStatuses(dagID string, retentionDays int) error {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	if retentionDays < 0 {
 		return nil
@@ -522,8 +522,8 @@ func (s *JSONDB) Compact(statusFile string) error {
 	return os.Remove(statusFile)
 }
 
-// Rename changes the ID of a DAG, effectively renaming its associated files.
-func (s *JSONDB) Rename(oldID, newID string) error {
+// RenameDAG changes the ID of a DAG, effectively renaming its associated files.
+func (s *JSONDB) RenameDAG(oldID, newID string) error {
 	if oldID == newID {
 		return nil
 	}
@@ -590,8 +590,8 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 	return files[0], nil
 }
 
-// ReadStatusForDate retrieves all status files for a given DAG on a specific date.
-func (s *JSONDB) ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error) {
+// ListStatusesByDate retrieves all status files for a given DAG on a specific date.
+func (s *JSONDB) ListStatusesByDate(dagID string, date time.Time) ([]*model.StatusFile, error) {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	dateStr := date.Format(dateFormat)
 	pattern := filepath.Join(indexDir, dateStr+"*."+normalizedID(dagID)+".*.dat")

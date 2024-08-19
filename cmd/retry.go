@@ -61,7 +61,7 @@ func retryCmd() *cobra.Command {
 					"file", specFilePath)
 			}
 
-			status, err := historyStore.FindByRequestID(absoluteFilePath, requestID)
+			status, err := historyStore.GetStatusByRequestID(absoluteFilePath, requestID)
 			if err != nil {
 				initLogger.Fatal("Historical execution retrieval failed",
 					"error", err,
