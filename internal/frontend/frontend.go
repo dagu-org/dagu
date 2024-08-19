@@ -18,7 +18,7 @@ package frontend
 import (
 	"github.com/daguflow/dagu/internal/client"
 	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend/dag"
+	"github.com/daguflow/dagu/internal/frontend/dags"
 	"github.com/daguflow/dagu/internal/frontend/server"
 	"github.com/daguflow/dagu/internal/logger"
 )
@@ -26,12 +26,10 @@ import (
 func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server {
 	var hs []server.Handler
 
-	hs = append(hs, dag.NewHandler(
-		&dag.NewHandlerArgs{
-			Client:             cli,
-			LogEncodingCharset: cfg.LogEncodingCharset,
-		},
-	))
+	hs = append(hs, dags.NewHandler(&dags.NewHandlerArgs{
+		Client:             cli,
+		LogEncodingCharset: cfg.LogEncodingCharset,
+	}))
 
 	serverParams := server.NewServerArgs{
 		Host:        cfg.Host,
