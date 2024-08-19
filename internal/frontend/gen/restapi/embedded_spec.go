@@ -281,6 +281,40 @@ func init() {
         }
       }
     },
+    "/history": {
+      "get": {
+        "description": "Returns a list of statuses.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "dags"
+        ],
+        "operationId": "listStatuses",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "date",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/historyResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "get": {
         "description": "Searches for DAGs.",
@@ -843,6 +877,20 @@ func init() {
         },
         "Success": {
           "$ref": "#/definitions/stepObject"
+        }
+      }
+    },
+    "historyResponse": {
+      "type": "object",
+      "required": [
+        "Statuses"
+      ],
+      "properties": {
+        "Statuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagStatus"
+          }
         }
       }
     },
@@ -1378,6 +1426,40 @@ func init() {
         }
       }
     },
+    "/history": {
+      "get": {
+        "description": "Returns a list of statuses.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "dags"
+        ],
+        "operationId": "listStatuses",
+        "parameters": [
+          {
+            "type": "string",
+            "name": "date",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/historyResponse"
+            }
+          },
+          "default": {
+            "description": "Generic error response.",
+            "schema": {
+              "$ref": "#/definitions/ApiError"
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "get": {
         "description": "Searches for DAGs.",
@@ -1940,6 +2022,20 @@ func init() {
         },
         "Success": {
           "$ref": "#/definitions/stepObject"
+        }
+      }
+    },
+    "historyResponse": {
+      "type": "object",
+      "required": [
+        "Statuses"
+      ],
+      "properties": {
+        "Statuses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagStatus"
+          }
         }
       }
     },

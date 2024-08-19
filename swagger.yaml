@@ -226,6 +226,28 @@ paths:
             $ref: "#/definitions/ApiError"
       tags:
         - dags
+  /history:
+    get:
+      description: Returns a list of statuses.
+      produces:
+        - application/json
+      operationId: listStatuses
+      parameters:
+        - name: date
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/historyResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
 
 definitions:
   ApiError:
@@ -238,6 +260,16 @@ definitions:
     required:
       - message
       - detailedMessage
+
+  historyResponse:
+    type: object
+    properties:
+      Statuses:
+        type: array
+        items:
+          $ref: "#/definitions/dagStatus"
+    required:
+      - Statuses
 
   listDagsResponse:
     type: object
