@@ -107,7 +107,7 @@ func TestJSONDB_WriteAndClose(t *testing.T) {
 	defer te.cleanup()
 
 	d := createTestDAG(te, "test_write", "test_write.yaml")
-	requestID := "request-id-1"
+	requestID := "req-1"
 	now := time.Now()
 
 	require.NoError(t, te.JSONDB.Open(d.Location, now, requestID))

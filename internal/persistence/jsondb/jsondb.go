@@ -556,9 +556,9 @@ func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool
 	// Search the today's status directory for the latest status file.
 	var pattern string
 	if latestStatusToday {
-		pattern = filepath.Join(indexDir, normalizedID(dagID)+"*"+day.Format(dateFormat)+"*.dat")
+		pattern = filepath.Join(indexDir, day.Format(dateFormat)+"*."+normalizedID(dagID)+"*.dat")
 	} else {
-		pattern = filepath.Join(indexDir, normalizedID(dagID)+"*.dat")
+		pattern = filepath.Join(indexDir, "*."+normalizedID(dagID)+"*.dat")
 	}
 
 	matches, err := filepath.Glob(pattern)
@@ -594,7 +594,7 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 func (s *JSONDB) ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error) {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	dateStr := date.Format(dateFormat)
-	pattern := filepath.Join(indexDir, normalizedID(dagID)+"*"+dateStr+"*.dat")
+	pattern := filepath.Join(indexDir, dateStr+"*."+normalizedID(dagID)+".*.dat")
 
 	indexFiles, err := filepath.Glob(pattern)
 	if err != nil {
@@ -738,10 +738,10 @@ func craftStatusDataDir(baseDir string, t time.Time) string {
 
 // craftStatusFile generates a filename for a status file.
 func craftStatusFile(dagID, requestID string, t time.Time) string {
-	// status file name format: <dagID>.<timestamp>.<requestID>.dat
+	// status file name format: <timestamp>.<dagID>.<requestID>.dat
 	return fmt.Sprintf("%s.%s.%s.dat",
-		normalizedID(dagID),
 		t.Format(dateTimeFormat),
+		normalizedID(dagID),
 		util.TruncString(requestID, requestIDLenSafe),
 	)
 }
@@ -762,7 +762,7 @@ func indexFileToStatusFilePattern(baseDir, indexFile string) (string, error) {
 }
 
 var (
-	indexFileRegExp = regexp.MustCompile(`(\d{4})(\d{2})(\d{2})\.\d{2}:\d{2}:\d{2}.\d{3}\.([^.]+)\.dat`)
+	indexFileRegExp = regexp.MustCompile(`^(\d{4})(\d{2})(\d{2})\.\d{2}:\d{2}:\d{2}.\d{3}\.([^.]+)\.([^.]+)\.dat`)
 )
 
 // indexFileInfo holds information parsed from an index file name.
@@ -776,8 +776,9 @@ type indexFileInfo struct {
 
 // parseIndexFile extracts information from an index file name.
 func parseIndexFile(indexFile string) (indexFileInfo, error) {
-	m := indexFileRegExp.FindStringSubmatch(indexFile)
-	if len(m) != 5 {
+	base := filepath.Base(indexFile)
+	m := indexFileRegExp.FindStringSubmatch(base)
+	if len(m) != 6 {
 		return indexFileInfo{}, fmt.Errorf("invalid index file: %s", indexFile)
 	}
 	return indexFileInfo{
@@ -785,7 +786,7 @@ func parseIndexFile(indexFile string) (indexFileInfo, error) {
 		year:     m[1],
 		month:    m[2],
 		date:     m[3],
-		reqID:    m[4],
+		reqID:    m[5],
 	}, nil
 }
 
