@@ -98,6 +98,8 @@ func (s *JSONDB) OpenEntry(dagID string, t time.Time, requestID string) error {
 	s.writerLock.Lock()
 	defer s.writerLock.Unlock()
 
+	t = t.UTC()
+
 	filename := craftStatusFile(dagID, requestID, t)
 
 	// Index file is used to index the status files by its filename.
@@ -376,7 +378,8 @@ func listFilesSorted(path string, reverse bool) ([]string, error) {
 
 // GetTodayStatus retrieves the latest status file for today for a given DAG.
 func (s *JSONDB) GetTodayStatus(dagID string) (*model.Status, error) {
-	file, err := s.latestToday(dagID, time.Now(), s.latestStatusToday)
+	// Use UTC time
+	file, err := s.latestToday(dagID, time.Now().UTC(), s.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}
@@ -553,10 +556,10 @@ func (s *JSONDB) RenameDAG(oldID, newID string) error {
 func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool) (string, error) {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 
-	// Search the today's status directory for the latest status file.
+	// Use UTC format
 	var pattern string
 	if latestStatusToday {
-		pattern = filepath.Join(indexDir, day.Format(dateFormat)+"*."+normalizedID(dagID)+"*.dat")
+		pattern = filepath.Join(indexDir, day.Format("20060102")+"*."+normalizedID(dagID)+"*.dat")
 	} else {
 		pattern = filepath.Join(indexDir, "*."+normalizedID(dagID)+"*.dat")
 	}
@@ -592,11 +595,11 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 
 // ListStatusesByDate retrieves all status files for a specific date across all DAGs, using local timezone.
 func (s *JSONDB) ListStatusesByDate(date time.Time) ([]*model.StatusFile, error) {
-	// Ensure the date is in the local timezone
-	localDate := date.Local()
+	// Ensure the date is in UTC
+	utcDate := date.UTC()
 
-	// Get the start and end of the day in local time
-	startOfDay := time.Date(localDate.Year(), localDate.Month(), localDate.Day(), 0, 0, 0, 0, time.Local)
+	// Get the start and end of the day in UTC
+	startOfDay := time.Date(utcDate.Year(), utcDate.Month(), utcDate.Day(), 0, 0, 0, 0, time.UTC)
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	var result []*model.StatusFile
@@ -627,12 +630,13 @@ func (s *JSONDB) ListStatusesByDate(date time.Time) ([]*model.StatusFile, error)
 				continue
 			}
 
-			// Check if the status is within the desired day
+			// Check if the status is within the desired day (in UTC)
 			statusTime, err := time.Parse(time.RFC3339, status.StartedAt)
 			if err != nil {
 				s.logger.Errorf("failed to parse status time %s: %v", status.StartedAt, err)
 				continue
 			}
+			statusTime = statusTime.UTC()
 			if statusTime.Before(startOfDay) || statusTime.After(endOfDay) {
 				continue
 			}
@@ -743,6 +747,8 @@ func craftIndexDataDir(baseDir string, dagID string) string {
 
 // craftStatusDataDir constructs the path to the status directory for a specific date.
 func craftStatusDataDir(baseDir string, t time.Time) string {
+	// Ensure time is in UTC
+	t = t.UTC()
 	year := t.Format("2006")
 	month := t.Format("01")
 	date := t.Format("02")
@@ -751,6 +757,8 @@ func craftStatusDataDir(baseDir string, t time.Time) string {
 
 // craftStatusFile generates a filename for a status file.
 func craftStatusFile(dagID, requestID string, t time.Time) string {
+	// Ensure time is in UTC
+	t = t.UTC()
 	// status file name format: <timestamp>.<dagID>.<requestID>.dat
 	return fmt.Sprintf("%s.%s.%s.dat",
 		t.Format(dateTimeFormat),

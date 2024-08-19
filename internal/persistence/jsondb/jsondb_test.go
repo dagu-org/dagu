@@ -523,7 +523,7 @@ func TestJSONDB_latestToday(t *testing.T) {
 	defer te.cleanup()
 
 	d := createTestDAG(te, "test_latest_today", "test_latest_today.yaml")
-	now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
+	now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Create multiple status entries for today
 	for i := 0; i < 3; i++ {
