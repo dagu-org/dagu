@@ -61,7 +61,7 @@ type HistoryStore interface {
 	// GetTodayStatus retrieves the latest status entry for today
 	GetTodayStatus(dagFile string) (*model.Status, error)
 	// ListStatusesByDate retrieves all status entries for a specific date
-	ListStatusesByDate(date time.Time) ([]*model.StatusFile, error)
+	ListStatusesByLocalDate(date time.Time) ([]*model.StatusFile, error)
 	// ListRecentStatusAllDAGs retrieves the n most recent status files across all DAGs.
 	ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error)
 	// GetStatusByRequestID locates a specific history entry by its request ID

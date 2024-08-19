@@ -568,7 +568,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 
 	for _, dagID := range dags {
 		for i := 0; i < 3; i++ {
-			requestID := fmt.Sprintf("%s-request-id-%d", dagID, i)
+			requestID := fmt.Sprintf("%s-req-%d", dagID, i)
 			timestamp := date.Add(time.Duration(i) * time.Hour)
 
 			err := db.OpenEntry(dagID, timestamp, requestID)
@@ -591,7 +591,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	}
 
 	// Test reading status for the date
-	statusFiles, err := db.ListStatusesByDate(date)
+	statusFiles, err := db.ListStatusesByLocalDate(date)
 	require.NoError(t, err)
 	assert.Len(t, statusFiles, totalEntries)
 
@@ -612,7 +612,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 
 	// Test reading status for a date with no data
 	emptyDate := date.AddDate(0, 0, 1)
-	emptyStatusFiles, err := db.ListStatusesByDate(emptyDate)
+	emptyStatusFiles, err := db.ListStatusesByLocalDate(emptyDate)
 	require.NoError(t, err)
 	assert.Empty(t, emptyStatusFiles)
 
@@ -631,7 +631,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	err = db.CloseEntry()
 	require.NoError(t, err)
 
-	edgeStatusFiles, err := db.ListStatusesByDate(edgeDate)
+	edgeStatusFiles, err := db.ListStatusesByLocalDate(edgeDate)
 	require.NoError(t, err)
 	assert.Len(t, edgeStatusFiles, 1)
 	assert.Equal(t, "edge-dag", edgeStatusFiles[0].Status.Name)

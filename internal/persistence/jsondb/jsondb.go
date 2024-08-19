@@ -263,9 +263,9 @@ func (s *JSONDB) ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error) {
 		})
 	}
 
-	// Sort results by StartedAt in descending order
+	// Sort results by file name
 	sort.Slice(results, func(i, j int) bool {
-		return results[i].Status.StartedAt > results[j].Status.StartedAt
+		return strings.Compare(results[i].File, results[j].File) > 0
 	})
 
 	// Trim to the requested number of results
@@ -593,19 +593,26 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 	return files[0], nil
 }
 
-// ListStatusesByDate retrieves all status files for a specific date across all DAGs, using local timezone.
-func (s *JSONDB) ListStatusesByDate(date time.Time) ([]*model.StatusFile, error) {
-	// Ensure the date is in UTC
-	utcDate := date.UTC()
+// ListStatusesByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
+func (s *JSONDB) ListStatusesByLocalDate(localDate time.Time) ([]*model.StatusFile, error) {
+	// Convert the start of the local date to UTC
+	utcStartOfDay := localDate.UTC()
 
-	// Get the start and end of the day in UTC
-	startOfDay := time.Date(utcDate.Year(), utcDate.Month(), utcDate.Day(), 0, 0, 0, 0, time.UTC)
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	// Set the time to 00:00:00
+	utcStartOfDay = time.Date(utcStartOfDay.Year(), utcStartOfDay.Month(), utcStartOfDay.Day(), 0, 0, 0, 0, time.UTC)
 
+	// Calculate the end of the day in UTC
+	utcEndOfDay := utcStartOfDay.Add(24 * time.Hour)
+
+	return s.listStatusInRange(utcStartOfDay, utcEndOfDay)
+}
+
+// listStatusInRange retrieves all status files for a specific date range.
+// The range is inclusive of the start time and exclusive of the end time.
+func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.StatusFile, error) {
 	var result []*model.StatusFile
 
-	// Iterate through each hour of the day
-	for t := startOfDay; t.Before(endOfDay); t = t.Add(time.Hour) {
+	for t := start; t.Before(end); t = t.Add(time.Hour) {
 		year, month, day := t.Date()
 		hour := t.Hour()
 
@@ -630,17 +637,6 @@ func (s *JSONDB) ListStatusesByDate(date time.Time) ([]*model.StatusFile, error)
 				continue
 			}
 
-			// Check if the status is within the desired day (in UTC)
-			statusTime, err := time.Parse(time.RFC3339, status.StartedAt)
-			if err != nil {
-				s.logger.Errorf("failed to parse status time %s: %v", status.StartedAt, err)
-				continue
-			}
-			statusTime = statusTime.UTC()
-			if statusTime.Before(startOfDay) || statusTime.After(endOfDay) {
-				continue
-			}
-
 			result = append(result, &model.StatusFile{
 				File:   statusFile,
 				Status: status,
@@ -648,9 +644,9 @@ func (s *JSONDB) ListStatusesByDate(date time.Time) ([]*model.StatusFile, error)
 		}
 	}
 
-	// Sort status files by timestamp in descending order
+	// Sort status files by file name
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].Status.StartedAt > result[j].Status.StartedAt
+		return strings.Compare(result[i].File, result[j].File) > 0
 	})
 
 	return result, nil
