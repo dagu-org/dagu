@@ -62,6 +62,8 @@ type HistoryStore interface {
 	ReadStatusToday(dagFile string) (*model.Status, error)
 	// ReadStatusForDate retrieves all status entries for a specific date
 	ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error)
+	// ListRecentStatusAllDAGs retrieves the n most recent status files across all DAGs.
+	ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error)
 	// FindByRequestID locates a specific history entry by its request ID
 	FindByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
 	// RemoveAll deletes all history entries for a DAG

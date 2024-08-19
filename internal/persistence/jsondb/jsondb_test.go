@@ -599,3 +599,58 @@ func TestJSONDB_ReadStatusForDate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, emptyStatusFiles)
 }
+
+func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {
+	te := setup(t)
+	defer te.cleanup()
+
+	// Create multiple DAGs with different statuses
+	dags := []struct {
+		name     string
+		location string
+	}{
+		{"dag1", "dag1.yaml"},
+		{"dag2", "dag2.yaml"},
+		{"dag3", "dag3.yaml"},
+	}
+
+	now := time.Now()
+
+	// Create test data
+	for i, d := range dags {
+		dag := createTestDAG(te, d.name, d.location)
+		for j := 0; j < 3; j++ {
+			tm := now.Add(-time.Duration(i*3+j) * time.Hour)
+			status := createTestStatus(dag, scheduler.Status(j), 10000+i*3+j)
+			status.RequestID = fmt.Sprintf("req-%d-%d", i, j)
+			status.StartedAt = tm.Format(time.RFC3339)
+			writeTestStatus(t, te.JSONDB, dag, status, tm)
+		}
+	}
+
+	// Test retrieving recent status across all DAGs
+	recentStatus, err := te.JSONDB.ListRecentStatusAllDAGs(5)
+	require.NoError(t, err)
+	assert.Len(t, recentStatus, 5)
+
+	// Verify the order and content of the results
+	for i := 0; i < len(recentStatus)-1; i++ {
+		// Check if the statuses are in descending order of start time
+		assert.True(t, recentStatus[i].Status.StartedAt > recentStatus[i+1].Status.StartedAt)
+	}
+
+	// Test with a larger number than available statuses
+	allStatus, err := te.JSONDB.ListRecentStatusAllDAGs(100)
+	require.NoError(t, err)
+	assert.Len(t, allStatus, 9) // 3 DAGs * 3 statuses each
+
+	// Test with zero
+	zeroStatus, err := te.JSONDB.ListRecentStatusAllDAGs(0)
+	require.NoError(t, err)
+	assert.Empty(t, zeroStatus)
+
+	// Test error case: non-existent directory
+	te.JSONDB.baseDir = "/non/existent/dir"
+	_, err = te.JSONDB.ListRecentStatusAllDAGs(5)
+	assert.Error(t, err)
+}

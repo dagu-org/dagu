@@ -53,7 +53,7 @@ type JSONDB struct {
 	writer            *writer                         // Current writer for active status updates
 	cache             *filecache.Cache[*model.Status] // Cache for storing parsed status files
 	latestStatusToday bool                            // Flag to determine if only today's latest status should be returned
-	mu                sync.Mutex                      // Mutex for synchronizing access to shared resources
+	writerLock        sync.Mutex                      // Mutex for synchronizing access to shared resources
 	logger            logger.Logger                   // Logger for recording events and errors
 }
 
@@ -95,8 +95,8 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 		return persistence.ErrWriterOpen
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.writerLock.Lock()
+	defer s.writerLock.Unlock()
 
 	filename := craftStatusFile(dagID, requestID, t)
 
@@ -144,10 +144,10 @@ func (s *JSONDB) Write(status *model.Status) error {
 
 // Close finalizes the current writer and compacts the status file.
 func (s *JSONDB) Close() error {
-	s.mu.Lock()
+	s.writerLock.Lock()
 
 	if s.writer == nil {
-		s.mu.Unlock()
+		s.writerLock.Unlock()
 		return nil
 	}
 
@@ -163,7 +163,7 @@ func (s *JSONDB) Close() error {
 			s.logger.Errorf("failed to close file %s: %v", s.writer.statusFile, err)
 		}
 		s.writer = nil
-		s.mu.Unlock()
+		s.writerLock.Unlock()
 	}()
 
 	// compact the file
@@ -231,6 +231,47 @@ func (s *JSONDB) ReadStatusRecent(dagID string, n int) []*model.StatusFile {
 	}
 
 	return ret
+}
+
+// ListRecentStatusAllDAGs retrieves the n most recent status files across all DAGs.
+func (s *JSONDB) ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error) {
+	statusDir := filepath.Join(s.baseDir, "status")
+
+	// List recent files from the status directory
+	recentFiles, err := s.listRecentFiles(statusDir, n)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list recent files: %w", err)
+	}
+
+	var results []*model.StatusFile
+
+	for _, file := range recentFiles {
+		// Parse the status file
+		status, err := s.cache.LoadLatest(file, func() (*model.Status, error) {
+			return ParseStatusFile(file)
+		})
+		if err != nil {
+			s.logger.Errorf("failed to parse file %s: %v", file, err)
+			continue
+		}
+
+		results = append(results, &model.StatusFile{
+			File:   file,
+			Status: status,
+		})
+	}
+
+	// Sort results by StartedAt in descending order
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Status.StartedAt > results[j].Status.StartedAt
+	})
+
+	// Trim to the requested number of results
+	if len(results) > n {
+		results = results[:n]
+	}
+
+	return results, nil
 }
 
 // listRecentFiles lists the most recent n status files in reverse chronological order.
