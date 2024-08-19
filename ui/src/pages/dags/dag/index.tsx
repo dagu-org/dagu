@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { GetDAGResponse } from '../../../models/api';
-import DAGSpecErrors from '../../../components/molecules/DAGSpecErrors';
 import DAGStatus from '../../../components/organizations/DAGStatus';
 import { DAGContext } from '../../../contexts/DAGContext';
 import DAGSpec from '../../../components/organizations/DAGSpec';
@@ -14,6 +13,7 @@ import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
 import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
 import useSWR from 'swr';
+import DAGErrorSnackBar from '../../../components/molecules/DAGErrorSnackBar';
 
 type Params = {
   name: string;
@@ -24,6 +24,7 @@ function DAGDetails() {
   const params = useParams<Params>();
   const appBarContext = React.useContext(AppBarContext);
   const { pathname } = useLocation();
+  const [open, setOpen] = React.useState(true);
 
   const baseUrl = useMemo(
     () => `/dags/${encodeURI(params.name!)}`,
@@ -46,6 +47,9 @@ function DAGDetails() {
   React.useEffect(() => {
     if (data) {
       appBarContext.setTitle(data.Title);
+    }
+    if (data && data.Errors.length > 0 && params.tab == 'spec') {
+      setOpen(true);
     }
   }, [data, appBarContext]);
 
@@ -103,7 +107,7 @@ function DAGDetails() {
             <LinkTab label="Spec" value={`${baseUrl}/spec`} />
             <LinkTab label="History" value={`${baseUrl}/history`} />
             {pathname == `${baseUrl}/log` ||
-            pathname == `${baseUrl}/scheduler-log` ? (
+              pathname == `${baseUrl}/scheduler-log` ? (
               <Tab label="Log" value={pathname} />
             ) : null}
           </Tabs>
@@ -113,7 +117,11 @@ function DAGDetails() {
         </Stack>
 
         <Box sx={{ mt: 2, mx: 4 }}>
-          <DAGSpecErrors errors={data.Errors} />
+          <DAGErrorSnackBar
+            open={open}
+            setOpen={setOpen}
+            errors={data.Errors}
+          />
         </Box>
 
         <Box sx={{ mx: 4, flex: 1 }}>
