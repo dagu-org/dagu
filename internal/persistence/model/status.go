@@ -77,23 +77,23 @@ func NewStatusDefault(workflow *dag.DAG) *Status {
 }
 
 func NewStatus(
-	workflow *dag.DAG,
+	dag *dag.DAG,
 	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
 	statusObj := &Status{
-		Name:       workflow.Name,
+		Name:       dag.Name,
 		Status:     status,
 		StatusText: status.String(),
 		PID:        PID(pid),
-		Nodes:      FromNodesOrSteps(nodes, workflow.Steps),
-		OnExit:     nodeOrNil(workflow.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(workflow.HandlerOn.Success),
-		OnFailure:  nodeOrNil(workflow.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(workflow.HandlerOn.Cancel),
-		Params:     Params(workflow.Params),
+		Nodes:      FromNodesOrSteps(nodes, dag.Steps),
+		OnExit:     nodeOrNil(dag.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(dag.HandlerOn.Success),
+		OnFailure:  nodeOrNil(dag.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(dag.HandlerOn.Cancel),
+		Params:     Params(dag.Params),
 	}
 	if startTime != nil {
 		statusObj.StartedAt = util.FormatTime(*startTime)
