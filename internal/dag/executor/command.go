@@ -43,7 +43,7 @@ func newCommand(ctx context.Context, step dag.Step) (Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("dagContext: %v\n", dagContext)
+
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
