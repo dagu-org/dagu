@@ -131,6 +131,16 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
+	dagContext, err := dag.GetContext(ctx)
+	if err != nil {
+		return err
+	}
+	// set node special log path environment variable
+	if err = os.Setenv(dag.GenGlobalStepLogEnvKey(n.id), n.data.State.Log); err != nil {
+		return err
+	}
+	dagContext.Envs = append(dagContext.Envs, fmt.Sprintf("%s=%s", constants.StepDaguExecutionLogPathKeySuffix, n.data.State.Log))
+	ctx = dag.WithDagContext(ctx, dagContext)
 	cmd, err := n.setupExec(ctx)
 	if err != nil {
 		return err
@@ -361,9 +371,6 @@ func (n *Node) setupLog() error {
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 	var err error
-	if err = os.Setenv(util.GenerateStepSpecialExecutionLogPathKey(n.id), n.data.State.Log); err != nil {
-		return err
-	}
 	n.logFile, err = util.OpenOrCreateFile(n.data.State.Log)
 	if err != nil {
 		n.data.State.Error = err
@@ -437,12 +444,11 @@ func (n *Node) init() {
 		return
 	}
 	n.id = getNextNodeID()
-	n.data.Step.NodeID = n.id
 
 	n.data.Step.CmdWithArgs = strings.ReplaceAll(
 		n.data.Step.CmdWithArgs,
 		constants.StepDaguExecutionLogPathKeySuffix,
-		util.GenerateStepSpecialExecutionLogPathKey(n.id),
+		dag.GenGlobalStepLogEnvKey(n.id),
 	)
 
 	if n.data.Step.Variables == nil {
