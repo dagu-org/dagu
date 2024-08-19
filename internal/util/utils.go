@@ -21,13 +21,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mattn/go-shellwords"
-
-	"github.com/daguflow/dagu/internal/constants"
 )
 
 var (
@@ -227,22 +224,4 @@ func AddYamlExtension(file string) string {
 		return strings.TrimSuffix(file, ext) + ".yaml"
 	}
 	return file
-}
-
-func GenerateStepSpecialExecutionLogPathKey(stepID int) string {
-	var (
-		keyBuilder = strings.Builder{}
-	)
-
-	keyBuilder.WriteString(constants.StepDaguExecutionLogPathKeyPrefix)
-
-	keyBuilder.WriteString("_")
-
-	keyBuilder.WriteString(strconv.Itoa(stepID))
-
-	keyBuilder.WriteString("_")
-
-	keyBuilder.WriteString(constants.StepDaguExecutionLogPathKeySuffix)
-
-	return keyBuilder.String()
 }
