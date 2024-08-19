@@ -18,6 +18,10 @@ package dag
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
+
+	"github.com/daguflow/dagu/internal/constants"
 )
 
 // Finder finds a DAG by name.
@@ -30,6 +34,7 @@ type Finder interface {
 type Context struct {
 	DAG    *DAG
 	Finder Finder
+	Envs   []string
 }
 
 // ctxKey is used as the key for storing the DAG in the context.
@@ -37,7 +42,7 @@ type ctxKey struct{}
 
 // NewContext creates a new context with the DAG and Finder.
 func NewContext(ctx context.Context, dag *DAG, finder Finder) context.Context {
-	return context.WithValue(ctx, ctxKey{}, Context{DAG: dag, Finder: finder})
+	return context.WithValue(ctx, ctxKey{}, Context{DAG: dag, Finder: finder, Envs: make([]string, 0)})
 }
 
 var (
@@ -52,4 +57,26 @@ func GetContext(ctx context.Context) (Context, error) {
 		return Context{}, errFailedCtxAssertion
 	}
 	return dagCtx, nil
+}
+
+func WithDagContext(ctx context.Context, dagContext Context) context.Context {
+	return context.WithValue(ctx, ctxKey{}, dagContext)
+}
+
+func GenGlobalStepLogEnvKey(stepID int) string {
+	var (
+		keyBuilder = strings.Builder{}
+	)
+
+	keyBuilder.WriteString(constants.StepDaguExecutionLogPathKeyPrefix)
+
+	keyBuilder.WriteString("_")
+
+	keyBuilder.WriteString(strconv.Itoa(stepID))
+
+	keyBuilder.WriteString("_")
+
+	keyBuilder.WriteString(constants.StepDaguExecutionLogPathKeySuffix)
+
+	return keyBuilder.String()
 }
