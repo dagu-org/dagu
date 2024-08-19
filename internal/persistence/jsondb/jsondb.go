@@ -47,17 +47,17 @@ const (
 	dateFormat       = "20060102"
 )
 
-// JSONDB manages DAGs status files in local storage.
+// JSONDB manages DAG status files in local storage.
 type JSONDB struct {
-	baseDir           string
-	writer            *writer
-	cache             *filecache.Cache[*model.Status]
-	latestStatusToday bool
-	mu                sync.Mutex
-	logger            logger.Logger
+	baseDir           string                          // Base directory for storing files
+	writer            *writer                         // Current writer for active status updates
+	cache             *filecache.Cache[*model.Status] // Cache for storing parsed status files
+	latestStatusToday bool                            // Flag to determine if only today's latest status should be returned
+	mu                sync.Mutex                      // Mutex for synchronizing access to shared resources
+	logger            logger.Logger                   // Logger for recording events and errors
 }
 
-// New creates a new JSONDB with default configuration.
+// New creates a new JSONDB instance with default configuration.
 func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 	s := &JSONDB{
 		baseDir:           baseDir,
@@ -69,6 +69,7 @@ func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 	return s
 }
 
+// Update updates the status of a specific DAG execution.
 func (s *JSONDB) Update(dagID, reqID string, status *model.Status) error {
 	f, err := s.FindByRequestID(dagID, reqID)
 	if err != nil {
@@ -88,6 +89,7 @@ func (s *JSONDB) Update(dagID, reqID string, status *model.Status) error {
 	return w.write(status)
 }
 
+// Open initializes a new writer for a DAG execution.
 func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	if s.writer != nil {
 		return persistence.ErrWriterOpen
@@ -132,6 +134,7 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	return nil
 }
 
+// Write writes the current status to the active writer.
 func (s *JSONDB) Write(status *model.Status) error {
 	if err := s.writer.write(status); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
@@ -139,6 +142,7 @@ func (s *JSONDB) Write(status *model.Status) error {
 	return nil
 }
 
+// Close finalizes the current writer and compacts the status file.
 func (s *JSONDB) Close() error {
 	s.mu.Lock()
 
@@ -170,6 +174,7 @@ func (s *JSONDB) Close() error {
 	return nil
 }
 
+// ReadStatusRecent retrieves the n most recent status files for a given DAG.
 func (s *JSONDB) ReadStatusRecent(dagID string, n int) []*model.StatusFile {
 	// Read the latest n status files for the given DAG.
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
@@ -228,7 +233,7 @@ func (s *JSONDB) ReadStatusRecent(dagID string, n int) []*model.StatusFile {
 	return ret
 }
 
-// listRecentFiles lists the most recent n status files
+// listRecentFiles lists the most recent n status files in reverse chronological order.
 func (s *JSONDB) listRecentFiles(path string, n int) ([]string, error) {
 	var allFiles []string
 
@@ -282,7 +287,7 @@ func (s *JSONDB) listRecentFiles(path string, n int) ([]string, error) {
 	return allFiles, nil
 }
 
-// listDirsSorted lists directories in the given path, optionally in reverse order
+// listDirsSorted lists directories in the given path, optionally in reverse order.
 func listDirsSorted(path string, reverse bool) ([]string, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -305,7 +310,7 @@ func listDirsSorted(path string, reverse bool) ([]string, error) {
 	return dirs, nil
 }
 
-// listFilesSorted lists files in the given path, optionally in reverse order
+// listFilesSorted lists files in the given path, optionally in reverse order.
 func listFilesSorted(path string, reverse bool) ([]string, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -328,6 +333,7 @@ func listFilesSorted(path string, reverse bool) ([]string, error) {
 	return files, nil
 }
 
+// ReadStatusToday retrieves the latest status file for today for a given DAG.
 func (s *JSONDB) ReadStatusToday(dagID string) (*model.Status, error) {
 	file, err := s.latestToday(dagID, time.Now(), s.latestStatusToday)
 	if err != nil {
@@ -339,6 +345,7 @@ func (s *JSONDB) ReadStatusToday(dagID string) (*model.Status, error) {
 	})
 }
 
+// FindByRequestID finds a status file by its request ID.
 func (s *JSONDB) FindByRequestID(dagID string, reqID string) (*model.StatusFile, error) {
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", persistence.ErrRequestIDNotFound)
@@ -383,10 +390,12 @@ func (s *JSONDB) FindByRequestID(dagID string, reqID string) (*model.StatusFile,
 	return nil, fmt.Errorf("%w: %s", persistence.ErrRequestIDNotFound, reqID)
 }
 
+// RemoveAll removes all status files for a given DAG.
 func (s *JSONDB) RemoveAll(dagID string) error {
 	return s.RemoveOld(dagID, 0)
 }
 
+// RemoveOld removes status files older than the specified retention period.
 func (s *JSONDB) RemoveOld(dagID string, retentionDays int) error {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	if retentionDays < 0 {
@@ -439,7 +448,7 @@ func (s *JSONDB) RemoveOld(dagID string, retentionDays int) error {
 	return lastErr
 }
 
-// Compact compacts the status files for the given DAG.
+// Compact compresses the status file by keeping only the latest status.
 func (s *JSONDB) Compact(statusFile string) error {
 	status, err := ParseStatusFile(statusFile)
 	if err == io.EOF {
@@ -472,6 +481,7 @@ func (s *JSONDB) Compact(statusFile string) error {
 	return os.Remove(statusFile)
 }
 
+// Rename changes the ID of a DAG, effectively renaming its associated files.
 func (s *JSONDB) Rename(oldID, newID string) error {
 	if oldID == newID {
 		return nil
@@ -498,6 +508,7 @@ func (s *JSONDB) Rename(oldID, newID string) error {
 	return nil
 }
 
+// latestToday finds the latest status file for today or the most recent day.
 func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool) (string, error) {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 
@@ -521,6 +532,7 @@ func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool
 	return s.indexFileToStatusFile(latestFiles[0])
 }
 
+// indexFileToStatusFile converts an index file path to its corresponding status file path.
 func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 	pattern, err := indexFileToStatusFilePattern(s.baseDir, indexFile)
 	if err != nil {
@@ -537,6 +549,7 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 	return files[0], nil
 }
 
+// ReadStatusForDate retrieves all status files for a given DAG on a specific date.
 func (s *JSONDB) ReadStatusForDate(dagID string, date time.Time) ([]*model.StatusFile, error) {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	dateStr := date.Format(dateFormat)
@@ -585,11 +598,13 @@ func (s *JSONDB) ReadStatusForDate(dagID string, date time.Time) ([]*model.Statu
 	return statusFiles, nil
 }
 
+// pathExists checks if a given path exists.
 func pathExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
 }
 
+// ParseStatusFile reads and parses a status file, returning the latest status.
 func ParseStatusFile(file string) (*model.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -622,6 +637,7 @@ func ParseStatusFile(file string) (*model.Status, error) {
 	}
 }
 
+// getLatestFiles returns the n most recent files from a given list.
 func getLatestFiles(files []string, n int) []string {
 	if len(files) == 0 {
 		return nil
@@ -630,6 +646,7 @@ func getLatestFiles(files []string, n int) []string {
 	return files[:min(n, len(files))]
 }
 
+// readLineFrom reads a line from a file starting at a specific offset.
 func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
 		return nil, err
@@ -653,6 +670,7 @@ const (
 	compactedFileSuffix = "_c.dat"
 )
 
+// craftCompactedFileName creates a filename for a compacted status file.
 func craftCompactedFileName(file string) (string, error) {
 	if strings.HasSuffix(file, compactedFileSuffix) {
 		return "", persistence.ErrFileIsCompacted
@@ -664,10 +682,12 @@ func craftCompactedFileName(file string) (string, error) {
 	), nil
 }
 
+// craftIndexDataDir constructs the path to the index directory for a DAG.
 func craftIndexDataDir(baseDir string, dagID string) string {
 	return filepath.Join(baseDir, "index", normalizedID(dagID))
 }
 
+// craftStatusDataDir constructs the path to the status directory for a specific date.
 func craftStatusDataDir(baseDir string, t time.Time) string {
 	year := t.Format("2006")
 	month := t.Format("01")
@@ -675,6 +695,7 @@ func craftStatusDataDir(baseDir string, t time.Time) string {
 	return filepath.Join(baseDir, "status", year, month, date)
 }
 
+// craftStatusFile generates a filename for a status file.
 func craftStatusFile(dagID, requestID string, t time.Time) string {
 	// status file name format: <dagID>.<timestamp>.<requestID>.dat
 	return fmt.Sprintf("%s.%s.%s.dat",
@@ -684,6 +705,7 @@ func craftStatusFile(dagID, requestID string, t time.Time) string {
 	)
 }
 
+// indexFileToStatusFilePattern converts an index file path to a pattern for finding corresponding status files.
 func indexFileToStatusFilePattern(baseDir, indexFile string) (string, error) {
 	indexFileInfo, err := parseIndexFile(indexFile)
 	if err != nil {
@@ -702,6 +724,7 @@ var (
 	indexFileRegExp = regexp.MustCompile(`(\d{4})(\d{2})(\d{2})\.\d{2}:\d{2}:\d{2}.\d{3}\.([^.]+)\.dat`)
 )
 
+// indexFileInfo holds information parsed from an index file name.
 type indexFileInfo struct {
 	filePath string
 	year     string
@@ -710,6 +733,7 @@ type indexFileInfo struct {
 	reqID    string
 }
 
+// parseIndexFile extracts information from an index file name.
 func parseIndexFile(indexFile string) (indexFileInfo, error) {
 	m := indexFileRegExp.FindStringSubmatch(indexFile)
 	if len(m) != 5 {
@@ -724,6 +748,7 @@ func parseIndexFile(indexFile string) (indexFileInfo, error) {
 	}, nil
 }
 
+// normalizedID creates a valid filename from a DAG ID.
 func normalizedID(dagID string) string {
 	return util.ValidFilename(
 		strings.TrimSuffix(filepath.Base(dagID), filepath.Ext(dagID)),
