@@ -468,7 +468,7 @@ func (a *Agent) setupGraphForRetry() error {
 func (a *Agent) setupDatabase() error {
 	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
-	if err := a.historyStore.DeleteOldStatuses(location, retentionDays); err != nil {
+	if err := a.historyStore.DeleteOld(location, retentionDays); err != nil {
 		a.logger.Error("History data cleanup failed", "error", err)
 	}
 

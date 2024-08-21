@@ -143,7 +143,7 @@ func testLastStatusEventual(
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		status := hs.ListRecentStatuses(dg, 1)
+		status := hs.ListRecent(dg, 1)
 		if len(status) < 1 {
 			return false
 		}

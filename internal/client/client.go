@@ -200,7 +200,7 @@ func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
 func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
 	*model.Status, error,
 ) {
-	ret, err := e.dataStore.HistoryStore().GetStatusByRequestID(
+	ret, err := e.dataStore.HistoryStore().GetByRequestID(
 		workflow.Location, requestID,
 	)
 	if err != nil {
@@ -228,7 +228,7 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().GetTodayStatus(workflow.Location)
+	status, err := e.dataStore.HistoryStore().GetLatest(workflow.Location)
 	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
 		errors.Is(err, persistence.ErrNoStatusData) {
 		return model.NewStatusDefault(workflow), nil
@@ -241,7 +241,7 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 }
 
 func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStore.HistoryStore().ListRecentStatuses(workflow.Location, n)
+	return e.dataStore.HistoryStore().ListRecent(workflow.Location, n)
 }
 
 func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
@@ -269,7 +269,7 @@ func (e *client) UpdateDAG(id string, spec string) error {
 }
 
 func (e *client) DeleteDAG(name, loc string) error {
-	err := e.dataStore.HistoryStore().DeleteAllStatuses(loc)
+	err := e.dataStore.HistoryStore().DeleteAll(loc)
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func (e *client) GetAllStatuses(date string) ([]*model.StatusFile, error) {
 	}
 
 	historyStore := e.dataStore.HistoryStore()
-	return historyStore.ListStatusesByLocalDate(d)
+	return historyStore.ListByLocalDate(d)
 }
 
 func (e *client) getDAG(name string) (*dag.DAG, error) {

@@ -71,7 +71,7 @@ func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 
 // UpdateStatus updates the status of a specific DAG execution.
 func (s *JSONDB) UpdateStatus(dagID, reqID string, status *model.Status) error {
-	f, err := s.GetStatusByRequestID(dagID, reqID)
+	f, err := s.GetByRequestID(dagID, reqID)
 	if err != nil {
 		return err
 	}
@@ -176,8 +176,8 @@ func (s *JSONDB) CloseEntry() error {
 	return nil
 }
 
-// ListRecentStatuses retrieves the n most recent status files for a given DAG.
-func (s *JSONDB) ListRecentStatuses(dagID string, n int) []*model.StatusFile {
+// ListRecent retrieves the n most recent status files for a given DAG.
+func (s *JSONDB) ListRecent(dagID string, n int) []*model.StatusFile {
 	// Read the latest n status files for the given DAG.
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 
@@ -235,8 +235,8 @@ func (s *JSONDB) ListRecentStatuses(dagID string, n int) []*model.StatusFile {
 	return ret
 }
 
-// ListRecentStatusAllDAGs retrieves the n most recent status files across all DAGs.
-func (s *JSONDB) ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error) {
+// ListRecentAll retrieves the n most recent status files across all DAGs.
+func (s *JSONDB) ListRecentAll(n int) ([]*model.StatusFile, error) {
 	statusDir := filepath.Join(s.baseDir, "status")
 
 	// List recent files from the status directory
@@ -376,8 +376,8 @@ func listFilesSorted(path string, reverse bool) ([]string, error) {
 	return files, nil
 }
 
-// GetTodayStatus retrieves the latest status file for today for a given DAG.
-func (s *JSONDB) GetTodayStatus(dagID string) (*model.Status, error) {
+// GetLatest retrieves the latest status file for today for a given DAG.
+func (s *JSONDB) GetLatest(dagID string) (*model.Status, error) {
 	// Use UTC time
 	file, err := s.latestToday(dagID, time.Now().UTC(), s.latestStatusToday)
 	if err != nil {
@@ -389,8 +389,8 @@ func (s *JSONDB) GetTodayStatus(dagID string) (*model.Status, error) {
 	})
 }
 
-// GetStatusByRequestID finds a status file by its request ID.
-func (s *JSONDB) GetStatusByRequestID(dagID string, reqID string) (*model.StatusFile, error) {
+// GetByRequestID finds a status file by its request ID.
+func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.StatusFile, error) {
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", persistence.ErrRequestIDNotFound)
 	}
@@ -434,13 +434,13 @@ func (s *JSONDB) GetStatusByRequestID(dagID string, reqID string) (*model.Status
 	return nil, fmt.Errorf("%w: %s", persistence.ErrRequestIDNotFound, reqID)
 }
 
-// DeleteAllStatuses removes all status files for a given DAG.
-func (s *JSONDB) DeleteAllStatuses(dagID string) error {
-	return s.DeleteOldStatuses(dagID, 0)
+// DeleteAll removes all status files for a given DAG.
+func (s *JSONDB) DeleteAll(dagID string) error {
+	return s.DeleteOld(dagID, 0)
 }
 
-// DeleteOldStatuses removes status files older than the specified retention period.
-func (s *JSONDB) DeleteOldStatuses(dagID string, retentionDays int) error {
+// DeleteOld removes status files older than the specified retention period.
+func (s *JSONDB) DeleteOld(dagID string, retentionDays int) error {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	if retentionDays < 0 {
 		return nil
@@ -593,8 +593,8 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 	return files[0], nil
 }
 
-// ListStatusesByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
-func (s *JSONDB) ListStatusesByLocalDate(localDate time.Time) ([]*model.StatusFile, error) {
+// ListByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
+func (s *JSONDB) ListByLocalDate(localDate time.Time) ([]*model.StatusFile, error) {
 	// Convert the start of the local date to UTC
 	utcStartOfDay := localDate.UTC()
 

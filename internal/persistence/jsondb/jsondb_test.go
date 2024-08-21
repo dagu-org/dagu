@@ -119,7 +119,7 @@ func TestJSONDB_WriteAndClose(t *testing.T) {
 	require.NoError(t, te.JSONDB.CloseEntry())
 
 	// Verify
-	statusFiles := te.JSONDB.ListRecentStatuses(d.Location, 1)
+	statusFiles := te.JSONDB.ListRecent(d.Location, 1)
 	require.Len(t, statusFiles, 1)
 	assert.Equal(t, status.RequestID, statusFiles[0].Status.RequestID)
 	assert.Equal(t, status.Status, statusFiles[0].Status.Status)
@@ -147,7 +147,7 @@ func TestJSONDB_ReadStatusRecent(t *testing.T) {
 		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
 	}
 
-	recentStatus := te.JSONDB.ListRecentStatuses(d.Location, 2)
+	recentStatus := te.JSONDB.ListRecent(d.Location, 2)
 	require.Len(t, recentStatus, 2)
 	assert.Equal(t, "request-id-3", recentStatus[0].Status.RequestID)
 	assert.Equal(t, "request-id-2", recentStatus[1].Status.RequestID)
@@ -175,13 +175,13 @@ func TestJSONDB_FindByRequestID(t *testing.T) {
 	}
 
 	t.Run("ExistingRequestID", func(t *testing.T) {
-		status, err := te.JSONDB.GetStatusByRequestID(d.Location, "request-id-2")
+		status, err := te.JSONDB.GetByRequestID(d.Location, "request-id-2")
 		require.NoError(t, err)
 		require.Equal(t, "request-id-2", status.Status.RequestID)
 	})
 
 	t.Run("NonExistentRequestID", func(t *testing.T) {
-		status, err := te.JSONDB.GetStatusByRequestID(d.Location, "request-id-10000")
+		status, err := te.JSONDB.GetByRequestID(d.Location, "request-id-10000")
 		require.Error(t, err)
 		require.Nil(t, status)
 	})
@@ -208,16 +208,16 @@ func TestJSONDB_RemoveOld(t *testing.T) {
 		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
 	}
 
-	files := te.JSONDB.ListRecentStatuses(d.Location, 3)
+	files := te.JSONDB.ListRecent(d.Location, 3)
 	require.Equal(t, 3, len(files))
 
 	// modify the timestamp of the first two files to be older than 1 day
 	require.NoError(t, os.Chtimes(files[0].File, time.Now().AddDate(0, 0, -2), time.Now().AddDate(0, 0, -2)))
 	require.NoError(t, os.Chtimes(files[1].File, time.Now().AddDate(0, 0, -1), time.Now().AddDate(0, 0, -1)))
 
-	require.NoError(t, te.JSONDB.DeleteOldStatuses(d.Location, 1))
+	require.NoError(t, te.JSONDB.DeleteOld(d.Location, 1))
 
-	files = te.JSONDB.ListRecentStatuses(d.Location, 3)
+	files = te.JSONDB.ListRecent(d.Location, 3)
 	require.Equal(t, 1, len(files))
 }
 
@@ -234,7 +234,7 @@ func TestJSONDB_ReadStatusToday(t *testing.T) {
 	writeTestStatus(t, te.JSONDB, d, status, now)
 
 	te.JSONDB.latestStatusToday = true
-	ret, err := te.JSONDB.GetTodayStatus(d.Location)
+	ret, err := te.JSONDB.GetLatest(d.Location)
 
 	require.NoError(t, err)
 	require.NotNil(t, ret)
@@ -260,7 +260,7 @@ func TestJSONDB_Update(t *testing.T) {
 	require.NoError(t, te.JSONDB.UpdateStatus(d.Location, requestID, updatedStatus))
 
 	// Verify
-	statusFiles := te.JSONDB.ListRecentStatuses(d.Location, 1)
+	statusFiles := te.JSONDB.ListRecent(d.Location, 1)
 	require.Len(t, statusFiles, 1)
 	assert.Equal(t, updatedStatus.RequestID, statusFiles[0].Status.RequestID)
 	assert.Equal(t, updatedStatus.Status, statusFiles[0].Status.Status)
@@ -283,11 +283,11 @@ func TestJSONDB_Compact(t *testing.T) {
 	status2.RequestID = requestID
 	require.NoError(t, te.JSONDB.UpdateStatus(d.Location, requestID, status2))
 
-	statusFiles := te.JSONDB.ListRecentStatuses(d.Location, 1)
+	statusFiles := te.JSONDB.ListRecent(d.Location, 1)
 	require.Len(t, statusFiles, 1)
 
 	// Verify compacted file
-	compactedFiles := te.JSONDB.ListRecentStatuses(d.Location, 1)
+	compactedFiles := te.JSONDB.ListRecent(d.Location, 1)
 	require.Len(t, compactedFiles, 1)
 	assert.True(t, strings.HasSuffix(compactedFiles[0].File, "_c.dat"))
 	assert.Equal(t, status2.Status, compactedFiles[0].Status.Status)
@@ -318,7 +318,7 @@ func TestJSONDB_Rename(t *testing.T) {
 	assert.DirExists(t, newIndexDir)
 
 	// Verify content of new files
-	statusFiles := te.JSONDB.ListRecentStatuses(newPath, 1)
+	statusFiles := te.JSONDB.ListRecent(newPath, 1)
 	require.Len(t, statusFiles, 1)
 	assert.Equal(t, status.RequestID, statusFiles[0].Status.RequestID)
 	assert.Equal(t, status.Status, statusFiles[0].Status.Status)
@@ -336,7 +336,7 @@ func TestParseStatusFile(t *testing.T) {
 	status.RequestID = requestID
 	writeTestStatus(t, te.JSONDB, d, status, now)
 
-	statusFiles := te.JSONDB.ListRecentStatuses(d.Location, 1)
+	statusFiles := te.JSONDB.ListRecent(d.Location, 1)
 	require.Len(t, statusFiles, 1)
 
 	parsedStatus, err := ParseStatusFile(statusFiles[0].File)
@@ -370,7 +370,7 @@ func TestJSONDB_ReadStatusToday_NoData(t *testing.T) {
 
 	d := createTestDAG(te, "test_no_data", "test_no_data.yaml")
 
-	_, err := te.JSONDB.GetTodayStatus(d.Location)
+	_, err := te.JSONDB.GetLatest(d.Location)
 	require.Error(t, err)
 }
 
@@ -380,7 +380,7 @@ func TestJSONDB_FindByRequestID_EmptyID(t *testing.T) {
 
 	d := createTestDAG(te, "test_empty_id", "test_empty_id.yaml")
 
-	_, err := te.JSONDB.GetStatusByRequestID(d.Location, "")
+	_, err := te.JSONDB.GetByRequestID(d.Location, "")
 	require.Error(t, err)
 }
 
@@ -405,12 +405,12 @@ func TestJSONDB_RemoveAll(t *testing.T) {
 		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
 	}
 
-	files := te.JSONDB.ListRecentStatuses(d.Location, 3)
+	files := te.JSONDB.ListRecent(d.Location, 3)
 	require.Equal(t, 3, len(files))
 
-	require.NoError(t, te.JSONDB.DeleteAllStatuses(d.Location))
+	require.NoError(t, te.JSONDB.DeleteAll(d.Location))
 
-	files = te.JSONDB.ListRecentStatuses(d.Location, 3)
+	files = te.JSONDB.ListRecent(d.Location, 3)
 	require.Empty(t, files)
 }
 
@@ -591,7 +591,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	}
 
 	// Test reading status for the date
-	statusFiles, err := db.ListStatusesByLocalDate(date)
+	statusFiles, err := db.ListByLocalDate(date)
 	require.NoError(t, err)
 	assert.Len(t, statusFiles, totalEntries)
 
@@ -612,7 +612,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 
 	// Test reading status for a date with no data
 	emptyDate := date.AddDate(0, 0, 1)
-	emptyStatusFiles, err := db.ListStatusesByLocalDate(emptyDate)
+	emptyStatusFiles, err := db.ListByLocalDate(emptyDate)
 	require.NoError(t, err)
 	assert.Empty(t, emptyStatusFiles)
 
@@ -631,7 +631,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	err = db.CloseEntry()
 	require.NoError(t, err)
 
-	edgeStatusFiles, err := db.ListStatusesByLocalDate(edgeDate)
+	edgeStatusFiles, err := db.ListByLocalDate(edgeDate)
 	require.NoError(t, err)
 	assert.Len(t, edgeStatusFiles, 1)
 	assert.Equal(t, "edge-dag", edgeStatusFiles[0].Status.Name)
@@ -666,7 +666,7 @@ func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {
 	}
 
 	// Test retrieving recent status across all DAGs
-	recentStatus, err := te.JSONDB.ListRecentStatusAllDAGs(5)
+	recentStatus, err := te.JSONDB.ListRecentAll(5)
 	require.NoError(t, err)
 	assert.Len(t, recentStatus, 5)
 
@@ -677,17 +677,17 @@ func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {
 	}
 
 	// Test with a larger number than available statuses
-	allStatus, err := te.JSONDB.ListRecentStatusAllDAGs(100)
+	allStatus, err := te.JSONDB.ListRecentAll(100)
 	require.NoError(t, err)
 	assert.Len(t, allStatus, 9) // 3 DAGs * 3 statuses each
 
 	// Test with zero
-	zeroStatus, err := te.JSONDB.ListRecentStatusAllDAGs(0)
+	zeroStatus, err := te.JSONDB.ListRecentAll(0)
 	require.NoError(t, err)
 	assert.Empty(t, zeroStatus)
 
 	// Test error case: non-existent directory
 	te.JSONDB.baseDir = "/non/existent/dir"
-	_, err = te.JSONDB.ListRecentStatusAllDAGs(5)
+	_, err = te.JSONDB.ListRecentAll(5)
 	assert.Error(t, err)
 }

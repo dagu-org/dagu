@@ -56,20 +56,20 @@ type HistoryStore interface {
 	CloseEntry() error
 	// UpdateStatus modifies an existing history entry
 	UpdateStatus(dagFile, requestID string, st *model.Status) error
-	// ListRecentStatuses retrieves the n most recent status entries for a DAG
-	ListRecentStatuses(dagFile string, n int) []*model.StatusFile
-	// GetTodayStatus retrieves the latest status entry for today
-	GetTodayStatus(dagFile string) (*model.Status, error)
+	// GetLatest retrieves the latest status entry for today
+	GetLatest(dagFile string) (*model.Status, error)
+	// GetByRequestID locates a specific history entry by its request ID
+	GetByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
+	// ListRecent retrieves the n most recent status entries for a DAG
+	ListRecent(dagFile string, n int) []*model.StatusFile
 	// ListStatusesByDate retrieves all status entries for a specific date
-	ListStatusesByLocalDate(date time.Time) ([]*model.StatusFile, error)
-	// ListRecentStatusAllDAGs retrieves the n most recent status files across all DAGs.
-	ListRecentStatusAllDAGs(n int) ([]*model.StatusFile, error)
-	// GetStatusByRequestID locates a specific history entry by its request ID
-	GetStatusByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
-	// DeleteAllStatuses deletes all history entries for a DAG
-	DeleteAllStatuses(dagFile string) error
-	// DeleteOldStatuses deletes history entries older than the specified retention period
-	DeleteOldStatuses(dagFile string, retentionDays int) error
+	ListByLocalDate(date time.Time) ([]*model.StatusFile, error)
+	// ListRecentAll retrieves the n most recent status files across all DAGs.
+	ListRecentAll(n int) ([]*model.StatusFile, error)
+	// DeleteAll deletes all history entries for a DAG
+	DeleteAll(dagFile string) error
+	// DeleteOld deletes history entries older than the specified retention period
+	DeleteOld(dagFile string, retentionDays int) error
 	// RenameDAG updates the DAG identifier in history entries
 	RenameDAG(oldID, newID string) error
 }
