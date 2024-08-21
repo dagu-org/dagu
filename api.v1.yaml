@@ -231,7 +231,7 @@ paths:
       description: Returns a list of statuses.
       produces:
         - application/json
-      operationId: listStatuses
+      operationId: listHistory
       parameters:
         - name: date
           in: query
@@ -241,7 +241,7 @@ paths:
         "200":
           description: A successful response.
           schema:
-            $ref: "#/definitions/historyResponse"
+            $ref: "#/definitions/listHistoryResponse"
         default:
           description: Generic error response.
           schema:
@@ -261,15 +261,15 @@ definitions:
       - message
       - detailedMessage
 
-  historyResponse:
+  listHistoryResponse:
     type: object
     properties:
-      Statuses:
+      History:
         type: array
         items:
           $ref: "#/definitions/dagStatus"
     required:
-      - Statuses
+      - History
 
   listDagsResponse:
     type: object

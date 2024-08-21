@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/scheduler"
@@ -33,6 +34,8 @@ import (
 	"github.com/daguflow/dagu/internal/persistence/model"
 	"github.com/daguflow/dagu/internal/sock"
 )
+
+var _ Client = (*client)(nil)
 
 // New creates a new Client instance.
 // The Client is used to interact with the DAG.
@@ -330,6 +333,16 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 		PageCount: e.getPageCount(int64(dagListPaginationResult.Count), params.Limit),
 		ErrorList: dagListPaginationResult.ErrorList,
 	}, nil
+}
+
+func (e *client) GetAllStatuses(date string) ([]*model.StatusFile, error) {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, err
+	}
+
+	historyStore := e.dataStore.HistoryStore()
+	return historyStore.ListStatusesByLocalDate(d)
 }
 
 func (e *client) getDAG(name string) (*dag.DAG, error) {

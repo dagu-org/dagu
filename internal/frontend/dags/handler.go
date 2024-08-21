@@ -143,6 +143,16 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			}
 			return dags.NewListTagsOK().WithPayload(tags)
 		})
+
+	api.DagsListHistoryHandler = dags.ListHistoryHandlerFunc(
+		func(lsp dags.ListHistoryParams) middleware.Responder {
+			statuses, err := h.listHistory(lsp)
+			if err != nil {
+				return dags.NewListHistoryDefault(err.Code).
+					WithPayload(err.APIError)
+			}
+			return dags.NewListHistoryOK().WithPayload(statuses)
+		})
 }
 
 func (h *Handler) createDAG(
@@ -786,5 +796,28 @@ func (h *Handler) getTagList(_ dags.ListTagsParams) (*models.ListTagResponse, *c
 	return &models.ListTagResponse{
 		Errors: errs,
 		Tags:   tags,
+	}, nil
+}
+
+func (h *Handler) listHistory(params dags.ListHistoryParams) (*models.ListHistoryResponse, *codedError) {
+	statuses, err := h.client.GetAllStatuses(params.Date)
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+	var history []*models.DagStatus
+	for _, s := range statuses {
+		history = append(history, &models.DagStatus{
+			FinishedAt: &s.Status.FinishedAt,
+			Log:        &s.Status.Log,
+			Name:       &s.Status.Name,
+			Params:     &s.Status.Params,
+			RequestID:  &s.Status.RequestID,
+			StartedAt:  &s.Status.StartedAt,
+			Status:     swag.Int64(int64(s.Status.Status)),
+			StatusText: &s.Status.StatusText,
+		})
+	}
+	return &models.ListHistoryResponse{
+		History: history,
 	}, nil
 }

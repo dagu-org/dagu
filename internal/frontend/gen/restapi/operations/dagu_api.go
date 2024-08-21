@@ -56,8 +56,8 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		DagsListDagsHandler: dags.ListDagsHandlerFunc(func(params dags.ListDagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.ListDags has not yet been implemented")
 		}),
-		DagsListStatusesHandler: dags.ListStatusesHandlerFunc(func(params dags.ListStatusesParams) middleware.Responder {
-			return middleware.NotImplemented("operation dags.ListStatuses has not yet been implemented")
+		DagsListHistoryHandler: dags.ListHistoryHandlerFunc(func(params dags.ListHistoryParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.ListHistory has not yet been implemented")
 		}),
 		DagsListTagsHandler: dags.ListTagsHandlerFunc(func(params dags.ListTagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.ListTags has not yet been implemented")
@@ -115,8 +115,8 @@ type DaguAPI struct {
 	DagsGetDagDetailsHandler dags.GetDagDetailsHandler
 	// DagsListDagsHandler sets the operation handler for the list dags operation
 	DagsListDagsHandler dags.ListDagsHandler
-	// DagsListStatusesHandler sets the operation handler for the list statuses operation
-	DagsListStatusesHandler dags.ListStatusesHandler
+	// DagsListHistoryHandler sets the operation handler for the list history operation
+	DagsListHistoryHandler dags.ListHistoryHandler
 	// DagsListTagsHandler sets the operation handler for the list tags operation
 	DagsListTagsHandler dags.ListTagsHandler
 	// DagsPostDagActionHandler sets the operation handler for the post dag action operation
@@ -212,8 +212,8 @@ func (o *DaguAPI) Validate() error {
 	if o.DagsListDagsHandler == nil {
 		unregistered = append(unregistered, "dags.ListDagsHandler")
 	}
-	if o.DagsListStatusesHandler == nil {
-		unregistered = append(unregistered, "dags.ListStatusesHandler")
+	if o.DagsListHistoryHandler == nil {
+		unregistered = append(unregistered, "dags.ListHistoryHandler")
 	}
 	if o.DagsListTagsHandler == nil {
 		unregistered = append(unregistered, "dags.ListTagsHandler")
@@ -331,7 +331,7 @@ func (o *DaguAPI) initHandlerCache() {
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
-	o.handlers["GET"]["/history"] = dags.NewListStatuses(o.context, o.DagsListStatusesHandler)
+	o.handlers["GET"]["/history"] = dags.NewListHistory(o.context, o.DagsListHistoryHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}

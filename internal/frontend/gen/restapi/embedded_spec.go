@@ -290,7 +290,7 @@ func init() {
         "tags": [
           "dags"
         ],
-        "operationId": "listStatuses",
+        "operationId": "listHistory",
         "parameters": [
           {
             "type": "string",
@@ -303,7 +303,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/historyResponse"
+              "$ref": "#/definitions/listHistoryResponse"
             }
           },
           "default": {
@@ -880,20 +880,6 @@ func init() {
         }
       }
     },
-    "historyResponse": {
-      "type": "object",
-      "required": [
-        "Statuses"
-      ],
-      "properties": {
-        "Statuses": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/dagStatus"
-          }
-        }
-      }
-    },
     "listDagsResponse": {
       "type": "object",
       "required": [
@@ -920,6 +906,20 @@ func init() {
         },
         "PageCount": {
           "type": "integer"
+        }
+      }
+    },
+    "listHistoryResponse": {
+      "type": "object",
+      "required": [
+        "History"
+      ],
+      "properties": {
+        "History": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagStatus"
+          }
         }
       }
     },
@@ -1435,7 +1435,7 @@ func init() {
         "tags": [
           "dags"
         ],
-        "operationId": "listStatuses",
+        "operationId": "listHistory",
         "parameters": [
           {
             "type": "string",
@@ -1448,7 +1448,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/historyResponse"
+              "$ref": "#/definitions/listHistoryResponse"
             }
           },
           "default": {
@@ -2025,20 +2025,6 @@ func init() {
         }
       }
     },
-    "historyResponse": {
-      "type": "object",
-      "required": [
-        "Statuses"
-      ],
-      "properties": {
-        "Statuses": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/dagStatus"
-          }
-        }
-      }
-    },
     "listDagsResponse": {
       "type": "object",
       "required": [
@@ -2065,6 +2051,20 @@ func init() {
         },
         "PageCount": {
           "type": "integer"
+        }
+      }
+    },
+    "listHistoryResponse": {
+      "type": "object",
+      "required": [
+        "History"
+      ],
+      "properties": {
+        "History": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/dagStatus"
+          }
         }
       }
     },

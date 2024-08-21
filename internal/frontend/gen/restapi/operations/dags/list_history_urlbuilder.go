@@ -11,8 +11,8 @@ import (
 	golangswaggerpaths "path"
 )
 
-// ListStatusesURL generates an URL for the list statuses operation
-type ListStatusesURL struct {
+// ListHistoryURL generates an URL for the list history operation
+type ListHistoryURL struct {
 	Date string
 
 	_basePath string
@@ -23,7 +23,7 @@ type ListStatusesURL struct {
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *ListStatusesURL) WithBasePath(bp string) *ListStatusesURL {
+func (o *ListHistoryURL) WithBasePath(bp string) *ListHistoryURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -31,12 +31,12 @@ func (o *ListStatusesURL) WithBasePath(bp string) *ListStatusesURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *ListStatusesURL) SetBasePath(bp string) {
+func (o *ListHistoryURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *ListStatusesURL) Build() (*url.URL, error) {
+func (o *ListHistoryURL) Build() (*url.URL, error) {
 	var _result url.URL
 
 	var _path = "/history"
@@ -60,7 +60,7 @@ func (o *ListStatusesURL) Build() (*url.URL, error) {
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *ListStatusesURL) Must(u *url.URL, err error) *url.URL {
+func (o *ListHistoryURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -71,17 +71,17 @@ func (o *ListStatusesURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *ListStatusesURL) String() string {
+func (o *ListHistoryURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *ListStatusesURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *ListHistoryURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on ListStatusesURL")
+		return nil, errors.New("scheme is required for a full url on ListHistoryURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on ListStatusesURL")
+		return nil, errors.New("host is required for a full url on ListHistoryURL")
 	}
 
 	base, err := o.Build()
@@ -95,6 +95,6 @@ func (o *ListStatusesURL) BuildFull(scheme, host string) (*url.URL, error) {
 }
 
 // StringFull returns the string representation of a complete url
-func (o *ListStatusesURL) StringFull(scheme, host string) string {
+func (o *ListHistoryURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

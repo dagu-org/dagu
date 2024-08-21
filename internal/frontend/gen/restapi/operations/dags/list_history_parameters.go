@@ -15,19 +15,19 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// NewListStatusesParams creates a new ListStatusesParams object
+// NewListHistoryParams creates a new ListHistoryParams object
 //
 // There are no default values defined in the spec.
-func NewListStatusesParams() ListStatusesParams {
+func NewListHistoryParams() ListHistoryParams {
 
-	return ListStatusesParams{}
+	return ListHistoryParams{}
 }
 
-// ListStatusesParams contains all the bound params for the list statuses operation
+// ListHistoryParams contains all the bound params for the list history operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters listStatuses
-type ListStatusesParams struct {
+// swagger:parameters listHistory
+type ListHistoryParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
@@ -42,8 +42,8 @@ type ListStatusesParams struct {
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewListStatusesParams() beforehand.
-func (o *ListStatusesParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewListHistoryParams() beforehand.
+func (o *ListHistoryParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
@@ -61,7 +61,7 @@ func (o *ListStatusesParams) BindRequest(r *http.Request, route *middleware.Matc
 }
 
 // bindDate binds and validates parameter Date from query.
-func (o *ListStatusesParams) bindDate(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *ListHistoryParams) bindDate(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	if !hasKey {
 		return errors.Required("date", "query", rawData)
 	}

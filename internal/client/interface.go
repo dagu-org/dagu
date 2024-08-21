@@ -43,6 +43,7 @@ type Client interface {
 	DeleteDAG(id, loc string) error
 	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
 	GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
+	GetAllStatuses(date string) ([]*model.StatusFile, error)
 	GetStatus(dagLocation string) (*DAGStatus, error)
 	IsSuspended(id string) bool
 	ToggleSuspend(id string, suspend bool) error
