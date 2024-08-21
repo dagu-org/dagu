@@ -89,8 +89,8 @@ func (s *JSONDB) UpdateStatus(dagID, reqID string, status *model.Status) error {
 	return w.write(status)
 }
 
-// OpenEntry initializes a new writer for a DAG execution.
-func (s *JSONDB) OpenEntry(dagID string, t time.Time, requestID string) error {
+// Open initializes a new writer for a DAG execution.
+func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	if s.writer != nil {
 		return persistence.ErrWriterOpen
 	}
@@ -136,16 +136,16 @@ func (s *JSONDB) OpenEntry(dagID string, t time.Time, requestID string) error {
 	return nil
 }
 
-// WriteStatus writes the current status to the active writer.
-func (s *JSONDB) WriteStatus(status *model.Status) error {
+// Write writes the current status to the active writer.
+func (s *JSONDB) Write(status *model.Status) error {
 	if err := s.writer.write(status); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
 	}
 	return nil
 }
 
-// CloseEntry finalizes the current writer and compacts the status file.
-func (s *JSONDB) CloseEntry() error {
+// Close finalizes the current writer and compacts the status file.
+func (s *JSONDB) Close() error {
 	s.writerLock.Lock()
 
 	if s.writer == nil {

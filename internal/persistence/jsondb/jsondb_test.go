@@ -61,9 +61,9 @@ func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *model.Statu
 }
 
 func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *model.Status, tm time.Time) {
-	require.NoError(t, db.OpenEntry(d.Location, tm, status.RequestID))
-	require.NoError(t, db.WriteStatus(status))
-	require.NoError(t, db.CloseEntry())
+	require.NoError(t, db.Open(d.Location, tm, status.RequestID))
+	require.NoError(t, db.Write(status))
+	require.NoError(t, db.Close())
 }
 
 func TestNewJSONDB(t *testing.T) {
@@ -88,7 +88,7 @@ func TestJSONDB_Open(t *testing.T) {
 	requestID := "request-id-1"
 	now := time.Now()
 
-	err := te.JSONDB.OpenEntry(d.Location, now, requestID)
+	err := te.JSONDB.Open(d.Location, now, requestID)
 	require.NoError(t, err)
 
 	// Verify that index and status files were created
@@ -99,7 +99,7 @@ func TestJSONDB_Open(t *testing.T) {
 	assert.DirExists(t, statusDir)
 
 	// Clean up
-	require.NoError(t, te.JSONDB.CloseEntry())
+	require.NoError(t, te.JSONDB.Close())
 }
 
 func TestJSONDB_WriteAndClose(t *testing.T) {
@@ -110,13 +110,13 @@ func TestJSONDB_WriteAndClose(t *testing.T) {
 	requestID := "req-1"
 	now := time.Now()
 
-	require.NoError(t, te.JSONDB.OpenEntry(d.Location, now, requestID))
+	require.NoError(t, te.JSONDB.Open(d.Location, now, requestID))
 
 	status := createTestStatus(d, scheduler.StatusRunning, 12345)
-	require.NoError(t, te.JSONDB.WriteStatus(status))
+	require.NoError(t, te.JSONDB.Write(status))
 
 	// Clean up
-	require.NoError(t, te.JSONDB.CloseEntry())
+	require.NoError(t, te.JSONDB.Close())
 
 	// Verify
 	statusFiles := te.JSONDB.ListRecent(d.Location, 1)
@@ -571,7 +571,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 			requestID := fmt.Sprintf("%s-req-%d", dagID, i)
 			timestamp := date.Add(time.Duration(i) * time.Hour)
 
-			err := db.OpenEntry(dagID, timestamp, requestID)
+			err := db.Open(dagID, timestamp, requestID)
 			require.NoError(t, err)
 
 			status := &model.Status{
@@ -580,10 +580,10 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 				StartedAt: timestamp.Format(time.RFC3339),
 				Status:    scheduler.StatusRunning,
 			}
-			err = db.WriteStatus(status)
+			err = db.Write(status)
 			require.NoError(t, err)
 
-			err = db.CloseEntry()
+			err = db.Close()
 			require.NoError(t, err)
 
 			totalEntries++
@@ -618,7 +618,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 
 	// Test reading status for a date at the edge of timezone change
 	edgeDate := time.Date(2023, 3, 26, 1, 30, 0, 0, loc) // A date near daylight saving time change
-	err = db.OpenEntry("edge-dag", edgeDate, "edge-request")
+	err = db.Open("edge-dag", edgeDate, "edge-request")
 	require.NoError(t, err)
 	edgeStatus := &model.Status{
 		Name:      "edge-dag",
@@ -626,9 +626,9 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 		StartedAt: edgeDate.Format(time.RFC3339),
 		Status:    scheduler.StatusRunning,
 	}
-	err = db.WriteStatus(edgeStatus)
+	err = db.Write(edgeStatus)
 	require.NoError(t, err)
-	err = db.CloseEntry()
+	err = db.Close()
 	require.NoError(t, err)
 
 	edgeStatusFiles, err := db.ListByLocalDate(edgeDate)

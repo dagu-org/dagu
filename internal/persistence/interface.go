@@ -48,12 +48,12 @@ type DataStores interface {
 
 // HistoryStore interface defines methods for managing DAG execution history.
 type HistoryStore interface {
-	// OpenEntry initializes a new history entry for a DAG execution
-	OpenEntry(dagFile string, t time.Time, requestID string) error
-	// WriteStatus records a new status for the current DAG execution
-	WriteStatus(status *model.Status) error
-	// CloseEntry finalizes the current history entry
-	CloseEntry() error
+	// Open initializes a new history entry for a DAG execution
+	Open(dagFile string, t time.Time, requestID string) error
+	// Write records a new status for the current DAG execution
+	Write(status *model.Status) error
+	// Close finalizes the current history entry
+	Close() error
 	// UpdateStatus modifies an existing history entry
 	UpdateStatus(dagFile, requestID string, st *model.Status) error
 	// GetLatest retrieves the latest status entry for today
