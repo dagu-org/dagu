@@ -43,7 +43,7 @@ func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
 	return FromSteps(steps)
 }
 
-type StatusFile struct {
+type History struct {
 	File   string
 	Status *Status
 }

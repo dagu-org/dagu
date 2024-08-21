@@ -87,7 +87,7 @@ func (e *client) CreateDAG(name string) (string, error) {
 	return id, nil
 }
 
-func (e *client) Grep(pattern string) (
+func (e *client) GrepDAGs(pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
 	dagStore := e.dataStore.DAGStore()
@@ -240,7 +240,7 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 	return status, nil
 }
 
-func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
+func (e *client) ListRecentHistory(workflow *dag.DAG, n int) []*model.History {
 	return e.dataStore.HistoryStore().ListRecent(workflow.Location, n)
 }
 
@@ -263,7 +263,7 @@ func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
 	)
 }
 
-func (e *client) UpdateDAG(id string, spec string) error {
+func (e *client) UpdateDAGSpec(id string, spec string) error {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.UpdateSpec(id, []byte(spec))
 }
@@ -277,7 +277,7 @@ func (e *client) DeleteDAG(name, loc string) error {
 	return dagStore.Delete(name)
 }
 
-func (e *client) GetAllStatus() (
+func (e *client) ListDAGStatusObsolete() (
 	statuses []*DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
@@ -304,7 +304,7 @@ func (e *client) getPageCount(total int64, limit int64) int {
 	return pageCount
 }
 
-func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
+func (e *client) ListDAGStatus(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
 	var (
 		dagListPaginationResult *persistence.DagListPaginationResult
 		err                     error
@@ -335,7 +335,7 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 	}, nil
 }
 
-func (e *client) GetAllStatuses(date string) ([]*model.StatusFile, error) {
+func (e *client) ListHistoryByDate(date string) ([]*model.History, error) {
 	d, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return nil, err
@@ -351,7 +351,7 @@ func (e *client) getDAG(name string) (*dag.DAG, error) {
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(id string) (*DAGStatus, error) {
+func (e *client) GetLatestDAGStatus(id string) (*DAGStatus, error) {
 	dg, err := e.getDAG(id)
 	if dg == nil {
 		// TODO: fix not to use location
@@ -412,6 +412,6 @@ func escapeArg(input string) string {
 	return escaped.String()
 }
 
-func (e *client) GetTagList() ([]string, []string, error) {
+func (e *client) ListTags() ([]string, []string, error) {
 	return e.dataStore.DAGStore().TagList()
 }

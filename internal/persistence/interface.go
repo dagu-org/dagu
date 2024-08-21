@@ -59,13 +59,13 @@ type HistoryStore interface {
 	// GetLatest retrieves the latest status entry for today
 	GetLatest(dagFile string) (*model.Status, error)
 	// GetByRequestID locates a specific history entry by its request ID
-	GetByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
+	GetByRequestID(dagFile string, requestID string) (*model.History, error)
 	// ListRecent retrieves the n most recent status entries for a DAG
-	ListRecent(dagFile string, n int) []*model.StatusFile
+	ListRecent(dagFile string, n int) []*model.History
 	// ListStatusesByDate retrieves all status entries for a specific date
-	ListByLocalDate(date time.Time) ([]*model.StatusFile, error)
+	ListByLocalDate(date time.Time) ([]*model.History, error)
 	// ListRecentAll retrieves the n most recent status files across all DAGs.
-	ListRecentAll(n int) ([]*model.StatusFile, error)
+	ListRecentAll(n int) ([]*model.History, error)
 	// DeleteAll deletes all history entries for a DAG
 	DeleteAll(dagFile string) error
 	// DeleteOld deletes history entries older than the specified retention period

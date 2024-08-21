@@ -81,7 +81,7 @@ func TestRestartCommand(t *testing.T) {
 			setup.Config,
 			dataStore,
 			logger.Default,
-		).GetRecentHistory(workflow, 2)
+		).ListRecentHistory(workflow, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

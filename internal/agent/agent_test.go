@@ -72,7 +72,7 @@ func TestAgent_Run(t *testing.T) {
 
 		err := agt.Run(context.Background())
 		require.NoError(t, err)
-		history := cli.GetRecentHistory(workflow, 2)
+		history := cli.ListRecentHistory(workflow, 2)
 		require.Equal(t, 1, len(history))
 
 		// Set the retention days to 0 and run the DAG again
@@ -82,7 +82,7 @@ func TestAgent_Run(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check if only the latest history file exists
-		history = cli.GetRecentHistory(workflow, 2)
+		history = cli.ListRecentHistory(workflow, 2)
 		require.Equal(t, 1, len(history))
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
@@ -224,7 +224,7 @@ func TestAgent_DryRun(t *testing.T) {
 
 		// Check if the status is not saved
 		cli := setup.Client()
-		history := cli.GetRecentHistory(workflow, 1)
+		history := cli.ListRecentHistory(workflow, 1)
 		require.Equal(t, 0, len(history))
 	})
 }

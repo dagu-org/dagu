@@ -177,7 +177,7 @@ func (s *JSONDB) CloseEntry() error {
 }
 
 // ListRecent retrieves the n most recent status files for a given DAG.
-func (s *JSONDB) ListRecent(dagID string, n int) []*model.StatusFile {
+func (s *JSONDB) ListRecent(dagID string, n int) []*model.History {
 	// Read the latest n status files for the given DAG.
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 
@@ -195,7 +195,7 @@ func (s *JSONDB) ListRecent(dagID string, n int) []*model.StatusFile {
 	files = files[:min(n, len(files))]
 
 	// Load the status of the latest n status files.
-	var ret []*model.StatusFile
+	var ret []*model.History
 	for _, indexFile := range files {
 		// Convert the index file to the status file.
 		statusFilePattern, err := indexFileToStatusFilePattern(s.baseDir, indexFile)
@@ -226,7 +226,7 @@ func (s *JSONDB) ListRecent(dagID string, n int) []*model.StatusFile {
 			continue
 		}
 
-		ret = append(ret, &model.StatusFile{
+		ret = append(ret, &model.History{
 			File:   statusFile,
 			Status: status,
 		})
@@ -236,7 +236,7 @@ func (s *JSONDB) ListRecent(dagID string, n int) []*model.StatusFile {
 }
 
 // ListRecentAll retrieves the n most recent status files across all DAGs.
-func (s *JSONDB) ListRecentAll(n int) ([]*model.StatusFile, error) {
+func (s *JSONDB) ListRecentAll(n int) ([]*model.History, error) {
 	statusDir := filepath.Join(s.baseDir, "status")
 
 	// List recent files from the status directory
@@ -245,7 +245,7 @@ func (s *JSONDB) ListRecentAll(n int) ([]*model.StatusFile, error) {
 		return nil, fmt.Errorf("failed to list recent files: %w", err)
 	}
 
-	var results []*model.StatusFile
+	var results []*model.History
 
 	for _, file := range recentFiles {
 		// Parse the status file
@@ -257,7 +257,7 @@ func (s *JSONDB) ListRecentAll(n int) ([]*model.StatusFile, error) {
 			continue
 		}
 
-		results = append(results, &model.StatusFile{
+		results = append(results, &model.History{
 			File:   file,
 			Status: status,
 		})
@@ -390,7 +390,7 @@ func (s *JSONDB) GetLatest(dagID string) (*model.Status, error) {
 }
 
 // GetByRequestID finds a status file by its request ID.
-func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.StatusFile, error) {
+func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.History, error) {
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", persistence.ErrRequestIDNotFound)
 	}
@@ -426,7 +426,7 @@ func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.StatusFile, 
 				continue
 			}
 			if status != nil && status.RequestID == reqID {
-				return &model.StatusFile{File: statusFile, Status: status}, nil
+				return &model.History{File: statusFile, Status: status}, nil
 			}
 		}
 	}
@@ -594,7 +594,7 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 }
 
 // ListByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
-func (s *JSONDB) ListByLocalDate(localDate time.Time) ([]*model.StatusFile, error) {
+func (s *JSONDB) ListByLocalDate(localDate time.Time) ([]*model.History, error) {
 	// Convert the start of the local date to UTC
 	utcStartOfDay := localDate.UTC()
 
@@ -609,8 +609,8 @@ func (s *JSONDB) ListByLocalDate(localDate time.Time) ([]*model.StatusFile, erro
 
 // listStatusInRange retrieves all status files for a specific date range.
 // The range is inclusive of the start time and exclusive of the end time.
-func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.StatusFile, error) {
-	var result []*model.StatusFile
+func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.History, error) {
+	var result []*model.History
 
 	for t := start; t.Before(end); t = t.Add(time.Hour) {
 		year, month, day := t.Date()
@@ -637,7 +637,7 @@ func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.StatusFile, e
 				continue
 			}
 
-			result = append(result, &model.StatusFile{
+			result = append(result, &model.History{
 				File:   statusFile,
 				Status: status,
 			})

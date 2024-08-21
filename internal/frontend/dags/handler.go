@@ -175,7 +175,7 @@ func (h *Handler) createDAG(
 	}
 }
 func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
-	dagStatus, err := h.client.GetStatus(params.DagID)
+	dagStatus, err := h.client.GetLatestDAGStatus(params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
 	}
@@ -188,7 +188,7 @@ func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 }
 
 func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
-	dgs, result, err := h.client.GetAllStatusPagination(params)
+	dgs, result, err := h.client.ListDAGStatus(params)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -254,7 +254,7 @@ func (h *Handler) getDetail(
 		tab = *params.Tab
 	}
 
-	dagStatus, err := h.client.GetStatus(dagID)
+	dagStatus, err := h.client.GetLatestDAGStatus(dagID)
 	if dagStatus == nil {
 		return nil, newNotFoundError(err)
 	}
@@ -494,7 +494,7 @@ func (h *Handler) processLogRequest(
 	resp *models.GetDagDetailsResponse,
 	workflow *dag.DAG,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	logs := h.client.GetRecentHistory(workflow, defaultHistoryLimit)
+	logs := h.client.ListRecentHistory(workflow, defaultHistoryLimit)
 
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
 	for idx, log := range logs {
@@ -603,7 +603,7 @@ func (h *Handler) postAction(
 	var dagStatus *client.DAGStatus
 
 	if *params.Body.Action != "save" {
-		s, err := h.client.GetStatus(params.DagID)
+		s, err := h.client.GetLatestDAGStatus(params.DagID)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
@@ -661,7 +661,7 @@ func (h *Handler) postAction(
 		)
 
 	case "save":
-		if err := h.client.UpdateDAG(params.DagID, params.Body.Value); err != nil {
+		if err := h.client.UpdateDAGSpec(params.DagID, params.Body.Value); err != nil {
 			return nil, newInternalError(err)
 		}
 		return &models.PostDagActionResponse{}, nil
@@ -742,7 +742,7 @@ func (h *Handler) searchDAGs(
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
-	ret, errs, err := h.client.Grep(query)
+	ret, errs, err := h.client.GrepDAGs(query)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -789,7 +789,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 }
 
 func (h *Handler) getTagList(_ dags.ListTagsParams) (*models.ListTagResponse, *codedError) {
-	tags, errs, err := h.client.GetTagList()
+	tags, errs, err := h.client.ListTags()
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -800,7 +800,7 @@ func (h *Handler) getTagList(_ dags.ListTagsParams) (*models.ListTagResponse, *c
 }
 
 func (h *Handler) listHistory(params dags.ListHistoryParams) (*models.ListHistoryResponse, *codedError) {
-	statuses, err := h.client.GetAllStatuses(params.Date)
+	statuses, err := h.client.ListHistoryByDate(params.Date)
 	if err != nil {
 		return nil, newInternalError(err)
 	}

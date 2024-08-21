@@ -25,29 +25,52 @@ import (
 )
 
 type Client interface {
+	// CreateDAG creates a new DAG.
 	CreateDAG(id string) (string, error)
+	// GetDAGSpec returns the spec of the specific DAG.
 	GetDAGSpec(id string) (string, error)
-	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
+	// GetDAG returns the DAG object.
+	GrepDAGs(pattern string) ([]*persistence.GrepResult, []string, error)
+	// Rename renames the DAG.
 	Rename(oldID, newID string) error
-	Stop(workflow *dag.DAG) error
-	StartAsync(workflow *dag.DAG, opts StartOptions)
-	Start(workflow *dag.DAG, opts StartOptions) error
-	Restart(workflow *dag.DAG, opts RestartOptions) error
-	Retry(workflow *dag.DAG, requestID string) error
-	GetCurrentStatus(workflow *dag.DAG) (*model.Status, error)
-	GetStatusByRequestID(workflow *dag.DAG, requestID string) (*model.Status, error)
-	GetLatestStatus(workflow *dag.DAG) (*model.Status, error)
-	GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile
-	UpdateStatus(workflow *dag.DAG, status *model.Status) error
-	UpdateDAG(id string, spec string) error
+	// Stop stops the current DAG execution.
+	Stop(dAG *dag.DAG) error
+	// StartAsync starts the specific history asynchronously.
+	StartAsync(dAG *dag.DAG, opts StartOptions)
+	// Start starts the specific history.
+	Start(dAG *dag.DAG, opts StartOptions) error
+	// Restart restarts the specific history.
+	Restart(dAG *dag.DAG, opts RestartOptions) error
+	// Rerty retries the execution of the DAG.
+	Retry(dAG *dag.DAG, requestID string) error
+	// GetCurrentStatus returns the current status of the DAG.
+	GetCurrentStatus(dAG *dag.DAG) (*model.Status, error)
+	// GetLatestStatus returns the latest status of the DAG.
+	GetLatestStatus(dAG *dag.DAG) (*model.Status, error)
+	// GetLatestDAGStatus returns the latest status of the DAG.
+	GetLatestDAGStatus(dagLocation string) (*DAGStatus, error)
+	// GetStatusByRequestID returns the status of the specific history.
+	GetStatusByRequestID(dAG *dag.DAG, requestID string) (*model.Status, error)
+	// ListRecentHistory returns the recent history of the DAG.
+	ListRecentHistory(dAG *dag.DAG, n int) []*model.History
+	// UpdateStatus updates the status of the specific history.
+	UpdateStatus(dAG *dag.DAG, status *model.Status) error
+	// UpdateDAGSpec updates the spec of the specific DAG.
+	UpdateDAGSpec(id string, spec string) error
+	// DeleteDAG deletes the specific DAG.
 	DeleteDAG(id, loc string) error
-	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
-	GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
-	GetAllStatuses(date string) ([]*model.StatusFile, error)
-	GetStatus(dagLocation string) (*DAGStatus, error)
+	// ListDAGStatusObsolete returns the list of statuses of the DAGs.
+	ListDAGStatusObsolete() (statuses []*DAGStatus, errs []string, err error)
+	// ListDAGStatus returns the list of statuses of the DAGs.
+	ListDAGStatus(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
+	// ListHistoryByDate returns the history of the specific date.
+	ListHistoryByDate(date string) ([]*model.History, error)
+	// IsSuspended returns whether the DAG is suspended.
 	IsSuspended(id string) bool
+	// ToggleSuspend toggles the suspend status of the DAG.
 	ToggleSuspend(id string, suspend bool) error
-	GetTagList() ([]string, []string, error)
+	// ListTags returns the list of tags of the DAGs.
+	ListTags() ([]string, []string, error)
 }
 
 type StartOptions struct {

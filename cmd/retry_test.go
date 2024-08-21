@@ -36,7 +36,7 @@ func TestRetryCommand(t *testing.T) {
 
 		// Find the request ID.
 		cli := setup.Client()
-		status, err := cli.GetStatus(dagFile)
+		status, err := cli.GetLatestDAGStatus(dagFile)
 		require.NoError(t, err)
 		require.Equal(t, status.Status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)
