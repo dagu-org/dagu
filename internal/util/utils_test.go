@@ -139,9 +139,9 @@ func Test_FileExits(t *testing.T) {
 	})
 }
 
-func Test_ValidFilename(t *testing.T) {
+func Test_SafeText(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		ret := util.ValidFilename("file\\name")
+		ret := util.SafeText("file\\name")
 		require.Equal(t, ret, "file_name")
 	})
 }

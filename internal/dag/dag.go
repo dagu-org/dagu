@@ -28,79 +28,89 @@ import (
 
 // DAG contains all information about a workflow.
 type DAG struct {
+	// Source contains the base configuration and the source of the DAG in YAML.
+	Source Source `json:"Source"`
 	// Location is the absolute path to the DAG file.
-	Location string `json:"Location"`
+	Location string `json:"Location,omitempty"`
 	// Group is the group name of the DAG. This is optional.
-	Group string `json:"Group"`
+	Group string `json:"Group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the
 	// extension.
-	Name string `json:"Name"`
+	Name string `json:"Name,omitempty"`
 	// Tags contains the list of tags for the DAG. optional.
-	Tags []string `json:"Tags"`
+	Tags []string `json:"Tags,omitempty"`
 	// Description is the description of the DAG. optional.
-	Description string `json:"Description"`
+	Description string `json:"Description,omitempty"`
 
 	// Schedule configuration.
 	// This is used by the scheduler to start / stop / restart the DAG.
-	Schedule        []Schedule `json:"Schedule"`
-	StopSchedule    []Schedule `json:"StopSchedule"`
-	RestartSchedule []Schedule `json:"RestartSchedule"`
+	Schedule        []Schedule `json:"Schedule,omitempty"`
+	StopSchedule    []Schedule `json:"StopSchedule,omitempty"`
+	RestartSchedule []Schedule `json:"RestartSchedule,omitempty"`
 
 	// Env contains a list of environment variables to be set before running
 	// the DAG.
-	Env []string `json:"Env"`
+	Env []string `json:"Env,omitempty"`
 
 	// LogDir is the directory where the logs are stored.
 	// The actual log directory is LogDir + Name (with invalid characters
 	// replaced with '_').
-	LogDir string `json:"LogDir"`
+	LogDir string `json:"LogDir,omitempty"`
 
 	// Parameters configuration.
 	// The DAG definition contains only DefaultParams. Params are automatically
 	// set by the DAG loader.
 	// DefaultParams contains the default parameters to be passed to the DAG.
-	DefaultParams string `json:"DefaultParams"`
+	DefaultParams string `json:"DefaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
-	Params []string `json:"Params"`
+	Params []string `json:"Params,omitempty"`
 
 	// Commands configuration to be executed in the DAG.
 	// Steps contains the list of steps in the DAG.
-	Steps []Step `json:"Steps"`
+	Steps []Step `json:"Steps,omitempty"`
 	// HandlerOn contains the steps to be executed on different events.
-	HandlerOn HandlerOn `json:"HandlerOn"`
+	HandlerOn HandlerOn `json:"HandlerOn,omitempty"`
 
 	// Preconditions contains the conditions to be met before running the DAG.
 	// If the conditions are not met, the whole DAG is skipped.
-	Preconditions []Condition `json:"Preconditions"`
+	Preconditions []Condition `json:"Preconditions,omitempty"`
 
 	// Mail notification configuration.
 	// MailOn contains the conditions to send mail.
 	// SMTP contains the SMTP configuration.
 	// If you don't want to repeat the SMTP configuration for each DAG, you can
 	// set it in the base configuration.
-	SMTP *SMTPConfig `json:"Smtp"`
+	SMTP *SMTPConfig `json:"Smtp,omitempty"`
 	// ErrorMail contains the mail configuration for error.
-	ErrorMail *MailConfig `json:"ErrorMail"`
+	ErrorMail *MailConfig `json:"ErrorMail,omitempty"`
 	// InfoMail contains the mail configuration for info.
-	InfoMail *MailConfig `json:"InfoMail"`
+	InfoMail *MailConfig `json:"InfoMail,omitempty"`
 	// MailOn contains the conditions to send mail.
-	MailOn *MailOn `json:"MailOn"`
+	MailOn *MailOn `json:"MailOn,omitempty"`
 
 	// Timeout is a field to specify the maximum execution time of the DAG task
-	Timeout time.Duration `json:"Timeout"`
+	Timeout time.Duration `json:"Timeout,omitempty"`
 	// Misc configuration for DAG execution.
 	// Delay is the delay before starting the DAG.
-	Delay time.Duration `json:"Delay"`
+	Delay time.Duration `json:"Delay,omitempty"`
 	// RestartWait is the time to wait before restarting the DAG.
-	RestartWait time.Duration `json:"RestartWait"`
+	RestartWait time.Duration `json:"RestartWait,omitempty"`
 	// MaxActiveRuns specifies the maximum concurrent steps to run in an
 	// execution.
-	MaxActiveRuns int `json:"MaxActiveRuns"`
+	MaxActiveRuns int `json:"MaxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is
 	// stopped.
-	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime"`
+	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history.
-	HistRetentionDays int `json:"HistRetentionDays"`
+	HistRetentionDays int `json:"HistRetentionDays,omitempty"`
+}
+
+// Source contains the base configuration and the source of the DAG in YAML
+type Source struct {
+	// Base configuration.
+	Base string `json:"Base,omitempty"`
+	// Source is the source of the DAG in YAML format.
+	Source string `json:"Source,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.
@@ -212,6 +222,13 @@ func (d *DAG) setup() {
 	if d.HandlerOn.Cancel != nil {
 		d.HandlerOn.Cancel.setup(dir)
 	}
+}
+
+func (d *DAG) validate() error {
+	if d.Name == "" {
+		return fmt.Errorf("DAG name is required")
+	}
+	return nil
 }
 
 // HasTag checks if the DAG has the given tag.

@@ -378,16 +378,16 @@ type testCase struct {
 
 type stepTestCase map[string]any
 
-func readTestFile(t *testing.T, filename string) []byte {
+func readTestFile(t *testing.T, filename string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(testdataDir, filename))
-	require.NoError(t, err)
-	return data
+	return filepath.Join(testdataDir, filename)
 }
 
 func runTest(t *testing.T, tc testCase) {
 	t.Helper()
-	dag, err := loadYAML(readTestFile(t, tc.InputFile), buildOpts{})
+	dag, err := loadFile(readTestFile(t, tc.InputFile), buildOpts{
+		file: tc.InputFile,
+	})
 
 	if tc.ExpectedErr != nil {
 		assert.Error(t, err)

@@ -91,7 +91,7 @@ var errDOGFileNotExist = errors.New("the DAG file does not exist")
 
 func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 	// validation
-	_, err := dag.LoadYAML(spec)
+	_, err := dag.LoadYAML(name, nil, spec)
 	if err != nil {
 		return err
 	}

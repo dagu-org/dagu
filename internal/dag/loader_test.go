@@ -16,6 +16,7 @@
 package dag
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -84,7 +85,10 @@ func Test_LoadMetadata(t *testing.T) {
 
 func Test_loadBaseConfig(t *testing.T) {
 	t.Run("LoadBaseConfigFile", func(t *testing.T) {
-		dg, err := loadBaseConfig(filepath.Join(testdataDir, "base.yaml"), buildOpts{})
+		base, err := os.ReadFile(filepath.Join(testdataDir, "base.yaml"))
+		require.NoError(t, err)
+
+		dg, err := loadBaseConfig(base, buildOpts{})
 		require.NotNil(t, dg)
 		require.NoError(t, err)
 	})
@@ -123,7 +127,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
-		ret, err := loadYAML([]byte(testDAG), buildOpts{})
+		ret, err := LoadYAML("test", nil, []byte(testDAG))
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -132,7 +136,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
-		_, err := loadYAML([]byte(`invalidyaml`), buildOpts{})
+		_, err := LoadYAML("test", nil, []byte(`invalidyaml`))
 		require.Error(t, err)
 	})
 }

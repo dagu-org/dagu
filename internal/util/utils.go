@@ -170,8 +170,8 @@ var (
 	specialCharRepl      = "_"
 )
 
-// ValidFilename makes filename valid by replacing reserved characters.
-func ValidFilename(str string) string {
+// SafeText makes filename valid by replacing reserved characters.
+func SafeText(str string) string {
 	s := filenameReservedRegex.ReplaceAllString(str, specialCharRepl)
 	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, specialCharRepl)
 	return filenameSpacingRegex.ReplaceAllString(s, specialCharRepl)

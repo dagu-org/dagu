@@ -38,67 +38,81 @@ var (
 )
 
 // Load loads config from file.
-func Load(base, dag, params string) (*DAG, error) {
-	return loadDAG(dag, buildOpts{
-		base:         base,
+func Load(baseDAGFile, dAGFile, params string) (*DAG, error) {
+	return loadFile(dAGFile, buildOpts{
+		base:         baseDAGFile,
 		parameters:   params,
 		metadataOnly: false,
 		noEval:       false,
+		file:         dAGFile,
 	})
 }
 
 // LoadWithoutEval loads config from file without evaluating env variables.
-func LoadWithoutEval(dag string) (*DAG, error) {
-	return loadDAG(dag, buildOpts{
+func LoadWithoutEval(dAGFile string) (*DAG, error) {
+	return loadFile(dAGFile, buildOpts{
 		metadataOnly: false,
 		noEval:       true,
+		file:         dAGFile,
 	})
 }
 
 // LoadMetadata loads config from file and returns only the headline data.
-func LoadMetadata(dag string) (*DAG, error) {
-	return loadDAG(dag, buildOpts{
+func LoadMetadata(dAGFile string) (*DAG, error) {
+	return loadFile(dAGFile, buildOpts{
 		metadataOnly: true,
 		noEval:       true,
+		file:         dAGFile,
 	})
 }
 
 // LoadYAML loads config from YAML data.
 // It does not evaluate the environment variables.
 // This is used to validate the YAML data.
-func LoadYAML(data []byte) (*DAG, error) {
-	return loadYAML(data, buildOpts{
+func LoadYAML(name string, base []byte, source []byte) (*DAG, error) {
+	return loadDAG(base, source, buildOpts{
 		metadataOnly: false,
 		noEval:       true,
+		name:         name,
 	})
 }
 
-// LoadYAML loads config from YAML data.
-func loadYAML(data []byte, opts buildOpts) (*DAG, error) {
-	raw, err := unmarshalData(data)
+func loadFile(file string, opts buildOpts) (*DAG, error) {
+	var baseData []byte
+
+	if opts.base != "" {
+		// Find the absolute path to the file.
+		// The file must be a YAML file.
+		base, err := normalizeFilePath(opts.base)
+		if err != nil {
+			return nil, err
+		}
+		if util.FileExists(base) {
+			// Load the base configuration if it exists.
+			baseData, err = os.ReadFile(base)
+			if err != nil {
+				return nil, fmt.Errorf("%w %s: %v", errReadFile, base, err)
+			}
+		}
+	}
+
+	// Load the DAG from the file.
+	file, err := normalizeFilePath(file)
 	if err != nil {
 		return nil, err
 	}
-
-	def, err := decode(raw)
+	data, err := os.ReadFile(file)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
 	}
 
-	b := &builder{opts: opts}
-	return b.build(def, nil)
+	return loadDAG(baseData, data, opts)
 }
 
 // loadBaseConfig loads the global configuration from the given file.
 // The global configuration can be overridden by the DAG configuration.
-func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
-	// The base config is optional.
-	if !util.FileExists(file) {
-		return nil, nil
-	}
-
-	// Load the raw data from the file.
-	raw, err := readFile(file)
+func loadBaseConfig(base []byte, opts buildOpts) (*DAG, error) {
+	raw, err := unmarshalData(base)
 	if err != nil {
 		return nil, err
 	}
@@ -119,24 +133,25 @@ func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 }
 
 // loadDAG loads the DAG from the given file.
-func loadDAG(dag string, opts buildOpts) (*DAG, error) {
-	// Find the absolute path to the file.
-	// The file must be a YAML file.
-	file, err := craftFilePath(dag)
-	if err != nil {
-		return nil, err
-	}
-
+func loadDAG(base, data []byte, opts buildOpts) (*DAG, error) {
 	// Load the base configuration unless only the metadata is required.
 	// If only the metadata is required, the base configuration is not loaded
 	// and the DAG is created with the default values.
-	dst, err := loadBaseConfigIfRequired(opts.base, opts)
-	if err != nil {
-		return nil, err
+	var dst *DAG
+	if base != nil {
+		baseDAG, err := loadBaseConfig(base, opts)
+		if err != nil {
+			return nil, err
+		}
+		// Base config is optional.
+		if baseDAG != nil {
+			dst = baseDAG
+		}
+	} else {
+		dst = new(DAG)
 	}
 
-	// Load the raw data from the file.
-	raw, err := readFile(file)
+	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
 	}
@@ -161,31 +176,31 @@ func loadDAG(dag string, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	// Set the absolute path to the file.
-	dst.Location = file
-
-	// Set the name if not set.
-	if dst.Name == "" {
-		dst.Name = defaultName(file)
-	}
-
 	// Set the default values for the DAG.
 	if !opts.metadataOnly {
 		dst.setup()
 	}
 
+	dst.Source.Base = string(base)
+	dst.Source.Source = string(data)
+
+	// Check if the DAG has the required fields.
+	if err := dst.validate(); err != nil {
+		return nil, err
+	}
+
 	return dst, nil
 }
 
-// defaultName returns the default name for the given file.
+// getDefaultName returns the default name for the given file.
 // The default name is the filename without the extension.
-func defaultName(file string) string {
+func getDefaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
-// craftFilePath prepares the filepath for the given file.
+// normalizeFilePath prepares the filepath for the given file.
 // The file must be a YAML file.
-func craftFilePath(file string) (string, error) {
+func normalizeFilePath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
 	}
@@ -196,25 +211,6 @@ func craftFilePath(file string) (string, error) {
 	}
 
 	return filepath.Abs(file)
-}
-
-// loadBaseConfigIfRequired loads the base config if needed, based on the
-// given options.
-func loadBaseConfigIfRequired(
-	baseConfig string, opts buildOpts,
-) (*DAG, error) {
-	if !opts.metadataOnly && baseConfig != "" {
-		dag, err := loadBaseConfig(baseConfig, opts)
-		if err != nil {
-			return nil, err
-		}
-		// Base config is optional.
-		if dag != nil {
-			return dag, nil
-		}
-	}
-
-	return new(DAG), nil
 }
 
 type mergeTransformer struct{}
@@ -238,16 +234,6 @@ func (*mergeTransformer) Transformer(
 	}
 
 	return nil
-}
-
-// readFile reads the contents of the file into a map.
-func readFile(file string) (cfg map[string]any, err error) {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
-	}
-
-	return unmarshalData(data)
 }
 
 // unmarshalData unmarshals the data into a map.
