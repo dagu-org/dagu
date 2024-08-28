@@ -47,7 +47,7 @@ func newCommand(ctx context.Context, step dag.Step) (Executor, error) {
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
-	cmd.Env = append(cmd.Env, dagContext.Envs...)
+	cmd.Env = append(cmd.Env, dagContext.Envs.All()...)
 	step.OutputVariables.Range(func(_, value any) bool {
 		cmd.Env = append(cmd.Env, value.(string))
 		return true

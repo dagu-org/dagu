@@ -30,7 +30,7 @@ import (
 )
 
 func nodeTextCtxWithDagContext() context.Context {
-	return dag.NewContext(context.Background(), nil, nil)
+	return dag.NewContext(context.Background(), nil, nil, "", "")
 }
 
 func TestExecute(t *testing.T) {

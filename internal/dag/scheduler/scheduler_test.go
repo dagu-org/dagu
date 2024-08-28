@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 }
 
 func schedulerTextCtxWithDagContext() context.Context {
-	return dag.NewContext(context.Background(), nil, nil)
+	return dag.NewContext(context.Background(), nil, nil, "", "")
 }
 
 func TestScheduler(t *testing.T) {

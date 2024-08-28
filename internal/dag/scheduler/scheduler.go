@@ -91,6 +91,7 @@ func New(cfg *Config) *Scheduler {
 		onFailure:     cfg.OnFailure,
 		onCancel:      cfg.OnCancel,
 		requestID:     cfg.ReqID,
+		pause:         time.Millisecond * 100,
 	}
 }
 
@@ -110,7 +111,7 @@ type Config struct {
 
 // Schedule runs the graph of steps.
 func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan *Node) error {
-	if err := sc.setup(); err != nil {
+	if err := sc.setup(ctx); err != nil {
 		return err
 	}
 	g.Start()
@@ -431,8 +432,16 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-func (sc *Scheduler) setup() (err error) {
-	sc.pause = time.Millisecond * 100
+func (sc *Scheduler) setup(ctx context.Context) (err error) {
+	// set global environment variables
+	dagCtx, err := dag.GetContext(ctx)
+	if err != nil {
+		return err
+	}
+	for _, env := range dagCtx.Envs {
+		os.Setenv(env.Key, env.Value)
+	}
+
 	if !sc.dry {
 		if err = os.MkdirAll(sc.logDir, 0755); err != nil {
 			err = fmt.Errorf("failed to create log directory: %w", err)
