@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -30,10 +30,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/daguflow/dagu/internal/constants"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/executor"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag/executor"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 // Node is a node in a DAG. It executes a command.
@@ -131,16 +130,16 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
-	dagContext, err := dag.GetContext(ctx)
+	dagCtx, err := dag.GetContext(ctx)
 	if err != nil {
 		return err
 	}
-	// set node special log path environment variable
-	if err = os.Setenv(dag.GenGlobalStepLogEnvKey(n.id), n.data.State.Log); err != nil {
-		return err
-	}
-	dagContext.Envs = append(dagContext.Envs, fmt.Sprintf("%s=%s", constants.StepDaguExecutionLogPathKeySuffix, n.data.State.Log))
-	ctx = dag.WithDagContext(ctx, dagContext)
+	// Add the log path to the environment
+	dagCtx = dagCtx.WithEnv(dag.Env{
+		Key:   dag.EnvKeyLogPath,
+		Value: n.data.State.Log,
+	})
+	ctx = dag.WithDagContext(ctx, dagCtx)
 	cmd, err := n.setupExec(ctx)
 	if err != nil {
 		return err
@@ -291,18 +290,36 @@ func (n *Node) setup(logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	// Expand environment variables in the step
-	n.data.Step.Stdout = os.ExpandEnv(n.data.Step.Stdout)
-	n.data.Step.Stderr = os.ExpandEnv(n.data.Step.Stderr)
-	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
-
-	// Set the working directory if not set
+	// Set the log file path
 	n.data.State.StartedAt = time.Now()
 	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		util.ValidFilename(n.data.Step.Name),
 		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
 		util.TruncString(requestID, 8),
 	))
+
+	// Replace the special environment variables in the command
+	// Why this is necessary:
+	// 1. We need to expand the environment variables when setup the node.
+	// 2. The environment variables need to be set in the current process.
+	// 3. But since the values of the log path are different for each node,
+	//    we need to replace the name differently for each node.
+	envKeyLogPath := fmt.Sprintf("STEP_%d_DAG_EXECUTION_LOG_PATH", n.id)
+	if err := os.Setenv(envKeyLogPath, n.data.State.Log); err != nil {
+		return err
+	}
+
+	// Expand environment variables in the step
+	n.data.Step.CmdWithArgs = strings.ReplaceAll(
+		n.data.Step.CmdWithArgs,
+		dag.EnvKeyLogPath,
+		envKeyLogPath,
+	)
+
+	n.data.Step.Stdout = os.ExpandEnv(n.data.Step.Stdout)
+	n.data.Step.Stderr = os.ExpandEnv(n.data.Step.Stderr)
+	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
+
 	if err := n.setupLog(); err != nil {
 		return err
 	}
@@ -450,12 +467,6 @@ func (n *Node) init() {
 		return
 	}
 	n.id = getNextNodeID()
-
-	n.data.Step.CmdWithArgs = strings.ReplaceAll(
-		n.data.Step.CmdWithArgs,
-		constants.StepDaguExecutionLogPathKeySuffix,
-		dag.GenGlobalStepLogEnvKey(n.id),
-	)
 
 	if n.data.Step.Variables == nil {
 		n.data.Step.Variables = []string{}

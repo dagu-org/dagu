@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,13 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/persistence"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )

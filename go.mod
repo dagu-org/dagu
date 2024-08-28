@@ -1,4 +1,4 @@
-module github.com/daguflow/dagu
+module github.com/dagu-org/dagu
 
 go 1.22.5
 

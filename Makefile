@@ -149,13 +149,13 @@ ifeq ($(VERSION),)
 	$(error "VERSION is not set")
 endif
 	echo "${COLOR_GREEN}Building the docker image with the version $(VERSION)...${COLOR_RESET}"
-	$(DOCKER_CMD) -t ghcr.io/daguflow/${APP_NAME}:$(VERSION) .
+	$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:$(VERSION) .
 
 # build-image-latest build the docker image with the latest tag and push to 
 # the registry.
 build-image-latest:
 	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
-	$(DOCKER_CMD) -t ghcr.io/daguflow/${APP_NAME}:latest .
+	$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:latest .
 
 # gomerger merges all go files into a single file.
 gomerger: ${LOCAL_DIR}/merged
@@ -189,7 +189,7 @@ addlicense:
 		-ignore "**/*.yaml" \
 		-ignore "**/filenotify/*" \
 		-ignore "**/testdata/**" \
-		-c "The Daguflow/Dagu Authors" \
+		-c "The Dagu Authors" \
 		-f scripts/header.txt \
 		.
 

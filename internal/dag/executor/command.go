@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 type commandExecutor struct {
@@ -47,7 +47,7 @@ func newCommand(ctx context.Context, step dag.Step) (Executor, error) {
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
-	cmd.Env = append(cmd.Env, dagContext.Envs...)
+	cmd.Env = append(cmd.Env, dagContext.Envs.All()...)
 	step.OutputVariables.Range(func(_, value any) bool {
 		cmd.Env = append(cmd.Env, value.(string))
 		return true

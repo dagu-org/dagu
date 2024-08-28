@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-openapi/runtime"
 
-	"github.com/daguflow/dagu/internal/frontend/gen/models"
+	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 )
 
 // CreateDagOKCode is the HTTP code returned for type CreateDagOK

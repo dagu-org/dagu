@@ -48,8 +48,6 @@ import moment from 'moment';
 import 'moment-duration-format';
 import Ticker from '../atoms/Ticker';
 import VisuallyHidden from '../atoms/VisuallyHidden';
-import useSWR from 'swr';
-import { GetListTagsResponse } from '../../models/api';
 
 type Props = {
   DAGs: DAGItem[];
@@ -446,7 +444,6 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
   const instance = useReactTable({
     data,
     columns,
-    getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

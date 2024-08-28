@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence"
-	dsclient "github.com/daguflow/dagu/internal/persistence/client"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
+	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )

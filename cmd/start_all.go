@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@ package cmd
 import (
 	"log"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/scheduler"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

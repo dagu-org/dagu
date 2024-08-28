@@ -3,19 +3,19 @@
 </p>
 
 <p align="center">
-  <a href="https://goreportcard.com/report/github.com/daguflow/dagu">
-    <img src="https://goreportcard.com/badge/github.com/daguflow/dagu" />
+  <a href="https://goreportcard.com/report/github.com/dagu-org/dagu">
+    <img src="https://goreportcard.com/badge/github.com/dagu-org/dagu" />
   </a>
-  <a href="https://codecov.io/gh/daguflow/dagu">
-    <img src="https://codecov.io/gh/daguflow/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
+  <a href="https://codecov.io/gh/dagu-org/dagu">
+    <img src="https://codecov.io/gh/dagu-org/dagu/branch/main/graph/badge.svg?token=CODZQP61J2" />
   </a>
-  <a href="https://github.com/daguflow/dagu/releases">
-    <img src="https://img.shields.io/github/release/daguflow/dagu.svg" />
+  <a href="https://github.com/dagu-org/dagu/releases">
+    <img src="https://img.shields.io/github/release/dagu-org/dagu.svg" />
   </a>
-  <a href="https://godoc.org/github.com/daguflow/dagu">
-    <img src="https://godoc.org/github.com/daguflow/dagu?status.svg" />
+  <a href="https://godoc.org/github.com/dagu-org/dagu">
+    <img src="https://godoc.org/github.com/dagu-org/dagu?status.svg" />
   </a>
-  <img src="https://github.com/daguflow/dagu/actions/workflows/ci.yaml/badge.svg" />
+  <img src="https://github.com/dagu-org/dagu/actions/workflows/ci.yaml/badge.svg" />
 </p>
 
 <div align="center">
@@ -151,23 +151,23 @@ You can install Dagu quickly using Homebrew or by downloading the latest binary 
 ### Via Bash script
 
 ```sh
-curl -L https://raw.githubusercontent.com/daguflow/dagu/main/scripts/installer.sh | bash
+curl -L https://raw.githubusercontent.com/dagu-org/dagu/main/scripts/installer.sh | bash
 ```
 
 ### Via GitHub Releases Page
 
-Download the latest binary from the [Releases page](https://github.com/daguflow/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
+Download the latest binary from the [Releases page](https://github.com/dagu-org/dagu/releases) and place it in your `$PATH` (e.g. `/usr/local/bin`).
 
 ### Via Homebrew (macOS)
 
 ```sh
-brew install daguflow/brew/dagu
+brew install dagu-org/brew/dagu
 ```
 
 Upgrade to the latest version:
 
 ```sh
-brew upgrade daguflow/brew/dagu
+brew upgrade dagu-org/brew/dagu
 ```
 
 ### Via Docker
@@ -178,7 +178,7 @@ docker run \
 -p 8080:8080 \
 -v $HOME/.config/dagu/dags:/home/dagu/.config/dagu/dags \
 -v $HOME/.local/share/dagu:/home/dagu/.local/share/dagu \
-ghcr.io/daguflow/dagu:latest dagu start-all
+ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
 
 See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.

@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,9 +16,5 @@
 package constants
 
 var (
-	Version                           = "0.0.1"
-	StepDaguExecutionLogPathKeySuffix = "DAGU_EXECUTION_LOG_PATH"
-	StepDaguExecutionLogPathKeyPrefix = "STEP"
-	DaguSchedulerLogPathKey           = "DAGU_SCHEDULER_LOG_PATH"
-	DaguRequestIDKey                  = "DAGU_REQUEST_ID"
+	Version = "0.0.1"
 )

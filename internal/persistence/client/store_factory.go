@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@ package client
 import (
 	"os"
 
-	"github.com/daguflow/dagu/internal/persistence"
-	"github.com/daguflow/dagu/internal/persistence/jsondb"
-	"github.com/daguflow/dagu/internal/persistence/local"
-	"github.com/daguflow/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
 
 var _ persistence.DataStores = (*dataStores)(nil)

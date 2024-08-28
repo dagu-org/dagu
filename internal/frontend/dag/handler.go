@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -23,15 +23,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/frontend/gen/models"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
-	"github.com/daguflow/dagu/internal/frontend/server"
-	"github.com/daguflow/dagu/internal/persistence/jsondb"
-	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/frontend/gen/models"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/dagu-org/dagu/internal/frontend/server"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
