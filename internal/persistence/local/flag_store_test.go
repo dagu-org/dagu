@@ -19,9 +19,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/daguflow/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 

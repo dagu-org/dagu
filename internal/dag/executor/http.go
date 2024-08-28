@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/go-resty/resty/v2"
 	"github.com/mitchellh/mapstructure"
 )

@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 

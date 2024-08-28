@@ -5,7 +5,7 @@ REST API Docs
 
 Dagu server provides simple APIs to query and control DAGs.
 
-See the `OpenAPI Schema for Dagu <https://github.com/daguflow/dagu/blob/main/swagger.yaml>`_ for more details.
+See the `OpenAPI Schema for Dagu <https://github.com/dagu-org/dagu/blob/main/swagger.yaml>`_ for more details.
 
 **Endpoint** : `localhost:8080` (default)
 

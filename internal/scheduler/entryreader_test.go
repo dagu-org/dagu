@@ -21,15 +21,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/logger"
-	dsclient "github.com/daguflow/dagu/internal/persistence/client"
-	"github.com/daguflow/dagu/internal/test"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/logger"
+	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/util"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/daguflow/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/config"
 )
 
 func TestReadEntries(t *testing.T) {

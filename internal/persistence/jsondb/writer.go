@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/daguflow/dagu/internal/persistence/model"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 var (

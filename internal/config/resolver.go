@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 type resolver struct {

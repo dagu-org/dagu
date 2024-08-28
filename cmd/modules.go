@@ -16,11 +16,11 @@
 package cmd
 
 import (
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence"
-	dsclient "github.com/daguflow/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
+	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 )
 
 func newClient(cfg *config.Config, ds persistence.DataStores, lg logger.Logger) client.Client {

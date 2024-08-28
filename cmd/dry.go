@@ -19,10 +19,10 @@ import (
 	"log"
 	"path/filepath"
 
-	"github.com/daguflow/dagu/internal/agent"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 

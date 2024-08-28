@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-chi/chi/v5/middleware"
 )
 

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 

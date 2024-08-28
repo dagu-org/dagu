@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/itchyny/gojq"
 	"github.com/mitchellh/mapstructure"
 )

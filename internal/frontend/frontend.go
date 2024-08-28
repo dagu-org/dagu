@@ -16,11 +16,11 @@
 package frontend
 
 import (
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend/dag"
-	"github.com/daguflow/dagu/internal/frontend/server"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend/dag"
+	"github.com/dagu-org/dagu/internal/frontend/server"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server {

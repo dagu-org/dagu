@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestSchedulerCommand(t *testing.T) {

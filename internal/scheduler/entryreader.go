@@ -22,12 +22,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/scheduler/filenotify"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
 

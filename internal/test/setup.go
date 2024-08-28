@@ -21,12 +21,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence"
-	dsclient "github.com/daguflow/dagu/internal/persistence/client"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
+	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )

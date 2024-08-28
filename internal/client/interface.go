@@ -18,10 +18,10 @@ package client
 import (
 	"path/filepath"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
-	"github.com/daguflow/dagu/internal/persistence"
-	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 )
 
 type Client interface {

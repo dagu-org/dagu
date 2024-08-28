@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // ExecutionGraph represents a graph of steps.

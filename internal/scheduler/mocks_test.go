@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag"
 )
 
 var _ jobCreator = (*mockJobFactory)(nil)

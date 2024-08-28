@@ -24,14 +24,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/agent"
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/persistence/model"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 

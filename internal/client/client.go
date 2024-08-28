@@ -25,13 +25,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence"
-	"github.com/daguflow/dagu/internal/persistence/model"
-	"github.com/daguflow/dagu/internal/sock"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/sock"
 )
 
 // New creates a new Client instance.

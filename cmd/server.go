@@ -18,9 +18,9 @@ package cmd
 import (
 	"log"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

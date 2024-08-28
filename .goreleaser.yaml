@@ -29,12 +29,12 @@ changelog:
       - "^docs:"
       - "^test:"
 brews:
-  # DEPRECATED: prefer using daguflow/dagu for brew formula
+  # DEPRECATED: prefer using dagu-org/dagu for brew formula
   - repository:
       owner: yohamta
       name: homebrew-tap
     directory: Formula
-    homepage: "https://github.com/daguflow/dagu"
+    homepage: "https://github.com/dagu-org/dagu"
     description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
     custom_block: |
@@ -46,10 +46,10 @@ brews:
         working_dir var
       end
   - repository:
-      owner: daguflow
+      owner: dagu-org
       name: homebrew-brew
     directory: Formula
-    homepage: "https://github.com/daguflow/dagu"
+    homepage: "https://github.com/dagu-org/dagu"
     description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
     custom_block: |

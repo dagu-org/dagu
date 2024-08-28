@@ -18,10 +18,10 @@ package client
 import (
 	"os"
 
-	"github.com/daguflow/dagu/internal/persistence"
-	"github.com/daguflow/dagu/internal/persistence/jsondb"
-	"github.com/daguflow/dagu/internal/persistence/local"
-	"github.com/daguflow/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
 
 var _ persistence.DataStores = (*dataStores)(nil)

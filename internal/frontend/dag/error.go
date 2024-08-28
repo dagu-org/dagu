@@ -16,7 +16,7 @@
 package dag
 
 import (
-	"github.com/daguflow/dagu/internal/frontend/gen/models"
+	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 	"github.com/go-openapi/swag"
 )
 

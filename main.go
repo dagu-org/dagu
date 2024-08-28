@@ -18,8 +18,8 @@ package main
 import (
 	"os"
 
-	"github.com/daguflow/dagu/cmd"
-	"github.com/daguflow/dagu/internal/constants"
+	"github.com/dagu-org/dagu/cmd"
+	"github.com/dagu-org/dagu/internal/constants"
 )
 
 func main() {

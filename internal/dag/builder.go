@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 // Exts is a list of supported file extensions for DAG files.

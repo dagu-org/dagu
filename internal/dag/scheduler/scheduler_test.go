@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 

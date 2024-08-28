@@ -20,13 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/persistence"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )

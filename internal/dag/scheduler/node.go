@@ -30,9 +30,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/executor"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag/executor"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 // Node is a node in a DAG. It executes a command.

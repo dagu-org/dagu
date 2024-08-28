@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/util"
 )
 
 func TestStorage(t *testing.T) {

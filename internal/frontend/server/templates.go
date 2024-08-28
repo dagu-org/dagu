@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/daguflow/dagu/internal/constants"
+	"github.com/dagu-org/dagu/internal/constants"
 )
 
 var (

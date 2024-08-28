@@ -21,8 +21,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/mailer"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/mitchellh/mapstructure"
 )
 

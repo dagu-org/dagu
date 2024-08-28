@@ -26,7 +26,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/daguflow/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag"
 )
 
 type sshExec struct {

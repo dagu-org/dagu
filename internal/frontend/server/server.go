@@ -24,14 +24,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-openapi/loads"
 	flags "github.com/jessevdk/go-flags"
 
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
-	pkgmiddleware "github.com/daguflow/dagu/internal/frontend/middleware"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
+	pkgmiddleware "github.com/dagu-org/dagu/internal/frontend/middleware"
 
 	"github.com/go-chi/chi/v5"
 )

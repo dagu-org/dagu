@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
 

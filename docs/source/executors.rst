@@ -6,7 +6,7 @@ Executors
 .. contents::
     :local:
 
-Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/daguflow/dagu/tree/main/internal/dag/executor>`_ are very welcome.
+Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/dagu-org/dagu/tree/main/internal/dag/executor>`_ are very welcome.
 
 .. _docker executor:
 
@@ -35,7 +35,7 @@ In the example below, it pulls and runs `Deno's docker image <https://hub.docker
 
 Example Log output:
 
-.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/docker.png
+.. image:: https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/docker.png
 
 By default, Dagu will try to pull the Docker image. For images built locally this will fail. If you want to skip image pull, pass :code:`pull: false` in executor config.
 

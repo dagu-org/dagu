@@ -18,8 +18,8 @@ package cmd
 import (
 	"testing"
 
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestStatusCommand(t *testing.T) {

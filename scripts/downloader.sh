@@ -16,7 +16,7 @@
 
 
 # Set up constants and URLs
-RELEASES_URL="https://github.com/daguflow/dagu/releases"
+RELEASES_URL="https://github.com/dagu-org/dagu/releases"
 FILE_BASENAME="dagu"
 
 echo "Downloading the latest binary to the current directory..."

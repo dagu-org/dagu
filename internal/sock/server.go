@@ -26,7 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var ErrServerRequestedShutdown = errors.New(

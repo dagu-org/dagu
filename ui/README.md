@@ -7,7 +7,7 @@
 The Dagu UI relies on a backend server that provides the necessary data for the UI to function properly. To start the backend server, navigate to the project root directory and execute the following command:
 
 ```bash
-git clone git@github.com:daguflow/dagu.git
+git clone git@github.com:dagu-org/dagu.git
 cd dagu
 make server
 ```
