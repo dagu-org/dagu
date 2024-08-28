@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,6 +46,10 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	_ = os.RemoveAll(testHomeDir)
 	os.Exit(code)
+}
+
+func schedulerTextCtxWithDagContext() context.Context {
+	return dag.NewContext(context.Background(), nil, nil, "", "")
 }
 
 func TestScheduler(t *testing.T) {
@@ -69,7 +73,7 @@ func TestScheduler(t *testing.T) {
 		}
 	}()
 
-	err = sc.Schedule(context.Background(), g, done)
+	err = sc.Schedule(schedulerTextCtxWithDagContext(), g, done)
 	require.Error(t, err)
 
 	require.Equal(t, counter.Load(), int64(3))
@@ -87,7 +91,7 @@ func TestSchedulerParallel(t *testing.T) {
 		step("2", testCommand),
 		step("3", testCommand),
 	)
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 	require.Equal(t, sc.Status(g), StatusSuccess)
 
@@ -177,7 +181,7 @@ func TestSchedulerCancel(t *testing.T) {
 		sc.Cancel(g)
 	}()
 
-	_ = sc.Schedule(context.Background(), g, nil)
+	_ = sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 
 	require.Eventually(t, func() bool {
 		return sc.Status(g) == StatusCancel
@@ -201,7 +205,7 @@ func TestSchedulerTimeout(t *testing.T) {
 	)
 	sc := New(&Config{Timeout: time.Second * 2, LogDir: testHomeDir})
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), StatusError)
 
@@ -308,7 +312,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 		require.Greater(t, retriedAt.Sub(startedAt), time.Millisecond*500)
 	}()
 
-	err = sc.Schedule(context.Background(), g, nil)
+	err = sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 
 	require.NoError(t, err)
 	require.Equal(t, sc.Status(g), StatusSuccess)
@@ -370,7 +374,7 @@ func TestSchedulerOnExit(t *testing.T) {
 		step("3", testCommand),
 	)
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -392,7 +396,7 @@ func TestSchedulerOnExitOnFail(t *testing.T) {
 		step("3", testCommand),
 	)
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
@@ -419,7 +423,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 		sc.Signal(g, syscall.SIGTERM, nil, false)
 	}()
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -451,7 +455,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 	<-done // Wait for canceling finished
 	require.Equal(t, sc.Status(g), StatusCancel)
@@ -478,7 +482,7 @@ func TestSchedulerOnSuccess(t *testing.T) {
 		step("1", testCommand),
 	)
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -504,7 +508,7 @@ func TestSchedulerOnFailure(t *testing.T) {
 		step("1", testCommandFail),
 	)
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
@@ -537,7 +541,7 @@ func TestRepeat(t *testing.T) {
 		sc.Cancel(g)
 	}()
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -560,7 +564,7 @@ func TestRepeatFail(t *testing.T) {
 		},
 	)
 	sc := New(&Config{LogDir: testHomeDir})
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.Error(t, err)
 
 	nodes := g.Nodes()
@@ -592,7 +596,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 		sc.Signal(g, syscall.SIGTERM, done, false)
 	}()
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 	<-done
 
@@ -637,7 +641,7 @@ func TestNodeSetupFailure(t *testing.T) {
 		},
 	)
 	sc := New(&Config{LogDir: testHomeDir})
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.Error(t, err)
 	require.Equal(t, sc.Status(g), StatusError)
 
@@ -665,7 +669,7 @@ func TestNodeTeardownFailure(t *testing.T) {
 		nodes[0].mu.Unlock()
 	}()
 
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	// file already closed
 	require.Error(t, err)
 
@@ -683,7 +687,7 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	s2.Output = "TOOK_PREV_OUT"
 
 	g, sc := newTestScheduler(t, &Config{LogDir: testHomeDir}, s1, s2)
-	err := sc.Schedule(context.Background(), g, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
@@ -712,7 +716,7 @@ func testSchedule(t *testing.T, steps ...dag.Step) (
 			MaxActiveRuns: 2,
 			LogDir:        testHomeDir,
 		}, steps...)
-	return g, sc, sc.Schedule(context.Background(), g, nil)
+	return g, sc, sc.Schedule(schedulerTextCtxWithDagContext(), g, nil)
 }
 
 func newTestScheduler(t *testing.T, cfg *Config, steps ...dag.Step) (

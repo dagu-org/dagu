@@ -45,7 +45,7 @@ Conditional Steps
         - condition: "$1"
           expected: bar
 
-.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/conditional.png
+.. image:: https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/conditional.png
 
 
 File Output
@@ -178,7 +178,7 @@ Expected Output:
 Sending Email Notifications
 ---------------------------
 
-.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/email.png
+.. image:: https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/email.png
 
 .. code-block:: yaml
 

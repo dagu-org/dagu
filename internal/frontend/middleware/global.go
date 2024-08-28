@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-chi/chi/v5/middleware"
 )
 

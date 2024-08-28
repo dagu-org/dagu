@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,14 +21,14 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	pkgmiddleware "github.com/daguflow/dagu/internal/frontend/middleware"
+	pkgmiddleware "github.com/dagu-org/dagu/internal/frontend/middleware"
 
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
 
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 )
 
 //go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../api.v1.yaml --principal any --exclude-main

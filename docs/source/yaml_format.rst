@@ -37,11 +37,11 @@ The command can be string or list of strings. The list of strings is useful when
 Schema Definition
 ~~~~~~~~~~~~~~~~~~
 
-We have a schema definition for the DAG file. The schema definition is used to validate the DAG file. The schema definition is available at `dag.schema.json <https://github.com/daguflow/dagu/blob/main/schemas/dag.schema.json>`_. This schema can be used by IDEs to provide auto-completion and validation. I.e.,:
+We have a schema definition for the DAG file. The schema definition is used to validate the DAG file. The schema definition is available at `dag.schema.json <https://github.com/dagu-org/dagu/blob/main/schemas/dag.schema.json>`_. This schema can be used by IDEs to provide auto-completion and validation. I.e.,:
 
 .. code-block:: yaml
 
-  # yaml-language-server: $schema=https://raw.githubusercontent.com/daguflow/dagu/main/schemas/dag.schema.json
+  # yaml-language-server: $schema=https://raw.githubusercontent.com/dagu-org/dagu/main/schemas/dag.schema.json
   steps:
     - name: step 1
       command: echo hello

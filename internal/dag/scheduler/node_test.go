@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,9 +25,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/stretchr/testify/require"
 )
+
+func nodeTextCtxWithDagContext() context.Context {
+	return dag.NewContext(context.Background(), nil, nil, "", "")
+}
 
 func TestExecute(t *testing.T) {
 	n := &Node{data: NodeData{
@@ -35,7 +39,7 @@ func TestExecute(t *testing.T) {
 			Command:         "true",
 			OutputVariables: &dag.SyncMap{},
 		}}}
-	require.NoError(t, n.Execute(context.Background()))
+	require.NoError(t, n.Execute(nodeTextCtxWithDagContext()))
 	require.Nil(t, n.data.State.Error)
 }
 
@@ -45,7 +49,7 @@ func TestError(t *testing.T) {
 			Command:         "false",
 			OutputVariables: &dag.SyncMap{},
 		}}}
-	err := n.Execute(context.Background())
+	err := n.Execute(nodeTextCtxWithDagContext())
 	require.True(t, err != nil)
 	require.Equal(t, n.data.State.Error, err)
 }
@@ -64,7 +68,7 @@ func TestSignal(t *testing.T) {
 	}()
 
 	n.setStatus(NodeStatusRunning)
-	err := n.Execute(context.Background())
+	err := n.Execute(nodeTextCtxWithDagContext())
 
 	require.Error(t, err)
 	require.Equal(t, n.State().Status, NodeStatusCancel)
@@ -85,7 +89,7 @@ func TestSignalSpecified(t *testing.T) {
 	}()
 
 	n.setStatus(NodeStatusRunning)
-	err := n.Execute(context.Background())
+	err := n.Execute(nodeTextCtxWithDagContext())
 
 	require.Error(t, err)
 	require.Equal(t, n.State().Status, NodeStatusCancel)
@@ -346,7 +350,7 @@ func TestRunScript(t *testing.T) {
 	require.Equal(t, n.data.Step.Script, string(b))
 
 	require.NoError(t, err)
-	err = n.Execute(context.Background())
+	err = n.Execute(nodeTextCtxWithDagContext())
 	require.NoError(t, err)
 	err = n.teardown()
 	require.NoError(t, err)
@@ -383,7 +387,7 @@ func runTestNode(t *testing.T, n *Node) {
 	err := n.setup(os.Getenv("HOME"),
 		fmt.Sprintf("test-request-id-%d", rand.Int()))
 	require.NoError(t, err)
-	err = n.Execute(context.Background())
+	err = n.Execute(nodeTextCtxWithDagContext())
 	require.NoError(t, err)
 	err = n.teardown()
 	require.NoError(t, err)

@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,9 +16,9 @@
 package dags
 
 import (
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/frontend/gen/models"
-	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/frontend/gen/models"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/swag"
 )
 

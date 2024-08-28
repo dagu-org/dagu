@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/daguflow/dagu/internal/constants"
+	"github.com/dagu-org/dagu/internal/constants"
 )
 
 var (
