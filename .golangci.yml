@@ -70,7 +70,7 @@ linters-settings:
   goheader:
     values:
       const:
-        AUTHOR: The Daguflow/Dagu Authors
+        AUTHOR: The Dagu Authors
     template: |-
       Copyright (C) {{ YEAR }} {{ AUTHOR }}
 

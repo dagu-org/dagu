@@ -189,7 +189,7 @@ addlicense:
 		-ignore "**/*.yaml" \
 		-ignore "**/filenotify/*" \
 		-ignore "**/testdata/**" \
-		-c "The Daguflow/Dagu Authors" \
+		-c "The Dagu Authors" \
 		-f scripts/header.txt \
 		.
 
