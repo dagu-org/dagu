@@ -27,13 +27,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence"
-
 	"github.com/daguflow/dagu/internal/client"
+	"github.com/daguflow/dagu/internal/constants"
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/daguflow/dagu/internal/logger"
 	"github.com/daguflow/dagu/internal/mailer"
+	"github.com/daguflow/dagu/internal/persistence"
 	"github.com/daguflow/dagu/internal/persistence/model"
 	"github.com/daguflow/dagu/internal/sock"
 )
@@ -202,11 +202,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}()
 
 	// Start the DAG execution.
-	lastErr := a.scheduler.Schedule(
-		dag.NewContext(ctx, a.dag, a.dataStore.DAGStore()),
-		a.graph,
-		done,
-	)
+	lastErr := a.scheduler.Schedule(dag.NewContext(ctx, a.dag, a.dataStore.DAGStore()), a.graph, done)
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
@@ -313,11 +309,27 @@ func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *Agent) setupEnvironmentVariable() error {
+	var (
+		err error
+	)
+
+	if err = os.Setenv(constants.DaguSchedulerLogPathKey, a.logFile); err != nil {
+		return err
+	}
+
+	return os.Setenv(constants.DaguRequestIDKey, a.requestID)
+}
+
 // setup the agent instance for DAG execution.
 func (a *Agent) setup() error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
+
+	if err := a.setupEnvironmentVariable(); err != nil {
+		return err
+	}
 
 	a.scheduler = a.newScheduler()
 	a.reporter = newReporter(
@@ -383,11 +395,7 @@ func (a *Agent) dryRun() error {
 
 	a.logger.Info("Dry-run started", "reqId", a.requestID)
 
-	lastErr := a.scheduler.Schedule(
-		dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore()),
-		a.graph,
-		done,
-	)
+	lastErr := a.scheduler.Schedule(dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore()), a.graph, done)
 
 	a.reporter.report(a.Status(), lastErr)
 

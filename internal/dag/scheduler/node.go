@@ -28,10 +28,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
+	"github.com/daguflow/dagu/internal/constants"
 	"github.com/daguflow/dagu/internal/dag"
 	"github.com/daguflow/dagu/internal/dag/executor"
 	"github.com/daguflow/dagu/internal/util"
-	"golang.org/x/sys/unix"
 )
 
 // Node is a node in a DAG. It executes a command.
@@ -129,6 +131,16 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
+	dagContext, err := dag.GetContext(ctx)
+	if err != nil {
+		return err
+	}
+	// set node special log path environment variable
+	if err = os.Setenv(dag.GenGlobalStepLogEnvKey(n.id), n.data.State.Log); err != nil {
+		return err
+	}
+	dagContext.Envs = append(dagContext.Envs, fmt.Sprintf("%s=%s", constants.StepDaguExecutionLogPathKeySuffix, n.data.State.Log))
+	ctx = dag.WithDagContext(ctx, dagContext)
 	cmd, err := n.setupExec(ctx)
 	if err != nil {
 		return err
@@ -373,7 +385,6 @@ func (n *Node) setupLog() error {
 	n.logWriter = bufio.NewWriter(n.logFile)
 	return nil
 }
-
 func (n *Node) teardown() error {
 	if n.done {
 		return nil
@@ -439,6 +450,13 @@ func (n *Node) init() {
 		return
 	}
 	n.id = getNextNodeID()
+
+	n.data.Step.CmdWithArgs = strings.ReplaceAll(
+		n.data.Step.CmdWithArgs,
+		constants.StepDaguExecutionLogPathKeySuffix,
+		dag.GenGlobalStepLogEnvKey(n.id),
+	)
+
 	if n.data.Step.Variables == nil {
 		n.data.Step.Variables = []string{}
 	}
