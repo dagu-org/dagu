@@ -31,25 +31,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testEnv struct {
+type testHelper struct {
 	JSONDB *JSONDB
 	TmpDir string
 }
 
-func setup(t *testing.T) testEnv {
+func setupTest(t *testing.T) testHelper {
 	tmpDir, err := os.MkdirTemp("", "test-persistence")
 	require.NoError(t, err)
-	return testEnv{
+	th := testHelper{
 		JSONDB: New(tmpDir, logger.Default, true),
 		TmpDir: tmpDir,
 	}
+	t.Cleanup(th.cleanup)
+	return th
 }
 
-func (te testEnv) cleanup() {
+func (te testHelper) cleanup() {
 	_ = os.RemoveAll(te.TmpDir)
 }
 
-func createTestDAG(te testEnv, name, location string) *dag.DAG {
+func createTestDAG(te testHelper, name, location string) *dag.DAG {
 	return &dag.DAG{
 		Name:     name,
 		Location: filepath.Join(te.TmpDir, location),
@@ -81,8 +83,7 @@ func TestNewJSONDB(t *testing.T) {
 }
 
 func TestJSONDB_Open(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_open", "test_open.yaml")
 	requestID := "request-id-1"
@@ -103,8 +104,7 @@ func TestJSONDB_Open(t *testing.T) {
 }
 
 func TestJSONDB_WriteAndClose(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_write", "test_write.yaml")
 	requestID := "req-1"
@@ -127,8 +127,7 @@ func TestJSONDB_WriteAndClose(t *testing.T) {
 }
 
 func TestJSONDB_ReadStatusRecent(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_read_status_recent", "test_read_status_recent.yaml")
 
@@ -154,8 +153,7 @@ func TestJSONDB_ReadStatusRecent(t *testing.T) {
 }
 
 func TestJSONDB_FindByRequestID(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_find_by_request_id", "test_find_by_request_id.yaml")
 
@@ -188,8 +186,7 @@ func TestJSONDB_FindByRequestID(t *testing.T) {
 }
 
 func TestJSONDB_RemoveOld(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_remove_old", "test_remove_old.yaml")
 
@@ -222,8 +219,7 @@ func TestJSONDB_RemoveOld(t *testing.T) {
 }
 
 func TestJSONDB_ReadStatusToday(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_read_status_today", "test_read_status_today.yaml")
 	requestID := "request-id-1"
@@ -244,8 +240,7 @@ func TestJSONDB_ReadStatusToday(t *testing.T) {
 }
 
 func TestJSONDB_Update(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_update", "test_update.yaml")
 	requestID := "request-id-1"
@@ -268,8 +263,7 @@ func TestJSONDB_Update(t *testing.T) {
 }
 
 func TestJSONDB_Compact(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_compact", "test_compact.yaml")
 	requestID := "req-1"
@@ -294,8 +288,7 @@ func TestJSONDB_Compact(t *testing.T) {
 }
 
 func TestJSONDB_Rename(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	oldID := "old_dag"
 	newID := "new_dag"
@@ -325,8 +318,7 @@ func TestJSONDB_Rename(t *testing.T) {
 }
 
 func TestParseStatusFile(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_parse", "test_parse.yaml")
 	requestID := "request-id-1"
@@ -352,8 +344,7 @@ func TestParseStatusFile_InvalidFile(t *testing.T) {
 }
 
 func TestParseStatusFile_EmptyFile(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	emptyFile := filepath.Join(te.TmpDir, "empty.dat")
 	_, err := os.Create(emptyFile)
@@ -365,8 +356,7 @@ func TestParseStatusFile_EmptyFile(t *testing.T) {
 }
 
 func TestJSONDB_ReadStatusToday_NoData(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_no_data", "test_no_data.yaml")
 
@@ -375,8 +365,7 @@ func TestJSONDB_ReadStatusToday_NoData(t *testing.T) {
 }
 
 func TestJSONDB_FindByRequestID_EmptyID(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_empty_id", "test_empty_id.yaml")
 
@@ -385,8 +374,7 @@ func TestJSONDB_FindByRequestID_EmptyID(t *testing.T) {
 }
 
 func TestJSONDB_RemoveAll(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_remove_all", "test_remove_all.yaml")
 
@@ -415,8 +403,7 @@ func TestJSONDB_RemoveAll(t *testing.T) {
 }
 
 func TestJSONDB_Rename_Conflict(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	oldID := "old_dag"
 	newID := "new_dag"
@@ -437,8 +424,7 @@ func TestJSONDB_Rename_Conflict(t *testing.T) {
 }
 
 func TestJSONDB_listRecentFiles(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_list_recent", "test_list_recent.yaml")
 
@@ -460,8 +446,7 @@ func TestJSONDB_listRecentFiles(t *testing.T) {
 }
 
 func TestJSONDB_listDirsSorted(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	testDir := filepath.Join(te.TmpDir, "test_list_dirs")
 	require.NoError(t, os.MkdirAll(testDir, 0755))
@@ -486,8 +471,7 @@ func TestJSONDB_listDirsSorted(t *testing.T) {
 }
 
 func TestJSONDB_listFilesSorted(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	testDir := filepath.Join(te.TmpDir, "test_list_files")
 	require.NoError(t, os.MkdirAll(testDir, 0755))
@@ -519,8 +503,7 @@ func TestJSONDB_listFilesSorted(t *testing.T) {
 }
 
 func TestJSONDB_latestToday(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	d := createTestDAG(te, "test_latest_today", "test_latest_today.yaml")
 	now := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -638,8 +621,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 }
 
 func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	te := setupTest(t)
 
 	// Create multiple DAGs with different statuses
 	dags := []struct {

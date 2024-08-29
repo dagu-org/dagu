@@ -21,8 +21,8 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/history"
 )
 
-// DataStores is an interface that provides access to various data stores.
-type DataStores interface {
+// ClientFactory is an interface that provides access to various data stores.
+type ClientFactory interface {
 	HistoryStore() history.Store // Returns the HistoryStore implementation
 	DAGStore() DAGStore          // Returns the DAGStore implementation
 	FlagStore() FlagStore        // Returns the FlagStore implementation

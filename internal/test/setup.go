@@ -42,8 +42,8 @@ func (t Setup) Cleanup() {
 	_ = os.RemoveAll(t.homeDir)
 }
 
-func (t Setup) DataStore() persistence.DataStores {
-	return dsclient.NewDataStores(
+func (t Setup) DataStore() persistence.ClientFactory {
+	return dsclient.NewFactory(
 		t.Config.DAGs,
 		t.Config.DataDir,
 		t.Config.SuspendFlagsDir,

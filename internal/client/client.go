@@ -41,7 +41,7 @@ var _ Client = (*client)(nil)
 // New creates a new Client instance.
 // The Client is used to interact with the DAG.
 func New(
-	dataStore persistence.DataStores,
+	dataStore persistence.ClientFactory,
 	executable string,
 	workDir string,
 	lg logger.Logger,
@@ -55,7 +55,7 @@ func New(
 }
 
 type client struct {
-	dataStore  persistence.DataStores
+	dataStore  persistence.ClientFactory
 	executable string
 	workDir    string
 	logger     logger.Logger

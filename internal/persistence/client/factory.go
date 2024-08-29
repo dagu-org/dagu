@@ -26,11 +26,11 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
 
-var _ persistence.DataStores = (*dataStores)(nil)
+var _ persistence.ClientFactory = (*dataStores)(nil)
 
 type dataStores struct {
 	historyStore history.Store
-	dagStore     persistence.DAGStore
+	dAGStore     persistence.DAGStore
 
 	dags              string
 	dataDir           string
@@ -43,13 +43,13 @@ type DataStoreOptions struct {
 	LatestStatusToday bool
 }
 
-func NewDataStores(
+func NewFactory(
 	dags string,
 	dataDir string,
 	suspendFlagsDir string,
 	logger logger.Logger,
 	opts DataStoreOptions,
-) persistence.DataStores {
+) persistence.ClientFactory {
 	dataStoreImpl := &dataStores{
 		dags:              dags,
 		dataDir:           dataDir,
@@ -82,10 +82,10 @@ func (f *dataStores) HistoryStore() history.Store {
 }
 
 func (f *dataStores) DAGStore() persistence.DAGStore {
-	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
+	if f.dAGStore == nil {
+		f.dAGStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
 	}
-	return f.dagStore
+	return f.dAGStore
 }
 
 func (f *dataStores) FlagStore() persistence.FlagStore {

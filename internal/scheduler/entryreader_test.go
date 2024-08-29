@@ -106,7 +106,7 @@ func setupTest(t *testing.T) (string, client.Client) {
 		WorkDir:         tmpDir,
 	}
 
-	dataStore := dsclient.NewDataStores(
+	dataStore := dsclient.NewFactory(
 		cfg.DAGs,
 		cfg.DataDir,
 		cfg.SuspendFlagsDir,

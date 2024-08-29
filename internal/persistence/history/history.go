@@ -26,11 +26,11 @@ import (
 var (
 	ErrReqIDNotFound     = errors.New("request ID not found")
 	ErrCreateDir         = errors.New("failed to create new directory")
-	ErrConflict          = errors.New("conflict")
 	ErrFileIsCompacted   = errors.New("file is already compacted")
 	ErrWriterOpen        = errors.New("writer is already open")
 	ErrNoStatusDataToday = fmt.Errorf("no status data today")
 	ErrNoStatusData      = fmt.Errorf("no status data")
+	ErrConflict          = errors.New("conflict")
 )
 
 // Store interface defines methods for managing DAG execution history.

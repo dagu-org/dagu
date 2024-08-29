@@ -23,12 +23,12 @@ import (
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 )
 
-func newClient(cfg *config.Config, ds persistence.DataStores, lg logger.Logger) client.Client {
+func newClient(cfg *config.Config, ds persistence.ClientFactory, lg logger.Logger) client.Client {
 	return client.New(ds, cfg.Executable, cfg.WorkDir, lg)
 }
 
-func newDataStores(cfg *config.Config, logger logger.Logger) persistence.DataStores {
-	return dsclient.NewDataStores(
+func newDataStores(cfg *config.Config, logger logger.Logger) persistence.ClientFactory {
+	return dsclient.NewFactory(
 		cfg.DAGs,
 		cfg.DataDir,
 		cfg.SuspendFlagsDir,

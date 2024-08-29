@@ -48,7 +48,7 @@ type Agent struct {
 	dag          *dag.DAG
 	dry          bool
 	retryTarget  *model.Status
-	dataStore    persistence.DataStores
+	dataStore    persistence.ClientFactory
 	client       client.Client
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
@@ -85,7 +85,7 @@ func New(
 	lg logger.Logger,
 	logDir, logFile string,
 	cli client.Client,
-	dataStore persistence.DataStores,
+	dataStore persistence.ClientFactory,
 	opts *Options,
 ) *Agent {
 	return &Agent{
