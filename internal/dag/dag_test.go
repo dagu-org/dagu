@@ -39,19 +39,19 @@ func TestDAG_String(t *testing.T) {
 
 func TestDAG_SockAddr(t *testing.T) {
 	t.Run("UnixSocketLocation", func(t *testing.T) {
-		workflow := &DAG{Location: "testdata/testDag.yml"}
-		require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, workflow.SockAddr())
+		dAG := &DAG{Location: "testdata/testDag.yml"}
+		require.Regexp(t, `^/tmp/@dagu-testDag-[0-9a-f]+\.sock$`, dAG.SockAddr())
 	})
 	t.Run("MaxUnixSocketLength", func(t *testing.T) {
-		workflow := &DAG{
+		dAG := &DAG{
 			Location: "testdata/testDagVeryLongNameThatExceedsUnixSocketLengthMaximum-testDagVeryLongNameThatExceedsUnixSocketLengthMaximum.yml",
 		}
 		// 108 is the maximum length of a unix socket address
-		require.Greater(t, 108, len(workflow.SockAddr()))
+		require.Greater(t, 108, len(dAG.SockAddr()))
 		require.Equal(
 			t,
 			"/tmp/@dagu-testDagVeryLongNameThatExceedsUnixSocketLengthMax-b92b711162d6012f025a76d0cf0b40c2.sock",
-			workflow.SockAddr(),
+			dAG.SockAddr(),
 		)
 	})
 }

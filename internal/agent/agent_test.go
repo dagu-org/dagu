@@ -244,9 +244,9 @@ func TestAgent_Retry(t *testing.T) {
 		defer setup.Cleanup()
 
 		// retry.yaml has a DAG that fails
-		workflow := testLoadDAG(t, "retry.yaml")
+		dAG := testLoadDAG(t, "retry.yaml")
 
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt := newAgent(setup, genRequestID(), dAG, &agent.Options{})
 		ctx := context.Background()
 		err := agt.Run(ctx)
 		require.Error(t, err)
@@ -261,7 +261,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Retry the DAG and check if it is successful
-		agt = newAgent(setup, genRequestID(), workflow, &agent.Options{
+		agt = newAgent(setup, genRequestID(), dAG, &agent.Options{
 			RetryTarget: status,
 		})
 		err = agt.Run(ctx)
@@ -431,9 +431,9 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 // without base config or parameters.
 func testLoadDAG(t *testing.T, name string) *dag.DAG {
 	file := filepath.Join(util.MustGetwd(), "testdata", name)
-	workflow, err := dag.Load("", file, "")
+	dAG, err := dag.Load("", file, "")
 	require.NoError(t, err)
-	return workflow
+	return dAG
 }
 
 func genRequestID() string {
@@ -447,12 +447,12 @@ func genRequestID() string {
 func newAgent(
 	setup test.Setup,
 	requestID string,
-	workflow *dag.DAG,
+	dAG *dag.DAG,
 	opts *agent.Options,
 ) *agent.Agent {
 	return agent.New(
 		requestID,
-		workflow,
+		dAG,
 		test.NewLogger(),
 		setup.Config.LogDir,
 		"",

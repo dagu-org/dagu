@@ -22,21 +22,21 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-func convertToDAG(workflow *dag.DAG) *models.Dag {
+func convertToDAG(dAG *dag.DAG) *models.Dag {
 	var schedules []*models.Schedule
-	for _, s := range workflow.Schedule {
+	for _, s := range dAG.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	return &models.Dag{
-		Name:          swag.String(workflow.Name),
-		Group:         swag.String(workflow.Group),
-		Description:   swag.String(workflow.Description),
-		Params:        workflow.Params,
-		DefaultParams: swag.String(workflow.DefaultParams),
-		Tags:          workflow.Tags,
+		Name:          swag.String(dAG.Name),
+		Group:         swag.String(dAG.Group),
+		Description:   swag.String(dAG.Description),
+		Params:        dAG.Params,
+		DefaultParams: swag.String(dAG.DefaultParams),
+		Tags:          dAG.Tags,
 		Schedule:      schedules,
 	}
 }

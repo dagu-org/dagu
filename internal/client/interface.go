@@ -99,12 +99,12 @@ type DagListPaginationSummaryResult struct {
 }
 
 func newDAGStatus(
-	workflow *dag.DAG, s *model.Status, suspended bool, err error,
+	dAG *dag.DAG, s *model.Status, suspended bool, err error,
 ) *DAGStatus {
 	ret := &DAGStatus{
-		File:      filepath.Base(workflow.Location),
-		Dir:       filepath.Dir(workflow.Location),
-		DAG:       workflow,
+		File:      filepath.Base(dAG.Location),
+		Dir:       filepath.Dir(dAG.Location),
+		DAG:       dAG,
 		Status:    s,
 		Suspended: suspended,
 		Error:     err,

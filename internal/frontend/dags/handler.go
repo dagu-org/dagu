@@ -264,10 +264,10 @@ func (h *Handler) getDetail(
 		return nil, newNotFoundError(err)
 	}
 
-	workflow := dagStatus.DAG
+	dAG := dagStatus.DAG
 
 	var steps []*models.StepObject
-	for _, step := range workflow.Steps {
+	for _, step := range dAG.Steps {
 		steps = append(steps, convertToStepObject(step))
 	}
 
@@ -288,14 +288,14 @@ func (h *Handler) getDetail(
 	}
 
 	var schedules []*models.Schedule
-	for _, s := range workflow.Schedule {
+	for _, s := range dAG.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	var preconditions []*models.Condition
-	for _, p := range workflow.Preconditions {
+	for _, p := range dAG.Preconditions {
 		preconditions = append(preconditions, &models.Condition{
 			Condition: p.Condition,
 			Expected:  p.Expected,
@@ -303,22 +303,22 @@ func (h *Handler) getDetail(
 	}
 
 	dagDetail := &models.DagDetail{
-		DefaultParams:     swag.String(workflow.DefaultParams),
-		Delay:             swag.Int64(int64(workflow.Delay)),
-		Description:       swag.String(workflow.Description),
-		Env:               workflow.Env,
-		Group:             swag.String(workflow.Group),
+		DefaultParams:     swag.String(dAG.DefaultParams),
+		Delay:             swag.Int64(int64(dAG.Delay)),
+		Description:       swag.String(dAG.Description),
+		Env:               dAG.Env,
+		Group:             swag.String(dAG.Group),
 		HandlerOn:         handlerOn,
-		HistRetentionDays: swag.Int64(int64(workflow.HistRetentionDays)),
-		Location:          swag.String(workflow.Location),
-		LogDir:            swag.String(workflow.LogDir),
-		MaxActiveRuns:     swag.Int64(int64(workflow.MaxActiveRuns)),
-		Name:              swag.String(workflow.Name),
-		Params:            workflow.Params,
+		HistRetentionDays: swag.Int64(int64(dAG.HistRetentionDays)),
+		Location:          swag.String(dAG.Location),
+		LogDir:            swag.String(dAG.LogDir),
+		MaxActiveRuns:     swag.Int64(int64(dAG.MaxActiveRuns)),
+		Name:              swag.String(dAG.Name),
+		Params:            dAG.Params,
 		Preconditions:     preconditions,
 		Schedule:          schedules,
 		Steps:             steps,
-		Tags:              workflow.Tags,
+		Tags:              dAG.Tags,
 	}
 
 	statusWithDetails := &models.DagStatusWithDetails{
@@ -355,13 +355,13 @@ func (h *Handler) getDetail(
 		return h.processSpecRequest(ctx, dagID, resp)
 
 	case dagTabTypeHistory:
-		return h.processLogRequest(ctx, resp, workflow)
+		return h.processLogRequest(ctx, resp, dAG)
 
 	case dagTabTypeStepLog:
-		return h.processStepLogRequest(workflow, params, resp)
+		return h.processStepLogRequest(dAG, params, resp)
 
 	case dagTabTypeSchedulerLog:
-		return h.processSchedulerLogRequest(workflow, params, resp)
+		return h.processSchedulerLogRequest(dAG, params, resp)
 
 	default:
 		return nil, newBadRequestError(errInvalidArgs)

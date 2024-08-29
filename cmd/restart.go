@@ -68,7 +68,7 @@ func restartCmd() *cobra.Command {
 			if err := stopDAGIfRunning(ctx, cli, dAG, initLogger); err != nil {
 				initLogger.Fatal("Workflow stop operation failed",
 					"error", err,
-					"workflow", dAG.Name)
+					"dag", dAG.Name)
 			}
 
 			// Wait for the specified amount of time before restarting.
@@ -79,7 +79,7 @@ func restartCmd() *cobra.Command {
 			if err != nil {
 				initLogger.Fatal("Previous execution parameter retrieval failed",
 					"error", err,
-					"workflow", dAG.Name)
+					"dag", dAG.Name)
 			}
 
 			// Start the DAG with the same parameter.
@@ -107,7 +107,7 @@ func restartCmd() *cobra.Command {
 			if err != nil {
 				initLogger.Fatal("Log file creation failed",
 					"error", err,
-					"workflow", dAG.Name)
+					"dag", dAG.Name)
 			}
 			defer logFile.Close()
 
@@ -119,7 +119,7 @@ func restartCmd() *cobra.Command {
 			})
 
 			agentLogger.Info("Workflow restart initiated",
-				"workflow", dAG.Name,
+				"dag", dAG.Name,
 				"requestID", requestID,
 				"logFile", logFile.Name())
 
@@ -139,7 +139,7 @@ func restartCmd() *cobra.Command {
 			if err := agt.Run(ctx); err != nil {
 				agentLogger.Fatal("Workflow restart failed",
 					"error", err,
-					"workflow", dAG.Name,
+					"dag", dAG.Name,
 					"requestID", requestID)
 			}
 		},

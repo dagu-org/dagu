@@ -107,7 +107,7 @@ func (e *entry) Invoke(ctx context.Context) error {
 	e.Logger.Info(
 		"Workflow operation started",
 		"operation", e.EntryType.String(),
-		"workflow", e.Job.String(),
+		"dag", e.Job.String(),
 		"next", e.Next.Format(time.RFC3339),
 	)
 
@@ -204,13 +204,13 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 		go func(e *entry) {
 			if err := e.Invoke(ctx); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("Workflow is already finished", "workflow", e.Job)
+					s.logger.Info("Workflow is already finished", "dag", e.Job)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("Workflow is already running", "workflow", e.Job)
+					s.logger.Info("Workflow is already running", "dag", e.Job)
 				} else {
 					s.logger.Error(
 						"Workflow execution failed",
-						"workflow", e.Job,
+						"dag", e.Job,
 						"operation", e.EntryType.String(),
 						"error", err,
 					)

@@ -29,14 +29,14 @@ import (
 	"github.com/dagu-org/dagu/internal/dag"
 )
 
-type subWorkflow struct {
+type subDAG struct {
 	cmd  *exec.Cmd
 	lock sync.Mutex
 }
 
 var errWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
-func newSubWorkflow(
+func newSubDAG(
 	ctx context.Context, step dag.Step,
 ) (Executor, error) {
 	executable, err := os.Executable()
@@ -52,7 +52,7 @@ func newSubWorkflow(
 	sugDAG, err := dagCtx.Finder.Find(step.SubWorkflow.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to find subworkflow %q: %w", step.SubWorkflow.Name, err,
+			"failed to find sub DAG %q: %w", step.SubWorkflow.Name, err,
 		)
 	}
 
@@ -80,12 +80,12 @@ func newSubWorkflow(
 		Pgid:    0,
 	}
 
-	return &subWorkflow{
+	return &subDAG{
 		cmd: cmd,
 	}, nil
 }
 
-func (e *subWorkflow) Run() error {
+func (e *subDAG) Run() error {
 	e.lock.Lock()
 	err := e.cmd.Start()
 	e.lock.Unlock()
@@ -95,15 +95,15 @@ func (e *subWorkflow) Run() error {
 	return e.cmd.Wait()
 }
 
-func (e *subWorkflow) SetStdout(out io.Writer) {
+func (e *subDAG) SetStdout(out io.Writer) {
 	e.cmd.Stdout = out
 }
 
-func (e *subWorkflow) SetStderr(out io.Writer) {
+func (e *subDAG) SetStderr(out io.Writer) {
 	e.cmd.Stderr = out
 }
 
-func (e *subWorkflow) Kill(sig os.Signal) error {
+func (e *subDAG) Kill(sig os.Signal) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	if e.cmd == nil || e.cmd.Process == nil {
@@ -113,5 +113,5 @@ func (e *subWorkflow) Kill(sig os.Signal) error {
 }
 
 func init() {
-	Register(dag.ExecutorTypeSubWorkflow, newSubWorkflow)
+	Register(dag.ExecutorTypeSubWorkflow, newSubDAG)
 }

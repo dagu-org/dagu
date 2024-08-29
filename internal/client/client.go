@@ -113,9 +113,9 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	return historyStore.RenameDAG(ctx, oldDAG.Location, newDAG.Location)
 }
 
-func (e *client) Stop(_ context.Context, workflow *dag.DAG) error {
+func (e *client) Stop(_ context.Context, dAG *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.NewClient(workflow.SockAddr())
+	client := sock.NewClient(dAG.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
@@ -216,8 +216,8 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, request
 	return ret.Status, err
 }
 
-func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) currentStatus(dAG *dag.DAG) (*model.Status, error) {
+	client := sock.NewClient(dAG.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
@@ -225,29 +225,29 @@ func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(ctx context.Context, workflow *dag.DAG) (*model.Status, error) {
-	currStatus, _ := e.currentStatus(workflow)
+func (e *client) GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*model.Status, error) {
+	currStatus, _ := e.currentStatus(dAG)
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().GetLatestStatus(ctx, workflow.Location)
+	status, err := e.dataStore.HistoryStore().GetLatestStatus(ctx, dAG.Location)
 	if errors.Is(err, history.ErrNoStatusDataToday) ||
 		errors.Is(err, history.ErrNoStatusData) {
-		return model.NewStatusDefault(workflow), nil
+		return model.NewStatusDefault(dAG), nil
 	}
 	if err != nil {
-		return model.NewStatusDefault(workflow), err
+		return model.NewStatusDefault(dAG), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
 }
 
-func (e *client) ListRecentHistory(ctx context.Context, workflow *dag.DAG, n int) []*model.History {
-	return e.dataStore.HistoryStore().ListRecentStatuses(ctx, workflow.Location, n)
+func (e *client) ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*model.History {
+	return e.dataStore.HistoryStore().ListRecentStatuses(ctx, dAG.Location, n)
 }
 
-func (e *client) UpdateStatus(ctx context.Context, workflow *dag.DAG, status *model.Status) error {
-	client := sock.NewClient(workflow.SockAddr())
+func (e *client) UpdateStatus(ctx context.Context, dAG *dag.DAG, status *model.Status) error {
+	client := sock.NewClient(dAG.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -261,7 +261,7 @@ func (e *client) UpdateStatus(ctx context.Context, workflow *dag.DAG, status *mo
 		}
 	}
 	return e.dataStore.HistoryStore().UpdateStatus(
-		ctx, workflow.Location, status.RequestID, status,
+		ctx, dAG.Location, status.RequestID, status,
 	)
 }
 
@@ -383,15 +383,15 @@ func (e *client) ListTags(_ context.Context) ([]string, []string, error) {
 	return e.dataStore.DAGStore().TagList()
 }
 
-func (e *client) readStatus(ctx context.Context, workflow *dag.DAG) (*DAGStatus, error) {
-	latestStatus, err := e.GetLatestStatus(ctx, workflow)
+func (e *client) readStatus(ctx context.Context, dAG *dag.DAG) (*DAGStatus, error) {
+	latestStatus, err := e.GetLatestStatus(ctx, dAG)
 	id := strings.TrimSuffix(
-		filepath.Base(workflow.Location),
-		filepath.Ext(workflow.Location),
+		filepath.Base(dAG.Location),
+		filepath.Ext(dAG.Location),
 	)
 
 	return newDAGStatus(
-		workflow, latestStatus, e.IsSuspended(ctx, id), err,
+		dAG, latestStatus, e.IsSuspended(ctx, id), err,
 	), err
 }
 

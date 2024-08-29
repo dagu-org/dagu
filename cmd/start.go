@@ -54,7 +54,7 @@ func startCmd() *cobra.Command {
 				initLogger.Fatal("Parameter retrieval failed", "error", err)
 			}
 
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
+			dAG, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
@@ -67,8 +67,8 @@ func startCmd() *cobra.Command {
 			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
 				Prefix:    "start_",
 				LogDir:    cfg.LogDir,
-				DAGLogDir: workflow.LogDir,
-				DAGName:   workflow.Name,
+				DAGLogDir: dAG.LogDir,
+				DAGName:   dAG.Name,
 				RequestID: requestID,
 			})
 			if err != nil {
@@ -76,8 +76,8 @@ func startCmd() *cobra.Command {
 					"Log file creation failed",
 					"error",
 					err,
-					"workflow",
-					workflow.Name,
+					"dag",
+					dAG.Name,
 				)
 			}
 			defer logFile.Close()
@@ -93,13 +93,13 @@ func startCmd() *cobra.Command {
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Info("Workflow execution initiated",
-				"workflow", workflow.Name,
+				"dag", dAG.Name,
 				"requestID", requestID,
 				"logFile", logFile.Name())
 
 			agt := agent.New(
 				requestID,
-				workflow,
+				dAG,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
@@ -114,7 +114,7 @@ func startCmd() *cobra.Command {
 			if err := agt.Run(ctx); err != nil {
 				agentLogger.Fatal("Workflow execution failed",
 					"error", err,
-					"workflow", workflow.Name,
+					"dag", dAG.Name,
 					"requestID", requestID)
 			}
 		},

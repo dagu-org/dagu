@@ -70,9 +70,9 @@ type Status struct {
 	mu         sync.RWMutex
 }
 
-func NewStatusDefault(workflow *dag.DAG) *Status {
+func NewStatusDefault(dAG *dag.DAG) *Status {
 	return NewStatus(
-		workflow, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
+		dAG, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
 	)
 }
 
