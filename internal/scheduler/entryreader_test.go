@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -39,6 +40,7 @@ func TestReadEntries(t *testing.T) {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
+		ctx := context.Background()
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(newEntryReaderArgs{
 			DagsDir:    filepath.Join(testdataDir, "invalid_directory"),
@@ -47,7 +49,7 @@ func TestReadEntries(t *testing.T) {
 			Client:     cli,
 		})
 
-		entries, err := entryReader.Read(now)
+		entries, err := entryReader.Read(ctx, now)
 		require.NoError(t, err)
 		require.Len(t, entries, 0)
 
@@ -60,9 +62,9 @@ func TestReadEntries(t *testing.T) {
 
 		done := make(chan any)
 		defer close(done)
-		entryReader.Start(done)
+		entryReader.Start(ctx, done)
 
-		entries, err = entryReader.Read(now)
+		entries, err = entryReader.Read(ctx, now)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(entries), 1)
 
@@ -79,11 +81,11 @@ func TestReadEntries(t *testing.T) {
 			}
 		}
 
-		err = cli.ToggleSuspend(j.GetDAG().Name, true)
+		err = cli.ToggleSuspend(ctx, j.GetDAG().Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended
-		lives, err := entryReader.Read(now)
+		lives, err := entryReader.Read(ctx, now)
 		require.NoError(t, err)
 		require.Equal(t, len(entries)-1, len(lives))
 	})

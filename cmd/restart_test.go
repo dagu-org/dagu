@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ func TestRestartCommand(t *testing.T) {
 		defer setup.Cleanup()
 
 		dagFile := testDAGFile("restart.yaml")
+		ctx := context.Background()
 
 		// Start the DAG.
 		go func() {
@@ -73,7 +75,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
+		dAG, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
 		dataStore := newDataStores(setup.Config, logger.Default)
@@ -81,7 +83,7 @@ func TestRestartCommand(t *testing.T) {
 			setup.Config,
 			dataStore,
 			logger.Default,
-		).ListRecentHistory(workflow, 2)
+		).ListRecentHistory(ctx, dAG, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

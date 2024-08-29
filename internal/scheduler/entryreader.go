@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,11 +69,11 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 	return er
 }
 
-func (er *entryReaderImpl) Start(done chan any) {
+func (er *entryReaderImpl) Start(_ context.Context, done chan any) {
 	go er.watchDags(done)
 }
 
-func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
+func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
@@ -95,7 +96,7 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 			filepath.Ext(workflow.Location),
 		)
 
-		if er.client.IsSuspended(id) {
+		if er.client.IsSuspended(ctx, id) {
 			continue
 		}
 		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)

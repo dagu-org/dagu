@@ -31,6 +31,7 @@ func stopCmd() *cobra.Command {
 		Long:  `dagu stop /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
 			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Configuration load failed: %v", err)
@@ -57,7 +58,7 @@ func stopCmd() *cobra.Command {
 			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 
-			if err := cli.Stop(workflow); err != nil {
+			if err := cli.Stop(ctx, workflow); err != nil {
 				logger.Fatal(
 					"Workflow stop operation failed",
 					"error",

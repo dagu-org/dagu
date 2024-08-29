@@ -16,6 +16,7 @@
 package history
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -37,27 +38,27 @@ var (
 // Store interface defines methods for managing DAG execution history.
 type Store interface {
 	// Open initializes a new history entry for a DAG execution
-	Open(dagFile string, t time.Time, requestID string) error
+	Open(ctx context.Context, dagID string, startTime time.Time, requestID string) error
 	// Write records a new status for the current DAG execution
-	Write(status *model.Status) error
+	Write(ctx context.Context, status *model.Status) error
 	// Close finalizes the current history entry
-	Close() error
+	Close(ctx context.Context) error
 	// UpdateStatus modifies an existing history entry
-	UpdateStatus(dagFile, requestID string, st *model.Status) error
+	UpdateStatus(ctx context.Context, dagID, requestID string, status *model.Status) error
 	// GetLatest retrieves the latest status entry for today
-	GetLatest(dagFile string) (*model.Status, error)
+	GetLatestStatus(ctx context.Context, dagID string) (*model.Status, error)
 	// GetByRequestID locates a specific history entry by its request ID
-	GetByRequestID(dagFile string, requestID string) (*model.History, error)
+	GetStatusByRequestID(ctx context.Context, dagID string, requestID string) (*model.History, error)
 	// ListRecent retrieves the n most recent status entries for a DAG
-	ListRecent(dagFile string, n int) []*model.History
+	ListRecentStatuses(ctx context.Context, dagID string, limit int) []*model.History
 	// ListStatusesByDate retrieves all status entries for a specific date
-	ListByLocalDate(date time.Time) ([]*model.History, error)
+	ListStatusesByDate(ctx context.Context, date time.Time) ([]*model.History, error)
 	// ListRecentAll retrieves the n most recent status files across all DAGs.
-	ListRecentAll(n int) ([]*model.History, error)
+	ListRecentStatusesAllDAGs(ctx context.Context, limit int) ([]*model.History, error)
 	// DeleteAll deletes all history entries for a DAG
-	DeleteAll(dagFile string) error
+	DeleteAllStatuses(ctx context.Context, dagID string) error
 	// DeleteOld deletes history entries older than the specified retention period
-	DeleteOld(dagFile string, retentionDays int) error
+	DeleteOldStatuses(ctx context.Context, dagID string, retentionDays int) error
 	// RenameDAG updates the DAG identifier in history entries
-	RenameDAG(oldID, newID string) error
+	RenameDAG(ctx context.Context, oldID, newID string) error
 }

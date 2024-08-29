@@ -127,23 +127,23 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Check if the DAG is already running.
-	if err := a.checkIsAlreadyRunning(); err != nil {
+	if err := a.checkIsAlreadyRunning(ctx); err != nil {
 		return err
 	}
 
 	// Make a connection to the database.
 	// It should close the connection to the history database when the DAG
 	// execution is finished.
-	if err := a.setupDatabase(); err != nil {
+	if err := a.setupDatabase(ctx); err != nil {
 		return err
 	}
 	defer func() {
-		if err := a.historyStore.Close(); err != nil {
+		if err := a.historyStore.Close(ctx); err != nil {
 			a.logger.Error("Failed to close history store", "error", err)
 		}
 	}()
 
-	if err := a.historyStore.Write(a.Status()); err != nil {
+	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Failed to write status", "error", err)
 	}
 
@@ -180,7 +180,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			if err := a.historyStore.Write(status); err != nil {
+			if err := a.historyStore.Write(ctx, status); err != nil {
 				a.logger.Error("Failed to write status", "error", err)
 			}
 			if err := a.reporter.reportStep(a.dag, status, node); err != nil {
@@ -196,7 +196,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := a.historyStore.Write(a.Status()); err != nil {
+		if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 			a.logger.Error("Status write failed", "error", err)
 		}
 	}()
@@ -208,7 +208,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
 	a.logger.Info("Workflow execution finished", "status", finishedStatus.Status)
-	if err := a.historyStore.Write(a.Status()); err != nil {
+	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Status write failed", "error", err)
 	}
 
@@ -459,14 +459,14 @@ func (a *Agent) setupGraphForRetry() error {
 }
 
 // setup database prepare database connection and remove old history data.
-func (a *Agent) setupDatabase() error {
+func (a *Agent) setupDatabase(ctx context.Context) error {
 	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
-	if err := a.historyStore.DeleteOld(location, retentionDays); err != nil {
+	if err := a.historyStore.DeleteOldStatuses(ctx, location, retentionDays); err != nil {
 		a.logger.Error("History data cleanup failed", "error", err)
 	}
 
-	return a.historyStore.Open(a.dag.Location, time.Now(), a.requestID)
+	return a.historyStore.Open(ctx, a.dag.Location, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.
@@ -499,8 +499,8 @@ func (a *Agent) checkPreconditions() error {
 }
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
-func (a *Agent) checkIsAlreadyRunning() error {
-	status, err := a.client.GetCurrentStatus(a.dag)
+func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
+	status, err := a.client.GetCurrentStatus(ctx, a.dag)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -123,11 +124,12 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	workflow, err := dag.Load(cfg.BaseConfig, dagFile, "")
+	ctx := context.Background()
+	dAG, err := dag.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(workflow)
+		status, err := e.GetCurrentStatus(ctx, dAG)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)
@@ -143,7 +145,7 @@ func testLastStatusEventual(
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		status := hs.ListRecent(dg, 1)
+		status := hs.ListRecentStatuses(context.Background(), dg, 1)
 		if len(status) < 1 {
 			return false
 		}

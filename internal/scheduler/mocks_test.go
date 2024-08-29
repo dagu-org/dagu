@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -26,8 +27,8 @@ var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(workflow *dag.DAG, _ time.Time) job {
-	return newMockJob(workflow)
+func (f *mockJobFactory) CreateJob(dAG *dag.DAG, _ time.Time) job {
+	return newMockJob(dAG)
 }
 
 var _ entryReader = (*mockEntryReader)(nil)
@@ -36,11 +37,11 @@ type mockEntryReader struct {
 	Entries []*entry
 }
 
-func (er *mockEntryReader) Read(_ time.Time) ([]*entry, error) {
+func (er *mockEntryReader) Read(_ context.Context, _ time.Time) ([]*entry, error) {
 	return er.Entries, nil
 }
 
-func (er *mockEntryReader) Start(chan any) {}
+func (er *mockEntryReader) Start(context.Context, chan any) {}
 
 var _ job = (*mockJob)(nil)
 
@@ -53,10 +54,10 @@ type mockJob struct {
 	Panic        error
 }
 
-func newMockJob(workflow *dag.DAG) *mockJob {
+func newMockJob(dAG *dag.DAG) *mockJob {
 	return &mockJob{
-		DAG:  workflow,
-		Name: workflow.Name,
+		DAG:  dAG,
+		Name: dAG.Name,
 	}
 }
 
@@ -68,7 +69,7 @@ func (j *mockJob) String() string {
 	return j.Name
 }
 
-func (j *mockJob) Start() error {
+func (j *mockJob) Start(_ context.Context) error {
 	j.RunCount.Add(1)
 	if j.Panic != nil {
 		panic(j.Panic)
@@ -76,12 +77,12 @@ func (j *mockJob) Start() error {
 	return nil
 }
 
-func (j *mockJob) Stop() error {
+func (j *mockJob) Stop(_ context.Context) error {
 	j.StopCount.Add(1)
 	return nil
 }
 
-func (j *mockJob) Restart() error {
+func (j *mockJob) Restart(_ context.Context) error {
 	j.RestartCount.Add(1)
 	return nil
 }

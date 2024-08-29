@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -63,8 +64,8 @@ func (j *jobImpl) GetDAG() *dag.DAG {
 	return j.DAG
 }
 
-func (j *jobImpl) Start() error {
-	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
+func (j *jobImpl) Start(ctx context.Context) error {
+	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
 		return err
 	}
@@ -82,24 +83,24 @@ func (j *jobImpl) Start() error {
 			return errJobFinished
 		}
 	}
-	return j.Client.Start(j.DAG, client.StartOptions{
+	return j.Client.Start(ctx, j.DAG, client.StartOptions{
 		Quiet: true,
 	})
 }
 
-func (j *jobImpl) Stop() error {
-	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
+func (j *jobImpl) Stop(ctx context.Context) error {
+	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
 		return err
 	}
 	if latestStatus.Status != dagscheduler.StatusRunning {
 		return errJobIsNotRunning
 	}
-	return j.Client.Stop(j.DAG)
+	return j.Client.Stop(ctx, j.DAG)
 }
 
-func (j *jobImpl) Restart() error {
-	return j.Client.Restart(j.DAG, client.RestartOptions{
+func (j *jobImpl) Restart(ctx context.Context) error {
+	return j.Client.Restart(ctx, j.DAG, client.RestartOptions{
 		Quiet: true,
 	})
 }

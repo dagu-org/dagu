@@ -16,6 +16,7 @@
 package jsondb
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,9 +63,10 @@ func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *model.Statu
 }
 
 func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *model.Status, tm time.Time) {
-	require.NoError(t, db.Open(d.Location, tm, status.RequestID))
-	require.NoError(t, db.Write(status))
-	require.NoError(t, db.Close())
+	ctx := context.Background()
+	require.NoError(t, db.Open(ctx, d.Location, tm, status.RequestID))
+	require.NoError(t, db.Write(ctx, status))
+	require.NoError(t, db.Close(ctx))
 }
 
 func TestNewJSONDB(t *testing.T) {
@@ -91,7 +93,9 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 		}
 
 		// Get the latest status
-		latestStatus, err := th.JSONDB.GetLatest(d.Location)
+		latestStatus, err := th.JSONDB.GetLatestStatus(
+			context.Background(),
+			d.Location)
 		require.NoError(t, err)
 		assert.NotNil(t, latestStatus)
 		assert.Equal(t, "request-id-3", latestStatus.RequestID)
@@ -101,7 +105,7 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 		d := createTestDAG(th, "test_get_latest_no_status", "test_get_latest_no_status.yaml")
 
 		// Try to get the latest status when no status exists
-		_, err := th.JSONDB.GetLatest(d.Location)
+		_, err := th.JSONDB.GetLatestStatus(context.Background(), d.Location)
 		assert.Error(t, err)
 	})
 
@@ -110,7 +114,7 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 		requestID := "request-id-1"
 		now := time.Now()
 
-		err := th.JSONDB.Open(d.Location, now, requestID)
+		err := th.JSONDB.Open(context.Background(), d.Location, now, requestID)
 		require.NoError(t, err)
 
 		indexDir := filepath.Join(th.TmpDir, "index", d.Name)
@@ -119,7 +123,7 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 		assert.DirExists(t, indexDir)
 		assert.DirExists(t, statusDir)
 
-		require.NoError(t, th.JSONDB.Close())
+		require.NoError(t, th.JSONDB.Close(context.Background()))
 	})
 
 	t.Run("WriteAndClose", func(t *testing.T) {
@@ -127,14 +131,14 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 		requestID := "req-1"
 		now := time.Now()
 
-		require.NoError(t, th.JSONDB.Open(d.Location, now, requestID))
+		require.NoError(t, th.JSONDB.Open(context.Background(), d.Location, now, requestID))
 
 		status := createTestStatus(d, scheduler.StatusRunning, 12345)
-		require.NoError(t, th.JSONDB.Write(status))
+		require.NoError(t, th.JSONDB.Write(context.Background(), status))
 
-		require.NoError(t, th.JSONDB.Close())
+		require.NoError(t, th.JSONDB.Close(context.Background()))
 
-		statusFiles := th.JSONDB.ListRecent(d.Location, 1)
+		statusFiles := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 1)
 		require.Len(t, statusFiles, 1)
 		assert.Equal(t, status.RequestID, statusFiles[0].Status.RequestID)
 		assert.Equal(t, status.Status, statusFiles[0].Status.Status)
@@ -163,7 +167,7 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 			writeTestStatus(t, th.JSONDB, d, data.Status, data.Timestamp)
 		}
 
-		recentStatus := th.JSONDB.ListRecent(d.Location, 2)
+		recentStatus := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 2)
 		require.Len(t, recentStatus, 2)
 		assert.Equal(t, "request-id-3", recentStatus[0].Status.RequestID)
 		assert.Equal(t, "request-id-2", recentStatus[1].Status.RequestID)
@@ -188,13 +192,13 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 		}
 
 		t.Run("ExistingRequestID", func(t *testing.T) {
-			status, err := th.JSONDB.GetByRequestID(d.Location, "request-id-2")
+			status, err := th.JSONDB.GetStatusByRequestID(context.Background(), d.Location, "request-id-2")
 			require.NoError(t, err)
 			require.Equal(t, "request-id-2", status.Status.RequestID)
 		})
 
 		t.Run("NonExistentRequestID", func(t *testing.T) {
-			status, err := th.JSONDB.GetByRequestID(d.Location, "request-id-10000")
+			status, err := th.JSONDB.GetStatusByRequestID(context.Background(), d.Location, "request-id-10000")
 			require.Error(t, err)
 			require.Nil(t, status)
 		})
@@ -211,9 +215,9 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 
 		updatedStatus := createTestStatus(d, scheduler.StatusSuccess, 12345)
 		updatedStatus.RequestID = requestID
-		require.NoError(t, th.JSONDB.UpdateStatus(d.Location, requestID, updatedStatus))
+		require.NoError(t, th.JSONDB.UpdateStatus(context.Background(), d.Location, requestID, updatedStatus))
 
-		statusFiles := th.JSONDB.ListRecent(d.Location, 1)
+		statusFiles := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 1)
 		require.Len(t, statusFiles, 1)
 		assert.Equal(t, updatedStatus.RequestID, statusFiles[0].Status.RequestID)
 		assert.Equal(t, updatedStatus.Status, statusFiles[0].Status.Status)
@@ -242,15 +246,15 @@ func TestJSONDB_FileOperations(t *testing.T) {
 			writeTestStatus(t, th.JSONDB, d, data.Status, data.Timestamp)
 		}
 
-		files := th.JSONDB.ListRecent(d.Location, 3)
+		files := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 3)
 		require.Equal(t, 3, len(files))
 
 		require.NoError(t, os.Chtimes(files[0].File, time.Now().AddDate(0, 0, -2), time.Now().AddDate(0, 0, -2)))
 		require.NoError(t, os.Chtimes(files[1].File, time.Now().AddDate(0, 0, -1), time.Now().AddDate(0, 0, -1)))
 
-		require.NoError(t, th.JSONDB.DeleteOld(d.Location, 1))
+		require.NoError(t, th.JSONDB.DeleteOldStatuses(context.Background(), d.Location, 1))
 
-		files = th.JSONDB.ListRecent(d.Location, 3)
+		files = th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 3)
 		require.Equal(t, 1, len(files))
 	})
 
@@ -272,12 +276,12 @@ func TestJSONDB_FileOperations(t *testing.T) {
 			writeTestStatus(t, th.JSONDB, d, data.Status, data.Timestamp)
 		}
 
-		files := th.JSONDB.ListRecent(d.Location, 3)
+		files := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 3)
 		require.Equal(t, 3, len(files))
 
-		require.NoError(t, th.JSONDB.DeleteAll(d.Location))
+		require.NoError(t, th.JSONDB.DeleteAllStatuses(context.Background(), d.Location))
 
-		files = th.JSONDB.ListRecent(d.Location, 3)
+		files = th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 3)
 		require.Empty(t, files)
 	})
 
@@ -293,7 +297,7 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		oldPath := d.Location
 		newPath := filepath.Join(filepath.Dir(d.Location), newID+".yaml")
 
-		require.NoError(t, th.JSONDB.RenameDAG(oldPath, newPath))
+		require.NoError(t, th.JSONDB.RenameDAG(context.Background(), oldPath, newPath))
 
 		oldIndexDir := filepath.Join(th.TmpDir, "index", oldID)
 		assert.NoDirExists(t, oldIndexDir)
@@ -301,7 +305,7 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		newIndexDir := filepath.Join(th.TmpDir, "index", newID)
 		assert.DirExists(t, newIndexDir)
 
-		statusFiles := th.JSONDB.ListRecent(newPath, 1)
+		statusFiles := th.JSONDB.ListRecentStatuses(context.Background(), newPath, 1)
 		require.Len(t, statusFiles, 1)
 		assert.Equal(t, status.RequestID, statusFiles[0].Status.RequestID)
 		assert.Equal(t, status.Status, statusFiles[0].Status.Status)
@@ -321,7 +325,7 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		status2.RequestID = "request-id-2"
 		writeTestStatus(t, th.JSONDB, d2, status2, time.Now())
 
-		err := th.JSONDB.RenameDAG(d1.Location, d2.Location)
+		err := th.JSONDB.RenameDAG(context.Background(), d1.Location, d2.Location)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conflict")
 	})
@@ -445,7 +449,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 			requestID := fmt.Sprintf("%s-req-%d", dagID, i)
 			timestamp := date.Add(time.Duration(i) * time.Hour)
 
-			err := th.JSONDB.Open(dagID, timestamp, requestID)
+			err := th.JSONDB.Open(context.Background(), dagID, timestamp, requestID)
 			require.NoError(t, err)
 
 			status := &model.Status{
@@ -454,17 +458,17 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 				StartedAt: timestamp.Format(time.RFC3339),
 				Status:    scheduler.StatusRunning,
 			}
-			err = th.JSONDB.Write(status)
+			err = th.JSONDB.Write(context.Background(), status)
 			require.NoError(t, err)
 
-			err = th.JSONDB.Close()
+			err = th.JSONDB.Close(context.Background())
 			require.NoError(t, err)
 
 			totalEntries++
 		}
 	}
 
-	statusFiles, err := th.JSONDB.ListByLocalDate(date)
+	statusFiles, err := th.JSONDB.ListStatusesByDate(context.Background(), date)
 	require.NoError(t, err)
 	assert.Len(t, statusFiles, totalEntries)
 
@@ -481,12 +485,12 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	assert.Equal(t, len(dags), len(dagSet), "Statuses should be from all DAGs")
 
 	emptyDate := date.AddDate(0, 0, 1)
-	emptyStatusFiles, err := th.JSONDB.ListByLocalDate(emptyDate)
+	emptyStatusFiles, err := th.JSONDB.ListStatusesByDate(context.Background(), emptyDate)
 	require.NoError(t, err)
 	assert.Empty(t, emptyStatusFiles)
 
 	edgeDate := time.Date(2023, 3, 26, 1, 30, 0, 0, loc)
-	err = th.JSONDB.Open("edge-dag", edgeDate, "edge-request")
+	err = th.JSONDB.Open(context.Background(), "edge-dag", edgeDate, "edge-request")
 	require.NoError(t, err)
 	edgeStatus := &model.Status{
 		Name:      "edge-dag",
@@ -494,12 +498,12 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 		StartedAt: edgeDate.Format(time.RFC3339),
 		Status:    scheduler.StatusRunning,
 	}
-	err = th.JSONDB.Write(edgeStatus)
+	err = th.JSONDB.Write(context.Background(), edgeStatus)
 	require.NoError(t, err)
-	err = th.JSONDB.Close()
+	err = th.JSONDB.Close(context.Background())
 	require.NoError(t, err)
 
-	edgeStatusFiles, err := th.JSONDB.ListByLocalDate(edgeDate)
+	edgeStatusFiles, err := th.JSONDB.ListStatusesByDate(context.Background(), edgeDate)
 	require.NoError(t, err)
 	assert.Len(t, edgeStatusFiles, 1)
 	assert.Equal(t, "edge-dag", edgeStatusFiles[0].Status.Name)
@@ -530,7 +534,7 @@ func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {
 		}
 	}
 
-	recentStatus, err := th.JSONDB.ListRecentAll(5)
+	recentStatus, err := th.JSONDB.ListRecentStatusesAllDAGs(context.Background(), 5)
 	require.NoError(t, err)
 	assert.Len(t, recentStatus, 5)
 
@@ -538,16 +542,16 @@ func TestJSONDB_ListRecentStatusAllDAGs(t *testing.T) {
 		assert.True(t, recentStatus[i].Status.StartedAt > recentStatus[i+1].Status.StartedAt)
 	}
 
-	allStatus, err := th.JSONDB.ListRecentAll(100)
+	allStatus, err := th.JSONDB.ListRecentStatusesAllDAGs(context.Background(), 100)
 	require.NoError(t, err)
 	assert.Len(t, allStatus, 9)
 
-	zeroStatus, err := th.JSONDB.ListRecentAll(0)
+	zeroStatus, err := th.JSONDB.ListRecentStatusesAllDAGs(context.Background(), 0)
 	require.NoError(t, err)
 	assert.Empty(t, zeroStatus)
 
 	th.JSONDB.baseDir = "/non/existent/dir"
-	_, err = th.JSONDB.ListRecentAll(5)
+	_, err = th.JSONDB.ListRecentStatusesAllDAGs(context.Background(), 5)
 	assert.Error(t, err)
 }
 
@@ -557,25 +561,25 @@ func TestJSONDB_EdgeCases(t *testing.T) {
 	t.Run("WriteWithoutOpen", func(t *testing.T) {
 		d := createTestDAG(th, "test_write_without_open", "test_write_without_open.yaml")
 		status := createTestStatus(d, scheduler.StatusRunning, 12345)
-		err := th.JSONDB.Write(status)
+		err := th.JSONDB.Write(context.Background(), status)
 		assert.Error(t, err)
 	})
 
 	t.Run("CloseWithoutOpen", func(t *testing.T) {
-		err := th.JSONDB.Close()
+		err := th.JSONDB.Close(context.Background())
 		assert.Error(t, err)
 	})
 
 	t.Run("DeleteOldWithInvalidDuration", func(t *testing.T) {
 		d := createTestDAG(th, "test_delete_old_invalid", "test_delete_old_invalid.yaml")
-		err := th.JSONDB.DeleteOld(d.Location, -1)
+		err := th.JSONDB.DeleteOldStatuses(context.Background(), d.Location, -1)
 		assert.Error(t, err)
 	})
 
 	t.Run("RenameNonExistentDAG", func(t *testing.T) {
 		oldPath := filepath.Join(th.TmpDir, "non_existent_old.yaml")
 		newPath := filepath.Join(th.TmpDir, "non_existent_new.yaml")
-		err := th.JSONDB.RenameDAG(oldPath, newPath)
+		err := th.JSONDB.RenameDAG(context.Background(), oldPath, newPath)
 		// No error should be returned if the DAG does not exist
 		assert.NoError(t, err)
 	})

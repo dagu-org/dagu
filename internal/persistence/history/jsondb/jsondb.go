@@ -16,6 +16,7 @@ package jsondb
 
 import (
 	"bufio"
+	"context"
 	"sync"
 
 	"fmt"
@@ -70,8 +71,8 @@ func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 }
 
 // UpdateStatus updates the status of a specific DAG execution.
-func (s *JSONDB) UpdateStatus(dagID, reqID string, status *model.Status) error {
-	f, err := s.GetByRequestID(dagID, reqID)
+func (s *JSONDB) UpdateStatus(ctx context.Context, dagID, reqID string, status *model.Status) error {
+	f, err := s.GetStatusByRequestID(ctx, dagID, reqID)
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,7 @@ func (s *JSONDB) UpdateStatus(dagID, reqID string, status *model.Status) error {
 }
 
 // Open initializes a new writer for a DAG execution.
-func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
+func (s *JSONDB) Open(_ context.Context, dagID string, startTime time.Time, requestID string) error {
 	if s.writer != nil {
 		return history.ErrWriterOpen
 	}
@@ -98,9 +99,9 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	s.writerLock.Lock()
 	defer s.writerLock.Unlock()
 
-	t = t.UTC()
+	startTime = startTime.UTC()
 
-	filename := craftStatusFile(dagID, requestID, t)
+	filename := craftStatusFile(dagID, requestID, startTime)
 
 	// Index file is used to index the status files by its filename.
 	// Status files are stored in date-wise directories and indexed by the index file
@@ -111,7 +112,7 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	// renaming a DAG does not rename the status files.
 	// Therefore, index file name should not be renamed once created.
 	indexFile := filepath.Join(craftIndexDataDir(s.baseDir, dagID), filename)
-	statusFile := filepath.Join(craftStatusDataDir(s.baseDir, t), filename)
+	statusFile := filepath.Join(craftStatusDataDir(s.baseDir, startTime), filename)
 
 	// make directories
 	if err := os.MkdirAll(filepath.Dir(indexFile), 0755); err != nil {
@@ -137,7 +138,7 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 }
 
 // Write writes the current status to the active writer.
-func (s *JSONDB) Write(status *model.Status) error {
+func (s *JSONDB) Write(_ context.Context, status *model.Status) error {
 	s.writerLock.Lock()
 	defer s.writerLock.Unlock()
 
@@ -152,7 +153,7 @@ func (s *JSONDB) Write(status *model.Status) error {
 }
 
 // Close finalizes the current writer and compacts the status file.
-func (s *JSONDB) Close() error {
+func (s *JSONDB) Close(_ context.Context) error {
 	s.writerLock.Lock()
 
 	if s.writer == nil {
@@ -176,7 +177,7 @@ func (s *JSONDB) Close() error {
 	}()
 
 	// compact the file
-	if err := s.Compact(s.writer.statusFile); err != nil {
+	if err := s.compact(s.writer.statusFile); err != nil {
 		s.logger.Errorf("failed to compact file %s: %v", s.writer.statusFile, err)
 	}
 
@@ -184,7 +185,7 @@ func (s *JSONDB) Close() error {
 }
 
 // ListRecent retrieves the n most recent status files for a given DAG.
-func (s *JSONDB) ListRecent(dagID string, n int) []*model.History {
+func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) []*model.History {
 	// Read the latest n status files for the given DAG.
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 
@@ -199,7 +200,7 @@ func (s *JSONDB) ListRecent(dagID string, n int) []*model.History {
 		s.logger.Errorf("failed to list files in %s: %v", indexDir, err)
 		return nil
 	}
-	files = files[:min(n, len(files))]
+	files = files[:min(limit, len(files))]
 
 	// Load the status of the latest n status files.
 	var ret []*model.History
@@ -243,7 +244,7 @@ func (s *JSONDB) ListRecent(dagID string, n int) []*model.History {
 }
 
 // ListRecentAll retrieves the n most recent status files across all DAGs.
-func (s *JSONDB) ListRecentAll(n int) ([]*model.History, error) {
+func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*model.History, error) {
 	statusDir := filepath.Join(s.baseDir, "status")
 
 	// List recent files from the status directory
@@ -284,7 +285,7 @@ func (s *JSONDB) ListRecentAll(n int) ([]*model.History, error) {
 }
 
 // listRecentFiles lists the most recent n status files in reverse chronological order.
-func (s *JSONDB) listRecentFiles(path string, n int) ([]string, error) {
+func (s *JSONDB) listRecentFiles(path string, limit int) ([]string, error) {
 	var allFiles []string
 
 	// Walk through the years in reverse order
@@ -323,68 +324,22 @@ func (s *JSONDB) listRecentFiles(path string, n int) ([]string, error) {
 				allFiles = append(allFiles, files...)
 
 				// If we have enough files, return them
-				if len(allFiles) >= n {
-					return allFiles[:n], nil
+				if len(allFiles) >= limit {
+					return allFiles[:limit], nil
 				}
 			}
 		}
 	}
 
 	// If we don't have enough files, return all we found
-	if len(allFiles) > n {
-		return allFiles[:n], nil
+	if len(allFiles) > limit {
+		return allFiles[:limit], nil
 	}
 	return allFiles, nil
 }
 
-// listDirsSorted lists directories in the given path, optionally in reverse order.
-func listDirsSorted(path string, reverse bool) ([]string, error) {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var dirs []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			dirs = append(dirs, entry.Name())
-		}
-	}
-
-	if reverse {
-		sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
-	} else {
-		sort.Strings(dirs)
-	}
-
-	return dirs, nil
-}
-
-// listFilesSorted lists files in the given path, optionally in reverse order.
-func listFilesSorted(path string, reverse bool) ([]string, error) {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var files []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), extDat) {
-			files = append(files, filepath.Join(path, entry.Name()))
-		}
-	}
-
-	if reverse {
-		sort.Sort(sort.Reverse(sort.StringSlice(files)))
-	} else {
-		sort.Strings(files)
-	}
-
-	return files, nil
-}
-
 // GetLatest retrieves the latest status file for today for a given DAG.
-func (s *JSONDB) GetLatest(dagID string) (*model.Status, error) {
+func (s *JSONDB) GetLatestStatus(_ context.Context, dagID string) (*model.Status, error) {
 	// Use UTC time
 	file, err := s.latestToday(dagID, time.Now().UTC(), s.latestStatusToday)
 	if err != nil {
@@ -397,7 +352,7 @@ func (s *JSONDB) GetLatest(dagID string) (*model.Status, error) {
 }
 
 // GetByRequestID finds a status file by its request ID.
-func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.History, error) {
+func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID string) (*model.History, error) {
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", history.ErrReqIDNotFound)
 	}
@@ -442,12 +397,12 @@ func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.History, err
 }
 
 // DeleteAll removes all status files for a given DAG.
-func (s *JSONDB) DeleteAll(dagID string) error {
-	return s.DeleteOld(dagID, 0)
+func (s *JSONDB) DeleteAllStatuses(ctx context.Context, dagID string) error {
+	return s.DeleteOldStatuses(ctx, dagID, 0)
 }
 
 // DeleteOld removes status files older than the specified retention period.
-func (s *JSONDB) DeleteOld(dagID string, retentionDays int) error {
+func (s *JSONDB) DeleteOldStatuses(_ context.Context, dagID string, retentionDays int) error {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	if retentionDays < 0 {
 		return fmt.Errorf("retentionDays must be a non-negative integer: %d", retentionDays)
@@ -500,7 +455,7 @@ func (s *JSONDB) DeleteOld(dagID string, retentionDays int) error {
 }
 
 // Compact compresses the status file by keeping only the latest status.
-func (s *JSONDB) Compact(statusFile string) error {
+func (s *JSONDB) compact(statusFile string) error {
 	status, err := ParseStatusFile(statusFile)
 	if err == io.EOF {
 		// no data to compact
@@ -533,7 +488,7 @@ func (s *JSONDB) Compact(statusFile string) error {
 }
 
 // RenameDAG changes the ID of a DAG, effectively renaming its associated files.
-func (s *JSONDB) RenameDAG(oldID, newID string) error {
+func (s *JSONDB) RenameDAG(_ context.Context, oldID, newID string) error {
 	if oldID == newID {
 		return nil
 	}
@@ -602,9 +557,9 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 }
 
 // ListByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
-func (s *JSONDB) ListByLocalDate(localDate time.Time) ([]*model.History, error) {
+func (s *JSONDB) ListStatusesByDate(_ context.Context, date time.Time) ([]*model.History, error) {
 	// Convert the start of the local date to UTC
-	utcStartOfDay := localDate.UTC()
+	utcStartOfDay := date.UTC()
 
 	// Set the time to 00:00:00
 	utcStartOfDay = time.Date(utcStartOfDay.Year(), utcStartOfDay.Month(), utcStartOfDay.Day(), 0, 0, 0, 0, time.UTC)
@@ -820,4 +775,50 @@ func normalizedID(dagID string) string {
 	return util.SafeText(
 		strings.TrimSuffix(filepath.Base(dagID), filepath.Ext(dagID)),
 	)
+}
+
+// listDirsSorted lists directories in the given path, optionally in reverse order.
+func listDirsSorted(path string, reverse bool) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var dirs []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirs = append(dirs, entry.Name())
+		}
+	}
+
+	if reverse {
+		sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
+	} else {
+		sort.Strings(dirs)
+	}
+
+	return dirs, nil
+}
+
+// listFilesSorted lists files in the given path, optionally in reverse order.
+func listFilesSorted(path string, reverse bool) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), extDat) {
+			files = append(files, filepath.Join(path, entry.Name()))
+		}
+	}
+
+	if reverse {
+		sort.Sort(sort.Reverse(sort.StringSlice(files)))
+	} else {
+		sort.Strings(files)
+	}
+
+	return files, nil
 }
