@@ -138,6 +138,13 @@ func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 
 // Write writes the current status to the active writer.
 func (s *JSONDB) Write(status *model.Status) error {
+	s.writerLock.Lock()
+	defer s.writerLock.Unlock()
+
+	if s.writer == nil {
+		return history.ErrWriterIsClosed
+	}
+
 	if err := s.writer.write(status); err != nil {
 		return fmt.Errorf("failed to write status: %w", err)
 	}
@@ -150,7 +157,7 @@ func (s *JSONDB) Close() error {
 
 	if s.writer == nil {
 		s.writerLock.Unlock()
-		return nil
+		return history.ErrWriterIsClosed
 	}
 
 	defer func() {
@@ -443,7 +450,7 @@ func (s *JSONDB) DeleteAll(dagID string) error {
 func (s *JSONDB) DeleteOld(dagID string, retentionDays int) error {
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	if retentionDays < 0 {
-		return nil
+		return fmt.Errorf("retentionDays must be a non-negative integer: %d", retentionDays)
 	}
 	pattern := filepath.Join(indexDir, "*.dat")
 	matches, err := filepath.Glob(pattern)
@@ -535,6 +542,7 @@ func (s *JSONDB) RenameDAG(oldID, newID string) error {
 	newIndexDir := craftIndexDataDir(s.baseDir, newID)
 
 	if !pathExists(oldIndexDir) {
+		// No index directory for the old DAG, nothing to rename
 		return nil
 	}
 
