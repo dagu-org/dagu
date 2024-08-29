@@ -30,7 +30,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/frontend/server"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/history/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"

@@ -31,6 +31,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 )
@@ -229,8 +230,8 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 		return currStatus, nil
 	}
 	status, err := e.dataStore.HistoryStore().GetLatest(workflow.Location)
-	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
-		errors.Is(err, persistence.ErrNoStatusData) {
+	if errors.Is(err, history.ErrNoStatusDataToday) ||
+		errors.Is(err, history.ErrNoStatusData) {
 		return model.NewStatusDefault(workflow), nil
 	}
 	if err != nil {

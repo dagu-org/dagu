@@ -33,6 +33,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 )
@@ -52,7 +53,7 @@ type Agent struct {
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	reporter     *reporter
-	historyStore persistence.HistoryStore
+	historyStore history.Store
 	socketServer *sock.Server
 	logDir       string
 	logFile      string

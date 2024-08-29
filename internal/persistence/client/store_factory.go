@@ -20,7 +20,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/history"
+	"github.com/dagu-org/dagu/internal/persistence/history/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
@@ -28,7 +29,7 @@ import (
 var _ persistence.DataStores = (*dataStores)(nil)
 
 type dataStores struct {
-	historyStore persistence.HistoryStore
+	historyStore history.Store
 	dagStore     persistence.DAGStore
 
 	dags              string
@@ -71,7 +72,7 @@ func (f *dataStores) InitDagDir() error {
 	return nil
 }
 
-func (f *dataStores) HistoryStore() persistence.HistoryStore {
+func (f *dataStores) HistoryStore() history.Store {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
 		f.historyStore = jsondb.New(

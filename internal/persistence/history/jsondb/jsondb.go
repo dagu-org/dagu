@@ -29,14 +29,14 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
 var (
-	_ persistence.HistoryStore = (*JSONDB)(nil)
+	_ history.Store = (*JSONDB)(nil)
 )
 
 const (
@@ -92,7 +92,7 @@ func (s *JSONDB) UpdateStatus(dagID, reqID string, status *model.Status) error {
 // Open initializes a new writer for a DAG execution.
 func (s *JSONDB) Open(dagID string, t time.Time, requestID string) error {
 	if s.writer != nil {
-		return persistence.ErrWriterOpen
+		return history.ErrWriterOpen
 	}
 
 	s.writerLock.Lock()
@@ -392,7 +392,7 @@ func (s *JSONDB) GetLatest(dagID string) (*model.Status, error) {
 // GetByRequestID finds a status file by its request ID.
 func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.History, error) {
 	if reqID == "" {
-		return nil, fmt.Errorf("%w: requestID is empty", persistence.ErrRequestIDNotFound)
+		return nil, fmt.Errorf("%w: requestID is empty", history.ErrReqIDNotFound)
 	}
 	indexDir := craftIndexDataDir(s.baseDir, dagID)
 	safeReqID := util.TruncString(reqID, requestIDLenSafe)
@@ -431,7 +431,7 @@ func (s *JSONDB) GetByRequestID(dagID string, reqID string) (*model.History, err
 		}
 	}
 
-	return nil, fmt.Errorf("%w: %s", persistence.ErrRequestIDNotFound, reqID)
+	return nil, fmt.Errorf("%w: %s", history.ErrReqIDNotFound, reqID)
 }
 
 // DeleteAll removes all status files for a given DAG.
@@ -541,7 +541,7 @@ func (s *JSONDB) RenameDAG(oldID, newID string) error {
 	// Check the new directory does not exist.
 	// If it does, return an error.
 	if pathExists(newIndexDir) {
-		return fmt.Errorf("%w: %s", persistence.ErrConflict, newID)
+		return fmt.Errorf("%w: %s", history.ErrConflict, newID)
 	}
 
 	// Rename the index directory.
@@ -566,12 +566,12 @@ func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
-		return "", persistence.ErrNoStatusDataToday
+		return "", history.ErrNoStatusDataToday
 	}
 
 	latestFiles := getLatestFiles(matches, 1)
 	if len(latestFiles) == 0 {
-		return "", persistence.ErrNoStatusData
+		return "", history.ErrNoStatusData
 	}
 	return s.indexFileToStatusFile(latestFiles[0])
 }
@@ -727,7 +727,7 @@ const (
 // craftCompactedFileName creates a filename for a compacted status file.
 func craftCompactedFileName(file string) (string, error) {
 	if strings.HasSuffix(file, compactedFileSuffix) {
-		return "", persistence.ErrFileIsCompacted
+		return "", history.ErrFileIsCompacted
 	}
 	return filepath.Join(
 		filepath.Dir(file),
