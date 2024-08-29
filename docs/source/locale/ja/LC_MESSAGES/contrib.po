@@ -99,7 +99,7 @@ msgid "``docs``: Contains the documentation for the project."
 msgstr ""
 
 #: ../../source/contrib.rst:56 3dfc88298f48483b9378a4767c9fc9da
-msgid "``examples``: Contains the example workflows."
+msgid "``examples``: Contains the example DAGs."
 msgstr ""
 
 #: ../../source/contrib.rst:57 07c2f76c16ee437e936da51b38da6fa5
@@ -111,7 +111,7 @@ msgid "``web``: Contains the backend code for the Web UI."
 msgstr ""
 
 #: ../../source/contrib.rst:60 d24ee0505d1446d6b8641c7ba9a7eb6a
-msgid "``agent``: Contains the code for running the workflows."
+msgid "``agent``: Contains the code for running the DAGs."
 msgstr ""
 
 #: ../../source/contrib.rst:61 2abf2fad1f8147c5897152d428a40cd2
@@ -119,11 +119,11 @@ msgid "``config``: Contains the code for loading the configuration."
 msgstr ""
 
 #: ../../source/contrib.rst:62 643076848ff642a08bc17af3717fb2d6
-msgid "``controller``: Contains the code for managing the workflows."
+msgid "``controller``: Contains the code for managing the DAGs."
 msgstr ""
 
 #: ../../source/contrib.rst:63 85e97332706647028bbb3ad0732dbf4a
-msgid "``dag``: Contains the code for parsing the workflow definition."
+msgid "``dag``: Contains the code for parsing the DAG definition."
 msgstr ""
 
 #: ../../source/contrib.rst:64 4563b99fe1d24c69a600afe5c7564fd1

@@ -102,7 +102,7 @@ msgid ":ref:`examples`"
 msgstr ":ref:`示例`"
 
 #: ../../source/index.rst:36 10656dacce7e4a6c92ea69b9176e0621
-msgid "Examples of workflows."
+msgid "Examples of DAGs."
 msgstr "工作流示例。"
 
 #: ../../source/index.rst:39 9530ca023cfd491893426c940a6ead7d

@@ -27,7 +27,7 @@ import (
 func stopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop /path/to/spec.yaml",
-		Short: "Stop the running workflow",
+		Short: "Stop the running DAG",
 		Long:  `dagu stop /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

@@ -304,14 +304,14 @@ func TestBuilder_Build(t *testing.T) {
 		},
 		{
 			Name:      "ValidSubWorkflow",
-			InputFile: "valid_subworkflow.yaml",
+			InputFile: "valid_subDAG.yaml",
 			Expected: map[string]any{
 				"steps": []stepTestCase{
 					{
-						"name":     "sub_workflow_step",
+						"name":     "sub_DAG_step",
 						"command":  "run",
 						"args":     []string{"sub_dag", "param1=value1 param2=value2"},
-						"executor": "subworkflow",
+						"executor": "subDAG",
 						"subWorkflow": map[string]string{
 							"name":   "sub_dag",
 							"params": "param1=value1 param2=value2",
@@ -531,7 +531,7 @@ func testStep(t *testing.T, step Step, tc stepTestCase) {
 				case "params":
 					assert.Equal(t, val, step.SubWorkflow.Params)
 				default:
-					panic("unexpected subworkflow key: " + k)
+					panic("unexpected subDAG key: " + k)
 				}
 			}
 		default:

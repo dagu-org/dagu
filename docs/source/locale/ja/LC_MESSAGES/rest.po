@@ -24,7 +24,7 @@ msgid "REST API Docs"
 msgstr ""
 
 #: ../../source/rest.rst:6 030facc3f2554eda9bea0b0041ad4b0a
-msgid "Dagu server provides simple APIs to query and control workflows."
+msgid "Dagu server provides simple APIs to query and control DAGs."
 msgstr ""
 
 #: ../../source/rest.rst:8 f025ce93dadd4f23b4837d5c83f4f5f5
@@ -133,7 +133,7 @@ msgid "Show Workflow Detail `GET /api/v1/dags/:name`"
 msgstr ""
 
 #: ../../source/rest.rst:49 f5b546594b854ee9922c2cdb01f4cac7
-msgid "Return details about the specified workflow."
+msgid "Return details about the specified DAG."
 msgstr ""
 
 #: ../../source/rest.rst:52 ../../source/rest.rst:108
@@ -169,7 +169,7 @@ msgid "Show Workflow Spec `GET /api/v1/dags/:name/spec`"
 msgstr ""
 
 #: ../../source/rest.rst:77 c9c1129d82c145c88392404c8f3c3bd5
-msgid "Return the specifications of the specified workflow."
+msgid "Return the specifications of the specified DAG."
 msgstr ""
 
 #: ../../source/rest.rst:80 8b66dafb8dbe4d82b49b7cafdcb6e2d7
@@ -181,7 +181,7 @@ msgid "Submit Workflow Action `POST /api/v1/dags/:name`"
 msgstr ""
 
 #: ../../source/rest.rst:105 3e737f0e0d954444961f18c0b97cf211
-msgid "Submit an action to a specified workflow."
+msgid "Submit an action to a specified DAG."
 msgstr ""
 
 #: ../../source/rest.rst:116 47c716b461c248c4a65d8ba77934d60b

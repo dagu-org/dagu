@@ -128,7 +128,7 @@ func retryCmd() *cobra.Command {
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {
-				agentLogger.Fatal("Failed to start workflow", "error", err)
+				agentLogger.Fatal("Failed to start DAG", "error", err)
 			}
 		},
 	}

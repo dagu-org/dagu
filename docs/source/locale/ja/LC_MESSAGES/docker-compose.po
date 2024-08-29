@@ -25,7 +25,7 @@ msgstr ""
 
 #: ../../source/docker-compose.rst:4 b46235c2c67d44c0814658d3ea4324cf
 msgid ""
-"To automate workflows based on cron expressions, it is necessary to run "
+"To automate DAGs based on cron expressions, it is necessary to run "
 "both the ui server and scheduler process. Here is an example `docker-"
 "compose.yml` setup for running Dagu using Docker Compose."
 msgstr ""

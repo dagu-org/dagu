@@ -190,7 +190,7 @@ func (s *Scheduler) start(ctx context.Context) {
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second))
 	if err != nil {
-		s.logger.Error("Scheduler failed to read workflow entries", "error", err)
+		s.logger.Error("Scheduler failed to read DAG entries", "error", err)
 		return
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
