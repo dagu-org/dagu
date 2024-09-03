@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-package util_test
+package util
 
 import (
 	"bytes"
@@ -25,7 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +34,7 @@ func Test_MustGetUserHomeDir(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		hd := util.MustGetUserHomeDir()
+		hd := MustGetUserHomeDir()
 		require.Equal(t, "/test", hd)
 	})
 }
@@ -43,45 +42,45 @@ func Test_MustGetUserHomeDir(t *testing.T) {
 func Test_MustGetwd(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		wd, _ := os.Getwd()
-		require.Equal(t, util.MustGetwd(), wd)
+		require.Equal(t, MustGetwd(), wd)
 	})
 }
 
 func Test_FormatTime(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC)
-		formatted := util.FormatTime(tm)
+		formatted := FormatTime(tm)
 		require.Equal(t, "2022-02-01T02:02:02Z", formatted)
 
-		parsed, err := util.ParseTime(formatted)
+		parsed, err := ParseTime(formatted)
 		require.NoError(t, err)
 		require.Equal(t, tm, parsed)
 
 		// Test empty time
-		require.Equal(t, "-", util.FormatTime(time.Time{}))
-		parsed, err = util.ParseTime("-")
+		require.Equal(t, "-", FormatTime(time.Time{}))
+		parsed, err = ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
 	t.Run("Empty", func(t *testing.T) {
 		// Test empty time
-		require.Equal(t, "-", util.FormatTime(time.Time{}))
+		require.Equal(t, "-", FormatTime(time.Time{}))
 	})
 }
 
 func Test_ParseTime(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		parsed, err := util.ParseTime("2022-02-01T02:02:02Z")
+		parsed, err := ParseTime("2022-02-01T02:02:02Z")
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC), parsed)
 	})
 	t.Run("Valid_Legacy", func(t *testing.T) {
-		parsed, err := util.ParseTime("2022-02-01 02:02:02")
+		parsed, err := ParseTime("2022-02-01 02:02:02")
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location()), parsed)
 	})
 	t.Run("Empty", func(t *testing.T) {
-		parsed, err := util.ParseTime("-")
+		parsed, err := ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
@@ -89,20 +88,20 @@ func Test_ParseTime(t *testing.T) {
 
 func Test_SplitCommand(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		cmd, args := util.SplitCommand("ls -al test/")
+		cmd, args := SplitCommand("ls -al test/")
 		require.Equal(t, "ls", cmd)
 		require.Len(t, args, 2)
 		require.Equal(t, "-al", args[0])
 		require.Equal(t, "test/", args[1])
 	})
 	t.Run("WithJSON", func(t *testing.T) {
-		cmd, args := util.SplitCommand(`echo {"key":"value"}`)
+		cmd, args := SplitCommand(`echo {"key":"value"}`)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, `{"key":"value"}`, args[0])
 	})
 	t.Run("WithQuotedJSON", func(t *testing.T) {
-		cmd, args := util.SplitCommand(`echo "{\"key\":\"value\"}"`)
+		cmd, args := SplitCommand(`echo "{\"key\":\"value\"}"`)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, `"{\"key\":\"value\"}"`, args[0])
@@ -111,20 +110,20 @@ func Test_SplitCommand(t *testing.T) {
 
 func Test_SplitCommandWithParse(t *testing.T) {
 	t.Run("CommandSubstitution", func(t *testing.T) {
-		cmd, args := util.SplitCommandWithParse("echo `echo hello`")
+		cmd, args := SplitCommandWithParse("echo `echo hello`")
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, "hello", args[0])
 	})
 	t.Run("QuotedCommandSubstitution", func(t *testing.T) {
-		cmd, args := util.SplitCommandWithParse("echo `echo \"hello world\"`")
+		cmd, args := SplitCommandWithParse("echo `echo \"hello world\"`")
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, "hello world", args[0])
 	})
 	t.Run("EnvVar", func(t *testing.T) {
 		os.Setenv("TEST_ARG", "hello")
-		cmd, args := util.SplitCommandWithParse("echo $TEST_ARG")
+		cmd, args := SplitCommandWithParse("echo $TEST_ARG")
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, "hello", args[0])
@@ -133,16 +132,9 @@ func Test_SplitCommandWithParse(t *testing.T) {
 
 func Test_FileExits(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
-		if !util.FileExists("/") {
+		if !FileExists("/") {
 			t.Fatal("file exists failed")
 		}
-	})
-}
-
-func Test_SafeText(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		ret := util.SafeText("file\\name")
-		require.Equal(t, ret, "file_name")
 	})
 }
 
@@ -152,7 +144,7 @@ func Test_OpenOrCreateFile(t *testing.T) {
 		require.NoError(t, err)
 
 		name := filepath.Join(tmp, "/file.txt")
-		f, err := util.OpenOrCreateFile(name)
+		f, err := OpenOrCreateFile(name)
 		require.NoError(t, err)
 
 		defer func() {
@@ -160,18 +152,18 @@ func Test_OpenOrCreateFile(t *testing.T) {
 			_ = os.Remove(name)
 		}()
 
-		if !util.FileExists(name) {
+		if !FileExists(name) {
 			t.Fatal("failed to create file")
 		}
 	})
 	t.Run("OpenOrCreateThenWrite", func(t *testing.T) {
-		dir := util.MustTempDir("tempdir")
+		dir := MustTempDir("tempdir")
 		defer func() {
 			_ = os.RemoveAll(dir)
 		}()
 
 		filename := filepath.Join(dir, "test.txt")
-		createdFile, err := util.OpenOrCreateFile(filename)
+		createdFile, err := OpenOrCreateFile(filename)
 		require.NoError(t, err)
 		defer func() {
 			_ = createdFile.Close()
@@ -181,7 +173,7 @@ func Test_OpenOrCreateFile(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, createdFile.Sync(), err)
 		require.NoError(t, createdFile.Close(), err)
-		if !util.FileExists(filename) {
+		if !FileExists(filename) {
 			t.Fatal("failed to create file")
 		}
 
@@ -198,7 +190,7 @@ func Test_OpenOrCreateFile(t *testing.T) {
 
 func Test_MustTempDir(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		dir := util.MustTempDir("tempdir")
+		dir := MustTempDir("tempdir")
 		defer func() {
 			_ = os.RemoveAll(dir)
 		}()
@@ -219,7 +211,7 @@ func Test_LogErr(t *testing.T) {
 			log.SetOutput(origStdout)
 		}()
 
-		util.LogErr("test action", errors.New("test error"))
+		LogErr("test action", errors.New("test error"))
 		os.Stdout = origStdout
 		_ = w.Close()
 
@@ -236,22 +228,22 @@ func Test_LogErr(t *testing.T) {
 func TestTruncString(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		// Test empty string
-		require.Equal(t, "", util.TruncString("", 8))
+		require.Equal(t, "", TruncString("", 8))
 		// Test string with length less than limit
-		require.Equal(t, "1234567", util.TruncString("1234567", 8))
+		require.Equal(t, "1234567", TruncString("1234567", 8))
 		// Test string with length equal to limit
-		require.Equal(t, "12345678", util.TruncString("123456789", 8))
+		require.Equal(t, "12345678", TruncString("123456789", 8))
 	})
 }
 
 func TestMatchExtension(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		// Test empty extension
-		require.False(t, util.MatchExtension("test.txt", []string{}))
+		require.False(t, MatchExtension("test.txt", []string{}))
 		// Test matching extension
-		require.True(t, util.MatchExtension("test.txt", []string{".csv", ".txt"}))
+		require.True(t, MatchExtension("test.txt", []string{".csv", ".txt"}))
 		// Test matching extension
-		require.False(t, util.MatchExtension("test.txt", []string{".csv"}))
+		require.False(t, MatchExtension("test.txt", []string{".csv"}))
 	})
 }
 
@@ -288,7 +280,7 @@ func TestAddYamlExtension(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := util.AddYamlExtension(tt.args.file); got != tt.want {
+			if got := AddYamlExtension(tt.args.file); got != tt.want {
 				t.Errorf("AddYamlExtension() = %v, want %v", got, tt.want)
 			}
 		})

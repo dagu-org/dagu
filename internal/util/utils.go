@@ -20,7 +20,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -156,25 +155,6 @@ func createFile(file string) (*os.File, error) {
 		return nil, err
 	}
 	return outfile, nil
-}
-
-// https://github.com/sindresorhus/filename-reserved-regex/blob/master/index.js
-var (
-	filenameReservedRegex = regexp.MustCompile(
-		`[<>:"/\\|?*\x00-\x1F]`,
-	)
-	filenameReservedWindowsNamesRegex = regexp.MustCompile(
-		`(?i)^(con|prn|aux|nul|com[0-9]|lpt[0-9])$`,
-	)
-	filenameSpacingRegex = regexp.MustCompile(`\s`)
-	specialCharRepl      = "_"
-)
-
-// SafeText makes filename valid by replacing reserved characters.
-func SafeText(str string) string {
-	s := filenameReservedRegex.ReplaceAllString(str, specialCharRepl)
-	s = filenameReservedWindowsNamesRegex.ReplaceAllString(s, specialCharRepl)
-	return filenameSpacingRegex.ReplaceAllString(s, specialCharRepl)
 }
 
 // MustTempDir returns temporary directory.

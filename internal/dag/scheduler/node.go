@@ -293,7 +293,7 @@ func (n *Node) setup(logDir string, requestID string) error {
 	// Set the log file path
 	n.data.State.StartedAt = time.Now()
 	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
-		util.SafeText(n.data.Step.Name),
+		util.SafeName(n.data.Step.Name),
 		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
 		util.TruncString(requestID, 8),
 	))

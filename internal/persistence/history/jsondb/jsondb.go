@@ -772,7 +772,7 @@ func parseIndexFile(indexFile string) (indexFileInfo, error) {
 
 // normalizedID creates a valid filename from a DAG ID.
 func normalizedID(dagID string) string {
-	return util.SafeText(
+	return util.SafeName(
 		strings.TrimSuffix(filepath.Base(dagID), filepath.Ext(dagID)),
 	)
 }

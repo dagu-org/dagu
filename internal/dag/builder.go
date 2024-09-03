@@ -266,10 +266,10 @@ func (b *builder) buildMetadata() error {
 
 	// Set the name if not set.
 	if b.dag.Name == "" && b.opts.file != "" {
-		b.dag.Name = util.SafeText(getDefaultName(b.opts.file))
+		b.dag.Name = util.SafeName(getDefaultName(b.opts.file))
 	}
 	if b.dag.Name == "" && b.opts.name != "" {
-		b.dag.Name = util.SafeText(b.opts.name)
+		b.dag.Name = util.SafeName(b.opts.name)
 	}
 
 	return nil

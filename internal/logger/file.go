@@ -45,7 +45,7 @@ func OpenLogFile(config LogFileConfig) (*os.File, error) {
 }
 
 func prepareLogDirectory(config LogFileConfig) (string, error) {
-	validName := util.SafeText(config.DAGName)
+	validName := util.SafeName(config.DAGName)
 	logDir := filepath.Join(config.LogDir, validName)
 	if config.DAGLogDir != "" {
 		logDir = filepath.Join(config.DAGLogDir, validName)
@@ -60,7 +60,7 @@ func prepareLogDirectory(config LogFileConfig) (string, error) {
 func generateLogFilename(config LogFileConfig) string {
 	return fmt.Sprintf("%s%s.%s.%s.log",
 		config.Prefix,
-		util.SafeText(config.DAGName),
+		util.SafeName(config.DAGName),
 		time.Now().Format("20060102.15:04:05.000"),
 		util.TruncString(config.RequestID, 8),
 	)
