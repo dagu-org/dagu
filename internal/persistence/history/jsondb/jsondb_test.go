@@ -401,7 +401,7 @@ func TestJSONDB_SpecialOperations(t *testing.T) {
 			writeTestStatus(t, th.JSONDB, d, status, now.Add(time.Duration(i)*time.Hour))
 		}
 
-		latestFile, err := th.JSONDB.findLatestStatusFile(newSafeName(d.Location), now, true)
+		latestFile, err := th.JSONDB.findLatestStatusFile(newSafeName(d.Location), newUTC(now), true)
 		require.NoError(t, err)
 		assert.Contains(t, latestFile, now.Format("20060102"))
 		assert.Contains(t, latestFile, "req-3")

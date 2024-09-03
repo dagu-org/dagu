@@ -84,6 +84,15 @@ func (s safeName) String() string {
 	return string(s)
 }
 
+// utcTime is a wrapper for time.Time that ensures the time is in UTC.
+type utcTime struct {
+	time.Time
+}
+
+func newUTC(t time.Time) utcTime {
+	return utcTime{t.UTC()}
+}
+
 // JSONDB manages DAG status files in local storage.
 type JSONDB struct {
 	baseDir           string                          // Base directory for storing files
@@ -127,7 +136,7 @@ func (s *JSONDB) UpdateStatus(ctx context.Context, dagID, reqID string, status *
 }
 
 // Open initializes a new writer for a DAG execution.
-func (s *JSONDB) Open(_ context.Context, dagID string, startTime time.Time, requestID string) error {
+func (s *JSONDB) Open(_ context.Context, dagID string, start time.Time, requestID string) error {
 	if s.writer != nil {
 		return history.ErrWriterOpen
 	}
@@ -135,7 +144,7 @@ func (s *JSONDB) Open(_ context.Context, dagID string, startTime time.Time, requ
 	s.writerLock.Lock()
 	defer s.writerLock.Unlock()
 
-	startTime = startTime.UTC()
+	startTime := newUTC(start)
 
 	// Status directory name format: <timestamp>_<requestID>
 	// Status files are stored as <statusDirname>/status[_c].jsonl
@@ -397,7 +406,7 @@ func (s *JSONDB) listRecentFiles(root string, limit int) ([]string, error) {
 
 // GetLatest retrieves the latest status file for today for a given DAG.
 func (s *JSONDB) GetLatestStatus(_ context.Context, dagID string) (*model.Status, error) {
-	file, err := s.findLatestStatusFile(newSafeName(dagID), time.Now(), s.latestStatusToday)
+	file, err := s.findLatestStatusFile(newSafeName(dagID), newUTC(time.Now()), s.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}
@@ -577,12 +586,12 @@ func (s *JSONDB) RenameDAG(_ context.Context, oldID, newID string) error {
 }
 
 // findLatestStatusFile finds the latest status file for today or the most recent day.
-func (s *JSONDB) findLatestStatusFile(dagID safeName, now time.Time, today bool) (string, error) {
+func (s *JSONDB) findLatestStatusFile(dagID safeName, now utcTime, today bool) (string, error) {
 	// Find the index file for the given DAG
 	indexDir := craftIndexDir(s.baseDir, dagID)
 
 	if today {
-		start := now.Truncate(24 * time.Hour).UTC()
+		start := now.Truncate(24 * time.Hour)
 		end := start.Add(23 * time.Hour)
 
 		for t := end; t.After(start) || t.Equal(start); t = t.Add(-time.Hour) {
@@ -648,20 +657,20 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 // ListByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
 func (s *JSONDB) ListStatusesByDate(_ context.Context, date time.Time) ([]*model.History, error) {
 	// Set the time to 00:00:00
-	startOfDay := date.Truncate(24 * time.Hour).UTC()
+	startOfDay := date.Truncate(24 * time.Hour)
 
-	// Calculate the end of the day in UTC
+	// Calculate the end of the day (exclusive)
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	return s.listStatusInRange(startOfDay, endOfDay)
+	return s.listStatusInRange(newUTC(startOfDay), newUTC(endOfDay))
 }
 
 // listStatusInRange retrieves all status files for a specific date range.
 // The range is inclusive of the start time and exclusive of the end time.
-func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.History, error) {
+func (s *JSONDB) listStatusInRange(start, end utcTime) ([]*model.History, error) {
 	var result []*model.History
 
-	for t := start; t.Before(end); t = t.Add(time.Hour) {
+	for t := start.Time; t.Before(end.Time); t = t.Add(time.Hour) {
 		year, month, day := t.Date()
 		hour := t.Hour()
 
@@ -805,9 +814,7 @@ func craftIndexDir(baseDir string, dagID safeName) string {
 }
 
 // craftStatusDataDir constructs the path to the status directory for a specific date.
-func craftStatusDataDir(baseDir string, t time.Time) string {
-	// Ensure time is in UTC
-	t = t.UTC()
+func craftStatusDataDir(baseDir string, t utcTime) string {
 	year := t.Format("2006")
 	month := t.Format("01")
 	date := t.Format("02")
@@ -815,9 +822,7 @@ func craftStatusDataDir(baseDir string, t time.Time) string {
 }
 
 // craftStatusDirname generates a directory name for a status file.
-func craftStatusDirname(t time.Time, requestID string) string {
-	// Ensure time is in UTC
-	t = t.UTC()
+func craftStatusDirname(t utcTime, requestID string) string {
 	// status file name format: <timestamp>_<requestID>
 	return fmt.Sprintf("%s_%s",
 		t.Format(datePrefixFormat),
