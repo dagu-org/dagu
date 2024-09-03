@@ -53,7 +53,13 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &dag.MailConfig{},
 		SMTP:      &dag.SMTPConfig{},
 	}
-	status := NewStatus(dAG, nil, scheduler.StatusSuccess, 10000, &start, &end)
+	status := NewStatus(NewStatusArgs{
+		DAG:        dAG,
+		Status:     scheduler.StatusSuccess,
+		PID:        10000,
+		StartedAt:  start,
+		FinishedAt: end,
+	})
 
 	rawJSON, err := status.ToJSON()
 	require.NoError(t, err)
@@ -68,8 +74,11 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	dAG := &dag.DAG{Name: "test"}
-	status := NewStatus(dAG, nil, scheduler.StatusRunning,
-		10000, nil, nil)
+	status := NewStatus(NewStatusArgs{
+		DAG:    dAG,
+		Status: scheduler.StatusRunning,
+		PID:    10000,
+	})
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }

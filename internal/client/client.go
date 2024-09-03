@@ -193,7 +193,9 @@ func (*client) GetCurrentStatus(_ context.Context, dAG *dag.DAG) (*history.Statu
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return history.NewStatusDefault(dAG), nil
+		return history.NewStatus(history.NewStatusArgs{
+			DAG: dAG,
+		}), nil
 	}
 	return history.StatusFromJSON(ret)
 }
@@ -232,10 +234,14 @@ func (e *client) GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*history.St
 	status, err := e.dataStore.HistoryStore().GetLatestStatus(ctx, dAG.Location)
 	if errors.Is(err, history.ErrNoStatusDataToday) ||
 		errors.Is(err, history.ErrNoStatusData) {
-		return history.NewStatusDefault(dAG), nil
+		return history.NewStatus(history.NewStatusArgs{
+			DAG: dAG,
+		}), nil
 	}
 	if err != nil {
-		return history.NewStatusDefault(dAG), err
+		return history.NewStatus(history.NewStatusArgs{
+			DAG: dAG,
+		}), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil

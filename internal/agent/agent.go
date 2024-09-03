@@ -238,18 +238,18 @@ func (a *Agent) Status() *history.Status {
 	}
 
 	// Create the status object to record the current status.
-	status := &history.Status{
-		RequestID:  a.requestID,
-		Name:       a.dag.Name,
-		Status:     schedulerStatus,
-		StatusText: schedulerStatus.String(),
-		PID:        history.PID(os.Getpid()),
-		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.dag.Steps),
-		StartedAt:  history.FormatTime(a.graph.StartAt()),
-		FinishedAt: history.FormatTime(a.graph.FinishAt()),
-		Log:        a.logFile,
-		Params:     history.Params(a.dag.Params),
-	}
+	status := history.NewStatus(
+		history.NewStatusArgs{
+			RequestID:  a.requestID,
+			DAG:        a.dag,
+			Status:     schedulerStatus,
+			PID:        os.Getpid(),
+			Nodes:      a.graph.NodeData(),
+			StartedAt:  a.graph.StartAt(),
+			FinishedAt: a.graph.FinishAt(),
+			Log:        a.logFile,
+		},
+	)
 
 	// Collect the handler nodes.
 	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {

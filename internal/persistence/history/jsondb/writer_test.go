@@ -42,8 +42,12 @@ func TestWriter(t *testing.T) {
 			Name:     "test_write_status",
 			Location: "test_write_status.yaml",
 		}
-		status := history.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
-		status.RequestID = "req-1"
+		status := history.NewStatus(history.NewStatusArgs{
+			RequestID: "req-1",
+			DAG:       d,
+			Status:    scheduler.StatusRunning,
+			PID:       10000,
+		})
 
 		require.NoError(t, w.write(status))
 
@@ -65,7 +69,12 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, err)
 
 		d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
-		initialStatus := history.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
+		initialStatus := history.NewStatus(history.NewStatusArgs{
+			RequestID: "req-2",
+			DAG:       d,
+			Status:    scheduler.StatusCancel,
+			PID:       10000,
+		})
 		initialStatus.RequestID = "req-2"
 
 		require.NoError(t, w.write(initialStatus))
@@ -74,8 +83,12 @@ func TestWriter(t *testing.T) {
 		// Append to existing file
 		w, err = newWriter(statusFile)
 		require.NoError(t, err)
-		updatedStatus := history.NewStatus(d, nil, scheduler.StatusSuccess, 10000, nil, nil)
-		updatedStatus.RequestID = "req-2"
+		updatedStatus := history.NewStatus(history.NewStatusArgs{
+			RequestID: "req-2",
+			DAG:       d,
+			Status:    scheduler.StatusSuccess,
+			PID:       10000,
+		})
 		require.NoError(t, w.write(updatedStatus))
 		require.NoError(t, w.close())
 
@@ -113,7 +126,11 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, w.close())
 
 		d := &dag.DAG{Name: "test", Location: "test.yaml"}
-		status := history.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status := history.NewStatus(history.NewStatusArgs{
+			DAG:    d,
+			Status: scheduler.StatusRunning,
+			PID:    10000,
+		})
 		assert.Error(t, w.write(status))
 	})
 

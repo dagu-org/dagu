@@ -59,7 +59,11 @@ func createTestDAG(th testHelper, name, location string) *dag.DAG {
 }
 
 func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *history.Status {
-	return history.NewStatus(d, nil, status, pid, nil, nil)
+	return history.NewStatus(history.NewStatusArgs{
+		DAG:    d,
+		Status: status,
+		PID:    pid,
+	})
 }
 
 func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *history.Status, tm time.Time) {

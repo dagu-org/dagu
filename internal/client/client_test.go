@@ -53,8 +53,10 @@ func TestClient_GetStatus(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dagStatus.DAG.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := history.NewStatus(dagStatus.DAG, nil,
-					scheduler.StatusRunning, 0, nil, nil)
+				status := history.NewStatus(history.NewStatusArgs{
+					DAG:    dagStatus.DAG,
+					Status: scheduler.StatusRunning,
+				})
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJSON()
 				_, _ = w.Write(b)
@@ -871,17 +873,18 @@ func testDAG(name string) string {
 
 func testNewStatus(dAG *dag.DAG, requestID string, status scheduler.Status,
 	nodeStatus scheduler.NodeStatus) *history.Status {
+	startTime := time.Now()
 	ret := history.NewStatus(
-		dAG,
-		[]scheduler.NodeData{
-			{
-				State: scheduler.NodeState{Status: nodeStatus},
+		history.NewStatusArgs{
+			DAG: dAG,
+			Nodes: []scheduler.NodeData{
+				{
+					State: scheduler.NodeState{Status: nodeStatus},
+				},
 			},
+			StartedAt: startTime,
+			Status:    status,
 		},
-		status,
-		0,
-		history.Time(time.Now()),
-		nil,
 	)
 	ret.RequestID = requestID
 	return ret

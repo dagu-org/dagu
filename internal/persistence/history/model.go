@@ -28,111 +28,93 @@ import (
 	"github.com/dagu-org/dagu/internal/util"
 )
 
+const pidNotRunning PID = -1
+
+type (
+	History struct {
+		File   string
+		Status *Status
+	}
+
+	StatusResponse struct {
+		Status *Status `json:"status"`
+	}
+
+	Status struct {
+		RequestID  string           `json:"RequestId"`
+		Name       string           `json:"Name"`
+		Status     scheduler.Status `json:"Status"`
+		StatusText string           `json:"StatusText"`
+		PID        PID              `json:"Pid"`
+		Nodes      []*model.Node    `json:"Nodes"`
+		OnExit     *model.Node      `json:"OnExit"`
+		OnSuccess  *model.Node      `json:"OnSuccess"`
+		OnFailure  *model.Node      `json:"OnFailure"`
+		OnCancel   *model.Node      `json:"OnCancel"`
+		StartedAt  string           `json:"StartedAt"`
+		FinishedAt string           `json:"FinishedAt"`
+		Log        string           `json:"Log"`
+		Params     string           `json:"Params"`
+		mu         sync.RWMutex
+	}
+
+	PID int
+)
+
 func StatusFromJSON(s string) (*Status, error) {
 	status := new(Status)
 	err := json.Unmarshal([]byte(s), status)
-	if err != nil {
-		return nil, err
-	}
 	return status, err
 }
 
-type History struct {
-	File   string
-	Status *Status
+type NewStatusArgs struct {
+	RequestID             string
+	DAG                   *dag.DAG
+	Nodes                 []scheduler.NodeData
+	Status                scheduler.Status
+	PID                   int
+	StartedAt, FinishedAt time.Time
+	Log                   string
 }
 
-type StatusResponse struct {
-	Status *Status `json:"status"`
-}
-
-type Status struct {
-	RequestID  string           `json:"RequestId"`
-	Name       string           `json:"Name"`
-	Status     scheduler.Status `json:"Status"`
-	StatusText string           `json:"StatusText"`
-	PID        PID              `json:"Pid"`
-	Nodes      []*model.Node    `json:"Nodes"`
-	OnExit     *model.Node      `json:"OnExit"`
-	OnSuccess  *model.Node      `json:"OnSuccess"`
-	OnFailure  *model.Node      `json:"OnFailure"`
-	OnCancel   *model.Node      `json:"OnCancel"`
-	StartedAt  string           `json:"StartedAt"`
-	FinishedAt string           `json:"FinishedAt"`
-	Log        string           `json:"Log"`
-	Params     string           `json:"Params"`
-	mu         sync.RWMutex
-}
-
-func NewStatusDefault(dAG *dag.DAG) *Status {
-	return NewStatus(
-		dAG, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
-	)
-}
-
-func NewStatus(
-	dag *dag.DAG,
-	nodes []scheduler.NodeData,
-	status scheduler.Status,
-	pid int,
-	startTime, endTime *time.Time,
-) *Status {
-	statusObj := &Status{
-		Name:       dag.Name,
-		Status:     status,
-		StatusText: status.String(),
-		PID:        PID(pid),
-		Nodes:      model.FromNodesOrSteps(nodes, dag.Steps),
-		OnExit:     nodeOrNil(dag.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(dag.HandlerOn.Success),
-		OnFailure:  nodeOrNil(dag.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(dag.HandlerOn.Cancel),
-		Params:     Params(dag.Params),
+func NewStatus(args NewStatusArgs) *Status {
+	if args.PID == 0 {
+		args.PID = int(pidNotRunning)
 	}
-	if startTime != nil {
-		statusObj.StartedAt = util.FormatTime(*startTime)
+	if args.DAG == nil {
+		args.DAG = &dag.DAG{}
 	}
-	if endTime != nil {
-		statusObj.FinishedAt = util.FormatTime(*endTime)
-	}
-	return statusObj
-}
 
-func (st *Status) CorrectRunningStatus() {
-	if st.Status == scheduler.StatusRunning {
-		st.Status = scheduler.StatusError
-		st.StatusText = st.Status.String()
+	return &Status{
+		RequestID:  args.RequestID,
+		Name:       args.DAG.Name,
+		Status:     args.Status,
+		StatusText: args.Status.String(),
+		PID:        PID(args.PID),
+		Nodes:      model.FromNodesOrSteps(args.Nodes, args.DAG.Steps),
+		OnExit:     nodeOrNil(args.DAG.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(args.DAG.HandlerOn.Success),
+		OnFailure:  nodeOrNil(args.DAG.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(args.DAG.HandlerOn.Cancel),
+		Params:     formatParams(args.DAG.Params),
+		Log:        args.Log,
+		StartedAt:  util.FormatTime(args.StartedAt),
+		FinishedAt: util.FormatTime(args.FinishedAt),
 	}
 }
 
-func (st *Status) ToJSON() ([]byte, error) {
-	st.mu.RLock()
-	defer st.mu.RUnlock()
-	js, err := json.Marshal(st)
-	if err != nil {
-		return []byte{}, err
+func (s *Status) CorrectRunningStatus() {
+	if s.Status == scheduler.StatusRunning {
+		s.Status = scheduler.StatusError
+		s.StatusText = s.Status.String()
 	}
-	return js, nil
 }
 
-func FormatTime(val time.Time) string {
-	if val.IsZero() {
-		return ""
-	}
-	return util.FormatTime(val)
+func (s *Status) ToJSON() ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return json.Marshal(s)
 }
-
-func Time(t time.Time) *time.Time {
-	return &t
-}
-
-func Params(params []string) string {
-	return strings.Join(params, " ")
-}
-
-type PID int
-
-const pidNotRunning PID = -1
 
 func (p PID) String() string {
 	if p == pidNotRunning {
@@ -143,6 +125,10 @@ func (p PID) String() string {
 
 func (p PID) IsRunning() bool {
 	return p != pidNotRunning
+}
+
+func formatParams(params []string) string {
+	return strings.Join(params, " ")
 }
 
 func nodeOrNil(s *dag.Step) *model.Node {
