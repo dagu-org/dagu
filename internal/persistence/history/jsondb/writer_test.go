@@ -43,7 +43,7 @@ func TestWriter(t *testing.T) {
 			Location: "test_write_status.yaml",
 		}
 		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
-		status.RequestID = "request-id-1"
+		status.RequestID = "req-1"
 
 		require.NoError(t, w.write(status))
 
@@ -66,7 +66,7 @@ func TestWriter(t *testing.T) {
 
 		d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
 		initialStatus := model.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
-		initialStatus.RequestID = "request-id-2"
+		initialStatus.RequestID = "req-2"
 
 		require.NoError(t, w.write(initialStatus))
 		require.NoError(t, w.close())
@@ -75,7 +75,7 @@ func TestWriter(t *testing.T) {
 		w, err = newWriter(statusFile)
 		require.NoError(t, err)
 		updatedStatus := model.NewStatus(d, nil, scheduler.StatusSuccess, 10000, nil, nil)
-		updatedStatus.RequestID = "request-id-2"
+		updatedStatus.RequestID = "req-2"
 		require.NoError(t, w.write(updatedStatus))
 		require.NoError(t, w.close())
 

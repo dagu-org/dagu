@@ -16,8 +16,6 @@
 package util
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"regexp"
 	"strings"
 	"unicode"
@@ -37,8 +35,6 @@ var (
 const (
 	// MaxSafeNameLength is the maximum length of a safe filename
 	MaxSafeNameLength = 100
-	// HashLength is the length of the hash appended to the filename
-	HashLength = 5
 )
 
 // SafeName converts a string to a safe filename
@@ -62,25 +58,13 @@ func SafeName(str string) string {
 		return '_'
 	}, safe)
 
-	// Generate a 5-character hash
-	hash := generateHash(str)
-
 	// Truncate to a safe length (100 is generally safe)
 	// Use runes to safely truncate multi-byte characters
 	runes := []rune(safe)
-	if len(runes) > MaxSafeNameLength-HashLength-1 {
-		safe = string(runes[:MaxSafeNameLength-HashLength-1])
+	if len(runes) >= MaxSafeNameLength {
+		safe = string(runes[:MaxSafeNameLength])
 	}
-
-	// Append the hash
-	safe = safe + "_" + hash
 
 	// Ensure the last character is not a partial Unicode character
 	return strings.TrimRight(safe, "\uFFFD")
-}
-
-// generateHash creates a 5-character hash from the input string using SHA-256
-func generateHash(s string) string {
-	hash := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(hash[:])[0:HashLength]
 }

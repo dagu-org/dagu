@@ -27,7 +27,7 @@ import (
 var (
 	ErrReqIDNotFound     = errors.New("request ID not found")
 	ErrCreateDir         = errors.New("failed to create new directory")
-	ErrFileIsCompacted   = errors.New("file is already compacted")
+	ErrAlreadyCompacted  = errors.New("file is already compacted")
 	ErrWriterOpen        = errors.New("writer is already open")
 	ErrWriterIsClosed    = errors.New("writer is already closed")
 	ErrNoStatusDataToday = fmt.Errorf("no status data today")

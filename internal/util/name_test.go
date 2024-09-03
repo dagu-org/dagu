@@ -27,29 +27,29 @@ func TestSafeName(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"Basic", "hello world", "hello_world_"},
-		{"Reserved characters", "file<>:\"/\\|!?*.txt", "file___________txt_"},
-		{"Reserved Windows names", "CON", "_con__"},
-		{"Mixed case", "MixedCASE.txt", "mixedcase_txt_"},
-		{"Non-printable characters", "file\x00name.txt", "file_name_txt_"},
-		{"Leading and trailing spaces", " filename ", "_filename__"},
-		{"Long filename", strings.Repeat("a", 150), strings.Repeat("a", 94) + "_"},
-		{"All non-printable", "\x00\x01\x02", "____"},
-		{"Unicode characters", "文件名.txt", "文件名_txt_"},
-		{"Empty string", "", "_"},
+		{"Basic", "hello world", "hello_world"},
+		{"Reserved characters", "file<>:\"/\\|!?*.txt", "file___________txt"},
+		{"Reserved Windows names", "CON", "_con_"},
+		{"Mixed case", "MixedCASE.txt", "mixedcase_txt"},
+		{"Non-printable characters", "file\x00name.txt", "file_name_txt"},
+		{"Leading and trailing spaces", " filename ", "_filename_"},
+		{"Long filename", strings.Repeat("a", 150), strings.Repeat("a", 100)},
+		{"All non-printable", "\x00\x01\x02", "___"},
+		{"Unicode characters", "文件名.txt", "文件名_txt"},
+		{"Empty string", "", ""},
 		{"Dots and underscores", "...__", "_____"},
-		{"Reserved Windows name with extension", "aux.txt", "aux_txt_"},
-		{"Multiple spaces", "multiple   spaces", "multiple___spaces_"},
-		{"Single period", "file.name", "file_name_"},
-		{"Multiple periods", "file...name", "file___name_"},
-		{"Leading period", ".hidden", "_hidden_"},
-		{"Trailing period", "visible.", "visible__"},
-		{"Period and space", "file . name", "file___name_"},
-		{"Multiple periods and spaces", "file ...  name", "file______name_"},
-		{"Directory-like name", "my/directory/path", "my_directory_path_"},
-		{"File with multiple extensions", "script.tar.gz", "script_tar_gz_"},
-		{"Combination of issues", "My Weird File-Name!.txt", "my_weird_file-name__txt_"},
-		{"Multi-byte characters", "文件名" + strings.Repeat("あ", 100), "文件名" + strings.Repeat("あ", 91) + "_"},
+		{"Reserved Windows name with extension", "aux.txt", "aux_txt"},
+		{"Multiple spaces", "multiple   spaces", "multiple___spaces"},
+		{"Single period", "file.name", "file_name"},
+		{"Multiple periods", "file...name", "file___name"},
+		{"Leading period", ".hidden", "_hidden"},
+		{"Trailing period", "visible.", "visible_"},
+		{"Period and space", "file . name", "file___name"},
+		{"Multiple periods and spaces", "file ...  name", "file______name"},
+		{"Directory-like name", "my/directory/path", "my_directory_path"},
+		{"File with multiple extensions", "script.tar.gz", "script_tar_gz"},
+		{"Combination of issues", "My Weird File-Name!.txt", "my_weird_file-name__txt"},
+		{"Multi-byte characters", "文件名" + strings.Repeat("あ", 100), "文件名" + strings.Repeat("あ", 92)},
 	}
 
 	for _, tt := range tests {
@@ -57,9 +57,6 @@ func TestSafeName(t *testing.T) {
 			result := SafeName(tt.input)
 			if !strings.HasPrefix(result, tt.expected) {
 				t.Errorf("SafeName(%q) = %q, want prefix %q", tt.input, result, tt.expected)
-			}
-			if !isValidHash(result[len(result)-5:]) {
-				t.Errorf("SafeName(%q) did not append a valid 5-character hash: %q", tt.input, result[len(result)-5:])
 			}
 			if utf8.RuneCountInString(result) > 100 {
 				t.Errorf("SafeName(%q) produced a result with more than 100 runes: %d", tt.input, utf8.RuneCountInString(result))
@@ -89,7 +86,7 @@ func TestSafeNameProperties(t *testing.T) {
 		reservedNames := []string{"CON", "PRN", "AUX", "NUL", "COM1", "LPT1"}
 		for _, name := range reservedNames {
 			result := SafeName(name)
-			if reservedNamesRegex.MatchString(result[:len(result)-6]) {
+			if reservedNamesRegex.MatchString(result) {
 				t.Errorf("SafeName did not properly handle reserved Windows name %s: %s", name, result)
 			}
 		}
@@ -98,7 +95,7 @@ func TestSafeNameProperties(t *testing.T) {
 	t.Run("Lowercase conversion", func(t *testing.T) {
 		input := "MiXeDCaSe.TXT"
 		result := SafeName(input)
-		if result[:len(result)-6] != strings.ToLower(result[:len(result)-6]) {
+		if result != strings.ToLower(result) {
 			t.Errorf("SafeName did not convert to lowercase: %s", result)
 		}
 	})
@@ -107,7 +104,7 @@ func TestSafeNameProperties(t *testing.T) {
 		inputs := []string{"file.name", "file..name", ".hidden", "visible.", "...", "a.b.c.d"}
 		for _, input := range inputs {
 			result := SafeName(input)
-			if strings.Contains(result[:len(result)-6], ".") {
+			if strings.Contains(result, ".") {
 				t.Errorf("SafeName produced a name containing a period: %s", result)
 			}
 		}
@@ -122,25 +119,4 @@ func TestSafeNameProperties(t *testing.T) {
 			t.Errorf("SafeName did not produce unique names for different inputs: %s and %s", result1, result2)
 		}
 	})
-
-	t.Run("Hash consistency", func(t *testing.T) {
-		input := "test_input"
-		result1 := SafeName(input)
-		result2 := SafeName(input)
-		if result1 != result2 {
-			t.Errorf("SafeName produced inconsistent results for the same input: %s and %s", result1, result2)
-		}
-	})
-}
-
-func isValidHash(s string) bool {
-	if len(s) != 5 {
-		return false
-	}
-	for _, r := range s {
-		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
-			return false
-		}
-	}
-	return true
 }

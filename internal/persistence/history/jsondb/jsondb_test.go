@@ -83,12 +83,12 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 
 	t.Run("GetLatest", func(t *testing.T) {
 		d := createTestDAG(th, "test_get_latest", "test_get_latest.yaml")
-		now := time.Now().UTC()
+		now := time.Now()
 
 		// Create multiple statuses
 		for i := 0; i < 3; i++ {
 			status := createTestStatus(d, scheduler.StatusRunning, 10000+i)
-			status.RequestID = fmt.Sprintf("request-id-%d", i+1)
+			status.RequestID = fmt.Sprintf("r-%d", i+1)
 			writeTestStatus(t, th.JSONDB, d, status, now.Add(time.Duration(i)*time.Hour))
 		}
 
@@ -98,7 +98,7 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 			d.Location)
 		require.NoError(t, err)
 		assert.NotNil(t, latestStatus)
-		assert.Equal(t, "request-id-3", latestStatus.RequestID)
+		assert.Equal(t, "r-3", latestStatus.RequestID)
 	})
 
 	t.Run("GetLatest_NoStatus", func(t *testing.T) {
@@ -109,36 +109,20 @@ func TestJSONDB_BasicOperations(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("Open", func(t *testing.T) {
-		d := createTestDAG(th, "test_open", "test_open.yaml")
-		requestID := "request-id-1"
-		now := time.Now()
-
-		err := th.JSONDB.Open(context.Background(), d.Location, now, requestID)
-		require.NoError(t, err)
-
-		indexDir := filepath.Join(th.TmpDir, "index", d.Name)
-		statusDir := filepath.Join(th.TmpDir, "status", now.Format("2006"), now.Format("01"), now.Format("02"))
-
-		assert.DirExists(t, indexDir)
-		assert.DirExists(t, statusDir)
-
-		require.NoError(t, th.JSONDB.Close(context.Background()))
-	})
-
 	t.Run("WriteAndClose", func(t *testing.T) {
 		d := createTestDAG(th, "test_write", "test_write.yaml")
 		requestID := "req-1"
 		now := time.Now()
+		ctx := context.Background()
 
-		require.NoError(t, th.JSONDB.Open(context.Background(), d.Location, now, requestID))
+		require.NoError(t, th.JSONDB.Open(ctx, d.Location, now, requestID))
 
 		status := createTestStatus(d, scheduler.StatusRunning, 12345)
-		require.NoError(t, th.JSONDB.Write(context.Background(), status))
+		require.NoError(t, th.JSONDB.Write(ctx, status))
 
-		require.NoError(t, th.JSONDB.Close(context.Background()))
+		require.NoError(t, th.JSONDB.Close(ctx))
 
-		statusFiles := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 1)
+		statusFiles := th.JSONDB.ListRecentStatuses(ctx, d.Location, 1)
 		require.Len(t, statusFiles, 1)
 		assert.Equal(t, status.RequestID, statusFiles[0].Status.RequestID)
 		assert.Equal(t, status.Status, statusFiles[0].Status.Status)
@@ -157,9 +141,9 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 			ReqID     string
 			Timestamp time.Time
 		}{
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
 		}
 
 		for _, data := range testData {
@@ -169,8 +153,8 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 
 		recentStatus := th.JSONDB.ListRecentStatuses(context.Background(), d.Location, 2)
 		require.Len(t, recentStatus, 2)
-		assert.Equal(t, "request-id-3", recentStatus[0].Status.RequestID)
-		assert.Equal(t, "request-id-2", recentStatus[1].Status.RequestID)
+		assert.Equal(t, "req-3", recentStatus[0].Status.RequestID)
+		assert.Equal(t, "req-2", recentStatus[1].Status.RequestID)
 	})
 
 	t.Run("FindByRequestID", func(t *testing.T) {
@@ -181,9 +165,9 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 			ReqID     string
 			Timestamp time.Time
 		}{
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
 		}
 
 		for _, data := range testData {
@@ -192,13 +176,13 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 		}
 
 		t.Run("ExistingRequestID", func(t *testing.T) {
-			status, err := th.JSONDB.GetStatusByRequestID(context.Background(), d.Location, "request-id-2")
+			status, err := th.JSONDB.GetStatusByRequestID(context.Background(), d.Location, "req-2")
 			require.NoError(t, err)
-			require.Equal(t, "request-id-2", status.Status.RequestID)
+			require.Equal(t, "req-2", status.Status.RequestID)
 		})
 
 		t.Run("NonExistentRequestID", func(t *testing.T) {
-			status, err := th.JSONDB.GetStatusByRequestID(context.Background(), d.Location, "request-id-10000")
+			status, err := th.JSONDB.GetStatusByRequestID(context.Background(), d.Location, "req-10000")
 			require.Error(t, err)
 			require.Nil(t, status)
 		})
@@ -206,7 +190,7 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 
 	t.Run("Update", func(t *testing.T) {
 		d := createTestDAG(th, "test_update", "test_update.yaml")
-		requestID := "request-id-1"
+		requestID := "req-1"
 		now := time.Now()
 
 		initialStatus := createTestStatus(d, scheduler.StatusRunning, 12345)
@@ -236,9 +220,9 @@ func TestJSONDB_FileOperations(t *testing.T) {
 			ReqID     string
 			Timestamp time.Time
 		}{
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-			{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
+			{createTestStatus(d, scheduler.StatusNone, 10000), "req-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
 		}
 
 		for _, data := range testData {
@@ -291,7 +275,7 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		d := createTestDAG(th, oldID, oldID+".yaml")
 
 		status := createTestStatus(d, scheduler.StatusSuccess, 12345)
-		status.RequestID = "request-id-1"
+		status.RequestID = "req-1"
 		writeTestStatus(t, th.JSONDB, d, status, time.Now())
 
 		oldPath := d.Location
@@ -299,10 +283,10 @@ func TestJSONDB_FileOperations(t *testing.T) {
 
 		require.NoError(t, th.JSONDB.RenameDAG(context.Background(), oldPath, newPath))
 
-		oldIndexDir := filepath.Join(th.TmpDir, "index", oldID)
+		oldIndexDir := filepath.Join(th.TmpDir, "index", string(newSafeName(oldID)))
 		assert.NoDirExists(t, oldIndexDir)
 
-		newIndexDir := filepath.Join(th.TmpDir, "index", newID)
+		newIndexDir := filepath.Join(th.TmpDir, "index", string(newSafeName(newID)))
 		assert.DirExists(t, newIndexDir)
 
 		statusFiles := th.JSONDB.ListRecentStatuses(context.Background(), newPath, 1)
@@ -318,11 +302,11 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		d2 := createTestDAG(th, newID, newID+".yaml")
 
 		status1 := createTestStatus(d1, scheduler.StatusSuccess, 12345)
-		status1.RequestID = "request-id-1"
+		status1.RequestID = "req-1"
 		writeTestStatus(t, th.JSONDB, d1, status1, time.Now())
 
 		status2 := createTestStatus(d2, scheduler.StatusSuccess, 12346)
-		status2.RequestID = "request-id-2"
+		status2.RequestID = "req-2"
 		writeTestStatus(t, th.JSONDB, d2, status2, time.Now())
 
 		err := th.JSONDB.RenameDAG(context.Background(), d1.Location, d2.Location)
@@ -339,7 +323,7 @@ func TestJSONDB_ListingOperations(t *testing.T) {
 
 		for i := 0; i < 5; i++ {
 			status := createTestStatus(d, scheduler.StatusNone, 10000+i)
-			status.RequestID = fmt.Sprintf("request-id-%d", i+1)
+			status.RequestID = fmt.Sprintf("req-%d", i+1)
 			writeTestStatus(t, th.JSONDB, d, status, time.Now().AddDate(0, 0, -i))
 		}
 
@@ -362,13 +346,13 @@ func TestJSONDB_ListingOperations(t *testing.T) {
 		}
 
 		t.Run("Ascending", func(t *testing.T) {
-			dirs, err := listDirsSorted(testDir, false)
+			dirs, err := listDirsSorted(testDir, false, nil)
 			require.NoError(t, err)
 			assert.Equal(t, []string{"2021", "2022", "2023"}, dirs)
 		})
 
 		t.Run("Descending", func(t *testing.T) {
-			dirs, err := listDirsSorted(testDir, true)
+			dirs, err := listDirsSorted(testDir, true, nil)
 			require.NoError(t, err)
 			assert.Equal(t, []string{"2023", "2022", "2021"}, dirs)
 		})
@@ -385,7 +369,7 @@ func TestJSONDB_ListingOperations(t *testing.T) {
 		}
 
 		t.Run("Ascending", func(t *testing.T) {
-			files, err := listFilesSorted(testDir, false)
+			files, err := listFilesSorted(testDir, ".dat", false)
 			require.NoError(t, err)
 			assert.Len(t, files, 3)
 			for i, file := range files {
@@ -394,7 +378,7 @@ func TestJSONDB_ListingOperations(t *testing.T) {
 		})
 
 		t.Run("Descending", func(t *testing.T) {
-			files, err := listFilesSorted(testDir, true)
+			files, err := listFilesSorted(testDir, ".dat", true)
 			require.NoError(t, err)
 			assert.Len(t, files, 3)
 			for i, file := range files {
@@ -417,19 +401,19 @@ func TestJSONDB_SpecialOperations(t *testing.T) {
 			writeTestStatus(t, th.JSONDB, d, status, now.Add(time.Duration(i)*time.Hour))
 		}
 
-		latestFile, err := th.JSONDB.latestToday(d.Location, now, true)
+		latestFile, err := th.JSONDB.findLatestStatusFile(newSafeName(d.Location), now, true)
 		require.NoError(t, err)
 		assert.Contains(t, latestFile, now.Format("20060102"))
 		assert.Contains(t, latestFile, "req-3")
 	})
 
 	t.Run("craftCompactedFileName", func(t *testing.T) {
-		originalFile := "/path/to/status_file.dat"
-		compactedFile, err := craftCompactedFileName(originalFile)
+		originalFile := "/path/to/status_file.jsonl"
+		compactedFile, err := craftCompactedStatusFileName(originalFile)
 		require.NoError(t, err)
-		assert.Equal(t, "/path/to/status_file_c.dat", compactedFile)
+		assert.Equal(t, "/path/to/status_file_c.jsonl", compactedFile)
 
-		_, err = craftCompactedFileName("/path/to/status_file_c.dat")
+		_, err = craftCompactedStatusFileName("/path/to/status_file_c.jsonl")
 		require.Error(t, err)
 	})
 }

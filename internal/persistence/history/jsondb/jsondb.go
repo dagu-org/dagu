@@ -17,6 +17,8 @@ package jsondb
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"sync"
 
 	"fmt"
@@ -28,6 +30,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -41,12 +44,45 @@ var (
 )
 
 const (
-	defaultCacheSize = 300
-	requestIDLenSafe = 8
-	extDat           = ".dat"
-	dateTimeFormat   = "20060102.15:04:05.000"
-	dateFormat       = "20060102"
+	defaultCacheSize     = 300
+	safeRequestIDLen     = 8
+	datePrefixFormat     = "20060102.15:04:05.000"
+	dateFormat           = "20060102"
+	statusDirRoot        = "status"
+	statusFilename       = "status.jsonl"
+	dagFilename          = "dag.yaml"
+	indexFileExt         = ".dat"
+	statusFileExt        = ".jsonl"
+	compactedSuffix      = "_c"
+	indexFileRegExpMatch = 5
+	hashLength           = 5
 )
+
+var (
+	// indexFileRegExp is the regexp for extracting the date and request ID from the status file name
+	indexFileRegExp = regexp.MustCompile(`^(\d{4})(\d{2})(\d{2})\.\d{2}:\d{2}:\d{2}.\d{3}_([^.]+)\.dat`)
+	// yearDirRegExp is used to match directories of the format YYYY, MM, or DD
+	yearDirRegExp = regexp.MustCompile(`^\d{4}$`)
+	// monthDirRegExp is used to match directories of the format MM
+	monthDirRegExp = regexp.MustCompile(`^\d{2}$`)
+	// dayDirRegExp is used to match directories of the format DD
+	dayDirRegExp = regexp.MustCompile(`^\d{2}$`)
+)
+
+// safeName is a type for safe file names.
+type safeName string
+
+func newSafeName(dagID string) safeName {
+	base := strings.TrimSuffix(filepath.Base(dagID), filepath.Ext(dagID))
+	str := util.SafeName(base)
+	hash := generateHash(str)
+	// append the hash to the safe name
+	return safeName(str + "_" + hash)
+}
+
+func (s safeName) String() string {
+	return string(s)
+}
 
 // JSONDB manages DAG status files in local storage.
 type JSONDB struct {
@@ -101,33 +137,41 @@ func (s *JSONDB) Open(_ context.Context, dagID string, startTime time.Time, requ
 
 	startTime = startTime.UTC()
 
-	filename := craftStatusFile(dagID, requestID, startTime)
+	// Status directory name format: <timestamp>_<requestID>
+	// Status files are stored as <statusDirname>/status[_c].jsonl
+	statusDirname := craftStatusDirname(startTime, requestID)
 
-	// Index file is used to index the status files by its filename.
-	// Status files are stored in date-wise directories and indexed by the index file
-	// Both index and status files are named with the same filename but stored in different directories
-	// Filename format: <dagID>.<timestamp>.<requestID>.dat
-	//
-	// Note that dagID can be different from the actual DAG name because
-	// renaming a DAG does not rename the status files.
-	// Therefore, index file name should not be renamed once created.
-	indexFile := filepath.Join(craftIndexDataDir(s.baseDir, dagID), filename)
-	statusFile := filepath.Join(craftStatusDataDir(s.baseDir, startTime), filename)
+	// Create the index file for the DAG execution.
+	// Index files will be used to efficiently retrieve status files for a given DAG.
+	// Because the status files are stored in date-wise directories, the index file
+	// have the format <statusDirname>.index.
+	// We can construct the status file path from the index file path.
+	indexFilename := filepath.Join(
+		craftIndexDir(s.baseDir, newSafeName(dagID)),
+		statusDirname+indexFileExt,
+	)
 
 	// make directories
-	if err := os.MkdirAll(filepath.Dir(indexFile), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(indexFilename), 0755); err != nil {
 		return fmt.Errorf("failed to create index directory: %w", err)
 	}
 
 	// create index file if not exists
-	if _, err := os.Stat(indexFile); os.IsNotExist(err) {
-		if _, err := os.Create(indexFile); err != nil {
+	if _, err := os.Stat(indexFilename); os.IsNotExist(err) {
+		if _, err := os.Create(indexFilename); err != nil {
 			return fmt.Errorf("failed to create index file: %w", err)
 		}
 	}
 
 	// create status file
-	writer, err := newWriter(statusFile)
+	writer, err := newWriter(
+		filepath.Join(
+			craftStatusDataDir(s.baseDir, startTime),
+			statusDirname,
+			statusFilename,
+		),
+	)
+
 	if err != nil {
 		return fmt.Errorf("failed to create status file: %w", err)
 	}
@@ -172,6 +216,7 @@ func (s *JSONDB) Close(_ context.Context) error {
 		if err := s.writer.close(); err != nil {
 			s.logger.Errorf("failed to close file %s: %v", s.writer.statusFile, err)
 		}
+
 		s.writer = nil
 		s.writerLock.Unlock()
 	}()
@@ -184,10 +229,10 @@ func (s *JSONDB) Close(_ context.Context) error {
 	return nil
 }
 
-// ListRecent retrieves the n most recent status files for a given DAG.
+// ListRecentStatuses retrieves the n most recent status files for a given DAG.
 func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) []*model.History {
 	// Read the latest n status files for the given DAG.
-	indexDir := craftIndexDataDir(s.baseDir, dagID)
+	indexDir := craftIndexDir(s.baseDir, newSafeName(dagID))
 
 	// If the index directory does not exist, return nil.
 	if _, err := os.Stat(indexDir); os.IsNotExist(err) {
@@ -195,7 +240,7 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 	}
 
 	// Search the index directory for the latest n status files.
-	files, err := listFilesSorted(indexDir, true)
+	files, err := listFilesSorted(indexDir, indexFileExt, true)
 	if err != nil {
 		s.logger.Errorf("failed to list files in %s: %v", indexDir, err)
 		return nil
@@ -206,28 +251,31 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 	var ret []*model.History
 	for _, indexFile := range files {
 		// Convert the index file to the status file.
-		statusFilePattern, err := indexFileToStatusFilePattern(s.baseDir, indexFile)
+		indexFileInfo, err := getIndexFileInfo(indexFile)
 		if err != nil {
 			s.logger.Errorf("failed to convert index file to status file: %v", err)
 			continue
 		}
+		pattern := indexFileInfo.getStatusFilePattern(s.baseDir)
 
 		// get the latest status file
-		statusFiles, err := filepath.Glob(statusFilePattern)
+		files, err := filepath.Glob(pattern)
 		if err != nil {
-			s.logger.Errorf("failed to list files in %s: %v", statusFilePattern, err)
+			s.logger.Errorf("failed to list files in %s: %v", pattern, err)
 			continue
 		}
-		statusFiles = getLatestFiles(statusFiles, 1)
-		if len(statusFiles) == 0 {
+
+		// In most cases, there should be only one status file for a given index file.
+		files = getLatestFiles(files, 1)
+		if len(files) == 0 {
 			s.logger.Errorf("no status files found for %s", indexFile)
 			continue
 		}
-		statusFile := statusFiles[0]
+		statusFile := files[0]
 
 		// Load the latest status file
 		status, err := s.cache.LoadLatest(statusFile, func() (*model.Status, error) {
-			return ParseStatusFile(statusFile)
+			return LoadStatusFile(statusFile)
 		})
 		if err != nil {
 			s.logger.Errorf("failed to parse file %s: %v", indexFile, err)
@@ -243,12 +291,10 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 	return ret
 }
 
-// ListRecentAll retrieves the n most recent status files across all DAGs.
+// ListRecentAllDAGs retrieves the n most recent status files across all DAGs.
 func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*model.History, error) {
-	statusDir := filepath.Join(s.baseDir, "status")
-
 	// List recent files from the status directory
-	recentFiles, err := s.listRecentFiles(statusDir, n)
+	recentFiles, err := s.listRecentFiles(filepath.Join(s.baseDir, statusDirRoot), n)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent files: %w", err)
 	}
@@ -256,9 +302,9 @@ func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*model.H
 	var results []*model.History
 
 	for _, file := range recentFiles {
-		// Parse the status file
+		// Load the latest status file
 		status, err := s.cache.LoadLatest(file, func() (*model.Status, error) {
-			return ParseStatusFile(file)
+			return LoadStatusFile(file)
 		})
 		if err != nil {
 			s.logger.Errorf("failed to parse file %s: %v", file, err)
@@ -285,20 +331,20 @@ func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*model.H
 }
 
 // listRecentFiles lists the most recent n status files in reverse chronological order.
-func (s *JSONDB) listRecentFiles(path string, limit int) ([]string, error) {
+func (s *JSONDB) listRecentFiles(root string, limit int) ([]string, error) {
 	var allFiles []string
 
 	// Walk through the years in reverse order
-	years, err := listDirsSorted(path, true)
+	years, err := listDirsSorted(root, true, yearDirRegExp)
 	if err != nil {
 		return nil, fmt.Errorf("error listing years: %w", err)
 	}
 
 	for _, year := range years {
-		yearPath := filepath.Join(path, year)
+		yearPath := filepath.Join(root, year)
 
 		// Walk through the months in reverse order
-		months, err := listDirsSorted(yearPath, true)
+		months, err := listDirsSorted(yearPath, true, monthDirRegExp)
 		if err != nil {
 			return nil, fmt.Errorf("error listing months in %s: %w", year, err)
 		}
@@ -307,7 +353,7 @@ func (s *JSONDB) listRecentFiles(path string, limit int) ([]string, error) {
 			monthPath := filepath.Join(yearPath, month)
 
 			// Walk through the days in reverse order
-			days, err := listDirsSorted(monthPath, true)
+			days, err := listDirsSorted(monthPath, true, dayDirRegExp)
 			if err != nil {
 				return nil, fmt.Errorf("error listing days in %s/%s: %w", year, month, err)
 			}
@@ -315,17 +361,28 @@ func (s *JSONDB) listRecentFiles(path string, limit int) ([]string, error) {
 			for _, day := range days {
 				dayPath := filepath.Join(monthPath, day)
 
-				// List files in the day directory
-				files, err := listFilesSorted(dayPath, true)
+				// List directories in the day directory in reverse order
+				statusDirs, err := listDirsSorted(dayPath, true, nil)
 				if err != nil {
-					return nil, fmt.Errorf("error listing files in %s/%s/%s: %w", year, month, day, err)
+					return nil, fmt.Errorf("error listing directories in %s/%s/%s: %w", year, month, day, err)
 				}
 
-				allFiles = append(allFiles, files...)
+				for _, statusDir := range statusDirs {
+					// List files in the status directory
+					file, err := getStatusFile(
+						filepath.Join(dayPath, statusDir),
+					)
+					if err != nil {
+						s.logger.Warn("failed to get status file: %s", err)
+						continue
+					}
+					// only add the latest file for each status directory
+					allFiles = append(allFiles, file)
 
-				// If we have enough files, return them
-				if len(allFiles) >= limit {
-					return allFiles[:limit], nil
+					// If we have enough files, return them
+					if len(allFiles) >= limit {
+						return allFiles[:limit], nil
+					}
 				}
 			}
 		}
@@ -340,14 +397,13 @@ func (s *JSONDB) listRecentFiles(path string, limit int) ([]string, error) {
 
 // GetLatest retrieves the latest status file for today for a given DAG.
 func (s *JSONDB) GetLatestStatus(_ context.Context, dagID string) (*model.Status, error) {
-	// Use UTC time
-	file, err := s.latestToday(dagID, time.Now().UTC(), s.latestStatusToday)
+	file, err := s.findLatestStatusFile(newSafeName(dagID), time.Now(), s.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}
 
 	return s.cache.LoadLatest(file, func() (*model.Status, error) {
-		return ParseStatusFile(file)
+		return LoadStatusFile(file)
 	})
 }
 
@@ -356,9 +412,11 @@ func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID str
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", history.ErrReqIDNotFound)
 	}
-	indexDir := craftIndexDataDir(s.baseDir, dagID)
-	safeReqID := util.TruncString(reqID, requestIDLenSafe)
-	pattern := filepath.Join(indexDir, "*"+safeReqID+"*.dat")
+	indexDir := craftIndexDir(s.baseDir, newSafeName(dagID))
+	safeReqID := safeRequestID(reqID)
+
+	// Search for the index file for the given request ID
+	pattern := filepath.Join(indexDir, "*"+safeReqID+"*"+indexFileExt)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -368,11 +426,12 @@ func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID str
 	// get the latest status file
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 	for _, f := range matches {
-		pattern, err := indexFileToStatusFilePattern(s.baseDir, f)
+		indexFileInfo, err := getIndexFileInfo(f)
 		if err != nil {
 			s.logger.Warn("failed to convert index file to status file: %s", err)
 			continue
 		}
+		pattern := indexFileInfo.getStatusFilePattern(s.baseDir)
 
 		// get the latest status file
 		statusFiles, err := filepath.Glob(pattern)
@@ -382,7 +441,7 @@ func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID str
 		}
 
 		for _, statusFile := range statusFiles {
-			status, err := ParseStatusFile(statusFile)
+			status, err := LoadStatusFile(statusFile)
 			if err != nil {
 				s.logger.Warn("parsing failed %s : %s", statusFile, err)
 				continue
@@ -403,7 +462,7 @@ func (s *JSONDB) DeleteAllStatuses(ctx context.Context, dagID string) error {
 
 // DeleteOld removes status files older than the specified retention period.
 func (s *JSONDB) DeleteOldStatuses(_ context.Context, dagID string, retentionDays int) error {
-	indexDir := craftIndexDataDir(s.baseDir, dagID)
+	indexDir := craftIndexDir(s.baseDir, newSafeName(dagID))
 	if retentionDays < 0 {
 		return fmt.Errorf("retentionDays must be a non-negative integer: %d", retentionDays)
 	}
@@ -415,14 +474,16 @@ func (s *JSONDB) DeleteOldStatuses(_ context.Context, dagID string, retentionDay
 	expiredTime := time.Now().AddDate(0, 0, -retentionDays)
 	var lastErr error
 	for _, m := range matches {
-		statusFilePattern, err := indexFileToStatusFilePattern(s.baseDir, m)
+		indexFileInfo, err := getIndexFileInfo(m)
 		if err != nil {
 			s.logger.Warn("failed to convert index file to status file: %s", err)
 			continue
 		}
-		statusFiles, err := filepath.Glob(statusFilePattern)
+		pattern := indexFileInfo.getStatusFilePattern(s.baseDir)
+
+		statusFiles, err := filepath.Glob(pattern)
 		if err != nil {
-			s.logger.Warn("failed to list files in %s: %s", statusFilePattern, err)
+			s.logger.Warn("failed to list files in %s: %s", pattern, err)
 			continue
 		}
 		latestStatusFiles := getLatestFiles(statusFiles, 1)
@@ -456,7 +517,7 @@ func (s *JSONDB) DeleteOldStatuses(_ context.Context, dagID string, retentionDay
 
 // Compact compresses the status file by keeping only the latest status.
 func (s *JSONDB) compact(statusFile string) error {
-	status, err := ParseStatusFile(statusFile)
+	status, err := LoadStatusFile(statusFile)
 	if err == io.EOF {
 		// no data to compact
 		return nil
@@ -465,7 +526,7 @@ func (s *JSONDB) compact(statusFile string) error {
 		return fmt.Errorf("failed to parse file %s: %w", statusFile, err)
 	}
 
-	compactedFile, err := craftCompactedFileName(statusFile)
+	compactedFile, err := craftCompactedStatusFileName(statusFile)
 	if err != nil {
 		return err
 	}
@@ -484,7 +545,7 @@ func (s *JSONDB) compact(statusFile string) error {
 		return err
 	}
 
-	return os.Remove(statusFile)
+	return os.Rename(compactedFile, statusFile)
 }
 
 // RenameDAG changes the ID of a DAG, effectively renaming its associated files.
@@ -493,8 +554,8 @@ func (s *JSONDB) RenameDAG(_ context.Context, oldID, newID string) error {
 		return nil
 	}
 
-	oldIndexDir := craftIndexDataDir(s.baseDir, oldID)
-	newIndexDir := craftIndexDataDir(s.baseDir, newID)
+	oldIndexDir := craftIndexDir(s.baseDir, newSafeName(oldID))
+	newIndexDir := craftIndexDir(s.baseDir, newSafeName(newID))
 
 	if !pathExists(oldIndexDir) {
 		// No index directory for the old DAG, nothing to rename
@@ -515,19 +576,45 @@ func (s *JSONDB) RenameDAG(_ context.Context, oldID, newID string) error {
 	return nil
 }
 
-// latestToday finds the latest status file for today or the most recent day.
-func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool) (string, error) {
-	indexDir := craftIndexDataDir(s.baseDir, dagID)
+// findLatestStatusFile finds the latest status file for today or the most recent day.
+func (s *JSONDB) findLatestStatusFile(dagID safeName, now time.Time, today bool) (string, error) {
+	// Find the index file for the given DAG
+	indexDir := craftIndexDir(s.baseDir, dagID)
 
-	// Use UTC format
-	var pattern string
-	if latestStatusToday {
-		pattern = filepath.Join(indexDir, day.Format("20060102")+"*."+normalizedID(dagID)+"*.dat")
-	} else {
-		pattern = filepath.Join(indexDir, "*."+normalizedID(dagID)+"*.dat")
+	if today {
+		start := now.Truncate(24 * time.Hour).UTC()
+		end := start.Add(23 * time.Hour)
+
+		for t := end; t.After(start) || t.Equal(start); t = t.Add(-time.Hour) {
+			year, month, day := t.Date()
+			hour := t.Hour()
+
+			pattern := filepath.Join(indexDir,
+				fmt.Sprintf("%04d%02d%02d.%02d*", year, month, day, hour),
+			)
+			matches, err := filepath.Glob(pattern)
+			if err != nil || len(matches) == 0 {
+				continue
+			}
+
+			latestFiles := getLatestFiles(matches, 1)
+			if len(latestFiles) == 0 {
+				continue
+			}
+
+			status, err := s.indexFileToStatusFile(latestFiles[0])
+			if err != nil {
+				continue
+			}
+			return status, nil
+		}
+
+		return "", history.ErrNoStatusDataToday
 	}
 
-	matches, err := filepath.Glob(pattern)
+	matches, err := filepath.Glob(
+		filepath.Join(indexDir, "*.dat"),
+	)
 	if err != nil || len(matches) == 0 {
 		return "", history.ErrNoStatusDataToday
 	}
@@ -536,15 +623,17 @@ func (s *JSONDB) latestToday(dagID string, day time.Time, latestStatusToday bool
 	if len(latestFiles) == 0 {
 		return "", history.ErrNoStatusData
 	}
+
 	return s.indexFileToStatusFile(latestFiles[0])
 }
 
 // indexFileToStatusFile converts an index file path to its corresponding status file path.
 func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
-	pattern, err := indexFileToStatusFilePattern(s.baseDir, indexFile)
+	indexFileInfo, err := getIndexFileInfo(indexFile)
 	if err != nil {
 		return "", err
 	}
+	pattern := indexFileInfo.getStatusFilePattern(s.baseDir)
 	files, err := filepath.Glob(pattern)
 	if err != nil {
 		return "", err
@@ -558,16 +647,13 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 
 // ListByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
 func (s *JSONDB) ListStatusesByDate(_ context.Context, date time.Time) ([]*model.History, error) {
-	// Convert the start of the local date to UTC
-	utcStartOfDay := date.UTC()
-
 	// Set the time to 00:00:00
-	utcStartOfDay = time.Date(utcStartOfDay.Year(), utcStartOfDay.Month(), utcStartOfDay.Day(), 0, 0, 0, 0, time.UTC)
+	startOfDay := date.Truncate(24 * time.Hour).UTC()
 
 	// Calculate the end of the day in UTC
-	utcEndOfDay := utcStartOfDay.Add(24 * time.Hour)
+	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	return s.listStatusInRange(utcStartOfDay, utcEndOfDay)
+	return s.listStatusInRange(startOfDay, endOfDay)
 }
 
 // listStatusInRange retrieves all status files for a specific date range.
@@ -579,29 +665,36 @@ func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.History, erro
 		year, month, day := t.Date()
 		hour := t.Hour()
 
-		statusDir := filepath.Join(s.baseDir, "status",
+		dayPath := filepath.Join(s.baseDir, statusDirRoot,
 			fmt.Sprintf("%04d", year),
 			fmt.Sprintf("%02d", month),
 			fmt.Sprintf("%02d", day))
 
-		pattern := filepath.Join(statusDir, fmt.Sprintf("%04d%02d%02d.%02d*.dat", year, month, day, hour))
-		statusFiles, err := filepath.Glob(pattern)
+		pattern := filepath.Join(dayPath, fmt.Sprintf("%04d%02d%02d.%02d*", year, month, day, hour))
+		statusDirs, err := filepath.Glob(pattern)
 		if err != nil {
 			s.logger.Errorf("failed to list status files for %s: %v", t.Format("2006-01-02 15:04"), err)
 			continue
 		}
 
-		for _, statusFile := range statusFiles {
-			status, err := s.cache.LoadLatest(statusFile, func() (*model.Status, error) {
-				return ParseStatusFile(statusFile)
+		for _, statusDir := range statusDirs {
+			// List files in the status directory
+			file, err := getStatusFile(statusDir)
+			if err != nil {
+				s.logger.Warn("failed to get status file: %s", err)
+				continue
+			}
+
+			status, err := s.cache.LoadLatest(file, func() (*model.Status, error) {
+				return LoadStatusFile(file)
 			})
 			if err != nil {
-				s.logger.Errorf("failed to parse file %s: %v", statusFile, err)
+				s.logger.Errorf("failed to parse file %s: %v", file, err)
 				continue
 			}
 
 			result = append(result, &model.History{
-				File:   statusFile,
+				File:   file,
 				Status: status,
 			})
 		}
@@ -615,14 +708,25 @@ func (s *JSONDB) listStatusInRange(start, end time.Time) ([]*model.History, erro
 	return result, nil
 }
 
+func getStatusFile(statusDir string) (string, error) {
+	files, err := listFilesSorted(statusDir, statusFileExt, true)
+	if err != nil {
+		return "", err
+	}
+	if len(files) == 0 {
+		return "", fmt.Errorf("no status files found in %s", statusDir)
+	}
+	return files[0], nil
+}
+
 // pathExists checks if a given path exists.
 func pathExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
 }
 
-// ParseStatusFile reads and parses a status file, returning the latest status.
-func ParseStatusFile(file string) (*model.Status, error) {
+// LoadStatusFile reads and parses a status file, returning the latest status.
+func LoadStatusFile(file string) (*model.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Printf("failed to open file. err: %v", err)
@@ -683,25 +787,21 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 	return ret, nil
 }
 
-const (
-	compactedFileSuffix = "_c.dat"
-)
-
-// craftCompactedFileName creates a filename for a compacted status file.
-func craftCompactedFileName(file string) (string, error) {
-	if strings.HasSuffix(file, compactedFileSuffix) {
-		return "", history.ErrFileIsCompacted
+// craftCompactedStatusFileName creates a filename for a compacted status file.
+func craftCompactedStatusFileName(file string) (string, error) {
+	suffixWithExt := compactedSuffix + statusFileExt
+	if strings.HasSuffix(file, suffixWithExt) {
+		return "", history.ErrAlreadyCompacted
 	}
-	return filepath.Join(
-		filepath.Dir(file),
-		strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))+
-			compactedFileSuffix,
-	), nil
+	compactedFilename := strings.TrimSuffix(
+		filepath.Base(file), filepath.Ext(file),
+	) + suffixWithExt
+	return filepath.Join(filepath.Dir(file), compactedFilename), nil
 }
 
-// craftIndexDataDir constructs the path to the index directory for a DAG.
-func craftIndexDataDir(baseDir string, dagID string) string {
-	return filepath.Join(baseDir, "index", normalizedID(dagID))
+// craftIndexDir constructs the path to the index directory for a DAG.
+func craftIndexDir(baseDir string, dagID safeName) string {
+	return filepath.Join(baseDir, "index", dagID.String())
 }
 
 // craftStatusDataDir constructs the path to the status directory for a specific date.
@@ -711,39 +811,19 @@ func craftStatusDataDir(baseDir string, t time.Time) string {
 	year := t.Format("2006")
 	month := t.Format("01")
 	date := t.Format("02")
-	return filepath.Join(baseDir, "status", year, month, date)
+	return filepath.Join(baseDir, statusDirRoot, year, month, date)
 }
 
-// craftStatusFile generates a filename for a status file.
-func craftStatusFile(dagID, requestID string, t time.Time) string {
+// craftStatusDirname generates a directory name for a status file.
+func craftStatusDirname(t time.Time, requestID string) string {
 	// Ensure time is in UTC
 	t = t.UTC()
-	// status file name format: <timestamp>.<dagID>.<requestID>.dat
-	return fmt.Sprintf("%s.%s.%s.dat",
-		t.Format(dateTimeFormat),
-		normalizedID(dagID),
-		util.TruncString(requestID, requestIDLenSafe),
+	// status file name format: <timestamp>_<requestID>
+	return fmt.Sprintf("%s_%s",
+		t.Format(datePrefixFormat),
+		safeRequestID(requestID),
 	)
 }
-
-// indexFileToStatusFilePattern converts an index file path to a pattern for finding corresponding status files.
-func indexFileToStatusFilePattern(baseDir, indexFile string) (string, error) {
-	indexFileInfo, err := parseIndexFile(indexFile)
-	if err != nil {
-		return "", err
-	}
-	baseName := strings.TrimSuffix(filepath.Base(indexFile), filepath.Ext(indexFile))
-	return filepath.Join(
-		baseDir,
-		"status",
-		indexFileInfo.year, indexFileInfo.month, indexFileInfo.date,
-		baseName+"*.dat",
-	), nil
-}
-
-var (
-	indexFileRegExp = regexp.MustCompile(`^(\d{4})(\d{2})(\d{2})\.\d{2}:\d{2}:\d{2}.\d{3}\.([^.]+)\.([^.]+)\.dat`)
-)
 
 // indexFileInfo holds information parsed from an index file name.
 type indexFileInfo struct {
@@ -754,11 +834,11 @@ type indexFileInfo struct {
 	reqID    string
 }
 
-// parseIndexFile extracts information from an index file name.
-func parseIndexFile(indexFile string) (indexFileInfo, error) {
+// getIndexFileInfo extracts information from an index file name.
+func getIndexFileInfo(indexFile string) (indexFileInfo, error) {
 	base := filepath.Base(indexFile)
 	m := indexFileRegExp.FindStringSubmatch(base)
-	if len(m) != 6 {
+	if len(m) != indexFileRegExpMatch {
 		return indexFileInfo{}, fmt.Errorf("invalid index file: %s", indexFile)
 	}
 	return indexFileInfo{
@@ -766,28 +846,41 @@ func parseIndexFile(indexFile string) (indexFileInfo, error) {
 		year:     m[1],
 		month:    m[2],
 		date:     m[3],
-		reqID:    m[5],
+		reqID:    m[4],
 	}, nil
 }
 
-// normalizedID creates a valid filename from a DAG ID.
-func normalizedID(dagID string) string {
-	return util.SafeName(
-		strings.TrimSuffix(filepath.Base(dagID), filepath.Ext(dagID)),
+// StatusFilePattern returns a pattern to match status files for a given index file.
+func (i indexFileInfo) getStatusFilePattern(baseDir string) string {
+	statusDirname := strings.TrimSuffix(filepath.Base(i.filePath), filepath.Ext(i.filePath))
+	return filepath.Join(
+		baseDir,
+		statusDirRoot,
+		i.year, i.month, i.date,
+		statusDirname,
+		"*"+statusFileExt,
 	)
 }
 
 // listDirsSorted lists directories in the given path, optionally in reverse order.
-func listDirsSorted(path string, reverse bool) ([]string, error) {
+func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
 
 	var dirs []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			dirs = append(dirs, entry.Name())
+	if pattern != nil {
+		for _, entry := range entries {
+			if entry.IsDir() && pattern.MatchString(entry.Name()) {
+				dirs = append(dirs, entry.Name())
+			}
+		}
+	} else {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				dirs = append(dirs, entry.Name())
+			}
 		}
 	}
 
@@ -801,7 +894,7 @@ func listDirsSorted(path string, reverse bool) ([]string, error) {
 }
 
 // listFilesSorted lists files in the given path, optionally in reverse order.
-func listFilesSorted(path string, reverse bool) ([]string, error) {
+func listFilesSorted(path, ext string, reverse bool) ([]string, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -809,7 +902,7 @@ func listFilesSorted(path string, reverse bool) ([]string, error) {
 
 	var files []string
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), extDat) {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ext) {
 			files = append(files, filepath.Join(path, entry.Name()))
 		}
 	}
@@ -821,4 +914,14 @@ func listFilesSorted(path string, reverse bool) ([]string, error) {
 	}
 
 	return files, nil
+}
+
+func safeRequestID(reqID string) string {
+	return util.TruncString(reqID, safeRequestIDLen)
+}
+
+// generateHash creates a 5-character hash from the input string using SHA-256
+func generateHash(s string) string {
+	hash := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(hash[:])[0:hashLength]
 }
