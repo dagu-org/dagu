@@ -26,7 +26,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,11 +58,11 @@ func createTestDAG(th testHelper, name, location string) *dag.DAG {
 	}
 }
 
-func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *model.Status {
-	return model.NewStatus(d, nil, status, pid, nil, nil)
+func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *history.Status {
+	return history.NewStatus(d, nil, status, pid, nil, nil)
 }
 
-func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *model.Status, tm time.Time) {
+func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *history.Status, tm time.Time) {
 	ctx := context.Background()
 	require.NoError(t, db.Open(ctx, d.Location, tm, status.RequestID))
 	require.NoError(t, db.Write(ctx, status))
@@ -137,7 +137,7 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 		d := createTestDAG(th, "test_read_status_recent", "test_read_status_recent.yaml")
 
 		testData := []struct {
-			Status    *model.Status
+			Status    *history.Status
 			ReqID     string
 			Timestamp time.Time
 		}{
@@ -161,7 +161,7 @@ func TestJSONDB_StatusOperations(t *testing.T) {
 		d := createTestDAG(th, "test_find_by_request_id", "test_find_by_request_id.yaml")
 
 		testData := []struct {
-			Status    *model.Status
+			Status    *history.Status
 			ReqID     string
 			Timestamp time.Time
 		}{
@@ -216,7 +216,7 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		d := createTestDAG(th, "test_remove_old", "test_remove_old.yaml")
 
 		testData := []struct {
-			Status    *model.Status
+			Status    *history.Status
 			ReqID     string
 			Timestamp time.Time
 		}{
@@ -246,7 +246,7 @@ func TestJSONDB_FileOperations(t *testing.T) {
 		d := createTestDAG(th, "test_remove_all", "test_remove_all.yaml")
 
 		testData := []struct {
-			Status    *model.Status
+			Status    *history.Status
 			ReqID     string
 			Timestamp time.Time
 		}{
@@ -436,7 +436,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 			err := th.JSONDB.Open(context.Background(), dagID, timestamp, requestID)
 			require.NoError(t, err)
 
-			status := &model.Status{
+			status := &history.Status{
 				Name:      dagID,
 				RequestID: requestID,
 				StartedAt: timestamp.Format(time.RFC3339),
@@ -476,7 +476,7 @@ func TestJSONDB_ListStatusesByDate(t *testing.T) {
 	edgeDate := time.Date(2023, 3, 26, 1, 30, 0, 0, loc)
 	err = th.JSONDB.Open(context.Background(), "edge-dag", edgeDate, "edge-request")
 	require.NoError(t, err)
-	edgeStatus := &model.Status{
+	edgeStatus := &history.Status{
 		Name:      "edge-dag",
 		RequestID: "edge-request",
 		StartedAt: edgeDate.Format(time.RFC3339),

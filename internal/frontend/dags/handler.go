@@ -31,6 +31,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/frontend/server"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/history/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/runtime/middleware"
@@ -410,7 +411,7 @@ func (h *Handler) processStepLogRequest(
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	var status *model.Status
+	var status *history.Status
 	ctx := params.HTTPRequest.Context()
 
 	if params.Step == nil {

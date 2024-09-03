@@ -30,7 +30,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/util"
@@ -53,7 +53,7 @@ func TestClient_GetStatus(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dagStatus.DAG.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := model.NewStatus(dagStatus.DAG, nil,
+				status := history.NewStatus(dagStatus.DAG, nil,
 					scheduler.StatusRunning, 0, nil, nil)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJSON()
@@ -870,8 +870,8 @@ func testDAG(name string) string {
 }
 
 func testNewStatus(dAG *dag.DAG, requestID string, status scheduler.Status,
-	nodeStatus scheduler.NodeStatus) *model.Status {
-	ret := model.NewStatus(
+	nodeStatus scheduler.NodeStatus) *history.Status {
+	ret := history.NewStatus(
 		dAG,
 		[]scheduler.NodeData{
 			{
@@ -880,7 +880,7 @@ func testNewStatus(dAG *dag.DAG, requestID string, status scheduler.Status,
 		},
 		status,
 		0,
-		model.Time(time.Now()),
+		history.Time(time.Now()),
 		nil,
 	)
 	ret.RequestID = requestID

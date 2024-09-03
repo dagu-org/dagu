@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/dagu-org/dagu/internal/persistence/model"
 )
 
 var (
@@ -40,21 +38,21 @@ type Store interface {
 	// Open initializes a new history entry for a DAG execution
 	Open(ctx context.Context, dagID string, startTime time.Time, requestID string) error
 	// Write records a new status for the current DAG execution
-	Write(ctx context.Context, status *model.Status) error
+	Write(ctx context.Context, status *Status) error
 	// Close finalizes the current history entry
 	Close(ctx context.Context) error
 	// UpdateStatus modifies an existing history entry
-	UpdateStatus(ctx context.Context, dagID, requestID string, status *model.Status) error
+	UpdateStatus(ctx context.Context, dagID, requestID string, status *Status) error
 	// GetLatest retrieves the latest status entry for today
-	GetLatestStatus(ctx context.Context, dagID string) (*model.Status, error)
+	GetLatestStatus(ctx context.Context, dagID string) (*Status, error)
 	// GetByRequestID locates a specific history entry by its request ID
-	GetStatusByRequestID(ctx context.Context, dagID string, requestID string) (*model.History, error)
+	GetStatusByRequestID(ctx context.Context, dagID string, requestID string) (*History, error)
 	// ListRecent retrieves the n most recent status entries for a DAG
-	ListRecentStatuses(ctx context.Context, dagID string, limit int) []*model.History
+	ListRecentStatuses(ctx context.Context, dagID string, limit int) []*History
 	// ListStatusesByDate retrieves all status entries for a specific date
-	ListStatusesByDate(ctx context.Context, date time.Time) ([]*model.History, error)
+	ListStatusesByDate(ctx context.Context, date time.Time) ([]*History, error)
 	// ListRecentAll retrieves the n most recent status files across all DAGs.
-	ListRecentStatusesAllDAGs(ctx context.Context, limit int) ([]*model.History, error)
+	ListRecentStatusesAllDAGs(ctx context.Context, limit int) ([]*History, error)
 	// DeleteAll deletes all history entries for a DAG
 	DeleteAllStatuses(ctx context.Context, dagID string) error
 	// DeleteOld deletes history entries older than the specified retention period

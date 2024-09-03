@@ -27,6 +27,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/util"
@@ -96,7 +97,7 @@ func testErrorMail(t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.Node
 	dAG.MailOn.Failure = true
 	dAG.MailOn.Success = false
 
-	_ = rp.send(dAG, &model.Status{
+	_ = rp.send(dAG, &history.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -112,7 +113,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.No
 	dAG.MailOn.Failure = false
 	dAG.MailOn.Success = true
 
-	err := rp.send(dAG, &model.Status{
+	err := rp.send(dAG, &history.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -127,7 +128,7 @@ func testSuccessMail(t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.No
 	dAG.MailOn.Failure = true
 	dAG.MailOn.Success = true
 
-	err := rp.send(dAG, &model.Status{
+	err := rp.send(dAG, &history.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -152,7 +153,7 @@ func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.No
 		log.SetOutput(origStdout)
 	}()
 
-	rp.report(&model.Status{
+	rp.report(&history.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, errors.New("test error"))
@@ -169,7 +170,7 @@ func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.No
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, dAG *dag.DAG, nodes []*model.Node) {
-	status := &model.Status{
+	status := &history.Status{
 		Name:   dAG.Name,
 		Status: scheduler.StatusError,
 		Nodes:  nodes,

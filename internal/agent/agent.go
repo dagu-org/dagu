@@ -47,7 +47,7 @@ import (
 type Agent struct {
 	dag          *dag.DAG
 	dry          bool
-	retryTarget  *model.Status
+	retryTarget  *history.Status
 	dataStore    persistence.ClientFactory
 	client       client.Client
 	scheduler    *scheduler.Scheduler
@@ -75,7 +75,7 @@ type Options struct {
 	// RetryTarget is the target status (history of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *model.Status
+	RetryTarget *history.Status
 }
 
 // New creates a new Agent.
@@ -226,7 +226,7 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() *model.Status {
+func (a *Agent) Status() *history.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -238,17 +238,17 @@ func (a *Agent) Status() *model.Status {
 	}
 
 	// Create the status object to record the current status.
-	status := &model.Status{
+	status := &history.Status{
 		RequestID:  a.requestID,
 		Name:       a.dag.Name,
 		Status:     schedulerStatus,
 		StatusText: schedulerStatus.String(),
-		PID:        model.PID(os.Getpid()),
+		PID:        history.PID(os.Getpid()),
 		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.dag.Steps),
-		StartedAt:  model.FormatTime(a.graph.StartAt()),
-		FinishedAt: model.FormatTime(a.graph.FinishAt()),
+		StartedAt:  history.FormatTime(a.graph.StartAt()),
+		FinishedAt: history.FormatTime(a.graph.FinishAt()),
 		Log:        a.logFile,
-		Params:     model.Params(a.dag.Params),
+		Params:     history.Params(a.dag.Params),
 	}
 
 	// Collect the handler nodes.

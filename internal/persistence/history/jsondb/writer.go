@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -72,7 +72,7 @@ func (w *writer) open() error {
 
 // write appends the status to the local file in JSON format.
 // It ensures thread-safety and flushes the buffer after writing.
-func (w *writer) write(st *model.Status) error {
+func (w *writer) write(st *history.Status) error {
 	if w.writer == nil {
 		return fmt.Errorf("writer is not open")
 	}

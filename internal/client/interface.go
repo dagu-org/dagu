@@ -22,7 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 )
 
 type Client interface {
@@ -45,17 +45,17 @@ type Client interface {
 	// Rerty retries the execution of the DAG.
 	Retry(ctx context.Context, dAG *dag.DAG, requestID string) error
 	// GetCurrentStatus returns the current status of the DAG.
-	GetCurrentStatus(ctx context.Context, dAG *dag.DAG) (*model.Status, error)
+	GetCurrentStatus(ctx context.Context, dAG *dag.DAG) (*history.Status, error)
 	// GetLatestStatus returns the latest status of the DAG.
-	GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*model.Status, error)
+	GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*history.Status, error)
 	// GetLatestDAGStatus returns the latest status of the DAG.
 	GetLatestDAGStatus(ctx context.Context, dagLocation string) (*DAGStatus, error)
 	// GetStatusByRequestID returns the status of the specific history.
-	GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, requestID string) (*model.Status, error)
+	GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, requestID string) (*history.Status, error)
 	// ListRecentHistory returns the recent history of the DAG.
-	ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*model.History
+	ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*history.History
 	// UpdateStatus updates the status of the specific history.
-	UpdateStatus(ctx context.Context, dAG *dag.DAG, status *model.Status) error
+	UpdateStatus(ctx context.Context, dAG *dag.DAG, status *history.Status) error
 	// UpdateDAGSpec updates the spec of the specific DAG.
 	UpdateDAGSpec(ctx context.Context, id string, spec string) error
 	// DeleteDAG deletes the specific DAG.
@@ -65,7 +65,7 @@ type Client interface {
 	// ListDAGStatus returns the list of statuses of the DAGs.
 	ListDAGStatus(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
 	// ListHistoryByDate returns the history of the specific date.
-	ListHistoryByDate(ctx context.Context, date string) ([]*model.History, error)
+	ListHistoryByDate(ctx context.Context, date string) ([]*history.History, error)
 	// IsSuspended returns whether the DAG is suspended.
 	IsSuspended(ctx context.Context, id string) bool
 	// ToggleSuspend toggles the suspend status of the DAG.
@@ -87,7 +87,7 @@ type DAGStatus struct {
 	File      string
 	Dir       string
 	DAG       *dag.DAG
-	Status    *model.Status
+	Status    *history.Status
 	Suspended bool
 	Error     error
 	ErrorT    *string
@@ -99,7 +99,7 @@ type DagListPaginationSummaryResult struct {
 }
 
 func newDAGStatus(
-	dAG *dag.DAG, s *model.Status, suspended bool, err error,
+	dAG *dag.DAG, s *history.Status, suspended bool, err error,
 ) *DAGStatus {
 	ret := &DAGStatus{
 		File:      filepath.Base(dAG.Location),

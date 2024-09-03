@@ -22,7 +22,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +42,7 @@ func TestWriter(t *testing.T) {
 			Name:     "test_write_status",
 			Location: "test_write_status.yaml",
 		}
-		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status := history.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
 		status.RequestID = "req-1"
 
 		require.NoError(t, w.write(status))
@@ -51,7 +51,7 @@ func TestWriter(t *testing.T) {
 		dat, err := os.ReadFile(statusFile)
 		require.NoError(t, err)
 
-		var r model.Status
+		var r history.Status
 		err = json.Unmarshal(dat[:len(dat)-1], &r) // Remove trailing newline
 		require.NoError(t, err)
 		assert.Equal(t, d.Name, r.Name)
@@ -65,7 +65,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, err)
 
 		d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
-		initialStatus := model.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
+		initialStatus := history.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
 		initialStatus.RequestID = "req-2"
 
 		require.NoError(t, w.write(initialStatus))
@@ -74,7 +74,7 @@ func TestWriter(t *testing.T) {
 		// Append to existing file
 		w, err = newWriter(statusFile)
 		require.NoError(t, err)
-		updatedStatus := model.NewStatus(d, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		updatedStatus := history.NewStatus(d, nil, scheduler.StatusSuccess, 10000, nil, nil)
 		updatedStatus.RequestID = "req-2"
 		require.NoError(t, w.write(updatedStatus))
 		require.NoError(t, w.close())
@@ -86,7 +86,7 @@ func TestWriter(t *testing.T) {
 		lines := splitLines(string(dat))
 		require.Len(t, lines, 2)
 
-		var r1, r2 model.Status
+		var r1, r2 history.Status
 		err = json.Unmarshal([]byte(lines[0]), &r1)
 		require.NoError(t, err)
 		err = json.Unmarshal([]byte(lines[1]), &r2)
@@ -113,7 +113,7 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, w.close())
 
 		d := &dag.DAG{Name: "test", Location: "test.yaml"}
-		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status := history.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
 		assert.Error(t, w.write(status))
 	})
 

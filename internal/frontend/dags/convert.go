@@ -18,6 +18,7 @@ package dags
 import (
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/swag"
 )
@@ -41,7 +42,7 @@ func convertToDAG(dAG *dag.DAG) *models.Dag {
 	}
 }
 
-func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
+func convertToStatusDetail(s *history.Status) *models.DagStatusDetail {
 	status := &models.DagStatusDetail{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),

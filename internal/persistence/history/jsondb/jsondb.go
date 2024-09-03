@@ -35,7 +35,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/history"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -95,19 +94,19 @@ func newUTC(t time.Time) utcTime {
 
 // JSONDB manages DAG status files in local storage.
 type JSONDB struct {
-	baseDir           string                          // Base directory for storing files
-	writer            *writer                         // Current writer for active status updates
-	cache             *filecache.Cache[*model.Status] // Cache for storing parsed status files
-	latestStatusToday bool                            // Flag to determine if only today's latest status should be returned
-	writerLock        sync.Mutex                      // Mutex for synchronizing access to shared resources
-	logger            logger.Logger                   // Logger for recording events and errors
+	baseDir           string                            // Base directory for storing files
+	writer            *writer                           // Current writer for active status updates
+	cache             *filecache.Cache[*history.Status] // Cache for storing parsed status files
+	latestStatusToday bool                              // Flag to determine if only today's latest status should be returned
+	writerLock        sync.Mutex                        // Mutex for synchronizing access to shared resources
+	logger            logger.Logger                     // Logger for recording events and errors
 }
 
 // New creates a new JSONDB instance with default configuration.
 func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 	s := &JSONDB{
 		baseDir:           baseDir,
-		cache:             filecache.New[*model.Status](defaultCacheSize, 3*time.Hour),
+		cache:             filecache.New[*history.Status](defaultCacheSize, 3*time.Hour),
 		latestStatusToday: latestStatusToday,
 		logger:            logger,
 	}
@@ -116,7 +115,7 @@ func New(baseDir string, logger logger.Logger, latestStatusToday bool) *JSONDB {
 }
 
 // UpdateStatus updates the status of a specific DAG execution.
-func (s *JSONDB) UpdateStatus(ctx context.Context, dagID, reqID string, status *model.Status) error {
+func (s *JSONDB) UpdateStatus(ctx context.Context, dagID, reqID string, status *history.Status) error {
 	f, err := s.GetStatusByRequestID(ctx, dagID, reqID)
 	if err != nil {
 		return err
@@ -191,7 +190,7 @@ func (s *JSONDB) Open(_ context.Context, dagID string, start time.Time, requestI
 }
 
 // Write writes the current status to the active writer.
-func (s *JSONDB) Write(_ context.Context, status *model.Status) error {
+func (s *JSONDB) Write(_ context.Context, status *history.Status) error {
 	s.writerLock.Lock()
 	defer s.writerLock.Unlock()
 
@@ -239,7 +238,7 @@ func (s *JSONDB) Close(_ context.Context) error {
 }
 
 // ListRecentStatuses retrieves the n most recent status files for a given DAG.
-func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) []*model.History {
+func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) []*history.History {
 	// Read the latest n status files for the given DAG.
 	indexDir := craftIndexDir(s.baseDir, newSafeName(dagID))
 
@@ -257,7 +256,7 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 	files = files[:min(limit, len(files))]
 
 	// Load the status of the latest n status files.
-	var ret []*model.History
+	var ret []*history.History
 	for _, indexFile := range files {
 		// Convert the index file to the status file.
 		indexFileInfo, err := getIndexFileInfo(indexFile)
@@ -283,7 +282,7 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 		statusFile := files[0]
 
 		// Load the latest status file
-		status, err := s.cache.LoadLatest(statusFile, func() (*model.Status, error) {
+		status, err := s.cache.LoadLatest(statusFile, func() (*history.Status, error) {
 			return LoadStatusFile(statusFile)
 		})
 		if err != nil {
@@ -291,7 +290,7 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 			continue
 		}
 
-		ret = append(ret, &model.History{
+		ret = append(ret, &history.History{
 			File:   statusFile,
 			Status: status,
 		})
@@ -301,18 +300,18 @@ func (s *JSONDB) ListRecentStatuses(_ context.Context, dagID string, limit int) 
 }
 
 // ListRecentAllDAGs retrieves the n most recent status files across all DAGs.
-func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*model.History, error) {
+func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*history.History, error) {
 	// List recent files from the status directory
 	recentFiles, err := s.listRecentFiles(filepath.Join(s.baseDir, statusDirRoot), n)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recent files: %w", err)
 	}
 
-	var results []*model.History
+	var results []*history.History
 
 	for _, file := range recentFiles {
 		// Load the latest status file
-		status, err := s.cache.LoadLatest(file, func() (*model.Status, error) {
+		status, err := s.cache.LoadLatest(file, func() (*history.Status, error) {
 			return LoadStatusFile(file)
 		})
 		if err != nil {
@@ -320,7 +319,7 @@ func (s *JSONDB) ListRecentStatusesAllDAGs(_ context.Context, n int) ([]*model.H
 			continue
 		}
 
-		results = append(results, &model.History{
+		results = append(results, &history.History{
 			File:   file,
 			Status: status,
 		})
@@ -405,19 +404,19 @@ func (s *JSONDB) listRecentFiles(root string, limit int) ([]string, error) {
 }
 
 // GetLatest retrieves the latest status file for today for a given DAG.
-func (s *JSONDB) GetLatestStatus(_ context.Context, dagID string) (*model.Status, error) {
+func (s *JSONDB) GetLatestStatus(_ context.Context, dagID string) (*history.Status, error) {
 	file, err := s.findLatestStatusFile(newSafeName(dagID), newUTC(time.Now()), s.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.cache.LoadLatest(file, func() (*model.Status, error) {
+	return s.cache.LoadLatest(file, func() (*history.Status, error) {
 		return LoadStatusFile(file)
 	})
 }
 
 // GetByRequestID finds a status file by its request ID.
-func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID string) (*model.History, error) {
+func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID string) (*history.History, error) {
 	if reqID == "" {
 		return nil, fmt.Errorf("%w: requestID is empty", history.ErrReqIDNotFound)
 	}
@@ -456,7 +455,7 @@ func (s *JSONDB) GetStatusByRequestID(_ context.Context, dagID string, reqID str
 				continue
 			}
 			if status != nil && status.RequestID == reqID {
-				return &model.History{File: statusFile, Status: status}, nil
+				return &history.History{File: statusFile, Status: status}, nil
 			}
 		}
 	}
@@ -655,7 +654,7 @@ func (s *JSONDB) indexFileToStatusFile(indexFile string) (string, error) {
 }
 
 // ListByLocalDate retrieves all status files for a specific date across all DAGs, using local timezone.
-func (s *JSONDB) ListStatusesByDate(_ context.Context, date time.Time) ([]*model.History, error) {
+func (s *JSONDB) ListStatusesByDate(_ context.Context, date time.Time) ([]*history.History, error) {
 	// Set the time to 00:00:00
 	startOfDay := date.Truncate(24 * time.Hour)
 
@@ -667,8 +666,8 @@ func (s *JSONDB) ListStatusesByDate(_ context.Context, date time.Time) ([]*model
 
 // listStatusInRange retrieves all status files for a specific date range.
 // The range is inclusive of the start time and exclusive of the end time.
-func (s *JSONDB) listStatusInRange(start, end utcTime) ([]*model.History, error) {
-	var result []*model.History
+func (s *JSONDB) listStatusInRange(start, end utcTime) ([]*history.History, error) {
+	var result []*history.History
 
 	for t := start.Time; t.Before(end.Time); t = t.Add(time.Hour) {
 		year, month, day := t.Date()
@@ -694,7 +693,7 @@ func (s *JSONDB) listStatusInRange(start, end utcTime) ([]*model.History, error)
 				continue
 			}
 
-			status, err := s.cache.LoadLatest(file, func() (*model.Status, error) {
+			status, err := s.cache.LoadLatest(file, func() (*history.Status, error) {
 				return LoadStatusFile(file)
 			})
 			if err != nil {
@@ -702,7 +701,7 @@ func (s *JSONDB) listStatusInRange(start, end utcTime) ([]*model.History, error)
 				continue
 			}
 
-			result = append(result, &model.History{
+			result = append(result, &history.History{
 				File:   file,
 				Status: status,
 			})
@@ -735,7 +734,7 @@ func pathExists(path string) bool {
 }
 
 // LoadStatusFile reads and parses a status file, returning the latest status.
-func LoadStatusFile(file string) (*model.Status, error) {
+func LoadStatusFile(file string) (*history.Status, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Printf("failed to open file. err: %v", err)
@@ -745,7 +744,7 @@ func LoadStatusFile(file string) (*model.Status, error) {
 
 	var (
 		offset int64
-		ret    *model.Status
+		ret    *history.Status
 	)
 	for {
 		line, err := readLineFrom(f, offset)
@@ -759,7 +758,7 @@ func LoadStatusFile(file string) (*model.Status, error) {
 		}
 		offset += int64(len(line)) + 1 // +1 for newline
 		if len(line) > 0 {
-			m, err := model.StatusFromJSON(string(line))
+			m, err := history.StatusFromJSON(string(line))
 			if err == nil {
 				ret = m
 			}

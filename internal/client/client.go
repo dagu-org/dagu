@@ -33,7 +33,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/history"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -187,20 +186,20 @@ func (e *client) Retry(_ context.Context, dAG *dag.DAG, requestID string) error 
 	return cmd.Wait()
 }
 
-func (*client) GetCurrentStatus(_ context.Context, dAG *dag.DAG) (*model.Status, error) {
+func (*client) GetCurrentStatus(_ context.Context, dAG *dag.DAG) (*history.Status, error) {
 	client := sock.NewClient(dAG.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(dAG), nil
+		return history.NewStatusDefault(dAG), nil
 	}
-	return model.StatusFromJSON(ret)
+	return history.StatusFromJSON(ret)
 }
 
 func (e *client) GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, requestID string) (
-	*model.Status, error,
+	*history.Status, error,
 ) {
 	ret, err := e.dataStore.HistoryStore().GetStatusByRequestID(
 		ctx, dAG.Location, requestID,
@@ -216,16 +215,16 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, request
 	return ret.Status, err
 }
 
-func (*client) currentStatus(dAG *dag.DAG) (*model.Status, error) {
+func (*client) currentStatus(dAG *dag.DAG) (*history.Status, error) {
 	client := sock.NewClient(dAG.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
 	}
-	return model.StatusFromJSON(ret)
+	return history.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*model.Status, error) {
+func (e *client) GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*history.Status, error) {
 	currStatus, _ := e.currentStatus(dAG)
 	if currStatus != nil {
 		return currStatus, nil
@@ -233,20 +232,20 @@ func (e *client) GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*model.Stat
 	status, err := e.dataStore.HistoryStore().GetLatestStatus(ctx, dAG.Location)
 	if errors.Is(err, history.ErrNoStatusDataToday) ||
 		errors.Is(err, history.ErrNoStatusData) {
-		return model.NewStatusDefault(dAG), nil
+		return history.NewStatusDefault(dAG), nil
 	}
 	if err != nil {
-		return model.NewStatusDefault(dAG), err
+		return history.NewStatusDefault(dAG), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
 }
 
-func (e *client) ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*model.History {
+func (e *client) ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*history.History {
 	return e.dataStore.HistoryStore().ListRecentStatuses(ctx, dAG.Location, n)
 }
 
-func (e *client) UpdateStatus(ctx context.Context, dAG *dag.DAG, status *model.Status) error {
+func (e *client) UpdateStatus(ctx context.Context, dAG *dag.DAG, status *history.Status) error {
 	client := sock.NewClient(dAG.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
@@ -254,7 +253,7 @@ func (e *client) UpdateStatus(ctx context.Context, dAG *dag.DAG, status *model.S
 			return err
 		}
 	} else {
-		unmarshalled, _ := model.StatusFromJSON(res)
+		unmarshalled, _ := history.StatusFromJSON(res)
 		if unmarshalled != nil && unmarshalled.RequestID == status.RequestID &&
 			unmarshalled.Status == scheduler.StatusRunning {
 			return errDAGIsRunning
@@ -337,7 +336,7 @@ func (e *client) ListDAGStatus(ctx context.Context, params dags.ListDagsParams) 
 	}, nil
 }
 
-func (e *client) ListHistoryByDate(ctx context.Context, date string) ([]*model.History, error) {
+func (e *client) ListHistoryByDate(ctx context.Context, date string) ([]*history.History, error) {
 	d, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return nil, err

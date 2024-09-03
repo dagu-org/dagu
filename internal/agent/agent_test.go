@@ -25,12 +25,12 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -310,7 +310,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, http.StatusOK, mockResponseWriter.status)
 
 		// Check if the status is returned correctly
-		status, err := model.StatusFromJSON(mockResponseWriter.body)
+		status, err := history.StatusFromJSON(mockResponseWriter.body)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, status.Status)
 
