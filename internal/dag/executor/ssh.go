@@ -21,12 +21,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/mitchellh/mapstructure"
+)
+
+const (
+	sshExecutorConfigUserEnvKey                  = "DAGU_SSH_CONFIG_USER"
+	sshExecutorConfigIPEnvKey                    = "DAGU_SSH_CONFIG_IP"
+	sshExecutorConfigPortEnvKey                  = "DAGU_SSH_CONFIG_PORT"
+	sshExecutorConfigKeyEnvKey                   = "DAGU_SSH_CONFIG_KEY"
+	sshExecutorConfigPassEnvKey                  = "DAGU_SSH_CONFIG_PASSWORD"
+	sshExecutorConfigStrictHostKeyCheckingEnvKey = "DAGU_SSH_CONFIG_STRICT_HOST_KEY_CHECKING"
 )
 
 type sshExec struct {
@@ -67,6 +77,111 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 	return ssh.Password(cfg.Password), nil
 }
 
+func expendExecConfigUserKeyEnv() (interface{}, error) {
+	return os.Getenv(sshExecutorConfigUserEnvKey), nil
+}
+
+func expendExecConfigIPKeyEnv() (interface{}, error) {
+	return os.Getenv(sshExecutorConfigIPEnvKey), nil
+}
+
+func expendExecConfigPortKeyEnv() (interface{}, error) {
+	var (
+		portStr = os.Getenv(sshExecutorConfigPortEnvKey)
+		port    int
+		err     error
+	)
+
+	if port, err = strconv.Atoi(portStr); err != nil {
+		return nil, err
+	}
+
+	return port, nil
+}
+
+func expendExecConfigKeyKeyEnv() (interface{}, error) {
+	return os.Getenv(sshExecutorConfigKeyEnvKey), nil
+}
+
+func expendExecConfigPassKeyEnv() (interface{}, error) {
+	return os.Getenv(sshExecutorConfigPassEnvKey), nil
+}
+
+func expendExecConfigStrictHostKeyCheckingKeyEnv() (interface{}, error) {
+	var (
+		strictHostKeyChecking = os.Getenv(sshExecutorConfigStrictHostKeyCheckingEnvKey)
+		strictHostKey         bool
+		err                   error
+	)
+
+	if strictHostKey, err = strconv.ParseBool(strictHostKeyChecking); err != nil {
+		return nil, err
+	}
+
+	return strictHostKey, nil
+}
+
+func getExpendConfigEnvFunc(key string) handleExpendConfigEnv {
+	switch key {
+	case sshExecutorConfigUserEnvKey:
+		return expendExecConfigUserKeyEnv
+	case sshExecutorConfigIPEnvKey:
+		return expendExecConfigIPKeyEnv
+	case sshExecutorConfigPortEnvKey:
+		return expendExecConfigPortKeyEnv
+	case sshExecutorConfigKeyEnvKey:
+		return expendExecConfigKeyKeyEnv
+	case sshExecutorConfigPassEnvKey:
+		return expendExecConfigPassKeyEnv
+	case sshExecutorConfigStrictHostKeyCheckingEnvKey:
+		return expendExecConfigStrictHostKeyCheckingKeyEnv
+	}
+
+	return nil
+}
+
+func expendExecSingleConfigEnv(configValue interface{}) (interface{}, error) {
+	var (
+		configValueStr      string
+		ok                  bool
+		expendConfigEnvFunc handleExpendConfigEnv
+		expendConfigValue   interface{}
+		err                 error
+	)
+	if configValue == nil {
+		return nil, nil
+	}
+
+	if configValueStr, ok = configValue.(string); !ok || !strings.HasPrefix(configValueStr, daguConfigEnvPrefix) {
+		return nil, nil
+	}
+
+	if expendConfigEnvFunc = getExpendConfigEnvFunc(strings.TrimPrefix(configValueStr, "$")); expendConfigEnvFunc == nil {
+		return nil, errUnsupportedEnvKey
+	}
+
+	if expendConfigValue, err = expendConfigEnvFunc(); err != nil {
+		return nil, err
+	}
+
+	return expendConfigValue, nil
+}
+
+func expendExecConfigEnv(cfg map[string]interface{}) error {
+	for configKey, configValue := range cfg {
+		expendConfigValue, err := expendExecSingleConfigEnv(configValue)
+		if err != nil {
+			return err
+		}
+
+		if expendConfigValue != nil {
+			cfg[configKey] = expendConfigValue
+		}
+	}
+
+	return nil
+}
+
 func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 	cfg := new(sshExecConfig)
 	md, err := mapstructure.NewDecoder(
@@ -77,7 +192,11 @@ func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 		return nil, err
 	}
 
-	if err := md.Decode(step.ExecutorConfig.Config); err != nil {
+	if err = expendExecConfigEnv(step.ExecutorConfig.Config); err != nil {
+		return nil, err
+	}
+
+	if err = md.Decode(step.ExecutorConfig.Config); err != nil {
 		return nil, err
 	}
 
@@ -113,6 +232,7 @@ func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 }
 
 var errStrictHostKey = errors.New("StrictHostKeyChecking is not supported yet")
+var errUnsupportedEnvKey = errors.New("unsupported environment key")
 
 func (e *sshExec) SetStdout(out io.Writer) {
 	e.stdout = out

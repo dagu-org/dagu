@@ -25,6 +25,8 @@ import (
 	"github.com/dagu-org/dagu/internal/dag"
 )
 
+const daguConfigEnvPrefix = "$DAGU"
+
 type Executor interface {
 	SetStdout(out io.Writer)
 	SetStderr(out io.Writer)
@@ -50,3 +52,5 @@ func NewExecutor(ctx context.Context, step dag.Step) (Executor, error) {
 func Register(name string, register Creator) {
 	executors[name] = register
 }
+
+type handleExpendConfigEnv func() (interface{}, error)
