@@ -53,4 +53,4 @@ func Register(name string, register Creator) {
 	executors[name] = register
 }
 
-type handleExpendConfigEnv func() (interface{}, error)
+type handleExpendConfigEnv func() (any, error)

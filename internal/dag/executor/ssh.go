@@ -35,7 +35,7 @@ const (
 	sshExecutorConfigIPEnvKey                    = "DAGU_SSH_CONFIG_IP"
 	sshExecutorConfigPortEnvKey                  = "DAGU_SSH_CONFIG_PORT"
 	sshExecutorConfigKeyEnvKey                   = "DAGU_SSH_CONFIG_KEY"
-	sshExecutorConfigPassEnvKey                  = "DAGU_SSH_CONFIG_PASSWORD"
+	sshExecutorConfigPasswordEnvKey              = "DAGU_SSH_CONFIG_PASSWORD"
 	sshExecutorConfigStrictHostKeyCheckingEnvKey = "DAGU_SSH_CONFIG_STRICT_HOST_KEY_CHECKING"
 )
 
@@ -77,15 +77,15 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 	return ssh.Password(cfg.Password), nil
 }
 
-func expendExecConfigUserKeyEnv() (interface{}, error) {
+func expendExecConfigUserKeyEnv() (any, error) {
 	return os.Getenv(sshExecutorConfigUserEnvKey), nil
 }
 
-func expendExecConfigIPKeyEnv() (interface{}, error) {
+func expendExecConfigIPKeyEnv() (any, error) {
 	return os.Getenv(sshExecutorConfigIPEnvKey), nil
 }
 
-func expendExecConfigPortKeyEnv() (interface{}, error) {
+func expendExecConfigPortKeyEnv() (any, error) {
 	var (
 		portStr = os.Getenv(sshExecutorConfigPortEnvKey)
 		port    int
@@ -99,15 +99,15 @@ func expendExecConfigPortKeyEnv() (interface{}, error) {
 	return port, nil
 }
 
-func expendExecConfigKeyKeyEnv() (interface{}, error) {
+func expendExecConfigKeyKeyEnv() (any, error) {
 	return os.Getenv(sshExecutorConfigKeyEnvKey), nil
 }
 
-func expendExecConfigPassKeyEnv() (interface{}, error) {
-	return os.Getenv(sshExecutorConfigPassEnvKey), nil
+func expendExecConfigPassKeyEnv() (any, error) {
+	return os.Getenv(sshExecutorConfigPasswordEnvKey), nil
 }
 
-func expendExecConfigStrictHostKeyCheckingKeyEnv() (interface{}, error) {
+func expendExecConfigStrictHostKeyCheckingKeyEnv() (any, error) {
 	var (
 		strictHostKeyChecking = os.Getenv(sshExecutorConfigStrictHostKeyCheckingEnvKey)
 		strictHostKey         bool
@@ -131,7 +131,7 @@ func getExpendConfigEnvFunc(key string) handleExpendConfigEnv {
 		return expendExecConfigPortKeyEnv
 	case sshExecutorConfigKeyEnvKey:
 		return expendExecConfigKeyKeyEnv
-	case sshExecutorConfigPassEnvKey:
+	case sshExecutorConfigPasswordEnvKey:
 		return expendExecConfigPassKeyEnv
 	case sshExecutorConfigStrictHostKeyCheckingEnvKey:
 		return expendExecConfigStrictHostKeyCheckingKeyEnv
