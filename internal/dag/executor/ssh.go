@@ -147,7 +147,7 @@ func expendExecSingleConfigEnv(configValue any) (any, error) {
 		configValueStr      string
 		ok                  bool
 		expendConfigEnvFunc handleExpendConfigEnv
-		expendConfigValue   interface{}
+		expendConfigValue   any
 		err                 error
 	)
 	if configValue == nil {
