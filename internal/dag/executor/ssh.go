@@ -140,7 +140,7 @@ func getExpendConfigEnvFunc(key string) handleExpendConfigEnv {
 	return nil
 }
 
-func expendExecSingleConfigEnv(configValue interface{}) (interface{}, error) {
+func expendExecSingleConfigEnv(configValue any) (any, error) {
 	var (
 		configValueStr      string
 		ok                  bool
@@ -167,7 +167,7 @@ func expendExecSingleConfigEnv(configValue interface{}) (interface{}, error) {
 	return expendConfigValue, nil
 }
 
-func expendExecConfigEnv(cfg map[string]interface{}) error {
+func expendExecConfigEnv(cfg map[string]any) error {
 	for configKey, configValue := range cfg {
 		expendConfigValue, err := expendExecSingleConfigEnv(configValue)
 		if err != nil {
