@@ -35,8 +35,10 @@ const (
 	sshExecutorConfigIPEnvKey                    = "DAGU_SSH_CONFIG_IP"
 	sshExecutorConfigPortEnvKey                  = "DAGU_SSH_CONFIG_PORT"
 	sshExecutorConfigKeyEnvKey                   = "DAGU_SSH_CONFIG_KEY"
-	sshExecutorConfigPasswordEnvKey              = "DAGU_SSH_CONFIG_PASSWORD"
 	sshExecutorConfigStrictHostKeyCheckingEnvKey = "DAGU_SSH_CONFIG_STRICT_HOST_KEY_CHECKING"
+
+	// #nosec G101
+	sshExecutorConfigPasswordEnvKey = "DAGU_SSH_CONFIG_PASSWORD"
 )
 
 type sshExec struct {
