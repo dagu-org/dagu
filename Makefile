@@ -127,8 +127,8 @@ open-coverage:
 # lint runs the linter.
 lint: golangci-lint
 
-# swagger generates the swagger server code.
-swagger: clean-swagger gen-swagger
+# api generates the swagger server code.
+api: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
 certs: ${CERTS_DIR} ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} certs-check
@@ -228,8 +228,8 @@ clean-swagger:
 gen-swagger:
 	@echo "${COLOR_GREEN}Generating the swagger server code...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_swagger)
-	@${LOCAL_BIN_DIR}/swagger validate ./swagger.yaml
-	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./swagger.yaml
+	@${LOCAL_BIN_DIR}/swagger validate ./api.v1.yaml
+	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./api.v1.yaml
 	@go mod tidy
 
 ##############################################################################

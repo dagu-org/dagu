@@ -13,7 +13,6 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
-	"github.com/go-openapi/validate"
 )
 
 // NewListDagsParams creates a new ListDagsParams object
@@ -34,15 +33,13 @@ type ListDagsParams struct {
 	HTTPRequest *http.Request `json:"-"`
 
 	/*
-	  Required: true
 	  In: query
 	*/
-	Limit int64
+	Limit *int64
 	/*
-	  Required: true
 	  In: query
 	*/
-	Page int64
+	Page *int64
 	/*
 	  In: query
 	*/
@@ -91,52 +88,46 @@ func (o *ListDagsParams) BindRequest(r *http.Request, route *middleware.MatchedR
 
 // bindLimit binds and validates parameter Limit from query.
 func (o *ListDagsParams) bindLimit(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	if !hasKey {
-		return errors.Required("limit", "query", rawData)
-	}
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
 	}
 
-	// Required: true
+	// Required: false
 	// AllowEmptyValue: false
 
-	if err := validate.RequiredString("limit", "query", raw); err != nil {
-		return err
+	if raw == "" { // empty values pass all other validations
+		return nil
 	}
 
 	value, err := swag.ConvertInt64(raw)
 	if err != nil {
 		return errors.InvalidType("limit", "query", "int64", raw)
 	}
-	o.Limit = value
+	o.Limit = &value
 
 	return nil
 }
 
 // bindPage binds and validates parameter Page from query.
 func (o *ListDagsParams) bindPage(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	if !hasKey {
-		return errors.Required("page", "query", rawData)
-	}
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
 	}
 
-	// Required: true
+	// Required: false
 	// AllowEmptyValue: false
 
-	if err := validate.RequiredString("page", "query", raw); err != nil {
-		return err
+	if raw == "" { // empty values pass all other validations
+		return nil
 	}
 
 	value, err := swag.ConvertInt64(raw)
 	if err != nil {
 		return errors.InvalidType("page", "query", "int64", raw)
 	}
-	o.Page = value
+	o.Page = &value
 
 	return nil
 }
