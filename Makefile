@@ -127,8 +127,8 @@ open-coverage:
 # lint runs the linter.
 lint: golangci-lint
 
-# swagger generates the swagger server code.
-swagger: clean-swagger gen-swagger
+# api generates the swagger server code.
+api: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
 certs: ${CERTS_DIR} ${SERVER_CERT_FILE} ${CLIENT_CERT_FILE} certs-check

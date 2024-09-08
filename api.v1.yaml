@@ -30,11 +30,11 @@ paths:
       parameters:
         - name: page
           in: query
-          required: true
+          required: false
           type: integer
         - name: limit
           in: query
-          required: true
+          required: false
           type: integer
         - name: searchName
           in: query
