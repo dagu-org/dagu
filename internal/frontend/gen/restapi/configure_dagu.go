@@ -31,7 +31,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 )
 
-//go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../swagger.yaml --principal any --exclude-main
+//go:generate swagger generate server --target ../../frontend --name Dagu --spec ../../../api.v1.yaml --principal any --exclude-main
 
 func configureFlags(api *operations.DaguAPI) {
 	// handlers.CommandLineOptionsGroups = []swag.CommandLineOptionsGroup{ ... }

@@ -30,7 +30,7 @@ msgstr ""
 #: ../../source/rest.rst:8 f025ce93dadd4f23b4837d5c83f4f5f5
 msgid ""
 "See the `OpenAPI Schema for Dagu <https://github.com/dagu-"
-"dev/dagu/blob/main/swagger.yaml>`_ for more details."
+"dev/dagu/blob/main/api.v1.yaml>`_ for more details."
 msgstr ""
 
 #: ../../source/rest.rst:10 c6a6f4609e584ebb92c6f0b934f458c7

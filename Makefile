@@ -228,8 +228,8 @@ clean-swagger:
 gen-swagger:
 	@echo "${COLOR_GREEN}Generating the swagger server code...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_swagger)
-	@${LOCAL_BIN_DIR}/swagger validate ./swagger.yaml
-	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./swagger.yaml
+	@${LOCAL_BIN_DIR}/swagger validate ./api.v1.yaml
+	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./api.v1.yaml
 	@go mod tidy
 
 ##############################################################################
