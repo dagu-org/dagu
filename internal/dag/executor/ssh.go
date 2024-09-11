@@ -20,7 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -37,13 +39,21 @@ type sshExec struct {
 	session   *ssh.Session
 }
 
-type sshExecConfig struct {
+type sshExecConfigDefinition struct {
 	User                  string
 	IP                    string
-	Port                  int
+	Port                  any
 	Key                   string
 	Password              string
 	StrictHostKeyChecking bool
+}
+
+type sshExecConfig struct {
+	User     string
+	IP       string
+	Port     string
+	Key      string
+	Password string
 }
 
 // selectSSHAuthMethod selects the authentication method based on the configuration.
@@ -67,10 +77,21 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 	return ssh.Password(cfg.Password), nil
 }
 
+// expandEnvHook is a mapstructure decode hook that expands environment variables in string fields
+func expandEnvHook(f reflect.Type, t reflect.Type, data any) (any, error) {
+	if f.Kind() != reflect.String || t.Kind() != reflect.String {
+		return data, nil
+	}
+	return os.ExpandEnv(data.(string)), nil
+}
+
 func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
-	cfg := new(sshExecConfig)
+	def := new(sshExecConfigDefinition)
 	md, err := mapstructure.NewDecoder(
-		&mapstructure.DecoderConfig{Result: cfg},
+		&mapstructure.DecoderConfig{
+			Result:     def,
+			DecodeHook: expandEnvHook,
+		},
 	)
 
 	if err != nil {
@@ -81,11 +102,22 @@ func newSSHExec(_ context.Context, step dag.Step) (Executor, error) {
 		return nil, err
 	}
 
-	if cfg.Port == 0 {
-		cfg.Port = 22
+	cfg := &sshExecConfig{
+		User:     def.User,
+		IP:       def.IP,
+		Key:      def.Key,
+		Password: def.Password,
 	}
 
-	if cfg.StrictHostKeyChecking {
+	// Handle Port as either string or int
+	port := os.ExpandEnv(fmt.Sprintf("%v", def.Port))
+	if port == "" {
+		port = "22"
+	}
+	cfg.Port = port
+
+	// StrictHostKeyChecking is not supported yet.
+	if def.StrictHostKeyChecking {
 		return nil, errStrictHostKey
 	}
 
@@ -130,7 +162,7 @@ func (e *sshExec) Kill(_ os.Signal) error {
 }
 
 func (e *sshExec) Run() error {
-	addr := fmt.Sprintf("%s:%d", e.config.IP, e.config.Port)
+	addr := net.JoinHostPort(e.config.IP, e.config.Port)
 	conn, err := ssh.Dial("tcp", addr, e.sshConfig)
 	if err != nil {
 		return err
