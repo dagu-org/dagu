@@ -124,9 +124,9 @@ open-coverage:
 .PHONY: lint
 lint: golangci-lint
 
-# swagger generates the swagger server code.
-.PHONY: swagger
-swagger: clean-swagger gen-swagger
+# api generates the swagger server code.
+.PHONY: api
+api: clean-swagger gen-swagger
 
 # certs generates the certificates to use in the development environment.
 .PHONY: certs

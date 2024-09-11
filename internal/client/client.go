@@ -19,7 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -302,13 +301,8 @@ func (e *client) ListDAGStatusObsolete(ctx context.Context) (
 	return ret, errs, err
 }
 
-func (e *client) getPageCount(total int64, limit int64) int {
-	pageCount := int(math.Ceil(float64(total) / float64(limit)))
-	if pageCount == 0 {
-		pageCount = 1
-	}
-
-	return pageCount
+func (e *client) getPageCount(total int, limit int) int {
+	return (total-1)/(limit) + 1
 }
 
 func (e *client) ListDAGStatus(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
@@ -320,9 +314,18 @@ func (e *client) ListDAGStatus(ctx context.Context, params dags.ListDagsParams) 
 		currentStatus           *DAGStatus
 	)
 
+	page := 1
+	if params.Page != nil {
+		page = int(*params.Page)
+	}
+	limit := 100
+	if params.Limit != nil {
+		limit = int(*params.Limit)
+	}
+
 	if dagListPaginationResult, err = dagStore.ListPagination(persistence.DAGListPaginationArgs{
-		Page:  int(params.Page),
-		Limit: int(params.Limit),
+		Page:  page,
+		Limit: limit,
 		Name:  params.SearchName,
 		Tag:   params.SearchTag,
 	}); err != nil {
@@ -337,7 +340,7 @@ func (e *client) ListDAGStatus(ctx context.Context, params dags.ListDagsParams) 
 	}
 
 	return dagStatusList, &DagListPaginationSummaryResult{
-		PageCount: e.getPageCount(int64(dagListPaginationResult.Count), params.Limit),
+		PageCount: e.getPageCount(dagListPaginationResult.Count, limit),
 		ErrorList: dagListPaginationResult.ErrorList,
 	}, nil
 }

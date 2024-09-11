@@ -15,8 +15,8 @@ import (
 
 // ListDagsURL generates an URL for the list dags operation
 type ListDagsURL struct {
-	Limit      int64
-	Page       int64
+	Limit      *int64
+	Page       *int64
 	SearchName *string
 	SearchTag  *string
 
@@ -54,12 +54,18 @@ func (o *ListDagsURL) Build() (*url.URL, error) {
 
 	qs := make(url.Values)
 
-	limitQ := swag.FormatInt64(o.Limit)
+	var limitQ string
+	if o.Limit != nil {
+		limitQ = swag.FormatInt64(*o.Limit)
+	}
 	if limitQ != "" {
 		qs.Set("limit", limitQ)
 	}
 
-	pageQ := swag.FormatInt64(o.Page)
+	var pageQ string
+	if o.Page != nil {
+		pageQ = swag.FormatInt64(*o.Page)
+	}
 	if pageQ != "" {
 		qs.Set("page", pageQ)
 	}

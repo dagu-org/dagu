@@ -53,14 +53,12 @@ func init() {
           {
             "type": "integer",
             "name": "page",
-            "in": "query",
-            "required": true
+            "in": "query"
           },
           {
             "type": "integer",
             "name": "limit",
-            "in": "query",
-            "required": true
+            "in": "query"
           },
           {
             "type": "string",
@@ -1198,14 +1196,12 @@ func init() {
           {
             "type": "integer",
             "name": "page",
-            "in": "query",
-            "required": true
+            "in": "query"
           },
           {
             "type": "integer",
             "name": "limit",
-            "in": "query",
-            "required": true
+            "in": "query"
           },
           {
             "type": "string",

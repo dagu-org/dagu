@@ -23,14 +23,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/swag"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
+<<<<<<< HEAD
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/persistence/history"
+=======
+	"github.com/dagu-org/dagu/internal/persistence/model"
+>>>>>>> main
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/util"
