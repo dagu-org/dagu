@@ -441,9 +441,10 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
     ];
   }, [DAGs, group]);
 
-  const instance = useReactTable({
+  const instance = useReactTable<DAGRow>({
     data,
     columns,
+    getSubRows: (row) =>row.subRows,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
