@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 docs.egg-info/PKG-INFO

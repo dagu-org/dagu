@@ -68,6 +68,7 @@ Quick Start
    executors
    base_config
    examples
+   special_env
 
 .. toctree::
    :caption: Configuration
