@@ -50,8 +50,9 @@ type Client interface {
 }
 
 type StartOptions struct {
-	Params string
-	Quiet  bool
+	Params           string
+	Quiet            bool
+	FromWaitingQueue bool
 }
 
 type RestartOptions struct {

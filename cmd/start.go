@@ -42,6 +42,10 @@ func startCmd() *cobra.Command {
 			if err != nil {
 				log.Fatalf("Flag retrieval failed (quiet): %v", err)
 			}
+			waiting, err := cmd.Flags().GetBool("waiting")
+			if err != nil {
+				log.Fatalf("Flag retrieval failed (waiting): %v", err)
+			}
 
 			initLogger := logger.NewLogger(logger.NewLoggerArgs{
 				Debug:  cfg.Debug,
@@ -90,6 +94,10 @@ func startCmd() *cobra.Command {
 			})
 
 			dataStore := newDataStores(cfg)
+
+			queueStore := newQueueStore(cfg)
+			statsStore := newStatsStore(cfg)
+
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Info("Workflow execution initiated",
@@ -103,10 +111,12 @@ func startCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
+				cfg.DAGQueueLength,
 				cli,
 				dataStore,
-				&agent.Options{})
-
+				queueStore,
+				statsStore,
+				&agent.Options{FromWaitingQueue: waiting})
 			ctx := cmd.Context()
 
 			listenSignals(ctx, agt)
@@ -122,6 +132,8 @@ func startCmd() *cobra.Command {
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	cmd.Flags().BoolP("waiting", "w", false, "from waiting queue")
+
 	return cmd
 }
 

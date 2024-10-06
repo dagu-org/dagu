@@ -12,6 +12,8 @@ type resolver struct {
 	dagsDir         string
 	suspendFlagsDir string
 	dataDir         string
+	queueDir        string
+	statsDir        string
 	logsDir         string
 	adminLogsDir    string
 	baseConfigFile  string
@@ -44,12 +46,16 @@ func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) resolver {
 	if useXDGRules {
 		r.dataDir = filepath.Join(xdg.DataHome, appName, "history")
 		r.logsDir = filepath.Join(xdg.DataHome, appName, "logs")
+		r.queueDir = filepath.Join(xdg.DataHome, appName, "queue")
+		r.statsDir = filepath.Join(xdg.DataHome, appName, "stats")
 		r.baseConfigFile = filepath.Join(xdg.ConfigHome, appName, "base.yaml")
 		r.adminLogsDir = filepath.Join(xdg.DataHome, appName, "logs", "admin")
 		r.suspendFlagsDir = filepath.Join(xdg.DataHome, appName, "suspend")
 		r.dagsDir = filepath.Join(xdg.ConfigHome, appName, "dags")
 	} else {
 		r.dataDir = filepath.Join(r.configDir, "data")
+		r.queueDir = filepath.Join(r.configDir, "queue")
+		r.statsDir = filepath.Join(r.configDir, "stats")
 		r.logsDir = filepath.Join(r.configDir, "logs")
 		r.baseConfigFile = filepath.Join(r.configDir, "base.yaml")
 		r.adminLogsDir = filepath.Join(r.configDir, "logs", "admin")

@@ -21,16 +21,27 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/queue"
+	"github.com/dagu-org/dagu/internal/persistence/stats"
 )
 
 func newClient(cfg *config.Config, ds persistence.DataStores, lg logger.Logger) client.Client {
 	return client.New(ds, cfg.Executable, cfg.WorkDir, lg)
 }
 
+func newQueueStore(cfg *config.Config) persistence.QueueStore {
+	return queue.NewQueueStore(cfg.QueueDir)
+}
+func newStatsStore(cfg *config.Config) persistence.StatsStore {
+	return stats.NewStatsStore(cfg.StatsDir)
+}
+
 func newDataStores(cfg *config.Config) persistence.DataStores {
 	return dsclient.NewDataStores(
 		cfg.DAGs,
 		cfg.DataDir,
+		cfg.QueueDir,
+		cfg.StatsDir,
 		cfg.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,

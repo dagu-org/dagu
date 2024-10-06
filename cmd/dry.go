@@ -84,6 +84,8 @@ func dryCmd() *cobra.Command {
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, agentLogger)
+			queueStore := newQueueStore(cfg)
+			statsStore := newStatsStore(cfg)
 
 			agt := agent.New(
 				requestID,
@@ -91,8 +93,11 @@ func dryCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
+				cfg.DAGQueueLength,
 				cli,
 				dataStore,
+				queueStore,
+				statsStore,
 				&agent.Options{Dry: true})
 
 			ctx := cmd.Context()

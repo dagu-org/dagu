@@ -131,6 +131,34 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
+	if opts.FromWaitingQueue {
+		args = append(args, "-w")
+	}
+	args = append(args, workflow.Location)
+	// nolint:gosec
+	cmd := exec.Command(e.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = e.workDir
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
+}
+
+func (e *client) StartFromQueue(workflow *dag.DAG, opts StartOptions) error {
+	args := []string{"start"}
+	if opts.Params != "" {
+		args = append(args, "-p")
+		args = append(args, fmt.Sprintf(`"%s"`, escapeArg(opts.Params)))
+	}
+	if opts.Quiet {
+		args = append(args, "-q")
+	}
 	args = append(args, workflow.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)

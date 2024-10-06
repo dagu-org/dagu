@@ -31,10 +31,13 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/logger"
+	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 )
 
 type Scheduler struct {
 	entryReader entryReader
+	queueReader queueReader
 	logDir      string
 	stop        chan struct{}
 	running     atomic.Bool
@@ -42,6 +45,17 @@ type Scheduler struct {
 }
 
 func New(cfg *config.Config, lg logger.Logger, cli client.Client) *Scheduler {
+	dataStore := dsclient.NewDataStores(
+		cfg.DAGs,
+		cfg.DataDir,
+		cfg.QueueDir,
+		cfg.StatsDir,
+		cfg.SuspendFlagsDir,
+		dsclient.DataStoreOptions{
+			LatestStatusToday: cfg.LatestStatusToday,
+		},
+	)
+
 	return newScheduler(newSchedulerArgs{
 		EntryReader: newEntryReader(newEntryReaderArgs{
 			Client:  cli,
@@ -53,6 +67,11 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *Scheduler {
 			},
 			Logger: lg,
 		}),
+		QueueReader: newQueueReader(newQueueReaderArgs{
+			QueueDir:  cfg.QueueDir,
+			Logger:    lg,
+			DataStore: dataStore,
+		}),
 		Logger: lg,
 		LogDir: cfg.LogDir,
 	})
@@ -61,6 +80,11 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *Scheduler {
 type entryReader interface {
 	Start(done chan any)
 	Read(now time.Time) ([]*entry, error)
+}
+
+type queueReader interface {
+	Start(done chan any)
+	ReadFileQueue() ([]*model.Queue, error)
 }
 
 type entry struct {
@@ -125,6 +149,7 @@ func (e *entry) Invoke() error {
 
 type newSchedulerArgs struct {
 	EntryReader entryReader
+	QueueReader queueReader
 	Logger      logger.Logger
 	LogDir      string
 }
@@ -132,9 +157,11 @@ type newSchedulerArgs struct {
 func newScheduler(args newSchedulerArgs) *Scheduler {
 	return &Scheduler{
 		entryReader: args.EntryReader,
-		logDir:      args.LogDir,
-		stop:        make(chan struct{}),
-		logger:      args.Logger,
+		queueReader: args.QueueReader,
+
+		logDir: args.LogDir,
+		stop:   make(chan struct{}),
+		logger: args.Logger,
 	}
 }
 
@@ -142,8 +169,10 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	sig := make(chan os.Signal, 1)
 	done := make(chan any)
 	defer close(done)
+	queuesig := make(chan any)
 
 	s.entryReader.Start(done)
+	s.queueReader.Start(queuesig)
 
 	signal.Notify(
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
