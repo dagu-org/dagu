@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -36,7 +37,8 @@ func TestRetryCommand(t *testing.T) {
 
 		// Find the request ID.
 		cli := setup.Client()
-		status, err := cli.GetStatus(dagFile)
+		ctx := context.Background()
+		status, err := cli.GetLatestDAGStatus(ctx, dagFile)
 		require.NoError(t, err)
 		require.Equal(t, status.Status.Status, scheduler.StatusSuccess)
 		require.NotNil(t, status.Status)

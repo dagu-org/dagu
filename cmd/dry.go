@@ -47,7 +47,7 @@ func dryCmd() *cobra.Command {
 				initLogger.Fatal("Parameter retrieval failed", "error", err)
 			}
 
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
+			dAG, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
@@ -60,8 +60,8 @@ func dryCmd() *cobra.Command {
 			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
 				Prefix:    "dry_",
 				LogDir:    cfg.LogDir,
-				DAGLogDir: workflow.LogDir,
-				DAGName:   workflow.Name,
+				DAGLogDir: dAG.LogDir,
+				DAGName:   dAG.Name,
 				RequestID: requestID,
 			})
 
@@ -70,8 +70,8 @@ func dryCmd() *cobra.Command {
 					"Log file creation failed",
 					"error",
 					err,
-					"workflow",
-					workflow.Name,
+					"dag",
+					dAG.Name,
 				)
 			}
 			defer logFile.Close()
@@ -82,12 +82,12 @@ func dryCmd() *cobra.Command {
 				LogFile: logFile,
 			})
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, agentLogger)
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agt := agent.New(
 				requestID,
-				workflow,
+				dAG,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
@@ -102,7 +102,7 @@ func dryCmd() *cobra.Command {
 			if err := agt.Run(ctx); err != nil {
 				agentLogger.Fatal("Workflow execution failed",
 					"error", err,
-					"workflow", workflow.Name,
+					"dag", dAG.Name,
 					"requestID", requestID)
 			}
 		},

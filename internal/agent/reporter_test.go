@@ -27,6 +27,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/util"
@@ -35,7 +36,7 @@ import (
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node,
+		t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -92,11 +93,11 @@ func TestReporter(t *testing.T) {
 	}
 }
 
-func testErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
-	workflow.MailOn.Failure = true
-	workflow.MailOn.Success = false
+func testErrorMail(t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.Node) {
+	dAG.MailOn.Failure = true
+	dAG.MailOn.Success = false
 
-	_ = rp.send(workflow, &model.Status{
+	_ = rp.send(dAG, &history.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -108,11 +109,11 @@ func testErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
-	workflow.MailOn.Failure = false
-	workflow.MailOn.Success = true
+func testNoErrorMail(t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.Node) {
+	dAG.MailOn.Failure = false
+	dAG.MailOn.Success = true
 
-	err := rp.send(workflow, &model.Status{
+	err := rp.send(dAG, &history.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -123,11 +124,11 @@ func testNoErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*mod
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
-	workflow.MailOn.Failure = true
-	workflow.MailOn.Success = true
+func testSuccessMail(t *testing.T, rp *reporter, dAG *dag.DAG, nodes []*model.Node) {
+	dAG.MailOn.Failure = true
+	dAG.MailOn.Success = true
 
-	err := rp.send(workflow, &model.Status{
+	err := rp.send(dAG, &history.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -152,7 +153,7 @@ func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.No
 		log.SetOutput(origStdout)
 	}()
 
-	rp.report(&model.Status{
+	rp.report(&history.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, errors.New("test error"))
@@ -168,15 +169,15 @@ func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.No
 	require.Contains(t, s, "test error")
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, workflow *dag.DAG, nodes []*model.Node) {
-	status := &model.Status{
-		Name:   workflow.Name,
+func testRenderSummary(t *testing.T, _ *reporter, dAG *dag.DAG, nodes []*model.Node) {
+	status := &history.Status{
+		Name:   dAG.Name,
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}
 	summary := renderSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
-	require.Contains(t, summary, workflow.Name)
+	require.Contains(t, summary, dAG.Name)
 }
 
 func testRenderTable(t *testing.T, _ *reporter, _ *dag.DAG, nodes []*model.Node) {

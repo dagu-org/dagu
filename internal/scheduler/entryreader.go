@@ -16,6 +16,7 @@
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +51,7 @@ type newEntryReaderArgs struct {
 }
 
 type jobCreator interface {
-	CreateJob(workflow *dag.DAG, next time.Time) job
+	CreateJob(dAG *dag.DAG, next time.Time) job
 }
 
 func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
@@ -68,39 +69,39 @@ func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
 	return er
 }
 
-func (er *entryReaderImpl) Start(done chan any) {
+func (er *entryReaderImpl) Start(_ context.Context, done chan any) {
 	go er.watchDags(done)
 }
 
-func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
+func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(workflow *dag.DAG, s []dag.Schedule, e entryType) {
+	addEntriesFn := func(dAG *dag.DAG, s []dag.Schedule, e entryType) {
 		for _, ss := range s {
 			next := ss.Parsed.Next(now)
 			entries = append(entries, &entry{
 				Next:      ss.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(workflow, next),
+				Job:       er.jobCreator.CreateJob(dAG, next),
 				EntryType: e,
 				Logger:    er.logger,
 			})
 		}
 	}
 
-	for _, workflow := range er.dags {
+	for _, dAG := range er.dags {
 		id := strings.TrimSuffix(
-			filepath.Base(workflow.Location),
-			filepath.Ext(workflow.Location),
+			filepath.Base(dAG.Location),
+			filepath.Ext(dAG.Location),
 		)
 
-		if er.client.IsSuspended(id) {
+		if er.client.IsSuspended(ctx, id) {
 			continue
 		}
-		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
-		addEntriesFn(workflow, workflow.StopSchedule, entryTypeStop)
-		addEntriesFn(workflow, workflow.RestartSchedule, entryTypeRestart)
+		addEntriesFn(dAG, dAG.Schedule, entryTypeStart)
+		addEntriesFn(dAG, dAG.StopSchedule, entryTypeStop)
+		addEntriesFn(dAG, dAG.RestartSchedule, entryTypeRestart)
 	}
 
 	return entries, nil
@@ -118,18 +119,18 @@ func (er *entryReaderImpl) initDags() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if util.MatchExtension(fi.Name(), dag.Exts) {
-			workflow, err := dag.LoadMetadata(
+			dAG, err := dag.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
 				er.logger.Error(
 					"Workflow load failed",
 					"error", err,
-					"workflow", fi.Name(),
+					"dag", fi.Name(),
 				)
 				continue
 			}
-			er.dags[fi.Name()] = workflow
+			er.dags[fi.Name()] = dAG
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
@@ -163,7 +164,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				workflow, err := dag.LoadMetadata(
+				dAG, err := dag.LoadMetadata(
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {
@@ -175,13 +176,13 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 						event.Name,
 					)
 				} else {
-					er.dags[filepath.Base(event.Name)] = workflow
-					er.logger.Info("Workflow added/updated", "workflow", filepath.Base(event.Name))
+					er.dags[filepath.Base(event.Name)] = dAG
+					er.logger.Info("Workflow added/updated", "dag", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("Workflow removed", "workflow", filepath.Base(event.Name))
+				er.logger.Info("Workflow removed", "dag", filepath.Base(event.Name))
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():

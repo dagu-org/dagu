@@ -49,7 +49,7 @@ func schedulerCmd() *cobra.Command {
 				"logFormat", cfg.LogFormat)
 
 			ctx := cmd.Context()
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 			sc := scheduler.New(cfg, logger, cli)
 			if err := sc.Start(ctx); err != nil {

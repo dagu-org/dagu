@@ -47,7 +47,7 @@ func serverCmd() *cobra.Command {
 
 			logger.Info("Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 			server := frontend.New(cfg, logger, cli)
 			if err := server.Serve(cmd.Context()); err != nil {

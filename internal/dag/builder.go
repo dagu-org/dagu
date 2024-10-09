@@ -57,6 +57,10 @@ type buildOpts struct {
 	// This is useful when loading details for a DAG, but not
 	// for execution.
 	noEval bool
+	// file specifies the file to build the DAG from.
+	file string
+	// name specifies the name of the DAG.
+	name string
 }
 
 // errors on building a DAG.
@@ -131,8 +135,10 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 		RestartWait: time.Second * time.Duration(def.RestartWaitSec),
 		Tags:        parseTags(def.Tags),
 	}
+
 	b.stepBuilder = stepBuilder{noEval: b.opts.noEval}
 
+	b.callBuilderFunc(b.buildMetadata)
 	b.callBuilderFunc(b.buildEnvs)
 	b.callBuilderFunc(b.buildSchedule)
 	b.callBuilderFunc(b.buildMailOn)
@@ -245,6 +251,27 @@ func (b *builder) buildMailOn() error {
 		Failure: b.def.MailOn.Failure,
 		Success: b.def.MailOn.Success,
 	}
+	return nil
+}
+
+func (b *builder) buildMetadata() error {
+	// Set the absolute path to the file.
+	if b.opts.file != "" {
+		filePath, err := normalizeFilePath(b.opts.file)
+		if err != nil {
+			return err
+		}
+		b.dag.Location = filePath
+	}
+
+	// Set the name if not set.
+	if b.dag.Name == "" && b.opts.file != "" {
+		b.dag.Name = util.SafeName(getDefaultName(b.opts.file))
+	}
+	if b.dag.Name == "" && b.opts.name != "" {
+		b.dag.Name = util.SafeName(b.opts.name)
+	}
+
 	return nil
 }
 

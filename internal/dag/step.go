@@ -100,7 +100,7 @@ type SubWorkflow struct {
 
 // ExecutorTypeSubWorkflow is defined here in order to parse
 // the `run` field in the DAG file.
-const ExecutorTypeSubWorkflow = "subworkflow"
+const ExecutorTypeSubWorkflow = "subDAG"
 
 // ExecutorConfig contains the configuration for the executor.
 type ExecutorConfig struct {

@@ -16,13 +16,14 @@
 package cmd
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
@@ -123,11 +124,12 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	workflow, err := dag.Load(cfg.BaseConfig, dagFile, "")
+	ctx := context.Background()
+	dAG, err := dag.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(workflow)
+		status, err := e.GetCurrentStatus(ctx, dAG)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)
@@ -136,14 +138,14 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 // testLastStatusEventual tests the last status of a DAG to be the expected status.
 func testLastStatusEventual(
 	t *testing.T,
-	hs persistence.HistoryStore,
+	hs history.Store,
 	dg string,
 	expected scheduler.Status,
 ) {
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		status := hs.ReadStatusRecent(dg, 1)
+		status := hs.ListRecentStatuses(context.Background(), dg, 1)
 		if len(status) < 1 {
 			return false
 		}

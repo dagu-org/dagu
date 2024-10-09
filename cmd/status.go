@@ -30,7 +30,8 @@ func statusCmd() *cobra.Command {
 		Short: "Display current status of the DAG",
 		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(_ *cobra.Command, args []string) {
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
 			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Configuration load failed: %v", err)
@@ -41,15 +42,15 @@ func statusCmd() *cobra.Command {
 			})
 
 			// Load the DAG file and get the current running status.
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
+			dAG, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 
-			curStatus, err := cli.GetCurrentStatus(workflow)
+			curStatus, err := cli.GetCurrentStatus(ctx, dAG)
 
 			if err != nil {
 				logger.Fatal("Current status retrieval failed", "error", err)

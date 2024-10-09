@@ -102,7 +102,7 @@ msgstr ":ref:`examples`"
 
 #: ../../source/index.rst:36 10656dacce7e4a6c92ea69b9176e0621
 #, fuzzy
-msgid "Examples of workflows."
+msgid "Examples of DAGs."
 msgstr "DAGの例。"
 
 #: ../../source/index.rst:39 9530ca023cfd491893426c940a6ead7d

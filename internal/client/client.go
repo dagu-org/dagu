@@ -16,6 +16,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -23,20 +24,23 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/sock"
 )
+
+var _ Client = (*client)(nil)
 
 // New creates a new Client instance.
 // The Client is used to interact with the DAG.
 func New(
-	dataStore persistence.DataStores,
+	dataStore persistence.ClientFactory,
 	executable string,
 	workDir string,
 	lg logger.Logger,
@@ -50,7 +54,7 @@ func New(
 }
 
 type client struct {
-	dataStore  persistence.DataStores
+	dataStore  persistence.ClientFactory
 	executable string
 	workDir    string
 	logger     logger.Logger
@@ -69,12 +73,12 @@ var (
 	errDAGIsRunning  = errors.New("the DAG is running")
 )
 
-func (e *client) GetDAGSpec(id string) (string, error) {
+func (e *client) GetDAGSpec(_ context.Context, id string) (string, error) {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.GetSpec(id)
 }
 
-func (e *client) CreateDAG(name string) (string, error) {
+func (e *client) CreateDAG(_ context.Context, name string) (string, error) {
 	dagStore := e.dataStore.DAGStore()
 	id, err := dagStore.Create(name, dagTemplate)
 	if err != nil {
@@ -83,14 +87,14 @@ func (e *client) CreateDAG(name string) (string, error) {
 	return id, nil
 }
 
-func (e *client) Grep(pattern string) (
+func (e *client) GrepDAGs(_ context.Context, pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.Grep(pattern)
 }
 
-func (e *client) Rename(oldID, newID string) error {
+func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	dagStore := e.dataStore.DAGStore()
 	oldDAG, err := dagStore.Find(oldID)
 	if err != nil {
@@ -104,25 +108,25 @@ func (e *client) Rename(oldID, newID string) error {
 		return err
 	}
 	historyStore := e.dataStore.HistoryStore()
-	return historyStore.Rename(oldDAG.Location, newDAG.Location)
+	return historyStore.RenameDAG(ctx, oldDAG.Location, newDAG.Location)
 }
 
-func (e *client) Stop(workflow *dag.DAG) error {
+func (e *client) Stop(_ context.Context, dAG *dag.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.NewClient(workflow.SockAddr())
+	client := sock.NewClient(dAG.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *client) StartAsync(workflow *dag.DAG, opts StartOptions) {
+func (e *client) StartAsync(ctx context.Context, dAG *dag.DAG, opts StartOptions) {
 	go func() {
-		if err := e.Start(workflow, opts); err != nil {
+		if err := e.Start(ctx, dAG, opts); err != nil {
 			e.logger.Error("Workflow start operation failed", "error", err)
 		}
 	}()
 }
 
-func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
+func (e *client) Start(_ context.Context, dAG *dag.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -131,7 +135,7 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, workflow.Location)
+	args = append(args, dAG.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -147,12 +151,12 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
+func (e *client) Restart(_ context.Context, dAG *dag.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, workflow.Location)
+	args = append(args, dAG.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -165,10 +169,10 @@ func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Retry(workflow *dag.DAG, requestID string) error {
+func (e *client) Retry(_ context.Context, dAG *dag.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", requestID))
-	args = append(args, workflow.Location)
+	args = append(args, dAG.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -181,28 +185,30 @@ func (e *client) Retry(workflow *dag.DAG, requestID string) error {
 	return cmd.Wait()
 }
 
-func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) GetCurrentStatus(_ context.Context, dAG *dag.DAG) (*history.Status, error) {
+	client := sock.NewClient(dAG.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(workflow), nil
+		return history.NewStatus(history.NewStatusArgs{
+			DAG: dAG,
+		}), nil
 	}
-	return model.StatusFromJSON(ret)
+	return history.StatusFromJSON(ret)
 }
 
-func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
-	*model.Status, error,
+func (e *client) GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, requestID string) (
+	*history.Status, error,
 ) {
-	ret, err := e.dataStore.HistoryStore().FindByRequestID(
-		workflow.Location, requestID,
+	ret, err := e.dataStore.HistoryStore().GetStatusByRequestID(
+		ctx, dAG.Location, requestID,
 	)
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetCurrentStatus(workflow)
+	status, _ := e.GetCurrentStatus(ctx, dAG)
 	if status != nil && status.RequestID != requestID {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -210,62 +216,66 @@ func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
 	return ret.Status, err
 }
 
-func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) currentStatus(dAG *dag.DAG) (*history.Status, error) {
+	client := sock.NewClient(dAG.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
 	}
-	return model.StatusFromJSON(ret)
+	return history.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
-	currStatus, _ := e.currentStatus(workflow)
+func (e *client) GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*history.Status, error) {
+	currStatus, _ := e.currentStatus(dAG)
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().ReadStatusToday(workflow.Location)
-	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
-		errors.Is(err, persistence.ErrNoStatusData) {
-		return model.NewStatusDefault(workflow), nil
+	status, err := e.dataStore.HistoryStore().GetLatestStatus(ctx, dAG.Location)
+	if errors.Is(err, history.ErrNoStatusDataToday) ||
+		errors.Is(err, history.ErrNoStatusData) {
+		return history.NewStatus(history.NewStatusArgs{
+			DAG: dAG,
+		}), nil
 	}
 	if err != nil {
-		return model.NewStatusDefault(workflow), err
+		return history.NewStatus(history.NewStatusArgs{
+			DAG: dAG,
+		}), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
 }
 
-func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStore.HistoryStore().ReadStatusRecent(workflow.Location, n)
+func (e *client) ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*history.History {
+	return e.dataStore.HistoryStore().ListRecentStatuses(ctx, dAG.Location, n)
 }
 
-func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
-	client := sock.NewClient(workflow.SockAddr())
+func (e *client) UpdateStatus(ctx context.Context, dAG *dag.DAG, status *history.Status) error {
+	client := sock.NewClient(dAG.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return err
 		}
 	} else {
-		unmarshalled, _ := model.StatusFromJSON(res)
+		unmarshalled, _ := history.StatusFromJSON(res)
 		if unmarshalled != nil && unmarshalled.RequestID == status.RequestID &&
 			unmarshalled.Status == scheduler.StatusRunning {
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStore.HistoryStore().Update(
-		workflow.Location, status.RequestID, status,
+	return e.dataStore.HistoryStore().UpdateStatus(
+		ctx, dAG.Location, status.RequestID, status,
 	)
 }
 
-func (e *client) UpdateDAG(id string, spec string) error {
+func (e *client) UpdateDAGSpec(_ context.Context, id string, spec string) error {
 	dagStore := e.dataStore.DAGStore()
 	return dagStore.UpdateSpec(id, []byte(spec))
 }
 
-func (e *client) DeleteDAG(name, loc string) error {
-	err := e.dataStore.HistoryStore().RemoveAll(loc)
+func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
+	err := e.dataStore.HistoryStore().DeleteAllStatuses(ctx, loc)
 	if err != nil {
 		return err
 	}
@@ -273,7 +283,7 @@ func (e *client) DeleteDAG(name, loc string) error {
 	return dagStore.Delete(name)
 }
 
-func (e *client) GetAllStatus() (
+func (e *client) ListDAGStatusObsolete(ctx context.Context) (
 	statuses []*DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
@@ -281,7 +291,7 @@ func (e *client) GetAllStatus() (
 
 	var ret []*DAGStatus
 	for _, d := range dagList {
-		status, err := e.readStatus(d)
+		status, err := e.readStatus(ctx, d)
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
@@ -295,7 +305,7 @@ func (e *client) getPageCount(total int, limit int) int {
 	return (total-1)/(limit) + 1
 }
 
-func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
+func (e *client) ListDAGStatus(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
 	var (
 		dagListPaginationResult *persistence.DagListPaginationResult
 		err                     error
@@ -323,7 +333,7 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 	}
 
 	for _, currentDag := range dagListPaginationResult.DagList {
-		if currentStatus, err = e.readStatus(currentDag); err != nil {
+		if currentStatus, err = e.readStatus(ctx, currentDag); err != nil {
 			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
 		}
 		dagStatusList = append(dagStatusList, currentStatus)
@@ -335,13 +345,23 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 	}, nil
 }
 
+func (e *client) ListHistoryByDate(ctx context.Context, date string) ([]*history.History, error) {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, err
+	}
+
+	historyStore := e.dataStore.HistoryStore()
+	return historyStore.ListStatusesByDate(ctx, d)
+}
+
 func (e *client) getDAG(name string) (*dag.DAG, error) {
 	dagStore := e.dataStore.DAGStore()
 	dagDetail, err := dagStore.GetDetails(name)
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(id string) (*DAGStatus, error) {
+func (e *client) GetLatestDAGStatus(ctx context.Context, id string) (*DAGStatus, error) {
 	dg, err := e.getDAG(id)
 	if dg == nil {
 		// TODO: fix not to use location
@@ -351,39 +371,43 @@ func (e *client) GetStatus(id string) (*DAGStatus, error) {
 		// check the dag is correct in terms of graph
 		_, err = scheduler.NewExecutionGraph(e.logger, dg.Steps...)
 	}
-	latestStatus, _ := e.GetLatestStatus(dg)
+	latestStatus, _ := e.GetLatestStatus(ctx, dg)
 	return newDAGStatus(
-		dg, latestStatus, e.IsSuspended(id), err,
+		dg, latestStatus, e.IsSuspended(ctx, id), err,
 	), err
 }
 
-func (e *client) ToggleSuspend(id string, suspend bool) error {
+func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error {
 	flagStore := e.dataStore.FlagStore()
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *client) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
-	latestStatus, err := e.GetLatestStatus(workflow)
+func (e *client) IsSuspended(_ context.Context, id string) bool {
+	flagStore := e.dataStore.FlagStore()
+	return flagStore.IsSuspended(id)
+}
+
+func (e *client) ListTags(_ context.Context) ([]string, []string, error) {
+	return e.dataStore.DAGStore().TagList()
+}
+
+func (e *client) readStatus(ctx context.Context, dAG *dag.DAG) (*DAGStatus, error) {
+	latestStatus, err := e.GetLatestStatus(ctx, dAG)
 	id := strings.TrimSuffix(
-		filepath.Base(workflow.Location),
-		filepath.Ext(workflow.Location),
+		filepath.Base(dAG.Location),
+		filepath.Ext(dAG.Location),
 	)
 
 	return newDAGStatus(
-		workflow, latestStatus, e.IsSuspended(id), err,
+		dAG, latestStatus, e.IsSuspended(ctx, id), err,
 	), err
 }
 
-func (*client) emptyDAGIfNil(workflow *dag.DAG, dagLocation string) *dag.DAG {
-	if workflow != nil {
-		return workflow
+func (*client) emptyDAGIfNil(dAG *dag.DAG, dagLocation string) *dag.DAG {
+	if dAG != nil {
+		return dAG
 	}
 	return &dag.DAG{Location: dagLocation}
-}
-
-func (e *client) IsSuspended(id string) bool {
-	flagStore := e.dataStore.FlagStore()
-	return flagStore.IsSuspended(id)
 }
 
 func escapeArg(input string) string {
@@ -400,8 +424,4 @@ func escapeArg(input string) string {
 	}
 
 	return escaped.String()
-}
-
-func (e *client) GetTagList() ([]string, []string, error) {
-	return e.dataStore.DAGStore().TagList()
 }

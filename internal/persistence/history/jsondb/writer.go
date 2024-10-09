@@ -12,49 +12,55 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package jsondb
 
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/util"
-)
-
-var (
-	ErrWriterClosed  = errors.New("writer is closed")
-	ErrWriterNotOpen = errors.New("writer is not open")
 )
 
 // writer manages writing status to a local file.
 type writer struct {
-	target  string
-	dagFile string
-	writer  *bufio.Writer
-	file    *os.File
-	mu      sync.Mutex
-	closed  bool
+	statusFile string        // Path to the status file
+	writer     *bufio.Writer // Buffered writer for efficient writing
+	file       *os.File      // File handle
+	mu         sync.Mutex    // Mutex for thread-safe operations
+	closed     bool          // Flag to indicate if the writer is closed
 }
 
-// open opens the writer.
+// newWriter creates and initializes a new writer instance.
+// It opens the file for writing and returns the writer.
+func newWriter(statusFile string) (*writer, error) {
+	w := &writer{
+		statusFile: statusFile,
+	}
+	if err := w.open(); err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+// open prepares the writer for writing by creating necessary directories
+// and opening the file.
 func (w *writer) open() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed {
-		return ErrWriterClosed
-	}
-
-	if err := os.MkdirAll(filepath.Dir(w.target), 0755); err != nil {
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(w.statusFile), 0755); err != nil {
 		return err
 	}
 
-	file, err := util.OpenOrCreateFile(w.target)
+	// Open or create the file
+	file, err := util.OpenOrCreateFile(w.statusFile)
 	if err != nil {
 		return err
 	}
@@ -64,36 +70,38 @@ func (w *writer) open() error {
 	return nil
 }
 
-// write appends the status to the local file.
-func (w *writer) write(st *model.Status) error {
+// write appends the status to the local file in JSON format.
+// It ensures thread-safety and flushes the buffer after writing.
+func (w *writer) write(st *history.Status) error {
+	if w.writer == nil {
+		return fmt.Errorf("writer is not open")
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed {
-		return ErrWriterClosed
-	}
-
-	if w.writer == nil {
-		return ErrWriterNotOpen
-	}
-
+	// Convert status to JSON
 	jsonb, err := json.Marshal(st)
 	if err != nil {
 		return err
 	}
 
+	// Write JSON data
 	if _, err := w.writer.Write(jsonb); err != nil {
 		return err
 	}
 
+	// Add a newline after each JSON object
 	if err := w.writer.WriteByte('\n'); err != nil {
 		return err
 	}
 
+	// Flush the buffer to ensure data is written to disk
 	return w.writer.Flush()
 }
 
-// close closes the writer.
+// close properly closes the writer, flushing any remaining data
+// and closing the file handle.
 func (w *writer) close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -108,9 +116,11 @@ func (w *writer) close() error {
 	}
 
 	if w.file != nil {
+		// Ensure data is synced to disk
 		if syncErr := w.file.Sync(); syncErr != nil && err == nil {
 			err = syncErr
 		}
+		// Close the file handle
 		if closeErr := w.file.Close(); closeErr != nil && err == nil {
 			err = closeErr
 		}

@@ -18,39 +18,44 @@ package client
 import (
 	"os"
 
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/history"
+	"github.com/dagu-org/dagu/internal/persistence/history/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
 
-var _ persistence.DataStores = (*dataStores)(nil)
+var _ persistence.ClientFactory = (*dataStores)(nil)
 
 type dataStores struct {
-	historyStore persistence.HistoryStore
-	dagStore     persistence.DAGStore
+	historyStore history.Store
+	dAGStore     persistence.DAGStore
 
 	dags              string
 	dataDir           string
 	suspendFlagsDir   string
 	latestStatusToday bool
+	logger            logger.Logger
 }
 
 type DataStoreOptions struct {
 	LatestStatusToday bool
 }
 
-func NewDataStores(
+func NewFactory(
 	dags string,
 	dataDir string,
 	suspendFlagsDir string,
+	logger logger.Logger,
 	opts DataStoreOptions,
-) persistence.DataStores {
+) persistence.ClientFactory {
 	dataStoreImpl := &dataStores{
 		dags:              dags,
 		dataDir:           dataDir,
 		suspendFlagsDir:   suspendFlagsDir,
 		latestStatusToday: opts.LatestStatusToday,
+		logger:            logger,
 	}
 	_ = dataStoreImpl.InitDagDir()
 	return dataStoreImpl
@@ -67,20 +72,20 @@ func (f *dataStores) InitDagDir() error {
 	return nil
 }
 
-func (f *dataStores) HistoryStore() persistence.HistoryStore {
+func (f *dataStores) HistoryStore() history.Store {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
 		f.historyStore = jsondb.New(
-			f.dataDir, f.latestStatusToday)
+			f.dataDir, f.logger, f.latestStatusToday)
 	}
 	return f.historyStore
 }
 
 func (f *dataStores) DAGStore() persistence.DAGStore {
-	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
+	if f.dAGStore == nil {
+		f.dAGStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
 	}
-	return f.dagStore
+	return f.dAGStore
 }
 
 func (f *dataStores) FlagStore() persistence.FlagStore {

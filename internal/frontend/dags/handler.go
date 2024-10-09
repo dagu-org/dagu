@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-package dag
+package dags
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,7 +31,8 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/frontend/server"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/history"
+	"github.com/dagu-org/dagu/internal/persistence/history/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"
@@ -143,11 +145,22 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			}
 			return dags.NewListTagsOK().WithPayload(tags)
 		})
+
+	api.DagsListHistoryHandler = dags.ListHistoryHandlerFunc(
+		func(lsp dags.ListHistoryParams) middleware.Responder {
+			statuses, err := h.listHistory(lsp)
+			if err != nil {
+				return dags.NewListHistoryDefault(err.Code).
+					WithPayload(err.APIError)
+			}
+			return dags.NewListHistoryOK().WithPayload(statuses)
+		})
 }
 
 func (h *Handler) createDAG(
 	params dags.CreateDagParams,
 ) (*models.CreateDagResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
 	if params.Body.Action == nil || params.Body.Value == nil {
 		return nil, newBadRequestError(errInvalidArgs)
 	}
@@ -155,7 +168,7 @@ func (h *Handler) createDAG(
 	switch *params.Body.Action {
 	case "new":
 		name := *params.Body.Value
-		id, err := h.client.CreateDAG(name)
+		id, err := h.client.CreateDAG(ctx, name)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -165,12 +178,13 @@ func (h *Handler) createDAG(
 	}
 }
 func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
-	dagStatus, err := h.client.GetStatus(params.DagID)
+	ctx := params.HTTPRequest.Context()
+	dagStatus, err := h.client.GetLatestDAGStatus(ctx, params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
 	}
 	if err := h.client.DeleteDAG(
-		params.DagID, dagStatus.DAG.Location,
+		ctx, params.DagID, dagStatus.DAG.Location,
 	); err != nil {
 		return newInternalError(err)
 	}
@@ -178,7 +192,8 @@ func (h *Handler) deleteDAG(params dags.DeleteDagParams) *codedError {
 }
 
 func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
-	dgs, result, err := h.client.GetAllStatusPagination(params)
+	ctx := params.HTTPRequest.Context()
+	dgs, result, err := h.client.ListDAGStatus(ctx, params)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -237,6 +252,7 @@ func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse,
 func (h *Handler) getDetail(
 	params dags.GetDagDetailsParams,
 ) (*models.GetDagDetailsResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
 	dagID := params.DagID
 
 	tab := dagTabTypeStatus
@@ -244,15 +260,15 @@ func (h *Handler) getDetail(
 		tab = *params.Tab
 	}
 
-	dagStatus, err := h.client.GetStatus(dagID)
+	dagStatus, err := h.client.GetLatestDAGStatus(ctx, dagID)
 	if dagStatus == nil {
 		return nil, newNotFoundError(err)
 	}
 
-	workflow := dagStatus.DAG
+	dAG := dagStatus.DAG
 
 	var steps []*models.StepObject
-	for _, step := range workflow.Steps {
+	for _, step := range dAG.Steps {
 		steps = append(steps, convertToStepObject(step))
 	}
 
@@ -273,14 +289,14 @@ func (h *Handler) getDetail(
 	}
 
 	var schedules []*models.Schedule
-	for _, s := range workflow.Schedule {
+	for _, s := range dAG.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	var preconditions []*models.Condition
-	for _, p := range workflow.Preconditions {
+	for _, p := range dAG.Preconditions {
 		preconditions = append(preconditions, &models.Condition{
 			Condition: p.Condition,
 			Expected:  p.Expected,
@@ -288,22 +304,22 @@ func (h *Handler) getDetail(
 	}
 
 	dagDetail := &models.DagDetail{
-		DefaultParams:     swag.String(workflow.DefaultParams),
-		Delay:             swag.Int64(int64(workflow.Delay)),
-		Description:       swag.String(workflow.Description),
-		Env:               workflow.Env,
-		Group:             swag.String(workflow.Group),
+		DefaultParams:     swag.String(dAG.DefaultParams),
+		Delay:             swag.Int64(int64(dAG.Delay)),
+		Description:       swag.String(dAG.Description),
+		Env:               dAG.Env,
+		Group:             swag.String(dAG.Group),
 		HandlerOn:         handlerOn,
-		HistRetentionDays: swag.Int64(int64(workflow.HistRetentionDays)),
-		Location:          swag.String(workflow.Location),
-		LogDir:            swag.String(workflow.LogDir),
-		MaxActiveRuns:     swag.Int64(int64(workflow.MaxActiveRuns)),
-		Name:              swag.String(workflow.Name),
-		Params:            workflow.Params,
+		HistRetentionDays: swag.Int64(int64(dAG.HistRetentionDays)),
+		Location:          swag.String(dAG.Location),
+		LogDir:            swag.String(dAG.LogDir),
+		MaxActiveRuns:     swag.Int64(int64(dAG.MaxActiveRuns)),
+		Name:              swag.String(dAG.Name),
+		Params:            dAG.Params,
 		Preconditions:     preconditions,
 		Schedule:          schedules,
 		Steps:             steps,
-		Tags:              workflow.Tags,
+		Tags:              dAG.Tags,
 	}
 
 	statusWithDetails := &models.DagStatusWithDetails{
@@ -337,16 +353,16 @@ func (h *Handler) getDetail(
 		return resp, nil
 
 	case dagTabTypeSpec:
-		return h.processSpecRequest(dagID, resp)
+		return h.processSpecRequest(ctx, dagID, resp)
 
 	case dagTabTypeHistory:
-		return h.processLogRequest(resp, workflow)
+		return h.processLogRequest(ctx, resp, dAG)
 
 	case dagTabTypeStepLog:
-		return h.processStepLogRequest(workflow, params, resp)
+		return h.processStepLogRequest(dAG, params, resp)
 
 	case dagTabTypeSchedulerLog:
-		return h.processSchedulerLogRequest(workflow, params, resp)
+		return h.processSchedulerLogRequest(dAG, params, resp)
 
 	default:
 		return nil, newBadRequestError(errInvalidArgs)
@@ -354,14 +370,15 @@ func (h *Handler) getDetail(
 }
 
 func (h *Handler) processSchedulerLogRequest(
-	workflow *dag.DAG,
+	dAG *dag.DAG,
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	var logFile string
+	ctx := params.HTTPRequest.Context()
 
 	if params.File != nil {
-		status, err := jsondb.ParseFile(*params.File)
+		status, err := jsondb.LoadStatusFile(*params.File)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
@@ -369,7 +386,7 @@ func (h *Handler) processSchedulerLogRequest(
 	}
 
 	if logFile == "" {
-		lastStatus, err := h.client.GetLatestStatus(workflow)
+		lastStatus, err := h.client.GetLatestStatus(ctx, dAG)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -390,18 +407,19 @@ func (h *Handler) processSchedulerLogRequest(
 }
 
 func (h *Handler) processStepLogRequest(
-	workflow *dag.DAG,
+	dAG *dag.DAG,
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	var status *model.Status
+	var status *history.Status
+	ctx := params.HTTPRequest.Context()
 
 	if params.Step == nil {
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
 	if params.File != nil {
-		s, err := jsondb.ParseFile(*params.File)
+		s, err := jsondb.LoadStatusFile(*params.File)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
@@ -409,7 +427,7 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if status == nil {
-		s, err := h.client.GetLatestStatus(workflow)
+		s, err := h.client.GetLatestStatus(ctx, dAG)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -465,10 +483,11 @@ func (h *Handler) processStepLogRequest(
 }
 
 func (h *Handler) processSpecRequest(
+	ctx context.Context,
 	dagID string,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	dagContent, err := h.client.GetDAGSpec(dagID)
+	dagContent, err := h.client.GetDAGSpec(ctx, dagID)
 	if err != nil {
 		return nil, newNotFoundError(err)
 	}
@@ -481,10 +500,11 @@ var (
 )
 
 func (h *Handler) processLogRequest(
+	ctx context.Context,
 	resp *models.GetDagDetailsResponse,
-	workflow *dag.DAG,
+	dAG *dag.DAG,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	logs := h.client.GetRecentHistory(workflow, defaultHistoryLimit)
+	logs := h.client.ListRecentHistory(ctx, dAG, defaultHistoryLimit)
 
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
 	for idx, log := range logs {
@@ -586,6 +606,7 @@ func addNodeStatus(
 func (h *Handler) postAction(
 	params dags.PostDagActionParams,
 ) (*models.PostDagActionResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
 	if params.Body.Action == nil {
 		return nil, newBadRequestError(errInvalidArgs)
 	}
@@ -593,7 +614,7 @@ func (h *Handler) postAction(
 	var dagStatus *client.DAGStatus
 
 	if *params.Body.Action != "save" {
-		s, err := h.client.GetStatus(params.DagID)
+		s, err := h.client.GetLatestDAGStatus(ctx, params.DagID)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
@@ -605,13 +626,13 @@ func (h *Handler) postAction(
 		if dagStatus.Status.Status == scheduler.StatusRunning {
 			return nil, newBadRequestError(errInvalidArgs)
 		}
-		h.client.StartAsync(dagStatus.DAG, client.StartOptions{
+		h.client.StartAsync(ctx, dagStatus.DAG, client.StartOptions{
 			Params: params.Body.Params,
 		})
 		return &models.PostDagActionResponse{}, nil
 
 	case "suspend":
-		_ = h.client.ToggleSuspend(params.DagID, params.Body.Value == "true")
+		_ = h.client.ToggleSuspend(ctx, params.DagID, params.Body.Value == "true")
 		return &models.PostDagActionResponse{}, nil
 
 	case "stop":
@@ -620,7 +641,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("the DAG is not running: %w", errInvalidArgs),
 			)
 		}
-		if err := h.client.Stop(dagStatus.DAG); err != nil {
+		if err := h.client.Stop(ctx, dagStatus.DAG); err != nil {
 			return nil, newBadRequestError(
 				fmt.Errorf("error trying to stop the DAG: %w", err),
 			)
@@ -633,7 +654,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("request-id is required: %w", errInvalidArgs),
 			)
 		}
-		if err := h.client.Retry(dagStatus.DAG, params.Body.RequestID); err != nil {
+		if err := h.client.Retry(ctx, dagStatus.DAG, params.Body.RequestID); err != nil {
 			return nil, newInternalError(
 				fmt.Errorf("error trying to retry the DAG: %w", err),
 			)
@@ -651,7 +672,7 @@ func (h *Handler) postAction(
 		)
 
 	case "save":
-		if err := h.client.UpdateDAG(params.DagID, params.Body.Value); err != nil {
+		if err := h.client.UpdateDAGSpec(ctx, params.DagID, params.Body.Value); err != nil {
 			return nil, newInternalError(err)
 		}
 		return &models.PostDagActionResponse{}, nil
@@ -663,7 +684,7 @@ func (h *Handler) postAction(
 				fmt.Errorf("new name is required: %w", errInvalidArgs),
 			)
 		}
-		if err := h.client.Rename(params.DagID, newName); err != nil {
+		if err := h.client.Rename(ctx, params.DagID, newName); err != nil {
 			return nil, newInternalError(err)
 		}
 		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
@@ -679,6 +700,7 @@ func (h *Handler) processUpdateStatus(
 	params dags.PostDagActionParams,
 	dagStatus *client.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
 	if params.Body.RequestID == "" {
 		return nil, newBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
 	}
@@ -694,7 +716,7 @@ func (h *Handler) processUpdateStatus(
 		)
 	}
 
-	status, err := h.client.GetStatusByRequestID(dagStatus.DAG, params.Body.RequestID)
+	status, err := h.client.GetStatusByRequestID(ctx, dagStatus.DAG, params.Body.RequestID)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -717,7 +739,7 @@ func (h *Handler) processUpdateStatus(
 	status.Nodes[idxToUpdate].Status = to
 	status.Nodes[idxToUpdate].StatusText = to.String()
 
-	if err := h.client.UpdateStatus(dagStatus.DAG, status); err != nil {
+	if err := h.client.UpdateStatus(ctx, dagStatus.DAG, status); err != nil {
 		return nil, newInternalError(err)
 	}
 
@@ -727,12 +749,13 @@ func (h *Handler) processUpdateStatus(
 func (h *Handler) searchDAGs(
 	params dags.SearchDagsParams,
 ) (*models.SearchDagsResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
 	query := params.Q
 	if query == "" {
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
-	ret, errs, err := h.client.Grep(query)
+	ret, errs, err := h.client.GrepDAGs(ctx, query)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
@@ -778,13 +801,38 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *Handler) getTagList(_ dags.ListTagsParams) (*models.ListTagResponse, *codedError) {
-	tags, errs, err := h.client.GetTagList()
+func (h *Handler) getTagList(params dags.ListTagsParams) (*models.ListTagResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
+	tags, errs, err := h.client.ListTags(ctx)
 	if err != nil {
 		return nil, newInternalError(err)
 	}
 	return &models.ListTagResponse{
 		Errors: errs,
 		Tags:   tags,
+	}, nil
+}
+
+func (h *Handler) listHistory(params dags.ListHistoryParams) (*models.ListHistoryResponse, *codedError) {
+	ctx := params.HTTPRequest.Context()
+	statuses, err := h.client.ListHistoryByDate(ctx, params.Date)
+	if err != nil {
+		return nil, newInternalError(err)
+	}
+	var history []*models.DagStatus
+	for _, s := range statuses {
+		history = append(history, &models.DagStatus{
+			FinishedAt: &s.Status.FinishedAt,
+			Log:        &s.Status.Log,
+			Name:       &s.Status.Name,
+			Params:     &s.Status.Params,
+			RequestID:  &s.Status.RequestID,
+			StartedAt:  &s.Status.StartedAt,
+			Status:     swag.Int64(int64(s.Status.Status)),
+			StatusText: &s.Status.StatusText,
+		})
+	}
+	return &models.ListHistoryResponse{
+		History: history,
 	}, nil
 }

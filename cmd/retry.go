@@ -50,7 +50,7 @@ func retryCmd() *cobra.Command {
 			}
 
 			// Read the specified DAG execution status from the history store.
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, initLogger)
 			historyStore := dataStore.HistoryStore()
 
 			specFilePath := args[0]
@@ -61,7 +61,8 @@ func retryCmd() *cobra.Command {
 					"file", specFilePath)
 			}
 
-			status, err := historyStore.FindByRequestID(absoluteFilePath, requestID)
+			ctx := cmd.Context()
+			status, err := historyStore.GetStatusByRequestID(ctx, absoluteFilePath, requestID)
 			if err != nil {
 				initLogger.Fatal("Historical execution retrieval failed",
 					"error", err,
@@ -71,7 +72,7 @@ func retryCmd() *cobra.Command {
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			workflow, err := dag.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
+			dAG, err := dag.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
 			if err != nil {
 				initLogger.Fatal("Workflow specification load failed",
 					"error", err,
@@ -87,14 +88,14 @@ func retryCmd() *cobra.Command {
 			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
 				Prefix:    "retry_",
 				LogDir:    cfg.LogDir,
-				DAGLogDir: workflow.LogDir,
-				DAGName:   workflow.Name,
+				DAGLogDir: dAG.LogDir,
+				DAGName:   dAG.Name,
 				RequestID: newRequestID,
 			})
 			if err != nil {
 				initLogger.Fatal("Log file creation failed",
 					"error", err,
-					"workflow", workflow.Name)
+					"dag", dAG.Name)
 			}
 			defer logFile.Close()
 
@@ -104,17 +105,18 @@ func retryCmd() *cobra.Command {
 				LogFile: logFile,
 			})
 
+			dataStore = newDataStores(cfg, agentLogger)
 			cli := newClient(cfg, dataStore, agentLogger)
 
 			agentLogger.Info("Workflow retry initiated",
-				"workflow", workflow.Name,
+				"dag", dAG.Name,
 				"originalRequestID", requestID,
 				"newRequestID", newRequestID,
 				"logFile", logFile.Name())
 
 			agt := agent.New(
 				newRequestID,
-				workflow,
+				dAG,
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
@@ -123,11 +125,10 @@ func retryCmd() *cobra.Command {
 				&agent.Options{RetryTarget: status.Status},
 			)
 
-			ctx := cmd.Context()
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {
-				agentLogger.Fatal("Failed to start workflow", "error", err)
+				agentLogger.Fatal("Failed to start DAG", "error", err)
 			}
 		},
 	}

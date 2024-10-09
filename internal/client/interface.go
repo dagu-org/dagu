@@ -16,37 +16,62 @@
 package client
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 )
 
 type Client interface {
-	CreateDAG(id string) (string, error)
-	GetDAGSpec(id string) (string, error)
-	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
-	Rename(oldID, newID string) error
-	Stop(workflow *dag.DAG) error
-	StartAsync(workflow *dag.DAG, opts StartOptions)
-	Start(workflow *dag.DAG, opts StartOptions) error
-	Restart(workflow *dag.DAG, opts RestartOptions) error
-	Retry(workflow *dag.DAG, requestID string) error
-	GetCurrentStatus(workflow *dag.DAG) (*model.Status, error)
-	GetStatusByRequestID(workflow *dag.DAG, requestID string) (*model.Status, error)
-	GetLatestStatus(workflow *dag.DAG) (*model.Status, error)
-	GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile
-	UpdateStatus(workflow *dag.DAG, status *model.Status) error
-	UpdateDAG(id string, spec string) error
-	DeleteDAG(id, loc string) error
-	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
-	GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
-	GetStatus(dagLocation string) (*DAGStatus, error)
-	IsSuspended(id string) bool
-	ToggleSuspend(id string, suspend bool) error
-	GetTagList() ([]string, []string, error)
+	// CreateDAG creates a new DAG.
+	CreateDAG(ctx context.Context, id string) (string, error)
+	// GetDAGSpec returns the spec of the specific DAG.
+	GetDAGSpec(ctx context.Context, id string) (string, error)
+	// GetDAG returns the DAG object.
+	GrepDAGs(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
+	// Rename renames the DAG.
+	Rename(ctx context.Context, oldID, newID string) error
+	// Stop stops the current DAG execution.
+	Stop(ctx context.Context, dAG *dag.DAG) error
+	// StartAsync starts the specific history asynchronously.
+	StartAsync(ctx context.Context, dAG *dag.DAG, opts StartOptions)
+	// Start starts the specific history.
+	Start(ctx context.Context, dAG *dag.DAG, opts StartOptions) error
+	// Restart restarts the specific history.
+	Restart(ctx context.Context, dAG *dag.DAG, opts RestartOptions) error
+	// Rerty retries the execution of the DAG.
+	Retry(ctx context.Context, dAG *dag.DAG, requestID string) error
+	// GetCurrentStatus returns the current status of the DAG.
+	GetCurrentStatus(ctx context.Context, dAG *dag.DAG) (*history.Status, error)
+	// GetLatestStatus returns the latest status of the DAG.
+	GetLatestStatus(ctx context.Context, dAG *dag.DAG) (*history.Status, error)
+	// GetLatestDAGStatus returns the latest status of the DAG.
+	GetLatestDAGStatus(ctx context.Context, dagLocation string) (*DAGStatus, error)
+	// GetStatusByRequestID returns the status of the specific history.
+	GetStatusByRequestID(ctx context.Context, dAG *dag.DAG, requestID string) (*history.Status, error)
+	// ListRecentHistory returns the recent history of the DAG.
+	ListRecentHistory(ctx context.Context, dAG *dag.DAG, n int) []*history.History
+	// UpdateStatus updates the status of the specific history.
+	UpdateStatus(ctx context.Context, dAG *dag.DAG, status *history.Status) error
+	// UpdateDAGSpec updates the spec of the specific DAG.
+	UpdateDAGSpec(ctx context.Context, id string, spec string) error
+	// DeleteDAG deletes the specific DAG.
+	DeleteDAG(ctx context.Context, id, loc string) error
+	// ListDAGStatusObsolete returns the list of statuses of the DAGs.
+	ListDAGStatusObsolete(ctx context.Context) (statuses []*DAGStatus, errs []string, err error)
+	// ListDAGStatus returns the list of statuses of the DAGs.
+	ListDAGStatus(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
+	// ListHistoryByDate returns the history of the specific date.
+	ListHistoryByDate(ctx context.Context, date string) ([]*history.History, error)
+	// IsSuspended returns whether the DAG is suspended.
+	IsSuspended(ctx context.Context, id string) bool
+	// ToggleSuspend toggles the suspend status of the DAG.
+	ToggleSuspend(ctx context.Context, id string, suspend bool) error
+	// ListTags returns the list of tags of the DAGs.
+	ListTags(ctx context.Context) ([]string, []string, error)
 }
 
 type StartOptions struct {
@@ -62,7 +87,7 @@ type DAGStatus struct {
 	File      string
 	Dir       string
 	DAG       *dag.DAG
-	Status    *model.Status
+	Status    *history.Status
 	Suspended bool
 	Error     error
 	ErrorT    *string
@@ -74,12 +99,12 @@ type DagListPaginationSummaryResult struct {
 }
 
 func newDAGStatus(
-	workflow *dag.DAG, s *model.Status, suspended bool, err error,
+	dAG *dag.DAG, s *history.Status, suspended bool, err error,
 ) *DAGStatus {
 	ret := &DAGStatus{
-		File:      filepath.Base(workflow.Location),
-		Dir:       filepath.Dir(workflow.Location),
-		DAG:       workflow,
+		File:      filepath.Base(dAG.Location),
+		Dir:       filepath.Dir(dAG.Location),
+		DAG:       dAG,
 		Status:    s,
 		Suspended: suspended,
 		Error:     err,

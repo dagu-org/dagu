@@ -27,10 +27,11 @@ import (
 func stopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop /path/to/spec.yaml",
-		Short: "Stop the running workflow",
+		Short: "Stop the running DAG",
 		Long:  `dagu stop /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			ctx := cmd.Context()
 			cfg, err := config.Load()
 			if err != nil {
 				log.Fatalf("Configuration load failed: %v", err)
@@ -47,23 +48,23 @@ func stopCmd() *cobra.Command {
 				Quiet:  quiet,
 			})
 
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
+			dAG, err := dag.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
-			logger.Info("Workflow stop initiated", "workflow", workflow.Name)
+			logger.Info("Workflow stop initiated", "dag", dAG.Name)
 
-			dataStore := newDataStores(cfg)
+			dataStore := newDataStores(cfg, logger)
 			cli := newClient(cfg, dataStore, logger)
 
-			if err := cli.Stop(workflow); err != nil {
+			if err := cli.Stop(ctx, dAG); err != nil {
 				logger.Fatal(
 					"Workflow stop operation failed",
 					"error",
 					err,
-					"workflow",
-					workflow.Name,
+					"dag",
+					dAG.Name,
 				)
 			}
 		},

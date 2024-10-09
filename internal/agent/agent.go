@@ -33,6 +33,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/history"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 )
@@ -46,13 +47,13 @@ import (
 type Agent struct {
 	dag          *dag.DAG
 	dry          bool
-	retryTarget  *model.Status
-	dataStore    persistence.DataStores
+	retryTarget  *history.Status
+	dataStore    persistence.ClientFactory
 	client       client.Client
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
 	reporter     *reporter
-	historyStore persistence.HistoryStore
+	historyStore history.Store
 	socketServer *sock.Server
 	logDir       string
 	logFile      string
@@ -74,22 +75,22 @@ type Options struct {
 	// RetryTarget is the target status (history of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *model.Status
+	RetryTarget *history.Status
 }
 
 // New creates a new Agent.
 func New(
 	requestID string,
-	workflow *dag.DAG,
+	dAG *dag.DAG,
 	lg logger.Logger,
 	logDir, logFile string,
 	cli client.Client,
-	dataStore persistence.DataStores,
+	dataStore persistence.ClientFactory,
 	opts *Options,
 ) *Agent {
 	return &Agent{
 		requestID:   requestID,
-		dag:         workflow,
+		dag:         dAG,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
 		logDir:      logDir,
@@ -126,23 +127,23 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Check if the DAG is already running.
-	if err := a.checkIsAlreadyRunning(); err != nil {
+	if err := a.checkIsAlreadyRunning(ctx); err != nil {
 		return err
 	}
 
 	// Make a connection to the database.
 	// It should close the connection to the history database when the DAG
 	// execution is finished.
-	if err := a.setupDatabase(); err != nil {
+	if err := a.setupDatabase(ctx); err != nil {
 		return err
 	}
 	defer func() {
-		if err := a.historyStore.Close(); err != nil {
+		if err := a.historyStore.Close(ctx); err != nil {
 			a.logger.Error("Failed to close history store", "error", err)
 		}
 	}()
 
-	if err := a.historyStore.Write(a.Status()); err != nil {
+	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Failed to write status", "error", err)
 	}
 
@@ -179,7 +180,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			if err := a.historyStore.Write(status); err != nil {
+			if err := a.historyStore.Write(ctx, status); err != nil {
 				a.logger.Error("Failed to write status", "error", err)
 			}
 			if err := a.reporter.reportStep(a.dag, status, node); err != nil {
@@ -195,7 +196,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := a.historyStore.Write(a.Status()); err != nil {
+		if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 			a.logger.Error("Status write failed", "error", err)
 		}
 	}()
@@ -207,7 +208,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
 	a.logger.Info("Workflow execution finished", "status", finishedStatus.Status)
-	if err := a.historyStore.Write(a.Status()); err != nil {
+	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Status write failed", "error", err)
 	}
 
@@ -225,7 +226,7 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() *model.Status {
+func (a *Agent) Status() *history.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -237,18 +238,18 @@ func (a *Agent) Status() *model.Status {
 	}
 
 	// Create the status object to record the current status.
-	status := &model.Status{
-		RequestID:  a.requestID,
-		Name:       a.dag.Name,
-		Status:     schedulerStatus,
-		StatusText: schedulerStatus.String(),
-		PID:        model.PID(os.Getpid()),
-		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.dag.Steps),
-		StartedAt:  model.FormatTime(a.graph.StartAt()),
-		FinishedAt: model.FormatTime(a.graph.FinishAt()),
-		Log:        a.logFile,
-		Params:     model.Params(a.dag.Params),
-	}
+	status := history.NewStatus(
+		history.NewStatusArgs{
+			RequestID:  a.requestID,
+			DAG:        a.dag,
+			Status:     schedulerStatus,
+			PID:        os.Getpid(),
+			Nodes:      a.graph.NodeData(),
+			StartedAt:  a.graph.StartAt(),
+			FinishedAt: a.graph.FinishAt(),
+			Log:        a.logFile,
+		},
+	)
 
 	// Collect the handler nodes.
 	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
@@ -458,14 +459,14 @@ func (a *Agent) setupGraphForRetry() error {
 }
 
 // setup database prepare database connection and remove old history data.
-func (a *Agent) setupDatabase() error {
+func (a *Agent) setupDatabase(ctx context.Context) error {
 	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
-	if err := a.historyStore.RemoveOld(location, retentionDays); err != nil {
+	if err := a.historyStore.DeleteOldStatuses(ctx, location, retentionDays); err != nil {
 		a.logger.Error("History data cleanup failed", "error", err)
 	}
 
-	return a.historyStore.Open(a.dag.Location, time.Now(), a.requestID)
+	return a.historyStore.Open(ctx, a.dag.Location, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.
@@ -498,8 +499,8 @@ func (a *Agent) checkPreconditions() error {
 }
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
-func (a *Agent) checkIsAlreadyRunning() error {
-	status, err := a.client.GetCurrentStatus(a.dag)
+func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
+	status, err := a.client.GetCurrentStatus(ctx, a.dag)
 	if err != nil {
 		return err
 	}
