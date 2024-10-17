@@ -26,6 +26,7 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
           volumes:
               - dagu_config:/home/dagu/.config/dagu
               - dagu_data:/home/dagu/.local/share
+          command: dagu server
           depends_on:
               - init
       # scheduler process
