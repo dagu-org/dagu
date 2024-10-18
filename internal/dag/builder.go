@@ -282,15 +282,18 @@ func (b *builder) buildLogDir() (err error) {
 
 // buildParams builds the parameters for the DAG.
 func (b *builder) buildParams() (err error) {
-	b.dag.DefaultParams = b.def.Params
+	params := b.def.Params
+	if params == nil {
+		params = ""
+	}
+	b.dag.DefaultParams = fmt.Sprint(params)
 
-	params := b.dag.DefaultParams
 	if b.opts.parameters != "" {
 		params = b.opts.parameters
 	}
 
 	var envs []string
-	b.dag.Params, envs, err = parseParams(params, !b.opts.noEval, b.opts)
+	b.dag.Params, envs, err = parseParams(fmt.Sprint(params), !b.opts.noEval, b.opts)
 	if err == nil {
 		b.dag.Env = append(b.dag.Env, envs...)
 	}

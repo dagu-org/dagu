@@ -168,7 +168,7 @@ gomerger: ${LOCAL_DIR}/merged
 ${LOCAL_DIR}/merged:
 	@mkdir -p ${LOCAL_DIR}/merged
 
-# addlicnese adds license header to all files.
+# addlicense adds license header to all files.
 addlicense:
 	@echo "${COLOR_GREEN}Adding license headers...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_addlicense}
