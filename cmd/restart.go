@@ -61,6 +61,8 @@ func restartCmd() *cobra.Command {
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, initLogger)
+			queueStore := newQueueStore(cfg)
+			statsStore := newStatsStore(cfg)
 
 			if err := stopDAGIfRunning(cli, workflow, initLogger); err != nil {
 				initLogger.Fatal("Workflow stop operation failed",
@@ -126,8 +128,12 @@ func restartCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
+				cfg.DAGQueueLength,
+
 				newClient(cfg, dataStore, agentLogger),
 				dataStore,
+				queueStore,
+				statsStore,
 				&agent.Options{Dry: false})
 
 			listenSignals(cmd.Context(), agt)

@@ -444,8 +444,11 @@ func newAgent(
 		test.NewLogger(),
 		setup.Config.LogDir,
 		"",
+		setup.Config.DAGQueueLength,
 		setup.Client(),
 		setup.DataStore(),
+		setup.DataStore().QueueStore(),
+		setup.DataStore().StatsStore(),
 		opts,
 	)
 }

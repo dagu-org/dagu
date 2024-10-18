@@ -32,6 +32,7 @@ import (
 type Config struct {
 	Host               string   // Server host
 	Port               int      // Server port
+	DAGQueueLength     int      // Queue Length
 	DAGs               string   // Location of DAG files
 	Executable         string   // Executable path
 	WorkDir            string   // Default working directory
@@ -41,6 +42,8 @@ type Config struct {
 	LogEncodingCharset string   // Log encoding charset
 	LogDir             string   // Log directory
 	DataDir            string   // Data directory
+	QueueDir           string   // Queue directory
+	StatsDir           string   // Stats directory
 	SuspendFlagsDir    string   // Suspend flags directory
 	AdminLogsDir       string   // Directory for admin logs
 	BaseConfig         string   // Common config file for all DAGs.
@@ -135,6 +138,8 @@ func setupViper() error {
 	viper.SetDefault("dags", r.dagsDir)
 	viper.SetDefault("suspendFlagsDir", r.suspendFlagsDir)
 	viper.SetDefault("dataDir", r.dataDir)
+	viper.SetDefault("queueDir", r.queueDir)
+	viper.SetDefault("statsDir", r.statsDir)
 	viper.SetDefault("logDir", r.logsDir)
 	viper.SetDefault("adminLogsDir", r.adminLogsDir)
 	viper.SetDefault("baseConfig", r.baseConfigFile)
@@ -146,6 +151,7 @@ func setupViper() error {
 	// Other defaults
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
+	viper.SetDefault("dagQueueLength", "5")
 	viper.SetDefault("navbarTitle", "Dagu")
 	viper.SetDefault("apiBaseURL", "/api/v1")
 
@@ -201,6 +207,9 @@ func bindEnvs() {
 	_ = viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
 	_ = viper.BindEnv("logDir", "DAGU_LOG_DIR")
 	_ = viper.BindEnv("dataDir", "DAGU_DATA_DIR")
+	_ = viper.BindEnv("queueDir", "DAGU_QUEUE_DIR")
+	_ = viper.BindEnv("statsDir", "DAGU_STATS_DIR")
+
 	_ = viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
 	_ = viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
 
@@ -231,6 +240,14 @@ func loadLegacyEnvs(cfg *Config) {
 	if v := os.Getenv("DAGU__DATA"); v != "" {
 		log.Println("DAGU__DATA is deprecated. Use DAGU_DATA_DIR instead.")
 		cfg.DataDir = v
+	}
+	if v := os.Getenv("DAGU__QUEUE"); v != "" {
+		log.Println("DAGU__QUEUE is deprecated. Use DAGU_QUEUE_DIR instead.")
+		cfg.QueueDir = v
+	}
+	if v := os.Getenv("DAGU__STATS"); v != "" {
+		log.Println("DAGU__STATS is deprecated. Use DAGU_QUEUE_DIR instead.")
+		cfg.StatsDir = v
 	}
 	if v := os.Getenv("DAGU__SUSPEND_FLAGS_DIR"); v != "" {
 		log.Println("DAGU__SUSPEND_FLAGS_DIR is deprecated. Use DAGU_SUSPEND_FLAGS_DIR instead.")

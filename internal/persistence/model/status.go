@@ -76,6 +76,10 @@ func NewStatusDefault(workflow *dag.DAG) *Status {
 	)
 }
 
+func NewStatusQueue(d *dag.DAG) *Status {
+	return NewStatus(d, nil, scheduler.StatusQueue, int(pidNotRunning), nil, nil)
+}
+
 func NewStatus(
 	workflow *dag.DAG,
 	nodes []scheduler.NodeData,

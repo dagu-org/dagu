@@ -105,6 +105,8 @@ func retryCmd() *cobra.Command {
 			})
 
 			cli := newClient(cfg, dataStore, agentLogger)
+			queueStore := newQueueStore(cfg)
+			statsStore := newStatsStore(cfg)
 
 			agentLogger.Info("Workflow retry initiated",
 				"workflow", workflow.Name,
@@ -118,8 +120,11 @@ func retryCmd() *cobra.Command {
 				agentLogger,
 				filepath.Dir(logFile.Name()),
 				logFile.Name(),
+				cfg.DAGQueueLength,
 				cli,
 				dataStore,
+				queueStore,
+				statsStore,
 				&agent.Options{RetryTarget: status.Status},
 			)
 

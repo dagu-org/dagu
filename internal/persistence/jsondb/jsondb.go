@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/dag/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/model"
@@ -180,10 +181,48 @@ func (s *JSONDB) FindByRequestID(dagFile string, requestID string) (*model.Statu
 		}
 	}
 	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
+} // FindByRequestId finds a status file by status.
+func (s *JSONDB) FindByStatus(dagFile string) (*model.StatusFile, error) {
+	matches, err := filepath.Glob(s.globPattern(dagFile))
+	if len(matches) > 0 || err == nil {
+		sort.Slice(matches, func(i, j int) bool {
+			return strings.Compare(matches[i], matches[j]) >= 0
+		})
+		for _, f := range matches {
+			status, err := ParseFile(f)
+			if err != nil {
+				log.Printf("parsing failed %s : %s", f, err)
+				continue
+			}
+			if status != nil && status.Status == scheduler.StatusQueue {
+				return &model.StatusFile{
+					File:   f,
+					Status: status,
+				}, nil
+			}
+		}
+	}
+	// return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIdNotFound)
+	return nil, nil
 }
 
 func (s *JSONDB) RemoveAll(dagFile string) error {
 	return s.RemoveOld(dagFile, 0)
+}
+
+func (s *JSONDB) RemoveEmptyQueue(dagFile string) error {
+	f, err := s.FindByStatus(dagFile)
+	if f == nil {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(f.File); err != nil {
+		log.Printf("failed to remove %v : %s", f, err.Error())
+		return err
+	}
+	return nil
 }
 
 func (s *JSONDB) RemoveOld(dagFile string, retentionDays int) error {

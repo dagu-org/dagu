@@ -21,6 +21,9 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/queue"
+	"github.com/dagu-org/dagu/internal/persistence/stats"
+
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
 
@@ -29,9 +32,13 @@ var _ persistence.DataStores = (*dataStores)(nil)
 type dataStores struct {
 	historyStore persistence.HistoryStore
 	dagStore     persistence.DAGStore
+	queueStore   persistence.QueueStore
+	statsStore   persistence.StatsStore
 
 	dags              string
 	dataDir           string
+	queueDir          string
+	statsDir          string
 	suspendFlagsDir   string
 	latestStatusToday bool
 }
@@ -43,12 +50,16 @@ type DataStoreOptions struct {
 func NewDataStores(
 	dags string,
 	dataDir string,
+	queueDir string,
+	statsDir string,
 	suspendFlagsDir string,
 	opts DataStoreOptions,
 ) persistence.DataStores {
 	dataStoreImpl := &dataStores{
 		dags:              dags,
 		dataDir:           dataDir,
+		queueDir:          queueDir,
+		statsDir:          statsDir,
 		suspendFlagsDir:   suspendFlagsDir,
 		latestStatusToday: opts.LatestStatusToday,
 	}
@@ -85,4 +96,18 @@ func (f *dataStores) DAGStore() persistence.DAGStore {
 
 func (f *dataStores) FlagStore() persistence.FlagStore {
 	return local.NewFlagStore(storage.NewStorage(f.suspendFlagsDir))
+}
+
+func (f *dataStores) QueueStore() persistence.QueueStore {
+	if f.queueStore == nil {
+		f.queueStore = queue.NewQueueStore(f.queueDir)
+	}
+	return f.queueStore
+}
+
+func (f *dataStores) StatsStore() persistence.StatsStore {
+	if f.statsStore == nil {
+		f.statsStore = stats.NewStatsStore(f.statsDir)
+	}
+	return f.statsStore
 }

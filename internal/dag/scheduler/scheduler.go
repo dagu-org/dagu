@@ -34,6 +34,7 @@ const (
 	StatusError
 	StatusCancel
 	StatusSuccess
+	StatusQueue
 )
 
 func (s Status) String() string {
@@ -46,6 +47,8 @@ func (s Status) String() string {
 		return "canceled"
 	case StatusSuccess:
 		return "finished"
+	case StatusQueue:
+		return "queued"
 	case StatusNone:
 		fallthrough
 	default:
@@ -251,6 +254,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	case StatusCancel:
 		handlers = append(handlers, dag.HandlerOnCancel)
 	case StatusNone:
+	case StatusQueue:
+
 	case StatusRunning:
 	}
 	handlers = append(handlers, dag.HandlerOnExit)

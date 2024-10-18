@@ -46,6 +46,7 @@ func (t Setup) DataStore() persistence.DataStores {
 	return dsclient.NewDataStores(
 		t.Config.DAGs,
 		t.Config.DataDir,
+		t.Config.QueueDir,
 		t.Config.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: t.Config.LatestStatusToday,
