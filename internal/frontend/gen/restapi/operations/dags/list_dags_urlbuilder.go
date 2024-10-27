@@ -15,10 +15,11 @@ import (
 
 // ListDagsURL generates an URL for the list dags operation
 type ListDagsURL struct {
-	Limit      *int64
-	Page       *int64
-	SearchName *string
-	SearchTag  *string
+	Limit        *int64
+	Page         *int64
+	SearchName   *string
+	SearchStatus *string
+	SearchTag    *string
 
 	_basePath string
 	// avoid unkeyed usage
@@ -76,6 +77,14 @@ func (o *ListDagsURL) Build() (*url.URL, error) {
 	}
 	if searchNameQ != "" {
 		qs.Set("searchName", searchNameQ)
+	}
+
+	var searchStatusQ string
+	if o.SearchStatus != nil {
+		searchStatusQ = *o.SearchStatus
+	}
+	if searchStatusQ != "" {
+		qs.Set("searchStatus", searchStatusQ)
 	}
 
 	var searchTagQ string

@@ -20,19 +20,28 @@ function DAGs() {
   const appBarContext = React.useContext(AppBarContext);
   const [searchText, setSearchText] = React.useState(query.get('search') || '');
   const [searchTag, setSearchTag] = React.useState(query.get('tag') || '');
+  const [searchStatus, setSearchStatus] = React.useState(
+    query.get('status') || ''
+  );
   const [page, setPage] = React.useState(parseInt(query.get('page') || '1'));
-  const [apiSearchText, setAPISearchText] = React.useState(query.get('search') || '');
-  const [apiSearchTag, setAPISearchTag] = React.useState(query.get('tag') || '');
+  const [apiSearchText, setAPISearchText] = React.useState(
+    query.get('search') || ''
+  );
+  const [apiSearchTag, setAPISearchTag] = React.useState(
+    query.get('tag') || ''
+  );
+  const [apiSearchStatus, setAPISearchStatus] = React.useState(
+    query.get('status') || ''
+  );
 
   const { cache, mutate } = useSWRConfig();
-  const endPoint =`/dags?${new URLSearchParams(
-    {
-      page: page.toString(),
-      limit: '50',
-      searchName: apiSearchText,
-      searchTag: apiSearchTag,
-    }
-  ).toString()}`
+  const endPoint = `/dags?${new URLSearchParams({
+    page: page.toString(),
+    limit: '50',
+    searchName: apiSearchText,
+    searchTag: apiSearchTag,
+    searchStatus: apiSearchStatus,
+  }).toString()}`;
   const { data } = useSWR<ListWorkflowsResponse>(endPoint, null, {
     refreshInterval: 10000,
     revalidateIfStale: false,
@@ -41,8 +50,12 @@ function DAGs() {
   const addSearchParam = (key: string, value: string) => {
     const locationQuery = new URLSearchParams(window.location.search);
     locationQuery.set(key, value);
-    window.history.pushState({}, '', `${window.location.pathname}?${locationQuery.toString()}`);
-  }
+    window.history.pushState(
+      {},
+      '',
+      `${window.location.pathname}?${locationQuery.toString()}`
+    );
+  };
 
   const refreshFn = React.useCallback(() => {
     setTimeout(() => mutate(endPoint), 500);
@@ -73,27 +86,50 @@ function DAGs() {
     setPage(page);
   };
 
-  const debouncedAPISearchText = React.useMemo(() => debounce((searchText: string) => {
-    setAPISearchText(searchText);
-  }, 500), []);
+  const debouncedAPISearchText = React.useMemo(
+    () =>
+      debounce((searchText: string) => {
+        setAPISearchText(searchText);
+      }, 500),
+    []
+  );
 
-  const debouncedAPISearchTag = React.useMemo(() => debounce((searchTag: string) => {
-    setAPISearchTag(searchTag);
-  }, 500), []);
+  const debouncedAPISearchTag = React.useMemo(
+    () =>
+      debounce((searchTag: string) => {
+        setAPISearchTag(searchTag);
+      }, 500),
+    []
+  );
+
+  const debouncedAPISearchStatus = React.useMemo(
+    () =>
+      debounce((searchStatus: string) => {
+        setAPISearchStatus(searchStatus);
+      }, 500),
+    []
+  );
 
   const searchTextChange = (searchText: string) => {
     addSearchParam('search', searchText);
     setSearchText(searchText);
     setPage(1);
     debouncedAPISearchText(searchText);
-  }
+  };
 
   const searchTagChange = (searchTag: string) => {
     addSearchParam('tag', searchTag);
     setSearchTag(searchTag);
     setPage(1);
     debouncedAPISearchTag(searchTag);
-  }
+  };
+
+  const searchStatusChange = (searchStatus: string) => {
+    addSearchParam('status', searchStatus);
+    setSearchStatus(searchStatus);
+    setPage(1);
+    debouncedAPISearchStatus(searchStatus);
+  };
 
   return (
     <Box
@@ -133,8 +169,14 @@ function DAGs() {
                 handleSearchTextChange={searchTextChange}
                 searchTag={searchTag}
                 handleSearchTagChange={searchTagChange}
+                searchStatus={searchStatus}
+                handleSearchStatusChange={searchStatusChange}
               ></DAGTable>
-              <DAGPagination totalPages={data.PageCount} page={page} pageChange={pageChange} />
+              <DAGPagination
+                totalPages={data.PageCount}
+                page={page}
+                pageChange={pageChange}
+              />
             </React.Fragment>
           )}
         </WithLoading>

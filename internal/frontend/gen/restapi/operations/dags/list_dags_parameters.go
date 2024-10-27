@@ -47,6 +47,10 @@ type ListDagsParams struct {
 	/*
 	  In: query
 	*/
+	SearchStatus *string
+	/*
+	  In: query
+	*/
 	SearchTag *string
 }
 
@@ -73,6 +77,11 @@ func (o *ListDagsParams) BindRequest(r *http.Request, route *middleware.MatchedR
 
 	qSearchName, qhkSearchName, _ := qs.GetOK("searchName")
 	if err := o.bindSearchName(qSearchName, qhkSearchName, route.Formats); err != nil {
+		res = append(res, err)
+	}
+
+	qSearchStatus, qhkSearchStatus, _ := qs.GetOK("searchStatus")
+	if err := o.bindSearchStatus(qSearchStatus, qhkSearchStatus, route.Formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -146,6 +155,24 @@ func (o *ListDagsParams) bindSearchName(rawData []string, hasKey bool, formats s
 		return nil
 	}
 	o.SearchName = &raw
+
+	return nil
+}
+
+// bindSearchStatus binds and validates parameter SearchStatus from query.
+func (o *ListDagsParams) bindSearchStatus(rawData []string, hasKey bool, formats strfmt.Registry) error {
+	var raw string
+	if len(rawData) > 0 {
+		raw = rawData[len(rawData)-1]
+	}
+
+	// Required: false
+	// AllowEmptyValue: false
+
+	if raw == "" { // empty values pass all other validations
+		return nil
+	}
+	o.SearchStatus = &raw
 
 	return nil
 }

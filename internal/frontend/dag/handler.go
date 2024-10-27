@@ -227,8 +227,12 @@ func (h *Handler) getList(params dags.ListDagsParams) (*models.ListDagsResponse,
 		if dagStatus.Error != nil {
 			item.Error = swag.String(dagStatus.Error.Error())
 		}
-
-		resp.DAGs = append(resp.DAGs, item)
+		// add check for filtering over search status
+		if params.SearchStatus != nil && *params.SearchStatus == s.StatusText {
+			resp.DAGs = append(resp.DAGs, item)
+		} else if params.SearchStatus == nil {
+			resp.DAGs = append(resp.DAGs, item)
+		}
 	}
 
 	return resp, nil
