@@ -56,6 +56,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		DagsListDagsHandler: dags.ListDagsHandlerFunc(func(params dags.ListDagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.ListDags has not yet been implemented")
 		}),
+		DagsListStatusHandler: dags.ListStatusHandlerFunc(func(params dags.ListStatusParams) middleware.Responder {
+			return middleware.NotImplemented("operation dags.ListStatus has not yet been implemented")
+		}),
 		DagsListTagsHandler: dags.ListTagsHandlerFunc(func(params dags.ListTagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.ListTags has not yet been implemented")
 		}),
@@ -112,6 +115,8 @@ type DaguAPI struct {
 	DagsGetDagDetailsHandler dags.GetDagDetailsHandler
 	// DagsListDagsHandler sets the operation handler for the list dags operation
 	DagsListDagsHandler dags.ListDagsHandler
+	// DagsListStatusHandler sets the operation handler for the list status operation
+	DagsListStatusHandler dags.ListStatusHandler
 	// DagsListTagsHandler sets the operation handler for the list tags operation
 	DagsListTagsHandler dags.ListTagsHandler
 	// DagsPostDagActionHandler sets the operation handler for the post dag action operation
@@ -206,6 +211,9 @@ func (o *DaguAPI) Validate() error {
 	}
 	if o.DagsListDagsHandler == nil {
 		unregistered = append(unregistered, "dags.ListDagsHandler")
+	}
+	if o.DagsListStatusHandler == nil {
+		unregistered = append(unregistered, "dags.ListStatusHandler")
 	}
 	if o.DagsListTagsHandler == nil {
 		unregistered = append(unregistered, "dags.ListTagsHandler")
@@ -320,6 +328,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/dags"] = dags.NewListDags(o.context, o.DagsListDagsHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/status"] = dags.NewListStatus(o.context, o.DagsListStatusHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}

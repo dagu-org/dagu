@@ -82,10 +82,11 @@ type StatsStore interface {
 }
 
 type DAGListPaginationArgs struct {
-	Page  int
-	Limit int
-	Name  *string
-	Tag   *string
+	Page   int
+	Limit  int
+	Name   *string
+	Tag    *string
+	Status *string
 }
 
 type DagListPaginationResult struct {

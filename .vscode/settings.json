@@ -1,24 +1,18 @@
 {
-    "editor.formatOnSave": true,
-    "[go]": {
-        "editor.insertSpaces": true,
-        "editor.formatOnSave": true,
-        "editor.defaultFormatter": "golang.go"
-    },
-    "editor.rulers": [
-        80
-    ],
-    "editor.renderWhitespace": "all",
-    "go.lintTool": "golangci-lint",
-    "go.lintFlags": [
-        "--fast"
-    ],
-    "go.formatTool": "gofmt",
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "files.associations": {
-        "*.gohtml": "html"
-    },
-    "cSpell.words": [
-        "dagu"
-    ],
+	"editor.formatOnSave": true,
+	"[go]": {
+		"editor.insertSpaces": true,
+		"editor.formatOnSave": true,
+		"editor.defaultFormatter": "golang.go"
+	},
+	"editor.rulers": [80],
+	"editor.renderWhitespace": "all",
+	"go.lintTool": "golangci-lint",
+	"go.lintFlags": ["--fast"],
+	"go.formatTool": "gofmt",
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"files.associations": {
+		"*.gohtml": "html"
+	},
+	"cSpell.words": ["dagu", "filecache", "gosec", "nolint", "stretchr"]
 }

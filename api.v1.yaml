@@ -44,6 +44,10 @@ paths:
           in: query
           required: false
           type: string
+        - name: searchStatus
+          in: query
+          required: false
+          type: string
       responses:
         "200":
           description: A successful response.
@@ -220,6 +224,23 @@ paths:
           description: A successful response.
           schema:
             $ref: "#/definitions/listTagResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+  /status:
+    get:
+      description: Returns a list of current status.
+      produces:
+        - application/json
+      operationId: listStatus
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/listStatusResponse"
         default:
           description: Generic error response.
           schema:
@@ -784,4 +805,18 @@ definitions:
           type: string
     required:
       - Tags
+      - Errors
+  listStatusResponse:
+    type: object
+    properties:
+      Status:
+        type: array
+        items:
+          type: string
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Status
       - Errors
