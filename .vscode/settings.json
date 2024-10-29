@@ -14,5 +14,12 @@
 	"files.associations": {
 		"*.gohtml": "html"
 	},
-	"cSpell.words": ["dagu", "filecache", "gosec", "nolint", "stretchr"]
+	"cSpell.words": [
+		"dagu",
+		"dsclient",
+		"filecache",
+		"gosec",
+		"nolint",
+		"stretchr"
+	]
 }

@@ -102,3 +102,22 @@ func (store *jsonStore) Dequeue() (*model.Queue, error) {
 	err := store.Save()
 	return item, err
 }
+
+func (store *jsonStore) FindJobId(jobid string) (bool, error) {
+	store.queueLock.Lock()
+	defer store.queueLock.Unlock()
+	store.Load()
+	for i := 0; i < len(store.Dags); i++ {
+		if store.Dags[i].Name == jobid {
+			store.Dags = append(store.Dags[:i], store.Dags[i+1:]...) // Remove the item
+			err := store.Save()
+			if err != nil {
+				return false, err
+			} else {
+				return true, nil // Item found and deleted
+			}
+			// log.Print("jobid", jobid)
+		}
+	}
+	return false, nil
+}

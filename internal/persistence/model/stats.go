@@ -1,32 +1,33 @@
 package model
 
 import (
-	"sync"
+	"encoding/json"
+	// "sync"
 )
 
 type Stats struct {
-	RunningDags int `json:"running_dags"`
-	mutex       sync.Mutex
+	Name string
 }
 
-func New() *Stats {
-	return &Stats{}
+func New(jobid string) *Stats {
+	return &Stats{
+		Name: jobid,
+	}
 }
 
-func (s *Stats) IncrementRunningDags() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.RunningDags++
+func (s *Stats) StatsToJSON(str string) (*Stats, error) {
+	stats := &Stats{}
+	err := json.Unmarshal([]byte(str), stats)
+	if err != nil {
+		return nil, err
+	}
+	return stats, err
 }
 
-func (s *Stats) DecrementRunningDags() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.RunningDags--
-}
-
-func (s *Stats) GetRunningDags() int {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.RunningDags
+func (s *Stats) JSONToStats() ([]byte, error) {
+	js, err := json.Marshal(s)
+	if err != nil {
+		return []byte{}, err
+	}
+	return js, nil
 }

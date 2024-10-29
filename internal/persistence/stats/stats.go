@@ -2,94 +2,99 @@ package stats
 
 import (
 	"encoding/json"
+	"sync"
+
+	// "fmt"
 	"log"
 	"os"
+
+	// "strings"
+	// "errors"
 	"path/filepath"
-	"sync"
 
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
 type StatsStore struct {
-	stats *model.Stats
-	mutex sync.RWMutex
 	dir   string
+	mutex sync.RWMutex
+	Stats []*model.Stats `json:"stats"`
 }
 
 func NewStatsStore(dirPath string) *StatsStore {
-	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return nil
-	}
-
-	return &StatsStore{
-		stats: &model.Stats{},
-		dir:   dirPath,
-	}
+	_ = os.MkdirAll(dirPath, 0755)
+	return &StatsStore{dir: dirPath}
 }
 
-func (s *StatsStore) Create() error {
-	filePath := filepath.Join(s.dir, "stats.json")
-	_, err := util.OpenOrCreateFile(filePath)
+func (store *StatsStore) Create() error {
+	statsPath := filepath.Join(store.dir, "stats.json")
+	_, err := util.OpenOrCreateFile(statsPath)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *StatsStore) IncrementRunningDags() error {
-	s.mutex.Lock()
-	//defer s.mutex.Unlock()
-	_ = s.loadFromFile()
-	log.Print("incrementing   ", s.dir, s.stats)
-	s.stats.RunningDags++
-	write_stat := s.writeToFile()
-	s.mutex.Unlock()
-	return write_stat
-}
-
-func (s *StatsStore) DecrementRunningDags() error {
-	log.Print("decrementing")
-	_ = s.loadFromFile()
-	//Lock Mutex
-	s.mutex.Lock()
-	if s.stats.RunningDags > 0 {
-		s.stats.RunningDags--
-	}
-	write_stat := s.writeToFile()
-	//Unlock Mutex
-	//return s.writeToFile()
-	defer s.mutex.Unlock()
-	return write_stat
-}
-
-func (s *StatsStore) GetRunningDags() (int, error) {
-	s.mutex.Lock()
-	//defer s.mutex.Unlock()
-	_ = s.loadFromFile()
-	s.mutex.Unlock()
-	return s.stats.RunningDags, nil
-}
-
-func (s *StatsStore) writeToFile() error {
-	filePath := filepath.Join(s.dir, "stats.json")
-	data, err := json.Marshal(s.stats)
+func (store *StatsStore) Save() error {
+	statsPath := filepath.Join(store.dir, "stats.json")
+	data, err := json.Marshal(store)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filePath, data, 0600)
+	return os.WriteFile(statsPath, data, 0644)
 }
 
-func (s *StatsStore) loadFromFile() error {
-	filePath := filepath.Join(s.dir, "stats.json")
-
-	data, err := os.ReadFile(filePath)
+func (store *StatsStore) Load() error {
+	statsPath := filepath.Join(store.dir, "stats.json")
+	data, err := os.ReadFile(statsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // File doesn't exist yet, which is fine
+			store.Stats = []*model.Stats{}
+			return nil
 		}
 		return err
 	}
+	return json.Unmarshal(data, store)
+}
 
-	return json.Unmarshal(data, s.stats)
+func (store *StatsStore) IncrementRunningDags(jobid string) error {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	store.Load()
+	// log.Print("data:", data)
+	log.Print("incrementing: ", jobid)
+	store.Stats = append(store.Stats, &model.Stats{Name: jobid})
+	return store.Save()
+}
+
+func (store *StatsStore) DecrementRunningDags(jobid string) error {
+	store.mutex.Lock()
+	defer store.mutex.Unlock()
+	store.Load()
+	var item string
+	for i := 0; i < len(store.Stats); i++ {
+		if store.Stats[i].Name == jobid {
+			item = store.Stats[i].Name
+			store.Stats = append(store.Stats[:i], store.Stats[i+1:]...) // Remove the item
+			err := store.Save()
+			if err != nil {
+				return err
+			} else {
+				return nil // Item found and deleted
+			}
+			log.Print("jobid", jobid)
+		}
+	}
+	log.Print("decrementing: ", item)
+	err := store.Save()
+	return err
+}
+
+func (store *StatsStore) GetRunningDags() (int, error) {
+	store.mutex.RLock()
+	defer store.mutex.RUnlock()
+	store.Load()
+	lenQ := len(store.Stats)
+	return lenQ, nil
 }

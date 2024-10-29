@@ -225,10 +225,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		}()
 
 		// increment the number of running DAGs
-		a.statsStore.IncrementRunningDags()
+		a.statsStore.IncrementRunningDags(a.dag.Name)
 
 		// decrement running
-		defer a.statsStore.DecrementRunningDags()
+		defer a.statsStore.DecrementRunningDags(a.dag.Name)
 		dagCtx := dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 
 		// Start the DAG execution.

@@ -50,6 +50,7 @@ func registerCommands() {
 	rootCmd.AddCommand(schedulerCmd())
 	rootCmd.AddCommand(retryCmd())
 	rootCmd.AddCommand(startAllCmd())
+	rootCmd.AddCommand(dequeueCmd())
 }
 
 func init() {
