@@ -1,4 +1,4 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
+// Copyright (C) 2024 The Dagu Authors
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ func dequeueCmd() *cobra.Command {
 
 			found, err := queueStore.FindJobId(args[0])
 			if err := historyStore.RemoveEmptyQueue(args[0]); err != nil {
-				log.Fatalf("Queue History data clean up failed", "error", err)
+				log.Fatal("Queue History data clean up failed", "error", err)
 			}
 			if found {
 				log.Print("job id dequeued ", args[0])

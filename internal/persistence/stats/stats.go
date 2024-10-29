@@ -1,3 +1,18 @@
+// Copyright (C) 2024 The Dagu Authors
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package stats
 
 import (
@@ -42,7 +57,7 @@ func (store *StatsStore) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(statsPath, data, 0644)
+	return os.WriteFile(statsPath, data, 0600)
 }
 
 func (store *StatsStore) Load() error {
@@ -61,7 +76,10 @@ func (store *StatsStore) Load() error {
 func (store *StatsStore) IncrementRunningDags(jobid string) error {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
-	store.Load()
+	err := store.Load()
+	if err != nil {
+		return err
+	}
 	// log.Print("data:", data)
 	log.Print("incrementing: ", jobid)
 	store.Stats = append(store.Stats, &model.Stats{Name: jobid})
@@ -71,11 +89,12 @@ func (store *StatsStore) IncrementRunningDags(jobid string) error {
 func (store *StatsStore) DecrementRunningDags(jobid string) error {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
-	store.Load()
-	var item string
+	err := store.Load()
+	if err != nil {
+		return err
+	}
 	for i := 0; i < len(store.Stats); i++ {
 		if store.Stats[i].Name == jobid {
-			item = store.Stats[i].Name
 			store.Stats = append(store.Stats[:i], store.Stats[i+1:]...) // Remove the item
 			err := store.Save()
 			if err != nil {
@@ -83,18 +102,20 @@ func (store *StatsStore) DecrementRunningDags(jobid string) error {
 			} else {
 				return nil // Item found and deleted
 			}
-			log.Print("jobid", jobid)
 		}
 	}
-	log.Print("decrementing: ", item)
-	err := store.Save()
+	log.Print("decrementing: ", jobid)
+	err = store.Save()
 	return err
 }
 
 func (store *StatsStore) GetRunningDags() (int, error) {
 	store.mutex.RLock()
 	defer store.mutex.RUnlock()
-	store.Load()
+	err := store.Load()
+	if err != nil {
+		return 0, err
+	}
 	lenQ := len(store.Stats)
 	return lenQ, nil
 }
