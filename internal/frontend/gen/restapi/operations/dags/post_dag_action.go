@@ -68,7 +68,7 @@ type PostDagActionBody struct {
 
 	// action
 	// Required: true
-	// Enum: [start suspend stop retry mark-success mark-failed save rename]
+	// Enum: [start dequeue suspend stop retry mark-success mark-failed save rename]
 	Action *string `json:"action"`
 
 	// params
@@ -102,7 +102,7 @@ var postDagActionBodyTypeActionPropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["start","suspend","stop","retry","mark-success","mark-failed","save","rename"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["start","dequeue","suspend","stop","retry","mark-success","mark-failed","save","rename"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -114,6 +114,9 @@ const (
 
 	// PostDagActionBodyActionStart captures enum value "start"
 	PostDagActionBodyActionStart string = "start"
+
+	// PostDagActionBodyActionDequeue captures enum value "dequeue"
+	PostDagActionBodyActionDequeue string = "dequeue"
 
 	// PostDagActionBodyActionSuspend captures enum value "suspend"
 	PostDagActionBodyActionSuspend string = "suspend"

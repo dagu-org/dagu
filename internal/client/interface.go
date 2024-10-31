@@ -32,6 +32,7 @@ type Client interface {
 	Stop(workflow *dag.DAG) error
 	StartAsync(workflow *dag.DAG, opts StartOptions)
 	Start(workflow *dag.DAG, opts StartOptions) error
+	Dequeue(workflow *dag.DAG) error
 	Restart(workflow *dag.DAG, opts RestartOptions) error
 	Retry(workflow *dag.DAG, requestID string) error
 	GetCurrentStatus(workflow *dag.DAG) (*model.Status, error)

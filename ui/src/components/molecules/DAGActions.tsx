@@ -1,10 +1,15 @@
-import { Box, Stack } from '@mui/material';
+import { Box, Stack, Tooltip } from '@mui/material';
 import React from 'react';
 import { DAG, SchedulerStatus, Status } from '../../models';
 import ActionButton from '../atoms/ActionButton';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlay, faStop, faReply } from '@fortawesome/free-solid-svg-icons';
+import {
+  faPlay,
+  faStop,
+  faReply,
+  faCodePullRequest,
+} from '@fortawesome/free-solid-svg-icons';
 import VisuallyHidden from '../atoms/VisuallyHidden';
 import StartDAGModal from './StartDAGModal';
 import ConfirmModal from './ConfirmModal';
@@ -41,6 +46,7 @@ function DAGActions({
   const nav = useNavigate();
 
   const [isStartModal, setIsStartModal] = React.useState(false);
+  const [isDequeueModal, setIsDequeueModal] = React.useState(false);
   const [isStopModal, setIsStopModal] = React.useState(false);
   const [isRetryModal, setIsRetryModal] = React.useState(false);
 
@@ -78,6 +84,7 @@ function DAGActions({
     () => ({
       start: status?.Status != SchedulerStatus.Running,
       stop: status?.Status == SchedulerStatus.Running,
+      dequeue: status?.Status != SchedulerStatus.Running,
       retry:
         status?.Status != SchedulerStatus.Running && status?.RequestId != '',
     }),
@@ -90,9 +97,11 @@ function DAGActions({
         icon={
           <>
             <Label show={false}>Start</Label>
-            <span className="icon">
-              <FontAwesomeIcon icon={faPlay} />
-            </span>
+            <Tooltip title="start">
+              <span className="icon">
+                <FontAwesomeIcon icon={faPlay} />
+              </span>
+            </Tooltip>
           </>
         }
         disabled={!buttonState['start']}
@@ -100,14 +109,34 @@ function DAGActions({
       >
         {label && 'Start'}
       </ActionButton>
+
+      <ActionButton
+        label={label}
+        icon={
+          <>
+            <Label show={false}>Dequeue</Label>
+            <Tooltip title="dequeue">
+              <span className="icon">
+                <FontAwesomeIcon icon={faCodePullRequest} />
+              </span>
+            </Tooltip>
+          </>
+        }
+        disabled={!buttonState['dequeue']}
+        onClick={() => setIsDequeueModal(true)}
+      >
+        {label && 'Dequeue'}
+      </ActionButton>
       <ActionButton
         label={label}
         icon={
           <>
             <Label show={false}>Stop</Label>
-            <span className="icon">
-              <FontAwesomeIcon icon={faStop} />
-            </span>
+            <Tooltip title="stop">
+              <span className="icon">
+                <FontAwesomeIcon icon={faStop} />
+              </span>
+            </Tooltip>
           </>
         }
         disabled={!buttonState['stop']}
@@ -120,9 +149,11 @@ function DAGActions({
         icon={
           <>
             <Label show={false}>Retry</Label>
-            <span className="icon">
-              <FontAwesomeIcon icon={faReply} />
-            </span>
+            <Tooltip title="retry">
+              <span className="icon">
+                <FontAwesomeIcon icon={faReply} />
+              </span>
+            </Tooltip>
           </>
         }
         disabled={!buttonState['retry']}
@@ -173,6 +204,18 @@ function DAGActions({
           setIsStartModal(false);
         }}
       />
+      <ConfirmModal
+        title="Confirmation"
+        buttonText="Dequeue"
+        visible={isDequeueModal}
+        dismissModal={() => setIsDequeueModal(false)}
+        onSubmit={() => {
+          setIsDequeueModal(false);
+          onSubmit({ name: name, action: 'dequeue' });
+        }}
+      >
+        <Box>Do you really want to dequeue the DAG?</Box>
+      </ConfirmModal>
     </Stack>
   );
 }

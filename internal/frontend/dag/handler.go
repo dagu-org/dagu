@@ -614,6 +614,17 @@ func (h *Handler) postAction(
 		})
 		return &models.PostDagActionResponse{}, nil
 
+	case "dequeue":
+		if dagStatus.Status.Status == scheduler.StatusRunning {
+			return nil, newBadRequestError(errInvalidArgs)
+		}
+		if err := h.client.Dequeue(dagStatus.DAG); err != nil {
+			return nil, newBadRequestError(
+				fmt.Errorf("error trying to dequeue the DAG: %w", err),
+			)
+		}
+		return &models.PostDagActionResponse{}, nil
+
 	case "suspend":
 		_ = h.client.ToggleSuspend(params.DagID, params.Body.Value == "true")
 		return &models.PostDagActionResponse{}, nil

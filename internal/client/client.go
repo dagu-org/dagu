@@ -150,6 +150,25 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
+func (e *client) Dequeue(workflow *dag.DAG) error {
+	args := []string{"dequeue"}
+
+	args = append(args, workflow.Location)
+	// nolint:gosec
+	cmd := exec.Command(e.executable, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	cmd.Dir = e.workDir
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
+}
+
 func (e *client) StartFromQueue(workflow *dag.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {

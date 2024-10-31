@@ -214,6 +214,7 @@ func init() {
                   "type": "string",
                   "enum": [
                     "start",
+                    "dequeue",
                     "suspend",
                     "stop",
                     "retry",
@@ -1361,6 +1362,7 @@ func init() {
                   "type": "string",
                   "enum": [
                     "start",
+                    "dequeue",
                     "suspend",
                     "stop",
                     "retry",
