@@ -72,6 +72,25 @@ func TestCondition_Eval(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "ComplexCondition",
+			condition: []Condition{
+				{
+					Condition: "`(or (eq $1 foo) (eq $1 bar))`",
+					Expected:  "true",
+				},
+			},
+		},
+		{
+			name: "ComplexCondition1",
+			condition: []Condition{
+				{
+					Condition: "(and (eq $1 foo) (eq $1 bar))",
+					Expected:  "true",
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	// Set environment variable for testing
