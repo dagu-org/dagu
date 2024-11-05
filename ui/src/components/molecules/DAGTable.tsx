@@ -251,7 +251,9 @@ const defaultColumns = [
   }),
   columnHelper.accessor('Type', {
     id: 'Schedule',
-    header: `Schedule (${getConfig().timeZone})`,
+    header: getConfig().timeZone
+      ? `Schedule in ${getConfig().timeZone}`
+      : 'Schedule',
     enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
