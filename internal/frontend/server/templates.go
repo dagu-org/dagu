@@ -57,7 +57,7 @@ type funcsConfig struct {
 	NavbarColor string
 	NavbarTitle string
 	APIBaseURL  string
-	TimeZone  string
+	TimeZone    string
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {

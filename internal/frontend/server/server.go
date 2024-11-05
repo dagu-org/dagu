@@ -63,7 +63,7 @@ type NewServerArgs struct {
 	NavbarColor string
 	NavbarTitle string
 	APIBaseURL  string
-	TimeZone  string
+	TimeZone    string
 }
 
 type BasicAuth struct {
@@ -93,7 +93,7 @@ func New(params NewServerArgs) *Server {
 			NavbarColor: params.NavbarColor,
 			NavbarTitle: params.NavbarTitle,
 			APIBaseURL:  params.APIBaseURL,
-			TimeZone:  params.TimeZone,
+			TimeZone:    params.TimeZone,
 		},
 	}
 }
