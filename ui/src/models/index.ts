@@ -150,7 +150,7 @@ export function getNextSchedule(data: WorkflowListItem): number {
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
-  const tz = null; // If we can work out how to get the server TZ, we can set this
+  const tz = getConfig().timeZone;
   const datesToRun = schedules.map((s) => {
     const expression = tz
       ? cronParser.parseExpression(s.Expression, {

@@ -43,6 +43,7 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server
 		NavbarColor: cfg.NavbarColor,
 		NavbarTitle: cfg.NavbarTitle,
 		APIBaseURL:  cfg.APIBaseURL,
+		TimeZone:  cfg.TimeZone,
 	}
 
 	if cfg.IsAuthToken {
