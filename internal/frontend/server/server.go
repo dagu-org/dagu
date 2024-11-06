@@ -93,7 +93,7 @@ func New(params NewServerArgs) *Server {
 			NavbarColor: params.NavbarColor,
 			NavbarTitle: params.NavbarTitle,
 			APIBaseURL:  params.APIBaseURL,
-			TimeZone:    params.TimeZone,
+			TZ:          params.TimeZone,
 		},
 	}
 }

@@ -150,7 +150,7 @@ export function getNextSchedule(data: WorkflowListItem): number {
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
-  const tz = getConfig().timeZone;
+  const tz = getConfig().tz;
   const datesToRun = schedules.map((s) => {
     const expression = tz
       ? cronParser.parseExpression(s.Expression, {

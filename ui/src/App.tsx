@@ -13,7 +13,7 @@ export type Config = {
   apiURL: string;
   title: string;
   navbarColor: string;
-  timeZone: string;
+  tz: string;
   version: string;
 };
 
