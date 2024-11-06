@@ -42,25 +42,18 @@ type entryReaderImpl struct {
 	client     client.Client
 }
 
-type newEntryReaderArgs struct {
-	DagsDir    string
-	JobCreator jobCreator
-	Logger     logger.Logger
-	Client     client.Client
-}
-
 type jobCreator interface {
 	CreateJob(workflow *dag.DAG, next time.Time) job
 }
 
-func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
+func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
 	er := &entryReaderImpl{
-		dagsDir:    args.DagsDir,
+		dagsDir:    dagsDir,
 		dagsLock:   sync.Mutex{},
 		dags:       map[string]*dag.DAG{},
-		jobCreator: args.JobCreator,
-		logger:     args.Logger,
-		client:     args.Client,
+		jobCreator: jobCreator,
+		logger:     logger,
+		client:     client,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("DAG initialization failed", "error", err)
