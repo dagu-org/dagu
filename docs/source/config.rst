@@ -29,6 +29,7 @@ The following environment variables can be used to configure the Dagu. Default v
 - ``DAGU_WORK_DIR``: The working directory for DAGs. If not set, the default value is DAG location. Also you can set the working directory for each DAG steps in the DAG configuration file. For more information, see :ref:`specifying working dir`.
 - ``DAGU_CERT_FILE``: The path to the SSL certificate file.
 - ``DAGU_KEY_FILE`` : The path to the SSL key file.
+- ``DAGU_TZ`` (``""``): The timezone to use for the server. By default, the server will use the system's local timezone.
 
 Config File
 --------------
@@ -69,6 +70,9 @@ You can create ``admin.yaml`` file in ``$HOME/.config/dagu/`` to override the de
     tls:
         certFile: <path to SSL certificate file>
         keyFile: <path to SSL key file>
+    
+    # Timezone Configuration
+    tz: <timezone>                                               # default: "" (e.g. "Asia/Tokyo")
 
 .. _Host and Port Configuration:
 
