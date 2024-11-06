@@ -54,6 +54,7 @@ type Config struct {
 	APIBaseURL         string   // Base URL for API
 	Debug              bool     // Enable debug mode (verbose logging)
 	LogFormat          string   // Log format
+	TimeZone           string   // The server time zone
 }
 
 type TLS struct {
@@ -178,6 +179,7 @@ func bindEnvs() {
 	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
 	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
 	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
+	_ = viper.BindEnv("timeZone", "DAGU_TIME_ZONE")
 
 	// Basic authentication
 	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")

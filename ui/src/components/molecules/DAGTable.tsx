@@ -251,7 +251,9 @@ const defaultColumns = [
   }),
   columnHelper.accessor('Type', {
     id: 'Schedule',
-    header: 'Schedule',
+    header: getConfig().timeZone
+      ? `Schedule in ${getConfig().timeZone}`
+      : 'Schedule',
     enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
@@ -389,7 +391,15 @@ const defaultColumns = [
   }),
 ];
 
-function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTextChange, searchTag, handleSearchTagChange }: Props) {
+function DAGTable({
+  DAGs = [],
+  group = '',
+  refreshFn,
+  searchText,
+  handleSearchTextChange,
+  searchTag,
+  handleSearchTagChange,
+}: Props) {
   const [columns] = React.useState<typeof defaultColumns>(() => [
     ...defaultColumns,
   ]);
@@ -444,7 +454,7 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
   const instance = useReactTable<DAGRow>({
     data,
     columns,
-    getSubRows: (row) =>row.subRows,
+    getSubRows: (row) => row.subRows,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -497,21 +507,19 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
           limitTags={1}
           value={searchTag}
           freeSolo
-          options={
-            DAGs.reduce<string[]>((acc, dag) => {
-              if (dag.Type == DAGDataType.DAG) {
-                const tags = dag.DAGStatus.DAG.Tags;
-                if (tags) {
-                  tags.forEach((tag) => {
-                    if (!acc.includes(tag)) {
-                      acc.push(tag);
-                    }
-                  });
-                }
+          options={DAGs.reduce<string[]>((acc, dag) => {
+            if (dag.Type == DAGDataType.DAG) {
+              const tags = dag.DAGStatus.DAG.Tags;
+              if (tags) {
+                tags.forEach((tag) => {
+                  if (!acc.includes(tag)) {
+                    acc.push(tag);
+                  }
+                });
               }
-              return acc;
-            }, [])
-          }
+            }
+            return acc;
+          }, [])}
           onChange={(_, value) => {
             const v = value || '';
             handleSearchTagChange(v);
@@ -558,9 +566,9 @@ function DAGTable({ DAGs = [], group = '', refreshFn, searchText, handleSearchTe
                           {header.isPlaceholder
                             ? null
                             : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
                           {{
                             asc: (
                               <ArrowUpward

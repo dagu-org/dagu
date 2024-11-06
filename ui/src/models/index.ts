@@ -150,9 +150,16 @@ export function getNextSchedule(data: WorkflowListItem): number {
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
-  const datesToRun = schedules.map((s) =>
-    cronParser.parseExpression(s.Expression).next()
-  );
+  const tz = getConfig().timeZone;
+  const datesToRun = schedules.map((s) => {
+    const expression = tz
+      ? cronParser.parseExpression(s.Expression, {
+          currentDate: new Date(),
+          tz,
+        })
+      : cronParser.parseExpression(s.Expression);
+    return expression.next();
+  });
   const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
   return sorted[0].getTime() / 1000;
 }
