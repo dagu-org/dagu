@@ -38,17 +38,17 @@ RUN apk update; \
     addgroup -g ${USER_GID} ${USER}; \
     adduser ${USER} -h /home/${USER} -u ${USER_UID} -G ${USER} -D -s /bin/ash; \
     echo ${USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USER}; \
-    chmod 0440 /etc/sudoers.d/${USER};
+    chmod 0440 /etc/sudoers.d/${USER}; \
+    mkdir -p .config/dagu/dags; \
+    chown -R ${USER}:${USER} /home/${USER};
+
+COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 
 USER ${USER}
 WORKDIR /home/${USER}
 
-COPY --from=go-builder /app/bin/dagu /usr/local/bin/
-
-RUN mkdir -p .config/dagu/dags
-
 # Add the hello_world.yaml file
-COPY <<EOF .config/dagu/dags/hello_world.yaml
+COPY --chown=${USER}:${USER} <<EOF .config/dagu/dags/hello_world.yaml
 schedule: "* * * * *"
 steps:
   - name: hello world
@@ -59,6 +59,7 @@ EOF
 
 ENV DAGU_HOST=0.0.0.0
 ENV DAGU_PORT=8080
+ENV DAGU_TZ="Etc/UTC"
 
 EXPOSE 8080
 

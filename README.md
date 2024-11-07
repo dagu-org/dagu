@@ -178,8 +178,11 @@ docker run \
 -p 8080:8080 \
 -v $HOME/.config/dagu/dags:/home/dagu/.config/dagu/dags \
 -v $HOME/.local/share/dagu:/home/dagu/.local/share/dagu \
+-e DAGU_TZ=Asia/Tokyo \
 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
+
+Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and server. You can set it to your local timezone.
 
 See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
 

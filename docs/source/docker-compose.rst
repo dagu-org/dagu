@@ -20,6 +20,7 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
           image: "ghcr.io/dagu-org/dagu:latest"
           environment:
               - DAGU_PORT=8080
+              - DAGU_TZ=Asia/Tokyo
           restart: unless-stopped
           ports:
               - "8080:8080"
@@ -32,6 +33,8 @@ To automate DAG executions based on cron expressions, it is necessary to run bot
       # scheduler process
       scheduler:
           image: "ghcr.io/dagu-org/dagu:latest"
+          environment:
+              - DAGU_TZ=Asia/Tokyo
           restart: unless-stopped
           volumes:
               - dagu_config:/home/dagu/.config/dagu
