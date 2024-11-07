@@ -1,57 +1,74 @@
 Building Docker Image
 =====================
 
-Create the ``Dockerfile`` and you can build an image.
+Example Dockerfile for building a multi-platform image:
 
 .. code-block:: dockerfile
 
     # syntax=docker/dockerfile:1.4
-    FROM --platform=$BUILDPLATFORM alpine:latest
 
+    # Stage 1: UI Builder
+    FROM --platform=$BUILDPLATFORM node:18-alpine as ui-builder
+
+    WORKDIR /app
+    COPY ui/ ./
+
+    RUN rm -rf node_modules; \
+        yarn install --frozen-lockfile --non-interactive; \
+        yarn build
+
+    # Stage 2: Go Builder
+    FROM --platform=$TARGETPLATFORM golang:1.22-alpine as go-builder
+
+    ARG LDFLAGS
+    ARG TARGETOS
     ARG TARGETARCH
-    ARG VERSION=
-    ARG RELEASES_URL="https://github.com/dagu-org/dagu/releases"
+
+    WORKDIR /app
+    COPY . .
+
+    RUN go mod download && rm -rf frontend/assets
+    COPY --from=ui-builder /app/dist/ ./internal/frontend/assets/
+
+    RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="${LDFLAGS}" -o ./bin/dagu .
+
+    # Stage 3: Final Image
+    FROM --platform=$TARGETPLATFORM alpine:latest
 
     ARG USER="dagu"
     ARG USER_UID=1000
     ARG USER_GID=$USER_UID
 
-    EXPOSE 8080
+    # Create user and set permissions
+    RUN apk update; \
+        apk add --no-cache sudo tzdata; \
+        addgroup -g ${USER_GID} ${USER}; \
+        adduser ${USER} -h /home/${USER} -u ${USER_UID} -G ${USER} -D -s /bin/ash; \
+        echo ${USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USER}; \
+        chmod 0440 /etc/sudoers.d/${USER}; \
+        mkdir -p .config/dagu/dags; \
+        chown -R ${USER}:${USER} /home/${USER};
 
-    RUN <<EOF
-        #User and permissions setup
-        apk update
-        apk add --no-cache sudo tzdata
-        addgroup -g ${USER_GID} ${USER}
-        adduser ${USER} -h /home/${USER} -u ${USER_UID} -G ${USER} -D -s /bin/ash
-        echo ${USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USER}
-        chmod 0440 /etc/sudoers.d/${USER}
-    EOF
+    COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 
-    USER dagu
-    WORKDIR /home/dagu
-    RUN <<EOF
-        #dagu binary setup
-        if [ "${TARGETARCH}" == "amd64" ]; then 
-            arch="x86_64";
-        else 
-            arch="${TARGETARCH}"
-        fi
-        export TARGET_FILE="dagu_${VERSION}_Linux_${arch}.tar.gz"
-        wget ${RELEASES_URL}/download/v${VERSION}/${TARGET_FILE}
-        tar -xf ${TARGET_FILE} && rm *.tar.gz 
-        sudo mv dagu /usr/local/bin/ 
-        mkdir .dagu
+    USER ${USER}
+    WORKDIR /home/${USER}
+
+    # Add the hello_world.yaml file
+    COPY --chown=${USER}:${USER} <<EOF .config/dagu/dags/hello_world.yaml
+    schedule: "* * * * *"
+    steps:
+      - name: hello world
+        command: sh
+        script: |
+          echo "Hello, world!"
     EOF
 
     ENV DAGU_HOST=0.0.0.0
     ENV DAGU_PORT=8080
+    ENV DAGU_TZ="Etc/UTC"
 
-    CMD dagu server
+    EXPOSE 8080
 
-For example::
+    CMD ["dagu", "start-all"]
 
-    DAGU_VERSION=<X.X.X>
-    docker build -t dagu:${DAGU_VERSION} \
-    --build-arg VERSION=${DAGU_VERSION} \
-    --no-cache .
