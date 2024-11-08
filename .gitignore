@@ -24,3 +24,6 @@ tmp/*
 
 # Coverage files
 coverage.*
+
+# Debug files
+__debug_bin*
