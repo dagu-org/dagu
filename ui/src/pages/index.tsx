@@ -79,7 +79,7 @@ function Dashboard() {
             height: '100%',
           }}
         >
-          <Title>Timeline</Title>
+          <Title>{getConfig().tz ? `Timeline in ${getConfig().tz}` : "Timeline"}</Title>
           <DashboardTimechart data={data?.DAGs || []} />
         </Box>
       </Grid>
