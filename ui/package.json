@@ -70,6 +70,7 @@
     "mermaid": "^9.1.1",
     "moment": "^2.29.3",
     "moment-duration-format": "^2.3.2",
+    "moment-timezone": "^0.5.46",
     "monaco-editor": "^0.41.0",
     "monaco-loader": "^1.0.0",
     "monaco-react": "^1.1.0",

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Box } from '@mui/material';
-import moment from 'moment';
+import moment, { MomentInput } from 'moment-timezone';
 import { Timeline, DataSet } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { statusColorMapping } from '../../consts';
@@ -25,6 +25,11 @@ function DashboardTimechart({ data: input }: Props) {
   useEffect(() => {
     if (!timelineRef.current) return;
 
+    let timezone = getConfig().tz;
+    if (!timezone) {
+      timezone = moment.tz.guess();
+    }
+
     const items: TimelineItem[] = [];
     const now = moment();
     const startOfDay = moment().startOf('day');
@@ -33,7 +38,7 @@ function DashboardTimechart({ data: input }: Props) {
       const status = wf.Status;
       const start = status?.StartedAt;
       if (start && start !== '-') {
-        const startMoment = moment.max(moment(start), startOfDay);
+        const startMoment = moment(start);
         const end =
           status.FinishedAt && status.FinishedAt !== '-'
             ? moment(status.FinishedAt)
@@ -42,8 +47,8 @@ function DashboardTimechart({ data: input }: Props) {
         items.push({
           id: status.Name + `_${status.RequestId}`,
           content: status.Name,
-          start: startMoment.toDate(),
-          end: moment(end).toDate(),
+          start: startMoment.tz(timezone).toDate(),
+          end: end.tz(timezone).toDate(),
           group: 'main',
           className: `status-${status.Status}`,
         });
@@ -54,6 +59,7 @@ function DashboardTimechart({ data: input }: Props) {
 
     if (!timelineInstance.current) {
       timelineInstance.current = new Timeline(timelineRef.current, dataset, {
+        moment: (date: MomentInput) => moment(date).tz(timezone),
         start: startOfDay.toDate(),
         end: now.endOf('day').toDate(),
         orientation: 'top',
@@ -61,8 +67,6 @@ function DashboardTimechart({ data: input }: Props) {
         showMajorLabels: true,
         showMinorLabels: true,
         showTooltips: true,
-        zoomMin: 1000 * 60 * 60, // 1 hour in milliseconds
-        zoomMax: 1000 * 60 * 60 * 24, // 24 hours in milliseconds
         zoomable: false,
         verticalScroll: true,
         timeAxis: { scale: 'hour', step: 1 },
@@ -83,6 +87,10 @@ function DashboardTimechart({ data: input }: Props) {
     } else {
       timelineInstance.current.setItems(dataset);
     }
+
+    console.log(
+      {input, items}
+    )
 
     return () => {
       if (timelineInstance.current) {
