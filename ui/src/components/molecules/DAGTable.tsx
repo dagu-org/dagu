@@ -44,10 +44,10 @@ import {
   KeyboardArrowUp,
 } from '@mui/icons-material';
 import LiveSwitch from './LiveSwitch';
-import moment from 'moment';
 import 'moment-duration-format';
 import Ticker from '../atoms/Ticker';
 import VisuallyHidden from '../atoms/VisuallyHidden';
+import moment from 'moment-timezone';
 
 type Props = {
   DAGs: DAGItem[];
@@ -251,9 +251,7 @@ const defaultColumns = [
   }),
   columnHelper.accessor('Type', {
     id: 'Schedule',
-    header: getConfig().tz
-      ? `Schedule in ${getConfig().tz}`
-      : 'Schedule',
+    header: `Schedule in ${getConfig().tz || moment.tz.guess()}`,
     enableSorting: true,
     cell: (props) => {
       const data = props.row.original!;
