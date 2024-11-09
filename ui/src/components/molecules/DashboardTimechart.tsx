@@ -6,6 +6,7 @@ import 'vis-timeline/styles/vis-timeline-graph2d.css';
 import { statusColorMapping } from '../../consts';
 import { DAGStatus } from '../../models';
 import { WorkflowListItem } from '../../models/api';
+import { useConfig } from '../../contexts/ConfigContext';
 
 type Props = { data: DAGStatus[] | WorkflowListItem[] };
 
@@ -21,14 +22,10 @@ type TimelineItem = {
 function DashboardTimechart({ data: input }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineInstance = useRef<Timeline | null>(null);
+  const config = useConfig();
 
   useEffect(() => {
     if (!timelineRef.current) return;
-
-    let timezone = getConfig().tz;
-    if (!timezone) {
-      timezone = moment.tz.guess();
-    }
 
     const items: TimelineItem[] = [];
     const now = moment();
@@ -47,8 +44,8 @@ function DashboardTimechart({ data: input }: Props) {
         items.push({
           id: status.Name + `_${status.RequestId}`,
           content: status.Name,
-          start: startMoment.tz(timezone).toDate(),
-          end: end.tz(timezone).toDate(),
+          start: startMoment.tz(config.tz).toDate(),
+          end: end.tz(config.tz).toDate(),
           group: 'main',
           className: `status-${status.Status}`,
         });
@@ -59,7 +56,7 @@ function DashboardTimechart({ data: input }: Props) {
 
     if (!timelineInstance.current) {
       timelineInstance.current = new Timeline(timelineRef.current, dataset, {
-        moment: (date: MomentInput) => moment(date).tz(timezone),
+        moment: (date: MomentInput) => moment(date).tz(config.tz),
         start: startOfDay.toDate(),
         end: now.endOf('day').toDate(),
         orientation: 'top',
@@ -76,7 +73,7 @@ function DashboardTimechart({ data: input }: Props) {
             hour: 'HH:mm',
           },
           majorLabels: {
-            hour: 'HH:mm',
+            hour: 'ddd D MMMM',
             day: 'ddd D MMMM',
           },
         },

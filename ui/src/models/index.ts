@@ -1,4 +1,5 @@
 import cronParser from 'cron-parser';
+import moment from 'moment-timezone';
 import { WorkflowListItem } from './api';
 
 export enum SchedulerStatus {
@@ -150,7 +151,7 @@ export function getNextSchedule(data: WorkflowListItem): number {
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
-  const tz = getConfig().tz;
+  const tz = getConfig().tz || moment.tz.guess();
   const datesToRun = schedules.map((s) => {
     const expression = tz
       ? cronParser.parseExpression(s.Expression, {
