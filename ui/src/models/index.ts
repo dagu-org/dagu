@@ -151,14 +151,20 @@ export function getNextSchedule(data: WorkflowListItem): number {
   if (!schedules || schedules.length == 0 || data.Suspended) {
     return Number.MAX_SAFE_INTEGER;
   }
-  const tz = getConfig().tz || moment.tz.guess();
+  let tz = getConfig().tz || moment.tz.guess();
   const datesToRun = schedules.map((s) => {
+    let expressionText = s.Expression
+    const cronTzMatch = expressionText.match(/(?<=CRON_TZ=)[^\s]+/);
+    if (cronTzMatch) {
+      tz = cronTzMatch[0]
+      expressionText = expressionText.replace(`CRON_TZ=${tz}`, '')
+    }
     const expression = tz
-      ? cronParser.parseExpression(s.Expression, {
+      ? cronParser.parseExpression(expressionText, {
           currentDate: new Date(),
           tz,
         })
-      : cronParser.parseExpression(s.Expression);
+      : cronParser.parseExpression(expressionText);
     return expression.next();
   });
   const sorted = datesToRun.sort((a, b) => a.getTime() - b.getTime());
