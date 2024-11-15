@@ -221,6 +221,35 @@ You can use the `schedule` field to schedule a DAG with Cron expression.
 
 See :ref:`scheduler configuration` for more details.
 
+Skip Redundant Runs
+~~~~~~~~~~~~~~~~~~
+
+To prevent unnecessary executions of scheduled DAGs, use the ``skipIfSuccessful`` flag:
+
+.. code-block:: yaml
+
+    schedule: "0 */4 * * *"    # Run every 4 hours
+    skipIfSuccessful: true     # Skip if already succeeded since last schedule
+    steps:
+      - name: data-processing
+        command: process.sh
+
+When ``skipIfSuccessful`` is ``true``, Dagu checks if there's already been a successful run since the last scheduled time. If yes, it skips the execution. This is useful for:
+
+- Resource-intensive tasks
+- Data processing jobs that shouldn't run twice
+- Tasks that are expensive to run
+
+Note: This only affects scheduled runs - manual triggers always execute regardless of this setting.
+
+Example behavior:
+
+- Schedule: Every 4 hours (00:00, 04:00, 08:00, ...)
+- At 04:00: Runs successfully
+- At 05:00: Manual trigger → Runs (manual triggers always run)
+- At 06:00: Schedule trigger → Skips (already succeeded since 04:00)
+- At 08:00: Schedule trigger → Runs (new schedule window)
+
 Executors
 ~~~~~~~~~~
 
@@ -311,6 +340,7 @@ This section provides a comprehensive list of available fields that can be used 
 - ``name``: The name of the DAG, which is optional. The default name is the name of the file.
 - ``description``: A brief description of the DAG.
 - ``schedule``: The execution schedule of the DAG in Cron expression format.
+- ``skipIfSuccessful``: When true, skips scheduled runs if already succeeded since last schedule time. Default is false.
 - ``group``: The group name to organize DAGs, which is optional.
 - ``tags``: Free tags that can be used to categorize DAGs, separated by commas.
 - ``env``: Environment variables that can be accessed by the DAG and its steps.
