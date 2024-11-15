@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
+	"github.com/robfig/cron/v3"
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/util"
@@ -43,7 +44,7 @@ type entryReaderImpl struct {
 }
 
 type jobCreator interface {
-	CreateJob(workflow *dag.DAG, next time.Time) job
+	CreateJob(workflow *dag.DAG, next time.Time, schedule cron.Schedule) job
 }
 
 func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
@@ -70,13 +71,13 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(workflow *dag.DAG, s []dag.Schedule, e entryType) {
-		for _, ss := range s {
-			next := ss.Parsed.Next(now)
+	addEntriesFn := func(workflow *dag.DAG, schedules []dag.Schedule, entryType entryType) {
+		for _, schedule := range schedules {
+			next := schedule.Parsed.Next(now)
 			entries = append(entries, &entry{
-				Next:      ss.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(workflow, next),
-				EntryType: e,
+				Next:      schedule.Parsed.Next(now),
+				Job:       er.jobCreator.CreateJob(workflow, next, schedule.Parsed),
+				EntryType: entryType,
 				Logger:    er.logger,
 			})
 		}
