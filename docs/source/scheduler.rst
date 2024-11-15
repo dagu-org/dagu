@@ -101,9 +101,26 @@ The easiest way to make sure the process is always running on your system is to 
 
     exit
 
-Configuration
---------------
+Skip Successful Runs
+-------------------
 
-If you need to place DAGs in a different location, set the ``DAGU_DAGS`` environment variable to specify the directory of the DAGs.
+To prevent redundant executions of scheduled DAGs, you can set ``skipIfSuccessful`` flag to ``true``. When enabled, Dagu will check if the DAG has completed successfully since its last scheduled time. If it has, the current run will be skipped.
 
+.. code-block:: yaml
+
+    schedule: "0 */4 * * *"  # Run every 4 hours
+    skipIfSuccessful: true    # Skip if already succeeded since last schedule
+    steps:
+      - name: resource-intensive-job
+        command: process_data.sh
+
+This is particularly useful for resource-intensive tasks where unnecessary re-runs should be avoided. Note that this only affects scheduled runs - manual triggers will always execute regardless of this setting.
+
+For example, with the above configuration:
+- If the DAG runs successfully at 04:00
+- And someone triggers it at 05:00
+- The run will be skipped because there's already a successful run since the last schedule
+- The next run will occur at the next scheduled time (08:00)
+
+The default value is ``false``, meaning DAGs will run on every schedule by default.
 

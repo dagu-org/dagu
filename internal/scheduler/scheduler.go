@@ -196,9 +196,11 @@ func (s *Scheduler) run(now time.Time) {
 		go func(e *entry) {
 			if err := e.Invoke(); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("Workflow is already finished", "workflow", e.Job)
+					s.logger.Info("Workflow is already finished", "workflow", e.Job, "err", err)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("Workflow is already running", "workflow", e.Job)
+					s.logger.Info("Workflow is already running", "workflow", e.Job, "err", err)
+				} else if errors.Is(err, errJobSkipped) {
+					s.logger.Info("Workflow is skipped", "workflow", e.Job, "err", err)
 				} else {
 					s.logger.Error(
 						"Workflow execution failed",
