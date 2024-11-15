@@ -6,13 +6,17 @@ Writing DAGs
 .. contents::
     :local:
 
+Introduction
+------------
+Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for workflows. This document covers everything you need to know about writing DAG definitions, from basic usage to advanced features.
+
 Basics
 --------
 
 Minimal Example
 ~~~~~~~~~~~~~~~~
 
-The minimal example of a DAG file is as follows:
+A DAG consists of one or more steps, each with a name and command. Here's the simplest possible DAG:
 
 .. code-block:: yaml
 
