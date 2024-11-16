@@ -52,6 +52,7 @@ type Config struct {
 	IsAuthToken        bool           // Enable auth token for API
 	AuthToken          string         // Auth token for API
 	LatestStatusToday  bool           // Show latest status today or the latest status
+	BasePath           string         // Base path for the server
 	APIBaseURL         string         // Base URL for API
 	Debug              bool           // Enable debug mode (verbose logging)
 	LogFormat          string         // Log format
@@ -168,6 +169,7 @@ func setupViper() error {
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
 	viper.SetDefault("navbarTitle", "Dagu")
+	viper.SetDefault("basePath", "")
 	viper.SetDefault("apiBaseURL", "/api/v1")
 
 	// Set executable path
@@ -198,6 +200,7 @@ func bindEnvs() {
 	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
 	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
 	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+	_ = viper.BindEnv("basePath", "DAGU_BASE_PATH")
 	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
 	_ = viper.BindEnv("tz", "DAGU_TZ")
 

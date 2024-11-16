@@ -10,6 +10,7 @@
             function getConfig() {
                 return {
                     apiURL: "{{ apiURL }}",
+                    basePath: "{{ basePath }}",
                     title: "{{ navbarTitle }}",
                     navbarColor: "{{ navbarColor }}",
                     version: "{{ version }}",
@@ -17,7 +18,7 @@
                 };
             }
         </script>
-        <script defer="defer" src="/assets/bundle.js?v={{ version }}"></script>
+        <script defer="defer" src="{{ basePath }}/assets/bundle.js?v={{ version }}"></script>
     </head>
     <body>
         {{template "content" .}}
