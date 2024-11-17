@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -117,6 +118,18 @@ func Load() (*Config, error) {
 			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
 		}
 		cfg.Location = time.Local
+	}
+
+	if cfg.BasePath != "" {
+		cfg.BasePath = path.Clean(cfg.BasePath)
+
+		if !path.IsAbs(cfg.BasePath) {
+			cfg.BasePath = path.Join("/", cfg.BasePath)
+		}
+
+		if cfg.BasePath == "/" {
+			cfg.BasePath = ""
+		}
 	}
 
 	return &cfg, nil

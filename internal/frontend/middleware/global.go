@@ -18,7 +18,6 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/logger"
@@ -109,11 +108,13 @@ func prefixChecker(next http.Handler) http.Handler {
 				return
 			}
 
-			if strings.HasPrefix(r.URL.Path, path.Join(basePath, "/api")) {
-				http.StripPrefix(basePath, next).ServeHTTP(w, r)
-			} else {
-				http.StripPrefix(basePath, defaultHandler).ServeHTTP(w, r)
-			}
+			http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, "/api") {
+					next.ServeHTTP(w, r)
+				} else {
+					defaultHandler.ServeHTTP(w, r)
+				}
+			})).ServeHTTP(w, r)
 		})
 }
 
