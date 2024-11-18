@@ -72,7 +72,6 @@ var (
 	authBasic      *AuthBasic
 	authToken      *AuthToken
 	appLogger      logger.Logger
-	basePath       string
 )
 
 type Options struct {
@@ -97,7 +96,6 @@ func Setup(opts *Options) {
 	authBasic = opts.AuthBasic
 	authToken = opts.AuthToken
 	appLogger = opts.Logger
-	basePath = opts.BasePath
 }
 
 func prefixChecker(next http.Handler) http.Handler {
