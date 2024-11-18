@@ -28,6 +28,15 @@ Or you can set multiple schedules.
       - name: scheduled job
         command: job.sh
 
+You can also specify a cron expression to run within a specific timezone. See `list of tz database timezones <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones>`
+
+.. code-block:: yaml
+
+    schedule: "CRON_TZ=Asia/Tokyo 5 9 * * *" # Run at 09:05 in Tokyo
+    steps:
+      - name: scheduled job
+        command: job.sh
+
 Stop Schedule
 --------------
 
