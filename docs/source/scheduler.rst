@@ -28,7 +28,7 @@ Or you can set multiple schedules.
       - name: scheduled job
         command: job.sh
 
-You can also specify a cron expression to run within a specific timezone. See `list of tz database timezones <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones>`
+You can also specify a cron expression to run within a specific timezone. See `list of tz database timezones <https://en.wikipedia.org/wiki/List_of_tz_database_time_zones>`_.
 
 .. code-block:: yaml
 

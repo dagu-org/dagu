@@ -72,7 +72,6 @@ var (
 	authBasic      *AuthBasic
 	authToken      *AuthToken
 	appLogger      logger.Logger
-	basePath       string
 )
 
 type Options struct {
@@ -97,24 +96,16 @@ func Setup(opts *Options) {
 	authBasic = opts.AuthBasic
 	authToken = opts.AuthToken
 	appLogger = opts.Logger
-	basePath = opts.BasePath
 }
 
 func prefixChecker(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			if basePath != "" && r.URL.Path == "/" {
-				http.Redirect(w, r, basePath, http.StatusSeeOther)
-				return
+			if strings.HasPrefix(r.URL.Path, "/api") {
+				next.ServeHTTP(w, r)
+			} else {
+				defaultHandler.ServeHTTP(w, r)
 			}
-
-			http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if strings.HasPrefix(r.URL.Path, "/api") {
-					next.ServeHTTP(w, r)
-				} else {
-					defaultHandler.ServeHTTP(w, r)
-				}
-			})).ServeHTTP(w, r)
 		})
 }
 
