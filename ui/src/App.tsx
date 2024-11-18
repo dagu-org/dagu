@@ -37,7 +37,7 @@ function App({ config }: Props) {
       >
         <ConfigContext.Provider value={config}>
           <UserPreferencesProvider>
-            <BrowserRouter>
+            <BrowserRouter basename={config.basePath}>
               <Layout {...config}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />

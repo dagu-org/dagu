@@ -25,6 +25,7 @@ Server Configuration
 ~~~~~~~~~~~~~~~~~~
 - ``DAGU_HOST`` (``127.0.0.1``): Server binding host
 - ``DAGU_PORT`` (``8080``): Server binding port
+- ``DAGU_BASE_PATH`` (``""``): Base path to serve the application
 - ``DAGU_TZ`` (``""``): Server timezone (default: system timezone)
 - ``DAGU_CERT_FILE``: SSL certificate file path
 - ``DAGU_KEY_FILE``: SSL key file path
@@ -59,6 +60,7 @@ Create ``admin.yaml`` in ``$HOME/.config/dagu/`` to override default settings. B
     # Server Configuration
     host: "127.0.0.1"                # Web UI hostname
     port: 8080                       # Web UI port
+    basePath: ""                    # Base path to serve the application
     tz: "Asia/Tokyo"                 # Timezone (e.g., "America/New_York")
     
     # Directory Configuration

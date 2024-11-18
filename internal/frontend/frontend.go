@@ -42,6 +42,7 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server
 		AssetsFS:    assetsFS,
 		NavbarColor: cfg.NavbarColor,
 		NavbarTitle: cfg.NavbarTitle,
+		BasePath:    cfg.BasePath,
 		APIBaseURL:  cfg.APIBaseURL,
 		TimeZone:    cfg.TZ,
 	}
