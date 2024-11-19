@@ -101,19 +101,25 @@ func Setup(opts *Options) {
 }
 
 func prefixChecker(next http.Handler) http.Handler {
+	handleRequest := func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api") {
+			next.ServeHTTP(w, r)
+		} else {
+			defaultHandler.ServeHTTP(w, r)
+		}
+	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
+			if basePath == "" || !strings.HasPrefix(r.URL.Path, basePath) {
+				handleRequest(w, r)
+				return
+			}
 			if basePath != "" && r.URL.Path == "/" {
 				http.Redirect(w, r, basePath, http.StatusSeeOther)
 				return
 			}
-
 			http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if strings.HasPrefix(r.URL.Path, "/api") {
-					next.ServeHTTP(w, r)
-				} else {
-					defaultHandler.ServeHTTP(w, r)
-				}
+				handleRequest(w, r)
 			})).ServeHTTP(w, r)
 		})
 }
