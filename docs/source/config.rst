@@ -25,7 +25,7 @@ Server Configuration
 ~~~~~~~~~~~~~~~~~~
 - ``DAGU_HOST`` (``127.0.0.1``): Server binding host
 - ``DAGU_PORT`` (``8080``): Server binding port
-- ``DAGU_BASE_PATH`` (``""``): Base path to serve the application. E.g., ``/dagu``
+- ``DAGU_BASE_PATH`` (``""``): Base path to serve the application
 - ``DAGU_TZ`` (``""``): Server timezone (default: system timezone)
 - ``DAGU_CERT_FILE``: SSL certificate file path
 - ``DAGU_KEY_FILE``: SSL key file path
