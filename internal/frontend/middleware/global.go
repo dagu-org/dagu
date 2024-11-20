@@ -18,6 +18,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/logger"
@@ -45,6 +46,7 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 		)(next)
 	}
 	next = prefixChecker(next)
+	next = cleanPath(next)
 
 	return next
 }
@@ -121,6 +123,14 @@ func prefixChecker(next http.Handler) http.Handler {
 			http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handleRequest(w, r)
 			})).ServeHTTP(w, r)
+		})
+}
+
+func cleanPath(h http.Handler) http.Handler {
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			r.URL.Path = path.Clean(r.URL.Path)
+			h.ServeHTTP(w, r)
 		})
 }
 
