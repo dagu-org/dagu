@@ -55,11 +55,19 @@
       "description": "Max parallel running steps"
     },
     "params": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of default parameters accessible as $1, $2, etc"
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Space-separated list of default parameters accessible as $1, $2, etc"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of default parameters accessible as $1, $2, etc"
+        }
+      ]
     },
     "preconditions": {
       "type": "array",

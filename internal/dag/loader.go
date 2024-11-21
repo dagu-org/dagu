@@ -264,13 +264,35 @@ func unmarshalData(data []byte) (map[string]any, error) {
 // decode decodes the configuration map into a configDefinition.
 func decode(cm map[string]any) (*definition, error) {
 	c := new(definition)
-	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		ErrorUnused: true,
 		Result:      c,
 		TagName:     "",
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToSliceHookFunc(","),
+			func(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+				if t != reflect.TypeOf(c.Params) {
+					return data, nil
+				}
+				switch v := data.(type) {
+				case string:
+					return v, nil
+				case []interface{}:
+					params := make([]string, len(v))
+					for i, param := range v {
+						params[i] = fmt.Sprint(param)
+					}
+					return strings.Join(params, " "), nil
+				default:
+					return nil, fmt.Errorf("unexpected type for Params: %T", v)
+				}
+			},
+		),
 	})
-	err := md.Decode(cm)
-
+	if err != nil {
+		return nil, err
+	}
+	err = decoder.Decode(cm)
 	return c, err
 }
 
