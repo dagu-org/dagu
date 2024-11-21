@@ -105,7 +105,7 @@ func prefixChecker(next http.Handler) http.Handler {
 		func(w http.ResponseWriter, r *http.Request) {
 			// If the request does not come from a proxy and the path is the root
 			// path, redirect to the base path when one is set for convenience.
-			if basePath != "" && r.URL.Path == "/" && r.Header.Get("X-Forwarded-For") == "" {
+			if basePath != "" && r.URL.Path == "/" {
 				http.Redirect(w, r, basePath, http.StatusSeeOther)
 				return
 			}
