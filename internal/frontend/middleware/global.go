@@ -18,7 +18,6 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/logger"
@@ -46,7 +45,6 @@ func SetupGlobalMiddleware(handler http.Handler) http.Handler {
 		)(next)
 	}
 	next = prefixChecker(next)
-	next = cleanPath(next)
 
 	return next
 }
@@ -103,34 +101,21 @@ func Setup(opts *Options) {
 }
 
 func prefixChecker(next http.Handler) http.Handler {
-	handleRequest := func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api") {
-			next.ServeHTTP(w, r)
-		} else {
-			defaultHandler.ServeHTTP(w, r)
-		}
-	}
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			if basePath == "" || !strings.HasPrefix(r.URL.Path, basePath) {
-				handleRequest(w, r)
-				return
-			}
-			if basePath != "" && r.URL.Path == "/" {
+			// If the request does not come from a proxy and the path is the root
+			// path, redirect to the base path when one is set for convenience.
+			if basePath != "" && r.URL.Path == "/" && r.Header.Get("X-Forwarded-For") == "" {
 				http.Redirect(w, r, basePath, http.StatusSeeOther)
 				return
 			}
 			http.StripPrefix(basePath, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				handleRequest(w, r)
+				if strings.HasPrefix(r.URL.Path, "/api") {
+					next.ServeHTTP(w, r)
+				} else {
+					defaultHandler.ServeHTTP(w, r)
+				}
 			})).ServeHTTP(w, r)
-		})
-}
-
-func cleanPath(h http.Handler) http.Handler {
-	return http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			r.URL.Path = path.Clean(r.URL.Path)
-			h.ServeHTTP(w, r)
 		})
 }
 
