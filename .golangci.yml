@@ -1,92 +1,92 @@
 # https://golangci-lint.run/usage/configuration/#config-file
 # Linters: https://golangci-lint.run/usage/linters/
 linters:
-  disable-all: true
-  enable:
-    # enabled by default
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - typecheck
-    - unused
-    # additional
-    - bodyclose
-    - goheader
-    - goimports
-    - gosec
-    - misspell
-    - exhaustive
-    - revive
+    disable-all: true
+    enable:
+        # enabled by default
+        - errcheck
+        - gosimple
+        - govet
+        - ineffassign
+        - staticcheck
+        - typecheck
+        - unused
+        # additional
+        - bodyclose
+        - goheader
+        - goimports
+        - gosec
+        - misspell
+        - exhaustive
+        - revive
 
 issues:
-  exclude-use-default: true
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-  exclude-dirs:
-    - .github
-    - .vscode
-    - local
-    - config
-    - scripts
-    - ui
-    - docs
-    - gen
-    - filenotify
+    exclude-use-default: true
+    exclude-rules:
+        - path: _test\.go
+          linters:
+              - gosec
+    exclude-dirs:
+        - .github
+        - .vscode
+        - local
+        - config
+        - scripts
+        - ui
+        - docs
+        - gen
+        - filenotify
 
 linters-settings:
-  revive:
-    severity: error
-    confidence: 0.8
-    enable-all-rules: false
-    rules:
-      - name: "unused-parameter"
-        disabled: false
-      - name: "import-alias-naming"
-        disabled: false
-      - name: "if-return"
-        disabled: false
-      - name: "error-return"
-        disabled: false
-      - name: "dot-imports"
-        disabled: false
-      - name: "struct-tag"
-        disabled: false
-      - name: "function-result-limit"
-        disabled: false
-      - name: "atomic"
-        disabled: false
-      - name: "use-any"
-        disabled: false
-      - name: "redundant-import-alias"
-        disabled: false
-      - name: "enforce-map-style"
-        disabled: false
-      - name: "enforce-slice-style"
-        disabled: false
-  goheader:
-    values:
-      const:
-        AUTHOR: The Dagu Authors
-    template: |-
-      Copyright (C) {{ YEAR }} {{ AUTHOR }}
+    revive:
+        severity: error
+        confidence: 0.8
+        enable-all-rules: false
+        rules:
+            - name: "unused-parameter"
+              disabled: false
+            - name: "import-alias-naming"
+              disabled: false
+            - name: "if-return"
+              disabled: false
+            - name: "error-return"
+              disabled: false
+            - name: "dot-imports"
+              disabled: false
+            - name: "struct-tag"
+              disabled: false
+            - name: "function-result-limit"
+              disabled: false
+            - name: "atomic"
+              disabled: false
+            - name: "use-any"
+              disabled: false
+            - name: "redundant-import-alias"
+              disabled: false
+            - name: "enforce-map-style"
+              disabled: false
+            - name: "enforce-slice-style"
+              disabled: false
+    goheader:
+        values:
+            const:
+                AUTHOR: The Dagu Authors
+        template: |-
+            Copyright (C) {{ YEAR }} {{ AUTHOR }}
 
-      This program is free software: you can redistribute it and/or modify
-      it under the terms of the GNU General Public License as published by
-      the Free Software Foundation, either version 3 of the License, or
-      (at your option) any later version.
+            This program is free software: you can redistribute it and/or modify
+            it under the terms of the GNU General Public License as published by
+            the Free Software Foundation, either version 3 of the License, or
+            (at your option) any later version.
 
-      This program is distributed in the hope that it will be useful,
-      but WITHOUT ANY WARRANTY; without even the implied warranty of
-      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-      GNU General Public License for more details.
+            This program is distributed in the hope that it will be useful,
+            but WITHOUT ANY WARRANTY; without even the implied warranty of
+            MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+            GNU General Public License for more details.
 
-      You should have received a copy of the GNU General Public License
-      along with this program. If not, see <https://www.gnu.org/licenses/>.
+            You should have received a copy of the GNU General Public License
+            along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 run:
-  allow-parallel-runners: true
-  go: "1.22"
+    allow-parallel-runners: true
+    go: "1.23"
