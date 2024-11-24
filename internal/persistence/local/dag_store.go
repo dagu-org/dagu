@@ -166,10 +166,9 @@ func (d *dagStoreImpl) searchName(fileName string, searchText *string) bool {
 	if searchText == nil {
 		return true
 	}
-
 	fileName = strings.TrimSuffix(fileName, path.Ext(fileName))
-
-	return strings.Contains(fileName, *searchText)
+	ret := strings.Contains(strings.ToLower(fileName), strings.ToLower(*searchText))
+	return ret
 }
 
 func (d *dagStoreImpl) searchTags(tags []string, searchTag *string) bool {

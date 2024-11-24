@@ -18,18 +18,21 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/dag"
 	dagscheduler "github.com/dagu-org/dagu/internal/dag/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
+	"github.com/robfig/cron/v3"
 )
 
 var (
 	errJobRunning      = errors.New("job already running")
 	errJobIsNotRunning = errors.New("job is not running")
 	errJobFinished     = errors.New("job already finished")
+	errJobSkipped      = errors.New("job skipped")
 )
 
 var _ jobCreator = (*jobCreatorImpl)(nil)
@@ -40,12 +43,13 @@ type jobCreatorImpl struct {
 	Client     client.Client
 }
 
-func (jf jobCreatorImpl) CreateJob(dAG *dag.DAG, next time.Time) job {
+func (jf jobCreatorImpl) CreateJob(dAG *dag.DAG, next time.Time, schedule cron.Schedule) job {
 	return &jobImpl{
 		DAG:        dAG,
 		Executable: jf.Executable,
 		WorkDir:    jf.WorkDir,
 		Next:       next,
+		Schedule:   schedule,
 		Client:     jf.Client,
 	}
 }
@@ -57,6 +61,7 @@ type jobImpl struct {
 	Executable string
 	WorkDir    string
 	Next       time.Time
+	Schedule   cron.Schedule
 	Client     client.Client
 }
 
@@ -82,10 +87,33 @@ func (j *jobImpl) Start(ctx context.Context) error {
 		if lastExecTime.After(j.Next) || j.Next.Equal(lastExecTime) {
 			return errJobFinished
 		}
+
+		// Check the `skipIfSuccessful` is set to true in the DAG configuration.
+		// When set to true, Dagu will automatically check the last successful run
+		// time against the defined schedule. If the DAG has already run successfully
+		// since the last scheduled time, the current run will be skipped.
+		if j.DAG.SkipIfSuccessful {
+			prev := j.Prev()
+			if lastExecTime.After(prev) || lastExecTime.Equal(prev) {
+				// Calculate the previous scheduled time
+				lastStartedAt, _ := util.ParseTime(latestStatus.StartedAt)
+				return fmt.Errorf("%w: last successful run time: %s is after the previous scheduled time: %s", errJobSkipped, lastStartedAt, prev)
+			}
+		}
 	}
+
 	return j.Client.Start(ctx, j.DAG, client.StartOptions{
 		Quiet: true,
 	})
+}
+
+func (j *jobImpl) Prev() time.Time {
+	// Since robfig/cron does not provide a way to get the previous schedule time,
+	// we need to do it manually.
+	// The idea is to get the next schedule time and subtract the duration of the schedule.
+	// This will give us the previous schedule time.
+	t := j.Schedule.Next(j.Next.Add(time.Second))
+	return j.Next.Add(-t.Sub(j.Next))
 }
 
 func (j *jobImpl) Stop(ctx context.Context) error {

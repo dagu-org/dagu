@@ -141,6 +141,7 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 	b.callBuilderFunc(b.buildMetadata)
 	b.callBuilderFunc(b.buildEnvs)
 	b.callBuilderFunc(b.buildSchedule)
+	b.callBuilderFunc(b.skipIfSuccessful)
 	b.callBuilderFunc(b.buildMailOn)
 	b.callBuilderFunc(b.buildParams)
 
@@ -437,6 +438,12 @@ func loadVariables(strVariables any, opts buildOpts) (
 		vars[pair.key] = value
 	}
 	return vars, nil
+}
+
+// skipIfSuccessful sets the skipIfSuccessful field for the DAG.
+func (b *builder) skipIfSuccessful() error {
+	b.dag.SkipIfSuccessful = b.def.SkipIfSuccessful
+	return nil
 }
 
 // buildSteps builds the steps for the DAG.

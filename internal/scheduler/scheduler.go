@@ -39,23 +39,17 @@ type Scheduler struct {
 	stop        chan struct{}
 	running     atomic.Bool
 	logger      logger.Logger
+	location    *time.Location
 }
 
-func New(cfg *config.Config, lg logger.Logger, cli client.Client) *Scheduler {
-	return newScheduler(newSchedulerArgs{
-		EntryReader: newEntryReader(newEntryReaderArgs{
-			Client:  cli,
-			DagsDir: cfg.DAGs,
-			JobCreator: &jobCreatorImpl{
-				WorkDir:    cfg.WorkDir,
-				Client:     cli,
-				Executable: cfg.Executable,
-			},
-			Logger: lg,
-		}),
-		Logger: lg,
-		LogDir: cfg.LogDir,
-	})
+func New(cfg *config.Config, logger logger.Logger, cli client.Client) *Scheduler {
+	jobCreator := &jobCreatorImpl{
+		WorkDir:    cfg.WorkDir,
+		Client:     cli,
+		Executable: cfg.Executable,
+	}
+	entryReader := newEntryReader(cfg.DAGs, jobCreator, logger, cli)
+	return newScheduler(entryReader, logger, cfg.LogDir, cfg.Location)
 }
 
 type entryReader interface {
@@ -123,18 +117,16 @@ func (e *entry) Invoke(ctx context.Context) error {
 	}
 }
 
-type newSchedulerArgs struct {
-	EntryReader entryReader
-	Logger      logger.Logger
-	LogDir      string
-}
-
-func newScheduler(args newSchedulerArgs) *Scheduler {
+func newScheduler(entryReader entryReader, logger logger.Logger, logDir string, location *time.Location) *Scheduler {
+	if location == nil {
+		location = time.Local
+	}
 	return &Scheduler{
-		entryReader: args.EntryReader,
-		logDir:      args.LogDir,
+		entryReader: entryReader,
+		logDir:      logDir,
 		stop:        make(chan struct{}),
-		logger:      args.Logger,
+		logger:      logger,
+		location:    location,
 	}
 }
 
@@ -188,7 +180,7 @@ func (s *Scheduler) start(ctx context.Context) {
 }
 
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
-	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second))
+	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
 		s.logger.Error("Scheduler failed to read DAG entries", "error", err)
 		return
@@ -204,9 +196,11 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 		go func(e *entry) {
 			if err := e.Invoke(ctx); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("Workflow is already finished", "dag", e.Job)
+					s.logger.Info("Workflow is already finished", "workflow", e.Job, "err", err)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("Workflow is already running", "dag", e.Job)
+					s.logger.Info("Workflow is already running", "workflow", e.Job, "err", err)
+				} else if errors.Is(err, errJobSkipped) {
+					s.logger.Info("Workflow is skipped", "workflow", e.Job, "err", err)
 				} else {
 					s.logger.Error(
 						"Workflow execution failed",

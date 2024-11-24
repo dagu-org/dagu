@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"path"
 	"path/filepath"
 	"text/template"
 
@@ -56,7 +57,9 @@ func (srv *Server) useTemplate(
 type funcsConfig struct {
 	NavbarColor string
 	NavbarTitle string
+	BasePath    string
 	APIBaseURL  string
+	TZ          string
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -77,8 +80,14 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		"navbarTitle": func() string {
 			return cfg.NavbarTitle
 		},
+		"basePath": func() string {
+			return cfg.BasePath
+		},
 		"apiURL": func() string {
-			return cfg.APIBaseURL
+			return path.Join(cfg.BasePath, cfg.APIBaseURL)
+		},
+		"tz": func() string {
+			return cfg.TZ
 		},
 	}
 }

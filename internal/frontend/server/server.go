@@ -62,7 +62,9 @@ type NewServerArgs struct {
 	// Configuration for the frontend
 	NavbarColor string
 	NavbarTitle string
+	BasePath    string
 	APIBaseURL  string
+	TimeZone    string
 }
 
 type BasicAuth struct {
@@ -91,7 +93,9 @@ func New(params NewServerArgs) *Server {
 		funcsConfig: funcsConfig{
 			NavbarColor: params.NavbarColor,
 			NavbarTitle: params.NavbarTitle,
+			BasePath:    params.BasePath,
 			APIBaseURL:  params.APIBaseURL,
+			TZ:          params.TimeZone,
 		},
 	}
 }
@@ -108,8 +112,9 @@ func (svr *Server) Shutdown() {
 
 func (svr *Server) Serve(ctx context.Context) (err error) {
 	middlewareOptions := &pkgmiddleware.Options{
-		Handler: svr.defaultRoutes(chi.NewRouter()),
-		Logger:  svr.logger,
+		Handler:  svr.defaultRoutes(chi.NewRouter()),
+		Logger:   svr.logger,
+		BasePath: svr.funcsConfig.BasePath,
 	}
 	if svr.authToken != nil {
 		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{

@@ -42,23 +42,23 @@ func TestReadEntries(t *testing.T) {
 
 		ctx := context.Background()
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-		entryReader := newEntryReader(newEntryReaderArgs{
-			DagsDir:    filepath.Join(testdataDir, "invalid_directory"),
-			JobCreator: &mockJobFactory{},
-			Logger:     test.NewLogger(),
-			Client:     cli,
-		})
+		entryReader := newEntryReader(
+			filepath.Join(testdataDir, "invalid_directory"),
+			&mockJobFactory{},
+			test.NewLogger(),
+			cli,
+		)
 
 		entries, err := entryReader.Read(ctx, now)
 		require.NoError(t, err)
 		require.Len(t, entries, 0)
 
-		entryReader = newEntryReader(newEntryReaderArgs{
-			DagsDir:    testdataDir,
-			JobCreator: &mockJobFactory{},
-			Logger:     test.NewLogger(),
-			Client:     cli,
-		})
+		entryReader = newEntryReader(
+			testdataDir,
+			&mockJobFactory{},
+			test.NewLogger(),
+			cli,
+		)
 
 		done := make(chan any)
 		defer close(done)

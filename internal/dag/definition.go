@@ -23,6 +23,7 @@ type definition struct {
 	Group             string
 	Description       string
 	Schedule          any
+	SkipIfSuccessful  bool
 	LogDir            string
 	Env               any
 	HandlerOn         handlerOnDef

@@ -48,6 +48,9 @@ type DAG struct {
 	StopSchedule    []Schedule `json:"StopSchedule,omitempty"`
 	RestartSchedule []Schedule `json:"RestartSchedule,omitempty"`
 
+	// Skip if successful.
+	SkipIfSuccessful bool `json:"SkipIfSuccessful"`
+
 	// Env contains a list of environment variables to be set before running
 	// the DAG.
 	Env []string `json:"Env,omitempty"`

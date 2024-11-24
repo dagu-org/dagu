@@ -26,6 +26,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
+	"github.com/robfig/cron/v3"
 
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/util"
@@ -43,25 +44,18 @@ type entryReaderImpl struct {
 	client     client.Client
 }
 
-type newEntryReaderArgs struct {
-	DagsDir    string
-	JobCreator jobCreator
-	Logger     logger.Logger
-	Client     client.Client
-}
-
 type jobCreator interface {
-	CreateJob(dAG *dag.DAG, next time.Time) job
+	CreateJob(workflow *dag.DAG, next time.Time, schedule cron.Schedule) job
 }
 
-func newEntryReader(args newEntryReaderArgs) *entryReaderImpl {
+func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
 	er := &entryReaderImpl{
-		dagsDir:    args.DagsDir,
+		dagsDir:    dagsDir,
 		dagsLock:   sync.Mutex{},
 		dags:       map[string]*dag.DAG{},
-		jobCreator: args.JobCreator,
-		logger:     args.Logger,
-		client:     args.Client,
+		jobCreator: jobCreator,
+		logger:     logger,
+		client:     client,
 	}
 	if err := er.initDags(); err != nil {
 		er.logger.Error("DAG initialization failed", "error", err)
@@ -78,13 +72,13 @@ func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, e
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(dAG *dag.DAG, s []dag.Schedule, e entryType) {
-		for _, ss := range s {
-			next := ss.Parsed.Next(now)
+	addEntriesFn := func(workflow *dag.DAG, schedules []dag.Schedule, entryType entryType) {
+		for _, schedule := range schedules {
+			next := schedule.Parsed.Next(now)
 			entries = append(entries, &entry{
-				Next:      ss.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(dAG, next),
-				EntryType: e,
+				Next:      schedule.Parsed.Next(now),
+				Job:       er.jobCreator.CreateJob(workflow, next, schedule.Parsed),
+				EntryType: entryType,
 				Logger:    er.logger,
 			})
 		}

@@ -102,7 +102,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 
 # test runs all tests.
 .PHONY: test
-test:
+test: build-bin
 	@echo "${COLOR_GREEN}Running tests...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gotestsum}
 	@go clean -testcache

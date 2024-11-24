@@ -31,7 +31,7 @@ func TestScheduler(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		setFixedTime(now)
 
-		er := &mockEntryReader{
+		entryReader := &mockEntryReader{
 			Entries: []*entry{
 				{
 					Job:    &mockJob{},
@@ -46,11 +46,7 @@ func TestScheduler(t *testing.T) {
 			},
 		}
 
-		schedulerInstance := newScheduler(newSchedulerArgs{
-			EntryReader: er,
-			LogDir:      testHomeDir,
-			Logger:      test.NewLogger(),
-		})
+		schedulerInstance := newScheduler(entryReader, test.NewLogger(), testHomeDir, time.Local)
 
 		go func() {
 			_ = schedulerInstance.Start(context.Background())
@@ -59,8 +55,8 @@ func TestScheduler(t *testing.T) {
 		time.Sleep(time.Second + time.Millisecond*100)
 		schedulerInstance.Stop()
 
-		require.Equal(t, int32(1), er.Entries[0].Job.(*mockJob).RunCount.Load())
-		require.Equal(t, int32(0), er.Entries[1].Job.(*mockJob).RunCount.Load())
+		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
+		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
 	})
 	t.Run("Restart", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -77,11 +73,7 @@ func TestScheduler(t *testing.T) {
 			},
 		}
 
-		schedulerInstance := newScheduler(newSchedulerArgs{
-			EntryReader: entryReader,
-			LogDir:      testHomeDir,
-			Logger:      test.NewLogger(),
-		})
+		schedulerInstance := newScheduler(entryReader, test.NewLogger(), testHomeDir, time.Local)
 
 		go func() {
 			_ = schedulerInstance.Start(context.Background())
@@ -94,11 +86,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 		setFixedTime(now)
-		schedulerInstance := newScheduler(newSchedulerArgs{
-			EntryReader: &mockEntryReader{},
-			LogDir:      testHomeDir,
-			Logger:      test.NewLogger(),
-		})
+		schedulerInstance := newScheduler(&mockEntryReader{}, test.NewLogger(), testHomeDir, time.Local)
 		next := schedulerInstance.nextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 	})

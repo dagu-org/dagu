@@ -81,7 +81,11 @@ See the Docker's API documentation for all available options.
 Use Host's Docker Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you are running `dagu` using a container, you need the setup below.
+If you are running `dagu` using a container, there are two options to use the host's Docker environment.
+
+1. Mount the Docker socket to the container and pass through the host's docker group id. See the example in :ref:`Using Docker Compose <Using Docker Compose>`
+
+Or
 
 1. Run a `socat` container with the command below.
 

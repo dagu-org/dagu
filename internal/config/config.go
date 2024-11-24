@@ -19,10 +19,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/spf13/viper"
@@ -30,30 +32,33 @@ import (
 
 // Config represents the configuration for the server.
 type Config struct {
-	Host               string   // Server host
-	Port               int      // Server port
-	DAGs               string   // Location of DAG files
-	Executable         string   // Executable path
-	WorkDir            string   // Default working directory
-	IsBasicAuth        bool     // Enable basic auth
-	BasicAuthUsername  string   // Basic auth username
-	BasicAuthPassword  string   // Basic auth password
-	LogEncodingCharset string   // Log encoding charset
-	LogDir             string   // Log directory
-	DataDir            string   // Data directory
-	SuspendFlagsDir    string   // Suspend flags directory
-	AdminLogsDir       string   // Directory for admin logs
-	BaseConfig         string   // Common config file for all DAGs.
-	NavbarColor        string   // Navbar color for the web UI
-	NavbarTitle        string   // Navbar title for the web UI
-	Env                sync.Map // Store environment variables
-	TLS                *TLS     // TLS configuration
-	IsAuthToken        bool     // Enable auth token for API
-	AuthToken          string   // Auth token for API
-	LatestStatusToday  bool     // Show latest status today or the latest status
-	APIBaseURL         string   // Base URL for API
-	Debug              bool     // Enable debug mode (verbose logging)
-	LogFormat          string   // Log format
+	Host               string         // Server host
+	Port               int            // Server port
+	DAGs               string         // Location of DAG files
+	Executable         string         // Executable path
+	WorkDir            string         // Default working directory
+	IsBasicAuth        bool           // Enable basic auth
+	BasicAuthUsername  string         // Basic auth username
+	BasicAuthPassword  string         // Basic auth password
+	LogEncodingCharset string         // Log encoding charset
+	LogDir             string         // Log directory
+	DataDir            string         // Data directory
+	SuspendFlagsDir    string         // Suspend flags directory
+	AdminLogsDir       string         // Directory for admin logs
+	BaseConfig         string         // Common config file for all DAGs.
+	NavbarColor        string         // Navbar color for the web UI
+	NavbarTitle        string         // Navbar title for the web UI
+	Env                sync.Map       // Store environment variables
+	TLS                *TLS           // TLS configuration
+	IsAuthToken        bool           // Enable auth token for API
+	AuthToken          string         // Auth token for API
+	LatestStatusToday  bool           // Show latest status today or the latest status
+	BasePath           string         // Base path for the server
+	APIBaseURL         string         // Base URL for API
+	Debug              bool           // Enable debug mode (verbose logging)
+	LogFormat          string         // Log format
+	TZ                 string         // The server time zone
+	Location           *time.Location // The server location
 }
 
 type TLS struct {
@@ -96,6 +101,36 @@ func Load() (*Config, error) {
 		}
 		return true
 	})
+
+	if cfg.TZ != "" {
+		loc, err := time.LoadLocation(cfg.TZ)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load timezone: %w", err)
+		}
+		cfg.Location = loc
+		os.Setenv("TZ", cfg.TZ)
+	} else {
+		// Load local timezone if not set.
+		_, offset := time.Now().Zone()
+		if offset == 0 {
+			cfg.TZ = "UTC"
+		} else {
+			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
+		}
+		cfg.Location = time.Local
+	}
+
+	if cfg.BasePath != "" {
+		cfg.BasePath = path.Clean(cfg.BasePath)
+
+		if !path.IsAbs(cfg.BasePath) {
+			cfg.BasePath = path.Join("/", cfg.BasePath)
+		}
+
+		if cfg.BasePath == "/" {
+			cfg.BasePath = ""
+		}
+	}
 
 	return &cfg, nil
 }
@@ -147,6 +182,7 @@ func setupViper() error {
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
 	viper.SetDefault("navbarTitle", "Dagu")
+	viper.SetDefault("basePath", "")
 	viper.SetDefault("apiBaseURL", "/api/v1")
 
 	// Set executable path
@@ -177,7 +213,9 @@ func bindEnvs() {
 	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
 	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
 	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
+	_ = viper.BindEnv("basePath", "DAGU_BASE_PATH")
 	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
+	_ = viper.BindEnv("tz", "DAGU_TZ")
 
 	// Basic authentication
 	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")

@@ -8,6 +8,7 @@ import DashboardTimechart from '../components/molecules/DashboardTimechart';
 import Title from '../components/atoms/Title';
 import { AppBarContext } from '../contexts/AppBarContext';
 import useSWR from 'swr';
+import { useConfig } from '../contexts/ConfigContext';
 
 type metrics = Record<SchedulerStatus, number>;
 
@@ -25,6 +26,7 @@ function Dashboard() {
   const { data } = useSWR<ListWorkflowsResponse>(`/dags`, null, {
     refreshInterval: 10000,
   });
+  const config = useConfig();
 
   React.useEffect(() => {
     if (!data) {
@@ -79,7 +81,7 @@ function Dashboard() {
             height: '100%',
           }}
         >
-          <Title>Timeline</Title>
+          <Title>{`Timeline in ${config.tz}`}</Title>
           <DashboardTimechart data={data?.DAGs || []} />
         </Box>
       </Grid>

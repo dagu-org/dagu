@@ -21,14 +21,15 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/robfig/cron/v3"
 )
 
 var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(dAG *dag.DAG, _ time.Time) job {
-	return newMockJob(dAG)
+func (f *mockJobFactory) CreateJob(workflow *dag.DAG, _ time.Time, _ cron.Schedule) job {
+	return newMockJob(workflow)
 }
 
 var _ entryReader = (*mockEntryReader)(nil)
