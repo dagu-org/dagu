@@ -60,11 +60,12 @@ type NewServerArgs struct {
 	AssetsFS  fs.FS
 
 	// Configuration for the frontend
-	NavbarColor string
-	NavbarTitle string
-	BasePath    string
-	APIBaseURL  string
-	TimeZone    string
+	NavbarColor           string
+	NavbarTitle           string
+	BasePath              string
+	APIBaseURL            string
+	TimeZone              string
+	MaxDashboardPageLimit int
 }
 
 type BasicAuth struct {
@@ -91,11 +92,12 @@ func New(params NewServerArgs) *Server {
 		handlers:  params.Handlers,
 		assets:    params.AssetsFS,
 		funcsConfig: funcsConfig{
-			NavbarColor: params.NavbarColor,
-			NavbarTitle: params.NavbarTitle,
-			BasePath:    params.BasePath,
-			APIBaseURL:  params.APIBaseURL,
-			TZ:          params.TimeZone,
+			NavbarColor:           params.NavbarColor,
+			NavbarTitle:           params.NavbarTitle,
+			BasePath:              params.BasePath,
+			APIBaseURL:            params.APIBaseURL,
+			TZ:                    params.TimeZone,
+			MaxDashboardPageLimit: params.MaxDashboardPageLimit,
 		},
 	}
 }

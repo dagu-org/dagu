@@ -32,33 +32,34 @@ import (
 
 // Config represents the configuration for the server.
 type Config struct {
-	Host               string         // Server host
-	Port               int            // Server port
-	DAGs               string         // Location of DAG files
-	Executable         string         // Executable path
-	WorkDir            string         // Default working directory
-	IsBasicAuth        bool           // Enable basic auth
-	BasicAuthUsername  string         // Basic auth username
-	BasicAuthPassword  string         // Basic auth password
-	LogEncodingCharset string         // Log encoding charset
-	LogDir             string         // Log directory
-	DataDir            string         // Data directory
-	SuspendFlagsDir    string         // Suspend flags directory
-	AdminLogsDir       string         // Directory for admin logs
-	BaseConfig         string         // Common config file for all DAGs.
-	NavbarColor        string         // Navbar color for the web UI
-	NavbarTitle        string         // Navbar title for the web UI
-	Env                sync.Map       // Store environment variables
-	TLS                *TLS           // TLS configuration
-	IsAuthToken        bool           // Enable auth token for API
-	AuthToken          string         // Auth token for API
-	LatestStatusToday  bool           // Show latest status today or the latest status
-	BasePath           string         // Base path for the server
-	APIBaseURL         string         // Base URL for API
-	Debug              bool           // Enable debug mode (verbose logging)
-	LogFormat          string         // Log format
-	TZ                 string         // The server time zone
-	Location           *time.Location // The server location
+	Host                  string         // Server host
+	Port                  int            // Server port
+	DAGs                  string         // Location of DAG files
+	Executable            string         // Executable path
+	WorkDir               string         // Default working directory
+	IsBasicAuth           bool           // Enable basic auth
+	BasicAuthUsername     string         // Basic auth username
+	BasicAuthPassword     string         // Basic auth password
+	LogEncodingCharset    string         // Log encoding charset
+	LogDir                string         // Log directory
+	DataDir               string         // Data directory
+	SuspendFlagsDir       string         // Suspend flags directory
+	AdminLogsDir          string         // Directory for admin logs
+	BaseConfig            string         // Common config file for all DAGs.
+	NavbarColor           string         // Navbar color for the web UI
+	NavbarTitle           string         // Navbar title for the web UI
+	Env                   sync.Map       // Store environment variables
+	TLS                   *TLS           // TLS configuration
+	IsAuthToken           bool           // Enable auth token for API
+	AuthToken             string         // Auth token for API
+	LatestStatusToday     bool           // Show latest status today or the latest status
+	BasePath              string         // Base path for the server
+	APIBaseURL            string         // Base URL for API
+	Debug                 bool           // Enable debug mode (verbose logging)
+	LogFormat             string         // Log format
+	TZ                    string         // The server time zone
+	Location              *time.Location // The server location
+	MaxDashboardPageLimit int            // The default page limit for the dashboard
 }
 
 type TLS struct {
@@ -184,6 +185,7 @@ func setupViper() error {
 	viper.SetDefault("navbarTitle", "Dagu")
 	viper.SetDefault("basePath", "")
 	viper.SetDefault("apiBaseURL", "/api/v1")
+	viper.SetDefault("maxDashboardPageLimit", 100)
 
 	// Set executable path
 	// This is used for invoking the workflow process on the server.
@@ -216,6 +218,7 @@ func bindEnvs() {
 	_ = viper.BindEnv("basePath", "DAGU_BASE_PATH")
 	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
 	_ = viper.BindEnv("tz", "DAGU_TZ")
+	_ = viper.BindEnv("maxDashboardPageLimit", "DAGU_MAX_DASHBOARD_PAGE_LIMIT")
 
 	// Basic authentication
 	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
