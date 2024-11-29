@@ -34,17 +34,17 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server
 	))
 
 	serverParams := server.NewServerArgs{
-		Host:        cfg.Host,
-		Port:        cfg.Port,
-		TLS:         cfg.TLS,
-		Logger:      lg,
-		Handlers:    hs,
-		AssetsFS:    assetsFS,
-		NavbarColor: cfg.NavbarColor,
-		NavbarTitle: cfg.NavbarTitle,
-		BasePath:    cfg.BasePath,
-		APIBaseURL:  cfg.APIBaseURL,
-		TimeZone:    cfg.TZ,
+		Host:                  cfg.Host,
+		Port:                  cfg.Port,
+		TLS:                   cfg.TLS,
+		Logger:                lg,
+		Handlers:              hs,
+		AssetsFS:              assetsFS,
+		NavbarColor:           cfg.NavbarColor,
+		NavbarTitle:           cfg.NavbarTitle,
+		APIBaseURL:            cfg.APIBaseURL,
+		MaxDashboardPageLimit: cfg.MaxDashboardPageLimit,
+		TimeZone:              cfg.TZ,
 	}
 
 	if cfg.IsAuthToken {

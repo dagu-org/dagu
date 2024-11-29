@@ -23,10 +23,10 @@ for (const value in SchedulerStatus) {
 function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
-  const { data } = useSWR<ListWorkflowsResponse>(`/dags`, null, {
+  const config = useConfig();
+  const { data } = useSWR<ListWorkflowsResponse>(`/dags?limit=${config.maxDashboardPageLimit}`, null, {
     refreshInterval: 10000,
   });
-  const config = useConfig();
 
   React.useEffect(() => {
     if (!data) {

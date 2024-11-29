@@ -55,11 +55,12 @@ func (srv *Server) useTemplate(
 }
 
 type funcsConfig struct {
-	NavbarColor string
-	NavbarTitle string
-	BasePath    string
-	APIBaseURL  string
-	TZ          string
+	NavbarColor           string
+	NavbarTitle           string
+	BasePath              string
+	APIBaseURL            string
+	TZ                    string
+	MaxDashboardPageLimit int
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -88,6 +89,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"tz": func() string {
 			return cfg.TZ
+		},
+		"maxDashboardPageLimit": func() int {
+			return cfg.MaxDashboardPageLimit
 		},
 	}
 }

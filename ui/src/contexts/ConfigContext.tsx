@@ -6,7 +6,8 @@ export type Config = {
   title: string;
   navbarColor: string;
   tz: string;
-  version: string;
+  version: string;  
+  maxDashboardPageLimit: number;
 };
 
 export const ConfigContext = createContext<Config>(null!);
