@@ -1,28 +1,32 @@
 {{define "base"}}
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ navbarTitle }}</title>
-    <script>
-      function getConfig() {
-        return {
-          apiURL: "{{ apiURL }}",
-          basePath: "{{ basePath }}",
-          title: "{{ navbarTitle }}",
-          navbarColor: "{{ navbarColor }}",
-          version: "{{ version }}",
-          tz: "{{ tz }}",
-          maxDashboardPageLimit: "{{ maxDashboardPageLimit }}",
-        };
-      }
-    </script>
-        <script defer="defer" src="{{ basePath }}/assets/bundle.js?v={{ version }}"></script>
-  </head>
-  <body>
-    {{template "content" .}}
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{ navbarTitle }}</title>
+        <script>
+            function getConfig() {
+                return {
+                    apiURL: "{{ apiURL }}",
+                    basePath: "{{ basePath }}",
+                    title: "{{ navbarTitle }}",
+                    navbarColor: "{{ navbarColor }}",
+                    version: "{{ version }}",
+                    tz: "{{ tz }}",
+                    maxDashboardPageLimit: "{{ maxDashboardPageLimit }}",
+                    remoteNodes: "{{ remoteNodes }}",
+                };
+            }
+        </script>
+        <script
+            defer="defer"
+            src="{{ basePath }}/assets/bundle.js?v={{ version }}"
+        ></script>
+    </head>
+    <body>
+        {{template "content" .}}
+    </body>
 </html>
 {{ end }}

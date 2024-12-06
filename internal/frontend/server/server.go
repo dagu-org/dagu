@@ -66,6 +66,7 @@ type NewServerArgs struct {
 	APIBaseURL            string
 	TimeZone              string
 	MaxDashboardPageLimit int
+	RemoteNodes           []string
 }
 
 type BasicAuth struct {
@@ -98,6 +99,7 @@ func New(params NewServerArgs) *Server {
 			APIBaseURL:            params.APIBaseURL,
 			TZ:                    params.TimeZone,
 			MaxDashboardPageLimit: params.MaxDashboardPageLimit,
+			RemoteNodes:           params.RemoteNodes,
 		},
 	}
 }

@@ -1,6 +1,7 @@
 import { Switch } from '@mui/material';
 import React from 'react';
 import { WorkflowListItem } from '../../models/api';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
   inputProps?: React.HTMLProps<HTMLInputElement>;
@@ -9,10 +10,13 @@ type Props = {
 };
 
 function LiveSwitch({ DAG, refresh, inputProps }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
   const [checked, setChecked] = React.useState(!DAG.Suspended);
   const onSubmit = React.useCallback(
     async (params: { name: string; action: string; value: string }) => {
-      const url = `${getConfig().apiURL}/dags/${params.name}`;
+      const url = `${getConfig().apiURL}/dags/${params.name}?remoteNode=${
+        appBarContext.selectedRemoteNode || 'local'
+      }`;
       const ret = await fetch(url, {
         method: 'POST',
         mode: 'cors',

@@ -8,6 +8,7 @@ export type Config = {
   tz: string;
   version: string;  
   maxDashboardPageLimit: number;
+  remoteNodes: string;
 };
 
 export const ConfigContext = createContext<Config>(null!);

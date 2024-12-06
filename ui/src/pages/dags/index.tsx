@@ -41,6 +41,7 @@ function DAGs() {
     limit: preferences.pageLimit.toString(),
     searchName: apiSearchText,
     searchTag: apiSearchTag,
+    remoteNode: appBarContext.selectedRemoteNode || 'local',
   }).toString()}`;
   const { data } = useSWR<ListWorkflowsResponse>(endPoint, null, {
     refreshInterval: 10000,

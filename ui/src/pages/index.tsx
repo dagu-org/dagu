@@ -24,9 +24,15 @@ function Dashboard() {
   const [metrics, setMetrics] = React.useState<metrics>(defaultMetrics);
   const appBarContext = React.useContext(AppBarContext);
   const config = useConfig();
-  const { data } = useSWR<ListWorkflowsResponse>(`/dags?limit=${config.maxDashboardPageLimit}`, null, {
-    refreshInterval: 10000,
-  });
+  const { data } = useSWR<ListWorkflowsResponse>(
+    `/dags?limit=${config.maxDashboardPageLimit}&remoteNode=${
+      appBarContext.selectedRemoteNode || 'local'
+    }`,
+    null,
+    {
+      refreshInterval: 10000,
+    }
+  );
 
   React.useEffect(() => {
     if (!data) {

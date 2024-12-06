@@ -30,8 +30,15 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server
 		&dag.NewHandlerArgs{
 			Client:             cli,
 			LogEncodingCharset: cfg.LogEncodingCharset,
+			RemoteNodes:        cfg.RemoteNodes,
+			ApiBasePath:        cfg.APIBaseURL,
 		},
 	))
+
+	var remoteNodes []string
+	for _, n := range cfg.RemoteNodes {
+		remoteNodes = append(remoteNodes, n.Name)
+	}
 
 	serverParams := server.NewServerArgs{
 		Host:                  cfg.Host,
@@ -45,6 +52,7 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server
 		APIBaseURL:            cfg.APIBaseURL,
 		MaxDashboardPageLimit: cfg.MaxDashboardPageLimit,
 		TimeZone:              cfg.TZ,
+		RemoteNodes:           remoteNodes,
 	}
 
 	if cfg.IsAuthToken {

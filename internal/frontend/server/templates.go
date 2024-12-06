@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/dagu-org/dagu/internal/constants"
@@ -61,6 +62,7 @@ type funcsConfig struct {
 	APIBaseURL            string
 	TZ                    string
 	MaxDashboardPageLimit int
+	RemoteNodes           []string
 }
 
 func defaultFunctions(cfg funcsConfig) template.FuncMap {
@@ -92,6 +94,9 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 		},
 		"maxDashboardPageLimit": func() int {
 			return cfg.MaxDashboardPageLimit
+		},
+		"remoteNodes": func() string {
+			return strings.Join(cfg.RemoteNodes, ",")
 		},
 	}
 }
