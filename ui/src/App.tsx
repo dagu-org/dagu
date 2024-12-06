@@ -19,6 +19,15 @@ type Props = {
 function App({ config }: Props) {
   const [title, setTitle] = React.useState<string>('');
   config.tz ||= moment.tz.guess();
+  const remoteNodes = config.remoteNodes
+    .split(',')
+    .filter(Boolean)
+    .map((node) => node.trim());
+  if (!remoteNodes.includes('local')) {
+    remoteNodes.unshift('local');
+  }
+  const [selectedRemoteNode, setSelectedRemoteNode] =
+    React.useState<string>('local');
 
   return (
     <SWRConfig
@@ -33,6 +42,9 @@ function App({ config }: Props) {
         value={{
           title,
           setTitle,
+          remoteNodes,
+          selectedRemoteNode,
+          selectRemoteNode: setSelectedRemoteNode,
         }}
       >
         <ConfigContext.Provider value={config}>

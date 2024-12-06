@@ -32,6 +32,7 @@ import (
 
 // Config represents the configuration for the server.
 type Config struct {
+	RemoteNodes           []RemoteNode   // Remote node API URLs (e.g., http://localhost:8080/api/v1)
 	Host                  string         // Server host
 	Port                  int            // Server port
 	DAGs                  string         // Location of DAG files
@@ -60,6 +61,18 @@ type Config struct {
 	TZ                    string         // The server time zone
 	Location              *time.Location // The server location
 	MaxDashboardPageLimit int            // The default page limit for the dashboard
+}
+
+// RemoteNode is the configuration for a remote host that can be proxied by the server.
+// This is useful for fetching data from a remote host and displaying it on the server.
+type RemoteNode struct {
+	Name              string // Name of the remote host
+	APIBaseURL        string // Base URL for the remote host API (e.g., http://localhost:9090/api/v1)
+	IsBasicAuth       bool   // Enable basic auth
+	BasicAuthUsername string // Basic auth username
+	BasicAuthPassword string // Basic auth password
+	IsAuthToken       bool   // Enable auth token for API
+	AuthToken         string // Auth token for API
 }
 
 type TLS struct {

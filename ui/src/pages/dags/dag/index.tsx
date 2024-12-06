@@ -31,7 +31,7 @@ function DAGDetails() {
   const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
     `/dags/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
       window.location.search
-    ).toString()}`,
+    ).toString()}&remoteNode=${appBarContext.selectedRemoteNode || 'local'}`,
     null,
     {
       refreshInterval: 2000,

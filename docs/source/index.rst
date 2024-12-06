@@ -44,6 +44,9 @@ Quick Start
 :ref:`Configuration Options`
    Configuration options.
 
+:ref:`Remote Node Configuration`
+   Remote Node Configuration.
+
 .. toctree::
    :caption: Installation
    :hidden:
@@ -75,6 +78,7 @@ Quick Start
    :hidden:
 
    config
+   config_remote
    scheduler
    auth
    email

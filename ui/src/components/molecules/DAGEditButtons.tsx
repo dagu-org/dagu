@@ -1,11 +1,13 @@
 import React from 'react';
 import { Button, Stack } from '@mui/material';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
   name: string;
 };
 
 function DAGEditButtons({ name }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
   return (
     <Stack direction="row" spacing={1}>
       <Button
@@ -18,7 +20,9 @@ function DAGEditButtons({ name }: Props) {
             alert('DAG name cannot contain space');
             return;
           }
-          const url = `${getConfig().apiURL}/dags/${name}`;
+          const url = `${getConfig().apiURL}/dags/${name}?remoteNode=${
+            appBarContext.selectedRemoteNode || 'local'
+          }`;
           const resp = await fetch(url, {
             method: 'POST',
             headers: {

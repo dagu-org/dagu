@@ -1,7 +1,9 @@
 import { Button } from '@mui/material';
 import React from 'react';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 function CreateDAGButton() {
+  const appBarContext = React.useContext(AppBarContext);
   return (
     <Button
       variant="outlined"
@@ -22,15 +24,20 @@ function CreateDAGButton() {
           alert('File name cannot contain space');
           return;
         }
-        const resp = await fetch(`${getConfig().apiURL}/dags`, {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'new',
-            value: name,
-          }),
-        });
+        const resp = await fetch(
+          `${getConfig().apiURL}/dags?remoteNode=${
+            appBarContext.selectedRemoteNode || 'local'
+          }`,
+          {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'new',
+              value: name,
+            }),
+          }
+        );
         if (resp.ok) {
           window.location.href = `/dags/${name.replace(/.yaml$/, '')}/spec`;
         } else {
