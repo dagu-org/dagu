@@ -1,4 +1,5 @@
 import React from 'react';
+import { AppBarContext } from '../contexts/AppBarContext';
 
 type Options = {
   name: string;
@@ -8,9 +9,12 @@ type Options = {
 };
 
 export function useDAGPostAPI(opts: Options) {
+  const appBarContext = React.useContext(AppBarContext);
   const doPost = React.useCallback(
     async (action: string, step?: string) => {
-      const url = `${getConfig().apiURL}/dags/${opts.name}`;
+      const url = `${getConfig().apiURL}/dags/${opts.name}?remoteNode=${
+        appBarContext.selectedRemoteNode || 'local'
+      }`;
       const ret = await fetch(url, {
         method: 'POST',
         mode: 'cors',

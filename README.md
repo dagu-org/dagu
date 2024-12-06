@@ -63,6 +63,8 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
     -   [3. Edit the DAG](#3-edit-the-dag)
     -   [4. Execute the DAG](#4-execute-the-dag)
 -   [**CLI**](#cli)
+-   [**Remote Node Management support**](#remote-node-management-support)
+    -   [Configuration](#configuration)
 -   [**Localized Documentation**](#localized-documentation)
 -   [**Documentation**](#documentation)
 -   [**Running as a daemon**](#running-as-a-daemon)
@@ -92,6 +94,10 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
     -   Sending emails
     -   Running jq command
     -   Executing remote commands via SSH
+-   Remote Node support for managing multiple Dagu instances:
+    -   Monitor DAGs across different environments
+    -   Switch between nodes through UI dropdown
+    -   Centralized management interface
 -   Email notification
 -   Scheduling with Cron expressions
 -   REST API Interface
@@ -253,6 +259,29 @@ dagu scheduler [--dags=<path to directory>]
 dagu version
 ```
 
+## **Remote Node Management support**
+
+Dagu supports managing multiple Dagu servers from a single UI through its remote node feature. This allows you to:
+
+-   Monitor and manage DAGs across different environments (dev, staging, prod)
+-   Access multiple Dagu instances from a centralized UI
+-   Switch between nodes easily through the UI dropdown
+
+See [Remote Node Configuration](https://dagu.readthedocs.io/en/latest/config_remote.html) for more details.
+
+### Configuration
+
+Remote nodes can be configured by creating `admin.yaml` in `$HOME/.config/dagu/`:
+
+```yaml
+# admin.yaml
+remoteNodes:
+    - name: "prod" # Name of the remote node
+      apiBaseUrl: "https://prod.example.com/api/v1" # Base URL of the remote node API
+    - name: "staging"
+      apiBaseUrl: "https://staging.example.com/api/v1"
+```
+
 ## **Localized Documentation**
 
 -   [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
@@ -289,6 +318,7 @@ dagu version
     -   [JSON Processing](https://dagu.readthedocs.io/en/latest/examples.html#querying-json-data-with-jq)
     -   [Email](https://dagu.readthedocs.io/en/latest/examples.html#sending-email)
 -   [Configurations](https://dagu.readthedocs.io/en/latest/config.html)
+-   [Remote Node](https://dagu.readthedocs.io/en/latest/config_remote.html)
 -   [Scheduler](https://dagu.readthedocs.io/en/latest/scheduler.html)
 -   [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
 -   [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)

@@ -16,14 +16,17 @@
 package dag
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/dag"
 	"github.com/dagu-org/dagu/internal/dag/scheduler"
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
@@ -32,6 +35,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/server"
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"
 	"github.com/samber/lo"
@@ -59,23 +63,36 @@ var (
 type Handler struct {
 	client             client.Client
 	logEncodingCharset string
+	remoteNodes        map[string]config.RemoteNode
+	apiBasePath        string
 }
 
 type NewHandlerArgs struct {
 	Client             client.Client
 	LogEncodingCharset string
+	RemoteNodes        []config.RemoteNode
+	ApiBasePath        string
 }
 
 func NewHandler(args *NewHandlerArgs) server.Handler {
+	remoteNodes := make(map[string]config.RemoteNode)
+	for _, node := range args.RemoteNodes {
+		remoteNodes[node.Name] = node
+	}
 	return &Handler{
 		client:             args.Client,
 		logEncodingCharset: args.LogEncodingCharset,
+		remoteNodes:        remoteNodes,
+		apiBasePath:        args.ApiBasePath,
 	}
 }
 
 func (h *Handler) Configure(api *operations.DaguAPI) {
 	api.DagsListDagsHandler = dags.ListDagsHandlerFunc(
 		func(params dags.ListDagsParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			resp, err := h.getList(params)
 			if err != nil {
 				return dags.NewListDagsDefault(err.Code).
@@ -86,6 +103,9 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 
 	api.DagsGetDagDetailsHandler = dags.GetDagDetailsHandlerFunc(
 		func(params dags.GetDagDetailsParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			resp, err := h.getDetail(params)
 			if err != nil {
 				return dags.NewGetDagDetailsDefault(err.Code).
@@ -96,6 +116,9 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 
 	api.DagsPostDagActionHandler = dags.PostDagActionHandlerFunc(
 		func(params dags.PostDagActionParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(params.Body, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			resp, err := h.postAction(params)
 			if err != nil {
 				return dags.NewPostDagActionDefault(err.Code).
@@ -106,6 +129,9 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 
 	api.DagsCreateDagHandler = dags.CreateDagHandlerFunc(
 		func(params dags.CreateDagParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(params.Body, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			resp, err := h.createDAG(params)
 			if err != nil {
 				return dags.NewCreateDagDefault(err.Code).
@@ -116,6 +142,9 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 
 	api.DagsDeleteDagHandler = dags.DeleteDagHandlerFunc(
 		func(params dags.DeleteDagParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			err := h.deleteDAG(params)
 			if err != nil {
 				return dags.NewDeleteDagDefault(err.Code).
@@ -126,6 +155,9 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 
 	api.DagsSearchDagsHandler = dags.SearchDagsHandlerFunc(
 		func(params dags.SearchDagsParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			resp, err := h.searchDAGs(params)
 			if err != nil {
 				return dags.NewSearchDagsDefault(err.Code).
@@ -136,6 +168,9 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 
 	api.DagsListTagsHandler = dags.ListTagsHandlerFunc(
 		func(params dags.ListTagsParams) middleware.Responder {
+			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
+				return resp
+			}
 			tags, err := h.getTagList(params)
 			if err != nil {
 				return dags.NewListTagsDefault(err.Code).
@@ -143,6 +178,143 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			}
 			return dags.NewListTagsOK().WithPayload(tags)
 		})
+}
+
+// handleRemoteNodeProxy checks if 'remoteNode' is present in the query parameters.
+// If yes, it proxies the request to the remote node and returns the remote response.
+// If not, it returns nil, indicating to proceed locally.
+func (h *Handler) handleRemoteNodeProxy(body any, r *http.Request) middleware.Responder {
+	if r == nil {
+		return nil
+	}
+
+	remoteNodeName := r.URL.Query().Get("remoteNode")
+	if remoteNodeName == "" || remoteNodeName == "local" {
+		return nil // No remote node specified, handle locally
+	}
+
+	node, ok := h.remoteNodes[remoteNodeName]
+	if !ok {
+		// remote node not found, return bad request
+		return dags.NewListDagsDefault(400)
+	}
+
+	// forward the request to the remote node
+	return h.doRemoteProxy(body, r, node)
+}
+
+// doRemoteProxy performs the actual proxying of the request to the remote node.
+func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config.RemoteNode) middleware.Responder {
+	// Copy original query parameters except remoteNode
+	q := originalReq.URL.Query()
+	q.Del("remoteNode")
+
+	// Build the new remote URL
+	urlComponents := strings.Split(originalReq.URL.Path, h.apiBasePath)
+	if len(urlComponents) < 2 {
+		return h.responderWithCodedError(&codedError{
+			Code: 400,
+			APIError: &models.APIError{
+				Message: swag.String("invalid API path"),
+			}})
+	}
+	remoteURL := fmt.Sprintf("%s%s?%s", strings.TrimSuffix(node.APIBaseURL, "/"), urlComponents[1], q.Encode())
+
+	method := originalReq.Method
+	var bodyJSON io.Reader
+	if body != nil {
+		// Forward the request body if needed
+		// originalReq.Body is a ReadCloser; ensure we can read it only once.
+		// Typically, you'd buffer it or ensure it's reusable.
+		// For simplicity, let's assume we can read it directly.
+		data, err := json.Marshal(body)
+		if err != nil {
+			return h.responderWithCodedError(&codedError{
+				Code: 502,
+				APIError: &models.APIError{
+					Message: swag.String(fmt.Sprintf("failed to read request body: %v", err)),
+				}})
+		}
+		bodyJSON = strings.NewReader(string(data))
+	}
+
+	req, err := http.NewRequest(method, remoteURL, bodyJSON)
+	if err != nil {
+		return h.responderWithCodedError(&codedError{
+			Code: 502,
+			APIError: &models.APIError{
+				Message: swag.String(fmt.Sprintf("failed to create request to remote node: %v", err)),
+			}})
+	}
+
+	// Copy headers from the original request if needed
+	// But we need to overwrite authorization headers
+	if node.IsBasicAuth {
+		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
+	} else if node.IsAuthToken {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", node.AuthToken))
+	}
+	for k, v := range originalReq.Header {
+		if k == "Authorization" {
+			continue
+		}
+		for _, vv := range v {
+			req.Header.Add(k, vv)
+		}
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	defer func() {
+		_ = resp.Body.Close()
+	}() // Ensure we close the response body
+	if err != nil {
+		return h.responderWithCodedError(&codedError{
+			Code: 502,
+			APIError: &models.APIError{
+				Message: swag.String(fmt.Sprintf("failed to send request to remote node: %v", err)),
+			}})
+	}
+	defer resp.Body.Close()
+
+	// If not status 200, return an error
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		// Try to decode remote error if it's JSON
+		var remoteErr models.APIError
+		if err := json.NewDecoder(resp.Body).Decode(&remoteErr); err == nil && remoteErr.Message != nil {
+			return h.responderWithCodedError(&codedError{
+				Code:     resp.StatusCode,
+				APIError: &remoteErr,
+			})
+		}
+		// If we cannot decode a proper error, return a generic one
+		payload := &models.APIError{
+			Message: swag.String(fmt.Sprintf("remote node responded with status %d", resp.StatusCode)),
+		}
+		return h.responderWithCodedError(&codedError{
+			Code:     resp.StatusCode,
+			APIError: payload,
+		})
+	}
+
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return h.responderWithCodedError(&codedError{
+			Code: 502,
+			APIError: &models.APIError{
+				Message: swag.String(fmt.Sprintf("failed to read response from remote node: %v", err)),
+			}})
+	}
+
+	return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
+		w.WriteHeader(resp.StatusCode)
+		_, _ = w.Write(respData)
+	})
+}
+
+func (h *Handler) responderWithCodedError(err *codedError) middleware.Responder {
+	return dags.NewListDagsDefault(err.Code).
+		WithPayload(err.APIError)
 }
 
 func (h *Handler) createDAG(
