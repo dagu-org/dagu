@@ -18,7 +18,7 @@ Example Dockerfile for building a multi-platform image:
         yarn build
 
     # Stage 2: Go Builder
-    FROM --platform=$TARGETPLATFORM golang:1.22-alpine as go-builder
+    FROM --platform=$TARGETPLATFORM golang:1.23-alpine as go-builder
 
     ARG LDFLAGS
     ARG TARGETOS

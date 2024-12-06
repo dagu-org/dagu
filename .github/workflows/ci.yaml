@@ -1,84 +1,84 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+-*"
-  pull_request:
-    types:
-      - opened
-      - reopened # new commits are pushed to the branch that the PR is based on
-      - synchronize # new commits are pushed to the branch that the PR is based on
-      - ready_for_review # PR is ready for review
+    push:
+        branches:
+            - main
+        tags:
+            - "v[0-9]+.[0-9]+.[0-9]+"
+            - "v[0-9]+.[0-9]+.[0-9]+-*"
+    pull_request:
+        types:
+            - opened
+            - reopened # new commits are pushed to the branch that the PR is based on
+            - synchronize # new commits are pushed to the branch that the PR is based on
+            - ready_for_review # PR is ready for review
 
 jobs:
-  # Spell check
-  codespell:
-    name: Check for spelling errors
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    # Spell check
+    codespell:
+        name: Check for spelling errors
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Codespell
-        uses: codespell-project/actions-codespell@v2
+            - name: Codespell
+              uses: codespell-project/actions-codespell@v2
 
-  # Lint Go code
-  golint:
-    name: Go Linter
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+    # Lint Go code
+    golint:
+        name: Go Linter
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out code
+              uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version-file: go.mod
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.59
-          args: --timeout=10m
+            - name: Run golangci-lint
+              uses: golangci/golangci-lint-action@v6
+              with:
+                  version: v1.62
+                  args: --timeout=10m
 
-  # Test Go code
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+    # Test Go code
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out code
+              uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version-file: go.mod
 
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+            - name: Cache Go modules
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/go-build
+                      ~/go/pkg/mod
+                  key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+                  restore-keys: |
+                      ${{ runner.os }}-go-
 
-      - name: Build
-        run: |
-          make build-bin
+            - name: Build
+              run: |
+                  make build-bin
 
-      - name: Test
-        run: |
-          make test-coverage
+            - name: Test
+              run: |
+                  make test-coverage
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.txt
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+            - name: Upload coverage
+              uses: codecov/codecov-action@v4
+              with:
+                  files: ./coverage.txt
+              env:
+                  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
