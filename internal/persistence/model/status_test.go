@@ -83,7 +83,7 @@ func TestJsonMarshal(t *testing.T) {
 	step.OutputVariables.Store("A", "B")
 	rawJSON, err := json.Marshal(step)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
-	t.Logf(string(rawJSON))
+	t.Log(string(rawJSON))
 }

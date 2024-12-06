@@ -89,4 +89,4 @@ linters-settings:
 
 run:
   allow-parallel-runners: true
-  go: "1.22"
+  go: "1.23"

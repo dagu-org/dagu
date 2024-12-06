@@ -18,4 +18,6 @@
     "files.associations": {
         "*.gohtml": "html"
     },
+    "prettier.tabWidth": 2,
+    "editor.tabSize": 2,
 }
