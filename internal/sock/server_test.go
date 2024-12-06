@@ -62,7 +62,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 
 	go func() {
 		err := unixServer.Serve(listen)
-		require.True(t, errors.Is(sock.ErrServerRequestedShutdown, err))
+		require.True(t, errors.Is(err, sock.ErrServerRequestedShutdown))
 	}()
 
 	time.Sleep(time.Millisecond * 50)
