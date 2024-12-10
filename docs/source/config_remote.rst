@@ -31,6 +31,9 @@ Create ``admin.yaml`` in ``$HOME/.config/dagu/`` to configure remote nodes. Exam
       isAuthToken: true              # Enable API token (optional)
       authToken: "your-secret-token" # API token value (optional)
 
+      # TLS settings
+      skipTLSVerify: false           # Skip TLS verification (optional)
+
 Using Remote Nodes
 -----------------
 Once configured, remote nodes can be selected from the dropdown menu in the top right corner of the UI. This allows you to:

@@ -73,6 +73,7 @@ type RemoteNode struct {
 	BasicAuthPassword string // Basic auth password
 	IsAuthToken       bool   // Enable auth token for API
 	AuthToken         string // Auth token for API
+	SkipTLSVerify     bool   // Skip TLS verification
 }
 
 type TLS struct {

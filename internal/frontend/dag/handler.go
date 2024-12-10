@@ -16,6 +16,7 @@
 package dag
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
@@ -223,10 +225,6 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 	method := originalReq.Method
 	var bodyJSON io.Reader
 	if body != nil {
-		// Forward the request body if needed
-		// originalReq.Body is a ReadCloser; ensure we can read it only once.
-		// Typically, you'd buffer it or ensure it's reusable.
-		// For simplicity, let's assume we can read it directly.
 		data, err := json.Marshal(body)
 		if err != nil {
 			return h.responderWithCodedError(&codedError{
@@ -263,11 +261,21 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 		}
 	}
 
-	client := &http.Client{}
+	// Create a custom transport that skips certificate verification
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			// Allow insecure TLS connections if the remote node is configured to skip verification
+			// This may be necessary for some enterprise setups
+			InsecureSkipVerify: node.SkipTLSVerify, // nolint:gosec
+		},
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second, // Add a reasonable timeout
+	}
+
 	resp, err := client.Do(req)
-	defer func() {
-		_ = resp.Body.Close()
-	}() // Ensure we close the response body
 	if err != nil {
 		return h.responderWithCodedError(&codedError{
 			Code: 502,
@@ -275,27 +283,20 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 				Message: swag.String(fmt.Sprintf("failed to send request to remote node: %v", err)),
 			}})
 	}
-	defer resp.Body.Close()
 
-	// If not status 200, return an error
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		// Try to decode remote error if it's JSON
-		var remoteErr models.APIError
-		if err := json.NewDecoder(resp.Body).Decode(&remoteErr); err == nil && remoteErr.Message != nil {
-			return h.responderWithCodedError(&codedError{
-				Code:     resp.StatusCode,
-				APIError: &remoteErr,
-			})
-		}
-		// If we cannot decode a proper error, return a generic one
-		payload := &models.APIError{
-			Message: swag.String(fmt.Sprintf("remote node responded with status %d", resp.StatusCode)),
-		}
+	if resp == nil {
 		return h.responderWithCodedError(&codedError{
-			Code:     resp.StatusCode,
-			APIError: payload,
-		})
+			Code: 502,
+			APIError: &models.APIError{
+				Message: swag.String("received nil response from remote node"),
+			}})
 	}
+
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -304,6 +305,28 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 			APIError: &models.APIError{
 				Message: swag.String(fmt.Sprintf("failed to read response from remote node: %v", err)),
 			}})
+	}
+
+	// If not status 200, try to parse the error response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		// Only try to decode JSON if we actually got some response data
+		if len(respData) > 0 {
+			var remoteErr models.APIError
+			if err := json.Unmarshal(respData, &remoteErr); err == nil && remoteErr.Message != nil {
+				return h.responderWithCodedError(&codedError{
+					Code:     resp.StatusCode,
+					APIError: &remoteErr,
+				})
+			}
+		}
+		// If we can't decode a proper error or have no data, return a generic one
+		payload := &models.APIError{
+			Message: swag.String(fmt.Sprintf("remote node responded with status %d", resp.StatusCode)),
+		}
+		return h.responderWithCodedError(&codedError{
+			Code:     resp.StatusCode,
+			APIError: payload,
+		})
 	}
 
 	return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
