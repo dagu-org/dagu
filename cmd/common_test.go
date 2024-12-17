@@ -112,12 +112,12 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	workflow, err := digraph.Load(context.Background(), cfg.BaseConfig, dagFile, "")
+	dag, err := digraph.Load(context.Background(), cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	ctx := context.Background()
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(ctx, workflow)
+		status, err := e.GetCurrentStatus(ctx, dag)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)

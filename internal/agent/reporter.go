@@ -38,7 +38,7 @@ func newReporter(sender Sender, lg logger.Logger) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	workflow *digraph.DAG, status *model.Status, node *scheduler.Node,
+	dag *digraph.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
@@ -49,13 +49,13 @@ func (r *reporter) reportStep(
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
 		return r.sender.Send(
-			workflow.ErrorMail.From,
-			[]string{workflow.ErrorMail.To},
+			dag.ErrorMail.From,
+			[]string{dag.ErrorMail.To},
 			fmt.Sprintf(
-				"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
+				"%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status,
 			),
 			renderHTML(status.Nodes),
-			addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
+			addAttachmentList(dag.ErrorMail.AttachLogs, status.Nodes),
 		)
 	}
 	return nil
@@ -75,30 +75,30 @@ func (r *reporter) report(status *model.Status, err error) {
 
 // send is a function that sends a report mail.
 func (r *reporter) send(
-	workflow *digraph.DAG, status *model.Status, err error,
+	dag *digraph.DAG, status *model.Status, err error,
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if workflow.MailOn != nil && workflow.MailOn.Failure {
+		if dag.MailOn != nil && dag.MailOn.Failure {
 			return r.sender.Send(
-				workflow.ErrorMail.From,
-				[]string{workflow.ErrorMail.To},
+				dag.ErrorMail.From,
+				[]string{dag.ErrorMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
+					"%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
+				addAttachmentList(dag.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if workflow.MailOn != nil && workflow.MailOn.Success {
+		if dag.MailOn != nil && dag.MailOn.Success {
 			_ = r.sender.Send(
-				workflow.InfoMail.From,
-				[]string{workflow.InfoMail.To},
+				dag.InfoMail.From,
+				[]string{dag.InfoMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", workflow.InfoMail.Prefix, workflow.Name, status.Status,
+					"%s %s (%s)", dag.InfoMail.Prefix, dag.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(workflow.InfoMail.AttachLogs, status.Nodes),
+				addAttachmentList(dag.InfoMail.AttachLogs, status.Nodes),
 			)
 		}
 	}

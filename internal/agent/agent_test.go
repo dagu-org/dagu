@@ -28,12 +28,12 @@ func TestAgent_Run(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		workflow := testLoadDAG(t, "run.yaml")
+		dag := testLoadDAG(t, "run.yaml")
 		cli := setup.Client()
 		ctx := context.Background()
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 
-		latestStatus, err := cli.GetLatestStatus(ctx, workflow)
+		latestStatus, err := cli.GetLatestStatus(ctx, dag)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusNone, latestStatus.Status)
 
@@ -45,7 +45,7 @@ func TestAgent_Run(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusSuccess
 		}, time.Second*2, time.Millisecond*100)
@@ -55,32 +55,32 @@ func TestAgent_Run(t *testing.T) {
 		defer setup.Cleanup()
 
 		// Create a history file by running a DAG
-		workflow := testLoadDAG(t, "simple.yaml")
+		dag := testLoadDAG(t, "simple.yaml")
 		cli := setup.Client()
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		ctx := context.Background()
 
 		err := agt.Run(context.Background())
 		require.NoError(t, err)
-		history := cli.GetRecentHistory(ctx, workflow, 2)
+		history := cli.GetRecentHistory(ctx, dag, 2)
 		require.Equal(t, 1, len(history))
 
 		// Set the retention days to 0 and run the DAG again
-		workflow.HistRetentionDays = 0
-		agt = newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		dag.HistRetentionDays = 0
+		agt = newAgent(setup, genRequestID(), dag, &agent.Options{})
 		err = agt.Run(context.Background())
 		require.NoError(t, err)
 
 		// Check if only the latest history file exists
-		history = cli.GetRecentHistory(ctx, workflow, 2)
+		history = cli.GetRecentHistory(ctx, dag, 2)
 		require.Equal(t, 1, len(history))
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		workflow := testLoadDAG(t, "is_running.yaml")
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		dag := testLoadDAG(t, "is_running.yaml")
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		ctx := context.Background()
 
 		go func() {
@@ -93,7 +93,7 @@ func TestAgent_Run(t *testing.T) {
 		require.NotNil(t, curStatus)
 		require.Equal(t, curStatus.Status, scheduler.StatusRunning)
 
-		agt = newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt = newAgent(setup, genRequestID(), dag, &agent.Options{})
 		err := agt.Run(ctx)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "is already running")
@@ -102,12 +102,12 @@ func TestAgent_Run(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		workflow := testLoadDAG(t, "multiple_steps.yaml")
+		dag := testLoadDAG(t, "multiple_steps.yaml")
 
 		// Precondition is not met
-		workflow.Preconditions = []digraph.Condition{{Condition: "`echo 1`", Expected: "0"}}
+		dag.Preconditions = []digraph.Condition{{Condition: "`echo 1`", Expected: "0"}}
 
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		err := agt.Run(context.Background())
 		require.Error(t, err)
 
@@ -150,9 +150,9 @@ func TestAgent_Run(t *testing.T) {
 
 		abortFunc := func(a *agent.Agent) { a.Signal(syscall.SIGTERM) }
 
-		workflow := testLoadDAG(t, "sleep.yaml")
+		dag := testLoadDAG(t, "sleep.yaml")
 		cli := setup.Client()
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		ctx := context.Background()
 
 		go func() {
@@ -161,7 +161,7 @@ func TestAgent_Run(t *testing.T) {
 
 		// wait for the DAG to start
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusRunning
 		}, time.Second*1, time.Millisecond*100)
@@ -170,7 +170,7 @@ func TestAgent_Run(t *testing.T) {
 		abortFunc(agt)
 
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusCancel
 		}, time.Second*1, time.Millisecond*100)
@@ -179,8 +179,8 @@ func TestAgent_Run(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		workflow := testLoadDAG(t, "on_exit.yaml")
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		dag := testLoadDAG(t, "on_exit.yaml")
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		err := agt.Run(context.Background())
 		require.NoError(t, err)
 
@@ -202,9 +202,9 @@ func TestAgent_DryRun(t *testing.T) {
 		setup := test.SetupTest(t)
 		defer setup.Cleanup()
 
-		workflow := testLoadDAG(t, "dry.yaml")
+		dag := testLoadDAG(t, "dry.yaml")
 		ctx := context.Background()
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{
 			Dry: true,
 		})
 
@@ -217,7 +217,7 @@ func TestAgent_DryRun(t *testing.T) {
 
 		// Check if the status is not saved
 		cli := setup.Client()
-		history := cli.GetRecentHistory(ctx, workflow, 1)
+		history := cli.GetRecentHistory(ctx, dag, 1)
 		require.Equal(t, 0, len(history))
 	})
 }
@@ -229,9 +229,9 @@ func TestAgent_Retry(t *testing.T) {
 		defer setup.Cleanup()
 
 		// retry.yaml has a DAG that fails
-		workflow := testLoadDAG(t, "retry.yaml")
+		dag := testLoadDAG(t, "retry.yaml")
 
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		err := agt.Run(context.Background())
 		require.Error(t, err)
 
@@ -245,7 +245,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Retry the DAG and check if it is successful
-		agt = newAgent(setup, genRequestID(), workflow, &agent.Options{
+		agt = newAgent(setup, genRequestID(), dag, &agent.Options{
 			RetryTarget: status,
 		})
 		err = agt.Run(context.Background())
@@ -270,8 +270,8 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		defer setup.Cleanup()
 
 		// Start a long-running DAG
-		workflow := testLoadDAG(t, "handle_http.yaml")
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		dag := testLoadDAG(t, "handle_http.yaml")
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		ctx := context.Background()
 		go func() {
 			err := agt.Run(context.Background())
@@ -281,7 +281,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Wait for the DAG to start
 		cli := setup.Client()
 		require.Eventually(t, func() bool {
-			status, _ := cli.GetLatestStatus(ctx, workflow)
+			status, _ := cli.GetLatestStatus(ctx, dag)
 			// require.NoError(t, err)
 			return status.Status == scheduler.StatusRunning
 		}, time.Second*2, time.Millisecond*100)
@@ -301,7 +301,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Stop the DAG
 		agt.Signal(syscall.SIGTERM)
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusCancel
 		}, time.Second*2, time.Millisecond*100)
@@ -312,8 +312,8 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		defer setup.Cleanup()
 
 		// Start a long-running DAG
-		workflow := testLoadDAG(t, "handle_http2.yaml")
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		dag := testLoadDAG(t, "handle_http2.yaml")
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		ctx := context.Background()
 
 		go func() {
@@ -324,7 +324,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Wait for the DAG to start
 		cli := setup.Client()
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusRunning
 		}, time.Second*2, time.Millisecond*100)
@@ -341,7 +341,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Stop the DAG
 		agt.Signal(syscall.SIGTERM)
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusCancel
 		}, time.Second*2, time.Millisecond*100)
@@ -351,8 +351,8 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		defer setup.Cleanup()
 
 		// Start a long-running DAG
-		workflow := testLoadDAG(t, "handle_http3.yaml")
-		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
+		dag := testLoadDAG(t, "handle_http3.yaml")
+		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
 		ctx := context.Background()
 
 		go func() {
@@ -363,7 +363,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		// Wait for the DAG to start
 		cli := setup.Client()
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusRunning
 		}, time.Second*2, time.Millisecond*100)
@@ -379,7 +379,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 
 		// Wait for the DAG to stop
 		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, workflow)
+			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusCancel
 		}, time.Second*3, time.Millisecond*100)
@@ -415,9 +415,9 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 // without base config or parameters.
 func testLoadDAG(t *testing.T, name string) *digraph.DAG {
 	file := filepath.Join(fileutil.MustGetwd(), "testdata", name)
-	workflow, err := digraph.Load(context.Background(), "", file, "")
+	dag, err := digraph.Load(context.Background(), "", file, "")
 	require.NoError(t, err)
-	return workflow
+	return dag
 }
 
 func genRequestID() string {
@@ -431,12 +431,12 @@ func genRequestID() string {
 func newAgent(
 	setup test.Setup,
 	requestID string,
-	workflow *digraph.DAG,
+	dag *digraph.DAG,
 	opts *agent.Options,
 ) *agent.Agent {
 	return agent.New(
 		requestID,
-		workflow,
+		dag,
 		test.NewLogger(),
 		setup.Config.LogDir,
 		"",

@@ -16,8 +16,8 @@ var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(workflow *digraph.DAG, _ time.Time, _ cron.Schedule) job {
-	return newMockJob(workflow)
+func (f *mockJobFactory) CreateJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) job {
+	return newMockJob(dag)
 }
 
 var _ entryReader = (*mockEntryReader)(nil)
@@ -26,11 +26,11 @@ type mockEntryReader struct {
 	Entries []*entry
 }
 
-func (er *mockEntryReader) Read(ctx context.Context, _ time.Time) ([]*entry, error) {
+func (er *mockEntryReader) Read(_ context.Context, _ time.Time) ([]*entry, error) {
 	return er.Entries, nil
 }
 
-func (er *mockEntryReader) Start(ctx context.Context, _ chan any) {}
+func (er *mockEntryReader) Start(_ context.Context, _ chan any) {}
 
 var _ job = (*mockJob)(nil)
 
@@ -43,18 +43,18 @@ type mockJob struct {
 	Panic        error
 }
 
-func newMockJob(workflow *digraph.DAG) *mockJob {
+func newMockJob(dag *digraph.DAG) *mockJob {
 	return &mockJob{
-		DAG:  workflow,
-		Name: workflow.Name,
+		DAG:  dag,
+		Name: dag.Name,
 	}
 }
 
-func (j *mockJob) GetDAG(ctx context.Context) *digraph.DAG {
+func (j *mockJob) GetDAG(_ context.Context) *digraph.DAG {
 	return j.DAG
 }
 
-func (j *mockJob) Start(ctx context.Context) error {
+func (j *mockJob) Start(_ context.Context) error {
 	j.RunCount.Add(1)
 	if j.Panic != nil {
 		panic(j.Panic)
@@ -62,12 +62,12 @@ func (j *mockJob) Start(ctx context.Context) error {
 	return nil
 }
 
-func (j *mockJob) Stop(ctx context.Context) error {
+func (j *mockJob) Stop(_ context.Context) error {
 	j.StopCount.Add(1)
 	return nil
 }
 
-func (j *mockJob) Restart(ctx context.Context) error {
+func (j *mockJob) Restart(_ context.Context) error {
 	j.RestartCount.Add(1)
 	return nil
 }

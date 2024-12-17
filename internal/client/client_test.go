@@ -314,9 +314,9 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		workflow, err := digraph.Load(ctx, "", filepath.Join(setup.Config.DAGs, id+".yaml"), "")
+		dag, err := digraph.Load(ctx, "", filepath.Join(setup.Config.DAGs, id+".yaml"), "")
 		require.NoError(t, err)
-		require.Equal(t, "test-dag", workflow.Name)
+		require.Equal(t, "test-dag", dag.Name)
 	})
 	t.Run("Rename", func(t *testing.T) {
 		setup := test.SetupTest(t)
@@ -377,10 +377,10 @@ func testDAG(name string) string {
 	return filepath.Join(testdataDir, name)
 }
 
-func testNewStatus(workflow *digraph.DAG, requestID string, status scheduler.Status,
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status,
 	nodeStatus scheduler.NodeStatus) *model.Status {
 	ret := model.NewStatus(
-		workflow,
+		dag,
 		[]scheduler.NodeData{
 			{
 				State: scheduler.NodeState{Status: nodeStatus},

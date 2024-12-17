@@ -88,9 +88,9 @@ func (e *entry) Invoke(ctx context.Context) error {
 	}
 
 	e.Logger.Info(
-		"Workflow operation started",
+		"DAG operation started",
 		"operation", e.EntryType.String(),
-		"workflow", e.Job.String(),
+		"DAG", e.Job.String(),
 		"next", e.Next.Format(time.RFC3339),
 	)
 
@@ -171,7 +171,7 @@ func (s *Scheduler) start(ctx context.Context) {
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		s.logger.Error("Scheduler failed to read workflow entries", "error", err)
+		s.logger.Error("Scheduler failed to read DAG entries", "error", err)
 		return
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -185,15 +185,15 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 		go func(e *entry) {
 			if err := e.Invoke(ctx); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("Workflow is already finished", "workflow", e.Job, "err", err)
+					s.logger.Info("DAG is already finished", "DAG", e.Job, "err", err)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("Workflow is already running", "workflow", e.Job, "err", err)
+					s.logger.Info("DAG is already running", "DAG", e.Job, "err", err)
 				} else if errors.Is(err, errJobSkipped) {
-					s.logger.Info("Workflow is skipped", "workflow", e.Job, "err", err)
+					s.logger.Info("DAG is skipped", "DAG", e.Job, "err", err)
 				} else {
 					s.logger.Error(
-						"Workflow execution failed",
-						"workflow", e.Job,
+						"DAG execution failed",
+						"DAG", e.Job,
 						"operation", e.EntryType.String(),
 						"error", err,
 					)

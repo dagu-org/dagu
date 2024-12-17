@@ -23,7 +23,7 @@ import (
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node,
+		t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*model.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -80,11 +80,11 @@ func TestReporter(t *testing.T) {
 	}
 }
 
-func testErrorMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node) {
-	workflow.MailOn.Failure = true
-	workflow.MailOn.Success = false
+func testErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*model.Node) {
+	dag.MailOn.Failure = true
+	dag.MailOn.Success = false
 
-	_ = rp.send(workflow, &model.Status{
+	_ = rp.send(dag, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -96,11 +96,11 @@ func testErrorMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*m
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node) {
-	workflow.MailOn.Failure = false
-	workflow.MailOn.Success = true
+func testNoErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*model.Node) {
+	dag.MailOn.Failure = false
+	dag.MailOn.Success = true
 
-	err := rp.send(workflow, &model.Status{
+	err := rp.send(dag, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -111,11 +111,11 @@ func testNoErrorMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node) {
-	workflow.MailOn.Failure = true
-	workflow.MailOn.Success = true
+func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*model.Node) {
+	dag.MailOn.Failure = true
+	dag.MailOn.Success = true
 
-	err := rp.send(workflow, &model.Status{
+	err := rp.send(dag, &model.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -156,15 +156,15 @@ func testReportSummary(t *testing.T, rp *reporter, _ *digraph.DAG, nodes []*mode
 	require.Contains(t, s, "test error")
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, workflow *digraph.DAG, nodes []*model.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, dag *digraph.DAG, nodes []*model.Node) {
 	status := &model.Status{
-		Name:   workflow.Name,
+		Name:   dag.Name,
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}
 	summary := renderSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
-	require.Contains(t, summary, workflow.Name)
+	require.Contains(t, summary, dag.Name)
 }
 
 func testRenderTable(t *testing.T, _ *reporter, _ *digraph.DAG, nodes []*model.Node) {

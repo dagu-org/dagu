@@ -29,15 +29,15 @@ func statusCmd() *cobra.Command {
 			})
 
 			// Load the DAG file and get the current running status.
-			workflow, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
+			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
 			if err != nil {
-				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
+				logger.Fatal("DAG load failed", "error", err, "file", args[0])
 			}
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, logger)
 
-			curStatus, err := cli.GetCurrentStatus(cmd.Context(), workflow)
+			curStatus, err := cli.GetCurrentStatus(cmd.Context(), dag)
 
 			if err != nil {
 				logger.Fatal("Current status retrieval failed", "error", err)

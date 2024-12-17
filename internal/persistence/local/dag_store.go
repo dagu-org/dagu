@@ -340,7 +340,7 @@ func (d *dagStoreImpl) resolve(name string) (string, error) {
 	// check if the name is a file path
 	if strings.Contains(name, string(filepath.Separator)) {
 		if !fileutil.FileExists(name) {
-			return "", fmt.Errorf("workflow %s not found", name)
+			return "", fmt.Errorf("DAG %s not found", name)
 		}
 		return name, nil
 	}
@@ -349,7 +349,7 @@ func (d *dagStoreImpl) resolve(name string) (string, error) {
 	if strings.Contains(name, string(filepath.Separator)) {
 		foundPath, err := find(name)
 		if err != nil {
-			return "", fmt.Errorf("workflow %s not found", name)
+			return "", fmt.Errorf("DAG %s not found", name)
 		}
 		return foundPath, nil
 	}

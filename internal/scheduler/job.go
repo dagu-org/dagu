@@ -31,9 +31,9 @@ type jobCreatorImpl struct {
 	Client     client.Client
 }
 
-func (jf jobCreatorImpl) CreateJob(workflow *digraph.DAG, next time.Time, schedule cron.Schedule) job {
+func (jf jobCreatorImpl) CreateJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) job {
 	return &jobImpl{
-		DAG:        workflow,
+		DAG:        dag,
 		Executable: jf.Executable,
 		WorkDir:    jf.WorkDir,
 		Next:       next,

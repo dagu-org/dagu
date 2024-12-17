@@ -33,7 +33,7 @@ type entryReaderImpl struct {
 }
 
 type jobCreator interface {
-	CreateJob(workflow *digraph.DAG, next time.Time, schedule cron.Schedule) job
+	CreateJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) job
 }
 
 func newEntryReader(ctx context.Context, dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
@@ -60,30 +60,30 @@ func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, e
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(workflow *digraph.DAG, schedules []digraph.Schedule, entryType entryType) {
+	addEntriesFn := func(dag *digraph.DAG, schedules []digraph.Schedule, entryType entryType) {
 		for _, schedule := range schedules {
 			next := schedule.Parsed.Next(now)
 			entries = append(entries, &entry{
 				Next:      schedule.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(workflow, next, schedule.Parsed),
+				Job:       er.jobCreator.CreateJob(dag, next, schedule.Parsed),
 				EntryType: entryType,
 				Logger:    er.logger,
 			})
 		}
 	}
 
-	for _, workflow := range er.dags {
+	for _, dag := range er.dags {
 		id := strings.TrimSuffix(
-			filepath.Base(workflow.Location),
-			filepath.Ext(workflow.Location),
+			filepath.Base(dag.Location),
+			filepath.Ext(dag.Location),
 		)
 
 		if er.client.IsSuspended(ctx, id) {
 			continue
 		}
-		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
-		addEntriesFn(workflow, workflow.StopSchedule, entryTypeStop)
-		addEntriesFn(workflow, workflow.RestartSchedule, entryTypeRestart)
+		addEntriesFn(dag, dag.Schedule, entryTypeStart)
+		addEntriesFn(dag, dag.StopSchedule, entryTypeStop)
+		addEntriesFn(dag, dag.RestartSchedule, entryTypeRestart)
 	}
 
 	return entries, nil
@@ -101,16 +101,16 @@ func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 	var fileNames []string
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			workflow, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, fi.Name()))
+			dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error(
-					"Workflow load failed",
+					"DAG load failed",
 					"error", err,
-					"workflow", fi.Name(),
+					"DAG", fi.Name(),
 				)
 				continue
 			}
-			er.dags[fi.Name()] = workflow
+			er.dags[fi.Name()] = dag
 			fileNames = append(fileNames, fi.Name())
 		}
 	}
@@ -144,23 +144,23 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				workflow, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error(
-						"Workflow load failed",
+						"DAG load failed",
 						"error",
 						err,
 						"file",
 						event.Name,
 					)
 				} else {
-					er.dags[filepath.Base(event.Name)] = workflow
-					er.logger.Info("Workflow added/updated", "workflow", filepath.Base(event.Name))
+					er.dags[filepath.Base(event.Name)] = dag
+					er.logger.Info("DAG added/updated", "DAG", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("Workflow removed", "workflow", filepath.Base(event.Name))
+				er.logger.Info("DAG removed", "DAG", filepath.Base(event.Name))
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():

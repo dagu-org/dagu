@@ -174,7 +174,7 @@ func setupViper() error {
 	setDefaultValues(r)
 
 	// Set executable path
-	// This is used for invoking the workflow process on the server.
+	// This is used for invoking the DAG process on the server.
 	return setExecutableDefault()
 }
 

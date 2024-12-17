@@ -27,7 +27,7 @@ func TestPID(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	workflow := &digraph.DAG{
+	dag := &digraph.DAG{
 		HandlerOn: digraph.HandlerOn{},
 		Steps: []digraph.Step{
 			{
@@ -43,7 +43,7 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
-	status := NewStatus(workflow, nil, scheduler.StatusSuccess, 10000, &start, &end)
+	status := NewStatus(dag, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
 	rawJSON, err := status.ToJSON()
 	require.NoError(t, err)
@@ -53,12 +53,12 @@ func TestStatusSerialization(t *testing.T) {
 
 	require.Equal(t, status.Name, unmarshalled.Name)
 	require.Equal(t, 1, len(unmarshalled.Nodes))
-	require.Equal(t, workflow.Steps[0].Name, unmarshalled.Nodes[0].Step.Name)
+	require.Equal(t, dag.Steps[0].Name, unmarshalled.Nodes[0].Step.Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	workflow := &digraph.DAG{Name: "test"}
-	status := NewStatus(workflow, nil, scheduler.StatusRunning,
+	dag := &digraph.DAG{Name: "test"}
+	status := NewStatus(dag, nil, scheduler.StatusRunning,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)

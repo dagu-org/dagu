@@ -96,22 +96,22 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	return historyStore.Rename(ctx, oldDAG.Location, newDAG.Location)
 }
 
-func (e *client) Stop(ctx context.Context, workflow *digraph.DAG) error {
+func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.NewClient(workflow.SockAddr())
+	client := sock.NewClient(dag.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *client) StartAsync(ctx context.Context, workflow *digraph.DAG, opts StartOptions) {
+func (e *client) StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) {
 	go func() {
-		if err := e.Start(ctx, workflow, opts); err != nil {
-			e.logger.Error("Workflow start operation failed", "error", err)
+		if err := e.Start(ctx, dag, opts); err != nil {
+			e.logger.Error("DAG start operation failed", "error", err)
 		}
 	}()
 }
 
-func (e *client) Start(ctx context.Context, workflow *digraph.DAG, opts StartOptions) error {
+func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -120,7 +120,7 @@ func (e *client) Start(ctx context.Context, workflow *digraph.DAG, opts StartOpt
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, workflow.Location)
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -136,12 +136,12 @@ func (e *client) Start(ctx context.Context, workflow *digraph.DAG, opts StartOpt
 	return cmd.Wait()
 }
 
-func (e *client) Restart(ctx context.Context, workflow *digraph.DAG, opts RestartOptions) error {
+func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, workflow.Location)
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -154,10 +154,10 @@ func (e *client) Restart(ctx context.Context, workflow *digraph.DAG, opts Restar
 	return cmd.Wait()
 }
 
-func (e *client) Retry(ctx context.Context, workflow *digraph.DAG, requestID string) error {
+func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", requestID))
-	args = append(args, workflow.Location)
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -170,26 +170,26 @@ func (e *client) Retry(ctx context.Context, workflow *digraph.DAG, requestID str
 	return cmd.Wait()
 }
 
-func (*client) GetCurrentStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
+	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(workflow), nil
+		return model.NewStatusDefault(dag), nil
 	}
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetStatusByRequestID(ctx context.Context, workflow *digraph.DAG, requestID string) (
+func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*model.Status, error,
 ) {
-	ret, err := e.dataStore.HistoryStore().FindByRequestID(ctx, workflow.Location, requestID)
+	ret, err := e.dataStore.HistoryStore().FindByRequestID(ctx, dag.Location, requestID)
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetCurrentStatus(ctx, workflow)
+	status, _ := e.GetCurrentStatus(ctx, dag)
 	if status != nil && status.RequestID != requestID {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
@@ -197,8 +197,8 @@ func (e *client) GetStatusByRequestID(ctx context.Context, workflow *digraph.DAG
 	return ret.Status, err
 }
 
-func (*client) currentStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
+	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
@@ -206,29 +206,29 @@ func (*client) currentStatus(ctx context.Context, workflow *digraph.DAG) (*model
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error) {
-	currStatus, _ := e.currentStatus(ctx, workflow)
+func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error) {
+	currStatus, _ := e.currentStatus(ctx, dag)
 	if currStatus != nil {
 		return currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().ReadStatusToday(ctx, workflow.Location)
+	status, err := e.dataStore.HistoryStore().ReadStatusToday(ctx, dag.Location)
 	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
 		errors.Is(err, persistence.ErrNoStatusData) {
-		return model.NewStatusDefault(workflow), nil
+		return model.NewStatusDefault(dag), nil
 	}
 	if err != nil {
-		return model.NewStatusDefault(workflow), err
+		return model.NewStatusDefault(dag), err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, workflow *digraph.DAG, n int) []*model.StatusFile {
-	return e.dataStore.HistoryStore().ReadStatusRecent(ctx, workflow.Location, n)
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []*model.StatusFile {
+	return e.dataStore.HistoryStore().ReadStatusRecent(ctx, dag.Location, n)
 }
 
-func (e *client) UpdateStatus(ctx context.Context, workflow *digraph.DAG, status *model.Status) error {
-	client := sock.NewClient(workflow.SockAddr())
+func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status *model.Status) error {
+	client := sock.NewClient(dag.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -241,7 +241,7 @@ func (e *client) UpdateStatus(ctx context.Context, workflow *digraph.DAG, status
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStore.HistoryStore().Update(ctx, workflow.Location, status.RequestID, status)
+	return e.dataStore.HistoryStore().Update(ctx, dag.Location, status.RequestID, status)
 }
 
 func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
@@ -342,31 +342,31 @@ func (e *client) GetStatus(ctx context.Context, id string) (*DAGStatus, error) {
 	), err
 }
 
-func (e *client) ToggleSuspend(ctx context.Context, id string, suspend bool) error {
+func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error {
 	flagStore := e.dataStore.FlagStore()
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *client) readStatus(ctx context.Context, workflow *digraph.DAG) (*DAGStatus, error) {
-	latestStatus, err := e.GetLatestStatus(ctx, workflow)
+func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (*DAGStatus, error) {
+	latestStatus, err := e.GetLatestStatus(ctx, dag)
 	id := strings.TrimSuffix(
-		filepath.Base(workflow.Location),
-		filepath.Ext(workflow.Location),
+		filepath.Base(dag.Location),
+		filepath.Ext(dag.Location),
 	)
 
 	return newDAGStatus(
-		workflow, latestStatus, e.IsSuspended(ctx, id), err,
+		dag, latestStatus, e.IsSuspended(ctx, id), err,
 	), err
 }
 
-func (*client) emptyDAGIfNil(workflow *digraph.DAG, dagLocation string) *digraph.DAG {
-	if workflow != nil {
-		return workflow
+func (*client) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.DAG {
+	if dag != nil {
+		return dag
 	}
 	return &digraph.DAG{Location: dagLocation}
 }
 
-func (e *client) IsSuspended(ctx context.Context, id string) bool {
+func (e *client) IsSuspended(_ context.Context, id string) bool {
 	flagStore := e.dataStore.FlagStore()
 	return flagStore.IsSuspended(id)
 }

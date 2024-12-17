@@ -438,10 +438,10 @@ func (h *Handler) getDetail(
 		return nil, newNotFoundError(err)
 	}
 
-	workflow := dagStatus.DAG
+	dag := dagStatus.DAG
 
 	var steps []*models.StepObject
-	for _, step := range workflow.Steps {
+	for _, step := range dag.Steps {
 		steps = append(steps, convertToStepObject(step))
 	}
 
@@ -462,14 +462,14 @@ func (h *Handler) getDetail(
 	}
 
 	var schedules []*models.Schedule
-	for _, s := range workflow.Schedule {
+	for _, s := range dag.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	var preconditions []*models.Condition
-	for _, p := range workflow.Preconditions {
+	for _, p := range dag.Preconditions {
 		preconditions = append(preconditions, &models.Condition{
 			Condition: p.Condition,
 			Expected:  p.Expected,
@@ -477,22 +477,22 @@ func (h *Handler) getDetail(
 	}
 
 	dagDetail := &models.DagDetail{
-		DefaultParams:     swag.String(workflow.DefaultParams),
-		Delay:             swag.Int64(int64(workflow.Delay)),
-		Description:       swag.String(workflow.Description),
-		Env:               workflow.Env,
-		Group:             swag.String(workflow.Group),
+		DefaultParams:     swag.String(dag.DefaultParams),
+		Delay:             swag.Int64(int64(dag.Delay)),
+		Description:       swag.String(dag.Description),
+		Env:               dag.Env,
+		Group:             swag.String(dag.Group),
 		HandlerOn:         handlerOn,
-		HistRetentionDays: swag.Int64(int64(workflow.HistRetentionDays)),
-		Location:          swag.String(workflow.Location),
-		LogDir:            swag.String(workflow.LogDir),
-		MaxActiveRuns:     swag.Int64(int64(workflow.MaxActiveRuns)),
-		Name:              swag.String(workflow.Name),
-		Params:            workflow.Params,
+		HistRetentionDays: swag.Int64(int64(dag.HistRetentionDays)),
+		Location:          swag.String(dag.Location),
+		LogDir:            swag.String(dag.LogDir),
+		MaxActiveRuns:     swag.Int64(int64(dag.MaxActiveRuns)),
+		Name:              swag.String(dag.Name),
+		Params:            dag.Params,
 		Preconditions:     preconditions,
 		Schedule:          schedules,
 		Steps:             steps,
-		Tags:              workflow.Tags,
+		Tags:              dag.Tags,
 	}
 
 	statusWithDetails := &models.DagStatusWithDetails{
@@ -529,13 +529,13 @@ func (h *Handler) getDetail(
 		return h.processSpecRequest(ctx, dagID, resp)
 
 	case dagTabTypeHistory:
-		return h.processLogRequest(ctx, resp, workflow)
+		return h.processLogRequest(ctx, resp, dag)
 
 	case dagTabTypeStepLog:
-		return h.processStepLogRequest(ctx, workflow, params, resp)
+		return h.processStepLogRequest(ctx, dag, params, resp)
 
 	case dagTabTypeSchedulerLog:
-		return h.processSchedulerLogRequest(ctx, workflow, params, resp)
+		return h.processSchedulerLogRequest(ctx, dag, params, resp)
 
 	default:
 		return nil, newBadRequestError(errInvalidArgs)
@@ -544,7 +544,7 @@ func (h *Handler) getDetail(
 
 func (h *Handler) processSchedulerLogRequest(
 	ctx context.Context,
-	workflow *digraph.DAG,
+	dag *digraph.DAG,
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
@@ -559,7 +559,7 @@ func (h *Handler) processSchedulerLogRequest(
 	}
 
 	if logFile == "" {
-		lastStatus, err := h.client.GetLatestStatus(ctx, workflow)
+		lastStatus, err := h.client.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -581,7 +581,7 @@ func (h *Handler) processSchedulerLogRequest(
 
 func (h *Handler) processStepLogRequest(
 	ctx context.Context,
-	workflow *digraph.DAG,
+	dag *digraph.DAG,
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
@@ -600,7 +600,7 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if status == nil {
-		s, err := h.client.GetLatestStatus(ctx, workflow)
+		s, err := h.client.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
@@ -675,9 +675,9 @@ var (
 func (h *Handler) processLogRequest(
 	ctx context.Context,
 	resp *models.GetDagDetailsResponse,
-	workflow *digraph.DAG,
+	dag *digraph.DAG,
 ) (*models.GetDagDetailsResponse, *codedError) {
-	logs := h.client.GetRecentHistory(ctx, workflow, defaultHistoryLimit)
+	logs := h.client.GetRecentHistory(ctx, dag, defaultHistoryLimit)
 
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
 	for idx, log := range logs {

@@ -68,7 +68,7 @@ type Options struct {
 // New creates a new Agent.
 func New(
 	requestID string,
-	workflow *digraph.DAG,
+	dag *digraph.DAG,
 	lg logger.Logger,
 	logDir, logFile string,
 	cli client.Client,
@@ -77,7 +77,7 @@ func New(
 ) *Agent {
 	return &Agent{
 		requestID:   requestID,
-		dag:         workflow,
+		dag:         dag,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
 		logDir:      logDir,
@@ -194,7 +194,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	a.logger.Info("Workflow execution finished", "status", finishedStatus.Status)
+	a.logger.Info("DAG execution finished", "status", finishedStatus.Status)
 	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Status write failed", "error", err)
 	}

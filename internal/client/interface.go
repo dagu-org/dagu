@@ -18,16 +18,16 @@ type Client interface {
 	GetDAGSpec(ctx context.Context, id string) (string, error)
 	Grep(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
 	Rename(ctx context.Context, oldID, newID string) error
-	Stop(ctx context.Context, workflow *digraph.DAG) error
-	StartAsync(ctx context.Context, workflow *digraph.DAG, opts StartOptions)
-	Start(ctx context.Context, workflow *digraph.DAG, opts StartOptions) error
-	Restart(ctx context.Context, workflow *digraph.DAG, opts RestartOptions) error
-	Retry(ctx context.Context, workflow *digraph.DAG, requestID string) error
-	GetCurrentStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error)
-	GetStatusByRequestID(ctx context.Context, workflow *digraph.DAG, requestID string) (*model.Status, error)
-	GetLatestStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error)
-	GetRecentHistory(ctx context.Context, workflow *digraph.DAG, n int) []*model.StatusFile
-	UpdateStatus(ctx context.Context, workflow *digraph.DAG, status *model.Status) error
+	Stop(ctx context.Context, dag *digraph.DAG) error
+	StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions)
+	Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
+	Restart(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
+	Retry(ctx context.Context, dag *digraph.DAG, requestID string) error
+	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
+	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*model.Status, error)
+	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
+	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []*model.StatusFile
+	UpdateStatus(ctx context.Context, dag *digraph.DAG, status *model.Status) error
 	UpdateDAG(ctx context.Context, id string, spec string) error
 	DeleteDAG(ctx context.Context, id, loc string) error
 	GetAllStatus(ctx context.Context) (statuses []*DAGStatus, errs []string, err error)
@@ -63,12 +63,12 @@ type DagListPaginationSummaryResult struct {
 }
 
 func newDAGStatus(
-	workflow *digraph.DAG, s *model.Status, suspended bool, err error,
+	dag *digraph.DAG, s *model.Status, suspended bool, err error,
 ) *DAGStatus {
 	ret := &DAGStatus{
-		File:      filepath.Base(workflow.Location),
-		Dir:       filepath.Dir(workflow.Location),
-		DAG:       workflow,
+		File:      filepath.Base(dag.Location),
+		Dir:       filepath.Dir(dag.Location),
+		DAG:       dag,
 		Status:    s,
 		Suspended: suspended,
 		Error:     err,

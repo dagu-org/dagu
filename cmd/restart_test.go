@@ -62,7 +62,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		workflow, err := digraph.Load(context.Background(), setup.Config.BaseConfig, dagFile, "")
+		dag, err := digraph.Load(context.Background(), setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
 		dataStore := newDataStores(setup.Config)
@@ -70,7 +70,7 @@ func TestRestartCommand(t *testing.T) {
 			setup.Config,
 			dataStore,
 			logger.Default,
-		).GetRecentHistory(context.Background(), workflow, 2)
+		).GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)
