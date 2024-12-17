@@ -6,7 +6,7 @@ package build
 import "strings"
 
 var (
-	Version = "dev"
+	Version = ""
 	AppName = "Dagu"
 	Slug    = ""
 )
