@@ -20,6 +20,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -281,7 +282,7 @@ func (n *Node) setup(logDir string, requestID string) error {
 	// Set the log file path
 	n.data.State.StartedAt = time.Now()
 	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
-		util.ValidFilename(n.data.Step.Name),
+		fileutil.SafeName(n.data.Step.Name),
 		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
 		util.TruncString(requestID, 8),
 	))
@@ -326,7 +327,7 @@ var (
 
 func (n *Node) setupScript() (err error) {
 	if n.data.Step.Script != "" {
-		if len(n.data.Step.Dir) > 0 && !util.FileExists(n.data.Step.Dir) {
+		if len(n.data.Step.Dir) > 0 && !fileutil.FileExists(n.data.Step.Dir) {
 			return ErrWorkingDirNotExist
 		}
 		n.scriptFile, _ = os.CreateTemp(n.data.Step.Dir, "dagu_script-")
@@ -348,7 +349,7 @@ func (n *Node) setupStdout() error {
 			f = filepath.Join(n.data.Step.Dir, f)
 		}
 		var err error
-		n.stdoutFile, err = util.OpenOrCreateFile(f)
+		n.stdoutFile, err = fileutil.OpenOrCreateFile(f)
 		if err != nil {
 			n.data.State.Error = err
 			return err
@@ -365,7 +366,7 @@ func (n *Node) setupStderr() error {
 			f = filepath.Join(n.data.Step.Dir, f)
 		}
 		var err error
-		n.stderrFile, err = util.OpenOrCreateFile(f)
+		n.stderrFile, err = fileutil.OpenOrCreateFile(f)
 		if err != nil {
 			n.data.State.Error = err
 			return err
@@ -382,7 +383,7 @@ func (n *Node) setupLog() error {
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 	var err error
-	n.logFile, err = util.OpenOrCreateFile(n.data.State.Log)
+	n.logFile, err = fileutil.OpenOrCreateFile(n.data.State.Log)
 	if err != nil {
 		n.data.State.Error = err
 		return err

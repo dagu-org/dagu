@@ -11,10 +11,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +55,7 @@ func SetupTest(t *testing.T) Setup {
 	lock.Lock()
 	defer lock.Unlock()
 
-	tmpDir := util.MustTempDir("test")
+	tmpDir := fileutil.MustTempDir("test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
@@ -75,7 +75,7 @@ func SetupTest(t *testing.T) Setup {
 	cfg.AdminLogsDir = filepath.Join(tmpDir, "log", "admin")
 
 	// Set the executable path to the test binary.
-	cfg.Executable = filepath.Join(util.MustGetwd(), "../../bin/dagu")
+	cfg.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
 
 	// Set environment variables.
 	// This is required for some tests that run the executable
@@ -99,7 +99,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	lock.Lock()
 	defer lock.Unlock()
 
-	tmpDir := util.MustTempDir("test")
+	tmpDir := fileutil.MustTempDir("test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 

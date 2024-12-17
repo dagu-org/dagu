@@ -15,13 +15,13 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/dagu-org/dagu/internal/util"
 )
 
-var testdataDir = filepath.Join(util.MustGetwd(), "./testdata")
+var testdataDir = filepath.Join(fileutil.MustGetwd(), "./testdata")
 
 func TestClient_GetStatus(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {

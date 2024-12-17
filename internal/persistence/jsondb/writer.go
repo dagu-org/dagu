@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/util"
 )
 
 var (
@@ -43,7 +43,7 @@ func (w *writer) open() error {
 		return err
 	}
 
-	file, err := util.OpenOrCreateFile(w.target)
+	file, err := fileutil.OpenOrCreateFile(w.target)
 	if err != nil {
 		return err
 	}

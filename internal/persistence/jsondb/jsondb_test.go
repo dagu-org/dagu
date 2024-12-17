@@ -13,8 +13,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +67,7 @@ func TestNewDataFile(t *testing.T) {
 	t.Run("ValidFile", func(t *testing.T) {
 		f, err := te.JSONDB.newFile(d.Location, timestamp, requestID)
 		require.NoError(t, err)
-		p := util.ValidFilename(strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location)))
+		p := fileutil.SafeName(strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location)))
 		assert.Regexp(t, p+".*"+p+"\\.20220101\\.00:00:00\\.000\\."+requestID[:8]+"\\.dat", f)
 	})
 
@@ -248,7 +248,7 @@ func TestCompactFile(t *testing.T) {
 
 	db2 := New(te.JSONDB.location, true)
 	require.NoError(t, db2.Compact(s.File))
-	require.False(t, util.FileExists(s.File))
+	require.False(t, fileutil.FileExists(s.File))
 
 	compactedStatusFiles := db2.ReadStatusRecent(d.Location, 1)
 	require.NotEmpty(t, compactedStatusFiles)
@@ -286,7 +286,7 @@ func TestErrorCases(t *testing.T) {
 }
 
 func TestErrorParseFile(t *testing.T) {
-	tmpDir := util.MustTempDir("test_error_parse_file")
+	tmpDir := fileutil.MustTempDir("test_error_parse_file")
 	defer os.RemoveAll(tmpDir)
 	tmpFile := filepath.Join(tmpDir, "test_error_parse_file.dat")
 
@@ -295,7 +295,7 @@ func TestErrorParseFile(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	f, err := util.OpenOrCreateFile(tmpFile)
+	f, err := fileutil.OpenOrCreateFile(tmpFile)
 	require.NoError(t, err)
 	defer f.Close()
 
@@ -336,11 +336,11 @@ func TestTimestamp(t *testing.T) {
 }
 
 func TestReadLine(t *testing.T) {
-	tmpDir := util.MustTempDir("test_read_line")
+	tmpDir := fileutil.MustTempDir("test_read_line")
 	defer os.RemoveAll(tmpDir)
 	tmpFile := filepath.Join(tmpDir, "test_read_line.dat")
 
-	f, err := util.OpenOrCreateFile(tmpFile)
+	f, err := fileutil.OpenOrCreateFile(tmpFile)
 	require.NoError(t, err)
 	defer f.Close()
 

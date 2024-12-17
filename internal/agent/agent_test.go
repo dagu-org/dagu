@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -406,7 +406,7 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 // testLoadDAG load the specified DAG file for testing
 // without base config or parameters.
 func testLoadDAG(t *testing.T, name string) *digraph.DAG {
-	file := filepath.Join(util.MustGetwd(), "testdata", name)
+	file := filepath.Join(fileutil.MustGetwd(), "testdata", name)
 	workflow, err := digraph.Load("", file, "")
 	require.NoError(t, err)
 	return workflow

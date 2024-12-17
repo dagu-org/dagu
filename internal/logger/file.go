@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -33,10 +34,10 @@ func OpenLogFile(config LogFileConfig) (*os.File, error) {
 }
 
 func prepareLogDirectory(config LogFileConfig) (string, error) {
-	validName := util.ValidFilename(config.DAGName)
-	logDir := filepath.Join(config.LogDir, validName)
+	name := fileutil.SafeName(config.DAGName)
+	logDir := filepath.Join(config.LogDir, name)
 	if config.DAGLogDir != "" {
-		logDir = filepath.Join(config.DAGLogDir, validName)
+		logDir = filepath.Join(config.DAGLogDir, name)
 	}
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create log directory: %w", err)
@@ -48,7 +49,7 @@ func prepareLogDirectory(config LogFileConfig) (string, error) {
 func generateLogFilename(config LogFileConfig) string {
 	return fmt.Sprintf("%s%s.%s.%s.log",
 		config.Prefix,
-		util.ValidFilename(config.DAGName),
+		fileutil.SafeName(config.DAGName),
 		time.Now().Format("20060102.15:04:05.000"),
 		util.TruncString(config.RequestID, 8),
 	)

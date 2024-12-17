@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ import (
 func TestResolver(t *testing.T) {
 	t.Parallel()
 	t.Run("App home directory", func(t *testing.T) {
-		tmpDir := util.MustTempDir("test")
+		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
 		os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
@@ -37,7 +37,7 @@ func TestResolver(t *testing.T) {
 		})
 	})
 	t.Run("Legacy home directory", func(t *testing.T) {
-		tmpDir := util.MustTempDir("test")
+		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
 		hiddenDir := filepath.Join(tmpDir, "."+build.Slug)

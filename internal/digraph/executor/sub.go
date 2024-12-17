@@ -12,9 +12,8 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/util"
-
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 type subWorkflow struct {
@@ -53,7 +52,7 @@ func newSubWorkflow(
 	}
 
 	cmd := exec.CommandContext(ctx, executable, args...)
-	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
+	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
 		return nil, errWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir

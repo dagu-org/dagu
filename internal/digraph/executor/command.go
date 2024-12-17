@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 type commandExecutor struct {
@@ -24,7 +24,7 @@ type commandExecutor struct {
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	// nolint: gosec
 	cmd := exec.CommandContext(ctx, step.Command, step.Args...)
-	if len(step.Dir) > 0 && !util.FileExists(step.Dir) {
+	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
 		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
 	}
 	dagContext, err := digraph.GetContext(ctx)

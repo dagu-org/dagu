@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	testHomeDir = util.MustTempDir("scheduler-test")
+	testHomeDir = fileutil.MustTempDir("scheduler-test")
 	err := os.Setenv("HOME", testHomeDir)
 	if err != nil {
 		panic(err)
@@ -207,7 +208,7 @@ func TestSchedulerTimeout(t *testing.T) {
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
-	cmd := filepath.Join(util.MustGetwd(), "testdata/testfile.sh")
+	cmd := filepath.Join(fileutil.MustGetwd(), "testdata/testfile.sh")
 	g, sc, err := testSchedule(t,
 		digraph.Step{
 			Name:        "1",
@@ -244,7 +245,7 @@ func TestSchedulerRetryFail(t *testing.T) {
 }
 
 func TestSchedulerRetrySuccess(t *testing.T) {
-	cmd := filepath.Join(util.MustGetwd(), "testdata/testfile.sh")
+	cmd := filepath.Join(fileutil.MustGetwd(), "testdata/testfile.sh")
 	tmpDir, err := os.MkdirTemp("", "scheduler_test")
 	tmpFile := filepath.Join(tmpDir, "flag")
 

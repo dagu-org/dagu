@@ -1,7 +1,19 @@
 // Copyright (C) 2024 The Dagu Authors
-// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-package util
+package fileutil
 
 import (
 	"errors"
@@ -20,6 +32,20 @@ var (
 	)
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
 )
+
+// MustGetUserHomeDir returns current working directory.
+// Panics is os.UserHomeDir() returns error
+func MustGetUserHomeDir() string {
+	hd, _ := os.UserHomeDir()
+	return hd
+}
+
+// MustGetwd returns current working directory.
+// Panics is os.Getwd() returns error
+func MustGetwd() string {
+	wd, _ := os.Getwd()
+	return wd
+}
 
 const (
 	legacyTimeFormat = "2006-01-02 15:04:05"
@@ -97,6 +123,48 @@ func SplitCommand(cmd string) (cmdx string, args []string) {
 	}
 
 	return splits[0], strings.Fields(splits[1])
+}
+
+// FileExists returns true if file exists.
+func FileExists(file string) bool {
+	_, err := os.Stat(file)
+	return !os.IsNotExist(err)
+}
+
+// OpenOrCreateFile opens file or creates it if it doesn't exist.
+func OpenOrCreateFile(file string) (*os.File, error) {
+	if FileExists(file) {
+		return openFile(file)
+	}
+	return createFile(file)
+}
+
+// openFile opens file.
+func openFile(file string) (*os.File, error) {
+	outfile, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0755)
+	if err != nil {
+		return nil, err
+	}
+	return outfile, nil
+}
+
+// createFile creates file.
+func createFile(file string) (*os.File, error) {
+	outfile, err := os.Create(file)
+	if err != nil {
+		return nil, err
+	}
+	return outfile, nil
+}
+
+// MustTempDir returns temporary directory.
+// This function is used only for testing.
+func MustTempDir(pattern string) string {
+	t, err := os.MkdirTemp("", pattern)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 // LogErr logs error if it's not nil.

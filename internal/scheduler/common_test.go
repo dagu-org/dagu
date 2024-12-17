@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"go.uber.org/goleak"
 )
 
@@ -15,7 +15,7 @@ var testHomeDir string
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
-	tempDir := util.MustTempDir("runner_test")
+	tempDir := fileutil.MustTempDir("runner_test")
 	err := os.Setenv("HOME", tempDir)
 	if err != nil {
 		panic(err)

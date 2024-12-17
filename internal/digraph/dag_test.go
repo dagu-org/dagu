@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testdataDir = filepath.Join(util.MustGetwd(), "testdata")
+	testdataDir = filepath.Join(fileutil.MustGetwd(), "testdata")
 )
 
 func TestDAG_String(t *testing.T) {

@@ -10,11 +10,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -94,7 +94,7 @@ func withSpool(t *testing.T, testFunction func()) string {
 
 func testDAGFile(name string) string {
 	return filepath.Join(
-		filepath.Join(util.MustGetwd(), "testdata"),
+		filepath.Join(fileutil.MustGetwd(), "testdata"),
 		name,
 	)
 }

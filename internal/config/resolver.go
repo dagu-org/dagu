@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 type PathResolver struct {
@@ -45,7 +45,7 @@ func (r *PathResolver) resolve(appHomeEnv, legacyPath string) {
 	case os.Getenv(appHomeEnv) != "":
 		r.Paths.ConfigDir = os.Getenv(appHomeEnv)
 		r.setLegacyPaths()
-	case util.FileExists(legacyPath):
+	case fileutil.FileExists(legacyPath):
 		r.Paths.ConfigDir = legacyPath
 		r.setLegacyPaths()
 	default:

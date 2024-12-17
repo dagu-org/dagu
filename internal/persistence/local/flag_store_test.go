@@ -7,14 +7,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFlagStore(t *testing.T) {
-	tmpDir := util.MustTempDir("test-suspend-checker")
+	tmpDir := fileutil.MustTempDir("test-suspend-checker")
 	defer func() {
 		_ = os.RemoveAll(tmpDir)
 	}()

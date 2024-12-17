@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/imdario/mergo"
 	"github.com/mitchellh/mapstructure"
 
@@ -81,7 +81,7 @@ func loadYAML(data []byte, opts buildOpts) (*DAG, error) {
 // The global configuration can be overridden by the DAG configuration.
 func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 	// The base config is optional.
-	if !util.FileExists(file) {
+	if !fileutil.FileExists(file) {
 		return nil, nil
 	}
 

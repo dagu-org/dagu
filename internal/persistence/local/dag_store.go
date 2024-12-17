@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/grep"
@@ -337,7 +338,7 @@ func (d *dagStoreImpl) Find(name string) (*digraph.DAG, error) {
 func (d *dagStoreImpl) resolve(name string) (string, error) {
 	// check if the name is a file path
 	if strings.Contains(name, string(filepath.Separator)) {
-		if !util.FileExists(name) {
+		if !fileutil.FileExists(name) {
 			return "", fmt.Errorf("workflow %s not found", name)
 		}
 		return name, nil
@@ -371,11 +372,11 @@ func find(name string) (string, error) {
 	if ext == "" {
 		// try all supported extensions
 		for _, ext := range digraph.Exts {
-			if util.FileExists(name + ext) {
+			if fileutil.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}
 		}
-	} else if util.FileExists(name) {
+	} else if fileutil.FileExists(name) {
 		// the name has an extension
 		return filepath.Abs(name)
 	}

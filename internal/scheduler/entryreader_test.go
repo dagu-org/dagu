@@ -11,10 +11,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/dagu-org/dagu/internal/util"
 
 	"github.com/stretchr/testify/require"
 
@@ -78,12 +78,12 @@ func TestReadEntries(t *testing.T) {
 	})
 }
 
-var testdataDir = filepath.Join(util.MustGetwd(), "testdata")
+var testdataDir = filepath.Join(fileutil.MustGetwd(), "testdata")
 
 func setupTest(t *testing.T) (string, client.Client) {
 	t.Helper()
 
-	tmpDir := util.MustTempDir("test")
+	tmpDir := fileutil.MustTempDir("test")
 
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
