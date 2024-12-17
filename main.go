@@ -19,7 +19,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/cmd"
-	"github.com/dagu-org/dagu/internal/constants"
+	"github.com/dagu-org/dagu/internal/build"
 )
 
 func main() {
@@ -33,5 +33,5 @@ func main() {
 var version = "0.0.0"
 
 func init() {
-	constants.Version = version
+	build.Version = version
 }

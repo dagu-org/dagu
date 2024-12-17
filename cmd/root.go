@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,7 +27,7 @@ var (
 
 	// rootCmd represents the base command when called without any subcommands
 	rootCmd = &cobra.Command{
-		Use:   "dagu",
+		Use:   build.Slug,
 		Short: "YAML-based DAG scheduling tool.",
 		Long:  `YAML-based DAG scheduling tool.`,
 	}

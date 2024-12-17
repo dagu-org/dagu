@@ -67,7 +67,7 @@ func SetupTest(t *testing.T) Setup {
 	lock.Lock()
 	defer lock.Unlock()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
@@ -111,7 +111,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	lock.Lock()
 	defer lock.Unlock()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 

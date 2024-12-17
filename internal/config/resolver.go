@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -30,7 +31,7 @@ func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) resolver {
 
 	// For backward compatibility.
 	// If the environment variable is set, use it.
-	// Use the legacy ~/.dagu directory if it exists.
+	// Use the legacy ~/.<app name> directory if it exists.
 	if v := os.Getenv(appHomeEnv); v != "" {
 		r.configDir = v
 		useXDGRules = false
@@ -38,16 +39,16 @@ func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) resolver {
 		r.configDir = legacyPath
 		useXDGRules = false
 	} else {
-		r.configDir = filepath.Join(xdg.ConfigHome, appName)
+		r.configDir = filepath.Join(xdg.ConfigHome, build.Slug)
 	}
 
 	if useXDGRules {
-		r.dataDir = filepath.Join(xdg.DataHome, appName, "history")
-		r.logsDir = filepath.Join(xdg.DataHome, appName, "logs")
-		r.baseConfigFile = filepath.Join(xdg.ConfigHome, appName, "base.yaml")
-		r.adminLogsDir = filepath.Join(xdg.DataHome, appName, "logs", "admin")
-		r.suspendFlagsDir = filepath.Join(xdg.DataHome, appName, "suspend")
-		r.dagsDir = filepath.Join(xdg.ConfigHome, appName, "dags")
+		r.dataDir = filepath.Join(xdg.DataHome, build.Slug, "history")
+		r.logsDir = filepath.Join(xdg.DataHome, build.Slug, "logs")
+		r.baseConfigFile = filepath.Join(xdg.ConfigHome, build.Slug, "base.yaml")
+		r.adminLogsDir = filepath.Join(xdg.DataHome, build.Slug, "logs", "admin")
+		r.suspendFlagsDir = filepath.Join(xdg.DataHome, build.Slug, "suspend")
+		r.dagsDir = filepath.Join(xdg.ConfigHome, build.Slug, "dags")
 	} else {
 		r.dataDir = filepath.Join(r.configDir, "data")
 		r.logsDir = filepath.Join(r.configDir, "logs")

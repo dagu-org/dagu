@@ -24,7 +24,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/dagu-org/dagu/internal/constants"
+	"github.com/dagu-org/dagu/internal/build"
 )
 
 var (
@@ -75,7 +75,7 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return v
 		},
 		"version": func() string {
-			return constants.Version
+			return build.Version
 		},
 		"navbarColor": func() string {
 			return cfg.NavbarColor

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/spf13/viper"
 )
 
@@ -150,15 +151,6 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
-const (
-	// Application name.
-	appName = "dagu"
-)
-
-var (
-	envPrefix = strings.ToUpper(appName)
-)
-
 func setupViper() error {
 	homeDir := getHomeDir()
 
@@ -175,7 +167,7 @@ func setupViper() error {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
 
-	viper.SetEnvPrefix(envPrefix)
+	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	// Bind environment variables with config keys.
@@ -196,7 +188,7 @@ func setupViper() error {
 	// Other defaults
 	viper.SetDefault("host", "127.0.0.1")
 	viper.SetDefault("port", "8080")
-	viper.SetDefault("navbarTitle", "Dagu")
+	viper.SetDefault("navbarTitle", build.AppName)
 	viper.SetDefault("basePath", "")
 	viper.SetDefault("apiBaseURL", "/api/v1")
 	viper.SetDefault("maxDashboardPageLimit", 100)

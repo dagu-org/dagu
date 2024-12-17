@@ -13,8 +13,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-package constants
+package build
+
+import "strings"
 
 var (
-	Version = "0.0.1"
+	Version = "dev"
+	AppName = "Dagu"
+	Slug    = ""
 )
+
+func init() {
+	if Slug == "" {
+		Slug = strings.ToLower(AppName)
+	}
+}

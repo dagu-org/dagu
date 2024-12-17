@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/logger"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
@@ -94,13 +95,13 @@ var testdataDir = filepath.Join(util.MustGetwd(), "testdata")
 func setupTest(t *testing.T) (string, client.Client) {
 	t.Helper()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := util.MustTempDir("test")
 
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
 	cfg := &config.Config{
-		DataDir:         filepath.Join(tmpDir, ".dagu", "data"),
+		DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
 		DAGs:            testdataDir,
 		SuspendFlagsDir: tmpDir,
 		WorkDir:         tmpDir,
