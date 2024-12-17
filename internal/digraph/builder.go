@@ -4,6 +4,7 @@
 package digraph
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -15,18 +16,16 @@ import (
 	"github.com/dagu-org/dagu/internal/util"
 )
 
-// builder is used to build a DAG from a configuration definition.
-type builder struct {
-	def         *definition // intermediate value to build the DAG.
-	envs        []string    // environment variables for the DAG.
-	opts        buildOpts   // options for building the DAG.
-	dag         *DAG        // the final DAG.
-	errs        errorList
-	stepBuilder stepBuilder
-}
+// BuilderFn is a function that builds a part of the DAG.
+type BuilderFn func(ctx BuildContext, spec *definition, dag *DAG) error
 
-// builderFunc is a function that builds a part of the DAG.
-type builderFunc func() error
+// BuildContext is the context for building a DAG.
+type BuildContext struct {
+	ctx            context.Context
+	opts           buildOpts
+	additionalEnvs []string
+	stepBuilder    stepBuilder
+}
 
 // buildOpts is used to control the behavior of the builder.
 type buildOpts struct {
@@ -99,53 +98,63 @@ var (
 	)
 )
 
-// build builds a DAG from a configuration definition and the base DAG.
-// This method requires two arguments:
-//   - def: the configuration definition for the DAG.
-//   - envs: the environment variables of the base configuration.
-//     These are used to set the environment variables for the DAG.
-func (b *builder) build(def *definition, envs []string) (*DAG, error) {
-	b.def = def
-	b.envs = envs
-	b.dag = &DAG{
-		Name:        def.Name,
-		Group:       def.Group,
-		Description: def.Description,
-		Timeout:     time.Second * time.Duration(def.TimeoutSec),
-		Delay:       time.Second * time.Duration(def.DelaySec),
-		RestartWait: time.Second * time.Duration(def.RestartWaitSec),
-		Tags:        parseTags(def.Tags),
+// build builds a DAG from the specification.
+func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs []string) (*DAG, error) {
+	buildCtx := BuildContext{
+		ctx:            ctx,
+		opts:           opts,
+		stepBuilder:    stepBuilder{noEval: opts.noEval},
+		additionalEnvs: additionalEnvs,
 	}
-	b.stepBuilder = stepBuilder{noEval: b.opts.noEval}
 
-	b.callBuilderFunc(b.buildEnvs)
-	b.callBuilderFunc(b.buildSchedule)
-	b.callBuilderFunc(b.skipIfSuccessful)
-	b.callBuilderFunc(b.buildMailOn)
-	b.callBuilderFunc(b.buildParams)
+	dag := &DAG{
+		Name:        spec.Name,
+		Group:       spec.Group,
+		Description: spec.Description,
+		Timeout:     time.Second * time.Duration(spec.TimeoutSec),
+		Delay:       time.Second * time.Duration(spec.DelaySec),
+		RestartWait: time.Second * time.Duration(spec.RestartWaitSec),
+		Tags:        parseTags(spec.Tags),
+	}
 
-	// If metadataOnly is set, return the DAG with the metadata.
-	// This is done for avoiding unnecessary processing when
-	// only the metadata is required.
-	if !b.opts.metadataOnly {
-		b.callBuilderFunc(b.buildSteps)
-		b.callBuilderFunc(b.buildLogDir)
-		b.callBuilderFunc(b.buildHandlers)
-		b.callBuilderFunc(b.buildSMTPConfig)
-		b.callBuilderFunc(b.buildErrMailConfig)
-		b.callBuilderFunc(b.buildInfoMailConfig)
-		b.callBuilderFunc(b.buildMiscs)
-
-		if err := assertFunctions(def.Functions); err != nil {
-			b.errs.Add(err)
+	var errs errorList
+	for _, builder := range []BuilderFn{
+		buildEnvs,
+		buildSchedule,
+		skipIfSuccessful,
+		buildMailOn,
+		buildParams,
+	} {
+		if err := builder(buildCtx, spec, dag); err != nil {
+			errs.Add(err)
 		}
 	}
 
-	if len(b.errs) > 0 {
-		return nil, &b.errs
+	if !opts.metadataOnly {
+		for _, builder := range []BuilderFn{
+			buildSteps,
+			buildLogDir,
+			buildHandlers,
+			buildSMTPConfig,
+			buildErrMailConfig,
+			buildInfoMailConfig,
+			buildMiscs,
+		} {
+			if err := builder(buildCtx, spec, dag); err != nil {
+				errs.Add(err)
+			}
+		}
+
+		if err := assertFunctions(spec.Functions); err != nil {
+			errs.Add(err)
+		}
 	}
 
-	return b.dag, nil
+	if len(errs) > 0 {
+		return nil, &errs
+	}
+
+	return dag, nil
 }
 
 // buildSchedule parses the schedule in different formats and builds the
@@ -171,10 +180,10 @@ func (b *builder) build(def *definition, envs []string) (*DAG, error) {
 // - start: string or array of strings
 // - stop: string or array of strings
 // - restart: string or array of strings
-func (b *builder) buildSchedule() error {
+func buildSchedule(ctx BuildContext, spec *definition, dag *DAG) error {
 	var starts, stops, restarts []string
 
-	switch schedule := (b.def.Schedule).(type) {
+	switch schedule := (spec.Schedule).(type) {
 	case string:
 		// Case 1. schedule is a string.
 		starts = append(starts, schedule)
@@ -205,31 +214,31 @@ func (b *builder) buildSchedule() error {
 
 	default:
 		// If schedule is of an invalid type, return an error.
-		return fmt.Errorf("%w: %T", errInvalidScheduleType, b.def.Schedule)
+		return fmt.Errorf("%w: %T", errInvalidScheduleType, spec.Schedule)
 
 	}
 
 	// Parse each schedule as a cron expression.
 	var err error
-	b.dag.Schedule, err = parseSchedules(starts)
+	dag.Schedule, err = parseSchedules(starts)
 	if err != nil {
 		return err
 	}
-	b.dag.StopSchedule, err = parseSchedules(stops)
+	dag.StopSchedule, err = parseSchedules(stops)
 	if err != nil {
 		return err
 	}
-	b.dag.RestartSchedule, err = parseSchedules(restarts)
+	dag.RestartSchedule, err = parseSchedules(restarts)
 	return err
 }
 
-func (b *builder) buildMailOn() error {
-	if b.def.MailOn == nil {
+func buildMailOn(ctx BuildContext, spec *definition, dag *DAG) error {
+	if spec.MailOn == nil {
 		return nil
 	}
-	b.dag.MailOn = &MailOn{
-		Failure: b.def.MailOn.Failure,
-		Success: b.def.MailOn.Success,
+	dag.MailOn = &MailOn{
+		Failure: spec.MailOn.Failure,
+		Success: spec.MailOn.Success,
 	}
 	return nil
 }
@@ -237,48 +246,48 @@ func (b *builder) buildMailOn() error {
 // buildEnvs builds the environment variables for the DAG.
 // Case 1: env is an array of maps with string keys and string values.
 // Case 2: env is a map with string keys and string values.
-func (b *builder) buildEnvs() error {
-	env, err := loadVariables(b.def.Env, b.opts)
+func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
+	env, err := loadVariables(ctx, spec.Env)
 	if err != nil {
 		return err
 	}
-	b.dag.Env = buildConfigEnv(env)
+	dag.Env = buildConfigEnv(env)
 
 	// Add the environment variables that are defined in the base
 	// configuration. If the environment variable is already defined in
 	// the DAG, it is not added.
-	for _, e := range b.envs {
+	for _, e := range ctx.additionalEnvs {
 		key := strings.SplitN(e, "=", 2)[0]
 		if _, ok := env[key]; !ok {
-			b.dag.Env = append(b.dag.Env, e)
+			dag.Env = append(dag.Env, e)
 		}
 	}
 	return nil
 }
 
 // buildLogDir builds the log directory for the DAG.
-func (b *builder) buildLogDir() (err error) {
-	logDir, err := substituteCommands(os.ExpandEnv(b.def.LogDir))
+func buildLogDir(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	logDir, err := substituteCommands(os.ExpandEnv(spec.LogDir))
 	if err != nil {
 		return err
 	}
-	b.dag.LogDir = logDir
+	dag.LogDir = logDir
 	return err
 }
 
 // buildParams builds the parameters for the DAG.
-func (b *builder) buildParams() (err error) {
-	b.dag.DefaultParams = b.def.Params
+func buildParams(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	dag.DefaultParams = spec.Params
 
-	params := b.dag.DefaultParams
-	if b.opts.parameters != "" {
-		params = b.opts.parameters
+	params := dag.DefaultParams
+	if ctx.opts.parameters != "" {
+		params = ctx.opts.parameters
 	}
 
 	var envs []string
-	b.dag.Params, envs, err = parseParams(params, !b.opts.noEval, b.opts)
+	dag.Params, envs, err = parseParams(params, !ctx.opts.noEval, ctx.opts)
 	if err == nil {
-		b.dag.Env = append(b.dag.Env, envs...)
+		dag.Env = append(dag.Env, envs...)
 	}
 
 	return
@@ -287,38 +296,38 @@ func (b *builder) buildParams() (err error) {
 // buildHandlers builds the handlers for the DAG.
 // The handlers are executed when the DAG is stopped, succeeded, failed, or
 // cancelled.
-func (b *builder) buildHandlers() (err error) {
-	if b.def.HandlerOn.Exit != nil {
-		b.def.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if b.dag.HandlerOn.Exit, err = b.stepBuilder.buildStep(
-			b.dag.Env, b.def.HandlerOn.Exit, b.def.Functions,
+func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	if spec.HandlerOn.Exit != nil {
+		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
+		if dag.HandlerOn.Exit, err = ctx.stepBuilder.buildStep(
+			dag.Env, spec.HandlerOn.Exit, spec.Functions,
 		); err != nil {
 			return err
 		}
 	}
 
-	if b.def.HandlerOn.Success != nil {
-		b.def.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if b.dag.HandlerOn.Success, err = b.stepBuilder.buildStep(
-			b.dag.Env, b.def.HandlerOn.Success, b.def.Functions,
+	if spec.HandlerOn.Success != nil {
+		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
+		if dag.HandlerOn.Success, err = ctx.stepBuilder.buildStep(
+			dag.Env, spec.HandlerOn.Success, spec.Functions,
 		); err != nil {
 			return
 		}
 	}
 
-	if b.def.HandlerOn.Failure != nil {
-		b.def.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if b.dag.HandlerOn.Failure, err = b.stepBuilder.buildStep(
-			b.dag.Env, b.def.HandlerOn.Failure, b.def.Functions,
+	if spec.HandlerOn.Failure != nil {
+		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
+		if dag.HandlerOn.Failure, err = ctx.stepBuilder.buildStep(
+			dag.Env, spec.HandlerOn.Failure, spec.Functions,
 		); err != nil {
 			return
 		}
 	}
 
-	if b.def.HandlerOn.Cancel != nil {
-		b.def.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if b.dag.HandlerOn.Cancel, err = b.stepBuilder.buildStep(
-			b.dag.Env, b.def.HandlerOn.Cancel, b.def.Functions,
+	if spec.HandlerOn.Cancel != nil {
+		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
+		if dag.HandlerOn.Cancel, err = ctx.stepBuilder.buildStep(
+			dag.Env, spec.HandlerOn.Cancel, spec.Functions,
 		); err != nil {
 			return
 		}
@@ -328,17 +337,17 @@ func (b *builder) buildHandlers() (err error) {
 }
 
 // buildMiscs builds the miscellaneous fields for the DAG.
-func (b *builder) buildMiscs() (err error) {
-	if b.def.HistRetentionDays != nil {
-		b.dag.HistRetentionDays = *b.def.HistRetentionDays
+func buildMiscs(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	if spec.HistRetentionDays != nil {
+		dag.HistRetentionDays = *spec.HistRetentionDays
 	}
 
-	b.dag.Preconditions = buildConditions(b.def.Preconditions)
-	b.dag.MaxActiveRuns = b.def.MaxActiveRuns
+	dag.Preconditions = buildConditions(spec.Preconditions)
+	dag.MaxActiveRuns = spec.MaxActiveRuns
 
-	if b.def.MaxCleanUpTimeSec != nil {
-		b.dag.MaxCleanUpTime = time.Second *
-			time.Duration(*b.def.MaxCleanUpTimeSec)
+	if spec.MaxCleanUpTimeSec != nil {
+		dag.MaxCleanUpTime = time.Second *
+			time.Duration(*spec.MaxCleanUpTimeSec)
 	}
 
 	return nil
@@ -349,11 +358,10 @@ func (b *builder) buildMiscs() (err error) {
 // Case 2: env is an array of maps.
 // Case 3: is recommended because the order of the environment variables is
 // preserved.
-func loadVariables(strVariables any, opts buildOpts) (
+func loadVariables(ctx BuildContext, strVariables any) (
 	map[string]string, error,
 ) {
 	var pairs []pair
-
 	switch a := strVariables.(type) {
 	case map[any]any:
 		// Case 1. env is a map.
@@ -378,7 +386,7 @@ func loadVariables(strVariables any, opts buildOpts) (
 	for _, pair := range pairs {
 		value := pair.val
 
-		if !opts.noEval {
+		if !ctx.opts.noEval {
 			// Evaluate the value of the environment variable.
 			// This also executes command substitution.
 			var err error
@@ -399,62 +407,51 @@ func loadVariables(strVariables any, opts buildOpts) (
 }
 
 // skipIfSuccessful sets the skipIfSuccessful field for the DAG.
-func (b *builder) skipIfSuccessful() error {
-	b.dag.SkipIfSuccessful = b.def.SkipIfSuccessful
+func skipIfSuccessful(ctx BuildContext, spec *definition, dag *DAG) error {
+	dag.SkipIfSuccessful = spec.SkipIfSuccessful
 	return nil
 }
 
 // buildSteps builds the steps for the DAG.
-func (b *builder) buildSteps() error {
-	var ret []Step
-
-	for _, stepDef := range b.def.Steps {
-		step, err := b.stepBuilder.buildStep(
-			b.dag.Env, stepDef, b.def.Functions,
+func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
+	var steps []Step
+	for _, stepDef := range spec.Steps {
+		step, err := ctx.stepBuilder.buildStep(
+			dag.Env, stepDef, spec.Functions,
 		)
 		if err != nil {
 			return err
 		}
-		ret = append(ret, *step)
+		steps = append(steps, *step)
 	}
-
-	b.dag.Steps = ret
-
+	dag.Steps = steps
 	return nil
 }
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
-func (b *builder) buildSMTPConfig() (err error) {
-	b.dag.SMTP = &SMTPConfig{
-		Host:     os.ExpandEnv(b.def.SMTP.Host),
-		Port:     os.ExpandEnv(b.def.SMTP.Port),
-		Username: os.ExpandEnv(b.def.SMTP.Username),
-		Password: os.ExpandEnv(b.def.SMTP.Password),
+func buildSMTPConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	dag.SMTP = &SMTPConfig{
+		Host:     os.ExpandEnv(spec.SMTP.Host),
+		Port:     os.ExpandEnv(spec.SMTP.Port),
+		Username: os.ExpandEnv(spec.SMTP.Username),
+		Password: os.ExpandEnv(spec.SMTP.Password),
 	}
 
 	return nil
 }
 
 // buildErrMailConfig builds the error mail configuration for the DAG.
-func (b *builder) buildErrMailConfig() (err error) {
-	b.dag.ErrorMail, err = buildMailConfig(b.def.ErrorMail)
+func buildErrMailConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	dag.ErrorMail, err = buildMailConfig(spec.ErrorMail)
 
 	return
 }
 
 // buildInfoMailConfig builds the info mail configuration for the DAG.
-func (b *builder) buildInfoMailConfig() (err error) {
-	b.dag.InfoMail, err = buildMailConfig(b.def.InfoMail)
+func buildInfoMailConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+	dag.InfoMail, err = buildMailConfig(spec.InfoMail)
 
 	return
-}
-
-// callBuilderFunc calls a builder function and adds any errors to the error
-// list.
-func (b *builder) callBuilderFunc(fn builderFunc) {
-	if err := fn(); err != nil {
-		b.errs.Add(err)
-	}
 }
 
 // stepBuilder is used to build a step from the step definition.

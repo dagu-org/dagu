@@ -49,7 +49,8 @@ func retryCmd() *cobra.Command {
 					"file", specFilePath)
 			}
 
-			status, err := historyStore.FindByRequestID(absoluteFilePath, requestID)
+			ctx := cmd.Context()
+			status, err := historyStore.FindByRequestID(ctx, absoluteFilePath, requestID)
 			if err != nil {
 				initLogger.Fatal("Historical execution retrieval failed",
 					"error", err,
@@ -59,7 +60,7 @@ func retryCmd() *cobra.Command {
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			workflow, err := digraph.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
+			workflow, err := digraph.Load(ctx, cfg.BaseConfig, absoluteFilePath, status.Status.Params)
 			if err != nil {
 				initLogger.Fatal("Workflow specification load failed",
 					"error", err,
@@ -111,7 +112,6 @@ func retryCmd() *cobra.Command {
 				&agent.Options{RetryTarget: status.Status},
 			)
 
-			ctx := cmd.Context()
 			listenSignals(ctx, agt)
 
 			if err := agt.Run(ctx); err != nil {

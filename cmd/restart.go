@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"path/filepath"
 	"time"
@@ -42,15 +43,16 @@ func restartCmd() *cobra.Command {
 
 			// Load the DAG file and stop the DAG if it is running.
 			specFilePath := args[0]
-			workflow, err := digraph.Load(cfg.BaseConfig, specFilePath, "")
+			workflow, err := digraph.Load(cmd.Context(), cfg.BaseConfig, specFilePath, "")
 			if err != nil {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, initLogger)
+			ctx := cmd.Context()
 
-			if err := stopDAGIfRunning(cli, workflow, initLogger); err != nil {
+			if err := stopDAGIfRunning(ctx, cli, workflow, initLogger); err != nil {
 				initLogger.Fatal("Workflow stop operation failed",
 					"error", err,
 					"workflow", workflow.Name)
@@ -60,7 +62,7 @@ func restartCmd() *cobra.Command {
 			waitForRestart(workflow.RestartWait, initLogger)
 
 			// Retrieve the parameter of the previous execution.
-			params, err := getPreviousExecutionParams(cli, workflow)
+			params, err := getPreviousExecutionParams(ctx, cli, workflow)
 			if err != nil {
 				initLogger.Fatal("Previous execution parameter retrieval failed",
 					"error", err,
@@ -69,7 +71,7 @@ func restartCmd() *cobra.Command {
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			workflow, err = digraph.Load(cfg.BaseConfig, specFilePath, params)
+			workflow, err = digraph.Load(cmd.Context(), cfg.BaseConfig, specFilePath, params)
 			if err != nil {
 				initLogger.Fatal("Workflow reload failed",
 					"error", err,
@@ -133,24 +135,24 @@ func restartCmd() *cobra.Command {
 
 // stopDAGIfRunning stops the DAG if it is running.
 // Otherwise, it does nothing.
-func stopDAGIfRunning(e client.Client, workflow *digraph.DAG, lg logger.Logger) error {
-	curStatus, err := e.GetCurrentStatus(workflow)
+func stopDAGIfRunning(ctx context.Context, e client.Client, workflow *digraph.DAG, lg logger.Logger) error {
+	curStatus, err := e.GetCurrentStatus(ctx, workflow)
 	if err != nil {
 		return err
 	}
 
 	if curStatus.Status == scheduler.StatusRunning {
 		lg.Infof("Stopping: %s", workflow.Name)
-		cobra.CheckErr(stopRunningDAG(e, workflow))
+		cobra.CheckErr(stopRunningDAG(ctx, e, workflow))
 	}
 	return nil
 }
 
 // stopRunningDAG attempts to stop the running DAG
 // by sending a stop signal to the agent.
-func stopRunningDAG(e client.Client, workflow *digraph.DAG) error {
+func stopRunningDAG(ctx context.Context, e client.Client, workflow *digraph.DAG) error {
 	for {
-		curStatus, err := e.GetCurrentStatus(workflow)
+		curStatus, err := e.GetCurrentStatus(ctx, workflow)
 		if err != nil {
 			return err
 		}
@@ -160,7 +162,7 @@ func stopRunningDAG(e client.Client, workflow *digraph.DAG) error {
 			return nil
 		}
 
-		if err := e.Stop(workflow); err != nil {
+		if err := e.Stop(ctx, workflow); err != nil {
 			return err
 		}
 
@@ -177,8 +179,8 @@ func waitForRestart(restartWait time.Duration, lg logger.Logger) {
 	}
 }
 
-func getPreviousExecutionParams(e client.Client, workflow *digraph.DAG) (string, error) {
-	latestStatus, err := e.GetLatestStatus(workflow)
+func getPreviousExecutionParams(ctx context.Context, e client.Client, workflow *digraph.DAG) (string, error) {
+	latestStatus, err := e.GetLatestStatus(ctx, workflow)
 	if err != nil {
 		return "", err
 	}

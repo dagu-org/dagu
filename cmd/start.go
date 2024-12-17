@@ -42,7 +42,8 @@ func startCmd() *cobra.Command {
 				initLogger.Fatal("Parameter retrieval failed", "error", err)
 			}
 
-			workflow, err := digraph.Load(cfg.BaseConfig, args[0], removeQuotes(params))
+			ctx := cmd.Context()
+			workflow, err := digraph.Load(ctx, cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
@@ -94,8 +95,6 @@ func startCmd() *cobra.Command {
 				cli,
 				dataStore,
 				&agent.Options{})
-
-			ctx := cmd.Context()
 
 			listenSignals(ctx, agt)
 

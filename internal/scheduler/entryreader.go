@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +36,7 @@ type jobCreator interface {
 	CreateJob(workflow *digraph.DAG, next time.Time, schedule cron.Schedule) job
 }
 
-func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
+func newEntryReader(ctx context.Context, dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
 	er := &entryReaderImpl{
 		dagsDir:    dagsDir,
 		dagsLock:   sync.Mutex{},
@@ -44,17 +45,17 @@ func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger,
 		logger:     logger,
 		client:     client,
 	}
-	if err := er.initDAGs(); err != nil {
+	if err := er.initDAGs(ctx); err != nil {
 		er.logger.Error("DAG initialization failed", "error", err)
 	}
 	return er
 }
 
-func (er *entryReaderImpl) Start(done chan any) {
-	go er.watchDags(done)
+func (er *entryReaderImpl) Start(ctx context.Context, done chan any) {
+	go er.watchDags(ctx, done)
 }
 
-func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
+func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, error) {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
@@ -77,7 +78,7 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 			filepath.Ext(workflow.Location),
 		)
 
-		if er.client.IsSuspended(id) {
+		if er.client.IsSuspended(ctx, id) {
 			continue
 		}
 		addEntriesFn(workflow, workflow.Schedule, entryTypeStart)
@@ -88,7 +89,7 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	return entries, nil
 }
 
-func (er *entryReaderImpl) initDAGs() error {
+func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
@@ -100,9 +101,7 @@ func (er *entryReaderImpl) initDAGs() error {
 	var fileNames []string
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			workflow, err := digraph.LoadMetadata(
-				filepath.Join(er.dagsDir, fi.Name()),
-			)
+			workflow, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
 				er.logger.Error(
 					"Workflow load failed",
@@ -120,7 +119,7 @@ func (er *entryReaderImpl) initDAGs() error {
 	return nil
 }
 
-func (er *entryReaderImpl) watchDags(done chan any) {
+func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
 		er.logger.Error("Watcher creation failed", "error", err)
@@ -145,9 +144,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				workflow, err := digraph.LoadMetadata(
-					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
-				)
+				workflow, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
 					er.logger.Error(
 						"Workflow load failed",

@@ -39,7 +39,7 @@ func schedulerCmd() *cobra.Command {
 			ctx := cmd.Context()
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, logger)
-			sc := scheduler.New(cfg, logger, cli)
+			sc := scheduler.New(ctx, cfg, logger, cli)
 			if err := sc.Start(ctx); err != nil {
 				logger.Fatal(
 					"Scheduler initialization failed",

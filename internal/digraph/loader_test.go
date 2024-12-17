@@ -4,6 +4,7 @@
 package digraph
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -47,7 +48,7 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dag, err := Load("", tt.file, "")
+			dag, err := Load(context.Background(), "", tt.file, "")
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
@@ -61,7 +62,7 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Metadata", func(t *testing.T) {
-		dag, err := LoadMetadata(filepath.Join(testdataDir, "default.yaml"))
+		dag, err := LoadMetadata(context.Background(), filepath.Join(testdataDir, "default.yaml"))
 		require.NoError(t, err)
 
 		require.Equal(t, dag.Name, "default")
@@ -72,7 +73,7 @@ func Test_LoadMetadata(t *testing.T) {
 
 func Test_loadBaseConfig(t *testing.T) {
 	t.Run("LoadBaseConfigFile", func(t *testing.T) {
-		dag, err := loadBaseConfig(filepath.Join(testdataDir, "base.yaml"), buildOpts{})
+		dag, err := loadBaseConfig(context.Background(), filepath.Join(testdataDir, "base.yaml"), buildOpts{})
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})
@@ -81,7 +82,7 @@ func Test_loadBaseConfig(t *testing.T) {
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
 		file := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load("", file, "")
+		dag, err := Load(context.Background(), "", file, "")
 
 		require.NoError(t, err)
 
@@ -111,7 +112,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
-		ret, err := loadYAML([]byte(testDAG), buildOpts{})
+		ret, err := loadYAML(context.Background(), []byte(testDAG), buildOpts{})
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -120,7 +121,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
-		_, err := loadYAML([]byte(`invalidyaml`), buildOpts{})
+		_, err := loadYAML(context.Background(), []byte(`invalidyaml`), buildOpts{})
 		require.Error(t, err)
 	})
 }

@@ -30,19 +30,20 @@ type Scheduler struct {
 	location    *time.Location
 }
 
-func New(cfg *config.Config, logger logger.Logger, cli client.Client) *Scheduler {
+// TODO: refactor to remove ctx from the constructor
+func New(ctx context.Context, cfg *config.Config, logger logger.Logger, cli client.Client) *Scheduler {
 	jobCreator := &jobCreatorImpl{
 		WorkDir:    cfg.WorkDir,
 		Client:     cli,
 		Executable: cfg.Executable,
 	}
-	entryReader := newEntryReader(cfg.DAGs, jobCreator, logger, cli)
+	entryReader := newEntryReader(ctx, cfg.DAGs, jobCreator, logger, cli)
 	return newScheduler(entryReader, logger, cfg.LogDir, cfg.Location)
 }
 
 type entryReader interface {
-	Start(done chan any)
-	Read(now time.Time) ([]*entry, error)
+	Start(ctx context.Context, done chan any)
+	Read(ctx context.Context, now time.Time) ([]*entry, error)
 }
 
 type entry struct {
@@ -53,10 +54,10 @@ type entry struct {
 }
 
 type job interface {
-	GetDAG() *digraph.DAG
-	Start() error
-	Stop() error
-	Restart() error
+	GetDAG(ctx context.Context) *digraph.DAG
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	Restart(ctx context.Context) error
 	String() string
 }
 
@@ -81,7 +82,7 @@ func (e entryType) String() string {
 	}
 }
 
-func (e *entry) Invoke() error {
+func (e *entry) Invoke(ctx context.Context) error {
 	if e.Job == nil {
 		return nil
 	}
@@ -95,11 +96,11 @@ func (e *entry) Invoke() error {
 
 	switch e.EntryType {
 	case entryTypeStart:
-		return e.Job.Start()
+		return e.Job.Start(ctx)
 	case entryTypeStop:
-		return e.Job.Stop()
+		return e.Job.Stop(ctx)
 	case entryTypeRestart:
-		return e.Job.Restart()
+		return e.Job.Restart(ctx)
 	default:
 		return fmt.Errorf("unknown entry type: %v", e.EntryType)
 	}
@@ -123,7 +124,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	done := make(chan any)
 	defer close(done)
 
-	s.entryReader.Start(done)
+	s.entryReader.Start(ctx, done)
 
 	signal.Notify(
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
@@ -140,12 +141,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.start()
+	s.start(ctx)
 
 	return nil
 }
 
-func (s *Scheduler) start() {
+func (s *Scheduler) start(ctx context.Context) {
 	// TODO: refactor this to use a ticker
 	t := now().Truncate(time.Minute)
 	timer := time.NewTimer(0)
@@ -154,7 +155,7 @@ func (s *Scheduler) start() {
 	for {
 		select {
 		case <-timer.C:
-			s.run(t)
+			s.run(ctx, t)
 			t = s.nextTick(t)
 			_ = timer.Stop()
 			timer.Reset(t.Sub(now()))
@@ -167,8 +168,8 @@ func (s *Scheduler) start() {
 	}
 }
 
-func (s *Scheduler) run(now time.Time) {
-	entries, err := s.entryReader.Read(now.Add(-time.Second).In(s.location))
+func (s *Scheduler) run(ctx context.Context, now time.Time) {
+	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
 		s.logger.Error("Scheduler failed to read workflow entries", "error", err)
 		return
@@ -182,7 +183,7 @@ func (s *Scheduler) run(now time.Time) {
 			break
 		}
 		go func(e *entry) {
-			if err := e.Invoke(); err != nil {
+			if err := e.Invoke(ctx); err != nil {
 				if errors.Is(err, errJobFinished) {
 					s.logger.Info("Workflow is already finished", "workflow", e.Job, "err", err)
 				} else if errors.Is(err, errJobRunning) {

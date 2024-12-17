@@ -4,6 +4,7 @@
 package digraph
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -337,7 +338,7 @@ func TestOverrideBaseConfig(t *testing.T) {
 
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
-		dag, err := Load(baseConfig, filepath.Join(testdataDir, "overwrite.yaml"), "")
+		dag, err := Load(context.Background(), baseConfig, filepath.Join(testdataDir, "overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
@@ -348,7 +349,7 @@ func TestOverrideBaseConfig(t *testing.T) {
 		baseConfig := filepath.Join(testdataDir, "base.yaml")
 
 		// no_overwrite.yaml does not have the MailOn key.
-		dag, err := Load(baseConfig, filepath.Join(testdataDir, "no_overwrite.yaml"), "")
+		dag, err := Load(context.Background(), baseConfig, filepath.Join(testdataDir, "no_overwrite.yaml"), "")
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.
@@ -375,7 +376,7 @@ func readTestFile(t *testing.T, filename string) []byte {
 
 func runTest(t *testing.T, tc testCase) {
 	t.Helper()
-	dag, err := loadYAML(readTestFile(t, tc.InputFile), buildOpts{})
+	dag, err := loadYAML(context.Background(), readTestFile(t, tc.InputFile), buildOpts{})
 
 	if tc.ExpectedErr != nil {
 		assert.Error(t, err)

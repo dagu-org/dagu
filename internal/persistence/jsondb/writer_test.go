@@ -4,6 +4,7 @@
 package jsondb
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,7 @@ func TestWriter(t *testing.T) {
 
 		defer func() {
 			assert.NoError(t, dw.close())
-			assert.NoError(t, te.JSONDB.RemoveOld(d.Location, 0))
+			assert.NoError(t, te.JSONDB.RemoveOld(context.Background(), d.Location, 0))
 		}()
 
 		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
@@ -67,7 +68,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, dw.close())
 
 		// Verify initial write
-		data, err := te.JSONDB.FindByRequestID(d.Location, requestID)
+		data, err := te.JSONDB.FindByRequestID(context.Background(), d.Location, requestID)
 		require.NoError(t, err)
 		assert.Equal(t, scheduler.StatusCancel, data.Status.Status)
 		assert.Equal(t, file, data.File)
@@ -80,7 +81,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, dw.close())
 
 		// Verify appended data
-		data, err = te.JSONDB.FindByRequestID(d.Location, requestID)
+		data, err = te.JSONDB.FindByRequestID(context.Background(), d.Location, requestID)
 		require.NoError(t, err)
 		assert.Equal(t, scheduler.StatusSuccess, data.Status.Status)
 		assert.Equal(t, file, data.File)
@@ -141,13 +142,13 @@ func TestWriterRename(t *testing.T) {
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 
-	err = te.JSONDB.Rename(oldPath, newPath)
+	err = te.JSONDB.Rename(context.Background(), oldPath, newPath)
 	require.NoError(t, err)
 
 	require.NoDirExists(t, oldDir)
 	require.DirExists(t, newDir)
 
-	ret := te.JSONDB.ReadStatusRecent(newPath, 1)
+	ret := te.JSONDB.ReadStatusRecent(context.Background(), newPath, 1)
 	require.Len(t, ret, 1)
 	assert.Equal(t, status.RequestID, ret[0].Status.RequestID)
 }

@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,17 +31,19 @@ func TestReadEntries(t *testing.T) {
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(
+			context.Background(),
 			filepath.Join(testdataDir, "invalid_directory"),
 			&mockJobFactory{},
 			test.NewLogger(),
 			cli,
 		)
 
-		entries, err := entryReader.Read(now)
+		entries, err := entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.Len(t, entries, 0)
 
 		entryReader = newEntryReader(
+			context.Background(),
 			testdataDir,
 			&mockJobFactory{},
 			test.NewLogger(),
@@ -49,9 +52,9 @@ func TestReadEntries(t *testing.T) {
 
 		done := make(chan any)
 		defer close(done)
-		entryReader.Start(done)
+		entryReader.Start(context.Background(), done)
 
-		entries, err = entryReader.Read(now)
+		entries, err = entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(entries), 1)
 
@@ -62,17 +65,17 @@ func TestReadEntries(t *testing.T) {
 		var j job
 		for _, e := range entries {
 			jj := e.Job
-			if jj.GetDAG().Name == "scheduled_job" {
+			if jj.GetDAG(context.Background()).Name == "scheduled_job" {
 				j = jj
 				break
 			}
 		}
 
-		err = cli.ToggleSuspend(j.GetDAG().Name, true)
+		err = cli.ToggleSuspend(context.Background(), j.GetDAG(context.Background()).Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended
-		lives, err := entryReader.Read(now)
+		lives, err := entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.Equal(t, len(entries)-1, len(lives))
 	})

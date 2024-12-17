@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -111,11 +112,12 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	workflow, err := digraph.Load(cfg.BaseConfig, dagFile, "")
+	workflow, err := digraph.Load(context.Background(), cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
+	ctx := context.Background()
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(workflow)
+		status, err := e.GetCurrentStatus(ctx, workflow)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)
@@ -131,7 +133,7 @@ func testLastStatusEventual(
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		status := hs.ReadStatusRecent(dg, 1)
+		status := hs.ReadStatusRecent(context.Background(), dg, 1)
 		if len(status) < 1 {
 			return false
 		}

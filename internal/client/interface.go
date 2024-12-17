@@ -4,6 +4,7 @@
 package client
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -13,28 +14,28 @@ import (
 )
 
 type Client interface {
-	CreateDAG(id string) (string, error)
-	GetDAGSpec(id string) (string, error)
-	Grep(pattern string) ([]*persistence.GrepResult, []string, error)
-	Rename(oldID, newID string) error
-	Stop(workflow *digraph.DAG) error
-	StartAsync(workflow *digraph.DAG, opts StartOptions)
-	Start(workflow *digraph.DAG, opts StartOptions) error
-	Restart(workflow *digraph.DAG, opts RestartOptions) error
-	Retry(workflow *digraph.DAG, requestID string) error
-	GetCurrentStatus(workflow *digraph.DAG) (*model.Status, error)
-	GetStatusByRequestID(workflow *digraph.DAG, requestID string) (*model.Status, error)
-	GetLatestStatus(workflow *digraph.DAG) (*model.Status, error)
-	GetRecentHistory(workflow *digraph.DAG, n int) []*model.StatusFile
-	UpdateStatus(workflow *digraph.DAG, status *model.Status) error
-	UpdateDAG(id string, spec string) error
-	DeleteDAG(id, loc string) error
-	GetAllStatus() (statuses []*DAGStatus, errs []string, err error)
-	GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
-	GetStatus(dagLocation string) (*DAGStatus, error)
-	IsSuspended(id string) bool
-	ToggleSuspend(id string, suspend bool) error
-	GetTagList() ([]string, []string, error)
+	CreateDAG(ctx context.Context, id string) (string, error)
+	GetDAGSpec(ctx context.Context, id string) (string, error)
+	Grep(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
+	Rename(ctx context.Context, oldID, newID string) error
+	Stop(ctx context.Context, workflow *digraph.DAG) error
+	StartAsync(ctx context.Context, workflow *digraph.DAG, opts StartOptions)
+	Start(ctx context.Context, workflow *digraph.DAG, opts StartOptions) error
+	Restart(ctx context.Context, workflow *digraph.DAG, opts RestartOptions) error
+	Retry(ctx context.Context, workflow *digraph.DAG, requestID string) error
+	GetCurrentStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error)
+	GetStatusByRequestID(ctx context.Context, workflow *digraph.DAG, requestID string) (*model.Status, error)
+	GetLatestStatus(ctx context.Context, workflow *digraph.DAG) (*model.Status, error)
+	GetRecentHistory(ctx context.Context, workflow *digraph.DAG, n int) []*model.StatusFile
+	UpdateStatus(ctx context.Context, workflow *digraph.DAG, status *model.Status) error
+	UpdateDAG(ctx context.Context, id string, spec string) error
+	DeleteDAG(ctx context.Context, id, loc string) error
+	GetAllStatus(ctx context.Context) (statuses []*DAGStatus, errs []string, err error)
+	GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
+	GetStatus(ctx context.Context, dagLocation string) (*DAGStatus, error)
+	IsSuspended(ctx context.Context, id string) bool
+	ToggleSuspend(ctx context.Context, id string, suspend bool) error
+	GetTagList(ctx context.Context) ([]string, []string, error)
 }
 
 type StartOptions struct {

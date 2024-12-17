@@ -35,7 +35,7 @@ func stopCmd() *cobra.Command {
 				Quiet:  quiet,
 			})
 
-			workflow, err := digraph.Load(cfg.BaseConfig, args[0], "")
+			workflow, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
 			if err != nil {
 				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
@@ -45,7 +45,7 @@ func stopCmd() *cobra.Command {
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore, logger)
 
-			if err := cli.Stop(workflow); err != nil {
+			if err := cli.Stop(cmd.Context(), workflow); err != nil {
 				logger.Fatal(
 					"Workflow stop operation failed",
 					"error",

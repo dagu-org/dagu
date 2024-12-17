@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -52,12 +53,12 @@ type jobImpl struct {
 	Client     client.Client
 }
 
-func (j *jobImpl) GetDAG() *digraph.DAG {
+func (j *jobImpl) GetDAG(ctx context.Context) *digraph.DAG {
 	return j.DAG
 }
 
-func (j *jobImpl) Start() error {
-	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
+func (j *jobImpl) Start(ctx context.Context) error {
+	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ func (j *jobImpl) Start() error {
 		// time against the defined schedule. If the DAG has already run successfully
 		// since the last scheduled time, the current run will be skipped.
 		if j.DAG.SkipIfSuccessful {
-			prev := j.Prev()
+			prev := j.Prev(ctx)
 			if lastExecTime.After(prev) || lastExecTime.Equal(prev) {
 				// Calculate the previous scheduled time
 				lastStartedAt, _ := util.ParseTime(latestStatus.StartedAt)
@@ -89,12 +90,10 @@ func (j *jobImpl) Start() error {
 		}
 	}
 
-	return j.Client.Start(j.DAG, client.StartOptions{
-		Quiet: true,
-	})
+	return j.Client.Start(ctx, j.DAG, client.StartOptions{Quiet: true})
 }
 
-func (j *jobImpl) Prev() time.Time {
+func (j *jobImpl) Prev(ctx context.Context) time.Time {
 	// Since robfig/cron does not provide a way to get the previous schedule time,
 	// we need to do it manually.
 	// The idea is to get the next schedule time and subtract the duration of the schedule.
@@ -103,21 +102,19 @@ func (j *jobImpl) Prev() time.Time {
 	return j.Next.Add(-t.Sub(j.Next))
 }
 
-func (j *jobImpl) Stop() error {
-	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
+func (j *jobImpl) Stop(ctx context.Context) error {
+	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
 		return err
 	}
 	if latestStatus.Status != dagscheduler.StatusRunning {
 		return errJobIsNotRunning
 	}
-	return j.Client.Stop(j.DAG)
+	return j.Client.Stop(ctx, j.DAG)
 }
 
-func (j *jobImpl) Restart() error {
-	return j.Client.Restart(j.DAG, client.RestartOptions{
-		Quiet: true,
-	})
+func (j *jobImpl) Restart(ctx context.Context) error {
+	return j.Client.Restart(ctx, j.DAG, client.RestartOptions{Quiet: true})
 }
 
 func (j *jobImpl) String() string {

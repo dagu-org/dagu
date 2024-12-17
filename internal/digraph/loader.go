@@ -5,6 +5,7 @@ package digraph
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,8 +27,8 @@ var (
 )
 
 // Load loads config from file.
-func Load(base, dag, params string) (*DAG, error) {
-	return loadDAG(dag, buildOpts{
+func Load(ctx context.Context, base, dag, params string) (*DAG, error) {
+	return loadDAG(ctx, dag, buildOpts{
 		base:         base,
 		parameters:   params,
 		metadataOnly: false,
@@ -36,16 +37,16 @@ func Load(base, dag, params string) (*DAG, error) {
 }
 
 // LoadWithoutEval loads config from file without evaluating env variables.
-func LoadWithoutEval(dag string) (*DAG, error) {
-	return loadDAG(dag, buildOpts{
+func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
+	return loadDAG(ctx, dag, buildOpts{
 		metadataOnly: false,
 		noEval:       true,
 	})
 }
 
 // LoadMetadata loads config from file and returns only the headline data.
-func LoadMetadata(dag string) (*DAG, error) {
-	return loadDAG(dag, buildOpts{
+func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {
+	return loadDAG(ctx, dag, buildOpts{
 		metadataOnly: true,
 		noEval:       true,
 	})
@@ -54,15 +55,15 @@ func LoadMetadata(dag string) (*DAG, error) {
 // LoadYAML loads config from YAML data.
 // It does not evaluate the environment variables.
 // This is used to validate the YAML data.
-func LoadYAML(data []byte) (*DAG, error) {
-	return loadYAML(data, buildOpts{
+func LoadYAML(ctx context.Context, data []byte) (*DAG, error) {
+	return loadYAML(ctx, data, buildOpts{
 		metadataOnly: false,
 		noEval:       true,
 	})
 }
 
 // LoadYAML loads config from YAML data.
-func loadYAML(data []byte, opts buildOpts) (*DAG, error) {
+func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
@@ -73,13 +74,12 @@ func loadYAML(data []byte, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	b := &builder{opts: opts}
-	return b.build(def, nil)
+	return build(ctx, def, opts, nil)
 }
 
 // loadBaseConfig loads the global configuration from the given file.
 // The global configuration can be overridden by the DAG configuration.
-func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
+func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, error) {
 	// The base config is optional.
 	if !fileutil.FileExists(file) {
 		return nil, nil
@@ -97,72 +97,57 @@ func loadBaseConfig(file string, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	// Build the DAG from the config definition.
-	// Base configuration must load all the data.
-	buildOpts := opts
-	buildOpts.metadataOnly = false
+	// TODO: Consider removing the line below.
+	opts.metadataOnly = false
 
-	b := &builder{opts: buildOpts}
-	return b.build(def, nil)
+	return build(ctx, def, opts, nil)
 }
 
 // loadDAG loads the DAG from the given file.
-func loadDAG(dag string, opts buildOpts) (*DAG, error) {
-	// Find the absolute path to the file.
-	// The file must be a YAML file.
-	file, err := craftFilePath(dag)
+func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
+	file, err := resolveYamlFilePath(dag)
 	if err != nil {
 		return nil, err
 	}
 
-	// Load the base configuration unless only the metadata is required.
-	// If only the metadata is required, the base configuration is not loaded
-	// and the DAG is created with the default values.
-	dst, err := loadBaseConfigIfRequired(opts.base, opts)
+	dest, err := loadBaseConfigIfRequired(ctx, opts.base, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// Load the raw data from the file.
 	raw, err := readFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	// Decode the raw data into a config definition.
-	def, err := decode(raw)
+	spec, err := decode(raw)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build the DAG from the config definition.
-	b := builder{opts: opts}
-	c, err := b.build(def, dst.Env)
+	target, err := build(ctx, spec, opts, dest.Env)
 	if err != nil {
 		return nil, err
 	}
 
-	// Merge the DAG with the base configuration.
-	// The DAG configuration overrides the base configuration.
-	err = merge(dst, c)
+	// Merge the target DAG into the dest DAG.
+	err = merge(dest, target)
 	if err != nil {
 		return nil, err
 	}
 
 	// Set the absolute path to the file.
-	dst.Location = file
+	dest.Location = file
 
 	// Set the name if not set.
-	if dst.Name == "" {
-		dst.Name = defaultName(file)
+	if dest.Name == "" {
+		dest.Name = defaultName(file)
 	}
 
-	// Set the default values for the DAG.
-	if !opts.metadataOnly {
-		dst.setup()
-	}
+	// Set defaults
+	dest.setup()
 
-	return dst, nil
+	return dest, nil
 }
 
 // defaultName returns the default name for the given file.
@@ -171,9 +156,7 @@ func defaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
-// craftFilePath prepares the filepath for the given file.
-// The file must be a YAML file.
-func craftFilePath(file string) (string, error) {
+func resolveYamlFilePath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
 	}
@@ -188,20 +171,20 @@ func craftFilePath(file string) (string, error) {
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the
 // given options.
-func loadBaseConfigIfRequired(
-	baseConfig string, opts buildOpts,
-) (*DAG, error) {
+func loadBaseConfigIfRequired(ctx context.Context, baseConfig string, opts buildOpts) (*DAG, error) {
 	if !opts.metadataOnly && baseConfig != "" {
-		dag, err := loadBaseConfig(baseConfig, opts)
+		dag, err := loadBaseConfig(ctx, baseConfig, opts)
 		if err != nil {
+			// Failed to load the base config.
 			return nil, err
 		}
-		// Base config is optional.
 		if dag != nil {
+			// Found the base config.
 			return dag, nil
 		}
 	}
 
+	// No base config.
 	return new(DAG), nil
 }
 

@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
@@ -25,11 +26,11 @@ type mockEntryReader struct {
 	Entries []*entry
 }
 
-func (er *mockEntryReader) Read(_ time.Time) ([]*entry, error) {
+func (er *mockEntryReader) Read(ctx context.Context, _ time.Time) ([]*entry, error) {
 	return er.Entries, nil
 }
 
-func (er *mockEntryReader) Start(chan any) {}
+func (er *mockEntryReader) Start(ctx context.Context, _ chan any) {}
 
 var _ job = (*mockJob)(nil)
 
@@ -49,15 +50,11 @@ func newMockJob(workflow *digraph.DAG) *mockJob {
 	}
 }
 
-func (j *mockJob) GetDAG() *digraph.DAG {
+func (j *mockJob) GetDAG(ctx context.Context) *digraph.DAG {
 	return j.DAG
 }
 
-func (j *mockJob) String() string {
-	return j.Name
-}
-
-func (j *mockJob) Start() error {
+func (j *mockJob) Start(ctx context.Context) error {
 	j.RunCount.Add(1)
 	if j.Panic != nil {
 		panic(j.Panic)
@@ -65,12 +62,16 @@ func (j *mockJob) Start() error {
 	return nil
 }
 
-func (j *mockJob) Stop() error {
+func (j *mockJob) Stop(ctx context.Context) error {
 	j.StopCount.Add(1)
 	return nil
 }
 
-func (j *mockJob) Restart() error {
+func (j *mockJob) Restart(ctx context.Context) error {
 	j.RestartCount.Add(1)
 	return nil
+}
+
+func (j *mockJob) String() string {
+	return j.Name
 }

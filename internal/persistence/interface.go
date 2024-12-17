@@ -4,6 +4,7 @@
 package persistence
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,31 +26,31 @@ type DataStores interface {
 }
 
 type HistoryStore interface {
-	Open(dagFile string, t time.Time, requestID string) error
-	Write(status *model.Status) error
-	Close() error
-	Update(dagFile, requestID string, st *model.Status) error
-	ReadStatusRecent(dagFile string, n int) []*model.StatusFile
-	ReadStatusToday(dagFile string) (*model.Status, error)
-	FindByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
-	RemoveAll(dagFile string) error
-	RemoveOld(dagFile string, retentionDays int) error
-	Rename(oldName, newName string) error
+	Open(ctx context.Context, dagFile string, t time.Time, requestID string) error
+	Write(ctx context.Context, status *model.Status) error
+	Close(ctx context.Context) error
+	Update(ctx context.Context, dagFile, requestID string, st *model.Status) error
+	ReadStatusRecent(ctx context.Context, dagFile string, n int) []*model.StatusFile
+	ReadStatusToday(ctx context.Context, dagFile string) (*model.Status, error)
+	FindByRequestID(ctx context.Context, dagFile string, requestID string) (*model.StatusFile, error)
+	RemoveAll(ctx context.Context, dagFile string) error
+	RemoveOld(ctx context.Context, dagFile string, retentionDays int) error
+	Rename(ctx context.Context, oldName, newName string) error
 }
 
 type DAGStore interface {
-	Create(name string, spec []byte) (string, error)
-	Delete(name string) error
-	List() (ret []*digraph.DAG, errs []string, err error)
-	ListPagination(params DAGListPaginationArgs) (*DagListPaginationResult, error)
-	GetMetadata(name string) (*digraph.DAG, error)
-	GetDetails(name string) (*digraph.DAG, error)
-	Grep(pattern string) (ret []*GrepResult, errs []string, err error)
-	Rename(oldID, newID string) error
-	GetSpec(name string) (string, error)
-	UpdateSpec(name string, spec []byte) error
-	Find(name string) (*digraph.DAG, error)
-	TagList() ([]string, []string, error)
+	Create(ctx context.Context, name string, spec []byte) (string, error)
+	Delete(ctx context.Context, name string) error
+	List(ctx context.Context) (ret []*digraph.DAG, errs []string, err error)
+	ListPagination(ctx context.Context, params DAGListPaginationArgs) (*DagListPaginationResult, error)
+	GetMetadata(ctx context.Context, name string) (*digraph.DAG, error)
+	GetDetails(ctx context.Context, name string) (*digraph.DAG, error)
+	Grep(ctx context.Context, pattern string) (ret []*GrepResult, errs []string, err error)
+	Rename(ctx context.Context, oldID, newID string) error
+	GetSpec(ctx context.Context, name string) (string, error)
+	UpdateSpec(ctx context.Context, name string, spec []byte) error
+	Find(ctx context.Context, name string) (*digraph.DAG, error)
+	TagList(ctx context.Context) ([]string, []string, error)
 }
 
 type DAGListPaginationArgs struct {

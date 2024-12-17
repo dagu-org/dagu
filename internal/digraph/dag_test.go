@@ -4,6 +4,7 @@
 package digraph
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -17,7 +18,7 @@ var (
 
 func TestDAG_String(t *testing.T) {
 	t.Run("DefaltConfig", func(t *testing.T) {
-		dag, err := Load("", filepath.Join(testdataDir, "default.yaml"), "")
+		dag, err := Load(context.Background(), "", filepath.Join(testdataDir, "default.yaml"), "")
 		require.NoError(t, err)
 
 		ret := dag.String()

@@ -45,7 +45,7 @@ func startAllCmd() *cobra.Command {
 			go func() {
 				logger.Info("Scheduler initialization", "dags", cfg.DAGs)
 
-				sc := scheduler.New(cfg, logger, cli)
+				sc := scheduler.New(ctx, cfg, logger, cli)
 				if err := sc.Start(ctx); err != nil {
 					logger.Fatal("Scheduler initialization failed", "error", err, "dags", cfg.DAGs)
 				}
