@@ -5,6 +5,9 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "golang.go"
     },
+    "[markdown]": {
+        "editor.formatOnSave": false
+    },
     "editor.rulers": [
         80
     ],
