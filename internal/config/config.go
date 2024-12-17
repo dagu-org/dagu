@@ -183,6 +183,14 @@ func setupViper() error {
 	bindEnvs()
 
 	// Set default values for config keys.
+	setDefaultValues(r)
+
+	// Set executable path
+	// This is used for invoking the workflow process on the server.
+	return setExecutableDefault()
+}
+
+func setDefaultValues(r resolver) {
 	viper.SetDefault("dags", r.dagsDir)
 	viper.SetDefault("dagsDir", r.dagsDir) // For backward compatibility
 	viper.SetDefault("suspendFlagsDir", r.suspendFlagsDir)
@@ -202,10 +210,6 @@ func setupViper() error {
 	viper.SetDefault("basePath", "")
 	viper.SetDefault("apiBaseURL", "/api/v1")
 	viper.SetDefault("maxDashboardPageLimit", 100)
-
-	// Set executable path
-	// This is used for invoking the workflow process on the server.
-	return setExecutableDefault()
 }
 
 func getHomeDir() string {
