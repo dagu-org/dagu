@@ -189,7 +189,7 @@ addlicense:
 		-ignore "**/*.yaml" \
 		-ignore "**/filenotify/*" \
 		-ignore "**/testdata/**" \
-		-c "The Dagu Authors" \
+		-c "Yota Hamada" \
 		-f scripts/header.txt \
 		.
 

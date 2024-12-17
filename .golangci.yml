@@ -70,7 +70,7 @@ linters-settings:
   goheader:
     values:
       const:
-        AUTHOR: The Dagu Authors
+        AUTHOR: Yota Hamada
     template: |-
       Copyright (C) {{ YEAR }} {{ AUTHOR }}
       SPDX-License-Identifier: GPL-3.0-or-later
