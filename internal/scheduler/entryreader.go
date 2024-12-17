@@ -44,7 +44,7 @@ func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger,
 		logger:     logger,
 		client:     client,
 	}
-	if err := er.initDags(); err != nil {
+	if err := er.initDAGs(); err != nil {
 		er.logger.Error("DAG initialization failed", "error", err)
 	}
 	return er
@@ -88,7 +88,7 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	return entries, nil
 }
 
-func (er *entryReaderImpl) initDags() error {
+func (er *entryReaderImpl) initDAGs() error {
 	er.dagsLock.Lock()
 	defer er.dagsLock.Unlock()
 
