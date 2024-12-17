@@ -107,7 +107,11 @@ func Load() (*Config, error) {
 
 	loadLegacyEnvs(&cfg)
 	setEnvVariables(&cfg)
-	setTimezone(&cfg)
+
+	if err := setTimezone(&cfg); err != nil {
+		return nil, err
+	}
+
 	cleanBasePath(&cfg)
 
 	return &cfg, nil
@@ -223,42 +227,47 @@ func setExecutableDefault() error {
 }
 
 func bindEnvs() {
+	prefix := strings.ToUpper(build.Slug) + "_"
+	bindEnv := func(key, env string) {
+		_ = viper.BindEnv(key, prefix+env)
+	}
+
 	// Server configurations
-	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
-	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
-	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
-	_ = viper.BindEnv("basePath", "DAGU_BASE_PATH")
-	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
-	_ = viper.BindEnv("tz", "DAGU_TZ")
-	_ = viper.BindEnv("maxDashboardPageLimit", "DAGU_MAX_DASHBOARD_PAGE_LIMIT")
+	bindEnv("logEncodingCharset", "LOG_ENCODING_CHARSET")
+	bindEnv("navbarColor", "NAVBAR_COLOR")
+	bindEnv("navbarTitle", "NAVBAR_TITLE")
+	bindEnv("basePath", "BASE_PATH")
+	bindEnv("apiBaseURL", "API_BASE_URL")
+	bindEnv("tz", "TZ")
+	bindEnv("maxDashboardPageLimit", "MAX_DASHBOARD_PAGE_LIMIT")
 
 	// Basic authentication
-	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
-	_ = viper.BindEnv("basicAuthUsername", "DAGU_BASICAUTH_USERNAME")
-	_ = viper.BindEnv("basicAuthPassword", "DAGU_BASICAUTH_PASSWORD")
+	bindEnv("isBasicAuth", "IS_BASICAUTH")
+	bindEnv("basicAuthUsername", "BASICAUTH_USERNAME")
+	bindEnv("basicAuthPassword", "BASICAUTH_PASSWORD")
 
 	// TLS configurations
-	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
-	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
+	bindEnv("tls.certFile", "CERT_FILE")
+	bindEnv("tls.keyFile", "KEY_FILE")
 
 	// Auth Token
-	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
-	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
+	bindEnv("isAuthToken", "IS_AUTHTOKEN")
+	bindEnv("authToken", "AUTHTOKEN")
 
 	// Executables
-	_ = viper.BindEnv("executable", "DAGU_EXECUTABLE")
+	bindEnv("executable", "EXECUTABLE")
 
 	// Directories and files
-	_ = viper.BindEnv("dags", "DAGU_DAGS_DIR")
-	_ = viper.BindEnv("workDir", "DAGU_WORK_DIR")
-	_ = viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
-	_ = viper.BindEnv("logDir", "DAGU_LOG_DIR")
-	_ = viper.BindEnv("dataDir", "DAGU_DATA_DIR")
-	_ = viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
-	_ = viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
+	bindEnv("dags", "DAGS_DIR")
+	bindEnv("workDir", "WORK_DIR")
+	bindEnv("baseConfig", "BASE_CONFIG")
+	bindEnv("logDir", "LOG_DIR")
+	bindEnv("dataDir", "DATA_DIR")
+	bindEnv("suspendFlagsDir", "SUSPEND_FLAGS_DIR")
+	bindEnv("adminLogsDir", "ADMIN_LOG_DIR")
 
 	// Miscellaneous
-	_ = viper.BindEnv("latestStatusToday", "DAGU_LATEST_STATUS")
+	bindEnv("latestStatusToday", "LATEST_STATUS")
 }
 
 func loadLegacyEnvs(cfg *Config) {
