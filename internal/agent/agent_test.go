@@ -28,8 +28,8 @@ import (
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
@@ -114,7 +114,7 @@ func TestAgent_Run(t *testing.T) {
 		workflow := testLoadDAG(t, "multiple_steps.yaml")
 
 		// Precondition is not met
-		workflow.Preconditions = []dag.Condition{{Condition: "`echo 1`", Expected: "0"}}
+		workflow.Preconditions = []digraph.Condition{{Condition: "`echo 1`", Expected: "0"}}
 
 		agt := newAgent(setup, genRequestID(), workflow, &agent.Options{})
 		err := agt.Run(context.Background())
@@ -417,9 +417,9 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 
 // testLoadDAG load the specified DAG file for testing
 // without base config or parameters.
-func testLoadDAG(t *testing.T, name string) *dag.DAG {
+func testLoadDAG(t *testing.T, name string) *digraph.DAG {
 	file := filepath.Join(util.MustGetwd(), "testdata", name)
-	workflow, err := dag.Load("", file, "")
+	workflow, err := digraph.Load("", file, "")
 	require.NoError(t, err)
 	return workflow
 }
@@ -435,7 +435,7 @@ func genRequestID() string {
 func newAgent(
 	setup test.Setup,
 	requestID string,
-	workflow *dag.DAG,
+	workflow *digraph.DAG,
 	opts *agent.Options,
 ) *agent.Agent {
 	return agent.New(

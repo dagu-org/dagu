@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/persistence"
@@ -44,7 +44,7 @@ import (
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
 type Agent struct {
-	dag          *dag.DAG
+	dag          *digraph.DAG
 	dry          bool
 	retryTarget  *model.Status
 	dataStore    persistence.DataStores
@@ -80,7 +80,7 @@ type Options struct {
 // New creates a new Agent.
 func New(
 	requestID string,
-	workflow *dag.DAG,
+	workflow *digraph.DAG,
 	lg logger.Logger,
 	logDir, logFile string,
 	cli client.Client,
@@ -201,7 +201,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}()
 
 	// Start the DAG execution.
-	dagCtx := dag.NewContext(ctx, a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(ctx, a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	// Update the finished status to the history database.
@@ -251,16 +251,16 @@ func (a *Agent) Status() *model.Status {
 	}
 
 	// Collect the handler nodes.
-	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnExit); node != nil {
 		status.OnExit = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnSuccess); node != nil {
 		status.OnSuccess = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnFailure); node != nil {
 		status.OnFailure = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnCancel); node != nil {
 		status.OnCancel = model.FromNode(node.Data())
 	}
 
@@ -379,7 +379,7 @@ func (a *Agent) dryRun() error {
 
 	a.logger.Info("Dry-run started", "reqId", a.requestID)
 
-	dagCtx := dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	a.reporter.report(a.Status(), lastErr)
@@ -489,7 +489,7 @@ func (a *Agent) checkPreconditions() error {
 		return nil
 	}
 	// If one of the conditions does not met, cancel the execution.
-	if err := dag.EvalConditions(a.dag.Preconditions); err != nil {
+	if err := digraph.EvalConditions(a.dag.Preconditions); err != nil {
 		a.logger.Error("Preconditions are not met", "error", err)
 		a.scheduler.Cancel(a.graph)
 		return err

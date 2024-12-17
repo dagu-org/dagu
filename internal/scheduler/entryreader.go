@@ -27,7 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
@@ -37,21 +37,21 @@ var _ entryReader = (*entryReaderImpl)(nil)
 type entryReaderImpl struct {
 	dagsDir    string
 	dagsLock   sync.Mutex
-	dags       map[string]*dag.DAG
+	dags       map[string]*digraph.DAG
 	jobCreator jobCreator
 	logger     logger.Logger
 	client     client.Client
 }
 
 type jobCreator interface {
-	CreateJob(workflow *dag.DAG, next time.Time, schedule cron.Schedule) job
+	CreateJob(workflow *digraph.DAG, next time.Time, schedule cron.Schedule) job
 }
 
 func newEntryReader(dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
 	er := &entryReaderImpl{
 		dagsDir:    dagsDir,
 		dagsLock:   sync.Mutex{},
-		dags:       map[string]*dag.DAG{},
+		dags:       map[string]*digraph.DAG{},
 		jobCreator: jobCreator,
 		logger:     logger,
 		client:     client,
@@ -71,7 +71,7 @@ func (er *entryReaderImpl) Read(now time.Time) ([]*entry, error) {
 	defer er.dagsLock.Unlock()
 
 	var entries []*entry
-	addEntriesFn := func(workflow *dag.DAG, schedules []dag.Schedule, entryType entryType) {
+	addEntriesFn := func(workflow *digraph.DAG, schedules []digraph.Schedule, entryType entryType) {
 		for _, schedule := range schedules {
 			next := schedule.Parsed.Next(now)
 			entries = append(entries, &entry{
@@ -111,8 +111,8 @@ func (er *entryReaderImpl) initDags() error {
 
 	var fileNames []string
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), dag.Exts) {
-			workflow, err := dag.LoadMetadata(
+		if util.MatchExtension(fi.Name(), digraph.Exts) {
+			workflow, err := digraph.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
 			if err != nil {
@@ -152,12 +152,12 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			if !util.MatchExtension(event.Name, dag.Exts) {
+			if !util.MatchExtension(event.Name, digraph.Exts) {
 				continue
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				workflow, err := dag.LoadMetadata(
+				workflow, err := digraph.LoadMetadata(
 					filepath.Join(er.dagsDir, filepath.Base(event.Name)),
 				)
 				if err != nil {

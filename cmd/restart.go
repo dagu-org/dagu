@@ -23,8 +23,8 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +54,7 @@ func restartCmd() *cobra.Command {
 
 			// Load the DAG file and stop the DAG if it is running.
 			specFilePath := args[0]
-			workflow, err := dag.Load(cfg.BaseConfig, specFilePath, "")
+			workflow, err := digraph.Load(cfg.BaseConfig, specFilePath, "")
 			if err != nil {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}
@@ -81,7 +81,7 @@ func restartCmd() *cobra.Command {
 
 			// Start the DAG with the same parameter.
 			// Need to reload the DAG file with the parameter.
-			workflow, err = dag.Load(cfg.BaseConfig, specFilePath, params)
+			workflow, err = digraph.Load(cfg.BaseConfig, specFilePath, params)
 			if err != nil {
 				initLogger.Fatal("Workflow reload failed",
 					"error", err,
@@ -145,7 +145,7 @@ func restartCmd() *cobra.Command {
 
 // stopDAGIfRunning stops the DAG if it is running.
 // Otherwise, it does nothing.
-func stopDAGIfRunning(e client.Client, workflow *dag.DAG, lg logger.Logger) error {
+func stopDAGIfRunning(e client.Client, workflow *digraph.DAG, lg logger.Logger) error {
 	curStatus, err := e.GetCurrentStatus(workflow)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func stopDAGIfRunning(e client.Client, workflow *dag.DAG, lg logger.Logger) erro
 
 // stopRunningDAG attempts to stop the running DAG
 // by sending a stop signal to the agent.
-func stopRunningDAG(e client.Client, workflow *dag.DAG) error {
+func stopRunningDAG(e client.Client, workflow *digraph.DAG) error {
 	for {
 		curStatus, err := e.GetCurrentStatus(workflow)
 		if err != nil {
@@ -189,7 +189,7 @@ func waitForRestart(restartWait time.Duration, lg logger.Logger) {
 	}
 }
 
-func getPreviousExecutionParams(e client.Client, workflow *dag.DAG) (string, error) {
+func getPreviousExecutionParams(e client.Client, workflow *digraph.DAG) (string, error) {
 	latestStatus, err := e.GetLatestStatus(workflow)
 	if err != nil {
 		return "", err

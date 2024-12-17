@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag"
-	dagscheduler "github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	dagscheduler "github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/robfig/cron/v3"
 )
@@ -42,7 +42,7 @@ type jobCreatorImpl struct {
 	Client     client.Client
 }
 
-func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time, schedule cron.Schedule) job {
+func (jf jobCreatorImpl) CreateJob(workflow *digraph.DAG, next time.Time, schedule cron.Schedule) job {
 	return &jobImpl{
 		DAG:        workflow,
 		Executable: jf.Executable,
@@ -56,7 +56,7 @@ func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time, schedule c
 var _ job = (*jobImpl)(nil)
 
 type jobImpl struct {
-	DAG        *dag.DAG
+	DAG        *digraph.DAG
 	Executable string
 	WorkDir    string
 	Next       time.Time
@@ -64,7 +64,7 @@ type jobImpl struct {
 	Client     client.Client
 }
 
-func (j *jobImpl) GetDAG() *dag.DAG {
+func (j *jobImpl) GetDAG() *digraph.DAG {
 	return j.DAG
 }
 

@@ -19,12 +19,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
-func FromSteps(steps []dag.Step) []*Node {
+func FromSteps(steps []digraph.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
 		ret = append(ret, NewNode(s))
@@ -55,7 +55,7 @@ func FromNode(node scheduler.NodeData) *Node {
 }
 
 type Node struct {
-	Step       dag.Step             `json:"Step"`
+	Step       digraph.Step         `json:"Step"`
 	Log        string               `json:"Log"`
 	StartedAt  string               `json:"StartedAt"`
 	FinishedAt string               `json:"FinishedAt"`
@@ -80,7 +80,7 @@ func (n *Node) ToNode() *scheduler.Node {
 	})
 }
 
-func NewNode(step dag.Step) *Node {
+func NewNode(step digraph.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",

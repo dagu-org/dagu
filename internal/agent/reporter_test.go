@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/util"
@@ -35,7 +35,7 @@ import (
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node,
+		t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -46,22 +46,22 @@ func TestReporter(t *testing.T) {
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
-			d := &dag.DAG{
+			d := &digraph.DAG{
 				Name: "test DAG",
-				MailOn: &dag.MailOn{
+				MailOn: &digraph.MailOn{
 					Failure: true,
 				},
-				ErrorMail: &dag.MailConfig{
+				ErrorMail: &digraph.MailConfig{
 					Prefix: "Error: ",
 					From:   "from@mailer.com",
 					To:     "to@mailer.com",
 				},
-				InfoMail: &dag.MailConfig{
+				InfoMail: &digraph.MailConfig{
 					Prefix: "Success: ",
 					From:   "from@mailer.com",
 					To:     "to@mailer.com",
 				},
-				Steps: []dag.Step{
+				Steps: []digraph.Step{
 					{
 						Name:    "test-step",
 						Command: "true",
@@ -71,7 +71,7 @@ func TestReporter(t *testing.T) {
 
 			nodes := []*model.Node{
 				{
-					Step: dag.Step{
+					Step: digraph.Step{
 						Name:    "test-step",
 						Command: "true",
 						Args:    []string{"param-x"},
@@ -92,7 +92,7 @@ func TestReporter(t *testing.T) {
 	}
 }
 
-func testErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testErrorMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node) {
 	workflow.MailOn.Failure = true
 	workflow.MailOn.Success = false
 
@@ -108,7 +108,7 @@ func testErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node) {
 	workflow.MailOn.Failure = false
 	workflow.MailOn.Success = true
 
@@ -123,7 +123,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*mod
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, workflow *digraph.DAG, nodes []*model.Node) {
 	workflow.MailOn.Failure = true
 	workflow.MailOn.Success = true
 
@@ -140,7 +140,7 @@ func testSuccessMail(t *testing.T, rp *reporter, workflow *dag.DAG, nodes []*mod
 	require.Equal(t, 1, mock.count)
 }
 
-func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.Node) {
+func testReportSummary(t *testing.T, rp *reporter, _ *digraph.DAG, nodes []*model.Node) {
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func testReportSummary(t *testing.T, rp *reporter, _ *dag.DAG, nodes []*model.No
 	require.Contains(t, s, "test error")
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, workflow *dag.DAG, nodes []*model.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, workflow *digraph.DAG, nodes []*model.Node) {
 	status := &model.Status{
 		Name:   workflow.Name,
 		Status: scheduler.StatusError,
@@ -179,7 +179,7 @@ func testRenderSummary(t *testing.T, _ *reporter, workflow *dag.DAG, nodes []*mo
 	require.Contains(t, summary, workflow.Name)
 }
 
-func testRenderTable(t *testing.T, _ *reporter, _ *dag.DAG, nodes []*model.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *digraph.DAG, nodes []*model.Node) {
 	summary := renderTable(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Contains(t, summary, nodes[0].Step.Args[0])

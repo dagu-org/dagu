@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -73,7 +73,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
+		workflow, err := digraph.Load(setup.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
 		dataStore := newDataStores(setup.Config)

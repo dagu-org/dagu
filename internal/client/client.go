@@ -24,8 +24,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
@@ -107,14 +107,14 @@ func (e *client) Rename(oldID, newID string) error {
 	return historyStore.Rename(oldDAG.Location, newDAG.Location)
 }
 
-func (e *client) Stop(workflow *dag.DAG) error {
+func (e *client) Stop(workflow *digraph.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
 	client := sock.NewClient(workflow.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *client) StartAsync(workflow *dag.DAG, opts StartOptions) {
+func (e *client) StartAsync(workflow *digraph.DAG, opts StartOptions) {
 	go func() {
 		if err := e.Start(workflow, opts); err != nil {
 			e.logger.Error("Workflow start operation failed", "error", err)
@@ -122,7 +122,7 @@ func (e *client) StartAsync(workflow *dag.DAG, opts StartOptions) {
 	}()
 }
 
-func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
+func (e *client) Start(workflow *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -147,7 +147,7 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
+func (e *client) Restart(workflow *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
@@ -165,7 +165,7 @@ func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Retry(workflow *dag.DAG, requestID string) error {
+func (e *client) Retry(workflow *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", requestID))
 	args = append(args, workflow.Location)
@@ -181,7 +181,7 @@ func (e *client) Retry(workflow *dag.DAG, requestID string) error {
 	return cmd.Wait()
 }
 
-func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
+func (*client) GetCurrentStatus(workflow *digraph.DAG) (*model.Status, error) {
 	client := sock.NewClient(workflow.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -193,7 +193,7 @@ func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
+func (e *client) GetStatusByRequestID(workflow *digraph.DAG, requestID string) (
 	*model.Status, error,
 ) {
 	ret, err := e.dataStore.HistoryStore().FindByRequestID(
@@ -210,7 +210,7 @@ func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
 	return ret.Status, err
 }
 
-func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
+func (*client) currentStatus(workflow *digraph.DAG) (*model.Status, error) {
 	client := sock.NewClient(workflow.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -219,7 +219,7 @@ func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
+func (e *client) GetLatestStatus(workflow *digraph.DAG) (*model.Status, error) {
 	currStatus, _ := e.currentStatus(workflow)
 	if currStatus != nil {
 		return currStatus, nil
@@ -236,11 +236,11 @@ func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
 	return status, nil
 }
 
-func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
+func (e *client) GetRecentHistory(workflow *digraph.DAG, n int) []*model.StatusFile {
 	return e.dataStore.HistoryStore().ReadStatusRecent(workflow.Location, n)
 }
 
-func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
+func (e *client) UpdateStatus(workflow *digraph.DAG, status *model.Status) error {
 	client := sock.NewClient(workflow.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
@@ -335,25 +335,25 @@ func (e *client) GetAllStatusPagination(params dags.ListDagsParams) ([]*DAGStatu
 	}, nil
 }
 
-func (e *client) getDAG(name string) (*dag.DAG, error) {
+func (e *client) getDAG(name string) (*digraph.DAG, error) {
 	dagStore := e.dataStore.DAGStore()
 	dagDetail, err := dagStore.GetDetails(name)
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
 func (e *client) GetStatus(id string) (*DAGStatus, error) {
-	dg, err := e.getDAG(id)
-	if dg == nil {
+	dag, err := e.getDAG(id)
+	if dag == nil {
 		// TODO: fix not to use location
-		dg = &dag.DAG{Name: id, Location: id}
+		dag = &digraph.DAG{Name: id, Location: id}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
-		_, err = scheduler.NewExecutionGraph(e.logger, dg.Steps...)
+		_, err = scheduler.NewExecutionGraph(e.logger, dag.Steps...)
 	}
-	latestStatus, _ := e.GetLatestStatus(dg)
+	latestStatus, _ := e.GetLatestStatus(dag)
 	return newDAGStatus(
-		dg, latestStatus, e.IsSuspended(id), err,
+		dag, latestStatus, e.IsSuspended(id), err,
 	), err
 }
 
@@ -362,7 +362,7 @@ func (e *client) ToggleSuspend(id string, suspend bool) error {
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *client) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
+func (e *client) readStatus(workflow *digraph.DAG) (*DAGStatus, error) {
 	latestStatus, err := e.GetLatestStatus(workflow)
 	id := strings.TrimSuffix(
 		filepath.Base(workflow.Location),
@@ -374,11 +374,11 @@ func (e *client) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
 	), err
 }
 
-func (*client) emptyDAGIfNil(workflow *dag.DAG, dagLocation string) *dag.DAG {
+func (*client) emptyDAGIfNil(workflow *digraph.DAG, dagLocation string) *digraph.DAG {
 	if workflow != nil {
 		return workflow
 	}
-	return &dag.DAG{Location: dagLocation}
+	return &digraph.DAG{Location: dagLocation}
 }
 
 func (e *client) IsSuspended(id string) bool {

@@ -29,7 +29,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
@@ -65,7 +65,7 @@ type entry struct {
 }
 
 type job interface {
-	GetDAG() *dag.DAG
+	GetDAG() *digraph.DAG
 	Start() error
 	Stop() error
 	Restart() error

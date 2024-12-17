@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 
 	"github.com/stretchr/testify/require"
 )
@@ -39,21 +39,21 @@ func TestPID(t *testing.T) {
 
 func TestStatusSerialization(t *testing.T) {
 	start, end := time.Now(), time.Now().Add(time.Second*1)
-	workflow := &dag.DAG{
-		HandlerOn: dag.HandlerOn{},
-		Steps: []dag.Step{
+	workflow := &digraph.DAG{
+		HandlerOn: digraph.HandlerOn{},
+		Steps: []digraph.Step{
 			{
 				Name: "1", Description: "", Variables: []string{},
 				Dir: "dir", Command: "echo 1", Args: []string{},
-				Depends: []string{}, ContinueOn: dag.ContinueOn{},
-				RetryPolicy: &dag.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []dag.Condition{},
+				Depends: []string{}, ContinueOn: digraph.ContinueOn{},
+				RetryPolicy: &digraph.RetryPolicy{}, MailOnError: false,
+				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []digraph.Condition{},
 			},
 		},
-		MailOn:    &dag.MailOn{},
-		ErrorMail: &dag.MailConfig{},
-		InfoMail:  &dag.MailConfig{},
-		SMTP:      &dag.SMTPConfig{},
+		MailOn:    &digraph.MailOn{},
+		ErrorMail: &digraph.MailConfig{},
+		InfoMail:  &digraph.MailConfig{},
+		SMTP:      &digraph.SMTPConfig{},
 	}
 	status := NewStatus(workflow, nil, scheduler.StatusSuccess, 10000, &start, &end)
 
@@ -69,7 +69,7 @@ func TestStatusSerialization(t *testing.T) {
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	workflow := &dag.DAG{Name: "test"}
+	workflow := &digraph.DAG{Name: "test"}
 	status := NewStatus(workflow, nil, scheduler.StatusRunning,
 		10000, nil, nil)
 	status.CorrectRunningStatus()
@@ -77,8 +77,8 @@ func TestCorrectRunningStatus(t *testing.T) {
 }
 
 func TestJsonMarshal(t *testing.T) {
-	step := dag.Step{
-		OutputVariables: &dag.SyncMap{},
+	step := digraph.Step{
+		OutputVariables: &digraph.SyncMap{},
 	}
 	step.OutputVariables.Store("A", "B")
 	rawJSON, err := json.Marshal(step)

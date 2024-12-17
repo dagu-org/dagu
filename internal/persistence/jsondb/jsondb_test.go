@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/assert"
@@ -48,18 +48,18 @@ func (te testEnv) cleanup() {
 	_ = os.RemoveAll(te.TmpDir)
 }
 
-func createTestDAG(te testEnv, name, location string) *dag.DAG {
-	return &dag.DAG{
+func createTestDAG(te testEnv, name, location string) *digraph.DAG {
+	return &digraph.DAG{
 		Name:     name,
 		Location: filepath.Join(te.TmpDir, location),
 	}
 }
 
-func createTestStatus(d *dag.DAG, status scheduler.Status, pid int) *model.Status {
+func createTestStatus(d *digraph.DAG, status scheduler.Status, pid int) *model.Status {
 	return model.NewStatus(d, nil, status, pid, nil, nil)
 }
 
-func writeTestStatus(t *testing.T, db *JSONDB, d *dag.DAG, status *model.Status, tm time.Time) {
+func writeTestStatus(t *testing.T, db *JSONDB, d *digraph.DAG, status *model.Status, tm time.Time) {
 	dw, _, err := db.newWriter(d.Location, tm, status.RequestID)
 	require.NoError(t, err)
 	require.NoError(t, dw.open())

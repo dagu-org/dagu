@@ -19,7 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/robfig/cron/v3"
 )
 
@@ -27,7 +27,7 @@ var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(workflow *dag.DAG, _ time.Time, _ cron.Schedule) job {
+func (f *mockJobFactory) CreateJob(workflow *digraph.DAG, _ time.Time, _ cron.Schedule) job {
 	return newMockJob(workflow)
 }
 
@@ -46,7 +46,7 @@ func (er *mockEntryReader) Start(chan any) {}
 var _ job = (*mockJob)(nil)
 
 type mockJob struct {
-	DAG          *dag.DAG
+	DAG          *digraph.DAG
 	Name         string
 	RunCount     atomic.Int32
 	StopCount    atomic.Int32
@@ -54,14 +54,14 @@ type mockJob struct {
 	Panic        error
 }
 
-func newMockJob(workflow *dag.DAG) *mockJob {
+func newMockJob(workflow *digraph.DAG) *mockJob {
 	return &mockJob{
 		DAG:  workflow,
 		Name: workflow.Name,
 	}
 }
 
-func (j *mockJob) GetDAG() *dag.DAG {
+func (j *mockJob) GetDAG() *digraph.DAG {
 	return j.DAG
 }
 

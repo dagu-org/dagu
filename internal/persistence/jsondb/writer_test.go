@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +33,7 @@ func TestWriter(t *testing.T) {
 	defer te.cleanup()
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
-		d := &dag.DAG{
+		d := &digraph.DAG{
 			Name:     "test_write_status",
 			Location: "test_write_status.yaml",
 		}
@@ -65,7 +65,7 @@ func TestWriter(t *testing.T) {
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
-		d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
+		d := &digraph.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
 		requestID := "request-id-test-write-status-to-existing-file"
 
 		dw, file, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
@@ -112,7 +112,7 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, w.open())
 		require.NoError(t, w.close())
 
-		d := &dag.DAG{Name: "test", Location: "test.yaml"}
+		d := &digraph.DAG{Name: "test", Location: "test.yaml"}
 		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
 		assert.Error(t, w.write(status))
 	})
@@ -131,7 +131,7 @@ func TestWriterRename(t *testing.T) {
 
 	oldName := "test_rename_old"
 	newName := "test_rename_new"
-	d := &dag.DAG{
+	d := &digraph.DAG{
 		Name:     oldName,
 		Location: filepath.Join(te.TmpDir, oldName+".yaml"),
 	}

@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
@@ -318,7 +318,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		workflow, err := dag.Load("", filepath.Join(setup.Config.DAGs, id+".yaml"), "")
+		workflow, err := digraph.Load("", filepath.Join(setup.Config.DAGs, id+".yaml"), "")
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", workflow.Name)
 	})
@@ -378,7 +378,7 @@ func testDAG(name string) string {
 	return filepath.Join(testdataDir, name)
 }
 
-func testNewStatus(workflow *dag.DAG, requestID string, status scheduler.Status,
+func testNewStatus(workflow *digraph.DAG, requestID string, status scheduler.Status,
 	nodeStatus scheduler.NodeStatus) *model.Status {
 	ret := model.NewStatus(
 		workflow,

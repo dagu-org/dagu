@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -36,7 +36,7 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
-func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
+func FromNodesOrSteps(nodes []scheduler.NodeData, steps []digraph.Step) []*Node {
 	if len(nodes) != 0 {
 		return FromNodes(nodes)
 	}
@@ -70,14 +70,14 @@ type Status struct {
 	mu         sync.RWMutex
 }
 
-func NewStatusDefault(workflow *dag.DAG) *Status {
+func NewStatusDefault(workflow *digraph.DAG) *Status {
 	return NewStatus(
 		workflow, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
 	)
 }
 
 func NewStatus(
-	workflow *dag.DAG,
+	workflow *digraph.DAG,
 	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
@@ -151,7 +151,7 @@ func (p PID) IsRunning() bool {
 	return p != pidNotRunning
 }
 
-func nodeOrNil(s *dag.Step) *Node {
+func nodeOrNil(s *digraph.Step) *Node {
 	if s == nil {
 		return nil
 	}

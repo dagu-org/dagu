@@ -29,8 +29,8 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
@@ -549,7 +549,7 @@ func (h *Handler) getDetail(
 }
 
 func (h *Handler) processSchedulerLogRequest(
-	workflow *dag.DAG,
+	workflow *digraph.DAG,
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
@@ -585,7 +585,7 @@ func (h *Handler) processSchedulerLogRequest(
 }
 
 func (h *Handler) processStepLogRequest(
-	workflow *dag.DAG,
+	workflow *digraph.DAG,
 	params dags.GetDagDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
@@ -677,7 +677,7 @@ var (
 
 func (h *Handler) processLogRequest(
 	resp *models.GetDagDetailsResponse,
-	workflow *dag.DAG,
+	workflow *digraph.DAG,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	logs := h.client.GetRecentHistory(workflow, defaultHistoryLimit)
 
@@ -731,11 +731,11 @@ func (h *Handler) processLogRequest(
 		}
 	}
 
-	for _, handlerType := range []dag.HandlerType{
-		dag.HandlerOnSuccess,
-		dag.HandlerOnFailure,
-		dag.HandlerOnCancel,
-		dag.HandlerOnExit,
+	for _, handlerType := range []digraph.HandlerType{
+		digraph.HandlerOnSuccess,
+		digraph.HandlerOnFailure,
+		digraph.HandlerOnCancel,
+		digraph.HandlerOnExit,
 	} {
 		if statusList, ok := handlerToStatusList[handlerType.String()]; ok {
 			var values []int64

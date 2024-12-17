@@ -16,13 +16,13 @@
 package dag
 
 import (
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/swag"
 )
 
-func convertToDAG(workflow *dag.DAG) *models.Dag {
+func convertToDAG(workflow *digraph.DAG) *models.Dag {
 	var schedules []*models.Schedule
 	for _, s := range workflow.Schedule {
 		schedules = append(schedules, &models.Schedule{
@@ -85,7 +85,7 @@ func convertToNode(node *model.Node) *models.StatusNode {
 	}
 }
 
-func convertToStepObject(step dag.Step) *models.StepObject {
+func convertToStepObject(step digraph.Step) *models.StepObject {
 	var conditions []*models.Condition
 	for _, cond := range step.Preconditions {
 		conditions = append(conditions, &models.Condition{

@@ -21,11 +21,11 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/persistence"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
@@ -123,7 +123,7 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	workflow, err := dag.Load(cfg.BaseConfig, dagFile, "")
+	workflow, err := digraph.Load(cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {

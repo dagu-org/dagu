@@ -19,7 +19,7 @@ import (
 	"log"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +41,7 @@ func statusCmd() *cobra.Command {
 			})
 
 			// Load the DAG file and get the current running status.
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
+			workflow, err := digraph.Load(cfg.BaseConfig, args[0], "")
 			if err != nil {
 				logger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}

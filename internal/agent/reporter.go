@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -50,7 +50,7 @@ func newReporter(sender Sender, lg logger.Logger) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	workflow *dag.DAG, status *model.Status, node *scheduler.Node,
+	workflow *digraph.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
@@ -87,7 +87,7 @@ func (r *reporter) report(status *model.Status, err error) {
 
 // send is a function that sends a report mail.
 func (r *reporter) send(
-	workflow *dag.DAG, status *model.Status, err error,
+	workflow *digraph.DAG, status *model.Status, err error,
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if workflow.MailOn != nil && workflow.MailOn.Failure {

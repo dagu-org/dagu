@@ -21,7 +21,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +54,7 @@ func startCmd() *cobra.Command {
 				initLogger.Fatal("Parameter retrieval failed", "error", err)
 			}
 
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
+			workflow, err := digraph.Load(cfg.BaseConfig, args[0], removeQuotes(params))
 			if err != nil {
 				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
 			}

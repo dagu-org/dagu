@@ -22,7 +22,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -71,7 +71,7 @@ func retryCmd() *cobra.Command {
 
 			// Start the DAG with the same parameters with the execution that
 			// is being retried.
-			workflow, err := dag.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
+			workflow, err := digraph.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
 			if err != nil {
 				initLogger.Fatal("Workflow specification load failed",
 					"error", err,

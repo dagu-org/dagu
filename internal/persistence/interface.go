@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/persistence/grep"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 )
@@ -52,15 +52,15 @@ type HistoryStore interface {
 type DAGStore interface {
 	Create(name string, spec []byte) (string, error)
 	Delete(name string) error
-	List() (ret []*dag.DAG, errs []string, err error)
+	List() (ret []*digraph.DAG, errs []string, err error)
 	ListPagination(params DAGListPaginationArgs) (*DagListPaginationResult, error)
-	GetMetadata(name string) (*dag.DAG, error)
-	GetDetails(name string) (*dag.DAG, error)
+	GetMetadata(name string) (*digraph.DAG, error)
+	GetDetails(name string) (*digraph.DAG, error)
 	Grep(pattern string) (ret []*GrepResult, errs []string, err error)
 	Rename(oldID, newID string) error
 	GetSpec(name string) (string, error)
 	UpdateSpec(name string, spec []byte) error
-	Find(name string) (*dag.DAG, error)
+	Find(name string) (*digraph.DAG, error)
 	TagList() ([]string, []string, error)
 }
 
@@ -72,14 +72,14 @@ type DAGListPaginationArgs struct {
 }
 
 type DagListPaginationResult struct {
-	DagList   []*dag.DAG
+	DagList   []*digraph.DAG
 	Count     int
 	ErrorList []string
 }
 
 type GrepResult struct {
 	Name    string
-	DAG     *dag.DAG
+	DAG     *digraph.DAG
 	Matches []*grep.Match
 }
 
