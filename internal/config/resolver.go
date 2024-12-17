@@ -8,14 +8,19 @@ import (
 	"github.com/dagu-org/dagu/internal/util"
 )
 
-type resolver struct {
-	configDir       string
-	dagsDir         string
-	suspendFlagsDir string
-	dataDir         string
-	logsDir         string
-	adminLogsDir    string
-	baseConfigFile  string
+type PathResolver struct {
+	Paths
+	XDGConfig
+}
+
+type Paths struct {
+	ConfigDir       string
+	DAGsDir         string
+	SuspendFlagsDir string
+	DataDir         string
+	LogsDir         string
+	AdminLogsDir    string
+	BaseConfigFile  string
 }
 
 type XDGConfig struct {
@@ -23,48 +28,43 @@ type XDGConfig struct {
 	ConfigHome string
 }
 
-func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) resolver {
-	var (
-		r           resolver
-		useXDGRules = true
-	)
-
-	// For backward compatibility.
-	// If the environment variable is set, use it.
-	// Use the legacy ~/.<app name> directory if it exists.
-	if v := os.Getenv(appHomeEnv); v != "" {
-		r.configDir = v
-		useXDGRules = false
-	} else if util.FileExists(legacyPath) {
-		r.configDir = legacyPath
-		useXDGRules = false
-	} else {
-		r.configDir = filepath.Join(xdg.ConfigHome, build.Slug)
+func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) PathResolver {
+	resolver := PathResolver{
+		XDGConfig: xdg,
 	}
 
-	if useXDGRules {
-		setXDGPaths(&r, xdg)
-	} else {
-		setLegacyPaths(&r)
+	resolver.resolve(appHomeEnv, legacyPath)
+	return resolver
+}
+
+func (r *PathResolver) resolve(appHomeEnv, legacyPath string) {
+	switch {
+	case os.Getenv(appHomeEnv) != "":
+		r.Paths.ConfigDir = os.Getenv(appHomeEnv)
+		r.setLegacyPaths()
+	case util.FileExists(legacyPath):
+		r.Paths.ConfigDir = legacyPath
+		r.setLegacyPaths()
+	default:
+		r.Paths.ConfigDir = filepath.Join(r.ConfigHome, build.Slug)
+		r.setXDGPaths()
 	}
-
-	return r
 }
 
-func setXDGPaths(r *resolver, xdg XDGConfig) {
-	r.dataDir = filepath.Join(xdg.DataHome, build.Slug, "history")
-	r.logsDir = filepath.Join(xdg.DataHome, build.Slug, "logs")
-	r.baseConfigFile = filepath.Join(xdg.ConfigHome, build.Slug, "base.yaml")
-	r.adminLogsDir = filepath.Join(xdg.DataHome, build.Slug, "logs", "admin")
-	r.suspendFlagsDir = filepath.Join(xdg.DataHome, build.Slug, "suspend")
-	r.dagsDir = filepath.Join(xdg.ConfigHome, build.Slug, "dags")
+func (r *PathResolver) setXDGPaths() {
+	r.DataDir = filepath.Join(r.DataHome, build.Slug, "history")
+	r.LogsDir = filepath.Join(r.DataHome, build.Slug, "logs")
+	r.BaseConfigFile = filepath.Join(r.ConfigHome, build.Slug, "base.yaml")
+	r.AdminLogsDir = filepath.Join(r.DataHome, build.Slug, "logs", "admin")
+	r.SuspendFlagsDir = filepath.Join(r.DataHome, build.Slug, "suspend")
+	r.DAGsDir = filepath.Join(r.ConfigHome, build.Slug, "dags")
 }
 
-func setLegacyPaths(r *resolver) {
-	r.dataDir = filepath.Join(r.configDir, "data")
-	r.logsDir = filepath.Join(r.configDir, "logs")
-	r.baseConfigFile = filepath.Join(r.configDir, "base.yaml")
-	r.adminLogsDir = filepath.Join(r.configDir, "logs", "admin")
-	r.suspendFlagsDir = filepath.Join(r.configDir, "suspend")
-	r.dagsDir = filepath.Join(r.configDir, "dags")
+func (r *PathResolver) setLegacyPaths() {
+	r.DataDir = filepath.Join(r.ConfigDir, "data")
+	r.LogsDir = filepath.Join(r.ConfigDir, "logs")
+	r.BaseConfigFile = filepath.Join(r.ConfigDir, "base.yaml")
+	r.AdminLogsDir = filepath.Join(r.ConfigDir, "logs", "admin")
+	r.SuspendFlagsDir = filepath.Join(r.ConfigDir, "suspend")
+	r.DAGsDir = filepath.Join(r.ConfigDir, "dags")
 }

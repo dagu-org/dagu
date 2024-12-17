@@ -172,7 +172,7 @@ func setupViper() error {
 
 	r := newResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgCfg)
 
-	viper.AddConfigPath(r.configDir)
+	viper.AddConfigPath(r.ConfigDir)
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
 
@@ -190,14 +190,14 @@ func setupViper() error {
 	return setExecutableDefault()
 }
 
-func setDefaultValues(r resolver) {
-	viper.SetDefault("dags", r.dagsDir)
-	viper.SetDefault("dagsDir", r.dagsDir) // For backward compatibility
-	viper.SetDefault("suspendFlagsDir", r.suspendFlagsDir)
-	viper.SetDefault("dataDir", r.dataDir)
-	viper.SetDefault("logDir", r.logsDir)
-	viper.SetDefault("adminLogsDir", r.adminLogsDir)
-	viper.SetDefault("baseConfig", r.baseConfigFile)
+func setDefaultValues(r PathResolver) {
+	viper.SetDefault("dags", r.DAGsDir)
+	viper.SetDefault("dagsDir", r.DAGsDir) // For backward compatibility
+	viper.SetDefault("suspendFlagsDir", r.SuspendFlagsDir)
+	viper.SetDefault("dataDir", r.DataDir)
+	viper.SetDefault("logDir", r.LogsDir)
+	viper.SetDefault("adminLogsDir", r.AdminLogsDir)
+	viper.SetDefault("baseConfig", r.BaseConfigFile)
 
 	// Logging configurations
 	viper.SetDefault("logLevel", "info")
