@@ -88,12 +88,10 @@ func Load() (*Config, error) {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	// Set default values for config keys.
 	if err := setupViper(); err != nil {
 		return nil, err
 	}
 
-	// Populate viper with environment variables.
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -107,26 +105,32 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal cfg file: %w", err)
 	}
 
-	// Load legacy environment variables if they exist.
 	loadLegacyEnvs(&cfg)
+	setEnvVariables(&cfg)
+	setTimezone(&cfg)
+	cleanBasePath(&cfg)
 
-	// Set environment variables specified in the config file.
+	return &cfg, nil
+}
+
+func setEnvVariables(cfg *Config) {
 	cfg.Env.Range(func(k, v any) bool {
 		if err := os.Setenv(k.(string), v.(string)); err != nil {
 			log.Printf("failed to set env variable %s: %v", k, err)
 		}
 		return true
 	})
+}
 
+func setTimezone(cfg *Config) error {
 	if cfg.TZ != "" {
 		loc, err := time.LoadLocation(cfg.TZ)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load timezone: %w", err)
+			return fmt.Errorf("failed to load timezone: %w", err)
 		}
 		cfg.Location = loc
 		os.Setenv("TZ", cfg.TZ)
 	} else {
-		// Load local timezone if not set.
 		_, offset := time.Now().Zone()
 		if offset == 0 {
 			cfg.TZ = "UTC"
@@ -135,7 +139,10 @@ func Load() (*Config, error) {
 		}
 		cfg.Location = time.Local
 	}
+	return nil
+}
 
+func cleanBasePath(cfg *Config) {
 	if cfg.BasePath != "" {
 		cfg.BasePath = path.Clean(cfg.BasePath)
 
@@ -147,8 +154,6 @@ func Load() (*Config, error) {
 			cfg.BasePath = ""
 		}
 	}
-
-	return &cfg, nil
 }
 
 func setupViper() error {
