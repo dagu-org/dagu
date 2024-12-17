@@ -98,6 +98,24 @@ var (
 	)
 )
 
+var metadataBuilderRegistry = map[string]BuilderFn{
+	"env":              buildEnvs,
+	"schedule":         buildSchedule,
+	"skipIfSuccessful": skipIfSuccessful,
+	"mailOn":           buildMailOn,
+	"params":           buildParams,
+}
+
+var builderRegistry = map[string]BuilderFn{
+	"steps":          buildSteps,
+	"logDir":         buildLogDir,
+	"handlers":       buildHandlers,
+	"smtpConfig":     buildSMTPConfig,
+	"errMailConfig":  buildErrMailConfig,
+	"infoMailConfig": buildInfoMailConfig,
+	"miscs":          buildMiscs,
+}
+
 // build builds a DAG from the specification.
 func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs []string) (*DAG, error) {
 	buildCtx := BuildContext{
@@ -118,28 +136,14 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 	}
 
 	var errs errorList
-	for _, builder := range []BuilderFn{
-		buildEnvs,
-		buildSchedule,
-		skipIfSuccessful,
-		buildMailOn,
-		buildParams,
-	} {
+	for _, builder := range metadataBuilderRegistry {
 		if err := builder(buildCtx, spec, dag); err != nil {
 			errs.Add(err)
 		}
 	}
 
 	if !opts.metadataOnly {
-		for _, builder := range []BuilderFn{
-			buildSteps,
-			buildLogDir,
-			buildHandlers,
-			buildSMTPConfig,
-			buildErrMailConfig,
-			buildInfoMailConfig,
-			buildMiscs,
-		} {
+		for _, builder := range builderRegistry {
 			if err := builder(buildCtx, spec, dag); err != nil {
 				errs.Add(err)
 			}
@@ -180,7 +184,7 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 // - start: string or array of strings
 // - stop: string or array of strings
 // - restart: string or array of strings
-func buildSchedule(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	var starts, stops, restarts []string
 
 	switch schedule := (spec.Schedule).(type) {
@@ -232,7 +236,7 @@ func buildSchedule(ctx BuildContext, spec *definition, dag *DAG) error {
 	return err
 }
 
-func buildMailOn(ctx BuildContext, spec *definition, dag *DAG) error {
+func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.MailOn == nil {
 		return nil
 	}
@@ -266,7 +270,7 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 }
 
 // buildLogDir builds the log directory for the DAG.
-func buildLogDir(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	logDir, err := substituteCommands(os.ExpandEnv(spec.LogDir))
 	if err != nil {
 		return err
@@ -337,7 +341,7 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 }
 
 // buildMiscs builds the miscellaneous fields for the DAG.
-func buildMiscs(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+func buildMiscs(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HistRetentionDays != nil {
 		dag.HistRetentionDays = *spec.HistRetentionDays
 	}
@@ -407,7 +411,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 }
 
 // skipIfSuccessful sets the skipIfSuccessful field for the DAG.
-func skipIfSuccessful(ctx BuildContext, spec *definition, dag *DAG) error {
+func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 	dag.SkipIfSuccessful = spec.SkipIfSuccessful
 	return nil
 }
@@ -429,7 +433,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 }
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
-func buildSMTPConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	dag.SMTP = &SMTPConfig{
 		Host:     os.ExpandEnv(spec.SMTP.Host),
 		Port:     os.ExpandEnv(spec.SMTP.Port),
@@ -441,14 +445,14 @@ func buildSMTPConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 }
 
 // buildErrMailConfig builds the error mail configuration for the DAG.
-func buildErrMailConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+func buildErrMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	dag.ErrorMail, err = buildMailConfig(spec.ErrorMail)
 
 	return
 }
 
 // buildInfoMailConfig builds the info mail configuration for the DAG.
-func buildInfoMailConfig(ctx BuildContext, spec *definition, dag *DAG) (err error) {
+func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	dag.InfoMail, err = buildMailConfig(spec.InfoMail)
 
 	return

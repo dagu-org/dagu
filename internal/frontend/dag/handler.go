@@ -756,7 +756,7 @@ func (h *Handler) processLogRequest(
 }
 
 func addNodeStatus(
-	ctx context.Context,
+	_ context.Context,
 	data map[string][]scheduler.NodeStatus,
 	logLen int,
 	logIdx int,
