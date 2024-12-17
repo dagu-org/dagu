@@ -180,6 +180,7 @@ func setupViper() error {
 
 	// Set default values for config keys.
 	viper.SetDefault("dags", r.dagsDir)
+	viper.SetDefault("dagsDir", r.dagsDir) // For backward compatibility
 	viper.SetDefault("suspendFlagsDir", r.suspendFlagsDir)
 	viper.SetDefault("dataDir", r.dataDir)
 	viper.SetDefault("logDir", r.logsDir)
