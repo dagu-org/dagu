@@ -15,9 +15,6 @@ import (
 	"github.com/dagu-org/dagu/internal/util"
 )
 
-// Exts is a list of supported file extensions for DAG files.
-var Exts = []string{".yaml", ".yml"}
-
 // builder is used to build a DAG from a configuration definition.
 type builder struct {
 	def         *definition // intermediate value to build the DAG.

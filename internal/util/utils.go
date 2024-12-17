@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -112,28 +111,4 @@ func TruncString(val string, max int) string {
 		return val[:max]
 	}
 	return val
-}
-
-// MatchExtension returns true if extension matches.
-func MatchExtension(file string, exts []string) bool {
-	ext := filepath.Ext(file)
-	for _, e := range exts {
-		if e == ext {
-			return true
-		}
-	}
-	return false
-}
-
-// AddYamlExtension adds .yaml extension if not present
-// if it has .yml extension, replace it with .yaml
-func AddYamlExtension(file string) string {
-	ext := filepath.Ext(file)
-	if ext == "" {
-		return file + ".yaml"
-	}
-	if ext == ".yml" {
-		return strings.TrimSuffix(file, ext) + ".yaml"
-	}
-	return file
 }

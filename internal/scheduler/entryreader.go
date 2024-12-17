@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
 	"github.com/robfig/cron/v3"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -99,7 +99,7 @@ func (er *entryReaderImpl) initDAGs() error {
 
 	var fileNames []string
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), digraph.Exts) {
+		if fileutil.IsYAMLFile(fi.Name()) {
 			workflow, err := digraph.LoadMetadata(
 				filepath.Join(er.dagsDir, fi.Name()),
 			)
@@ -140,7 +140,7 @@ func (er *entryReaderImpl) watchDags(done chan any) {
 			if !ok {
 				return
 			}
-			if !util.MatchExtension(event.Name, digraph.Exts) {
+			if !fileutil.IsYAMLFile(event.Name) {
 				continue
 			}
 			er.dagsLock.Lock()

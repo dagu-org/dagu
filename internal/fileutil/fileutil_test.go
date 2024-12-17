@@ -236,53 +236,40 @@ func TestTruncString(t *testing.T) {
 	})
 }
 
-func TestMatchExtension(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		// Test empty extension
-		require.False(t, MatchExtension("test.txt", []string{}))
-		// Test matching extension
-		require.True(t, MatchExtension("test.txt", []string{".csv", ".txt"}))
-		// Test matching extension
-		require.False(t, MatchExtension("test.txt", []string{".csv"}))
-	})
+func TestIsYAMLFile(t *testing.T) {
+	tests := []struct {
+		file string
+		want bool
+	}{
+		{"config.yaml", true},
+		{"config.yml", true},
+		{"config.json", false},
+		{"config", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := IsYAMLFile(tt.file); got != tt.want {
+			t.Errorf("IsYAMLFile(%q) = %v, want %v", tt.file, got, tt.want)
+		}
+	}
 }
 
 func TestAddYamlExtension(t *testing.T) {
-	type args struct {
-		file string
-	}
 	tests := []struct {
-		name string
-		args args
+		file string
 		want string
 	}{
-		{
-			name: "Empty",
-			args: args{
-				file: "",
-			},
-			want: ".yaml",
-		},
-		{
-			name: "WithExtension",
-			args: args{
-				file: "test.yml",
-			},
-			want: "test.yaml",
-		},
-		{
-			name: "WithoutExtension",
-			args: args{
-				file: "test",
-			},
-			want: "test.yaml",
-		},
+		{"config", "config.yaml"},
+		{"config.yml", "config.yaml"},
+		{"config.yaml", "config.yaml"},
+		{"config.json", "config.json"},
+		{"", ""},
 	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := AddYamlExtension(tt.args.file); got != tt.want {
-				t.Errorf("AddYamlExtension() = %v, want %v", got, tt.want)
-			}
-		})
+		if got := AddYAMLExtension(tt.file); got != tt.want {
+			t.Errorf("AddYamlExtension(%q) = %q, want %q", tt.file, got, tt.want)
+		}
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,9 +28,7 @@ import (
 )
 
 var (
-	ErrUnexpectedEOF = errors.New(
-		"unexpected end of input after escape character",
-	)
+	ErrUnexpectedEOF         = errors.New("unexpected end of input after escape character")
 	ErrUnknownEscapeSequence = errors.New("unknown escape sequence")
 )
 
@@ -182,26 +181,46 @@ func TruncString(val string, max int) string {
 	return val
 }
 
-// MatchExtension returns true if extension matches.
-func MatchExtension(file string, exts []string) bool {
-	ext := filepath.Ext(file)
-	for _, e := range exts {
-		if e == ext {
-			return true
-		}
+const (
+	yamlExtension = ".yaml"
+	ymlExtension  = ".yml"
+)
+
+// ValidYAMLExtensions contains valid YAML extensions.
+var ValidYAMLExtensions = []string{yamlExtension, ymlExtension}
+
+// IsYAMLFile checks if a file has a valid YAML extension (.yaml or .yml).
+// Returns false for empty strings or files without extensions.
+func IsYAMLFile(filename string) bool {
+	if filename == "" {
+		return false
 	}
-	return false
+	return slices.Contains(ValidYAMLExtensions, filepath.Ext(filename))
 }
 
-// AddYamlExtension adds .yaml extension if not present
+// IsFileWithExtension is a more generic function that checks if a file
+// has any of the provided extensions.
+func IsFileWithExtension(filename string, validExtensions []string) bool {
+	if filename == "" || len(validExtensions) == 0 {
+		return false
+	}
+	return slices.Contains(validExtensions, filepath.Ext(filename))
+}
+
+// AddYAMLExtension adds .yaml extension if not present
 // if it has .yml extension, replace it with .yaml
-func AddYamlExtension(file string) string {
-	ext := filepath.Ext(file)
-	if ext == "" {
-		return file + ".yaml"
+func AddYAMLExtension(filename string) string {
+	if filename == "" {
+		return ""
 	}
-	if ext == ".yml" {
-		return strings.TrimSuffix(file, ext) + ".yaml"
+
+	ext := filepath.Ext(filename)
+	switch ext {
+	case "":
+		return filename + yamlExtension
+	case ymlExtension:
+		return strings.TrimSuffix(filename, ext) + yamlExtension
+	default:
+		return filename
 	}
-	return file
 }

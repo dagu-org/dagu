@@ -139,7 +139,7 @@ func (d *dagStoreImpl) fileLocation(name string) (string, error) {
 		// this is for backward compatibility
 		return name, nil
 	}
-	return util.AddYamlExtension(path.Join(d.dir, name)), nil
+	return fileutil.AddYAMLExtension(path.Join(d.dir, name)), nil
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {
@@ -284,7 +284,7 @@ func (d *dagStoreImpl) Grep(
 
 	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), digraph.Exts) {
+		if fileutil.IsYAMLFile(fi.Name()) {
 			file := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(file)
 			if err != nil {
@@ -371,7 +371,7 @@ func find(name string) (string, error) {
 	ext := path.Ext(name)
 	if ext == "" {
 		// try all supported extensions
-		for _, ext := range digraph.Exts {
+		for _, ext := range fileutil.ValidYAMLExtensions {
 			if fileutil.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}

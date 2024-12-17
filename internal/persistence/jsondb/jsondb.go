@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/model"
@@ -227,8 +228,8 @@ func (s *JSONDB) Compact(original string) error {
 }
 
 func (s *JSONDB) Rename(oldID, newID string) error {
-	on := util.AddYamlExtension(oldID)
-	nn := util.AddYamlExtension(newID)
+	on := fileutil.AddYAMLExtension(oldID)
+	nn := fileutil.AddYAMLExtension(newID)
 
 	if !filepath.IsAbs(on) || !filepath.IsAbs(nn) {
 		return fmt.Errorf("invalid path: %s -> %s", on, nn)
