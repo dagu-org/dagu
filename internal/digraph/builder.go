@@ -45,75 +45,50 @@ type buildOpts struct {
 
 // errors on building a DAG.
 var (
-	errInvalidSchedule             = errors.New("invalid schedule")
-	errScheduleMustBeStringOrArray = errors.New(
-		"schedule must be a string or an array of strings",
-	)
-	errInvalidScheduleType        = errors.New("invalid schedule type")
-	errInvalidKeyType             = errors.New("invalid key type")
-	errExecutorConfigMustBeString = errors.New(
-		"executor config key must be string",
-	)
-	errDuplicateFunction  = errors.New("duplicate function")
-	errFuncParamsMismatch = errors.New(
-		"func params and args given to func command do not match",
-	)
-	errStepNameRequired          = errors.New("step name must be specified")
-	errStepCommandOrCallRequired = errors.New(
-		"either step command or step call must be specified if executor is nil",
-	)
-	errStepCommandIsEmpty             = errors.New("step command is empty")
-	errStepCommandMustBeArrayOrString = errors.New(
-		"step command must be an array of strings or a string",
-	)
-	errInvalidParamValue    = errors.New("invalid parameter value")
-	errCallFunctionNotFound = errors.New(
-		"call must specify a functions that exists",
-	)
-	errNumberOfParamsMismatch = errors.New(
-		"the number of parameters defined in the function does not match the number of parameters given",
-	)
-	errRequiredParameterNotFound = errors.New(
-		"required parameter not found",
-	)
-	errScheduleKeyMustBeString = errors.New(
-		"schedule key must be a string",
-	)
+	errInvalidSchedule                    = errors.New("invalid schedule")
+	errScheduleMustBeStringOrArray        = errors.New("schedule must be a string or an array of strings")
+	errInvalidScheduleType                = errors.New("invalid schedule type")
+	errInvalidKeyType                     = errors.New("invalid key type")
+	errExecutorConfigMustBeString         = errors.New("executor config key must be string")
+	errDuplicateFunction                  = errors.New("duplicate function")
+	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
+	errStepNameRequired                   = errors.New("step name must be specified")
+	errStepCommandOrCallRequired          = errors.New("either step command or step call must be specified if executor is nil")
+	errStepCommandIsEmpty                 = errors.New("step command is empty")
+	errStepCommandMustBeArrayOrString     = errors.New("step command must be an array of strings or a string")
+	errInvalidParamValue                  = errors.New("invalid parameter value")
+	errCallFunctionNotFound               = errors.New("call must specify a functions that exists")
+	errNumberOfParamsMismatch             = errors.New("the number of parameters defined in the function does not match the number of parameters given")
+	errRequiredParameterNotFound          = errors.New("required parameter not found")
+	errScheduleKeyMustBeString            = errors.New("schedule key must be a string")
 	errInvalidSignal                      = errors.New("invalid signal")
 	errInvalidEnvValue                    = errors.New("invalid value for env")
-	errArgsMustBeConvertibleToIntOrString = errors.New(
-		"args must be convertible to either int or string",
-	)
-	errExecutorTypeMustBeString = errors.New(
-		"executor.type value must be string",
-	)
-	errExecutorConfigValueMustBeMap = errors.New(
-		"executor.config value must be a map",
-	)
-	errExecutorHasInvalidKey = errors.New(
-		"executor has invalid key",
-	)
-	errExecutorConfigMustBeStringOrMap = errors.New(
-		"executor config must be string or map",
-	)
+	errArgsMustBeConvertibleToIntOrString = errors.New("args must be convertible to either int or string")
+	errExecutorTypeMustBeString           = errors.New("executor.type value must be string")
+	errExecutorConfigValueMustBeMap       = errors.New("executor.config value must be a map")
+	errExecutorHasInvalidKey              = errors.New("executor has invalid key")
+	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
 )
 
-var metadataBuilderRegistry = map[string]BuilderFn{
-	"env":              buildEnvs,
-	"schedule":         buildSchedule,
-	"skipIfSuccessful": skipIfSuccessful,
-	"mailOn":           buildMailOn,
-	"params":           buildParams,
+var builderRegistry = []builderEntry{
+	{metadata: true, name: "env", fn: buildEnvs},
+	{metadata: true, name: "schedule", fn: buildSchedule},
+	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
+	{metadata: true, name: "mailOn", fn: buildMailOn},
+	{metadata: true, name: "params", fn: buildParams},
+	{name: "steps", fn: buildSteps},
+	{name: "logDir", fn: buildLogDir},
+	{name: "handlers", fn: buildHandlers},
+	{name: "smtpConfig", fn: buildSMTPConfig},
+	{name: "errMailConfig", fn: buildErrMailConfig},
+	{name: "infoMailConfig", fn: buildInfoMailConfig},
+	{name: "miscs", fn: buildMiscs},
 }
 
-var builderRegistry = map[string]BuilderFn{
-	"steps":          buildSteps,
-	"logDir":         buildLogDir,
-	"handlers":       buildHandlers,
-	"smtpConfig":     buildSMTPConfig,
-	"errMailConfig":  buildErrMailConfig,
-	"infoMailConfig": buildInfoMailConfig,
-	"miscs":          buildMiscs,
+type builderEntry struct {
+	metadata bool
+	name     string
+	fn       BuilderFn
 }
 
 // build builds a DAG from the specification.
@@ -136,19 +111,17 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 	}
 
 	var errs errorList
-	for _, builder := range metadataBuilderRegistry {
-		if err := builder(buildCtx, spec, dag); err != nil {
-			errs.Add(err)
+	for _, builder := range builderRegistry {
+		if !builder.metadata && opts.metadataOnly {
+			continue
+		}
+		if err := builder.fn(buildCtx, spec, dag); err != nil {
+			errs.Add(fmt.Errorf("%s: %w", builder.name, err))
 		}
 	}
 
 	if !opts.metadataOnly {
-		for _, builder := range builderRegistry {
-			if err := builder(buildCtx, spec, dag); err != nil {
-				errs.Add(err)
-			}
-		}
-
+		// TODO: Remove functions feature.
 		if err := assertFunctions(spec.Functions); err != nil {
 			errs.Add(err)
 		}
@@ -382,7 +355,6 @@ func loadVariables(ctx BuildContext, strVariables any) (
 				}
 			}
 		}
-
 	}
 
 	// Parse each key-value pair and set the environment variable.

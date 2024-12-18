@@ -15,7 +15,7 @@ type definition struct {
 	LogDir            string
 	Env               any
 	HandlerOn         handlerOnDef
-	Functions         []*funcDef
+	Functions         []*funcDef // deprecated
 	Steps             []*stepDef
 	SMTP              smtpConfigDef
 	MailOn            *mailOnDef
