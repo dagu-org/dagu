@@ -1,5 +1,5 @@
 #!/usr/bin/env /bin/sh
-# Copyright (C) 2024 The Dagu Authors
+# Copyright (C) 2024 Yota Hamada
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 

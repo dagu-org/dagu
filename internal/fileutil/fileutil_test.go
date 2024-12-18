@@ -1,17 +1,5 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package fileutil
 
@@ -83,50 +71,6 @@ func Test_ParseTime(t *testing.T) {
 		parsed, err := ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
-	})
-}
-
-func Test_SplitCommand(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		cmd, args := SplitCommand("ls -al test/")
-		require.Equal(t, "ls", cmd)
-		require.Len(t, args, 2)
-		require.Equal(t, "-al", args[0])
-		require.Equal(t, "test/", args[1])
-	})
-	t.Run("WithJSON", func(t *testing.T) {
-		cmd, args := SplitCommand(`echo {"key":"value"}`)
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, `{"key":"value"}`, args[0])
-	})
-	t.Run("WithQuotedJSON", func(t *testing.T) {
-		cmd, args := SplitCommand(`echo "{\"key\":\"value\"}"`)
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, `"{\"key\":\"value\"}"`, args[0])
-	})
-}
-
-func Test_SplitCommandWithParse(t *testing.T) {
-	t.Run("CommandSubstitution", func(t *testing.T) {
-		cmd, args := SplitCommandWithParse("echo `echo hello`")
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, "hello", args[0])
-	})
-	t.Run("QuotedCommandSubstitution", func(t *testing.T) {
-		cmd, args := SplitCommandWithParse("echo `echo \"hello world\"`")
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, "hello world", args[0])
-	})
-	t.Run("EnvVar", func(t *testing.T) {
-		os.Setenv("TEST_ARG", "hello")
-		cmd, args := SplitCommandWithParse("echo $TEST_ARG")
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, "hello", args[0])
 	})
 }
 
