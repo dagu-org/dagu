@@ -4,12 +4,8 @@
 package agent
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"log"
-	"os"
 	"testing"
 	"time"
 
@@ -30,7 +26,6 @@ func TestReporter(t *testing.T) {
 		"create success mail": testSuccessMail,
 		"create summary":      testRenderSummary,
 		"create node list":    testRenderTable,
-		"report summary":      testReportSummary,
 	} {
 		t.Run(scenario, func(t *testing.T) {
 
@@ -126,34 +121,6 @@ func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*mode
 	require.Contains(t, mock.subject, "Success")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
-}
-
-func testReportSummary(t *testing.T, rp *reporter, _ *digraph.DAG, nodes []*model.Node) {
-	origStdout := os.Stdout
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	os.Stdout = w
-	log.SetOutput(w)
-
-	defer func() {
-		os.Stdout = origStdout
-		log.SetOutput(origStdout)
-	}()
-
-	rp.report(&model.Status{
-		Status: scheduler.StatusSuccess,
-		Nodes:  nodes,
-	}, errors.New("test error"))
-
-	_ = w.Close()
-	os.Stdout = origStdout
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
-
-	s := buf.String()
-	require.Contains(t, s, "test error")
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, dag *digraph.DAG, nodes []*model.Node) {

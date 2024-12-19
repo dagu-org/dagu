@@ -4,11 +4,10 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -18,32 +17,40 @@ func statusCmd() *cobra.Command {
 		Short: "Display current status of the DAG",
 		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-			})
-
-			// Load the DAG file and get the current running status.
-			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
-			if err != nil {
-				logger.Fatal("DAG load failed", "error", err, "file", args[0])
-			}
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, logger)
-
-			curStatus, err := cli.GetCurrentStatus(cmd.Context(), dag)
-
-			if err != nil {
-				logger.Fatal("Current status retrieval failed", "error", err)
-			}
-
-			logger.Info("Current status", "pid", curStatus.PID, "status", curStatus.Status)
-		},
+		RunE:  runStatus,
 	}
+}
+
+func runStatus(cmd *cobra.Command, args []string) error {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	logger := buildLogger(cfg, false)
+	ctx := cmd.Context()
+
+	// Load the DAG
+	dag, err := digraph.Load(ctx, cfg.BaseConfig, args[0], "")
+	if err != nil {
+		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+	}
+
+	// Initialize services and get status
+	dataStore := newDataStores(cfg)
+	cli := newClient(cfg, dataStore, logger)
+
+	status, err := cli.GetCurrentStatus(ctx, dag)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve current status: %w", err)
+	}
+
+	// Log the status information
+	logger.Info("Current status",
+		"pid", status.PID,
+		"status", status.Status,
+	)
+
+	return nil
 }

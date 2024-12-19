@@ -13,29 +13,25 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
-type (
-	Logger interface {
-		Debug(msg string, tags ...any)
-		Info(msg string, tags ...any)
-		Warn(msg string, tags ...any)
-		Error(msg string, tags ...any)
-		Fatal(msg string, tags ...any)
+type Logger interface {
+	Debug(msg string, tags ...any)
+	Info(msg string, tags ...any)
+	Warn(msg string, tags ...any)
+	Error(msg string, tags ...any)
+	Fatal(msg string, tags ...any)
 
-		Debugf(format string, v ...any)
-		Infof(format string, v ...any)
-		Warnf(format string, v ...any)
-		Errorf(format string, v ...any)
-		Fatalf(format string, v ...any)
+	Debugf(format string, v ...any)
+	Infof(format string, v ...any)
+	Warnf(format string, v ...any)
+	Errorf(format string, v ...any)
+	Fatalf(format string, v ...any)
 
-		With(attrs ...any) Logger
-		WithGroup(name string) Logger
+	With(attrs ...any) Logger
+	WithGroup(name string) Logger
 
-		// Write writes a free-form message to the logger.
-		// It writes to the standard output and to the log file if present.
-		// If the log file is not present, it writes only to the standard output.
-		Write(string)
-	}
-)
+	// Write writes a message to the logger in free form.
+	Write(string)
+}
 
 var _ Logger = (*appLogger)(nil)
 
@@ -45,34 +41,64 @@ type appLogger struct {
 	quiet          bool
 }
 
-type NewLoggerArgs struct {
-	Debug   bool
-	Format  string
-	LogFile *os.File
-	Quiet   bool
+type Config struct {
+	debug   bool
+	format  string
+	logFile *os.File
+	quiet   bool
 }
 
-var (
-	// Default is the default logger used by the application.
-	Default = NewLogger(NewLoggerArgs{
-		Format: "text",
-	})
-)
+type Option func(*Config)
 
-func NewLogger(args NewLoggerArgs) Logger {
+// WithDebug sets the level of the logger to debug.
+func WithDebug() Option {
+	return func(o *Config) {
+		o.debug = true
+	}
+}
+
+// WithFormat sets the format of the logger (text or json).
+func WithFormat(format string) Option {
+	return func(o *Config) {
+		o.format = format
+	}
+}
+
+// WithLogFile sets the file to write logs to.
+func WithLogFile(f *os.File) Option {
+	return func(o *Config) {
+		o.logFile = f
+	}
+}
+
+// WithQuiet suppresses output to stderr.
+func WithQuiet() Option {
+	return func(o *Config) {
+		o.quiet = true
+	}
+}
+
+var Default = NewLogger(WithFormat("text"))
+
+func NewLogger(opts ...Option) Logger {
+	cfg := &Config{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	var level slog.Level
-	if args.Debug {
+	if cfg.debug {
 		level = slog.LevelDebug
 	} else {
 		level = slog.LevelInfo
 	}
 
-	opts := &slog.HandlerOptions{
+	handlerOpts := &slog.HandlerOptions{
 		Level: level,
 	}
 
 	if level == slog.LevelDebug {
-		opts.AddSource = true
+		handlerOpts.AddSource = true
 	}
 
 	var (
@@ -80,23 +106,20 @@ func NewLogger(args NewLoggerArgs) Logger {
 		guardedHandler *guardedHandler
 	)
 
-	if !args.Quiet {
-		handlers = append(handlers, newHandler(os.Stderr, args.Format, opts))
+	if !cfg.quiet {
+		handlers = append(handlers, newHandler(os.Stderr, cfg.format, handlerOpts))
 	}
 
-	if args.LogFile != nil {
-		guardedHandler = newGuardedHandler(
-			newHandler(args.LogFile, args.Format, opts), args.LogFile,
-		)
+	if cfg.logFile != nil {
+		handler := newHandler(cfg.logFile, cfg.format, handlerOpts)
+		guardedHandler = newGuardedHandler(handler, cfg.logFile)
 		handlers = append(handlers, guardedHandler)
 	}
 
 	return &appLogger{
-		logger: slog.New(
-			slogmulti.Fanout(handlers...),
-		),
+		logger:         slog.New(slogmulti.Fanout(handlers...)),
 		guardedHandler: guardedHandler,
-		quiet:          args.Quiet,
+		quiet:          cfg.quiet,
 	}
 }
 
@@ -229,7 +252,6 @@ func (a *appLogger) WithGroup(name string) Logger {
 	}
 }
 
-// Write implements logger.Logger.
 func (a *appLogger) Write(msg string) {
 	// write to the standard output
 	if !a.quiet {

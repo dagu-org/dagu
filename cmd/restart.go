@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -18,160 +18,159 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	restartPrefix    = "restart_"
+	stopPollInterval = 100 * time.Millisecond
+)
+
 func restartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart /path/to/spec.yaml",
 		Short: "Stop the running DAG and restart it",
 		Long:  `dagu restart /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-
-			quiet, err := cmd.Flags().GetBool("quiet")
-			if err != nil {
-				log.Fatalf("Flag retrieval failed (quiet): %v", err)
-			}
-
-			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-				Quiet:  quiet,
-			})
-
-			// Load the DAG file and stop the DAG if it is running.
-			specFilePath := args[0]
-			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, specFilePath, "")
-			if err != nil {
-				initLogger.Fatal("DAG load failed", "error", err, "file", args[0])
-			}
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, initLogger)
-			ctx := cmd.Context()
-
-			if err := stopDAGIfRunning(ctx, cli, dag, initLogger); err != nil {
-				initLogger.Fatal("DAG stop operation failed",
-					"error", err,
-					"DAG", dag.Name)
-			}
-
-			// Wait for the specified amount of time before restarting.
-			waitForRestart(dag.RestartWait, initLogger)
-
-			// Retrieve the parameter of the previous execution.
-			params, err := getPreviousExecutionParams(ctx, cli, dag)
-			if err != nil {
-				initLogger.Fatal("Previous execution parameter retrieval failed",
-					"error", err,
-					"DAG", dag.Name)
-			}
-
-			// Start the DAG with the same parameter.
-			// Need to reload the DAG file with the parameter.
-			dag, err = digraph.Load(cmd.Context(), cfg.BaseConfig, specFilePath, params)
-			if err != nil {
-				initLogger.Fatal("DAG reload failed",
-					"error", err,
-					"file", specFilePath,
-					"params", params)
-			}
-
-			requestID, err := generateRequestID()
-			if err != nil {
-				initLogger.Fatal("Request ID generation failed", "error", err)
-			}
-
-			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
-				Prefix:    "restart_",
-				LogDir:    cfg.LogDir,
-				DAGLogDir: dag.LogDir,
-				DAGName:   dag.Name,
-				RequestID: requestID,
-			})
-			if err != nil {
-				initLogger.Fatal("Log file creation failed",
-					"error", err,
-					"DAG", dag.Name)
-			}
-			defer logFile.Close()
-
-			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:   cfg.Debug,
-				Format:  cfg.LogFormat,
-				LogFile: logFile,
-				Quiet:   quiet,
-			})
-
-			agentLogger.Info("DAG restart initiated",
-				"DAG", dag.Name,
-				"requestID", requestID,
-				"logFile", logFile.Name())
-
-			agt := agent.New(
-				requestID,
-				dag,
-				agentLogger,
-				filepath.Dir(logFile.Name()),
-				logFile.Name(),
-				newClient(cfg, dataStore, agentLogger),
-				dataStore,
-				&agent.Options{Dry: false})
-
-			listenSignals(cmd.Context(), agt)
-			if err := agt.Run(cmd.Context()); err != nil {
-				agentLogger.Fatal("DAG restart failed",
-					"error", err,
-					"DAG", dag.Name,
-					"requestID", requestID)
-			}
-		},
+		RunE:  runRestart,
 	}
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
 }
 
-// stopDAGIfRunning stops the DAG if it is running.
-// Otherwise, it does nothing.
-func stopDAGIfRunning(ctx context.Context, e client.Client, dag *digraph.DAG, lg logger.Logger) error {
-	curStatus, err := e.GetCurrentStatus(ctx, dag)
+func runRestart(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if curStatus.Status == scheduler.StatusRunning {
+	quiet, err := cmd.Flags().GetBool("quiet")
+	if err != nil {
+		return fmt.Errorf("failed to get quiet flag: %w", err)
+	}
+
+	logger := buildLogger(cfg, quiet)
+	ctx := cmd.Context()
+	specFilePath := args[0]
+
+	// Load initial DAG configuration
+	dag, err := digraph.Load(ctx, cfg.BaseConfig, specFilePath, "")
+	if err != nil {
+		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
+	}
+
+	dataStore := newDataStores(cfg)
+	cli := newClient(cfg, dataStore, logger)
+
+	// Handle the restart process
+	if err := handleRestartProcess(ctx, cli, cfg, dag, quiet, specFilePath, logger); err != nil {
+		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
+	}
+
+	return nil
+}
+
+func handleRestartProcess(ctx context.Context, cli client.Client, cfg *config.Config,
+	dag *digraph.DAG, quiet bool, specFilePath string, lg logger.Logger) error {
+
+	// Stop if running
+	if err := stopDAGIfRunning(ctx, cli, dag, lg); err != nil {
+		return fmt.Errorf("failed to stop DAG: %w", err)
+	}
+
+	// Wait before restart if configured
+	waitForRestart(dag.RestartWait, lg)
+
+	// Get previous parameters
+	params, err := getPreviousExecutionParams(ctx, cli, dag)
+	if err != nil {
+		return fmt.Errorf("failed to get previous execution parameters: %w", err)
+	}
+
+	// Reload DAG with parameters
+	dag, err = digraph.Load(ctx, cfg.BaseConfig, specFilePath, params)
+	if err != nil {
+		return fmt.Errorf("failed to reload DAG with params: %w", err)
+	}
+
+	logger := buildLogger(cfg, quiet)
+	return executeDAG(ctx, cli, cfg, dag, quiet, logger)
+}
+
+func executeDAG(ctx context.Context, cli client.Client, cfg *config.Config,
+	dag *digraph.DAG, quiet bool, logger logger.Logger) error {
+
+	requestID, err := generateRequestID()
+	if err != nil {
+		return fmt.Errorf("failed to generate request ID: %w", err)
+	}
+
+	logFile, err := openLogFile(logFileSettings{
+		Prefix:    restartPrefix,
+		LogDir:    cfg.LogDir,
+		DAGLogDir: dag.LogDir,
+		DAGName:   dag.Name,
+		RequestID: requestID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create log file: %w", err)
+	}
+	defer logFile.Close()
+
+	logger.Info("DAG restart initiated",
+		"DAG", dag.Name,
+		"requestID", requestID,
+		"logFile", logFile.Name())
+
+	agt := agent.New(
+		requestID,
+		dag,
+		buildLoggerWithFile(cfg, quiet, logFile),
+		filepath.Dir(logFile.Name()),
+		logFile.Name(),
+		cli,
+		newDataStores(cfg),
+		&agent.Options{Dry: false})
+
+	listenSignals(ctx, agt)
+	if err := agt.Run(ctx); err != nil {
+		return fmt.Errorf("DAG execution failed: %w", err)
+	}
+
+	return nil
+}
+
+func stopDAGIfRunning(ctx context.Context, cli client.Client, dag *digraph.DAG, lg logger.Logger) error {
+	status, err := cli.GetCurrentStatus(ctx, dag)
+	if err != nil {
+		return fmt.Errorf("failed to get current status: %w", err)
+	}
+
+	if status.Status == scheduler.StatusRunning {
 		lg.Infof("Stopping: %s", dag.Name)
-		cobra.CheckErr(stopRunningDAG(ctx, e, dag))
+		if err := stopRunningDAG(ctx, cli, dag); err != nil {
+			return fmt.Errorf("failed to stop running DAG: %w", err)
+		}
 	}
 	return nil
 }
 
-// stopRunningDAG attempts to stop the running DAG
-// by sending a stop signal to the agent.
-func stopRunningDAG(ctx context.Context, e client.Client, dag *digraph.DAG) error {
+func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) error {
 	for {
-		curStatus, err := e.GetCurrentStatus(ctx, dag)
+		status, err := cli.GetCurrentStatus(ctx, dag)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get current status: %w", err)
 		}
 
-		// If the DAG is not running, do nothing.
-		if curStatus.Status != scheduler.StatusRunning {
+		if status.Status != scheduler.StatusRunning {
 			return nil
 		}
 
-		if err := e.Stop(ctx, dag); err != nil {
-			return err
+		if err := cli.Stop(ctx, dag); err != nil {
+			return fmt.Errorf("failed to stop DAG: %w", err)
 		}
 
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(stopPollInterval)
 	}
 }
 
-// waitForRestart waits for the specified amount of time before restarting
-// the DAG.
 func waitForRestart(restartWait time.Duration, lg logger.Logger) {
 	if restartWait > 0 {
 		lg.Info("Waiting for restart", "duration", restartWait)
@@ -179,11 +178,10 @@ func waitForRestart(restartWait time.Duration, lg logger.Logger) {
 	}
 }
 
-func getPreviousExecutionParams(ctx context.Context, e client.Client, dag *digraph.DAG) (string, error) {
-	latestStatus, err := e.GetLatestStatus(ctx, dag)
+func getPreviousExecutionParams(ctx context.Context, cli client.Client, dag *digraph.DAG) (string, error) {
+	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get latest status: %w", err)
 	}
-
-	return latestStatus.Params, nil
+	return status.Params, nil
 }

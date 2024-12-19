@@ -8,7 +8,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -29,11 +28,7 @@ func stopCmd() *cobra.Command {
 				log.Fatalf("Flag retrieval failed (quiet): %v", err)
 			}
 
-			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-				Quiet:  quiet,
-			})
+			logger := buildLogger(cfg, quiet)
 
 			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
 			if err != nil {

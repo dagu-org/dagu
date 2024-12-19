@@ -119,8 +119,5 @@ func SetupForDir(t *testing.T, dir string) Setup {
 }
 
 func NewLogger() logger.Logger {
-	return logger.NewLogger(logger.NewLoggerArgs{
-		Debug:  true,
-		Format: "text",
-	})
+	return logger.NewLogger(logger.WithDebug(), logger.WithFormat("text"))
 }

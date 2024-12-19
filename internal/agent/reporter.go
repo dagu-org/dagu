@@ -6,6 +6,7 @@ package agent
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -13,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"golang.org/x/term"
 )
 
 // Sender is a mailer interface.
@@ -63,6 +65,11 @@ func (r *reporter) reportStep(
 
 // report is a function that reports the status of the scheduler.
 func (r *reporter) report(status *model.Status, err error) {
+	isTerminal := term.IsTerminal(int(os.Stderr.Fd()))
+	if !isTerminal {
+		// If the output is not a terminal, we don't need to render the table.
+		return
+	}
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
