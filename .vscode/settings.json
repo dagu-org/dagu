@@ -23,4 +23,9 @@
     },
     "prettier.tabWidth": 2,
     "editor.tabSize": 2,
+    "cSpell.words": [
+        "dagu",
+        "yota",
+        "hamada"
+    ],
 }
