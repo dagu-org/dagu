@@ -26,6 +26,11 @@
     "cSpell.words": [
         "dagu",
         "yota",
-        "hamada"
+        "hamada",
+        "debugf",
+        "infof",
+        "warnf",
+        "errorf",
+        "fatalf",
     ],
 }

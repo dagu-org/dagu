@@ -45,12 +45,11 @@ func TestClient_GetStatus(t *testing.T) {
 				b, _ := status.ToJSON()
 				_, _ = w.Write(b)
 			},
-			test.NewLogger(),
 		)
 
 		go func() {
-			_ = socketServer.Serve(nil)
-			_ = socketServer.Shutdown()
+			_ = socketServer.Serve(ctx, nil)
+			_ = socketServer.Shutdown(ctx)
 		}()
 
 		time.Sleep(time.Millisecond * 100)
@@ -58,7 +57,7 @@ func TestClient_GetStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, curStatus.Status)
 
-		_ = socketServer.Shutdown()
+		_ = socketServer.Shutdown(ctx)
 
 		curStatus, err = cli.GetCurrentStatus(ctx, dagStatus.DAG)
 		require.NoError(t, err)

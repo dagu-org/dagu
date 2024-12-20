@@ -48,7 +48,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	logger := buildLogger(cfg, quiet)
+	ctx := cmd.Context()
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
 
 	// Get parameters
 	params, err := cmd.Flags().GetString("params")
@@ -57,10 +58,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize and run DAG
-	return executeDag(cmd.Context(), cfg, args[0], removeQuotes(params), quiet, logger)
+	return executeDag(ctx, cfg, args[0], removeQuotes(params), quiet)
 }
 
-func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool, logger logger.Logger) error {
+func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool) error {
 	// Load DAG
 	dag, err := digraph.Load(ctx, cfg.BaseConfig, specPath, params)
 	if err != nil {
@@ -88,18 +89,15 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 
 	// Initialize services
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore, logger)
+	cli := newClient(cfg, dataStore)
 
-	logger.Info("DAG execution initiated",
-		"DAG", dag.Name,
-		"requestID", requestID,
-		"logFile", logFile.Name())
+	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(cfg, quiet, logFile))
 
 	// Create and run agent
 	agt := agent.New(
 		requestID,
 		dag,
-		buildLoggerWithFile(cfg, quiet, logFile),
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
@@ -110,8 +108,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	listenSignals(ctx, agt)
 
 	if err := agt.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w",
-			dag.Name, requestID, err)
+		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 	}
 
 	return nil

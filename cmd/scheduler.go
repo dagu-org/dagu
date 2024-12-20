@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -37,22 +38,22 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	logger := buildLogger(cfg, false)
+	ctx := cmd.Context()
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		cfg.DAGs = dagsDir
 	}
 
-	logger.Info("Scheduler initialization",
+	logger.Info(ctx, "Scheduler initialization",
 		"specsDirectory", cfg.DAGs,
 		"logFormat", cfg.LogFormat)
 
-	ctx := cmd.Context()
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore, logger)
+	cli := newClient(cfg, dataStore)
 
-	sc := scheduler.New(ctx, cfg, logger, cli)
+	sc := scheduler.New(cfg, cli)
 	if err := sc.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
 			cfg.DAGs, err)

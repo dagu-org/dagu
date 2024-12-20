@@ -28,13 +28,11 @@ func New(
 	dataStore persistence.DataStores,
 	executable string,
 	workDir string,
-	lg logger.Logger,
 ) Client {
 	return &client{
 		dataStore:  dataStore,
 		executable: executable,
 		workDir:    workDir,
-		logger:     lg,
 	}
 }
 
@@ -42,7 +40,6 @@ type client struct {
 	dataStore  persistence.DataStores
 	executable string
 	workDir    string
-	logger     logger.Logger
 }
 
 var (
@@ -106,7 +103,7 @@ func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
 func (e *client) StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) {
 	go func() {
 		if err := e.Start(ctx, dag, opts); err != nil {
-			e.logger.Error("DAG start operation failed", "error", err)
+			logger.Error(ctx, "DAG start operation failed", "error", err)
 		}
 	}()
 }
@@ -334,7 +331,7 @@ func (e *client) GetStatus(ctx context.Context, id string) (*DAGStatus, error) {
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
-		_, err = scheduler.NewExecutionGraph(e.logger, dag.Steps...)
+		_, err = scheduler.NewExecutionGraph(dag.Steps...)
 	}
 	latestStatus, _ := e.GetLatestStatus(ctx, dag)
 	return newDAGStatus(

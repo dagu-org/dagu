@@ -5,6 +5,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +29,6 @@ type entryReaderImpl struct {
 	dagsLock   sync.Mutex
 	dags       map[string]*digraph.DAG
 	jobCreator jobCreator
-	logger     logger.Logger
 	client     client.Client
 }
 
@@ -36,23 +36,22 @@ type jobCreator interface {
 	CreateJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) job
 }
 
-func newEntryReader(ctx context.Context, dagsDir string, jobCreator jobCreator, logger logger.Logger, client client.Client) *entryReaderImpl {
-	er := &entryReaderImpl{
+func newEntryReader(dagsDir string, jobCreator jobCreator, client client.Client) *entryReaderImpl {
+	return &entryReaderImpl{
 		dagsDir:    dagsDir,
 		dagsLock:   sync.Mutex{},
 		dags:       map[string]*digraph.DAG{},
 		jobCreator: jobCreator,
-		logger:     logger,
 		client:     client,
 	}
-	if err := er.initDAGs(ctx); err != nil {
-		er.logger.Error("DAG initialization failed", "error", err)
-	}
-	return er
 }
 
-func (er *entryReaderImpl) Start(ctx context.Context, done chan any) {
+func (er *entryReaderImpl) Start(ctx context.Context, done chan any) error {
+	if err := er.initDAGs(ctx); err != nil {
+		return fmt.Errorf("failed to initialize DAGs: %w", err)
+	}
 	go er.watchDags(ctx, done)
+	return nil
 }
 
 func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, error) {
@@ -67,7 +66,6 @@ func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, e
 				Next:      schedule.Parsed.Next(now),
 				Job:       er.jobCreator.CreateJob(dag, next, schedule.Parsed),
 				EntryType: entryType,
-				Logger:    er.logger,
 			})
 		}
 	}
@@ -103,11 +101,7 @@ func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 		if fileutil.IsYAMLFile(fi.Name()) {
 			dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
-				er.logger.Error(
-					"DAG load failed",
-					"error", err,
-					"DAG", fi.Name(),
-				)
+				logger.Error(ctx, "DAG load failed", "error", err, "DAG", fi.Name())
 				continue
 			}
 			er.dags[fi.Name()] = dag
@@ -115,14 +109,14 @@ func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 		}
 	}
 
-	er.logger.Info("Scheduler initialized", "specs", strings.Join(fileNames, ","))
+	logger.Info(ctx, "Scheduler initialized", "specs", strings.Join(fileNames, ","))
 	return nil
 }
 
 func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		er.logger.Error("Watcher creation failed", "error", err)
+		logger.Error(ctx, "Watcher creation failed", "error", err)
 		return
 	}
 
@@ -146,28 +140,22 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
 				dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
-					er.logger.Error(
-						"DAG load failed",
-						"error",
-						err,
-						"file",
-						event.Name,
-					)
+					logger.Error(ctx, "DAG load failed", "error", err, "file", event.Name)
 				} else {
 					er.dags[filepath.Base(event.Name)] = dag
-					er.logger.Info("DAG added/updated", "DAG", filepath.Base(event.Name))
+					logger.Info(ctx, "DAG added/updated", "DAG", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(er.dags, filepath.Base(event.Name))
-				er.logger.Info("DAG removed", "DAG", filepath.Base(event.Name))
+				logger.Info(ctx, "DAG removed", "DAG", filepath.Base(event.Name))
 			}
 			er.dagsLock.Unlock()
 		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}
-			er.logger.Error("Watcher error", "error", err)
+			logger.Error(ctx, "Watcher error", "error", err)
 		}
 	}
 

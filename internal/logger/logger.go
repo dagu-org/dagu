@@ -78,7 +78,7 @@ func WithQuiet() Option {
 	}
 }
 
-var Default = NewLogger(WithFormat("text"))
+var defaultLogger = NewLogger(WithFormat("text"))
 
 func NewLogger(opts ...Option) Logger {
 	cfg := &Config{}

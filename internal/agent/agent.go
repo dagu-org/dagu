@@ -44,7 +44,6 @@ type Agent struct {
 	socketServer *sock.Server
 	logDir       string
 	logFile      string
-	logger       logger.Logger
 
 	// requestID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
@@ -69,8 +68,8 @@ type Options struct {
 func New(
 	requestID string,
 	dag *digraph.DAG,
-	lg logger.Logger,
-	logDir, logFile string,
+	logDir string,
+	logFile string,
 	cli client.Client,
 	dataStore persistence.DataStores,
 	opts *Options,
@@ -82,7 +81,6 @@ func New(
 		retryTarget: opts.RetryTarget,
 		logDir:      logDir,
 		logFile:     logFile,
-		logger:      lg,
 		client:      cli,
 		dataStore:   dataStore,
 	}
@@ -99,18 +97,18 @@ var (
 
 // Run setups the scheduler and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := a.setup(); err != nil {
+	if err := a.setup(ctx); err != nil {
 		return err
 	}
 
 	// It should not run the DAG if the condition is unmet.
-	if err := a.checkPreconditions(); err != nil {
+	if err := a.checkPreconditions(ctx); err != nil {
 		return err
 	}
 
 	// Handle dry execution.
 	if a.dry {
-		return a.dryRun()
+		return a.dryRun(ctx)
 	}
 
 	// Check if the DAG is already running.
@@ -126,36 +124,36 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	defer func() {
 		if err := a.historyStore.Close(ctx); err != nil {
-			a.logger.Error("Failed to close history store", "error", err)
+			logger.Error(ctx, "Failed to close history store", "error", err)
 		}
 	}()
 
 	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
-		a.logger.Error("Failed to write status", "error", err)
+		logger.Error(ctx, "Failed to write status", "error", err)
 	}
 
 	// Start the unix socket server for receiving HTTP requests from
 	// the local client (e.g., the frontend server, scheduler, etc).
-	if err := a.setupSocketServer(); err != nil {
-		return err
+	if err := a.setupSocketServer(ctx); err != nil {
+		return fmt.Errorf("failed to setup unix socket server: %w", err)
 	}
-	lnErr := make(chan error)
+	listenerErrCh := make(chan error)
 	go func() {
-		err := a.socketServer.Serve(lnErr)
+		err := a.socketServer.Serve(ctx, listenerErrCh)
 		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
-			a.logger.Error("Failed to start socket frontend", "error", err)
+			logger.Error(ctx, "Failed to start socket frontend", "error", err)
 		}
 	}()
 
 	// Stop the socket server when finishing the DAG execution.
 	defer func() {
-		if err := a.socketServer.Shutdown(); err != nil {
-			a.logger.Error("Failed to shutdown socket frontend", "error", err)
+		if err := a.socketServer.Shutdown(ctx); err != nil {
+			logger.Error(ctx, "Failed to shutdown socket frontend", "error", err)
 		}
 	}()
 
 	// It returns error if it failed to start the unix socket server.
-	if err := <-lnErr; err != nil {
+	if err := <-listenerErrCh; err != nil {
 		return errFailedSetupUnixSocket
 	}
 
@@ -168,10 +166,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		for node := range done {
 			status := a.Status()
 			if err := a.historyStore.Write(ctx, status); err != nil {
-				a.logger.Error("Failed to write status", "error", err)
+				logger.Error(ctx, "Failed to write status", "error", err)
 			}
-			if err := a.reporter.reportStep(a.dag, status, node); err != nil {
-				a.logger.Error("Failed to report step", "error", err)
+			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
+				logger.Error(ctx, "Failed to report step", "error", err)
 			}
 		}
 	}()
@@ -184,7 +182,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			return
 		}
 		if err := a.historyStore.Write(ctx, a.Status()); err != nil {
-			a.logger.Error("Status write failed", "error", err)
+			logger.Error(ctx, "Status write failed", "error", err)
 		}
 	}()
 
@@ -194,15 +192,15 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	a.logger.Info("DAG execution finished", "status", finishedStatus.Status)
+	logger.Info(ctx, "DAG execution finished", "status", finishedStatus.Status)
 	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
-		a.logger.Error("Status write failed", "error", err)
+		logger.Error(ctx, "Status write failed", "error", err)
 	}
 
 	// Send the execution report if necessary.
-	a.reporter.report(finishedStatus, lastErr)
+	a.reporter.report(ctx, finishedStatus, lastErr)
 	if err := a.reporter.send(a.dag, finishedStatus, lastErr); err != nil {
-		a.logger.Error("Mail notification failed", "error", err)
+		logger.Error(ctx, "Mail notification failed", "error", err)
 	}
 
 	// Mark the agent finished.
@@ -256,8 +254,8 @@ func (a *Agent) Status() *model.Status {
 }
 
 // Signal sends the signal to the processes running
-func (a *Agent) Signal(sig os.Signal) {
-	a.signal(sig, false)
+func (a *Agent) Signal(ctx context.Context, sig os.Signal) {
+	a.signal(ctx, sig, false)
 }
 
 // Simple regular expressions for request routing
@@ -267,38 +265,40 @@ var (
 )
 
 // HandleHTTP handles HTTP requests via unix socket.
-func (a *Agent) HandleHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("content-type", "application/json")
-	switch {
-	case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
-		// Return the current status of the execution.
-		status := a.Status()
-		status.Status = scheduler.StatusRunning
-		b, err := status.ToJSON()
-		if err != nil {
-			encodeError(w, err)
-			return
+func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && statusRe.MatchString(r.URL.Path):
+			// Return the current status of the execution.
+			status := a.Status()
+			status.Status = scheduler.StatusRunning
+			statusJSON, err := status.ToJSON()
+			if err != nil {
+				encodeError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(statusJSON)
+		case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
+			// Handle Stop request for the DAG execution.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("OK"))
+			go func() {
+				logger.Info(ctx, "Stop request received")
+				a.signal(ctx, syscall.SIGTERM, true)
+			}()
+		default:
+			// Unknown request
+			encodeError(
+				w, &httpError{Code: http.StatusNotFound, Message: "Not found"},
+			)
 		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(b)
-	case r.Method == http.MethodPost && stopRe.MatchString(r.URL.Path):
-		// Handle Stop request for the DAG execution.
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-		go func() {
-			a.logger.Info("Stop request received")
-			a.signal(syscall.SIGTERM, true)
-		}()
-	default:
-		// Unknown request
-		encodeError(
-			w, &httpError{Code: http.StatusNotFound, Message: "Not found"},
-		)
 	}
 }
 
 // setup the agent instance for DAG execution.
-func (a *Agent) setup() error {
+func (a *Agent) setup(ctx context.Context) error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -311,17 +311,15 @@ func (a *Agent) setup() error {
 			Username: a.dag.SMTP.Username,
 			Password: a.dag.SMTP.Password,
 		}),
-		a.logger,
 	)
 
-	return a.setupGraph()
+	return a.setupGraph(ctx)
 }
 
 // newScheduler creates a scheduler instance for the DAG execution.
 func (a *Agent) newScheduler() *scheduler.Scheduler {
 	cfg := &scheduler.Config{
 		LogDir:        a.logDir,
-		Logger:        a.logger,
 		MaxActiveRuns: a.dag.MaxActiveRuns,
 		Timeout:       a.dag.Timeout,
 		Delay:         a.dag.Delay,
@@ -350,7 +348,7 @@ func (a *Agent) newScheduler() *scheduler.Scheduler {
 
 // dryRun performs a dry-run of the DAG. It only simulates the execution of
 // the DAG without running the actual command.
-func (a *Agent) dryRun() error {
+func (a *Agent) dryRun(ctx context.Context) error {
 	// done channel receives the node when the node is done.
 	// It's a way to update the status in real-time in efficient manner.
 	done := make(chan *scheduler.Node)
@@ -361,18 +359,18 @@ func (a *Agent) dryRun() error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			_ = a.reporter.reportStep(a.dag, status, node)
+			_ = a.reporter.reportStep(ctx, a.dag, status, node)
 		}
 	}()
 
-	a.logger.Info("Dry-run started", "reqId", a.requestID)
+	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
 
 	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
-	a.reporter.report(a.Status(), lastErr)
+	a.reporter.report(ctx, a.Status(), lastErr)
 
-	a.logger.Info("Dry-run finished", "reqId", a.requestID)
+	logger.Info(ctx, "Dry-run finished", "reqId", a.requestID)
 
 	return lastErr
 }
@@ -384,8 +382,8 @@ func (a *Agent) dryRun() error {
 // The reason we need this is to allow the system to kill the child
 // process by sending a SIGKILL to force the process to be shutdown.
 // if processes do not terminate after MaxCleanUp time, it sends KILL signal.
-func (a *Agent) signal(sig os.Signal, allowOverride bool) {
-	a.logger.Info("Sending signal to running child processes", "signal", sig)
+func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
+	logger.Info(ctx, "Sending signal to running child processes", "signal", sig)
 	done := make(chan bool)
 	go func() {
 		a.scheduler.Signal(a.graph, sig, done, allowOverride)
@@ -398,19 +396,19 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 	for {
 		select {
 		case <-done:
-			a.logger.Info("All child processes have been terminated")
+			logger.Info(ctx, "All child processes have been terminated")
 			return
 		case <-timeout.C:
-			a.logger.Info("Time reached to max cleanup time")
-			a.logger.Info("Sending KILL signal to running child processes.")
+			logger.Info(ctx, "Time reached to max cleanup time")
+			logger.Info(ctx, "Sending KILL signal to running child processes.")
 			a.scheduler.Signal(a.graph, syscall.SIGKILL, nil, false)
 			return
 		case <-tick.C:
-			a.logger.Info("Sending signal again")
+			logger.Info(ctx, "Sending signal again")
 			a.scheduler.Signal(a.graph, sig, nil, false)
 			tick.Reset(time.Second * 5)
 		default:
-			a.logger.Info("Waiting for child processes to exit...")
+			logger.Info(ctx, "Waiting for child processes to exit...")
 			time.Sleep(time.Second * 3)
 		}
 	}
@@ -418,12 +416,12 @@ func (a *Agent) signal(sig os.Signal, allowOverride bool) {
 
 // setupGraph setups the DAG graph. If is retry execution, it loads nodes
 // from the retry node so that it runs the same DAG as the previous run.
-func (a *Agent) setupGraph() error {
+func (a *Agent) setupGraph(ctx context.Context) error {
 	if a.retryTarget != nil {
-		a.logger.Info("Retry execution", "reqId", a.requestID)
-		return a.setupGraphForRetry()
+		logger.Info(ctx, "Retry execution", "reqId", a.requestID)
+		return a.setupGraphForRetry(ctx)
 	}
-	graph, err := scheduler.NewExecutionGraph(a.logger, a.dag.Steps...)
+	graph, err := scheduler.NewExecutionGraph(a.dag.Steps...)
 	if err != nil {
 		return err
 	}
@@ -432,12 +430,12 @@ func (a *Agent) setupGraph() error {
 }
 
 // setupGraphForRetry setsup the graph for retry.
-func (a *Agent) setupGraphForRetry() error {
+func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	nodes := make([]*scheduler.Node, 0, len(a.retryTarget.Nodes))
 	for _, n := range a.retryTarget.Nodes {
 		nodes = append(nodes, n.ToNode())
 	}
-	graph, err := scheduler.NewExecutionGraphForRetry(a.logger, nodes...)
+	graph, err := scheduler.CreateRetryExecutionGraph(ctx, nodes...)
 	if err != nil {
 		return err
 	}
@@ -450,19 +448,15 @@ func (a *Agent) setupDatabase(ctx context.Context) error {
 	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(ctx, location, retentionDays); err != nil {
-		a.logger.Error("History data cleanup failed", "error", err)
+		logger.Error(ctx, "History data cleanup failed", "error", err)
 	}
 
 	return a.historyStore.Open(ctx, a.dag.Location, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.
-func (a *Agent) setupSocketServer() error {
-	socketServer, err := sock.NewServer(
-		a.dag.SockAddr(),
-		a.HandleHTTP,
-		a.logger,
-	)
+func (a *Agent) setupSocketServer(ctx context.Context) error {
+	socketServer, err := sock.NewServer(a.dag.SockAddr(), a.HandleHTTP(ctx))
 	if err != nil {
 		return err
 	}
@@ -472,13 +466,13 @@ func (a *Agent) setupSocketServer() error {
 
 // checkPrecondition check if the preconditions are met. If not, it returns
 // error.
-func (a *Agent) checkPreconditions() error {
+func (a *Agent) checkPreconditions(ctx context.Context) error {
 	if len(a.dag.Preconditions) == 0 {
 		return nil
 	}
 	// If one of the conditions does not met, cancel the execution.
 	if err := digraph.EvalConditions(a.dag.Preconditions); err != nil {
-		a.logger.Error("Preconditions are not met", "error", err)
+		logger.Error(ctx, "Preconditions are not met", "error", err)
 		a.scheduler.Cancel(a.graph)
 		return err
 	}

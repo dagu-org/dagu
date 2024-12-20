@@ -4,6 +4,7 @@
 package test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -20,8 +21,8 @@ import (
 )
 
 type Setup struct {
-	Config *config.Config
-	Logger logger.Logger
+	Context context.Context
+	Config  *config.Config
 
 	homeDir string
 }
@@ -42,9 +43,7 @@ func (t Setup) DataStore() persistence.DataStores {
 }
 
 func (t Setup) Client() client.Client {
-	return client.New(
-		t.DataStore(), t.Config.Executable, t.Config.WorkDir, logger.Default,
-	)
+	return client.New(t.DataStore(), t.Config.Executable, t.Config.WorkDir)
 }
 
 var (
@@ -87,9 +86,12 @@ func SetupTest(t *testing.T) Setup {
 	_ = os.Setenv("DAGU_SUSPEND_FLAGS_DIR", cfg.SuspendFlagsDir)
 	_ = os.Setenv("DAGU_ADMIN_LOG_DIR", cfg.AdminLogsDir)
 
+	ctx := context.Background()
+	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithDebug(), logger.WithFormat("text")))
+
 	return Setup{
-		Config: cfg,
-		Logger: NewLogger(),
+		Context: ctx,
+		Config:  cfg,
 
 		homeDir: tmpDir,
 	}
@@ -110,14 +112,13 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
+	ctx := context.Background()
+	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithDebug(), logger.WithFormat("text")))
+
 	return Setup{
-		Config: cfg,
-		Logger: NewLogger(),
+		Context: ctx,
+		Config:  cfg,
 
 		homeDir: tmpDir,
 	}
-}
-
-func NewLogger() logger.Logger {
-	return logger.NewLogger(logger.WithDebug(), logger.WithFormat("text"))
 }

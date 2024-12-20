@@ -5,6 +5,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"path"
@@ -13,6 +14,7 @@ import (
 	"text/template"
 
 	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var (
@@ -20,9 +22,7 @@ var (
 	templatePath = "templates/"
 )
 
-func (srv *Server) useTemplate(
-	layout string, name string,
-) func(http.ResponseWriter, any) {
+func (srv *Server) useTemplate(ctx context.Context, layout string, name string) func(http.ResponseWriter, any) {
 	files := append(baseTemplates(), filepath.Join(templatePath, layout))
 	tmpl, err := template.New(name).Funcs(
 		defaultFunctions(srv.funcsConfig)).ParseFS(srv.assets, files...,
@@ -34,7 +34,7 @@ func (srv *Server) useTemplate(
 	return func(w http.ResponseWriter, data any) {
 		var buf bytes.Buffer
 		if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
-			srv.logger.Error("Template execution failed", "error", err)
+			logger.Error(ctx, "Template execution failed", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

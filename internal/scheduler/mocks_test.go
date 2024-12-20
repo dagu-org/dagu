@@ -30,7 +30,9 @@ func (er *mockEntryReader) Read(_ context.Context, _ time.Time) ([]*entry, error
 	return er.Entries, nil
 }
 
-func (er *mockEntryReader) Start(_ context.Context, _ chan any) {}
+func (er *mockEntryReader) Start(_ context.Context, _ chan any) error {
+	return nil
+}
 
 var _ job = (*mockJob)(nil)
 

@@ -13,9 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
-	"github.com/dagu-org/dagu/internal/test"
 
 	"github.com/stretchr/testify/require"
 
@@ -31,10 +29,8 @@ func TestReadEntries(t *testing.T) {
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(
-			context.Background(),
 			filepath.Join(testdataDir, "invalid_directory"),
 			&mockJobFactory{},
-			test.NewLogger(),
 			cli,
 		)
 
@@ -43,10 +39,8 @@ func TestReadEntries(t *testing.T) {
 		require.Len(t, entries, 0)
 
 		entryReader = newEntryReader(
-			context.Background(),
 			testdataDir,
 			&mockJobFactory{},
-			test.NewLogger(),
 			cli,
 		)
 
@@ -107,5 +101,5 @@ func setupTest(t *testing.T) (string, client.Client) {
 		},
 	)
 
-	return tmpDir, client.New(dataStore, "", cfg.WorkDir, logger.Default)
+	return tmpDir, client.New(dataStore, "", cfg.WorkDir)
 }

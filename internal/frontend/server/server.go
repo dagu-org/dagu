@@ -31,7 +31,6 @@ type Server struct {
 	basicAuth   *BasicAuth
 	authToken   *AuthToken
 	tls         *config.TLS
-	logger      logger.Logger
 	server      *restapi.Server
 	handlers    []Handler
 	assets      fs.FS
@@ -43,7 +42,6 @@ type NewServerArgs struct {
 	BasicAuth *BasicAuth
 	AuthToken *AuthToken
 	TLS       *config.TLS
-	Logger    logger.Logger
 	Handlers  []Handler
 	AssetsFS  fs.FS
 
@@ -77,7 +75,6 @@ func New(params NewServerArgs) *Server {
 		basicAuth: params.BasicAuth,
 		authToken: params.AuthToken,
 		tls:       params.TLS,
-		logger:    params.Logger,
 		handlers:  params.Handlers,
 		assets:    params.AssetsFS,
 		funcsConfig: funcsConfig{
@@ -92,21 +89,22 @@ func New(params NewServerArgs) *Server {
 	}
 }
 
-func (svr *Server) Shutdown() {
+func (svr *Server) Shutdown(ctx context.Context) {
 	if svr.server == nil {
 		return
 	}
 	err := svr.server.Shutdown()
 	if err != nil {
-		svr.logger.Warn("Server shutdown", "error", err)
+		logger.Warn(ctx, "Server shutdown", "error", err)
 	}
 }
 
 func (svr *Server) Serve(ctx context.Context) (err error) {
+	loggerInstance := logger.FromContext(ctx)
 	middlewareOptions := &pkgmiddleware.Options{
-		Handler:  svr.defaultRoutes(chi.NewRouter()),
-		Logger:   svr.logger,
+		Handler:  svr.defaultRoutes(ctx, chi.NewRouter()),
 		BasePath: svr.funcsConfig.BasePath,
+		Logger:   loggerInstance,
 	}
 	if svr.authToken != nil {
 		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
@@ -123,17 +121,17 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 
 	swaggerSpec, err := loads.Analyzed(restapi.SwaggerJSON, "")
 	if err != nil {
-		svr.logger.Error("Failed to load API spec", "error", err)
+		logger.Error(ctx, "Failed to load API spec", "error", err)
 		return err
 	}
 	api := operations.NewDaguAPI(swaggerSpec)
-	api.Logger = svr.logger.Infof
+	api.Logger = loggerInstance.Infof
 	for _, h := range svr.handlers {
 		h.Configure(api)
 	}
 
 	svr.server = restapi.NewServer(api)
-	defer svr.Shutdown()
+	defer svr.Shutdown(ctx)
 
 	svr.server.Host = svr.host
 	svr.server.Port = svr.port
@@ -153,7 +151,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		// Trigger graceful shutdown
 		err := svr.server.Shutdown()
 		if err != nil {
-			svr.logger.Error("Server shutdown", "error", err)
+			logger.Error(ctx, "Server shutdown", "error", err)
 		}
 		serverStopCtx()
 	}()
@@ -169,13 +167,13 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	// Run the server
 	err = svr.server.Serve()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		svr.logger.Error("Server error", "error", err)
+		logger.Error(ctx, "Server error", "error", err)
 	}
 
 	// Wait for server context to be stopped
 	<-serverCtx.Done()
 
-	svr.logger.Info("Server stopped")
+	logger.Info(ctx, "Server stopped")
 
 	return nil
 }

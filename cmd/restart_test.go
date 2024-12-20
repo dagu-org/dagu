@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +68,6 @@ func TestRestartCommand(t *testing.T) {
 		recentHistory := newClient(
 			setup.Config,
 			dataStore,
-			logger.Default,
 		).GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -28,8 +29,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	logger := buildLogger(cfg, false)
 	ctx := cmd.Context()
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	// Load the DAG
 	dag, err := digraph.Load(ctx, cfg.BaseConfig, args[0], "")
@@ -39,7 +40,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Initialize services and get status
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore, logger)
+	cli := newClient(cfg, dataStore)
 
 	status, err := cli.GetCurrentStatus(ctx, dag)
 	if err != nil {
@@ -47,10 +48,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Log the status information
-	logger.Info("Current status",
-		"pid", status.PID,
-		"status", status.Status,
-	)
+	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status)
 
 	return nil
 }

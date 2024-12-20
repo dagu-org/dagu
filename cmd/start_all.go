@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -42,23 +43,23 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	logger := buildLogger(cfg, false)
-
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		cfg.DAGs = dagsDir
 	}
 
 	ctx := cmd.Context()
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore, logger)
+	cli := newClient(cfg, dataStore)
 
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Info("Scheduler initialization", "dags", cfg.DAGs)
+		logger.Info(ctx, "Scheduler initialization", "dags", cfg.DAGs)
 
-		sc := scheduler.New(ctx, cfg, logger, cli)
+		sc := scheduler.New(cfg, cli)
 		if err := sc.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
 			return
@@ -67,9 +68,9 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	}()
 
 	// Start server in main thread
-	logger.Info("Server initialization", "host", cfg.Host, "port", cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	server := frontend.New(cfg, logger, cli)
+	server := frontend.New(cfg, cli)
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := server.Serve(ctx); err != nil {

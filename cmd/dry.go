@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -64,14 +65,13 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 	defer logFile.Close()
 
-	logger := buildLoggerWithFile(cfg, false, logFile)
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(cfg, false, logFile))
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore, logger)
+	cli := newClient(cfg, dataStore)
 
 	agt := agent.New(
 		requestID,
 		dag,
-		logger,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
@@ -82,8 +82,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	listenSignals(ctx, agt)
 
 	if err := agt.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w",
-			dag.Name, requestID, err)
+		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 	}
 
 	return nil

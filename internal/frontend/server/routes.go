@@ -4,20 +4,21 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func (svr *Server) defaultRoutes(r *chi.Mux) *chi.Mux {
+func (svr *Server) defaultRoutes(ctx context.Context, r *chi.Mux) *chi.Mux {
 	r.Get("/assets/*", svr.handleGetAssets())
-	r.Get("/*", svr.handleRequest())
+	r.Get("/*", svr.handleRequest(ctx))
 
 	return r
 }
 
-func (svr *Server) handleRequest() http.HandlerFunc {
-	renderFunc := svr.useTemplate("index.gohtml", "index")
+func (svr *Server) handleRequest(ctx context.Context) http.HandlerFunc {
+	renderFunc := svr.useTemplate(ctx, "index.gohtml", "index")
 	return func(w http.ResponseWriter, _ *http.Request) {
 		renderFunc(w, nil)
 	}

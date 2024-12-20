@@ -44,7 +44,6 @@ func (s Status) String() string {
 // Scheduler is a scheduler that runs a graph of steps.
 type Scheduler struct {
 	logDir        string
-	logger        logger.Logger
 	maxActiveRuns int
 	timeout       time.Duration
 	delay         time.Duration
@@ -63,13 +62,8 @@ type Scheduler struct {
 }
 
 func New(cfg *Config) *Scheduler {
-	lg := cfg.Logger
-	if lg == nil {
-		lg = logger.Default
-	}
 	return &Scheduler{
 		logDir:        cfg.LogDir,
-		logger:        lg,
 		maxActiveRuns: cfg.MaxActiveRuns,
 		timeout:       cfg.Timeout,
 		delay:         cfg.Delay,
@@ -85,7 +79,6 @@ func New(cfg *Config) *Scheduler {
 
 type Config struct {
 	LogDir        string
-	Logger        logger.Logger
 	MaxActiveRuns int
 	Timeout       time.Duration
 	Delay         time.Duration
@@ -130,9 +123,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			}
 			// Check preconditions
 			if len(node.data.Step.Preconditions) > 0 {
-				sc.logger.Infof("Checking pre conditions for \"%s\"", node.data.Step.Name)
+				logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.data.Step.Name)
 				if err := digraph.EvalConditions(node.data.Step.Preconditions); err != nil {
-					sc.logger.Infof("Pre conditions failed for \"%s\"", node.data.Step.Name)
+					logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.data.Step.Name)
 					node.setStatus(NodeStatusSkipped)
 					node.SetError(err)
 					continue NodesIteration
@@ -140,7 +133,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 			}
 			wg.Add(1)
 
-			sc.logger.Info("Step execution started", "step", node.data.Step.Name)
+			logger.Info(ctx, "Step execution started", "step", node.data.Step.Name)
 			node.setStatus(NodeStatusRunning)
 			go func(node *Node) {
 				defer func() {
@@ -167,11 +160,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 						case status == NodeStatusSuccess || status == NodeStatusCancel:
 							// do nothing
 						case sc.isTimeout(g.startedAt):
-							sc.logger.Info(
-								"Step execution deadline exceeded",
-								"step", node.data.Step.Name,
-								"error", execErr,
-							)
+							logger.Info(ctx, "Step execution deadline exceeded", "step", node.data.Step.Name, "error", execErr)
 							node.setStatus(NodeStatusCancel)
 							sc.setLastError(execErr)
 						case sc.isCanceled():
@@ -179,12 +168,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 						case node.data.Step.RetryPolicy != nil && node.data.Step.RetryPolicy.Limit > node.getRetryCount():
 							// retry
 							node.incRetryCount()
-							sc.logger.Info(
-								"Step execution failed. Retrying...",
-								"step", node.data.Step.Name,
-								"error", execErr,
-								"retry", node.getRetryCount(),
-							)
+							logger.Info(ctx, "Step execution failed. Retrying...", "step", node.data.Step.Name, "error", execErr, "retry", node.getRetryCount())
 							time.Sleep(node.data.Step.RetryPolicy.Interval)
 							node.setRetriedAt(time.Now())
 							node.setStatus(NodeStatusNone)
@@ -244,7 +228,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, g *ExecutionGraph, done chan 
 	handlers = append(handlers, digraph.HandlerOnExit)
 	for _, h := range handlers {
 		if n := sc.handlers[h]; n != nil {
-			sc.logger.Info("Handler execution started", "handler", n.data.Step.Name)
+			logger.Info(ctx, "Handler execution started", "handler", n.data.Step.Name)
 
 			n.mu.Lock()
 			n.data.Step.OutputVariables = g.outputVariables
