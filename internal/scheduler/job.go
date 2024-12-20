@@ -53,7 +53,7 @@ type jobImpl struct {
 	Client     client.Client
 }
 
-func (j *jobImpl) GetDAG(ctx context.Context) *digraph.DAG {
+func (j *jobImpl) GetDAG(_ context.Context) *digraph.DAG {
 	return j.DAG
 }
 
@@ -93,7 +93,7 @@ func (j *jobImpl) Start(ctx context.Context) error {
 	return j.Client.Start(ctx, j.DAG, client.StartOptions{Quiet: true})
 }
 
-func (j *jobImpl) Prev(ctx context.Context) time.Time {
+func (j *jobImpl) Prev(_ context.Context) time.Time {
 	// Since robfig/cron does not provide a way to get the previous schedule time,
 	// we need to do it manually.
 	// The idea is to get the next schedule time and subtract the duration of the schedule.

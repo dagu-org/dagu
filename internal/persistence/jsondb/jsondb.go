@@ -81,7 +81,7 @@ func (s *JSONDB) Update(ctx context.Context, dagFile, requestID string, status *
 	return w.write(status)
 }
 
-func (s *JSONDB) Open(ctx context.Context, dagFile string, t time.Time, requestID string) error {
+func (s *JSONDB) Open(_ context.Context, dagFile string, t time.Time, requestID string) error {
 	writer, _, err := s.newWriter(dagFile, t, requestID)
 	if err != nil {
 		return err
@@ -93,11 +93,11 @@ func (s *JSONDB) Open(ctx context.Context, dagFile string, t time.Time, requestI
 	return nil
 }
 
-func (s *JSONDB) Write(ctx context.Context, status *model.Status) error {
+func (s *JSONDB) Write(_ context.Context, status *model.Status) error {
 	return s.writer.write(status)
 }
 
-func (s *JSONDB) Close(ctx context.Context) error {
+func (s *JSONDB) Close(_ context.Context) error {
 	if s.writer == nil {
 		return nil
 	}
@@ -121,7 +121,7 @@ func (s *JSONDB) newWriter(dagFile string, t time.Time, requestID string) (*writ
 	return w, f, nil
 }
 
-func (s *JSONDB) ReadStatusRecent(ctx context.Context, dagFile string, n int) []*model.StatusFile {
+func (s *JSONDB) ReadStatusRecent(_ context.Context, dagFile string, n int) []*model.StatusFile {
 	var ret []*model.StatusFile
 	files := s.latest(s.globPattern(dagFile), n)
 	for _, file := range files {
@@ -139,7 +139,7 @@ func (s *JSONDB) ReadStatusRecent(ctx context.Context, dagFile string, n int) []
 	return ret
 }
 
-func (s *JSONDB) ReadStatusToday(ctx context.Context, dagFile string) (*model.Status, error) {
+func (s *JSONDB) ReadStatusToday(_ context.Context, dagFile string) (*model.Status, error) {
 	file, err := s.latestToday(dagFile, time.Now(), s.latestStatusToday)
 	if err != nil {
 		return nil, err
@@ -149,7 +149,7 @@ func (s *JSONDB) ReadStatusToday(ctx context.Context, dagFile string) (*model.St
 	})
 }
 
-func (s *JSONDB) FindByRequestID(ctx context.Context, dagFile string, requestID string) (*model.StatusFile, error) {
+func (s *JSONDB) FindByRequestID(_ context.Context, dagFile string, requestID string) (*model.StatusFile, error) {
 	if requestID == "" {
 		return nil, errRequestIDNotFound
 	}
@@ -178,7 +178,7 @@ func (s *JSONDB) RemoveAll(ctx context.Context, dagFile string) error {
 	return s.RemoveOld(ctx, dagFile, 0)
 }
 
-func (s *JSONDB) RemoveOld(ctx context.Context, dagFile string, retentionDays int) error {
+func (s *JSONDB) RemoveOld(_ context.Context, dagFile string, retentionDays int) error {
 	if retentionDays < 0 {
 		return nil
 	}
@@ -229,7 +229,7 @@ func (s *JSONDB) Compact(original string) error {
 	return os.Remove(original)
 }
 
-func (s *JSONDB) Rename(ctx context.Context, oldID, newID string) error {
+func (s *JSONDB) Rename(_ context.Context, oldID, newID string) error {
 	on := fileutil.AddYAMLExtension(oldID)
 	nn := fileutil.AddYAMLExtension(newID)
 
