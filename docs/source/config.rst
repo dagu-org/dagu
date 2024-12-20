@@ -58,29 +58,29 @@ Create ``admin.yaml`` in ``$HOME/.config/dagu/`` to override default settings. B
 .. code-block:: yaml
 
     # Server Configuration
-    host: "127.0.0.1"                # Web UI hostname
-    port: 8080                       # Web UI port
-    basePath: ""                    # Base path to serve the application
-    tz: "Asia/Tokyo"                 # Timezone (e.g., "America/New_York")
+    host: "127.0.0.1" # Web UI hostname
+    port: 8080        # Web UI port
+    basePath: ""      # Base path to serve the application
+    tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
     
     # Directory Configuration
-    dags: "${HOME}/.config/dagu/dags"    # DAG definitions location
-    workDir: "/path/to/work"             # Default working directory
+    dagsDir: "${HOME}/.config/dagu/dags"          # DAG definitions location
+    workDir: "/path/to/work"                      # Default working directory
     baseConfig: "${HOME}/.config/dagu/base.yaml"  # Base DAG config
     
     # UI Configuration
-    navbarColor: "#ff0000"          # Header color
-    navbarTitle: "Dagu - PROD"      # Header title
-    latestStatusToday: true         # Show today's latest status
+    navbarColor: "#ff0000"     # Header color
+    navbarTitle: "Dagu - PROD" # Header title
+    latestStatusToday: true    # Show today's latest status
     
     # Authentication
-    isBasicAuth: true               # Enable basic auth
-    basicAuthUsername: "admin"       # Basic auth username
-    basicAuthPassword: "secret"      # Basic auth password
+    isBasicAuth: true           # Enable basic auth
+    basicAuthUsername: "admin"  # Basic auth username
+    basicAuthPassword: "secret" # Basic auth password
     
     # API Authentication
-    isAuthToken: true               # Enable API token
-    authToken: "your-secret-token"  # API token value
+    isAuthToken: true              # Enable API token
+    authToken: "your-secret-token" # API token value
     
     # SSL Configuration
     tls:

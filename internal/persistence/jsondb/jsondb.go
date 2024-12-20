@@ -1,21 +1,12 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package jsondb
 
 import (
 	"bufio"
+	"context"
+
 	// nolint: gosec
 	"crypto/md5"
 	"encoding/hex"
@@ -30,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/model"
@@ -73,8 +65,8 @@ func New(location string, latestStatusToday bool) *JSONDB {
 	return s
 }
 
-func (s *JSONDB) Update(dagFile, requestID string, status *model.Status) error {
-	f, err := s.FindByRequestID(dagFile, requestID)
+func (s *JSONDB) Update(ctx context.Context, dagFile, requestID string, status *model.Status) error {
+	f, err := s.FindByRequestID(ctx, dagFile, requestID)
 	if err != nil {
 		return err
 	}
@@ -89,7 +81,7 @@ func (s *JSONDB) Update(dagFile, requestID string, status *model.Status) error {
 	return w.write(status)
 }
 
-func (s *JSONDB) Open(dagFile string, t time.Time, requestID string) error {
+func (s *JSONDB) Open(_ context.Context, dagFile string, t time.Time, requestID string) error {
 	writer, _, err := s.newWriter(dagFile, t, requestID)
 	if err != nil {
 		return err
@@ -101,11 +93,11 @@ func (s *JSONDB) Open(dagFile string, t time.Time, requestID string) error {
 	return nil
 }
 
-func (s *JSONDB) Write(status *model.Status) error {
+func (s *JSONDB) Write(_ context.Context, status *model.Status) error {
 	return s.writer.write(status)
 }
 
-func (s *JSONDB) Close() error {
+func (s *JSONDB) Close(_ context.Context) error {
 	if s.writer == nil {
 		return nil
 	}
@@ -129,7 +121,7 @@ func (s *JSONDB) newWriter(dagFile string, t time.Time, requestID string) (*writ
 	return w, f, nil
 }
 
-func (s *JSONDB) ReadStatusRecent(dagFile string, n int) []*model.StatusFile {
+func (s *JSONDB) ReadStatusRecent(_ context.Context, dagFile string, n int) []*model.StatusFile {
 	var ret []*model.StatusFile
 	files := s.latest(s.globPattern(dagFile), n)
 	for _, file := range files {
@@ -147,7 +139,7 @@ func (s *JSONDB) ReadStatusRecent(dagFile string, n int) []*model.StatusFile {
 	return ret
 }
 
-func (s *JSONDB) ReadStatusToday(dagFile string) (*model.Status, error) {
+func (s *JSONDB) ReadStatusToday(_ context.Context, dagFile string) (*model.Status, error) {
 	file, err := s.latestToday(dagFile, time.Now(), s.latestStatusToday)
 	if err != nil {
 		return nil, err
@@ -157,7 +149,7 @@ func (s *JSONDB) ReadStatusToday(dagFile string) (*model.Status, error) {
 	})
 }
 
-func (s *JSONDB) FindByRequestID(dagFile string, requestID string) (*model.StatusFile, error) {
+func (s *JSONDB) FindByRequestID(_ context.Context, dagFile string, requestID string) (*model.StatusFile, error) {
 	if requestID == "" {
 		return nil, errRequestIDNotFound
 	}
@@ -182,11 +174,11 @@ func (s *JSONDB) FindByRequestID(dagFile string, requestID string) (*model.Statu
 	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
 }
 
-func (s *JSONDB) RemoveAll(dagFile string) error {
-	return s.RemoveOld(dagFile, 0)
+func (s *JSONDB) RemoveAll(ctx context.Context, dagFile string) error {
+	return s.RemoveOld(ctx, dagFile, 0)
 }
 
-func (s *JSONDB) RemoveOld(dagFile string, retentionDays int) error {
+func (s *JSONDB) RemoveOld(_ context.Context, dagFile string, retentionDays int) error {
 	if retentionDays < 0 {
 		return nil
 	}
@@ -237,9 +229,9 @@ func (s *JSONDB) Compact(original string) error {
 	return os.Remove(original)
 }
 
-func (s *JSONDB) Rename(oldID, newID string) error {
-	on := util.AddYamlExtension(oldID)
-	nn := util.AddYamlExtension(newID)
+func (s *JSONDB) Rename(_ context.Context, oldID, newID string) error {
+	on := fileutil.AddYAMLExtension(oldID)
+	nn := fileutil.AddYAMLExtension(newID)
 
 	if !filepath.IsAbs(on) || !filepath.IsAbs(nn) {
 		return fmt.Errorf("invalid path: %s -> %s", on, nn)

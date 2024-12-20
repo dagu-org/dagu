@@ -1,17 +1,5 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package util_test
 
@@ -21,10 +9,10 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +23,7 @@ func Test_MustGetUserHomeDir(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		hd := util.MustGetUserHomeDir()
+		hd := fileutil.MustGetUserHomeDir()
 		require.Equal(t, "/test", hd)
 	})
 }
@@ -43,7 +31,7 @@ func Test_MustGetUserHomeDir(t *testing.T) {
 func Test_MustGetwd(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		wd, _ := os.Getwd()
-		require.Equal(t, util.MustGetwd(), wd)
+		require.Equal(t, fileutil.MustGetwd(), wd)
 	})
 }
 
@@ -131,81 +119,6 @@ func Test_SplitCommandWithParse(t *testing.T) {
 	})
 }
 
-func Test_FileExits(t *testing.T) {
-	t.Run("Exists", func(t *testing.T) {
-		if !util.FileExists("/") {
-			t.Fatal("file exists failed")
-		}
-	})
-}
-
-func Test_ValidFilename(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		ret := util.ValidFilename("file\\name")
-		require.Equal(t, ret, "file_name")
-	})
-}
-
-func Test_OpenOrCreateFile(t *testing.T) {
-	t.Run("OpenOrCreate", func(t *testing.T) {
-		tmp, err := os.MkdirTemp("", "open_or_create")
-		require.NoError(t, err)
-
-		name := filepath.Join(tmp, "/file.txt")
-		f, err := util.OpenOrCreateFile(name)
-		require.NoError(t, err)
-
-		defer func() {
-			_ = f.Close()
-			_ = os.Remove(name)
-		}()
-
-		if !util.FileExists(name) {
-			t.Fatal("failed to create file")
-		}
-	})
-	t.Run("OpenOrCreateThenWrite", func(t *testing.T) {
-		dir := util.MustTempDir("tempdir")
-		defer func() {
-			_ = os.RemoveAll(dir)
-		}()
-
-		filename := filepath.Join(dir, "test.txt")
-		createdFile, err := util.OpenOrCreateFile(filename)
-		require.NoError(t, err)
-		defer func() {
-			_ = createdFile.Close()
-		}()
-
-		_, err = createdFile.WriteString("test")
-		require.NoError(t, err)
-		require.NoError(t, createdFile.Sync(), err)
-		require.NoError(t, createdFile.Close(), err)
-		if !util.FileExists(filename) {
-			t.Fatal("failed to create file")
-		}
-
-		openedFile, err := os.Open(filename)
-		require.NoError(t, err)
-		defer func() {
-			_ = openedFile.Close()
-		}()
-		data, err := io.ReadAll(openedFile)
-		require.NoError(t, err)
-		require.Equal(t, "test", string(data))
-	})
-}
-
-func Test_MustTempDir(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		dir := util.MustTempDir("tempdir")
-		defer func() {
-			_ = os.RemoveAll(dir)
-		}()
-		require.Contains(t, dir, "tempdir")
-	})
-}
-
 func Test_LogErr(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		origStdout := os.Stdout
@@ -242,55 +155,4 @@ func TestTruncString(t *testing.T) {
 		// Test string with length equal to limit
 		require.Equal(t, "12345678", util.TruncString("123456789", 8))
 	})
-}
-
-func TestMatchExtension(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		// Test empty extension
-		require.False(t, util.MatchExtension("test.txt", []string{}))
-		// Test matching extension
-		require.True(t, util.MatchExtension("test.txt", []string{".csv", ".txt"}))
-		// Test matching extension
-		require.False(t, util.MatchExtension("test.txt", []string{".csv"}))
-	})
-}
-
-func TestAddYamlExtension(t *testing.T) {
-	type args struct {
-		file string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "Empty",
-			args: args{
-				file: "",
-			},
-			want: ".yaml",
-		},
-		{
-			name: "WithExtension",
-			args: args{
-				file: "test.yml",
-			},
-			want: "test.yaml",
-		},
-		{
-			name: "WithoutExtension",
-			args: args{
-				file: "test",
-			},
-			want: "test.yaml",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := util.AddYamlExtension(tt.args.file); got != tt.want {
-				t.Errorf("AddYamlExtension() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }

@@ -1,17 +1,5 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package test
 
@@ -23,10 +11,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +55,7 @@ func SetupTest(t *testing.T) Setup {
 	lock.Lock()
 	defer lock.Unlock()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := fileutil.MustTempDir("test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
@@ -87,7 +75,7 @@ func SetupTest(t *testing.T) Setup {
 	cfg.AdminLogsDir = filepath.Join(tmpDir, "log", "admin")
 
 	// Set the executable path to the test binary.
-	cfg.Executable = filepath.Join(util.MustGetwd(), "../../bin/dagu")
+	cfg.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
 
 	// Set environment variables.
 	// This is required for some tests that run the executable
@@ -111,7 +99,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	lock.Lock()
 	defer lock.Unlock()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := fileutil.MustTempDir("test")
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
@@ -131,8 +119,5 @@ func SetupForDir(t *testing.T, dir string) Setup {
 }
 
 func NewLogger() logger.Logger {
-	return logger.NewLogger(logger.NewLoggerArgs{
-		Debug:  true,
-		Format: "text",
-	})
+	return logger.NewLogger(logger.WithDebug(), logger.WithFormat("text"))
 }

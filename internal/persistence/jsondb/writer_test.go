@@ -1,28 +1,18 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package jsondb
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +23,7 @@ func TestWriter(t *testing.T) {
 	defer te.cleanup()
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
-		d := &dag.DAG{
+		d := &digraph.DAG{
 			Name:     "test_write_status",
 			Location: "test_write_status.yaml",
 		}
@@ -45,7 +35,7 @@ func TestWriter(t *testing.T) {
 
 		defer func() {
 			assert.NoError(t, dw.close())
-			assert.NoError(t, te.JSONDB.RemoveOld(d.Location, 0))
+			assert.NoError(t, te.JSONDB.RemoveOld(context.Background(), d.Location, 0))
 		}()
 
 		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
@@ -65,7 +55,7 @@ func TestWriter(t *testing.T) {
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
-		d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
+		d := &digraph.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
 		requestID := "request-id-test-write-status-to-existing-file"
 
 		dw, file, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
@@ -78,7 +68,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, dw.close())
 
 		// Verify initial write
-		data, err := te.JSONDB.FindByRequestID(d.Location, requestID)
+		data, err := te.JSONDB.FindByRequestID(context.Background(), d.Location, requestID)
 		require.NoError(t, err)
 		assert.Equal(t, scheduler.StatusCancel, data.Status.Status)
 		assert.Equal(t, file, data.File)
@@ -91,7 +81,7 @@ func TestWriter(t *testing.T) {
 		require.NoError(t, dw.close())
 
 		// Verify appended data
-		data, err = te.JSONDB.FindByRequestID(d.Location, requestID)
+		data, err = te.JSONDB.FindByRequestID(context.Background(), d.Location, requestID)
 		require.NoError(t, err)
 		assert.Equal(t, scheduler.StatusSuccess, data.Status.Status)
 		assert.Equal(t, file, data.File)
@@ -112,7 +102,7 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, w.open())
 		require.NoError(t, w.close())
 
-		d := &dag.DAG{Name: "test", Location: "test.yaml"}
+		d := &digraph.DAG{Name: "test", Location: "test.yaml"}
 		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
 		assert.Error(t, w.write(status))
 	})
@@ -131,7 +121,7 @@ func TestWriterRename(t *testing.T) {
 
 	oldName := "test_rename_old"
 	newName := "test_rename_new"
-	d := &dag.DAG{
+	d := &digraph.DAG{
 		Name:     oldName,
 		Location: filepath.Join(te.TmpDir, oldName+".yaml"),
 	}
@@ -152,13 +142,13 @@ func TestWriterRename(t *testing.T) {
 	require.DirExists(t, oldDir)
 	require.NoDirExists(t, newDir)
 
-	err = te.JSONDB.Rename(oldPath, newPath)
+	err = te.JSONDB.Rename(context.Background(), oldPath, newPath)
 	require.NoError(t, err)
 
 	require.NoDirExists(t, oldDir)
 	require.DirExists(t, newDir)
 
-	ret := te.JSONDB.ReadStatusRecent(newPath, 1)
+	ret := te.JSONDB.ReadStatusRecent(context.Background(), newPath, 1)
 	require.Len(t, ret, 1)
 	assert.Equal(t, status.RequestID, ret[0].Status.RequestID)
 }

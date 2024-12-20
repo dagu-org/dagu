@@ -1,32 +1,21 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-package cmd
+package main
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
@@ -106,7 +95,7 @@ func withSpool(t *testing.T, testFunction func()) string {
 
 func testDAGFile(name string) string {
 	return filepath.Join(
-		filepath.Join(util.MustGetwd(), "testdata"),
+		filepath.Join(fileutil.MustGetwd(), "testdata"),
 		name,
 	)
 }
@@ -123,11 +112,12 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	workflow, err := dag.Load(cfg.BaseConfig, dagFile, "")
+	dag, err := digraph.Load(context.Background(), cfg.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
+	ctx := context.Background()
 	require.Eventually(t, func() bool {
-		status, err := e.GetCurrentStatus(workflow)
+		status, err := e.GetCurrentStatus(ctx, dag)
 		require.NoError(t, err)
 		return expected == status.Status
 	}, waitForStatusTimeout, tick)
@@ -143,7 +133,7 @@ func testLastStatusEventual(
 	t.Helper()
 
 	require.Eventually(t, func() bool {
-		status := hs.ReadStatusRecent(dg, 1)
+		status := hs.ReadStatusRecent(context.Background(), dg, 1)
 		if len(status) < 1 {
 			return false
 		}

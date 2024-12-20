@@ -1,17 +1,5 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package agent
 
@@ -28,8 +16,8 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/persistence"
@@ -44,7 +32,7 @@ import (
 // 3. Handle the HTTP request via the unix socket.
 // 4. Write the log and status to the data store.
 type Agent struct {
-	dag          *dag.DAG
+	dag          *digraph.DAG
 	dry          bool
 	retryTarget  *model.Status
 	dataStore    persistence.DataStores
@@ -80,7 +68,7 @@ type Options struct {
 // New creates a new Agent.
 func New(
 	requestID string,
-	workflow *dag.DAG,
+	dag *digraph.DAG,
 	lg logger.Logger,
 	logDir, logFile string,
 	cli client.Client,
@@ -89,7 +77,7 @@ func New(
 ) *Agent {
 	return &Agent{
 		requestID:   requestID,
-		dag:         workflow,
+		dag:         dag,
 		dry:         opts.Dry,
 		retryTarget: opts.RetryTarget,
 		logDir:      logDir,
@@ -126,23 +114,23 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Check if the DAG is already running.
-	if err := a.checkIsAlreadyRunning(); err != nil {
+	if err := a.checkIsAlreadyRunning(ctx); err != nil {
 		return err
 	}
 
 	// Make a connection to the database.
 	// It should close the connection to the history database when the DAG
 	// execution is finished.
-	if err := a.setupDatabase(); err != nil {
+	if err := a.setupDatabase(ctx); err != nil {
 		return err
 	}
 	defer func() {
-		if err := a.historyStore.Close(); err != nil {
+		if err := a.historyStore.Close(ctx); err != nil {
 			a.logger.Error("Failed to close history store", "error", err)
 		}
 	}()
 
-	if err := a.historyStore.Write(a.Status()); err != nil {
+	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Failed to write status", "error", err)
 	}
 
@@ -179,7 +167,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go func() {
 		for node := range done {
 			status := a.Status()
-			if err := a.historyStore.Write(status); err != nil {
+			if err := a.historyStore.Write(ctx, status); err != nil {
 				a.logger.Error("Failed to write status", "error", err)
 			}
 			if err := a.reporter.reportStep(a.dag, status, node); err != nil {
@@ -195,19 +183,19 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := a.historyStore.Write(a.Status()); err != nil {
+		if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 			a.logger.Error("Status write failed", "error", err)
 		}
 	}()
 
 	// Start the DAG execution.
-	dagCtx := dag.NewContext(ctx, a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(ctx, a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	a.logger.Info("Workflow execution finished", "status", finishedStatus.Status)
-	if err := a.historyStore.Write(a.Status()); err != nil {
+	a.logger.Info("DAG execution finished", "status", finishedStatus.Status)
+	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 		a.logger.Error("Status write failed", "error", err)
 	}
 
@@ -251,16 +239,16 @@ func (a *Agent) Status() *model.Status {
 	}
 
 	// Collect the handler nodes.
-	if node := a.scheduler.HandlerNode(dag.HandlerOnExit); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnExit); node != nil {
 		status.OnExit = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnSuccess); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnSuccess); node != nil {
 		status.OnSuccess = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnFailure); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnFailure); node != nil {
 		status.OnFailure = model.FromNode(node.Data())
 	}
-	if node := a.scheduler.HandlerNode(dag.HandlerOnCancel); node != nil {
+	if node := a.scheduler.HandlerNode(digraph.HandlerOnCancel); node != nil {
 		status.OnCancel = model.FromNode(node.Data())
 	}
 
@@ -379,7 +367,7 @@ func (a *Agent) dryRun() error {
 
 	a.logger.Info("Dry-run started", "reqId", a.requestID)
 
-	dagCtx := dag.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	a.reporter.report(a.Status(), lastErr)
@@ -458,14 +446,14 @@ func (a *Agent) setupGraphForRetry() error {
 }
 
 // setup database prepare database connection and remove old history data.
-func (a *Agent) setupDatabase() error {
+func (a *Agent) setupDatabase(ctx context.Context) error {
 	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
-	if err := a.historyStore.RemoveOld(location, retentionDays); err != nil {
+	if err := a.historyStore.RemoveOld(ctx, location, retentionDays); err != nil {
 		a.logger.Error("History data cleanup failed", "error", err)
 	}
 
-	return a.historyStore.Open(a.dag.Location, time.Now(), a.requestID)
+	return a.historyStore.Open(ctx, a.dag.Location, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.
@@ -489,7 +477,7 @@ func (a *Agent) checkPreconditions() error {
 		return nil
 	}
 	// If one of the conditions does not met, cancel the execution.
-	if err := dag.EvalConditions(a.dag.Preconditions); err != nil {
+	if err := digraph.EvalConditions(a.dag.Preconditions); err != nil {
 		a.logger.Error("Preconditions are not met", "error", err)
 		a.scheduler.Cancel(a.graph)
 		return err
@@ -498,8 +486,8 @@ func (a *Agent) checkPreconditions() error {
 }
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
-func (a *Agent) checkIsAlreadyRunning() error {
-	status, err := a.client.GetCurrentStatus(a.dag)
+func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
+	status, err := a.client.GetCurrentStatus(ctx, a.dag)
 	if err != nil {
 		return err
 	}

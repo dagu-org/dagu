@@ -1,17 +1,5 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package model
 
@@ -22,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
 )
 
@@ -36,7 +24,7 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
-func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
+func FromNodesOrSteps(nodes []scheduler.NodeData, steps []digraph.Step) []*Node {
 	if len(nodes) != 0 {
 		return FromNodes(nodes)
 	}
@@ -70,30 +58,30 @@ type Status struct {
 	mu         sync.RWMutex
 }
 
-func NewStatusDefault(workflow *dag.DAG) *Status {
+func NewStatusDefault(dag *digraph.DAG) *Status {
 	return NewStatus(
-		workflow, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
+		dag, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
 	)
 }
 
 func NewStatus(
-	workflow *dag.DAG,
+	dag *digraph.DAG,
 	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
 	startTime, endTime *time.Time,
 ) *Status {
 	statusObj := &Status{
-		Name:       workflow.Name,
+		Name:       dag.Name,
 		Status:     status,
 		StatusText: status.String(),
 		PID:        PID(pid),
-		Nodes:      FromNodesOrSteps(nodes, workflow.Steps),
-		OnExit:     nodeOrNil(workflow.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(workflow.HandlerOn.Success),
-		OnFailure:  nodeOrNil(workflow.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(workflow.HandlerOn.Cancel),
-		Params:     Params(workflow.Params),
+		Nodes:      FromNodesOrSteps(nodes, dag.Steps),
+		OnExit:     nodeOrNil(dag.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(dag.HandlerOn.Success),
+		OnFailure:  nodeOrNil(dag.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(dag.HandlerOn.Cancel),
+		Params:     Params(dag.Params),
 	}
 	if startTime != nil {
 		statusObj.StartedAt = util.FormatTime(*startTime)
@@ -151,7 +139,7 @@ func (p PID) IsRunning() bool {
 	return p != pidNotRunning
 }
 
-func nodeOrNil(s *dag.Step) *Node {
+func nodeOrNil(s *digraph.Step) *Node {
 	if s == nil {
 		return nil
 	}

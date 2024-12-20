@@ -1,21 +1,10 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package local
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -25,7 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/grep"
@@ -34,7 +24,7 @@ import (
 
 type dagStoreImpl struct {
 	dir       string
-	metaCache *filecache.Cache[*dag.DAG]
+	metaCache *filecache.Cache[*digraph.DAG]
 }
 
 type NewDAGStoreArgs struct {
@@ -44,35 +34,35 @@ type NewDAGStoreArgs struct {
 func NewDAGStore(args *NewDAGStoreArgs) persistence.DAGStore {
 	dagStore := &dagStoreImpl{
 		dir:       args.Dir,
-		metaCache: filecache.New[*dag.DAG](0, time.Hour*24),
+		metaCache: filecache.New[*digraph.DAG](0, time.Hour*24),
 	}
 	dagStore.metaCache.StartEviction()
 	return dagStore
 }
 
-func (d *dagStoreImpl) GetMetadata(name string) (*dag.DAG, error) {
+func (d *dagStoreImpl) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
 	loc, err := d.fileLocation(name)
 	if err != nil {
 		return nil, err
 	}
-	return d.metaCache.LoadLatest(loc, func() (*dag.DAG, error) {
-		return dag.LoadMetadata(loc)
+	return d.metaCache.LoadLatest(loc, func() (*digraph.DAG, error) {
+		return digraph.LoadMetadata(ctx, loc)
 	})
 }
 
-func (d *dagStoreImpl) GetDetails(name string) (*dag.DAG, error) {
+func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
 	loc, err := d.fileLocation(name)
 	if err != nil {
 		return nil, err
 	}
-	dat, err := dag.LoadWithoutEval(loc)
+	dat, err := digraph.LoadWithoutEval(ctx, loc)
 	if err != nil {
 		return nil, err
 	}
 	return dat, nil
 }
 
-func (d *dagStoreImpl) GetSpec(name string) (string, error) {
+func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 	loc, err := d.fileLocation(name)
 	if err != nil {
 		return "", err
@@ -89,9 +79,9 @@ const defaultPerm os.FileMode = 0744
 
 var errDOGFileNotExist = errors.New("the DAG file does not exist")
 
-func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
+func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// validation
-	_, err := dag.LoadYAML(spec)
+	_, err := digraph.LoadYAML(ctx, spec)
 	if err != nil {
 		return err
 	}
@@ -112,7 +102,7 @@ func (d *dagStoreImpl) UpdateSpec(name string, spec []byte) error {
 
 var errDAGFileAlreadyExists = errors.New("the DAG file already exists")
 
-func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
+func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
 		return "", err
 	}
@@ -127,7 +117,7 @@ func (d *dagStoreImpl) Create(name string, spec []byte) (string, error) {
 	return name, os.WriteFile(loc, spec, 0644)
 }
 
-func (d *dagStoreImpl) Delete(name string) error {
+func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
 	loc, err := d.fileLocation(name)
 	if err != nil {
 		return err
@@ -150,7 +140,7 @@ func (d *dagStoreImpl) fileLocation(name string) (string, error) {
 		// this is for backward compatibility
 		return name, nil
 	}
-	return util.AddYamlExtension(path.Join(d.dir, name)), nil
+	return fileutil.AddYAMLExtension(path.Join(d.dir, name)), nil
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {
@@ -193,12 +183,12 @@ func (d *dagStoreImpl) getTagList(tagSet map[string]struct{}) []string {
 	return tagList
 }
 
-func (d *dagStoreImpl) ListPagination(params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
+func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
 	var (
-		dagList    = make([]*dag.DAG, 0)
+		dagList    = make([]*digraph.DAG, 0)
 		errList    = make([]string, 0)
 		count      int
-		currentDag *dag.DAG
+		currentDag *digraph.DAG
 	)
 
 	if err := filepath.WalkDir(d.dir, func(_ string, dir fs.DirEntry, err error) error {
@@ -210,7 +200,7 @@ func (d *dagStoreImpl) ListPagination(params persistence.DAGListPaginationArgs) 
 			return nil
 		}
 
-		if currentDag, err = d.GetMetadata(dir.Name()); err != nil {
+		if currentDag, err = d.GetMetadata(ctx, dir.Name()); err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dir.Name(), err))
 		}
 
@@ -239,7 +229,7 @@ func (d *dagStoreImpl) ListPagination(params persistence.DAGListPaginationArgs) 
 	}, nil
 }
 
-func (d *dagStoreImpl) List() (ret []*dag.DAG, errs []string, err error) {
+func (d *dagStoreImpl) List(ctx context.Context) (ret []*digraph.DAG, errs []string, err error) {
 	if err = d.ensureDirExist(); err != nil {
 		errs = append(errs, err.Error())
 		return
@@ -251,7 +241,7 @@ func (d *dagStoreImpl) List() (ret []*dag.DAG, errs []string, err error) {
 	}
 	for _, fi := range fis {
 		if checkExtension(fi.Name()) {
-			dat, err := d.GetMetadata(fi.Name())
+			dat, err := d.GetMetadata(ctx, fi.Name())
 			if err == nil {
 				ret = append(ret, dat)
 			} else {
@@ -276,9 +266,9 @@ func checkExtension(file string) bool {
 	return false
 }
 
-func (d *dagStoreImpl) Grep(
-	pattern string,
-) (ret []*persistence.GrepResult, errs []string, err error) {
+func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
+	ret []*persistence.GrepResult, errs []string, err error,
+) {
 	if err = d.ensureDirExist(); err != nil {
 		errs = append(
 			errs, fmt.Sprintf("failed to create DAGs directory %s", d.dir),
@@ -295,7 +285,7 @@ func (d *dagStoreImpl) Grep(
 
 	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
-		if util.MatchExtension(fi.Name(), dag.Exts) {
+		if fileutil.IsYAMLFile(fi.Name()) {
 			file := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(file)
 			if err != nil {
@@ -309,7 +299,7 @@ func (d *dagStoreImpl) Grep(
 				)
 				continue
 			}
-			dg, err := dag.LoadMetadata(file)
+			dag, err := digraph.LoadMetadata(ctx, file)
 			if err != nil {
 				errs = append(
 					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
@@ -318,7 +308,7 @@ func (d *dagStoreImpl) Grep(
 			}
 			ret = append(ret, &persistence.GrepResult{
 				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
-				DAG:     dg,
+				DAG:     dag,
 				Matches: m,
 			})
 		}
@@ -326,7 +316,7 @@ func (d *dagStoreImpl) Grep(
 	return ret, errs, nil
 }
 
-func (d *dagStoreImpl) Rename(oldID, newID string) error {
+func (d *dagStoreImpl) Rename(_ context.Context, oldID, newID string) error {
 	oldLoc, err := d.fileLocation(oldID)
 	if err != nil {
 		return err
@@ -338,19 +328,19 @@ func (d *dagStoreImpl) Rename(oldID, newID string) error {
 	return os.Rename(oldLoc, newLoc)
 }
 
-func (d *dagStoreImpl) Find(name string) (*dag.DAG, error) {
+func (d *dagStoreImpl) Find(ctx context.Context, name string) (*digraph.DAG, error) {
 	file, err := d.resolve(name)
 	if err != nil {
 		return nil, err
 	}
-	return dag.LoadWithoutEval(file)
+	return digraph.LoadWithoutEval(ctx, file)
 }
 
 func (d *dagStoreImpl) resolve(name string) (string, error) {
 	// check if the name is a file path
 	if strings.Contains(name, string(filepath.Separator)) {
-		if !util.FileExists(name) {
-			return "", fmt.Errorf("workflow %s not found", name)
+		if !fileutil.FileExists(name) {
+			return "", fmt.Errorf("DAG %s not found", name)
 		}
 		return name, nil
 	}
@@ -359,7 +349,7 @@ func (d *dagStoreImpl) resolve(name string) (string, error) {
 	if strings.Contains(name, string(filepath.Separator)) {
 		foundPath, err := find(name)
 		if err != nil {
-			return "", fmt.Errorf("workflow %s not found", name)
+			return "", fmt.Errorf("DAG %s not found", name)
 		}
 		return foundPath, nil
 	}
@@ -382,23 +372,23 @@ func find(name string) (string, error) {
 	ext := path.Ext(name)
 	if ext == "" {
 		// try all supported extensions
-		for _, ext := range dag.Exts {
-			if util.FileExists(name + ext) {
+		for _, ext := range fileutil.ValidYAMLExtensions {
+			if fileutil.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}
 		}
-	} else if util.FileExists(name) {
+	} else if fileutil.FileExists(name) {
 		// the name has an extension
 		return filepath.Abs(name)
 	}
 	return "", fmt.Errorf("sub workflow %s not found", name)
 }
 
-func (d *dagStoreImpl) TagList() ([]string, []string, error) {
+func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) {
 	var (
 		errList    = make([]string, 0)
 		tagSet     = make(map[string]struct{})
-		currentDag *dag.DAG
+		currentDag *digraph.DAG
 		err        error
 	)
 
@@ -411,7 +401,7 @@ func (d *dagStoreImpl) TagList() ([]string, []string, error) {
 			return nil
 		}
 
-		if currentDag, err = d.GetMetadata(dir.Name()); err != nil {
+		if currentDag, err = d.GetMetadata(ctx, dir.Name()); err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dir.Name(), err))
 		}
 

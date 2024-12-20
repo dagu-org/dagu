@@ -1,113 +1,90 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-package cmd
+package main
 
 import (
-	"log"
+	"fmt"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/spf13/cobra"
 )
 
+const (
+	dryPrefix = "dry_"
+)
+
 func dryCmd() *cobra.Command {
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry [--params="param1 param2"] /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Failed to load config: %v", err)
-			}
-			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-			})
+		RunE:  runDry,
+	}
+}
 
-			params, err := cmd.Flags().GetString("params")
-			if err != nil {
-				initLogger.Fatal("Parameter retrieval failed", "error", err)
-			}
-
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
-			if err != nil {
-				initLogger.Fatal("Workflow load failed", "error", err, "file", args[0])
-			}
-
-			requestID, err := generateRequestID()
-			if err != nil {
-				initLogger.Fatal("Request ID generation failed", "error", err)
-			}
-
-			logFile, err := logger.OpenLogFile(logger.LogFileConfig{
-				Prefix:    "dry_",
-				LogDir:    cfg.LogDir,
-				DAGLogDir: workflow.LogDir,
-				DAGName:   workflow.Name,
-				RequestID: requestID,
-			})
-
-			if err != nil {
-				initLogger.Fatal(
-					"Log file creation failed",
-					"error",
-					err,
-					"workflow",
-					workflow.Name,
-				)
-			}
-			defer logFile.Close()
-
-			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:   cfg.Debug,
-				Format:  cfg.LogFormat,
-				LogFile: logFile,
-			})
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, agentLogger)
-
-			agt := agent.New(
-				requestID,
-				workflow,
-				agentLogger,
-				filepath.Dir(logFile.Name()),
-				logFile.Name(),
-				cli,
-				dataStore,
-				&agent.Options{Dry: true})
-
-			ctx := cmd.Context()
-
-			listenSignals(ctx, agt)
-
-			if err := agt.Run(ctx); err != nil {
-				agentLogger.Fatal("Workflow execution failed",
-					"error", err,
-					"workflow", workflow.Name,
-					"requestID", requestID)
-			}
-		},
+func runDry(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
-	return cmd
+	params, err := cmd.Flags().GetString("params")
+	if err != nil {
+		return fmt.Errorf("failed to get parameters: %w", err)
+	}
+
+	ctx := cmd.Context()
+	dag, err := digraph.Load(ctx, cfg.BaseConfig, args[0], removeQuotes(params))
+	if err != nil {
+		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+	}
+
+	requestID, err := generateRequestID()
+	if err != nil {
+		return fmt.Errorf("failed to generate request ID: %w", err)
+	}
+
+	logSettings := logFileSettings{
+		Prefix:    dryPrefix,
+		LogDir:    cfg.LogDir,
+		DAGLogDir: dag.LogDir,
+		DAGName:   dag.Name,
+		RequestID: requestID,
+	}
+
+	logFile, err := openLogFile(logSettings)
+	if err != nil {
+		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
+	}
+	defer logFile.Close()
+
+	logger := buildLoggerWithFile(cfg, false, logFile)
+	dataStore := newDataStores(cfg)
+	cli := newClient(cfg, dataStore, logger)
+
+	agt := agent.New(
+		requestID,
+		dag,
+		logger,
+		filepath.Dir(logFile.Name()),
+		logFile.Name(),
+		cli,
+		dataStore,
+		&agent.Options{Dry: true},
+	)
+
+	listenSignals(ctx, agt)
+
+	if err := agt.Run(ctx); err != nil {
+		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w",
+			dag.Name, requestID, err)
+	}
+
+	return nil
 }

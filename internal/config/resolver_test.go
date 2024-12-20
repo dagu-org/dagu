@@ -1,51 +1,62 @@
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package config
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestResolver(t *testing.T) {
+	t.Parallel()
 	t.Run("App home directory", func(t *testing.T) {
-		tmpDir := util.MustTempDir("test")
+		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
-		os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, "dagu"))
+		os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
 		r := newResolver("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), XDGConfig{})
 
-		assert.Equal(t, r, resolver{
-			configDir:       filepath.Join(tmpDir, "dagu"),
-			dagsDir:         filepath.Join(tmpDir, "dagu", "dags"),
-			suspendFlagsDir: filepath.Join(tmpDir, "dagu", "suspend"),
-			dataDir:         filepath.Join(tmpDir, "dagu", "data"),
-			logsDir:         filepath.Join(tmpDir, "dagu", "logs"),
-			adminLogsDir:    filepath.Join(tmpDir, "dagu", "logs/admin"),
-			baseConfigFile:  filepath.Join(tmpDir, "dagu", "base.yaml"),
+		assert.Equal(t, r, PathResolver{
+			Paths: Paths{
+				ConfigDir:       filepath.Join(tmpDir, build.Slug),
+				DAGsDir:         filepath.Join(tmpDir, build.Slug, "dags"),
+				SuspendFlagsDir: filepath.Join(tmpDir, build.Slug, "suspend"),
+				DataDir:         filepath.Join(tmpDir, build.Slug, "data"),
+				LogsDir:         filepath.Join(tmpDir, build.Slug, "logs"),
+				AdminLogsDir:    filepath.Join(tmpDir, build.Slug, "logs/admin"),
+				BaseConfigFile:  filepath.Join(tmpDir, build.Slug, "base.yaml"),
+			},
 		})
 	})
 	t.Run("Legacy home directory", func(t *testing.T) {
-		tmpDir := util.MustTempDir("test")
+		tmpDir := fileutil.MustTempDir("test")
 		defer os.RemoveAll(tmpDir)
 
-		legacyPath := filepath.Join(tmpDir, ".dagu")
+		hiddenDir := filepath.Join(tmpDir, "."+build.Slug)
+		legacyPath := filepath.Join(tmpDir, hiddenDir)
 		err := os.MkdirAll(legacyPath, os.ModePerm)
 		require.NoError(t, err)
 
 		r := newResolver("UNSET_APP_HOME", legacyPath, XDGConfig{})
 
-		assert.Equal(t, r, resolver{
-			configDir:       filepath.Join(tmpDir, ".dagu"),
-			dagsDir:         filepath.Join(tmpDir, ".dagu", "dags"),
-			suspendFlagsDir: filepath.Join(tmpDir, ".dagu", "suspend"),
-			dataDir:         filepath.Join(tmpDir, ".dagu", "data"),
-			logsDir:         filepath.Join(tmpDir, ".dagu", "logs"),
-			adminLogsDir:    filepath.Join(tmpDir, ".dagu", "logs", "admin"),
-			baseConfigFile:  filepath.Join(tmpDir, ".dagu", "base.yaml"),
+		assert.Equal(t, r, PathResolver{
+			Paths: Paths{
+				ConfigDir:       filepath.Join(tmpDir, hiddenDir),
+				DAGsDir:         filepath.Join(tmpDir, hiddenDir, "dags"),
+				SuspendFlagsDir: filepath.Join(tmpDir, hiddenDir, "suspend"),
+				DataDir:         filepath.Join(tmpDir, hiddenDir, "data"),
+				LogsDir:         filepath.Join(tmpDir, hiddenDir, "logs"),
+				AdminLogsDir:    filepath.Join(tmpDir, hiddenDir, "logs", "admin"),
+				BaseConfigFile:  filepath.Join(tmpDir, hiddenDir, "base.yaml"),
+			},
 		})
 	})
 	t.Run("XDG_CONFIG_HOME", func(t *testing.T) {
@@ -53,14 +64,20 @@ func TestResolver(t *testing.T) {
 			DataHome:   "/home/user/.local/share",
 			ConfigHome: "/home/user/.config",
 		})
-		assert.Equal(t, r, resolver{
-			configDir:       "/home/user/.config/dagu",
-			dagsDir:         "/home/user/.config/dagu/dags",
-			suspendFlagsDir: "/home/user/.local/share/dagu/suspend",
-			dataDir:         "/home/user/.local/share/dagu/history",
-			logsDir:         "/home/user/.local/share/dagu/logs",
-			adminLogsDir:    "/home/user/.local/share/dagu/logs/admin",
-			baseConfigFile:  "/home/user/.config/dagu/base.yaml",
+		assert.Equal(t, r, PathResolver{
+			Paths: Paths{
+				ConfigDir:       path.Join("/home/user/.config", build.Slug),
+				DAGsDir:         path.Join("/home/user/.config", build.Slug, "dags"),
+				SuspendFlagsDir: path.Join("/home/user/.local/share", build.Slug, "suspend"),
+				DataDir:         path.Join("/home/user/.local/share", build.Slug, "history"),
+				LogsDir:         path.Join("/home/user/.local/share", build.Slug, "logs"),
+				AdminLogsDir:    path.Join("/home/user/.local/share", build.Slug, "logs", "admin"),
+				BaseConfigFile:  path.Join("/home/user/.config", build.Slug, "base.yaml"),
+			},
+			XDGConfig: XDGConfig{
+				DataHome:   "/home/user/.local/share",
+				ConfigHome: "/home/user/.config",
+			},
 		})
 	})
 }

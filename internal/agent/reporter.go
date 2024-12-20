@@ -1,30 +1,20 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package agent
 
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/dagu-org/dagu/internal/dag"
-	"github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"golang.org/x/term"
 )
 
 // Sender is a mailer interface.
@@ -50,7 +40,7 @@ func newReporter(sender Sender, lg logger.Logger) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	workflow *dag.DAG, status *model.Status, node *scheduler.Node,
+	dag *digraph.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
@@ -61,13 +51,13 @@ func (r *reporter) reportStep(
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
 		return r.sender.Send(
-			workflow.ErrorMail.From,
-			[]string{workflow.ErrorMail.To},
+			dag.ErrorMail.From,
+			[]string{dag.ErrorMail.To},
 			fmt.Sprintf(
-				"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
+				"%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status,
 			),
 			renderHTML(status.Nodes),
-			addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
+			addAttachmentList(dag.ErrorMail.AttachLogs, status.Nodes),
 		)
 	}
 	return nil
@@ -75,6 +65,11 @@ func (r *reporter) reportStep(
 
 // report is a function that reports the status of the scheduler.
 func (r *reporter) report(status *model.Status, err error) {
+	isTerminal := term.IsTerminal(int(os.Stderr.Fd()))
+	if !isTerminal {
+		// If the output is not a terminal, we don't need to render the table.
+		return
+	}
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -87,30 +82,30 @@ func (r *reporter) report(status *model.Status, err error) {
 
 // send is a function that sends a report mail.
 func (r *reporter) send(
-	workflow *dag.DAG, status *model.Status, err error,
+	dag *digraph.DAG, status *model.Status, err error,
 ) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if workflow.MailOn != nil && workflow.MailOn.Failure {
+		if dag.MailOn != nil && dag.MailOn.Failure {
 			return r.sender.Send(
-				workflow.ErrorMail.From,
-				[]string{workflow.ErrorMail.To},
+				dag.ErrorMail.From,
+				[]string{dag.ErrorMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
+					"%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
+				addAttachmentList(dag.ErrorMail.AttachLogs, status.Nodes),
 			)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if workflow.MailOn != nil && workflow.MailOn.Success {
+		if dag.MailOn != nil && dag.MailOn.Success {
 			_ = r.sender.Send(
-				workflow.InfoMail.From,
-				[]string{workflow.InfoMail.To},
+				dag.InfoMail.From,
+				[]string{dag.InfoMail.To},
 				fmt.Sprintf(
-					"%s %s (%s)", workflow.InfoMail.Prefix, workflow.Name, status.Status,
+					"%s %s (%s)", dag.InfoMail.Prefix, dag.Name, status.Status,
 				),
 				renderHTML(status.Nodes),
-				addAttachmentList(workflow.InfoMail.AttachLogs, status.Nodes),
+				addAttachmentList(dag.InfoMail.AttachLogs, status.Nodes),
 			)
 		}
 	}

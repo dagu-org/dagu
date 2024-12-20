@@ -1,28 +1,17 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/dag"
-	dagscheduler "github.com/dagu-org/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	dagscheduler "github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/robfig/cron/v3"
 )
@@ -42,9 +31,9 @@ type jobCreatorImpl struct {
 	Client     client.Client
 }
 
-func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time, schedule cron.Schedule) job {
+func (jf jobCreatorImpl) CreateJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) job {
 	return &jobImpl{
-		DAG:        workflow,
+		DAG:        dag,
 		Executable: jf.Executable,
 		WorkDir:    jf.WorkDir,
 		Next:       next,
@@ -56,7 +45,7 @@ func (jf jobCreatorImpl) CreateJob(workflow *dag.DAG, next time.Time, schedule c
 var _ job = (*jobImpl)(nil)
 
 type jobImpl struct {
-	DAG        *dag.DAG
+	DAG        *digraph.DAG
 	Executable string
 	WorkDir    string
 	Next       time.Time
@@ -64,12 +53,12 @@ type jobImpl struct {
 	Client     client.Client
 }
 
-func (j *jobImpl) GetDAG() *dag.DAG {
+func (j *jobImpl) GetDAG(_ context.Context) *digraph.DAG {
 	return j.DAG
 }
 
-func (j *jobImpl) Start() error {
-	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
+func (j *jobImpl) Start(ctx context.Context) error {
+	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
 		return err
 	}
@@ -92,7 +81,7 @@ func (j *jobImpl) Start() error {
 		// time against the defined schedule. If the DAG has already run successfully
 		// since the last scheduled time, the current run will be skipped.
 		if j.DAG.SkipIfSuccessful {
-			prev := j.Prev()
+			prev := j.Prev(ctx)
 			if lastExecTime.After(prev) || lastExecTime.Equal(prev) {
 				// Calculate the previous scheduled time
 				lastStartedAt, _ := util.ParseTime(latestStatus.StartedAt)
@@ -101,12 +90,10 @@ func (j *jobImpl) Start() error {
 		}
 	}
 
-	return j.Client.Start(j.DAG, client.StartOptions{
-		Quiet: true,
-	})
+	return j.Client.Start(ctx, j.DAG, client.StartOptions{Quiet: true})
 }
 
-func (j *jobImpl) Prev() time.Time {
+func (j *jobImpl) Prev(_ context.Context) time.Time {
 	// Since robfig/cron does not provide a way to get the previous schedule time,
 	// we need to do it manually.
 	// The idea is to get the next schedule time and subtract the duration of the schedule.
@@ -115,21 +102,19 @@ func (j *jobImpl) Prev() time.Time {
 	return j.Next.Add(-t.Sub(j.Next))
 }
 
-func (j *jobImpl) Stop() error {
-	latestStatus, err := j.Client.GetLatestStatus(j.DAG)
+func (j *jobImpl) Stop(ctx context.Context) error {
+	latestStatus, err := j.Client.GetLatestStatus(ctx, j.DAG)
 	if err != nil {
 		return err
 	}
 	if latestStatus.Status != dagscheduler.StatusRunning {
 		return errJobIsNotRunning
 	}
-	return j.Client.Stop(j.DAG)
+	return j.Client.Stop(ctx, j.DAG)
 }
 
-func (j *jobImpl) Restart() error {
-	return j.Client.Restart(j.DAG, client.RestartOptions{
-		Quiet: true,
-	})
+func (j *jobImpl) Restart(ctx context.Context) error {
+	return j.Client.Restart(ctx, j.DAG, client.RestartOptions{Quiet: true})
 }
 
 func (j *jobImpl) String() string {

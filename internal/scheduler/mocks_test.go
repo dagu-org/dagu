@@ -1,25 +1,14 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package scheduler
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/robfig/cron/v3"
 )
 
@@ -27,8 +16,8 @@ var _ jobCreator = (*mockJobFactory)(nil)
 
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(workflow *dag.DAG, _ time.Time, _ cron.Schedule) job {
-	return newMockJob(workflow)
+func (f *mockJobFactory) CreateJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) job {
+	return newMockJob(dag)
 }
 
 var _ entryReader = (*mockEntryReader)(nil)
@@ -37,16 +26,16 @@ type mockEntryReader struct {
 	Entries []*entry
 }
 
-func (er *mockEntryReader) Read(_ time.Time) ([]*entry, error) {
+func (er *mockEntryReader) Read(_ context.Context, _ time.Time) ([]*entry, error) {
 	return er.Entries, nil
 }
 
-func (er *mockEntryReader) Start(chan any) {}
+func (er *mockEntryReader) Start(_ context.Context, _ chan any) {}
 
 var _ job = (*mockJob)(nil)
 
 type mockJob struct {
-	DAG          *dag.DAG
+	DAG          *digraph.DAG
 	Name         string
 	RunCount     atomic.Int32
 	StopCount    atomic.Int32
@@ -54,22 +43,18 @@ type mockJob struct {
 	Panic        error
 }
 
-func newMockJob(workflow *dag.DAG) *mockJob {
+func newMockJob(dag *digraph.DAG) *mockJob {
 	return &mockJob{
-		DAG:  workflow,
-		Name: workflow.Name,
+		DAG:  dag,
+		Name: dag.Name,
 	}
 }
 
-func (j *mockJob) GetDAG() *dag.DAG {
+func (j *mockJob) GetDAG(_ context.Context) *digraph.DAG {
 	return j.DAG
 }
 
-func (j *mockJob) String() string {
-	return j.Name
-}
-
-func (j *mockJob) Start() error {
+func (j *mockJob) Start(_ context.Context) error {
 	j.RunCount.Add(1)
 	if j.Panic != nil {
 		panic(j.Panic)
@@ -77,12 +62,16 @@ func (j *mockJob) Start() error {
 	return nil
 }
 
-func (j *mockJob) Stop() error {
+func (j *mockJob) Stop(_ context.Context) error {
 	j.StopCount.Add(1)
 	return nil
 }
 
-func (j *mockJob) Restart() error {
+func (j *mockJob) Restart(_ context.Context) error {
 	j.RestartCount.Add(1)
 	return nil
+}
+
+func (j *mockJob) String() string {
+	return j.Name
 }

@@ -6,7 +6,7 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
 builds:
-  - dir: .
+  - dir: ./cmd
     env:
       - CGO_ENABLED=0
     goos:
@@ -35,7 +35,7 @@ brews:
       name: homebrew-tap
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
-    description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
+    description: "A No-code workflow engine that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
@@ -50,7 +50,7 @@ brews:
       name: homebrew-brew
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
-    description: "A No-code workflow executor that runs DAGs defined in a simple YAML format"
+    description: "A No-code workflow engine that runs DAGs defined in a simple YAML format"
     license: "GNU General Public License v3.0"
     custom_block: |
       service do

@@ -1,31 +1,21 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/dagu-org/dagu/internal/util"
 
 	"github.com/stretchr/testify/require"
 
@@ -41,17 +31,19 @@ func TestReadEntries(t *testing.T) {
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(
+			context.Background(),
 			filepath.Join(testdataDir, "invalid_directory"),
 			&mockJobFactory{},
 			test.NewLogger(),
 			cli,
 		)
 
-		entries, err := entryReader.Read(now)
+		entries, err := entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.Len(t, entries, 0)
 
 		entryReader = newEntryReader(
+			context.Background(),
 			testdataDir,
 			&mockJobFactory{},
 			test.NewLogger(),
@@ -60,9 +52,9 @@ func TestReadEntries(t *testing.T) {
 
 		done := make(chan any)
 		defer close(done)
-		entryReader.Start(done)
+		entryReader.Start(context.Background(), done)
 
-		entries, err = entryReader.Read(now)
+		entries, err = entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(entries), 1)
 
@@ -73,34 +65,34 @@ func TestReadEntries(t *testing.T) {
 		var j job
 		for _, e := range entries {
 			jj := e.Job
-			if jj.GetDAG().Name == "scheduled_job" {
+			if jj.GetDAG(context.Background()).Name == "scheduled_job" {
 				j = jj
 				break
 			}
 		}
 
-		err = cli.ToggleSuspend(j.GetDAG().Name, true)
+		err = cli.ToggleSuspend(context.Background(), j.GetDAG(context.Background()).Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended
-		lives, err := entryReader.Read(now)
+		lives, err := entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.Equal(t, len(entries)-1, len(lives))
 	})
 }
 
-var testdataDir = filepath.Join(util.MustGetwd(), "testdata")
+var testdataDir = filepath.Join(fileutil.MustGetwd(), "testdata")
 
 func setupTest(t *testing.T) (string, client.Client) {
 	t.Helper()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := fileutil.MustTempDir("test")
 
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
 	cfg := &config.Config{
-		DataDir:         filepath.Join(tmpDir, ".dagu", "data"),
+		DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
 		DAGs:            testdataDir,
 		SuspendFlagsDir: tmpDir,
 		WorkDir:         tmpDir,

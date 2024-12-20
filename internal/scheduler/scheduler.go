@@ -1,17 +1,5 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package scheduler
 
@@ -29,7 +17,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
@@ -42,19 +30,20 @@ type Scheduler struct {
 	location    *time.Location
 }
 
-func New(cfg *config.Config, logger logger.Logger, cli client.Client) *Scheduler {
+// TODO: refactor to remove ctx from the constructor
+func New(ctx context.Context, cfg *config.Config, logger logger.Logger, cli client.Client) *Scheduler {
 	jobCreator := &jobCreatorImpl{
 		WorkDir:    cfg.WorkDir,
 		Client:     cli,
 		Executable: cfg.Executable,
 	}
-	entryReader := newEntryReader(cfg.DAGs, jobCreator, logger, cli)
+	entryReader := newEntryReader(ctx, cfg.DAGs, jobCreator, logger, cli)
 	return newScheduler(entryReader, logger, cfg.LogDir, cfg.Location)
 }
 
 type entryReader interface {
-	Start(done chan any)
-	Read(now time.Time) ([]*entry, error)
+	Start(ctx context.Context, done chan any)
+	Read(ctx context.Context, now time.Time) ([]*entry, error)
 }
 
 type entry struct {
@@ -65,10 +54,10 @@ type entry struct {
 }
 
 type job interface {
-	GetDAG() *dag.DAG
-	Start() error
-	Stop() error
-	Restart() error
+	GetDAG(ctx context.Context) *digraph.DAG
+	Start(ctx context.Context) error
+	Stop(ctx context.Context) error
+	Restart(ctx context.Context) error
 	String() string
 }
 
@@ -93,25 +82,25 @@ func (e entryType) String() string {
 	}
 }
 
-func (e *entry) Invoke() error {
+func (e *entry) Invoke(ctx context.Context) error {
 	if e.Job == nil {
 		return nil
 	}
 
 	e.Logger.Info(
-		"Workflow operation started",
+		"DAG operation started",
 		"operation", e.EntryType.String(),
-		"workflow", e.Job.String(),
+		"DAG", e.Job.String(),
 		"next", e.Next.Format(time.RFC3339),
 	)
 
 	switch e.EntryType {
 	case entryTypeStart:
-		return e.Job.Start()
+		return e.Job.Start(ctx)
 	case entryTypeStop:
-		return e.Job.Stop()
+		return e.Job.Stop(ctx)
 	case entryTypeRestart:
-		return e.Job.Restart()
+		return e.Job.Restart(ctx)
 	default:
 		return fmt.Errorf("unknown entry type: %v", e.EntryType)
 	}
@@ -135,7 +124,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	done := make(chan any)
 	defer close(done)
 
-	s.entryReader.Start(done)
+	s.entryReader.Start(ctx, done)
 
 	signal.Notify(
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
@@ -152,12 +141,12 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}()
 
-	s.start()
+	s.start(ctx)
 
 	return nil
 }
 
-func (s *Scheduler) start() {
+func (s *Scheduler) start(ctx context.Context) {
 	// TODO: refactor this to use a ticker
 	t := now().Truncate(time.Minute)
 	timer := time.NewTimer(0)
@@ -166,7 +155,7 @@ func (s *Scheduler) start() {
 	for {
 		select {
 		case <-timer.C:
-			s.run(t)
+			s.run(ctx, t)
 			t = s.nextTick(t)
 			_ = timer.Stop()
 			timer.Reset(t.Sub(now()))
@@ -179,10 +168,10 @@ func (s *Scheduler) start() {
 	}
 }
 
-func (s *Scheduler) run(now time.Time) {
-	entries, err := s.entryReader.Read(now.Add(-time.Second).In(s.location))
+func (s *Scheduler) run(ctx context.Context, now time.Time) {
+	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		s.logger.Error("Scheduler failed to read workflow entries", "error", err)
+		s.logger.Error("Scheduler failed to read DAG entries", "error", err)
 		return
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -194,17 +183,17 @@ func (s *Scheduler) run(now time.Time) {
 			break
 		}
 		go func(e *entry) {
-			if err := e.Invoke(); err != nil {
+			if err := e.Invoke(ctx); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("Workflow is already finished", "workflow", e.Job, "err", err)
+					s.logger.Info("DAG is already finished", "DAG", e.Job, "err", err)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("Workflow is already running", "workflow", e.Job, "err", err)
+					s.logger.Info("DAG is already running", "DAG", e.Job, "err", err)
 				} else if errors.Is(err, errJobSkipped) {
-					s.logger.Info("Workflow is skipped", "workflow", e.Job, "err", err)
+					s.logger.Info("DAG is skipped", "DAG", e.Job, "err", err)
 				} else {
 					s.logger.Error(
-						"Workflow execution failed",
-						"workflow", e.Job,
+						"DAG execution failed",
+						"DAG", e.Job,
 						"operation", e.EntryType.String(),
 						"error", err,
 					)

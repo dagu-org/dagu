@@ -1,42 +1,30 @@
-// Copyright (C) 2024 The Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
+// Copyright (C) 2024 Yota Hamada
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 package dag
 
 import (
-	"github.com/dagu-org/dagu/internal/dag"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/swag"
 )
 
-func convertToDAG(workflow *dag.DAG) *models.Dag {
+func convertToDAG(dag *digraph.DAG) *models.Dag {
 	var schedules []*models.Schedule
-	for _, s := range workflow.Schedule {
+	for _, s := range dag.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	return &models.Dag{
-		Name:          swag.String(workflow.Name),
-		Group:         swag.String(workflow.Group),
-		Description:   swag.String(workflow.Description),
-		Params:        workflow.Params,
-		DefaultParams: swag.String(workflow.DefaultParams),
-		Tags:          workflow.Tags,
+		Name:          swag.String(dag.Name),
+		Group:         swag.String(dag.Group),
+		Description:   swag.String(dag.Description),
+		Params:        dag.Params,
+		DefaultParams: swag.String(dag.DefaultParams),
+		Tags:          dag.Tags,
 		Schedule:      schedules,
 	}
 }
@@ -85,7 +73,7 @@ func convertToNode(node *model.Node) *models.StatusNode {
 	}
 }
 
-func convertToStepObject(step dag.Step) *models.StepObject {
+func convertToStepObject(step digraph.Step) *models.StepObject {
 	var conditions []*models.Condition
 	for _, cond := range step.Preconditions {
 		conditions = append(conditions, &models.Condition{

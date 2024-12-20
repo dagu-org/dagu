@@ -83,7 +83,7 @@ OPENSSL_CONF=${CONFIG_DIR}/openssl.local.conf
 # run starts the frontend server and the scheduler.
 run: ${FE_BUNDLE_JS}
 	@echo "${COLOR_GREEN}Starting the frontend server and the scheduler...${COLOR_RESET}"
-	@go run . start-all
+	@go run ./cmd start-all
 
 # server build the binary and start the server.
 run-server: golangci-lint build-bin
@@ -105,7 +105,7 @@ run-server-https: ${SERVER_CERT_FILE} ${SERVER_KEY_FILE}
 	@echo "${COLOR_GREEN}Starting the server with HTTPS...${COLOR_RESET}"
 	@DAGU_CERT_FILE=${SERVER_CERT_FILE} \
 		DAGU_KEY_FILE=${SERVER_KEY_FILE} \
-		go run . start-all
+		go run ./cmd start-all
 
 # test runs all tests.
 test: build-bin
@@ -189,7 +189,7 @@ addlicense:
 		-ignore "**/*.yaml" \
 		-ignore "**/filenotify/*" \
 		-ignore "**/testdata/**" \
-		-c "The Dagu Authors" \
+		-c "Yota Hamada" \
 		-f scripts/header.txt \
 		.
 
@@ -201,7 +201,7 @@ addlicense:
 build-bin:
 	@echo "${COLOR_GREEN}Building the binary...${COLOR_RESET}"
 	@mkdir -p ${BIN_DIR}
-	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} .
+	@go build -ldflags="$(LDFLAGS)" -o ${BIN_DIR}/${APP_NAME} ./cmd
 
 # build-ui builds the frontend codes.
 build-ui:
