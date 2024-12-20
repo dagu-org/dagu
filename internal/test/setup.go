@@ -24,11 +24,11 @@ type Setup struct {
 	Context context.Context
 	Config  *config.Config
 
-	homeDir string
+	tmpDir string
 }
 
 func (t Setup) Cleanup() {
-	_ = os.RemoveAll(t.homeDir)
+	_ = os.RemoveAll(t.tmpDir)
 }
 
 func (t Setup) DataStore() persistence.DataStores {
@@ -89,12 +89,16 @@ func SetupTest(t *testing.T) Setup {
 	ctx := context.Background()
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithDebug(), logger.WithFormat("text")))
 
-	return Setup{
+	setup := Setup{
 		Context: ctx,
 		Config:  cfg,
 
-		homeDir: tmpDir,
+		tmpDir: tmpDir,
 	}
+
+	t.Cleanup(setup.Cleanup)
+
+	return setup
 }
 
 func SetupForDir(t *testing.T, dir string) Setup {
@@ -119,6 +123,6 @@ func SetupForDir(t *testing.T, dir string) Setup {
 		Context: ctx,
 		Config:  cfg,
 
-		homeDir: tmpDir,
+		tmpDir: tmpDir,
 	}
 }

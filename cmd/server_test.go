@@ -15,8 +15,7 @@ import (
 
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		_ = test.SetupTest(t)
 
 		go func() {
 			testRunCommand(t, serverCmd(), cmdTest{

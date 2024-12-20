@@ -11,8 +11,7 @@ import (
 
 func TestDryCommand(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		_ = test.SetupTest(t)
 
 		tests := []cmdTest{
 			{

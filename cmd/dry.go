@@ -65,7 +65,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 	defer logFile.Close()
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(cfg, false, logFile))
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
 	dataStore := newDataStores(cfg)
 	cli := newClient(cfg, dataStore)
 

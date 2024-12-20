@@ -26,7 +26,6 @@ import (
 func TestAgent_Run(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		dag := testLoadDAG(t, "run.yaml")
 		cli := setup.Client()
@@ -52,7 +51,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// Create a history file by running a DAG
 		dag := testLoadDAG(t, "simple.yaml")
@@ -77,7 +75,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		dag := testLoadDAG(t, "is_running.yaml")
 		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
@@ -100,7 +97,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		dag := testLoadDAG(t, "multiple_steps.yaml")
 
@@ -120,7 +116,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// Run a DAG that fails
 		errDAG := testLoadDAG(t, "error.yaml")
@@ -134,7 +129,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// Run a DAG that timeout
 		timeoutDAG := testLoadDAG(t, "timeout.yaml")
@@ -148,7 +142,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		ctx := setup.Context
 
@@ -180,7 +173,6 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		dag := testLoadDAG(t, "on_exit.yaml")
 		agt := newAgent(setup, genRequestID(), dag, &agent.Options{})
@@ -204,7 +196,6 @@ func TestAgent_DryRun(t *testing.T) {
 	t.Parallel()
 	t.Run("DryRun", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		dag := testLoadDAG(t, "dry.yaml")
 		ctx := setup.Context
@@ -230,7 +221,6 @@ func TestAgent_Retry(t *testing.T) {
 	t.Parallel()
 	t.Run("RetryDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// retry.yaml has a DAG that fails
 		dag := testLoadDAG(t, "retry.yaml")
@@ -273,7 +263,6 @@ func TestAgent_HandleHTTP(t *testing.T) {
 	t.Parallel()
 	t.Run("HTTP_Valid", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// Start a long-running DAG
 		dag := testLoadDAG(t, "handle_http.yaml")
@@ -315,7 +304,6 @@ func TestAgent_HandleHTTP(t *testing.T) {
 	})
 	t.Run("HTTP_InvalidRequest", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// Start a long-running DAG
 		dag := testLoadDAG(t, "handle_http2.yaml")
@@ -354,7 +342,6 @@ func TestAgent_HandleHTTP(t *testing.T) {
 	})
 	t.Run("HTTP_HandleCancel", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		// Start a long-running DAG
 		dag := testLoadDAG(t, "handle_http3.yaml")

@@ -47,7 +47,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
 	specFilePath := args[0]
 
@@ -119,7 +119,7 @@ func executeDAG(ctx context.Context, cli client.Client, cfg *config.Config,
 		"requestID", requestID,
 		"logFile", logFile.Name())
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(cfg, quiet, logFile))
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
 	agt := agent.New(
 		requestID,
 		dag,

@@ -12,8 +12,7 @@ import (
 
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartScheduler", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		_ = test.SetupTest(t)
 
 		go func() {
 			testRunCommand(t, schedulerCmd(), cmdTest{

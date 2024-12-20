@@ -47,7 +47,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
 	specFilePath := args[0]
 
@@ -126,7 +126,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 		"newRequestID", newRequestID,
 		"logFile", logFile.Name())
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(cfg, false, logFile))
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
 
 	agt := agent.New(
 		newRequestID,

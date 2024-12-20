@@ -27,7 +27,6 @@ var testdataDir = filepath.Join(fileutil.MustGetwd(), "./testdata")
 func TestClient_GetStatus(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		file := testDAG("sleep1.yaml")
 
@@ -65,7 +64,6 @@ func TestClient_GetStatus(t *testing.T) {
 	})
 	t.Run("InvalidDAGName", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 
@@ -79,7 +77,6 @@ func TestClient_GetStatus(t *testing.T) {
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		var (
 			file      = testDAG("success.yaml")
@@ -123,7 +120,6 @@ func TestClient_GetStatus(t *testing.T) {
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		var (
 			cli        = setup.Client()
@@ -148,7 +144,6 @@ func TestClient_GetStatus(t *testing.T) {
 func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		file := testDAG("success.yaml")
@@ -165,7 +160,6 @@ func TestClient_RunDAG(t *testing.T) {
 	})
 	t.Run("Stop", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		file := testDAG("sleep10.yaml")
@@ -189,7 +183,6 @@ func TestClient_RunDAG(t *testing.T) {
 	})
 	t.Run("Restart", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		file := testDAG("success.yaml")
@@ -206,7 +199,6 @@ func TestClient_RunDAG(t *testing.T) {
 	})
 	t.Run("Retry", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		ctx := context.Background()
 		cli := setup.Client()
@@ -246,7 +238,6 @@ func TestClient_UpdateDAG(t *testing.T) {
 	t.Parallel()
 	t.Run("Update", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		ctx := context.Background()
@@ -276,7 +267,6 @@ steps:
 	})
 	t.Run("Remove", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		ctx := context.Background()
@@ -304,7 +294,6 @@ steps:
 	})
 	t.Run("Create", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		ctx := context.Background()
@@ -319,7 +308,6 @@ steps:
 	})
 	t.Run("Rename", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		ctx := context.Background()
@@ -342,7 +330,6 @@ steps:
 func TestClient_ReadHistory(t *testing.T) {
 	t.Run("TestClient_Empty", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		file := testDAG("success.yaml")
@@ -353,7 +340,6 @@ func TestClient_ReadHistory(t *testing.T) {
 	})
 	t.Run("TestClient_All", func(t *testing.T) {
 		setup := test.SetupTest(t)
-		defer setup.Cleanup()
 
 		cli := setup.Client()
 		ctx := context.Background()
@@ -396,7 +382,6 @@ func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status,
 
 func TestClient_GetTagList(t *testing.T) {
 	setup := test.SetupTest(t)
-	defer setup.Cleanup()
 
 	cli := setup.Client()
 	ctx := context.Background()

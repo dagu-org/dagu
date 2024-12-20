@@ -49,7 +49,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
 	// Get parameters
 	params, err := cmd.Flags().GetString("params")
@@ -92,7 +92,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	cli := newClient(cfg, dataStore)
 
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(cfg, quiet, logFile))
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
 
 	// Create and run agent
 	agt := agent.New(

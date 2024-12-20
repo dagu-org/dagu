@@ -24,13 +24,8 @@ func stopCmd() *cobra.Command {
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 
-			quiet, err := cmd.Flags().GetBool("quiet")
-			if err != nil {
-				log.Fatalf("Flag retrieval failed (quiet): %v", err)
-			}
-
 			ctx := cmd.Context()
-			ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+			ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
 			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
 			if err != nil {
@@ -47,6 +42,5 @@ func stopCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
 }

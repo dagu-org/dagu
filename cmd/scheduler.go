@@ -39,7 +39,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
