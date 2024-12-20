@@ -20,7 +20,7 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
+		th := test.Setup(t)
 
 		dagFile := testDAGFile("restart.yaml")
 
@@ -28,13 +28,14 @@ func TestRestartCommand(t *testing.T) {
 		go func() {
 			testRunCommand(
 				t,
+				th.Context,
 				startCmd(),
 				cmdTest{args: []string{"start", `--params="foo"`, dagFile}},
 			)
 		}()
 
 		time.Sleep(waitForStatusUpdate)
-		cli := setup.Client()
+		cli := th.Client()
 
 		// Wait for the DAG running.
 		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
@@ -42,7 +43,7 @@ func TestRestartCommand(t *testing.T) {
 		// Restart the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, restartCmd(), cmdTest{args: []string{"restart", dagFile}})
+			testRunCommand(t, th.Context, restartCmd(), cmdTest{args: []string{"restart", dagFile}})
 			close(done)
 		}()
 
@@ -52,7 +53,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
-		testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
+		testRunCommand(t, th.Context, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
 
 		time.Sleep(waitForStatusUpdate)
 
@@ -60,14 +61,12 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dag, err := digraph.Load(context.Background(), setup.Config.BaseConfig, dagFile, "")
+		dag, err := digraph.Load(th.Context, th.Config.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
-		dataStore := newDataStores(setup.Config)
-		recentHistory := newClient(
-			setup.Config,
-			dataStore,
-		).GetRecentHistory(context.Background(), dag, 2)
+		dataStore := newDataStores(th.Config)
+		client := newClient(th.Config, dataStore)
+		recentHistory := client.GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

@@ -15,10 +15,10 @@ import (
 
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
-		_ = test.SetupTest(t)
+		th := test.Setup(t)
 
 		go func() {
-			testRunCommand(t, serverCmd(), cmdTest{
+			testRunCommand(t, th.Context, serverCmd(), cmdTest{
 				args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
 				expectedOut: []string{"server is running"},
 			})

@@ -12,32 +12,32 @@ import (
 
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
+		th := test.Setup(t)
 
 		dagFile := testDAGFile("long.yaml")
 
 		// Start the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, startCmd(), cmdTest{args: []string{"start", dagFile}})
+			testRunCommand(t, th.Context, startCmd(), cmdTest{args: []string{"start", dagFile}})
 			close(done)
 		}()
 
 		testLastStatusEventual(
 			t,
-			setup.DataStore().HistoryStore(),
+			th.DataStore().HistoryStore(),
 			dagFile,
 			scheduler.StatusRunning,
 		)
 
 		// Check the current status.
-		testRunCommand(t, statusCmd(), cmdTest{
+		testRunCommand(t, th.Context, statusCmd(), cmdTest{
 			args:        []string{"status", dagFile},
 			expectedOut: []string{"Status=running"},
 		})
 
 		// Stop the DAG.
-		testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
+		testRunCommand(t, th.Context, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
 		<-done
 	})
 }

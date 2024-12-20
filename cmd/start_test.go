@@ -10,8 +10,6 @@ import (
 )
 
 func TestStartCommand(t *testing.T) {
-	_ = test.SetupTest(t)
-
 	tests := []cmdTest{
 		{
 			args:        []string{"start", testDAGFile("success.yaml")},
@@ -31,7 +29,8 @@ func TestStartCommand(t *testing.T) {
 		},
 	}
 
+	th := test.Setup(t)
 	for _, tc := range tests {
-		testRunCommand(t, startCmd(), tc)
+		testRunCommand(t, th.Context, startCmd(), tc)
 	}
 }

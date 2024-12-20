@@ -15,15 +15,15 @@ import (
 
 func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
+		th := test.Setup(t)
 
 		dagFile := testDAGFile("retry.yaml")
 
 		// Run a DAG.
-		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+		testRunCommand(t, th.Context, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
 
 		// Find the request ID.
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 		status, err := cli.GetStatus(ctx, dagFile)
 		require.NoError(t, err)
@@ -33,7 +33,7 @@ func TestRetryCommand(t *testing.T) {
 		requestID := status.Status.RequestID
 
 		// Retry with the request ID.
-		testRunCommand(t, retryCmd(), cmdTest{
+		testRunCommand(t, th.Context, retryCmd(), cmdTest{
 			args:        []string{"retry", fmt.Sprintf("--req=%s", requestID), dagFile},
 			expectedOut: []string{"param is foo"},
 		})

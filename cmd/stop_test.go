@@ -13,14 +13,14 @@ import (
 
 func TestStopCommand(t *testing.T) {
 	t.Run("StopDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
+		th := test.Setup(t)
 
 		dagFile := testDAGFile("long2.yaml")
 
 		// Start the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, startCmd(), cmdTest{args: []string{"start", dagFile}})
+			testRunCommand(t, th.Context, startCmd(), cmdTest{args: []string{"start", dagFile}})
 			close(done)
 		}()
 
@@ -29,19 +29,19 @@ func TestStopCommand(t *testing.T) {
 		// Wait for the DAG running.
 		testLastStatusEventual(
 			t,
-			setup.DataStore().HistoryStore(),
+			th.DataStore().HistoryStore(),
 			dagFile,
 			scheduler.StatusRunning,
 		)
 
 		// Stop the DAG.
-		testRunCommand(t, stopCmd(), cmdTest{
+		testRunCommand(t, th.Context, stopCmd(), cmdTest{
 			args:        []string{"stop", dagFile},
 			expectedOut: []string{"Stopping..."}})
 
 		// Check the last execution is cancelled.
 		testLastStatusEventual(
-			t, setup.DataStore().HistoryStore(), dagFile, scheduler.StatusCancel,
+			t, th.DataStore().HistoryStore(), dagFile, scheduler.StatusCancel,
 		)
 		<-done
 	})

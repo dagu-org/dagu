@@ -12,10 +12,10 @@ import (
 
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartScheduler", func(t *testing.T) {
-		_ = test.SetupTest(t)
+		th := test.Setup(t)
 
 		go func() {
-			testRunCommand(t, schedulerCmd(), cmdTest{
+			testRunCommand(t, th.Context, schedulerCmd(), cmdTest{
 				args:        []string{"scheduler"},
 				expectedOut: []string{"starting dagu scheduler"},
 			})

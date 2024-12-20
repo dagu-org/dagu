@@ -11,7 +11,7 @@ import (
 
 func TestDryCommand(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
-		_ = test.SetupTest(t)
+		th := test.Setup(t)
 
 		tests := []cmdTest{
 			{
@@ -21,7 +21,7 @@ func TestDryCommand(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			testRunCommand(t, dryCmd(), tc)
+			testRunCommand(t, th.Context, dryCmd(), tc)
 		}
 	})
 }

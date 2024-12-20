@@ -28,19 +28,19 @@ type cmdTest struct {
 }
 
 // testRunCommand is a helper function to test a command.
-func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
+func testRunCommand(t *testing.T, ctx context.Context, cmd *cobra.Command, testCase cmdTest) {
 	t.Helper()
 
 	root := &cobra.Command{Use: "root"}
 	root.AddCommand(cmd)
 
 	// Set arguments.
-	root.SetArgs(test.args)
+	root.SetArgs(testCase.args)
 
 	// Run the command
 
 	// TODO: Fix thet test after update the logging code so that it can be
-	err := root.Execute()
+	err := root.ExecuteContext(ctx)
 	require.NoError(t, err)
 
 	// configured to write to a buffer.
@@ -48,10 +48,10 @@ func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 	// 	err := root.Execute()
 	// 	require.NoError(t, err)
 	// })
-	//
+
 	// Check if the expected output is present in the standard output.
-	// for _, s := range test.expectedOut {
-	// 	require.Contains(t, out, s)
+	// for _, s := range testCase.expectedOut {
+	// require.Contains(t, out, s)
 	// }
 }
 
@@ -60,36 +60,36 @@ func testRunCommand(t *testing.T, cmd *cobra.Command, test cmdTest) {
 func withSpool(t *testing.T, testFunction func()) string {
 	t.Helper()
 
-	origStdout := os.Stdout
+		origStdout := os.Stdout
 
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
+		r, w, err := os.Pipe()
+		require.NoError(t, err)
 
-	os.Stdout = w
-	log.SetOutput(w)
+		os.Stdout = w
+		log.SetOutput(w)
 
-	defer func() {
+		defer func() {
+			os.Stdout = origStdout
+			log.SetOutput(origStdout)
+			_ = w.Close()
+		}()
+
+		testFunction()
+
 		os.Stdout = origStdout
-		log.SetOutput(origStdout)
 		_ = w.Close()
-	}()
 
-	testFunction()
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, r)
+		require.NoError(t, err)
 
-	os.Stdout = origStdout
-	_ = w.Close()
+		out := buf.String()
 
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
-	require.NoError(t, err)
+		t.Cleanup(func() {
+			t.Log(out)
+		})
 
-	out := buf.String()
-
-	t.Cleanup(func() {
-		t.Log(out)
-	})
-
-	return out
+		return out
 }
 */
 

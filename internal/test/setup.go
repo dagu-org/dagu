@@ -20,18 +20,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Setup struct {
+type Helper struct {
 	Context context.Context
 	Config  *config.Config
 
 	tmpDir string
 }
 
-func (t Setup) Cleanup() {
+func (t Helper) Cleanup() {
 	_ = os.RemoveAll(t.tmpDir)
 }
 
-func (t Setup) DataStore() persistence.DataStores {
+func (t Helper) DataStore() persistence.DataStores {
 	return dsclient.NewDataStores(
 		t.Config.DAGs,
 		t.Config.DataDir,
@@ -42,7 +42,7 @@ func (t Setup) DataStore() persistence.DataStores {
 	)
 }
 
-func (t Setup) Client() client.Client {
+func (t Helper) Client() client.Client {
 	return client.New(t.DataStore(), t.Config.Executable, t.Config.WorkDir)
 }
 
@@ -50,7 +50,7 @@ var (
 	lock sync.Mutex
 )
 
-func SetupTest(t *testing.T) Setup {
+func Setup(t *testing.T) Helper {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -89,19 +89,19 @@ func SetupTest(t *testing.T) Setup {
 	ctx := context.Background()
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithDebug(), logger.WithFormat("text")))
 
-	setup := Setup{
+	helper := Helper{
 		Context: ctx,
 		Config:  cfg,
 
 		tmpDir: tmpDir,
 	}
 
-	t.Cleanup(setup.Cleanup)
+	t.Cleanup(helper.Cleanup)
 
-	return setup
+	return helper
 }
 
-func SetupForDir(t *testing.T, dir string) Setup {
+func SetupForDir(t *testing.T, dir string) Helper {
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -119,7 +119,7 @@ func SetupForDir(t *testing.T, dir string) Setup {
 	ctx := context.Background()
 	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithDebug(), logger.WithFormat("text")))
 
-	return Setup{
+	return Helper{
 		Context: ctx,
 		Config:  cfg,
 
