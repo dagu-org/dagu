@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestStopCommand(t *testing.T) {
 	t.Run("StopDAG", func(t *testing.T) {
-		th := test.Setup(t)
+		th := testSetup(t)
 
-		dagFile := testDAGFile("long2.yaml")
+		dagFile := th.DAGFile("long2.yaml")
 
-		// Start the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, th.Context, startCmd(), cmdTest{args: []string{"start", dagFile}})
+			// Start the DAG to stop.
+			args := []string{"start", dagFile}
+			th.RunCommand(t, startCmd(), cmdTest{args: args})
 			close(done)
 		}()
 
@@ -35,11 +35,11 @@ func TestStopCommand(t *testing.T) {
 		)
 
 		// Stop the DAG.
-		testRunCommand(t, th.Context, stopCmd(), cmdTest{
+		th.RunCommand(t, stopCmd(), cmdTest{
 			args:        []string{"stop", dagFile},
-			expectedOut: []string{"Stopping..."}})
+			expectedOut: []string{"DAG stopped"}})
 
-		// Check the last execution is cancelled.
+		// Check the DAG is stopped.
 		testLastStatusEventual(
 			t, th.DataStore().HistoryStore(), dagFile, scheduler.StatusCancel,
 		)

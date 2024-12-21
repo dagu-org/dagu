@@ -187,6 +187,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}()
 
 	// Start the DAG execution.
+	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 	dagCtx := digraph.NewContext(ctx, a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 

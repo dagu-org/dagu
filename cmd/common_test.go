@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/test"
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -23,85 +24,46 @@ import (
 // cmdTest is a helper struct to test commands.
 // It contains the arguments to the command and the expected output.
 type cmdTest struct {
+	name        string
 	args        []string
 	expectedOut []string
 }
 
-// testRunCommand is a helper function to test a command.
-func testRunCommand(t *testing.T, ctx context.Context, cmd *cobra.Command, testCase cmdTest) {
-	t.Helper()
+type testHelper struct {
+	test.Helper
+}
 
-	root := &cobra.Command{Use: "root"}
-	root.AddCommand(cmd)
+func (th testHelper) DAGFile(name string) string {
+	return filepath.Join(filepath.Join(fileutil.MustGetwd(), "testdata"), name)
+}
+
+func (th testHelper) RunCommand(t *testing.T, cmd *cobra.Command, testCase cmdTest) {
+	cmdRoot := &cobra.Command{Use: "root"}
+	cmdRoot.AddCommand(cmd)
 
 	// Set arguments.
-	root.SetArgs(testCase.args)
+	cmdRoot.SetArgs(testCase.args)
 
 	// Run the command
-
-	// TODO: Fix thet test after update the logging code so that it can be
-	err := root.ExecuteContext(ctx)
+	err := cmdRoot.ExecuteContext(th.Context)
 	require.NoError(t, err)
 
-	// configured to write to a buffer.
-	// _ = withSpool(t, func() {
-	// 	err := root.Execute()
-	// 	require.NoError(t, err)
-	// })
+	output := th.LoggingOutput.String()
 
 	// Check if the expected output is present in the standard output.
-	// for _, s := range testCase.expectedOut {
-	// require.Contains(t, out, s)
-	// }
+	for _, expectedOutput := range testCase.expectedOut {
+		require.Contains(t, output, expectedOutput)
+	}
 }
 
-// withSpool temporarily buffers the standard output and returns it as a string.
-/*
-func withSpool(t *testing.T, testFunction func()) string {
+func testSetup(t *testing.T) testHelper {
 	t.Helper()
 
-		origStdout := os.Stdout
-
-		r, w, err := os.Pipe()
-		require.NoError(t, err)
-
-		os.Stdout = w
-		log.SetOutput(w)
-
-		defer func() {
-			os.Stdout = origStdout
-			log.SetOutput(origStdout)
-			_ = w.Close()
-		}()
-
-		testFunction()
-
-		os.Stdout = origStdout
-		_ = w.Close()
-
-		var buf bytes.Buffer
-		_, err = io.Copy(&buf, r)
-		require.NoError(t, err)
-
-		out := buf.String()
-
-		t.Cleanup(func() {
-			t.Log(out)
-		})
-
-		return out
-}
-*/
-
-func testDAGFile(name string) string {
-	return filepath.Join(
-		filepath.Join(fileutil.MustGetwd(), "testdata"),
-		name,
-	)
+	return testHelper{Helper: test.Setup(t, test.WithCaptureLoggingOutput())}
 }
 
 const (
-	waitForStatusTimeout = time.Millisecond * 5000
+	waitForStatusTimeout = time.Millisecond * 3000
 	tick                 = time.Millisecond * 50
 )
 

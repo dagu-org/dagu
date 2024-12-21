@@ -4,6 +4,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -21,8 +22,9 @@ import (
 )
 
 type Helper struct {
-	Context context.Context
-	Config  *config.Config
+	Context       context.Context
+	Config        *config.Config
+	LoggingOutput *SyncBuffer
 
 	tmpDir string
 }
@@ -46,36 +48,55 @@ func (t Helper) Client() client.Client {
 	return client.New(t.DataStore(), t.Config.Executable, t.Config.WorkDir)
 }
 
-var (
-	lock sync.Mutex
-)
+var lock sync.Mutex
 
-func Setup(t *testing.T) Helper {
+type TestHelperOption func(th *Helper)
+
+func WithCaptureLoggingOutput() TestHelperOption {
+	return func(th *Helper) {
+		th.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
+
+		loggerInstance := logger.NewLogger(
+			logger.WithDebug(),
+			logger.WithFormat("text"),
+			logger.WithWriter(th.LoggingOutput),
+		)
+		th.Context = logger.WithFixedLogger(th.Context, loggerInstance)
+	}
+}
+
+type SyncBuffer struct {
+	buf  *bytes.Buffer
+	lock sync.Mutex
+}
+
+func (b *SyncBuffer) Write(p []byte) (n int, err error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *SyncBuffer) String() string {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.String()
+}
+
+func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	lock.Lock()
 	defer lock.Unlock()
 
 	tmpDir := fileutil.MustTempDir("test")
-	err := os.Setenv("HOME", tmpDir)
-	require.NoError(t, err)
 
-	configDir := filepath.Join(tmpDir, "config")
-	viper.AddConfigPath(configDir)
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("admin")
+	_ = os.Setenv("DAGU_HOME", tmpDir)
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	cfg.DAGs = filepath.Join(tmpDir, "dags")
-	cfg.WorkDir = tmpDir
-	cfg.BaseConfig = filepath.Join(tmpDir, "config", "base.yaml")
-	cfg.DataDir = filepath.Join(tmpDir, "data")
-	cfg.LogDir = filepath.Join(tmpDir, "log")
-	cfg.AdminLogsDir = filepath.Join(tmpDir, "log", "admin")
-
 	// Set the executable path to the test binary.
 	cfg.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
 
+	// TODO: Remove this if possible
 	// Set environment variables.
 	// This is required for some tests that run the executable
 	_ = os.Setenv("DAGU_DAGS_DIR", cfg.DAGs)
@@ -87,13 +108,21 @@ func Setup(t *testing.T) Helper {
 	_ = os.Setenv("DAGU_ADMIN_LOG_DIR", cfg.AdminLogsDir)
 
 	ctx := context.Background()
-	ctx = logger.WithLogger(ctx, logger.NewLogger(logger.WithDebug(), logger.WithFormat("text")))
+
+	loggerOpts := []logger.Option{
+		logger.WithDebug(), logger.WithFormat("text"),
+	}
+	ctx = logger.WithLogger(ctx, logger.NewLogger(loggerOpts...))
 
 	helper := Helper{
 		Context: ctx,
 		Config:  cfg,
 
 		tmpDir: tmpDir,
+	}
+
+	for _, opt := range opts {
+		opt(&helper)
 	}
 
 	t.Cleanup(helper.Cleanup)

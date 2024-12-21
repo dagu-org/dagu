@@ -5,32 +5,31 @@ package main
 
 import (
 	"testing"
-
-	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestStartCommand(t *testing.T) {
+	th := testSetup(t)
 	tests := []cmdTest{
 		{
-			args:        []string{"start", testDAGFile("success.yaml")},
-			expectedOut: []string{"1 finished"},
+			name:        "StartDAG",
+			args:        []string{"start", th.DAGFile("success.yaml")},
+			expectedOut: []string{"Step execution started"},
 		},
 		{
-			args:        []string{"start", testDAGFile("params.yaml")},
-			expectedOut: []string{"params is p1 and p2"},
+			name:        "StartDAGWithDefaultParams",
+			args:        []string{"start", th.DAGFile("params.yaml")},
+			expectedOut: []string{`params="[p1 p2]"`},
 		},
 		{
-			args: []string{
-				"start",
-				`--params="p3 p4"`,
-				testDAGFile("params.yaml"),
-			},
-			expectedOut: []string{"params is p3 and p4"},
+			name:        "StartDAGWithParams",
+			args:        []string{"start", `--params="p3 p4"`, th.DAGFile("params.yaml")},
+			expectedOut: []string{`params="[p3 p4]"`},
 		},
 	}
 
-	th := test.Setup(t)
 	for _, tc := range tests {
-		testRunCommand(t, th.Context, startCmd(), tc)
+		t.Run(tc.name, func(t *testing.T) {
+			th.RunCommand(t, startCmd(), tc)
+		})
 	}
 }

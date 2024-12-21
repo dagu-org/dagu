@@ -5,23 +5,23 @@ package main
 
 import (
 	"testing"
-
-	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestDryCommand(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
-		th := test.Setup(t)
-
+		th := testSetup(t)
 		tests := []cmdTest{
 			{
-				args:        []string{"dry", testDAGFile("success.yaml")},
-				expectedOut: []string{"Starting DRY-RUN"},
+				name:        "DryRunDAG",
+				args:        []string{"dry", th.DAGFile("success.yaml")},
+				expectedOut: []string{"Dry-run finished"},
 			},
 		}
 
 		for _, tc := range tests {
-			testRunCommand(t, th.Context, dryCmd(), tc)
+			t.Run(tc.name, func(t *testing.T) {
+				th.RunCommand(t, dryCmd(), tc)
+			})
 		}
 	})
 }

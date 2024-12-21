@@ -12,8 +12,17 @@ func WithLogger(ctx context.Context, logger Logger) context.Context {
 	return context.WithValue(ctx, contextKey{}, logger)
 }
 
+// WithFixedLogger returns a new context with the given fixed logger.
+// This is only used for testing.
+func WithFixedLogger(ctx context.Context, logger Logger) context.Context {
+	return context.WithValue(ctx, fixedKey{}, logger)
+}
+
 // FromContext returns a logger from the given context.
 func FromContext(ctx context.Context) Logger {
+	if value := ctx.Value(fixedKey{}); value != nil {
+		return value.(Logger)
+	}
 	value := ctx.Value(contextKey{})
 	if value == nil {
 		defaultLogger.Warn("logger not found in the context")
@@ -78,3 +87,4 @@ func Write(ctx context.Context, msg string) {
 }
 
 type contextKey struct{}
+type fixedKey struct{}

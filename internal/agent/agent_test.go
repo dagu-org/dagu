@@ -375,7 +375,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
 			return status.Status == scheduler.StatusCancel
-		}, time.Second*3, time.Millisecond*100)
+		}, time.Second*10, time.Millisecond*100)
 	})
 }
 

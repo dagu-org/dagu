@@ -10,7 +10,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,18 +19,13 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		th := test.Setup(t)
+		th := testSetup(t)
+		dagFile := th.DAGFile("restart.yaml")
 
-		dagFile := testDAGFile("restart.yaml")
-
-		// Start the DAG.
 		go func() {
-			testRunCommand(
-				t,
-				th.Context,
-				startCmd(),
-				cmdTest{args: []string{"start", `--params="foo"`, dagFile}},
-			)
+			// Start a DAG to restart.
+			args := []string{"start", `--params="foo"`, dagFile}
+			th.RunCommand(t, startCmd(), cmdTest{args: args})
 		}()
 
 		time.Sleep(waitForStatusUpdate)
@@ -43,7 +37,8 @@ func TestRestartCommand(t *testing.T) {
 		// Restart the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, th.Context, restartCmd(), cmdTest{args: []string{"restart", dagFile}})
+			args := []string{"restart", dagFile}
+			th.RunCommand(t, restartCmd(), cmdTest{args: args})
 			close(done)
 		}()
 
@@ -53,7 +48,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
-		testRunCommand(t, th.Context, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
+		th.RunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
 
 		time.Sleep(waitForStatusUpdate)
 

@@ -32,7 +32,7 @@ func stopCmd() *cobra.Command {
 				logger.Fatal(ctx, "DAG load failed", "error", err, "file", args[0])
 			}
 
-			logger.Info(ctx, "DAG stop initiated", "DAG", dag.Name)
+			logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
 			dataStore := newDataStores(cfg)
 			cli := newClient(cfg, dataStore)
@@ -40,6 +40,8 @@ func stopCmd() *cobra.Command {
 			if err := cli.Stop(cmd.Context(), dag); err != nil {
 				logger.Fatal(ctx, "DAG stop operation failed", "error", err, "dag", dag.Name)
 			}
+
+			logger.Info(ctx, "DAG stopped", "dag", dag.Name)
 		},
 	}
 	return cmd

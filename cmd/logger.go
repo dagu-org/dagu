@@ -32,7 +32,7 @@ func buildLoggerWithFile(f *os.File, quiet bool) logger.Logger {
 		opts = append(opts, logger.WithQuiet())
 	}
 	if f != nil {
-		opts = append(opts, logger.WithLogFile(f))
+		opts = append(opts, logger.WithWriter(f))
 	}
 	return logger.NewLogger(opts...)
 }
