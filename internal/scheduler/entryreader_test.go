@@ -46,7 +46,8 @@ func TestReadEntries(t *testing.T) {
 
 		done := make(chan any)
 		defer close(done)
-		entryReader.Start(context.Background(), done)
+		err = entryReader.Start(context.Background(), done)
+		require.NoError(t, err)
 
 		entries, err = entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
