@@ -86,16 +86,18 @@ func setupTest(t *testing.T) (string, client.Client) {
 	require.NoError(t, err)
 
 	cfg := &config.Config{
-		DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
-		DAGs:            testdataDir,
-		SuspendFlagsDir: tmpDir,
-		WorkDir:         tmpDir,
+		Paths: config.PathsConfig{
+			DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
+			DAGsDir:         testdataDir,
+			SuspendFlagsDir: tmpDir,
+		},
+		WorkDir: tmpDir,
 	}
 
 	dataStore := dsclient.NewDataStores(
-		cfg.DAGs,
-		cfg.DataDir,
-		cfg.SuspendFlagsDir,
+		cfg.Paths.DAGsDir,
+		cfg.Paths.DataDir,
+		cfg.Paths.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},

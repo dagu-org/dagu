@@ -45,7 +45,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
-		cfg.DAGs = dagsDir
+		cfg.Paths.DAGsDir = dagsDir
 	}
 
 	ctx := cmd.Context()
@@ -57,7 +57,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Info(ctx, "Scheduler initialization", "dags", cfg.DAGs)
+		logger.Info(ctx, "Scheduler initialization", "dags", cfg.Paths.DAGsDir)
 
 		sc := scheduler.New(cfg, cli)
 		if err := sc.Start(ctx); err != nil {

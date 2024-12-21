@@ -27,7 +27,7 @@ func stopCmd() *cobra.Command {
 			ctx := cmd.Context()
 			ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
-			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
+			dag, err := digraph.Load(cmd.Context(), cfg.Paths.BaseConfig, args[0], "")
 			if err != nil {
 				logger.Fatal(ctx, "DAG load failed", "error", err, "file", args[0])
 			}

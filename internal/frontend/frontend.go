@@ -16,7 +16,7 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 	hs = append(hs, dag.NewHandler(
 		&dag.NewHandlerArgs{
 			Client:             cli,
-			LogEncodingCharset: cfg.LogEncodingCharset,
+			LogEncodingCharset: cfg.UI.LogEncodingCharset,
 			RemoteNodes:        cfg.RemoteNodes,
 			ApiBasePath:        cfg.APIBaseURL,
 		},
@@ -33,24 +33,24 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		TLS:                   cfg.TLS,
 		Handlers:              hs,
 		AssetsFS:              assetsFS,
-		NavbarColor:           cfg.NavbarColor,
-		NavbarTitle:           cfg.NavbarTitle,
+		NavbarColor:           cfg.UI.NavbarColor,
+		NavbarTitle:           cfg.UI.NavbarTitle,
+		MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 		APIBaseURL:            cfg.APIBaseURL,
-		MaxDashboardPageLimit: cfg.MaxDashboardPageLimit,
 		TimeZone:              cfg.TZ,
 		RemoteNodes:           remoteNodes,
 	}
 
-	if cfg.IsAuthToken {
+	if cfg.Auth.Token.Enabled {
 		serverParams.AuthToken = &server.AuthToken{
-			Token: cfg.AuthToken,
+			Token: cfg.Auth.Token.Value,
 		}
 	}
 
-	if cfg.IsBasicAuth {
+	if cfg.Auth.Basic.Enabled {
 		serverParams.BasicAuth = &server.BasicAuth{
-			Username: cfg.BasicAuthUsername,
-			Password: cfg.BasicAuthPassword,
+			Username: cfg.Auth.Basic.Username,
+			Password: cfg.Auth.Basic.Password,
 		}
 	}
 

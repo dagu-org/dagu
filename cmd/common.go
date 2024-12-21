@@ -17,14 +17,14 @@ import (
 )
 
 func newClient(cfg *config.Config, ds persistence.DataStores) client.Client {
-	return client.New(ds, cfg.Executable, cfg.WorkDir)
+	return client.New(ds, cfg.Paths.Executable, cfg.WorkDir)
 }
 
 func newDataStores(cfg *config.Config) persistence.DataStores {
 	return dsclient.NewDataStores(
-		cfg.DAGs,
-		cfg.DataDir,
-		cfg.SuspendFlagsDir,
+		cfg.Paths.DAGsDir,
+		cfg.Paths.DataDir,
+		cfg.Paths.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},

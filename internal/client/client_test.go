@@ -302,7 +302,7 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		dag, err := digraph.Load(ctx, "", filepath.Join(th.Config.DAGs, id+".yaml"), "")
+		dag, err := digraph.Load(ctx, "", filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"), "")
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", dag.Name)
 	})
@@ -315,7 +315,7 @@ steps:
 		// Create a DAG to rename.
 		id, err := cli.CreateDAG(ctx, "old_name")
 		require.NoError(t, err)
-		_, err = cli.GetStatus(ctx, filepath.Join(th.Config.DAGs, id+".yaml"))
+		_, err = cli.GetStatus(ctx, filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"))
 		require.NoError(t, err)
 
 		// Rename the file.
@@ -323,7 +323,7 @@ steps:
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
-		require.FileExists(t, filepath.Join(th.Config.DAGs, id+"_renamed.yaml"))
+		require.FileExists(t, filepath.Join(th.Config.Paths.DAGsDir, id+"_renamed.yaml"))
 	})
 }
 

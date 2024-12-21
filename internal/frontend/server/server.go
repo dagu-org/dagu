@@ -30,7 +30,7 @@ type Server struct {
 	port        int
 	basicAuth   *BasicAuth
 	authToken   *AuthToken
-	tls         *config.TLS
+	tls         *config.TLSConfig
 	server      *restapi.Server
 	handlers    []Handler
 	assets      fs.FS
@@ -41,7 +41,7 @@ type NewServerArgs struct {
 	Port      int
 	BasicAuth *BasicAuth
 	AuthToken *AuthToken
-	TLS       *config.TLS
+	TLS       *config.TLSConfig
 	Handlers  []Handler
 	AssetsFS  fs.FS
 

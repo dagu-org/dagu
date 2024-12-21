@@ -32,9 +32,9 @@ type Helper struct {
 // DataStore creates a new DataStores instance
 func (h Helper) DataStore() persistence.DataStores {
 	return dsclient.NewDataStores(
-		h.Config.DAGs,
-		h.Config.DataDir,
-		h.Config.SuspendFlagsDir,
+		h.Config.Paths.DAGsDir,
+		h.Config.Paths.DataDir,
+		h.Config.Paths.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: h.Config.LatestStatusToday,
 		},
@@ -43,7 +43,7 @@ func (h Helper) DataStore() persistence.DataStores {
 
 // Client creates a new Client instance
 func (h Helper) Client() client.Client {
-	return client.New(h.DataStore(), h.Config.Executable, h.Config.WorkDir)
+	return client.New(h.DataStore(), h.Config.Paths.Executable, h.Config.WorkDir)
 }
 
 // Cleanup removes temporary test directories
@@ -98,7 +98,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	cfg.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
+	cfg.Paths.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
 
 	helper := Helper{
 		Context: createDefaultContext(),

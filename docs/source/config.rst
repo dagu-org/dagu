@@ -32,7 +32,7 @@ Server Configuration
 
 Directory Paths
 ~~~~~~~~~~~~~
-- ``DAGU_DAGS`` (``$HOME/.config/dagu/dags``): DAG definitions directory
+- ``DAGU_DAGS_DIR`` (``$HOME/.config/dagu/dags``): DAG definitions directory
 - ``DAGU_LOG_DIR`` (``$HOME/.local/share/dagu/logs``): Log files directory
 - ``DAGU_DATA_DIR`` (``$HOME/.local/share/dagu/history``): Application data directory
 - ``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): DAG suspend flags directory

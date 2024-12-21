@@ -33,7 +33,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	ctx = logger.WithLogger(ctx, buildLogger(cfg))
 
 	// Load the DAG
-	dag, err := digraph.Load(ctx, cfg.BaseConfig, args[0], "")
+	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], "")
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}

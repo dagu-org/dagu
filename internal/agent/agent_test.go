@@ -427,7 +427,7 @@ func newAgent(
 	dag *digraph.DAG,
 	opts *agent.Options,
 ) *agent.Agent {
-	logDir, logFile := th.Config.LogDir, ""
+	logDir, logFile := th.Config.Paths.LogDir, ""
 	return agent.New(
 		requestID,
 		dag,

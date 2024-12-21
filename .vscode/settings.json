@@ -32,5 +32,6 @@
         "warnf",
         "errorf",
         "fatalf",
+        "mapstructure",
     ],
 }

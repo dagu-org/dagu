@@ -43,11 +43,11 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
-		cfg.DAGs = dagsDir
+		cfg.Paths.DAGsDir = dagsDir
 	}
 
 	logger.Info(ctx, "Scheduler initialization",
-		"specsDirectory", cfg.DAGs,
+		"specsDirectory", cfg.Paths.DAGsDir,
 		"logFormat", cfg.LogFormat)
 
 	dataStore := newDataStores(cfg)
@@ -56,7 +56,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	sc := scheduler.New(cfg, cli)
 	if err := sc.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
-			cfg.DAGs, err)
+			cfg.Paths.DAGsDir, err)
 	}
 
 	return nil

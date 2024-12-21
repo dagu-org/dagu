@@ -34,10 +34,10 @@ func New(cfg *config.Config, cli client.Client) *Scheduler {
 	jobCreator := &jobCreatorImpl{
 		WorkDir:    cfg.WorkDir,
 		Client:     cli,
-		Executable: cfg.Executable,
+		Executable: cfg.Paths.Executable,
 	}
-	entryReader := newEntryReader(cfg.DAGs, jobCreator, cli)
-	return newScheduler(entryReader, cfg.LogDir, cfg.Location)
+	entryReader := newEntryReader(cfg.Paths.DAGsDir, jobCreator, cli)
+	return newScheduler(entryReader, cfg.Paths.LogDir, cfg.Location)
 }
 
 type entryReader interface {

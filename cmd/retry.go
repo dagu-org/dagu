@@ -86,7 +86,7 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 		return nil, fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
 	}
 
-	dag, err := digraph.Load(ctx, cfg.BaseConfig, absolutePath, status.Status.Params)
+	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, absolutePath, status.Status.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
 			specFilePath, status.Status.Params, err)
@@ -108,7 +108,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 
 	logFile, err := openLogFile(logFileSettings{
 		Prefix:    retryPrefix,
-		LogDir:    cfg.LogDir,
+		LogDir:    cfg.Paths.LogDir,
 		DAGLogDir: execCtx.dag.LogDir,
 		DAGName:   execCtx.dag.Name,
 		RequestID: newRequestID,

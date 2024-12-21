@@ -41,7 +41,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	dag, err := digraph.Load(ctx, cfg.BaseConfig, args[0], removeQuotes(params))
+	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], removeQuotes(params))
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
@@ -53,7 +53,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 
 	logSettings := logFileSettings{
 		Prefix:    dryPrefix,
-		LogDir:    cfg.LogDir,
+		LogDir:    cfg.Paths.LogDir,
 		DAGLogDir: dag.LogDir,
 		DAGName:   dag.Name,
 		RequestID: requestID,

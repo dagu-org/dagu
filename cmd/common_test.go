@@ -74,7 +74,7 @@ func testStatusEventual(t *testing.T, e client.Client, dagFile string, expected 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	dag, err := digraph.Load(context.Background(), cfg.BaseConfig, dagFile, "")
+	dag, err := digraph.Load(context.Background(), cfg.Paths.BaseConfig, dagFile, "")
 	require.NoError(t, err)
 
 	ctx := context.Background()

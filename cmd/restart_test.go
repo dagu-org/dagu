@@ -56,7 +56,7 @@ func TestRestartCommand(t *testing.T) {
 		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dag, err := digraph.Load(th.Context, th.Config.BaseConfig, dagFile, "")
+		dag, err := digraph.Load(th.Context, th.Config.Paths.BaseConfig, dagFile, "")
 		require.NoError(t, err)
 
 		dataStore := newDataStores(th.Config)

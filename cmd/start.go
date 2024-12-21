@@ -63,7 +63,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool) error {
 	// Load DAG
-	dag, err := digraph.Load(ctx, cfg.BaseConfig, specPath, params)
+	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specPath, params)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
 	}
@@ -77,7 +77,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	// Setup logging
 	logFile, err := openLogFile(logFileSettings{
 		Prefix:    startPrefix,
-		LogDir:    cfg.LogDir,
+		LogDir:    cfg.Paths.LogDir,
 		DAGLogDir: dag.LogDir,
 		DAGName:   dag.Name,
 		RequestID: requestID,
