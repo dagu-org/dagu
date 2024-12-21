@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/test"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,26 +20,24 @@ func TestScheduler(t *testing.T) {
 		entryReader := &mockEntryReader{
 			Entries: []*entry{
 				{
-					Job:    &mockJob{},
-					Next:   now,
-					Logger: test.NewLogger(),
+					Job:  &mockJob{},
+					Next: now,
 				},
 				{
-					Job:    &mockJob{},
-					Next:   now.Add(time.Minute),
-					Logger: test.NewLogger(),
+					Job:  &mockJob{},
+					Next: now.Add(time.Minute),
 				},
 			},
 		}
 
-		schedulerInstance := newScheduler(entryReader, test.NewLogger(), testHomeDir, time.Local)
+		schedulerInstance := newScheduler(entryReader, testHomeDir, time.Local)
 
 		go func() {
 			_ = schedulerInstance.Start(context.Background())
 		}()
 
 		time.Sleep(time.Second + time.Millisecond*100)
-		schedulerInstance.Stop()
+		schedulerInstance.Stop(context.Background())
 
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
 		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
@@ -56,17 +52,16 @@ func TestScheduler(t *testing.T) {
 					EntryType: entryTypeRestart,
 					Job:       &mockJob{},
 					Next:      now,
-					Logger:    test.NewLogger(),
 				},
 			},
 		}
 
-		schedulerInstance := newScheduler(entryReader, test.NewLogger(), testHomeDir, time.Local)
+		schedulerInstance := newScheduler(entryReader, testHomeDir, time.Local)
 
 		go func() {
 			_ = schedulerInstance.Start(context.Background())
 		}()
-		defer schedulerInstance.Stop()
+		defer schedulerInstance.Stop(context.Background())
 
 		time.Sleep(time.Second + time.Millisecond*100)
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RestartCount.Load())
@@ -74,7 +69,7 @@ func TestScheduler(t *testing.T) {
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 		setFixedTime(now)
-		schedulerInstance := newScheduler(&mockEntryReader{}, test.NewLogger(), testHomeDir, time.Local)
+		schedulerInstance := newScheduler(&mockEntryReader{}, testHomeDir, time.Local)
 		next := schedulerInstance.nextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 	})

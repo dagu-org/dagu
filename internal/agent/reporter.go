@@ -5,6 +5,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -19,43 +20,32 @@ import (
 
 // Sender is a mailer interface.
 type Sender interface {
-	Send(
-		from string, to []string, subject, body string, attachments []string,
-	) error
+	Send(from string, to []string, subject, body string, attachments []string) error
 }
 
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
 type reporter struct {
 	sender Sender
-	logger logger.Logger
 }
 
-func newReporter(sender Sender, lg logger.Logger) *reporter {
-	return &reporter{
-		sender: sender,
-		logger: lg,
-	}
+func newReporter(sender Sender) *reporter {
+	return &reporter{sender: sender}
 }
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	dag *digraph.DAG, status *model.Status, node *scheduler.Node,
+	ctx context.Context, dag *digraph.DAG, status *model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		r.logger.Info("Step execution finished",
-			"step", node.Data().Step.Name,
-			"status", nodeStatus,
-		)
+		logger.Info(ctx, "Step execution finished", "step", node.Data().Step.Name, "status", nodeStatus)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
 		return r.sender.Send(
 			dag.ErrorMail.From,
 			[]string{dag.ErrorMail.To},
-			fmt.Sprintf(
-				"%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status,
-			),
+			fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status),
 			renderHTML(status.Nodes),
 			addAttachmentList(dag.ErrorMail.AttachLogs, status.Nodes),
 		)
@@ -64,7 +54,7 @@ func (r *reporter) reportStep(
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) report(status *model.Status, err error) {
+func (r *reporter) report(ctx context.Context, status *model.Status, err error) {
 	isTerminal := term.IsTerminal(int(os.Stderr.Fd()))
 	if !isTerminal {
 		// If the output is not a terminal, we don't need to render the table.
@@ -77,7 +67,7 @@ func (r *reporter) report(status *model.Status, err error) {
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Details ->\n"))
 	_, _ = buf.Write([]byte(renderTable(status.Nodes)))
-	r.logger.Write(buf.String())
+	logger.Write(ctx, buf.String())
 }
 
 // send is a function that sends a report mail.

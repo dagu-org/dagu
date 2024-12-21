@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -65,10 +64,7 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			rp := &reporter{
-				sender: &mockSender{},
-				logger: test.NewLogger(),
-			}
+			rp := &reporter{sender: &mockSender{}}
 
 			fn(t, rp, d, nodes)
 		})

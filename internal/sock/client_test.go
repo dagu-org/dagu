@@ -4,6 +4,7 @@
 package sock_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/sock"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,12 +41,11 @@ func TestDialTimeout(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 		},
-		test.NewLogger(),
 	)
 	require.NoError(t, err)
 
 	go func() {
-		_ = srv.Serve(nil)
+		_ = srv.Serve(context.Background(), nil)
 	}()
 
 	time.Sleep(time.Millisecond * 500)

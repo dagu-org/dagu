@@ -15,11 +15,7 @@ import (
 	"github.com/dagu-org/dagu/internal/util"
 )
 
-func buildLogger(cfg *config.Config, quiet bool) logger.Logger {
-	return buildLoggerWithFile(cfg, quiet, nil)
-}
-
-func buildLoggerWithFile(cfg *config.Config, quiet bool, f *os.File) logger.Logger {
+func buildLogger(cfg *config.Config) logger.Logger {
 	var opts []logger.Option
 	if cfg.Debug {
 		opts = append(opts, logger.WithDebug())
@@ -27,11 +23,16 @@ func buildLoggerWithFile(cfg *config.Config, quiet bool, f *os.File) logger.Logg
 	if cfg.LogFormat != "" {
 		opts = append(opts, logger.WithFormat(cfg.LogFormat))
 	}
+	return logger.NewLogger(opts...)
+}
+
+func buildLoggerWithFile(f *os.File, quiet bool) logger.Logger {
+	var opts []logger.Option
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
 	if f != nil {
-		opts = append(opts, logger.WithLogFile(f))
+		opts = append(opts, logger.WithWriter(f))
 	}
 	return logger.NewLogger(opts...)
 }

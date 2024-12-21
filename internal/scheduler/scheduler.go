@@ -26,23 +26,22 @@ type Scheduler struct {
 	logDir      string
 	stop        chan struct{}
 	running     atomic.Bool
-	logger      logger.Logger
 	location    *time.Location
 }
 
 // TODO: refactor to remove ctx from the constructor
-func New(ctx context.Context, cfg *config.Config, logger logger.Logger, cli client.Client) *Scheduler {
+func New(cfg *config.Config, cli client.Client) *Scheduler {
 	jobCreator := &jobCreatorImpl{
 		WorkDir:    cfg.WorkDir,
 		Client:     cli,
-		Executable: cfg.Executable,
+		Executable: cfg.Paths.Executable,
 	}
-	entryReader := newEntryReader(ctx, cfg.DAGs, jobCreator, logger, cli)
-	return newScheduler(entryReader, logger, cfg.LogDir, cfg.Location)
+	entryReader := newEntryReader(cfg.Paths.DAGsDir, jobCreator, cli)
+	return newScheduler(entryReader, cfg.Paths.LogDir, cfg.Location)
 }
 
 type entryReader interface {
-	Start(ctx context.Context, done chan any)
+	Start(ctx context.Context, done chan any) error
 	Read(ctx context.Context, now time.Time) ([]*entry, error)
 }
 
@@ -50,7 +49,6 @@ type entry struct {
 	Next      time.Time
 	Job       job
 	EntryType entryType
-	Logger    logger.Logger
 }
 
 type job interface {
@@ -87,12 +85,7 @@ func (e *entry) Invoke(ctx context.Context) error {
 		return nil
 	}
 
-	e.Logger.Info(
-		"DAG operation started",
-		"operation", e.EntryType.String(),
-		"DAG", e.Job.String(),
-		"next", e.Next.Format(time.RFC3339),
-	)
+	logger.Info(ctx, "DAG operation started", "operation", e.EntryType.String(), "DAG", e.Job.String(), "next", e.Next.Format(time.RFC3339))
 
 	switch e.EntryType {
 	case entryTypeStart:
@@ -106,7 +99,7 @@ func (e *entry) Invoke(ctx context.Context) error {
 	}
 }
 
-func newScheduler(entryReader entryReader, logger logger.Logger, logDir string, location *time.Location) *Scheduler {
+func newScheduler(entryReader entryReader, logDir string, location *time.Location) *Scheduler {
 	if location == nil {
 		location = time.Local
 	}
@@ -114,7 +107,6 @@ func newScheduler(entryReader entryReader, logger logger.Logger, logDir string, 
 		entryReader: entryReader,
 		logDir:      logDir,
 		stop:        make(chan struct{}),
-		logger:      logger,
 		location:    location,
 	}
 }
@@ -124,7 +116,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 	done := make(chan any)
 	defer close(done)
 
-	s.entryReader.Start(ctx, done)
+	if err := s.entryReader.Start(ctx, done); err != nil {
+		return fmt.Errorf("failed to start entry reader: %w", err)
+	}
 
 	signal.Notify(
 		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
@@ -135,9 +129,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		case <-done:
 			return
 		case <-sig:
-			s.Stop()
+			s.Stop(ctx)
 		case <-ctx.Done():
-			s.Stop()
+			s.Stop(ctx)
 		}
 	}()
 
@@ -171,7 +165,7 @@ func (s *Scheduler) start(ctx context.Context) {
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		s.logger.Error("Scheduler failed to read DAG entries", "error", err)
+		logger.Error(ctx, "Scheduler failed to read DAG entries", "error", err)
 		return
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -185,18 +179,13 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 		go func(e *entry) {
 			if err := e.Invoke(ctx); err != nil {
 				if errors.Is(err, errJobFinished) {
-					s.logger.Info("DAG is already finished", "DAG", e.Job, "err", err)
+					logger.Info(ctx, "DAG is already finished", "DAG", e.Job, "err", err)
 				} else if errors.Is(err, errJobRunning) {
-					s.logger.Info("DAG is already running", "DAG", e.Job, "err", err)
+					logger.Info(ctx, "DAG is already running", "DAG", e.Job, "err", err)
 				} else if errors.Is(err, errJobSkipped) {
-					s.logger.Info("DAG is skipped", "DAG", e.Job, "err", err)
+					logger.Info(ctx, "DAG is skipped", "DAG", e.Job, "err", err)
 				} else {
-					s.logger.Error(
-						"DAG execution failed",
-						"DAG", e.Job,
-						"operation", e.EntryType.String(),
-						"error", err,
-					)
+					logger.Error(ctx, "DAG execution failed", "DAG", e.Job, "operation", e.EntryType.String(), "error", err)
 				}
 			}
 		}(e)
@@ -207,7 +196,7 @@ func (*Scheduler) nextTick(now time.Time) time.Time {
 	return now.Add(time.Minute).Truncate(time.Second * 60)
 }
 
-func (s *Scheduler) Stop() {
+func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.Load() {
 		return
 	}
@@ -215,7 +204,7 @@ func (s *Scheduler) Stop() {
 		close(s.stop)
 	}
 	s.running.Store(false)
-	s.logger.Info("Scheduler stopped")
+	logger.Info(ctx, "Scheduler stopped")
 }
 
 var (

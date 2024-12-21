@@ -6,6 +6,7 @@ package logger
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"sync"
@@ -42,10 +43,10 @@ type appLogger struct {
 }
 
 type Config struct {
-	debug   bool
-	format  string
-	logFile *os.File
-	quiet   bool
+	debug  bool
+	format string
+	writer io.Writer
+	quiet  bool
 }
 
 type Option func(*Config)
@@ -64,10 +65,10 @@ func WithFormat(format string) Option {
 	}
 }
 
-// WithLogFile sets the file to write logs to.
-func WithLogFile(f *os.File) Option {
+// WithWriter sets the file to write logs to.
+func WithWriter(w io.Writer) Option {
 	return func(o *Config) {
-		o.logFile = f
+		o.writer = w
 	}
 }
 
@@ -78,7 +79,7 @@ func WithQuiet() Option {
 	}
 }
 
-var Default = NewLogger(WithFormat("text"))
+var defaultLogger = NewLogger(WithFormat("text"))
 
 func NewLogger(opts ...Option) Logger {
 	cfg := &Config{}
@@ -110,9 +111,9 @@ func NewLogger(opts ...Option) Logger {
 		handlers = append(handlers, newHandler(os.Stderr, cfg.format, handlerOpts))
 	}
 
-	if cfg.logFile != nil {
-		handler := newHandler(cfg.logFile, cfg.format, handlerOpts)
-		guardedHandler = newGuardedHandler(handler, cfg.logFile)
+	if cfg.writer != nil {
+		handler := newHandler(cfg.writer, cfg.format, handlerOpts)
+		guardedHandler = newGuardedHandler(handler, cfg.writer)
 		handlers = append(handlers, guardedHandler)
 	}
 
@@ -132,14 +133,14 @@ var _ slog.Handler = (*guardedHandler)(nil)
 // 2. the file is opened with the O_SYNC flag to ensure that writes are atomic.
 type guardedHandler struct {
 	handler slog.Handler
-	file    *os.File
+	writer  io.Writer
 	mu      sync.Mutex
 }
 
-func newGuardedHandler(handler slog.Handler, file *os.File) *guardedHandler {
+func newGuardedHandler(handler slog.Handler, writer io.Writer) *guardedHandler {
 	return &guardedHandler{
 		handler: handler,
-		file:    file,
+		writer:  writer,
 	}
 }
 
@@ -161,7 +162,7 @@ func (s *guardedHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	defer s.mu.Unlock()
 	return &guardedHandler{
 		handler: s.handler.WithAttrs(attrs),
-		file:    s.file,
+		writer:  s.writer,
 		mu:      sync.Mutex{},
 	}
 }
@@ -172,16 +173,16 @@ func (s *guardedHandler) WithGroup(name string) slog.Handler {
 	defer s.mu.Unlock()
 	return &guardedHandler{
 		handler: s.handler.WithGroup(name),
-		file:    s.file,
+		writer:  s.writer,
 		mu:      sync.Mutex{},
 	}
 }
 
-func newHandler(f *os.File, format string, opts *slog.HandlerOptions) slog.Handler {
+func newHandler(w io.Writer, format string, opts *slog.HandlerOptions) slog.Handler {
 	if format == "text" {
-		return slog.NewTextHandler(f, opts)
+		return slog.NewTextHandler(w, opts)
 	}
-	return slog.NewJSONHandler(f, opts)
+	return slog.NewJSONHandler(w, opts)
 }
 
 // Debugf implements logger.Logger.
@@ -257,11 +258,10 @@ func (a *appLogger) Write(msg string) {
 	if !a.quiet {
 		_, _ = fmt.Fprintf(os.Stdout, "%s\n", msg)
 	}
-	// If a guarded handler is present, write to the file
-	if a.guardedHandler == nil {
-		return
+	if a.guardedHandler != nil {
+		// If a guarded handler is present, write to the file
+		a.guardedHandler.mu.Lock()
+		defer a.guardedHandler.mu.Unlock()
+		_, _ = a.guardedHandler.writer.Write([]byte(msg + "\n"))
 	}
-	a.guardedHandler.mu.Lock()
-	defer a.guardedHandler.mu.Unlock()
-	_, _ = a.guardedHandler.file.WriteString(msg)
 }

@@ -9,17 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
-
+		th := testSetup(t)
 		go func() {
-			testRunCommand(t, serverCmd(), cmdTest{
+			th.RunCommand(t, serverCmd(), cmdTest{
 				args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
 				expectedOut: []string{"server is running"},
 			})

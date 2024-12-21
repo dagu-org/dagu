@@ -4,6 +4,8 @@
 package test
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -19,105 +21,131 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Setup struct {
-	Config *config.Config
-	Logger logger.Logger
-
-	homeDir string
+// Helper provides test utilities and configuration
+type Helper struct {
+	Context       context.Context
+	Config        *config.Config
+	LoggingOutput *SyncBuffer
+	tmpDir        string
 }
 
-func (t Setup) Cleanup() {
-	_ = os.RemoveAll(t.homeDir)
-}
-
-func (t Setup) DataStore() persistence.DataStores {
+// DataStore creates a new DataStores instance
+func (h Helper) DataStore() persistence.DataStores {
 	return dsclient.NewDataStores(
-		t.Config.DAGs,
-		t.Config.DataDir,
-		t.Config.SuspendFlagsDir,
+		h.Config.Paths.DAGsDir,
+		h.Config.Paths.DataDir,
+		h.Config.Paths.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
-			LatestStatusToday: t.Config.LatestStatusToday,
+			LatestStatusToday: h.Config.LatestStatusToday,
 		},
 	)
 }
 
-func (t Setup) Client() client.Client {
-	return client.New(
-		t.DataStore(), t.Config.Executable, t.Config.WorkDir, logger.Default,
-	)
+// Client creates a new Client instance
+func (h Helper) Client() client.Client {
+	return client.New(h.DataStore(), h.Config.Paths.Executable, h.Config.WorkDir)
 }
 
-var (
-	lock sync.Mutex
-)
+// Cleanup removes temporary test directories
+func (h Helper) Cleanup() {
+	_ = os.RemoveAll(h.tmpDir)
+}
 
-func SetupTest(t *testing.T) Setup {
-	lock.Lock()
-	defer lock.Unlock()
+// SyncBuffer provides thread-safe buffer operations
+type SyncBuffer struct {
+	buf  *bytes.Buffer
+	lock sync.Mutex
+}
+
+func (b *SyncBuffer) Write(p []byte) (n int, err error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *SyncBuffer) String() string {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	return b.buf.String()
+}
+
+// TestHelperOption defines functional options for Helper
+type TestHelperOption func(*Helper)
+
+// WithCaptureLoggingOutput creates a logging capture option
+func WithCaptureLoggingOutput() TestHelperOption {
+	return func(h *Helper) {
+		h.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
+		loggerInstance := logger.NewLogger(
+			logger.WithDebug(),
+			logger.WithFormat("text"),
+			logger.WithWriter(h.LoggingOutput),
+		)
+		h.Context = logger.WithFixedLogger(h.Context, loggerInstance)
+	}
+}
+
+var setupLock sync.Mutex
+
+// Setup creates a new Helper instance for testing
+func Setup(t *testing.T, opts ...TestHelperOption) Helper {
+	setupLock.Lock()
+	defer setupLock.Unlock()
 
 	tmpDir := fileutil.MustTempDir("test")
-	err := os.Setenv("HOME", tmpDir)
-	require.NoError(t, err)
-
-	configDir := filepath.Join(tmpDir, "config")
-	viper.AddConfigPath(configDir)
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("admin")
+	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	cfg.DAGs = filepath.Join(tmpDir, "dags")
-	cfg.WorkDir = tmpDir
-	cfg.BaseConfig = filepath.Join(tmpDir, "config", "base.yaml")
-	cfg.DataDir = filepath.Join(tmpDir, "data")
-	cfg.LogDir = filepath.Join(tmpDir, "log")
-	cfg.AdminLogsDir = filepath.Join(tmpDir, "log", "admin")
+	cfg.Paths.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
 
-	// Set the executable path to the test binary.
-	cfg.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
+	helper := Helper{
+		Context: createDefaultContext(),
+		Config:  cfg,
+		tmpDir:  tmpDir,
+	}
 
-	// Set environment variables.
-	// This is required for some tests that run the executable
-	_ = os.Setenv("DAGU_DAGS_DIR", cfg.DAGs)
-	_ = os.Setenv("DAGU_WORK_DIR", cfg.WorkDir)
-	_ = os.Setenv("DAGU_BASE_CONFIG", cfg.BaseConfig)
-	_ = os.Setenv("DAGU_LOG_DIR", cfg.LogDir)
-	_ = os.Setenv("DAGU_DATA_DIR", cfg.DataDir)
-	_ = os.Setenv("DAGU_SUSPEND_FLAGS_DIR", cfg.SuspendFlagsDir)
-	_ = os.Setenv("DAGU_ADMIN_LOG_DIR", cfg.AdminLogsDir)
+	for _, opt := range opts {
+		opt(&helper)
+	}
 
-	return Setup{
-		Config: cfg,
-		Logger: NewLogger(),
+	t.Cleanup(helper.Cleanup)
+	return helper
+}
 
-		homeDir: tmpDir,
+// SetupForDir creates a new Helper instance with a specific configuration directory
+func SetupForDir(t *testing.T, dir string) Helper {
+	setupLock.Lock()
+	defer setupLock.Unlock()
+
+	tmpDir := fileutil.MustTempDir("test")
+	require.NoError(t, os.Setenv("HOME", tmpDir))
+
+	configureViper(dir)
+
+	cfg, err := config.Load()
+	require.NoError(t, err)
+
+	return Helper{
+		Context: createDefaultContext(),
+		Config:  cfg,
+		tmpDir:  tmpDir,
 	}
 }
 
-func SetupForDir(t *testing.T, dir string) Setup {
-	lock.Lock()
-	defer lock.Unlock()
+// createDefaultContext creates a context with default logger settings
+func createDefaultContext() context.Context {
+	ctx := context.Background()
+	return logger.WithLogger(ctx, logger.NewLogger(
+		logger.WithDebug(),
+		logger.WithFormat("text"),
+	))
+}
 
-	tmpDir := fileutil.MustTempDir("test")
-	err := os.Setenv("HOME", tmpDir)
-	require.NoError(t, err)
-
+// configureViper sets up Viper configuration
+func configureViper(dir string) {
 	viper.AddConfigPath(dir)
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("admin")
-
-	cfg, err := config.Load()
-	require.NoError(t, err)
-
-	return Setup{
-		Config: cfg,
-		Logger: NewLogger(),
-
-		homeDir: tmpDir,
-	}
-}
-
-func NewLogger() logger.Logger {
-	return logger.NewLogger(logger.WithDebug(), logger.WithFormat("text"))
 }

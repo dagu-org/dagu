@@ -8,16 +8,15 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/dag"
 	"github.com/dagu-org/dagu/internal/frontend/server"
-	"github.com/dagu-org/dagu/internal/logger"
 )
 
-func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server {
+func New(cfg *config.Config, cli client.Client) *server.Server {
 	var hs []server.Handler
 
 	hs = append(hs, dag.NewHandler(
 		&dag.NewHandlerArgs{
 			Client:             cli,
-			LogEncodingCharset: cfg.LogEncodingCharset,
+			LogEncodingCharset: cfg.UI.LogEncodingCharset,
 			RemoteNodes:        cfg.RemoteNodes,
 			ApiBasePath:        cfg.APIBaseURL,
 		},
@@ -32,27 +31,26 @@ func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server
 		Host:                  cfg.Host,
 		Port:                  cfg.Port,
 		TLS:                   cfg.TLS,
-		Logger:                lg,
 		Handlers:              hs,
 		AssetsFS:              assetsFS,
-		NavbarColor:           cfg.NavbarColor,
-		NavbarTitle:           cfg.NavbarTitle,
+		NavbarColor:           cfg.UI.NavbarColor,
+		NavbarTitle:           cfg.UI.NavbarTitle,
+		MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
 		APIBaseURL:            cfg.APIBaseURL,
-		MaxDashboardPageLimit: cfg.MaxDashboardPageLimit,
 		TimeZone:              cfg.TZ,
 		RemoteNodes:           remoteNodes,
 	}
 
-	if cfg.IsAuthToken {
+	if cfg.Auth.Token.Enabled {
 		serverParams.AuthToken = &server.AuthToken{
-			Token: cfg.AuthToken,
+			Token: cfg.Auth.Token.Value,
 		}
 	}
 
-	if cfg.IsBasicAuth {
+	if cfg.Auth.Basic.Enabled {
 		serverParams.BasicAuth = &server.BasicAuth{
-			Username: cfg.BasicAuthUsername,
-			Password: cfg.BasicAuthPassword,
+			Username: cfg.Auth.Basic.Username,
+			Password: cfg.Auth.Basic.Password,
 		}
 	}
 

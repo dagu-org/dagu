@@ -4,10 +4,10 @@
 package scheduler
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +20,7 @@ func TestCycleDetection(t *testing.T) {
 	step2.Name = "2"
 	step2.Depends = []string{"1"}
 
-	_, err := NewExecutionGraph(logger.Default, step1, step2)
+	_, err := NewExecutionGraph(step1, step2)
 
 	if err == nil {
 		t.Fatal("cycle detection should be detected.")
@@ -94,7 +94,8 @@ func TestRetryExecution(t *testing.T) {
 			},
 		},
 	}
-	_, err := NewExecutionGraphForRetry(logger.Default, nodes...)
+	ctx := context.Background()
+	_, err := CreateRetryExecutionGraph(ctx, nodes...)
 	require.NoError(t, err)
 	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
 	require.Equal(t, NodeStatusNone, nodes[1].State().Status)

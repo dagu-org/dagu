@@ -13,9 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
-	"github.com/dagu-org/dagu/internal/test"
 
 	"github.com/stretchr/testify/require"
 
@@ -31,10 +29,8 @@ func TestReadEntries(t *testing.T) {
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(
-			context.Background(),
 			filepath.Join(testdataDir, "invalid_directory"),
 			&mockJobFactory{},
-			test.NewLogger(),
 			cli,
 		)
 
@@ -43,16 +39,15 @@ func TestReadEntries(t *testing.T) {
 		require.Len(t, entries, 0)
 
 		entryReader = newEntryReader(
-			context.Background(),
 			testdataDir,
 			&mockJobFactory{},
-			test.NewLogger(),
 			cli,
 		)
 
 		done := make(chan any)
 		defer close(done)
-		entryReader.Start(context.Background(), done)
+		err = entryReader.Start(context.Background(), done)
+		require.NoError(t, err)
 
 		entries, err = entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
@@ -92,20 +87,22 @@ func setupTest(t *testing.T) (string, client.Client) {
 	require.NoError(t, err)
 
 	cfg := &config.Config{
-		DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
-		DAGs:            testdataDir,
-		SuspendFlagsDir: tmpDir,
-		WorkDir:         tmpDir,
+		Paths: config.PathsConfig{
+			DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
+			DAGsDir:         testdataDir,
+			SuspendFlagsDir: tmpDir,
+		},
+		WorkDir: tmpDir,
 	}
 
 	dataStore := dsclient.NewDataStores(
-		cfg.DAGs,
-		cfg.DataDir,
-		cfg.SuspendFlagsDir,
+		cfg.Paths.DAGsDir,
+		cfg.Paths.DataDir,
+		cfg.Paths.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},
 	)
 
-	return tmpDir, client.New(dataStore, "", cfg.WorkDir, logger.Default)
+	return tmpDir, client.New(dataStore, "", cfg.WorkDir)
 }

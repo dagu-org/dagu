@@ -8,6 +8,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -23,34 +24,25 @@ func stopCmd() *cobra.Command {
 				log.Fatalf("Configuration load failed: %v", err)
 			}
 
-			quiet, err := cmd.Flags().GetBool("quiet")
+			ctx := cmd.Context()
+			ctx = logger.WithLogger(ctx, buildLogger(cfg))
+
+			dag, err := digraph.Load(cmd.Context(), cfg.Paths.BaseConfig, args[0], "")
 			if err != nil {
-				log.Fatalf("Flag retrieval failed (quiet): %v", err)
+				logger.Fatal(ctx, "DAG load failed", "error", err, "file", args[0])
 			}
 
-			logger := buildLogger(cfg, quiet)
-
-			dag, err := digraph.Load(cmd.Context(), cfg.BaseConfig, args[0], "")
-			if err != nil {
-				logger.Fatal("DAG load failed", "error", err, "file", args[0])
-			}
-
-			logger.Info("DAG stop initiated", "DAG", dag.Name)
+			logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
 			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, logger)
+			cli := newClient(cfg, dataStore)
 
 			if err := cli.Stop(cmd.Context(), dag); err != nil {
-				logger.Fatal(
-					"DAG stop operation failed",
-					"error",
-					err,
-					"dag",
-					dag.Name,
-				)
+				logger.Fatal(ctx, "DAG stop operation failed", "error", err, "dag", dag.Name)
 			}
+
+			logger.Info(ctx, "DAG stopped", "dag", dag.Name)
 		},
 	}
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
 }

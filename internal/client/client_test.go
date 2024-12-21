@@ -26,12 +26,11 @@ var testdataDir = filepath.Join(fileutil.MustGetwd(), "./testdata")
 
 func TestClient_GetStatus(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
 		file := testDAG("sleep1.yaml")
 
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, file)
 		require.NoError(t, err)
@@ -45,12 +44,11 @@ func TestClient_GetStatus(t *testing.T) {
 				b, _ := status.ToJSON()
 				_, _ = w.Write(b)
 			},
-			test.NewLogger(),
 		)
 
 		go func() {
-			_ = socketServer.Serve(nil)
-			_ = socketServer.Shutdown()
+			_ = socketServer.Serve(ctx, nil)
+			_ = socketServer.Shutdown(ctx)
 		}()
 
 		time.Sleep(time.Millisecond * 100)
@@ -58,17 +56,16 @@ func TestClient_GetStatus(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusRunning, curStatus.Status)
 
-		_ = socketServer.Shutdown()
+		_ = socketServer.Shutdown(ctx)
 
 		curStatus, err = cli.GetCurrentStatus(ctx, dagStatus.DAG)
 		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusNone, curStatus.Status)
 	})
 	t.Run("InvalidDAGName", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, testDAG("invalid_dag"))
@@ -79,20 +76,19 @@ func TestClient_GetStatus(t *testing.T) {
 		require.Error(t, dagStatus.Error)
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
 		var (
 			file      = testDAG("success.yaml")
 			requestID = "test-update-status"
 			now       = time.Now()
-			cli       = setup.Client()
+			cli       = th.Client()
 		)
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, file)
 		require.NoError(t, err)
 
-		historyStore := setup.DataStore().HistoryStore()
+		historyStore := th.DataStore().HistoryStore()
 
 		err = historyStore.Open(ctx, dagStatus.DAG.Location, now, requestID)
 		require.NoError(t, err)
@@ -123,11 +119,10 @@ func TestClient_GetStatus(t *testing.T) {
 		require.Equal(t, newStatus, statusByRequestID.Nodes[0].Status)
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
 		var (
-			cli        = setup.Client()
+			cli        = th.Client()
 			file       = testDAG("sleep1.yaml")
 			wrongReqID = "invalid-request-id"
 		)
@@ -148,10 +143,9 @@ func TestClient_GetStatus(t *testing.T) {
 
 func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		file := testDAG("success.yaml")
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, file)
@@ -165,10 +159,9 @@ func TestClient_RunDAG(t *testing.T) {
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 	})
 	t.Run("Stop", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		file := testDAG("sleep10.yaml")
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, file)
@@ -189,10 +182,9 @@ func TestClient_RunDAG(t *testing.T) {
 		}, time.Millisecond*1500, time.Millisecond*100)
 	})
 	t.Run("Restart", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		file := testDAG("success.yaml")
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, file)
@@ -206,11 +198,10 @@ func TestClient_RunDAG(t *testing.T) {
 		require.Equal(t, scheduler.StatusSuccess, status.Status)
 	})
 	t.Run("Retry", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
 		ctx := context.Background()
-		cli := setup.Client()
+		cli := th.Client()
 		file := testDAG("retry.yaml")
 
 		dagStatus, err := cli.GetStatus(ctx, file)
@@ -246,10 +237,9 @@ func TestClient_RunDAG(t *testing.T) {
 func TestClient_UpdateDAG(t *testing.T) {
 	t.Parallel()
 	t.Run("Update", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 
 		// valid DAG
@@ -276,10 +266,9 @@ steps:
 		require.Equal(t, validDAG, spec)
 	})
 	t.Run("Remove", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 
 		spec := `name: test DAG
@@ -304,31 +293,29 @@ steps:
 		require.NoError(t, err)
 	})
 	t.Run("Create", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 
 		id, err := cli.CreateDAG(ctx, "test-dag")
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		dag, err := digraph.Load(ctx, "", filepath.Join(setup.Config.DAGs, id+".yaml"), "")
+		dag, err := digraph.Load(ctx, "", filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"), "")
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", dag.Name)
 	})
 	t.Run("Rename", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 
 		// Create a DAG to rename.
 		id, err := cli.CreateDAG(ctx, "old_name")
 		require.NoError(t, err)
-		_, err = cli.GetStatus(ctx, filepath.Join(setup.Config.DAGs, id+".yaml"))
+		_, err = cli.GetStatus(ctx, filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"))
 		require.NoError(t, err)
 
 		// Rename the file.
@@ -336,16 +323,15 @@ steps:
 
 		// Check if the file is renamed.
 		require.NoError(t, err)
-		require.FileExists(t, filepath.Join(setup.Config.DAGs, id+"_renamed.yaml"))
+		require.FileExists(t, filepath.Join(th.Config.Paths.DAGsDir, id+"_renamed.yaml"))
 	})
 }
 
 func TestClient_ReadHistory(t *testing.T) {
 	t.Run("TestClient_Empty", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		file := testDAG("success.yaml")
 		ctx := context.Background()
 
@@ -353,10 +339,9 @@ func TestClient_ReadHistory(t *testing.T) {
 		require.NoError(t, err)
 	})
 	t.Run("TestClient_All", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := test.Setup(t)
 
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 
 		// Create a DAG
@@ -396,10 +381,9 @@ func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status,
 }
 
 func TestClient_GetTagList(t *testing.T) {
-	setup := test.SetupTest(t)
-	defer setup.Cleanup()
+	th := test.Setup(t)
 
-	cli := setup.Client()
+	cli := th.Client()
 	ctx := context.Background()
 
 	// Create DAG List

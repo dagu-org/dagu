@@ -6,22 +6,19 @@ package main
 import (
 	"testing"
 	"time"
-
-	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartScheduler", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
-
+		th := testSetup(t)
 		go func() {
-			testRunCommand(t, schedulerCmd(), cmdTest{
+			th.RunCommand(t, schedulerCmd(), cmdTest{
 				args:        []string{"scheduler"},
 				expectedOut: []string{"starting dagu scheduler"},
 			})
 		}()
 
+		// Wait for the scheduler to start.
 		time.Sleep(time.Millisecond * 500)
 	})
 }

@@ -9,22 +9,21 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := testSetup(t)
 
-		dagFile := testDAGFile("retry.yaml")
+		dagFile := th.DAGFile("retry.yaml")
 
 		// Run a DAG.
-		testRunCommand(t, startCmd(), cmdTest{args: []string{"start", `--params="foo"`, dagFile}})
+		args := []string{"start", `--params="foo"`, dagFile}
+		th.RunCommand(t, startCmd(), cmdTest{args: args})
 
 		// Find the request ID.
-		cli := setup.Client()
+		cli := th.Client()
 		ctx := context.Background()
 		status, err := cli.GetStatus(ctx, dagFile)
 		require.NoError(t, err)
@@ -34,9 +33,10 @@ func TestRetryCommand(t *testing.T) {
 		requestID := status.Status.RequestID
 
 		// Retry with the request ID.
-		testRunCommand(t, retryCmd(), cmdTest{
-			args:        []string{"retry", fmt.Sprintf("--req=%s", requestID), dagFile},
-			expectedOut: []string{"param is foo"},
+		args = []string{"retry", fmt.Sprintf("--req=%s", requestID), dagFile}
+		th.RunCommand(t, retryCmd(), cmdTest{
+			args:        args,
+			expectedOut: []string{`params=[foo]`},
 		})
 	})
 }

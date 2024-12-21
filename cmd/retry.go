@@ -40,7 +40,6 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	logger := buildLogger(cfg, false)
 
 	requestID, err := cmd.Flags().GetString("req")
 	if err != nil {
@@ -48,6 +47,8 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
+	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+
 	specFilePath := args[0]
 
 	// Setup execution context
@@ -57,7 +58,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, executionCtx, cfg, logger); err != nil {
+	if err := executeRetry(ctx, executionCtx, cfg); err != nil {
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
@@ -85,7 +86,7 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 		return nil, fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
 	}
 
-	dag, err := digraph.Load(ctx, cfg.BaseConfig, absolutePath, status.Status.Params)
+	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, absolutePath, status.Status.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
 			specFilePath, status.Status.Params, err)
@@ -99,7 +100,7 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 	}, nil
 }
 
-func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Config, logger logger.Logger) error {
+func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Config) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)
@@ -107,7 +108,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 
 	logFile, err := openLogFile(logFileSettings{
 		Prefix:    retryPrefix,
-		LogDir:    cfg.LogDir,
+		LogDir:    cfg.Paths.LogDir,
 		DAGLogDir: execCtx.dag.LogDir,
 		DAGName:   execCtx.dag.Name,
 		RequestID: newRequestID,
@@ -117,18 +118,19 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 	}
 	defer logFile.Close()
 
-	cli := newClient(cfg, execCtx.dataStore, logger)
+	cli := newClient(cfg, execCtx.dataStore)
 
-	logger.Info("DAG retry initiated",
+	logger.Info(ctx, "DAG retry initiated",
 		"DAG", execCtx.dag.Name,
 		"originalRequestID", execCtx.originalState.Status.RequestID,
 		"newRequestID", newRequestID,
 		"logFile", logFile.Name())
 
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
+
 	agt := agent.New(
 		newRequestID,
 		execCtx.dag,
-		buildLoggerWithFile(cfg, false, logFile),
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,

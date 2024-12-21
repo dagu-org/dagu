@@ -4,6 +4,7 @@
 package sock_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/sock"
-	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,7 +37,6 @@ func TestStartAndShutdownServer(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 		},
-		test.NewLogger(),
 	)
 	require.NoError(t, err)
 
@@ -49,7 +48,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 	}()
 
 	go func() {
-		err := unixServer.Serve(listen)
+		err := unixServer.Serve(context.Background(), listen)
 		require.True(t, errors.Is(err, sock.ErrServerRequestedShutdown))
 	}()
 
@@ -59,7 +58,7 @@ func TestStartAndShutdownServer(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "OK", ret)
 
-	_ = unixServer.Shutdown()
+	_ = unixServer.Shutdown(context.Background())
 
 	time.Sleep(time.Millisecond * 50)
 	_, err = client.Request(http.MethodPost, "/")
@@ -76,7 +75,6 @@ func TestNoResponse(t *testing.T) {
 		func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
 		},
-		test.NewLogger(),
 	)
 	require.NoError(t, err)
 
@@ -88,8 +86,8 @@ func TestNoResponse(t *testing.T) {
 	}()
 
 	go func() {
-		err = unixServer.Serve(listen)
-		_ = unixServer.Shutdown()
+		err = unixServer.Serve(context.Background(), listen)
+		_ = unixServer.Shutdown(context.Background())
 	}()
 
 	time.Sleep(time.Millisecond * 50)
@@ -108,7 +106,6 @@ func TestErrorResponse(t *testing.T) {
 	unixServer, err := sock.NewServer(
 		tmpFile.Name(),
 		func(_ http.ResponseWriter, _ *http.Request) {},
-		test.NewLogger(),
 	)
 	require.NoError(t, err)
 
@@ -120,8 +117,8 @@ func TestErrorResponse(t *testing.T) {
 	}()
 
 	go func() {
-		err = unixServer.Serve(listen)
-		_ = unixServer.Shutdown()
+		err = unixServer.Serve(context.Background(), listen)
+		_ = unixServer.Shutdown(context.Background())
 	}()
 
 	time.Sleep(time.Millisecond * 50)

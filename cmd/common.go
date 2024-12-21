@@ -11,21 +11,20 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 	"github.com/google/uuid"
 )
 
-func newClient(cfg *config.Config, ds persistence.DataStores, lg logger.Logger) client.Client {
-	return client.New(ds, cfg.Executable, cfg.WorkDir, lg)
+func newClient(cfg *config.Config, ds persistence.DataStores) client.Client {
+	return client.New(ds, cfg.Paths.Executable, cfg.WorkDir)
 }
 
 func newDataStores(cfg *config.Config) persistence.DataStores {
 	return dsclient.NewDataStores(
-		cfg.DAGs,
-		cfg.DataDir,
-		cfg.SuspendFlagsDir,
+		cfg.Paths.DAGsDir,
+		cfg.Paths.DataDir,
+		cfg.Paths.SuspendFlagsDir,
 		dsclient.DataStoreOptions{
 			LatestStatusToday: cfg.LatestStatusToday,
 		},
@@ -43,7 +42,7 @@ func generateRequestID() (string, error) {
 }
 
 type signalListener interface {
-	Signal(os.Signal)
+	Signal(context.Context, os.Signal)
 }
 
 var signalChan = make(chan os.Signal, 100)
@@ -56,9 +55,9 @@ func listenSignals(ctx context.Context, listener signalListener) {
 
 		select {
 		case <-ctx.Done():
-			listener.Signal(os.Interrupt)
+			listener.Signal(ctx, os.Interrupt)
 		case sig := <-signalChan:
-			listener.Signal(sig)
+			listener.Signal(ctx, sig)
 		}
 	}()
 }
