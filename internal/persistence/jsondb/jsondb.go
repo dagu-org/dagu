@@ -312,11 +312,16 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 }
 
 func (db *JSONDB) getDirectory(key string, prefix string) string {
-	// nolint: gosec
-	h := md5.New()
-	_, _ = h.Write([]byte(key))
-	v := hex.EncodeToString(h.Sum(nil))
-	return filepath.Join(db.location, fmt.Sprintf("%s-%s", prefix, v))
+	if key != prefix {
+		// Add a hash postfix to the directory name to avoid conflicts.
+		// nolint: gosec
+		h := md5.New()
+		_, _ = h.Write([]byte(key))
+		v := hex.EncodeToString(h.Sum(nil))
+		return filepath.Join(db.location, fmt.Sprintf("%s-%s", prefix, v))
+	}
+
+	return filepath.Join(db.location, key)
 }
 
 func (db *JSONDB) generateFilePath(key string, timestamp timeInUTC, requestID string) (string, error) {
