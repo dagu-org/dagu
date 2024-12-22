@@ -250,7 +250,7 @@ func TestJSONDB_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("EmptyDAGFile", func(t *testing.T) {
-		_, err := th.DB.generateFilePath("", time.Now(), "request-id")
+		_, err := th.DB.generateFilePath("", newUTC(time.Now()), "request-id")
 		assert.ErrorIs(t, err, errKeyEmpty)
 	})
 
@@ -270,7 +270,7 @@ func TestJSONDB_FileManagement(t *testing.T) {
 		requestID := "request-id-old"
 		oldTime := time.Now().AddDate(0, 0, -10)
 
-		filePathOld, _ := th.DB.generateFilePath(dag.Location, oldTime, requestID)
+		filePathOld, _ := th.DB.generateFilePath(dag.Location, newUTC(oldTime), requestID)
 		println(filePathOld)
 		err := th.DB.Open(th.Context, dag.Location, oldTime, requestID)
 		require.NoError(t, err)
@@ -284,7 +284,7 @@ func TestJSONDB_FileManagement(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the file path and update its modification time
-		filePath, err := th.DB.generateFilePath(dag.Location, oldTime, requestID)
+		filePath, err := th.DB.generateFilePath(dag.Location, newUTC(oldTime), requestID)
 		require.NoError(t, err)
 		oldDate := time.Now().AddDate(0, 0, -10)
 		err = os.Chtimes(filePath, oldDate, oldDate)
@@ -315,7 +315,7 @@ func TestJSONDB_FileManagement(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		filePath, err := th.DB.generateFilePath(dag.Location, now, requestID)
+		filePath, err := th.DB.generateFilePath(dag.Location, newUTC(now), requestID)
 		require.NoError(t, err)
 
 		// Get file size before compaction

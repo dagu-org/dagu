@@ -57,7 +57,7 @@ type dagTestHelper struct {
 func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Time) writerTestHelper {
 	t.Helper()
 
-	filePath, err := d.th.DB.generateFilePath(d.DAG.Location, startedAt, requestID)
+	filePath, err := d.th.DB.generateFilePath(d.DAG.Location, newUTC(startedAt), requestID)
 	require.NoError(t, err)
 
 	writer := newWriter(filePath)

@@ -35,7 +35,8 @@ var (
 	errCreateNewDirectory = errors.New("failed to create new directory")
 	errKeyEmpty           = errors.New("dagFile is empty")
 
-	rTimestamp = regexp.MustCompile(`2\d{7}.\d{2}:\d{2}:\d{2}`)
+	// rTimestamp is a regular expression to match the timestamp in the file name.
+	rTimestamp = regexp.MustCompile(`2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}|2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}Z`)
 )
 
 type Config struct {
@@ -46,10 +47,11 @@ type Config struct {
 }
 
 const (
-	requestIDLenSafe = 8
-	extDat           = ".dat"
-	dateTimeFormat   = "20060102.15:04:05.000"
-	dateFormat       = "20060102"
+	requestIDLenSafe  = 8
+	extDat            = ".dat"
+	dateTimeFormatUTC = "20060102.15:04:05.000Z"
+	dateTimeFormat    = "20060102.15:04:05.000"
+	dateFormat        = "20060102"
 )
 
 // DefaultConfig returns default configuration
@@ -87,8 +89,8 @@ func New(location string, cfg Config) *JSONDB {
 	return db
 }
 
-func (db *JSONDB) Update(ctx context.Context, name, requestID string, status *model.Status) error {
-	statusFile, err := db.FindByRequestID(ctx, name, requestID)
+func (db *JSONDB) Update(ctx context.Context, key, requestID string, status *model.Status) error {
+	statusFile, err := db.FindByRequestID(ctx, key, requestID)
 	if err != nil {
 		return err
 	}
@@ -105,8 +107,8 @@ func (db *JSONDB) Update(ctx context.Context, name, requestID string, status *mo
 	return writer.write(status)
 }
 
-func (db *JSONDB) Open(_ context.Context, name string, t time.Time, requestID string) error {
-	filePath, err := db.generateFilePath(name, t, requestID)
+func (db *JSONDB) Open(_ context.Context, key string, timestamp time.Time, requestID string) error {
+	filePath, err := db.generateFilePath(key, newUTC(timestamp), requestID)
 	if err != nil {
 		return err
 	}
@@ -142,10 +144,10 @@ func (db *JSONDB) Close(ctx context.Context) error {
 	return db.writer.close()
 }
 
-func (db *JSONDB) ReadStatusRecent(_ context.Context, dagFile string, itemLimit int) []*model.StatusFile {
+func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []*model.StatusFile {
 	var ret []*model.StatusFile
 
-	files := db.getLatestMatches(db.globPattern(dagFile), itemLimit)
+	files := db.getLatestMatches(db.globPattern(key), itemLimit)
 	for _, file := range files {
 		status, err := db.cache.LoadLatest(file, func() (*model.Status, error) {
 			return ParseStatusFile(file)
@@ -162,8 +164,8 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, dagFile string, itemLimit 
 	return ret
 }
 
-func (db *JSONDB) ReadStatusToday(_ context.Context, dagFile string) (*model.Status, error) {
-	file, err := db.latestToday(dagFile, time.Now(), db.config.LatestStatusToday)
+func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*model.Status, error) {
+	file, err := db.latestToday(key, time.Now(), db.config.LatestStatusToday)
 	if err != nil {
 		return nil, err
 	}
@@ -173,12 +175,12 @@ func (db *JSONDB) ReadStatusToday(_ context.Context, dagFile string) (*model.Sta
 	})
 }
 
-func (db *JSONDB) FindByRequestID(_ context.Context, dagFile string, requestID string) (*model.StatusFile, error) {
+func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (*model.StatusFile, error) {
 	if requestID == "" {
 		return nil, errRequestIDNotFound
 	}
 
-	matches, err := filepath.Glob(db.globPattern(dagFile))
+	matches, err := filepath.Glob(db.globPattern(key))
 	if err != nil {
 		return nil, err
 	}
@@ -201,16 +203,16 @@ func (db *JSONDB) FindByRequestID(_ context.Context, dagFile string, requestID s
 	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
 }
 
-func (db *JSONDB) RemoveAll(ctx context.Context, dagFile string) error {
-	return db.RemoveOld(ctx, dagFile, 0)
+func (db *JSONDB) RemoveAll(ctx context.Context, key string) error {
+	return db.RemoveOld(ctx, key, 0)
 }
 
-func (db *JSONDB) RemoveOld(_ context.Context, dagFile string, retentionDays int) error {
+func (db *JSONDB) RemoveOld(_ context.Context, key string, retentionDays int) error {
 	if retentionDays < 0 {
 		return nil
 	}
 
-	matches, err := filepath.Glob(db.globPattern(dagFile))
+	matches, err := filepath.Glob(db.globPattern(key))
 	if err != nil {
 		return err
 	}
@@ -277,12 +279,12 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 		return fmt.Errorf("invalid path: %s -> %s", oldName, newName)
 	}
 
-	oldDir := db.getDirectory(oldName, getFilePrefix(oldName))
+	oldDir := db.getDirectory(oldName, getPrefix(oldName))
 	if !db.exists(oldDir) {
 		return nil
 	}
 
-	newDir := db.getDirectory(newName, getFilePrefix(newName))
+	newDir := db.getDirectory(newName, getPrefix(newName))
 	if !db.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
 			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err)
@@ -309,34 +311,27 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 	return nil
 }
 
-func (db *JSONDB) getDirectory(name string, prefix string) string {
+func (db *JSONDB) getDirectory(key string, prefix string) string {
 	// nolint: gosec
 	h := md5.New()
-	_, _ = h.Write([]byte(name))
+	_, _ = h.Write([]byte(key))
 	v := hex.EncodeToString(h.Sum(nil))
 	return filepath.Join(db.location, fmt.Sprintf("%s-%s", prefix, v))
 }
 
-func (db *JSONDB) generateFilePath(key string, t time.Time, requestID string) (string, error) {
+func (db *JSONDB) generateFilePath(key string, timestamp timeInUTC, requestID string) (string, error) {
 	if key == "" {
 		return "", errKeyEmpty
 	}
 	prefix := db.createPrefix(key)
-	timestamp := t.Format(dateTimeFormat)
+	timestampString := timestamp.Format(dateTimeFormatUTC)
 	requestID = util.TruncString(requestID, requestIDLenSafe)
-	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestamp, requestID), nil
+	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestampString, requestID), nil
 }
 
 func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool) (string, error) {
 	prefix := db.createPrefix(key)
-
-	var pattern string
-	if latestStatusToday {
-		timestamp := day.Format(dateFormat)
-		pattern = fmt.Sprintf("%s.%s*.*.dat", prefix, timestamp)
-	} else {
-		pattern = fmt.Sprintf("%s.*.*.dat", prefix)
-	}
+	pattern := fmt.Sprintf("%s.*.*.dat", prefix)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
@@ -347,6 +342,19 @@ func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool)
 	if len(ret) == 0 {
 		return "", persistence.ErrNoStatusData
 	}
+
+	startOfDay := day.Truncate(24 * time.Hour)
+	startOfDayInUTC := newUTC(startOfDay)
+	if latestStatusToday {
+		timestamp, err := findTimestamp(ret[0])
+		if err != nil {
+			return "", err
+		}
+		if timestamp.Before(startOfDayInUTC.Time) {
+			return "", persistence.ErrNoStatusDataToday
+		}
+	}
+
 	return ret[0], nil
 }
 
@@ -364,7 +372,7 @@ func (s *JSONDB) globPattern(name string) string {
 }
 
 func (s *JSONDB) createPrefix(name string) string {
-	prefix := getFilePrefix(name)
+	prefix := getPrefix(name)
 	return filepath.Join(s.getDirectory(name, prefix), prefix)
 }
 
@@ -410,13 +418,36 @@ func filterLatest(files []string, itemLimit int) []string {
 		return nil
 	}
 	sort.Slice(files, func(i, j int) bool {
-		return findTimestamp(files[i]) > findTimestamp(files[j])
+		a, err := findTimestamp(files[i])
+		if err != nil {
+			return false
+		}
+		b, err := findTimestamp(files[j])
+		if err != nil {
+			return true
+		}
+		return a.After(b)
 	})
 	return files[:min(len(files), itemLimit)]
 }
 
-func findTimestamp(file string) string {
-	return rTimestamp.FindString(file)
+func findTimestamp(file string) (time.Time, error) {
+	timestampString := rTimestamp.FindString(file)
+	if !strings.Contains(timestampString, "Z") {
+		// For backward compatibility
+		t, err := time.Parse(dateTimeFormat, timestampString)
+		if err != nil {
+			return time.Time{}, nil
+		}
+		return t, nil
+	}
+
+	// UTC
+	t, err := time.Parse(dateTimeFormatUTC, timestampString)
+	if err != nil {
+		return time.Time{}, nil
+	}
+	return t, nil
 }
 
 func readLineFrom(f *os.File, offset int64) ([]byte, error) {
@@ -438,6 +469,23 @@ func readLineFrom(f *os.File, offset int64) ([]byte, error) {
 	return ret, nil
 }
 
-func getFilePrefix(dagFile string) string {
-	return strings.TrimSuffix(filepath.Base(dagFile), filepath.Ext(dagFile))
+func getPrefix(key string) string {
+	ext := filepath.Ext(key)
+	if ext == "" {
+		// No extension
+		return filepath.Base(key)
+	}
+	if fileutil.IsYAMLFile(key) {
+		// Remove .yaml or .yml extension
+		return strings.TrimSuffix(filepath.Base(key), ext)
+	}
+	// Use the base name (if it's a path or just a name)
+	return filepath.Base(key)
+}
+
+// timeInUTC is a wrapper for time.Time that ensures the time is in UTC.
+type timeInUTC struct{ time.Time }
+
+func newUTC(t time.Time) timeInUTC {
+	return timeInUTC{t.UTC()}
 }
