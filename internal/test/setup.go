@@ -98,7 +98,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
-	cfg.Paths.Executable = filepath.Join(fileutil.MustGetwd(), "../../bin/dagu")
+	cfg.Paths.Executable = filepath.Join(fileutil.MustGetwd(), "../../.local/bin/dagu")
 
 	helper := Helper{
 		Context: createDefaultContext(),
