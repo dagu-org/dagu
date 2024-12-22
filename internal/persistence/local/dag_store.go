@@ -286,8 +286,8 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			file := filepath.Join(d.dir, fi.Name())
-			dat, err := os.ReadFile(file)
+			filePath := filepath.Join(d.dir, fi.Name())
+			dat, err := os.ReadFile(filePath)
 			if err != nil {
 				util.LogErr("read DAG file", err)
 				continue
@@ -299,7 +299,7 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 				)
 				continue
 			}
-			dag, err := digraph.LoadMetadata(ctx, file)
+			dag, err := digraph.LoadMetadata(ctx, filePath)
 			if err != nil {
 				errs = append(
 					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),

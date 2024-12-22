@@ -272,32 +272,29 @@ func (db *JSONDB) Compact(_ context.Context, targetFilePath string) error {
 }
 
 func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
-	oldName := fileutil.EnsureYAMLExtension(oldKey)
-	newName := fileutil.EnsureYAMLExtension(newKey)
-
-	if !filepath.IsAbs(oldName) || !filepath.IsAbs(newName) {
-		return fmt.Errorf("invalid path: %s -> %s", oldName, newName)
+	if !filepath.IsAbs(oldKey) || !filepath.IsAbs(newKey) {
+		return fmt.Errorf("invalid path: %s -> %s", oldKey, newKey)
 	}
 
-	oldDir := db.getDirectory(oldName, getPrefix(oldName))
+	oldDir := db.getDirectory(oldKey, getPrefix(oldKey))
 	if !db.exists(oldDir) {
 		return nil
 	}
 
-	newDir := db.getDirectory(newName, getPrefix(newName))
+	newDir := db.getDirectory(newKey, getPrefix(newKey))
 	if !db.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
 			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err)
 		}
 	}
 
-	matches, err := filepath.Glob(db.globPattern(oldName))
+	matches, err := filepath.Glob(db.globPattern(oldKey))
 	if err != nil {
 		return err
 	}
 
-	oldPrefix := filepath.Base(db.createPrefix(oldName))
-	newPrefix := filepath.Base(db.createPrefix(newName))
+	oldPrefix := filepath.Base(db.createPrefix(oldKey))
+	newPrefix := filepath.Base(db.createPrefix(newKey))
 	for _, m := range matches {
 		base := filepath.Base(m)
 		f := strings.Replace(base, oldPrefix, newPrefix, 1)
@@ -372,13 +369,13 @@ func (s *JSONDB) getLatestMatches(pattern string, itemLimit int) []string {
 	return filterLatest(matches, itemLimit)
 }
 
-func (s *JSONDB) globPattern(name string) string {
-	return s.createPrefix(name) + "*" + extDat
+func (s *JSONDB) globPattern(key string) string {
+	return s.createPrefix(key) + "*" + extDat
 }
 
-func (s *JSONDB) createPrefix(name string) string {
-	prefix := getPrefix(name)
-	return filepath.Join(s.getDirectory(name, prefix), prefix)
+func (s *JSONDB) createPrefix(key string) string {
+	prefix := getPrefix(key)
+	return filepath.Join(s.getDirectory(key, prefix), prefix)
 }
 
 func (s *JSONDB) exists(filePath string) bool {

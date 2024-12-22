@@ -81,14 +81,14 @@ func Test_loadBaseConfig(t *testing.T) {
 
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
-		file := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load(context.Background(), "", file, "")
+		filePath := filepath.Join(testdataDir, "default.yaml")
+		dag, err := Load(context.Background(), "", filePath, "")
 
 		require.NoError(t, err)
 
 		// Check if the default values are set correctly
 		assert.Equal(t, "", dag.LogDir)
-		assert.Equal(t, file, dag.Location)
+		assert.Equal(t, filePath, dag.Location)
 		assert.Equal(t, "default", dag.Name)
 		assert.Equal(t, time.Second*60, dag.MaxCleanUpTime)
 		assert.Equal(t, 30, dag.HistRetentionDays)
@@ -97,7 +97,7 @@ func Test_LoadDefaultConfig(t *testing.T) {
 		require.Len(t, dag.Steps, 1)
 		assert.Equal(t, "1", dag.Steps[0].Name, "1")
 		assert.Equal(t, "true", dag.Steps[0].Command, "true")
-		assert.Equal(t, filepath.Dir(file), dag.Steps[0].Dir)
+		assert.Equal(t, filepath.Dir(filePath), dag.Steps[0].Dir)
 	})
 }
 
