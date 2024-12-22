@@ -58,8 +58,9 @@ func (f *dataStores) InitDagDir() error {
 func (f *dataStores) HistoryStore() persistence.HistoryStore {
 	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
 	if f.historyStore == nil {
-		f.historyStore = jsondb.New(
-			f.dataDir, f.latestStatusToday)
+		cfg := jsondb.DefaultConfig()
+		cfg.LatestStatusToday = f.latestStatusToday
+		f.historyStore = jsondb.New(f.dataDir, cfg)
 	}
 	return f.historyStore
 }

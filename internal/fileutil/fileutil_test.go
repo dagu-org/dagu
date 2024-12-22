@@ -212,7 +212,7 @@ func TestAddYamlExtension(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := AddYAMLExtension(tt.file); got != tt.want {
+		if got := EnsureYAMLExtension(tt.file); got != tt.want {
 			t.Errorf("AddYamlExtension(%q) = %q, want %q", tt.file, got, tt.want)
 		}
 	}

@@ -6,12 +6,10 @@ package jsondb
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/stretchr/testify/assert"
@@ -19,136 +17,90 @@ import (
 )
 
 func TestWriter(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	th := testSetup(t)
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
-		d := &digraph.DAG{
-			Name:     "test_write_status",
-			Location: "test_write_status.yaml",
-		}
+		dag := th.DAG("test_write_status")
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-
-		dw, file, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
-		require.NoError(t, err)
-		require.NoError(t, dw.open())
-
-		defer func() {
-			assert.NoError(t, dw.close())
-			assert.NoError(t, te.JSONDB.RemoveOld(context.Background(), d.Location, 0))
-		}()
-
-		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
 		status.RequestID = requestID
-		require.NoError(t, dw.write(status))
-		assert.Regexp(t, ".*test_write_status.*", file)
 
-		// Verify file contents
-		dat, err := os.ReadFile(file)
-		require.NoError(t, err)
+		writer := dag.Writer(t, requestID, time.Now())
+		writer.Write(t, status)
 
-		r, err := model.StatusFromJSON(string(dat))
-		require.NoError(t, err)
-		assert.Equal(t, d.Name, r.Name)
-		assert.Equal(t, requestID, r.RequestID)
-		assert.Equal(t, scheduler.StatusRunning, r.Status)
+		writer.AssertContent(t, "test_write_status", requestID, scheduler.StatusRunning)
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
-		d := &digraph.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
+		dag := th.DAG("test_append_to_existing")
 		requestID := "request-id-test-write-status-to-existing-file"
+		startedAt := time.Now()
 
-		dw, file, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
-		require.NoError(t, err)
-		require.NoError(t, dw.open())
+		writer := dag.Writer(t, requestID, startedAt)
 
-		initialStatus := model.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
-		initialStatus.RequestID = requestID
-		require.NoError(t, dw.write(initialStatus))
-		require.NoError(t, dw.close())
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusCancel, 10000, nil, nil)
+		status.RequestID = requestID
 
-		// Verify initial write
-		data, err := te.JSONDB.FindByRequestID(context.Background(), d.Location, requestID)
-		require.NoError(t, err)
-		assert.Equal(t, scheduler.StatusCancel, data.Status.Status)
-		assert.Equal(t, file, data.File)
+		// Write initial status
+		writer.Write(t, status)
+		writer.Close(t)
+		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusCancel)
 
 		// Append to existing file
-		dw = &writer{target: file}
-		require.NoError(t, dw.open())
-		initialStatus.Status = scheduler.StatusSuccess
-		require.NoError(t, dw.write(initialStatus))
-		require.NoError(t, dw.close())
+		writer = dag.Writer(t, requestID, startedAt)
+		status.Status = scheduler.StatusSuccess
+		writer.Write(t, status)
+		writer.Close(t)
 
 		// Verify appended data
-		data, err = te.JSONDB.FindByRequestID(context.Background(), d.Location, requestID)
-		require.NoError(t, err)
-		assert.Equal(t, scheduler.StatusSuccess, data.Status.Status)
-		assert.Equal(t, file, data.File)
+		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusSuccess)
 	})
 }
 
 func TestWriterErrorHandling(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	th := testSetup(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
-		w := &writer{target: "/nonexistent/dir/file.dat"}
-		assert.Error(t, w.open())
+		writer := newWriter("/nonexistent/dir/file.dat")
+		err := writer.open()
+		assert.Error(t, err)
 	})
 
 	t.Run("WriteToClosedWriter", func(t *testing.T) {
-		w := &writer{target: filepath.Join(te.TmpDir, "test.dat")}
-		require.NoError(t, w.open())
-		require.NoError(t, w.close())
+		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.open())
+		require.NoError(t, writer.close())
 
-		d := &digraph.DAG{Name: "test", Location: "test.yaml"}
-		status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
-		assert.Error(t, w.write(status))
+		dag := th.DAG("test_write_to_closed_writer")
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+		assert.Error(t, writer.write(status))
 	})
 
 	t.Run("CloseMultipleTimes", func(t *testing.T) {
-		w := &writer{target: filepath.Join(te.TmpDir, "test.dat")}
-		require.NoError(t, w.open())
-		require.NoError(t, w.close())
-		assert.NoError(t, w.close()) // Second close should not return an error
+		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.open())
+		require.NoError(t, writer.close())
+		assert.NoError(t, writer.close()) // Second close should not return an error
 	})
 }
 
 func TestWriterRename(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+	th := testSetup(t)
 
-	oldName := "test_rename_old"
-	newName := "test_rename_new"
-	d := &digraph.DAG{
-		Name:     oldName,
-		Location: filepath.Join(te.TmpDir, oldName+".yaml"),
-	}
-	oldPath := d.Location
-	newPath := filepath.Join(te.TmpDir, newName+".yaml")
+	// Create a status file with old path
+	dag := th.DAG("test_rename_old")
+	writer := dag.Writer(t, "request-id-1", time.Now())
+	status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+	writer.Write(t, status)
+	writer.Close(t)
+	require.FileExists(t, writer.FilePath)
 
-	// Create a file
-	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), "request-id-1")
+	// Rename and verify the file
+	newDAG := th.DAG("test_rename_new")
+	err := th.DB.Rename(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
-	require.NoError(t, dw.open())
-	status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
-	require.NoError(t, dw.write(status))
-	require.NoError(t, dw.close())
+	newWriter := newDAG.Writer(t, "request-id-2", time.Now())
 
-	oldDir := te.JSONDB.getDirectory(oldPath, oldName)
-	newDir := te.JSONDB.getDirectory(newPath, newName)
-
-	require.DirExists(t, oldDir)
-	require.NoDirExists(t, newDir)
-
-	err = te.JSONDB.Rename(context.Background(), oldPath, newPath)
-	require.NoError(t, err)
-
-	require.NoDirExists(t, oldDir)
-	require.DirExists(t, newDir)
-
-	ret := te.JSONDB.ReadStatusRecent(context.Background(), newPath, 1)
-	require.Len(t, ret, 1)
-	assert.Equal(t, status.RequestID, ret[0].Status.RequestID)
+	require.NoFileExists(t, writer.FilePath)
+	require.FileExists(t, newWriter.FilePath)
 }

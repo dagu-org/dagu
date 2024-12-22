@@ -140,7 +140,7 @@ func (d *dagStoreImpl) fileLocation(name string) (string, error) {
 		// this is for backward compatibility
 		return name, nil
 	}
-	return fileutil.AddYAMLExtension(path.Join(d.dir, name)), nil
+	return fileutil.EnsureYAMLExtension(path.Join(d.dir, name)), nil
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {
