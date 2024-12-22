@@ -292,7 +292,7 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 }
 
 // parseMiscs parses the miscellaneous fields in the step definition.
-func parseMiscs(def *stepDef, step *Step) error {
+func parseMiscs(ctx BuildContext, def stepDef, step *Step) error {
 	if def.ContinueOn != nil {
 		step.ContinueOn.Skipped = def.ContinueOn.Skipped
 		step.ContinueOn.Failure = def.ContinueOn.Failure

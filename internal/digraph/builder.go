@@ -24,7 +24,6 @@ type BuildContext struct {
 	ctx            context.Context
 	opts           buildOpts
 	additionalEnvs []string
-	stepBuilder    stepBuilder
 }
 
 // buildOpts is used to control the behavior of the builder.
@@ -91,12 +90,26 @@ type builderEntry struct {
 	fn       BuilderFn
 }
 
+var stepBuilderRegistry = []stepBuilderEntry{
+	{name: "command", fn: buildCommand},
+	{name: "executor", fn: buildExecutor},
+	{name: "subworkflow", fn: buildSubWorkflow},
+	{name: "miscs", fn: parseMiscs},
+}
+
+type stepBuilderEntry struct {
+	name string
+	fn   StepBuilderFn
+}
+
+// StepBuilderFn is a function that builds a part of the step.
+type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
+
 // build builds a DAG from the specification.
 func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs []string) (*DAG, error) {
 	buildCtx := BuildContext{
 		ctx:            ctx,
 		opts:           opts,
-		stepBuilder:    stepBuilder{noEval: opts.noEval},
 		additionalEnvs: additionalEnvs,
 	}
 
@@ -276,36 +289,28 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Exit, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Exit, spec.Functions); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Success, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Success, spec.Functions); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Failure, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Failure, spec.Functions); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Cancel, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
 			return
 		}
 	}
@@ -392,9 +397,7 @@ func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	var steps []Step
 	for _, stepDef := range spec.Steps {
-		step, err := ctx.stepBuilder.buildStep(
-			dag.Env, stepDef, spec.Functions,
-		)
+		step, err := buildStep(ctx, dag.Env, stepDef, spec.Functions)
 		if err != nil {
 			return err
 		}
@@ -430,15 +433,18 @@ func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error)
 	return
 }
 
-// stepBuilder is used to build a step from the step definition.
-type stepBuilder struct {
-	noEval bool
+// buildMailConfig builds a MailConfig from the definition.
+func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
+	return &MailConfig{
+		From:       def.From,
+		To:         def.To,
+		Prefix:     def.Prefix,
+		AttachLogs: def.AttachLogs,
+	}, nil
 }
 
 // buildStep builds a step from the step definition.
-func (b *stepBuilder) buildStep(
-	variables []string, def *stepDef, fns []*funcDef,
-) (*Step, error) {
+func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef) (*Step, error) {
 	if err := assertStepDef(def, fns); err != nil {
 		return nil, err
 	}
@@ -458,50 +464,27 @@ func (b *stepBuilder) buildStep(
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
 
+	// TODO: remove the deprecated call field.
 	if err := parseFuncCall(step, def.Call, fns); err != nil {
 		return nil, err
 	}
 
-	for _, fn := range stepBuilderFuncs {
-		if err := fn(def, step); err != nil {
-			return nil, err
+	for _, entry := range stepBuilderRegistry {
+		if err := entry.fn(ctx, def, step); err != nil {
+			return nil, fmt.Errorf("%s: %w", entry.name, err)
 		}
 	}
 
 	return step, nil
 }
 
-// buildMailConfig builds a MailConfig from the definition.
-func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
-	return &MailConfig{
-		From:       def.From,
-		To:         def.To,
-		Prefix:     def.Prefix,
-		AttachLogs: def.AttachLogs,
-	}, nil
-}
-
-// stepBuilderFunc is a function that builds a step from the step definition.
-type stepBuilderFunc func(def *stepDef, step *Step) error
-
-var (
-	// stepBuilderFuncs is a list of functions that build a step from the step
-	// definition.
-	stepBuilderFuncs = []stepBuilderFunc{
-		parseCommand,
-		parseExecutor,
-		parseSubWorkflow,
-		parseMiscs,
-	}
-)
-
 // commandRun is not a actual command.
 // subworkflow does not use this command field so it is used
 // just for display purposes.
 const commandRun = "run"
 
-// parseSubWorkflow parses the subworkflow definition and sets the step fields.
-func parseSubWorkflow(def *stepDef, step *Step) error {
+// buildSubWorkflow parses the subworkflow definition and sets the step fields.
+func buildSubWorkflow(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -523,11 +506,11 @@ const (
 	executorKeyConfig = "config"
 )
 
-// parseExecutor parses the executor field in the step definition.
+// buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
 // Case 2: executor is a string
 // Case 3: executor is a struct
-func parseExecutor(def *stepDef, step *Step) error {
+func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 	executor := def.Executor
 
 	// Case 1: executor is nil
@@ -594,7 +577,7 @@ func parseExecutor(def *stepDef, step *Step) error {
 	return convertMap(step.ExecutorConfig.Config)
 }
 
-// parseCommand parses the command field in the step definition.
+// buildCommand parses the command field in the step definition.
 // Case 1: command is nil
 // Case 2: command is a string
 // Case 3: command is an array
@@ -617,7 +600,7 @@ func parseExecutor(def *stepDef, step *Step) error {
 //
 // ```
 // It returns an error if the command is not nil but empty.
-func parseCommand(def *stepDef, step *Step) error {
+func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 	command := def.Command
 
 	// Case 1: command is nil
