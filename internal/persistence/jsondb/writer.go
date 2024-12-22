@@ -22,12 +22,15 @@ var (
 
 // writer manages writing status to a local file.
 type writer struct {
-	target  string
-	dagFile string
-	writer  *bufio.Writer
-	file    *os.File
-	mu      sync.Mutex
-	closed  bool
+	target string
+	writer *bufio.Writer
+	file   *os.File
+	mu     sync.Mutex
+	closed bool
+}
+
+func newWriter(target string) *writer {
+	return &writer{target: target}
 }
 
 // open opens the writer.

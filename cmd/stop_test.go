@@ -19,7 +19,7 @@ func TestStopCommand(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			// Start the DAG to stop.
-			args := []string{"start", dagFile}
+			args := []string{"start", dagFile.Path}
 			th.RunCommand(t, startCmd(), cmdTest{args: args})
 			close(done)
 		}()
@@ -27,22 +27,15 @@ func TestStopCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the DAG running.
-		testLastStatusEventual(
-			t,
-			th.DataStore().HistoryStore(),
-			dagFile,
-			scheduler.StatusRunning,
-		)
+		dagFile.AssertLastStatus(t, scheduler.StatusRunning)
 
 		// Stop the DAG.
 		th.RunCommand(t, stopCmd(), cmdTest{
-			args:        []string{"stop", dagFile},
+			args:        []string{"stop", dagFile.Path},
 			expectedOut: []string{"DAG stopped"}})
 
 		// Check the DAG is stopped.
-		testLastStatusEventual(
-			t, th.DataStore().HistoryStore(), dagFile, scheduler.StatusCancel,
-		)
+		dagFile.AssertLastStatus(t, scheduler.StatusCancel)
 		<-done
 	})
 }

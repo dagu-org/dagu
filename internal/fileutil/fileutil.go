@@ -140,9 +140,9 @@ func IsFileWithExtension(filename string, validExtensions []string) bool {
 	return slices.Contains(validExtensions, filepath.Ext(filename))
 }
 
-// AddYAMLExtension adds .yaml extension if not present
+// EnsureYAMLExtension adds .yaml extension if not present
 // if it has .yml extension, replace it with .yaml
-func AddYAMLExtension(filename string) string {
+func EnsureYAMLExtension(filename string) string {
 	if filename == "" {
 		return ""
 	}

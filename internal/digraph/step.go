@@ -20,7 +20,7 @@ type Step struct {
 	// Variables contains the list of variables to be set.
 	Variables []string `json:"Variables,omitempty"`
 	// OutputVariables is a structure to store the output variables for the
-	// following steps.
+	// following steps. It only contains the local output variables.
 	OutputVariables *SyncMap `json:"OutputVariables,omitempty"`
 	// Dir is the working directory for the step.
 	Dir string `json:"Dir,omitempty"`

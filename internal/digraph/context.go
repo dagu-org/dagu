@@ -88,3 +88,20 @@ func GetContext(ctx context.Context) (Context, error) {
 func WithDagContext(ctx context.Context, dagContext Context) context.Context {
 	return context.WithValue(ctx, ctxKey{}, dagContext)
 }
+
+// StepContext contains the information needed to execute a step.
+type StepContext struct{ OutputVariables *SyncMap }
+
+type stepContextKey struct{}
+
+func WithStepContext(ctx context.Context, stepContext *StepContext) context.Context {
+	return context.WithValue(ctx, stepContextKey{}, stepContext)
+}
+
+// GetStepContext returns the StepContext from the context.
+func GetStepContext(ctx context.Context) *StepContext {
+	if v := ctx.Value(stepContextKey{}); v != nil {
+		return v.(*StepContext)
+	}
+	return nil
+}

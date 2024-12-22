@@ -105,7 +105,7 @@ func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, err
 
 // loadDAG loads the DAG from the given file.
 func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
-	file, err := resolveYamlFilePath(dag)
+	filePath, err := resolveYamlFilePath(dag)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	raw, err := readFile(file)
+	raw, err := readFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +137,11 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 	}
 
 	// Set the absolute path to the file.
-	dest.Location = file
+	dest.Location = filePath
 
 	// Set the name if not set.
 	if dest.Name == "" {
-		dest.Name = defaultName(file)
+		dest.Name = defaultName(filePath)
 	}
 
 	// Set defaults

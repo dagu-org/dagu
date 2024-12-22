@@ -4,508 +4,336 @@
 package jsondb
 
 import (
-	"context"
-	"io"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type testEnv struct {
-	JSONDB *JSONDB
-	TmpDir string
-}
+func TestJSONDB_Basic(t *testing.T) {
+	th := testSetup(t)
 
-func setup(t *testing.T) testEnv {
-	tmpDir, err := os.MkdirTemp("", "test-persistence")
-	require.NoError(t, err)
-	return testEnv{
-		JSONDB: New(tmpDir, true),
-		TmpDir: tmpDir,
-	}
-}
+	t.Run("OpenAndClose", func(t *testing.T) {
+		dag := th.DAG("test_open_close")
+		requestID := "request-id-test-open-close"
+		now := time.Now()
 
-func (te testEnv) cleanup() {
-	_ = os.RemoveAll(te.TmpDir)
-}
-
-func createTestDAG(te testEnv, name, location string) *digraph.DAG {
-	return &digraph.DAG{
-		Name:     name,
-		Location: filepath.Join(te.TmpDir, location),
-	}
-}
-
-func createTestStatus(d *digraph.DAG, status scheduler.Status, pid int) *model.Status {
-	return model.NewStatus(d, nil, status, pid, nil, nil)
-}
-
-func writeTestStatus(t *testing.T, db *JSONDB, d *digraph.DAG, status *model.Status, tm time.Time) {
-	dw, _, err := db.newWriter(d.Location, tm, status.RequestID)
-	require.NoError(t, err)
-	require.NoError(t, dw.open())
-	defer dw.close()
-	require.NoError(t, dw.write(status))
-}
-
-func TestNewDataFile(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_new_data_file", "test_new_data_file.yaml")
-	timestamp := time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)
-	requestID := "request-id-1"
-
-	t.Run("ValidFile", func(t *testing.T) {
-		f, err := te.JSONDB.newFile(d.Location, timestamp, requestID)
+		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
-		p := fileutil.SafeName(strings.TrimSuffix(filepath.Base(d.Location), filepath.Ext(d.Location)))
-		assert.Regexp(t, p+".*"+p+"\\.20220101\\.00:00:00\\.000\\."+requestID[:8]+"\\.dat", f)
+
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status.RequestID = requestID
+		err = th.DB.Write(th.Context, status)
+		require.NoError(t, err)
+
+		err = th.DB.Close(th.Context)
+		require.NoError(t, err)
 	})
 
-	t.Run("EmptyLocation", func(t *testing.T) {
-		_, err := te.JSONDB.newFile("", timestamp, requestID)
+	t.Run("UpdateStatus", func(t *testing.T) {
+		dag := th.DAG("test_update")
+		requestID := "request-id-test-update"
+		now := time.Now()
+
+		// Create initial status
+		err := th.DB.Open(th.Context, dag.Location, now, requestID)
+		require.NoError(t, err)
+
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status.RequestID = requestID
+		err = th.DB.Write(th.Context, status)
+		require.NoError(t, err)
+		err = th.DB.Close(th.Context)
+		require.NoError(t, err)
+
+		// Update status
+		status.Status = scheduler.StatusSuccess
+		err = th.DB.Update(th.Context, dag.Location, requestID, status)
+		require.NoError(t, err)
+
+		// Verify updated status
+		statusFile, err := th.DB.FindByRequestID(th.Context, dag.Location, requestID)
+		require.NoError(t, err)
+		assert.Equal(t, scheduler.StatusSuccess, statusFile.Status.Status)
+	})
+}
+
+func TestJSONDB_ReadStatus(t *testing.T) {
+	th := testSetup(t)
+
+	t.Run("ReadStatusRecent", func(t *testing.T) {
+		dag := th.DAG("test_read_recent")
+
+		// Create multiple status entries
+		for i := 0; i < 5; i++ {
+			requestID := fmt.Sprintf("request-id-%d", i)
+			now := time.Now().Add(time.Duration(-i) * time.Hour)
+
+			err := th.DB.Open(th.Context, dag.Location, now, requestID)
+			require.NoError(t, err)
+
+			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+			status.RequestID = requestID
+			err = th.DB.Write(th.Context, status)
+			require.NoError(t, err)
+			err = th.DB.Close(th.Context)
+			require.NoError(t, err)
+		}
+
+		// Read recent status entries
+		statuses := th.DB.ReadStatusRecent(th.Context, dag.Location, 3)
+		assert.Len(t, statuses, 3)
+		assert.Equal(t, "request-id-0", statuses[0].Status.RequestID)
+	})
+
+	t.Run("ReadStatusToday", func(t *testing.T) {
+		dag := th.DAG("test_read_today")
+		requestID := "request-id-today"
+		now := time.Now()
+
+		err := th.DB.Open(th.Context, dag.Location, now, requestID)
+		require.NoError(t, err)
+
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status.RequestID = requestID
+		err = th.DB.Write(th.Context, status)
+		require.NoError(t, err)
+		err = th.DB.Close(th.Context)
+		require.NoError(t, err)
+
+		// Read today's status
+		todayStatus, err := th.DB.ReadStatusToday(th.Context, dag.Location)
+		require.NoError(t, err)
+		assert.Equal(t, requestID, todayStatus.RequestID)
+	})
+}
+
+func TestJSONDB_ReadStatusRecent_EdgeCases(t *testing.T) {
+	th := testSetup(t)
+
+	t.Run("NoFilesExist", func(t *testing.T) {
+		dag := th.DAG("test_no_files")
+		statuses := th.DB.ReadStatusRecent(th.Context, dag.Location, 5)
+		assert.Empty(t, statuses)
+	})
+
+	t.Run("RequestedMoreThanExist", func(t *testing.T) {
+		dag := th.DAG("test_fewer_files")
+
+		// Create 3 status entries
+		for i := 0; i < 3; i++ {
+			requestID := fmt.Sprintf("request-id-%d", i)
+			now := time.Now().Add(time.Duration(-i) * time.Hour)
+
+			err := th.DB.Open(th.Context, dag.Location, now, requestID)
+			require.NoError(t, err)
+			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+			status.RequestID = requestID
+			err = th.DB.Write(th.Context, status)
+			require.NoError(t, err)
+			err = th.DB.Close(th.Context)
+			require.NoError(t, err)
+		}
+
+		// Request more than exist
+		statuses := th.DB.ReadStatusRecent(th.Context, dag.Location, 5)
+		assert.Len(t, statuses, 3)
+	})
+}
+
+func TestJSONDB_ReadStatusToday_EdgeCases(t *testing.T) {
+	th := testSetup(t)
+
+	t.Run("NoStatusToday", func(t *testing.T) {
+		dag := th.DAG("test_no_status_today")
+
+		// Create status from yesterday
+		yesterdayTime := time.Now().AddDate(0, 0, -1)
+		requestID := "request-id-yesterday"
+
+		err := th.DB.Open(th.Context, dag.Location, yesterdayTime, requestID)
+		require.NoError(t, err)
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		status.RequestID = requestID
+		err = th.DB.Write(th.Context, status)
+		require.NoError(t, err)
+		err = th.DB.Close(th.Context)
+		require.NoError(t, err)
+
+		// Try to read today's status
+		_, err = th.DB.ReadStatusToday(th.Context, dag.Location)
+		assert.ErrorIs(t, err, persistence.ErrNoStatusDataToday)
+	})
+
+	t.Run("NoStatusData", func(t *testing.T) {
+		dag := th.DAG("test_no_status_data")
+		_, err := th.DB.ReadStatusToday(th.Context, dag.Location)
+		assert.ErrorIs(t, err, persistence.ErrNoStatusDataToday)
+	})
+}
+
+func TestJSONDB_RemoveAll(t *testing.T) {
+	th := testSetup(t)
+
+	t.Run("RemoveAllFiles", func(t *testing.T) {
+		dag := th.DAG("test_remove_all")
+
+		// Create multiple status files
+		for i := 0; i < 3; i++ {
+			requestID := fmt.Sprintf("request-id-%d", i)
+			now := time.Now().Add(time.Duration(-i) * time.Hour)
+
+			err := th.DB.Open(th.Context, dag.Location, now, requestID)
+			require.NoError(t, err)
+			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+			status.RequestID = requestID
+			err = th.DB.Write(th.Context, status)
+			require.NoError(t, err)
+			err = th.DB.Close(th.Context)
+			require.NoError(t, err)
+		}
+
+		// Verify files exist
+		matches, err := filepath.Glob(th.DB.globPattern(dag.Location))
+		require.NoError(t, err)
+		assert.Len(t, matches, 3)
+
+		// Remove all files
+		err = th.DB.RemoveAll(th.Context, dag.Location)
+		require.NoError(t, err)
+
+		// Verify all files are removed
+		matches, err = filepath.Glob(th.DB.globPattern(dag.Location))
+		require.NoError(t, err)
+		assert.Empty(t, matches)
+	})
+
+	t.Run("RemoveAllNonExistent", func(t *testing.T) {
+		dag := th.DAG("test_remove_all_nonexistent")
+		err := th.DB.RemoveAll(th.Context, dag.Location)
+		assert.NoError(t, err)
+	})
+}
+
+func TestJSONDB_Update_EdgeCases(t *testing.T) {
+	th := testSetup(t)
+
+	t.Run("UpdateNonExistentStatus", func(t *testing.T) {
+		dag := th.DAG("test_update_nonexistent")
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		err := th.DB.Update(th.Context, dag.Location, "nonexistent-id", status)
+		assert.ErrorIs(t, err, persistence.ErrRequestIDNotFound)
+	})
+
+	t.Run("UpdateWithEmptyRequestID", func(t *testing.T) {
+		dag := th.DAG("test_update_empty_id")
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		err := th.DB.Update(th.Context, dag.Location, "", status)
+		assert.ErrorIs(t, err, errRequestIDNotFound)
+	})
+}
+
+func TestJSONDB_ErrorHandling(t *testing.T) {
+	th := testSetup(t)
+
+	t.Run("FindByRequestIDNotFound", func(t *testing.T) {
+		dag := th.DAG("test_not_found")
+		_, err := th.DB.FindByRequestID(th.Context, dag.Location, "nonexistent-id")
+		assert.ErrorIs(t, err, persistence.ErrRequestIDNotFound)
+	})
+
+	t.Run("EmptyDAGFile", func(t *testing.T) {
+		_, err := th.DB.generateFilePath("", newUTC(time.Now()), "request-id")
+		assert.ErrorIs(t, err, errKeyEmpty)
+	})
+
+	t.Run("InvalidPath", func(t *testing.T) {
+		err := th.DB.Rename(th.Context, "relative/path", "/absolute/path")
 		assert.Error(t, err)
 	})
 }
 
-func TestWriteAndFindFiles(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
+func TestJSONDB_FileManagement(t *testing.T) {
+	th := testSetup(t)
 
-	d := createTestDAG(te, "test_read_status_n", "test_data_files_n.yaml")
+	t.Run("RemoveOld", func(t *testing.T) {
+		dag := th.DAG("test_remove_old")
 
-	testData := []struct {
-		Status    *model.Status
-		ReqID     string
-		Timestamp time.Time
-	}{
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
-	}
+		// Create status file
+		requestID := "request-id-old"
+		oldTime := time.Now().AddDate(0, 0, -10)
 
-	for _, data := range testData {
-		data.Status.RequestID = data.ReqID
-		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
-	}
-
-	files := te.JSONDB.latest(te.JSONDB.prefixWithDirectory(d.Location)+"*.dat", 2)
-	require.Equal(t, 2, len(files))
-}
-
-func TestWriteAndFindByRequestID(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_find_by_request_id", "test_find_by_request_id.yaml")
-
-	testData := []struct {
-		Status    *model.Status
-		ReqID     string
-		Timestamp time.Time
-	}{
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
-	}
-
-	for _, data := range testData {
-		data.Status.RequestID = data.ReqID
-		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
-	}
-
-	t.Run("ExistingRequestID", func(t *testing.T) {
-		status, err := te.JSONDB.FindByRequestID(context.Background(), d.Location, "request-id-2")
-		require.NoError(t, err)
-		require.Equal(t, "request-id-2", status.Status.RequestID)
-	})
-
-	t.Run("NonExistentRequestID", func(t *testing.T) {
-		status, err := te.JSONDB.FindByRequestID(context.Background(), d.Location, "request-id-10000")
-		require.Error(t, err)
-		require.Nil(t, status)
-	})
-}
-
-func TestRemoveOldFiles(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_remove_old", "test_remove_old.yaml")
-
-	testData := []struct {
-		Status    *model.Status
-		ReqID     string
-		Timestamp time.Time
-	}{
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
-	}
-
-	for _, data := range testData {
-		data.Status.RequestID = data.ReqID
-		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
-	}
-
-	files := te.JSONDB.latest(te.JSONDB.prefixWithDirectory(d.Location)+"*.dat", 3)
-	require.Equal(t, 3, len(files))
-
-	require.NoError(t, te.JSONDB.RemoveOld(context.Background(), d.Location, 0))
-
-	files = te.JSONDB.latest(te.JSONDB.prefixWithDirectory(d.Location)+"*.dat", 3)
-	require.Empty(t, files)
-
-	invalidFiles := te.JSONDB.latest("invalid-pattern", 3)
-	require.Empty(t, invalidFiles)
-}
-
-func TestReadLatestStatus(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_read_latest_status", "test_config_status_reader.yaml")
-	requestID := "request-id-1"
-
-	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
-	require.NoError(t, err)
-	require.NoError(t, dw.open())
-	defer dw.close()
-
-	initialStatus := createTestStatus(d, scheduler.StatusNone, 10000)
-	require.NoError(t, dw.write(initialStatus))
-
-	updatedStatus := createTestStatus(d, scheduler.StatusSuccess, 20000)
-	require.NoError(t, dw.write(updatedStatus))
-
-	ret, err := te.JSONDB.ReadStatusToday(context.Background(), d.Location)
-
-	require.NoError(t, err)
-	require.NotNil(t, ret)
-	require.Equal(t, int(updatedStatus.PID), int(ret.PID))
-	require.Equal(t, updatedStatus.Status, ret.Status)
-}
-
-func TestReadStatusN(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_read_status_n", "test_config_status_reader_hist.yaml")
-
-	testData := []struct {
-		Status    *model.Status
-		ReqID     string
-		Timestamp time.Time
-	}{
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-3", time.Date(2022, 1, 3, 0, 0, 0, 0, time.Local)},
-	}
-
-	for _, data := range testData {
-		data.Status.RequestID = data.ReqID
-		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
-	}
-
-	recordMax := 2
-
-	ret := te.JSONDB.ReadStatusRecent(context.Background(), d.Location, recordMax)
-
-	require.Len(t, ret, recordMax)
-	require.Equal(t, d.Name, ret[0].Status.Name)
-	require.Equal(t, d.Name, ret[1].Status.Name)
-}
-
-func TestCompactFile(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_compact_file", "test_compact_file.yaml")
-	requestID := "request-id-1"
-
-	dw, _, err := te.JSONDB.newWriter(d.Location, time.Now(), requestID)
-	require.NoError(t, err)
-	require.NoError(t, dw.open())
-	defer dw.close()
-
-	testStatuses := []scheduler.Status{scheduler.StatusRunning, scheduler.StatusCancel, scheduler.StatusSuccess}
-	for _, status := range testStatuses {
-		require.NoError(t, dw.write(createTestStatus(d, status, 10000)))
-	}
-
-	statusFiles := te.JSONDB.ReadStatusRecent(context.Background(), d.Location, 1)
-	require.NotEmpty(t, statusFiles)
-	s := statusFiles[0]
-
-	db2 := New(te.JSONDB.location, true)
-	require.NoError(t, db2.Compact(s.File))
-	require.False(t, fileutil.FileExists(s.File))
-
-	compactedStatusFiles := db2.ReadStatusRecent(context.Background(), d.Location, 1)
-	require.NotEmpty(t, compactedStatusFiles)
-	s2 := compactedStatusFiles[0]
-
-	require.Regexp(t, `test_compact_file.*_c.dat`, s2.File)
-	require.Equal(t, s.Status, s2.Status)
-
-	require.Error(t, db2.Compact("Invalid_file_name.dat"))
-}
-
-func TestErrorCases(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	t.Run("InvalidParseFile", func(t *testing.T) {
-		_, err := ParseFile("invalid_file.dat")
-		require.Error(t, err)
-	})
-
-	t.Run("InvalidNewWriter", func(t *testing.T) {
-		_, _, err := te.JSONDB.newWriter("", time.Now(), "")
-		require.Error(t, err)
-	})
-
-	t.Run("InvalidReadStatusToday", func(t *testing.T) {
-		_, err := te.JSONDB.ReadStatusToday(context.Background(), "invalid_file.yaml")
-		require.Error(t, err)
-	})
-
-	t.Run("InvalidFindByRequestID", func(t *testing.T) {
-		_, err := te.JSONDB.FindByRequestID(context.Background(), "invalid_file.yaml", "invalid_id")
-		require.Error(t, err)
-	})
-}
-
-func TestErrorParseFile(t *testing.T) {
-	tmpDir := fileutil.MustTempDir("test_error_parse_file")
-	defer os.RemoveAll(tmpDir)
-	tmpFile := filepath.Join(tmpDir, "test_error_parse_file.dat")
-
-	t.Run("NonExistentFile", func(t *testing.T) {
-		_, err := ParseFile(tmpFile)
-		require.Error(t, err)
-	})
-
-	f, err := fileutil.OpenOrCreateFile(tmpFile)
-	require.NoError(t, err)
-	defer f.Close()
-
-	t.Run("EmptyFile", func(t *testing.T) {
-		_, err := ParseFile(tmpFile)
-		require.Error(t, err)
-	})
-
-	t.Run("InvalidJSON", func(t *testing.T) {
-		_, err = f.WriteString("invalid jsondb")
-		require.NoError(t, err)
-		_, err := ParseFile(tmpFile)
-		require.Error(t, err)
-	})
-
-	t.Run("ValidJSON", func(t *testing.T) {
-		_, err = f.WriteString("\n{}")
-		require.NoError(t, err)
-		_, err := ParseFile(tmpFile)
-		require.NoError(t, err)
-	})
-}
-
-func TestTimestamp(t *testing.T) {
-	testCases := []struct {
-		Name string
-		Want string
-	}{
-		{Name: "test_timestamp.20200101.10:00:00.dat", Want: "20200101.10:00:00"},
-		{Name: "test_timestamp.20200101.12:34:56_c.dat", Want: "20200101.12:34:56"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.Name, func(t *testing.T) {
-			require.Equal(t, tc.Want, timestamp(tc.Name))
-		})
-	}
-}
-
-func TestReadLine(t *testing.T) {
-	tmpDir := fileutil.MustTempDir("test_read_line")
-	defer os.RemoveAll(tmpDir)
-	tmpFile := filepath.Join(tmpDir, "test_read_line.dat")
-
-	f, err := fileutil.OpenOrCreateFile(tmpFile)
-	require.NoError(t, err)
-	defer f.Close()
-
-	t.Run("EmptyFile", func(t *testing.T) {
-		_, err = readLineFrom(f, 0)
-		require.Error(t, err)
-	})
-
-	dat := []byte("line1\nline2")
-	_, err = f.Write(dat)
-	require.NoError(t, err)
-	require.NoError(t, f.Sync())
-
-	f, err = os.Open(tmpFile)
-	require.NoError(t, err)
-	defer f.Close()
-
-	t.Run("ReadLines", func(t *testing.T) {
-		_, err = f.Seek(0, 0)
+		filePathOld, _ := th.DB.generateFilePath(dag.Location, newUTC(oldTime), requestID)
+		println(filePathOld)
+		err := th.DB.Open(th.Context, dag.Location, oldTime, requestID)
 		require.NoError(t, err)
 
-		testCases := []struct {
-			Want []byte
-		}{
-			{Want: []byte("line1")},
-			{Want: []byte("line2")},
-		}
+		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		status.RequestID = requestID
 
-		var offset int64
-		for i, tc := range testCases {
-			got, err := readLineFrom(f, offset)
+		err = th.DB.Write(th.Context, status)
+		require.NoError(t, err)
+		err = th.DB.Close(th.Context)
+		require.NoError(t, err)
+
+		// Get the file path and update its modification time
+		filePath, err := th.DB.generateFilePath(dag.Location, newUTC(oldTime), requestID)
+		require.NoError(t, err)
+		oldDate := time.Now().AddDate(0, 0, -10)
+		err = os.Chtimes(filePath, oldDate, oldDate)
+		require.NoError(t, err)
+
+		// Remove files older than 5 days
+		err = th.DB.RemoveOld(th.Context, dag.Location, 5)
+		require.NoError(t, err)
+
+		// Verify old file is removed
+		_, err = th.DB.FindByRequestID(th.Context, dag.Location, requestID)
+		assert.Error(t, err)
+	})
+
+	t.Run("Compact", func(t *testing.T) {
+		dag := th.DAG("test_compact")
+		requestID := "request-id-compact"
+		now := time.Now()
+
+		// Create a status file with multiple updates
+		err := th.DB.Open(th.Context, dag.Location, now, requestID)
+		require.NoError(t, err)
+
+		for i := 0; i < 3; i++ {
+			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+			status.RequestID = requestID
+			err = th.DB.Write(th.Context, status)
 			require.NoError(t, err)
-			require.Equal(t, tc.Want, got, "Line %d mismatch", i+1)
-			offset += int64(len(tc.Want)) + 1 // +1 for \n
 		}
 
-		_, err = readLineFrom(f, offset)
-		require.Equal(t, io.EOF, err)
+		filePath, err := th.DB.generateFilePath(dag.Location, newUTC(now), requestID)
+		require.NoError(t, err)
+
+		// Get file size before compaction
+		info, err := os.Stat(filePath)
+		require.NoError(t, err)
+		sizeBeforeCompact := info.Size()
+
+		// Compact the file
+		err = th.DB.Close(th.Context) // Close will trigger compaction
+		require.NoError(t, err)
+
+		// Verify compacted file
+		matches, err := filepath.Glob(th.DB.globPattern(dag.Location))
+		require.NoError(t, err)
+		require.Len(t, matches, 1)
+
+		info, err = os.Stat(matches[0])
+		require.NoError(t, err)
+		assert.Less(t, info.Size(), sizeBeforeCompact)
 	})
-}
-
-func TestRename(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	oldID := "old_dag"
-	newID := "new_dag"
-	d := createTestDAG(te, oldID, oldID+".yaml")
-
-	// Create some test data
-	testData := []struct {
-		Status    *model.Status
-		ReqID     string
-		Timestamp time.Time
-	}{
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-1", time.Date(2022, 1, 1, 0, 0, 0, 0, time.Local)},
-		{createTestStatus(d, scheduler.StatusNone, 10000), "request-id-2", time.Date(2022, 1, 2, 0, 0, 0, 0, time.Local)},
-	}
-
-	for _, data := range testData {
-		data.Status.RequestID = data.ReqID
-		writeTestStatus(t, te.JSONDB, d, data.Status, data.Timestamp)
-	}
-
-	oldPath := d.Location
-	newPath := filepath.Join(filepath.Dir(d.Location), newID+".yaml")
-
-	// Perform rename
-	err := te.JSONDB.Rename(context.Background(), d.Location, filepath.Join(filepath.Dir(d.Location), newID+".yaml"))
-	require.NoError(t, err)
-
-	// Check that old files are gone and new files exist
-	oldDir := te.JSONDB.getDirectory(oldPath, oldID)
-	oldFiles, err := filepath.Glob(filepath.Join(oldDir, "*"))
-	require.NoError(t, err)
-	require.Empty(t, oldFiles)
-
-	newDir := te.JSONDB.getDirectory(newPath, newID)
-	newFiles, err := filepath.Glob(filepath.Join(newDir, "*"))
-	require.NoError(t, err)
-	require.Len(t, newFiles, 2)
-
-	// Verify content of new files
-	d.Name = newID
-	d.Location = newPath
-	statusFiles := te.JSONDB.ReadStatusRecent(context.Background(), d.Location, 2)
-	require.Len(t, statusFiles, 2)
-	for i, sf := range statusFiles {
-		require.Equal(t, testData[1-i].ReqID, sf.Status.RequestID) // Reverse order due to recent first
-	}
-}
-
-func TestNewJSONDB(t *testing.T) {
-	location := "/tmp/jsondb"
-	latestStatusToday := true
-
-	db := New(location, latestStatusToday)
-
-	require.NotNil(t, db)
-	require.Equal(t, location, db.location)
-	require.Equal(t, latestStatusToday, db.latestStatusToday)
-	require.NotNil(t, db.cache)
-}
-
-func TestJSONDBOpen(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_open", "test_open.yaml")
-	requestID := "request-id-1"
-	now := time.Now()
-
-	err := te.JSONDB.Open(context.Background(), d.Location, now, requestID)
-	require.NoError(t, err)
-	require.NotNil(t, te.JSONDB.writer)
-
-	// Clean up
-	require.NoError(t, te.JSONDB.Close(context.Background()))
-}
-
-func TestJSONDBWrite(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_write", "test_write.yaml")
-	requestID := "request-id-1"
-	now := time.Now()
-
-	require.NoError(t, te.JSONDB.Open(context.Background(), d.Location, now, requestID))
-
-	status := createTestStatus(d, scheduler.StatusRunning, 12345)
-	require.NoError(t, te.JSONDB.Write(context.Background(), status))
-
-	// Clean up
-	require.NoError(t, te.JSONDB.Close(context.Background()))
-
-	// Verify
-	statusFiles := te.JSONDB.ReadStatusRecent(context.Background(), d.Location, 1)
-	require.Len(t, statusFiles, 1)
-	require.Equal(t, status.RequestID, statusFiles[0].Status.RequestID)
-	require.Equal(t, status.Status, statusFiles[0].Status.Status)
-	require.Equal(t, status.PID, statusFiles[0].Status.PID)
-}
-
-func TestJSONDBUpdate(t *testing.T) {
-	te := setup(t)
-	defer te.cleanup()
-
-	d := createTestDAG(te, "test_update", "test_update.yaml")
-	requestID := "request-id-1"
-	now := time.Now()
-
-	initialStatus := createTestStatus(d, scheduler.StatusRunning, 12345)
-	initialStatus.RequestID = requestID
-	writeTestStatus(t, te.JSONDB, d, initialStatus, now)
-
-	updatedStatus := createTestStatus(d, scheduler.StatusSuccess, 12345)
-	updatedStatus.RequestID = requestID
-	require.NoError(t, te.JSONDB.Update(context.Background(), d.Location, requestID, updatedStatus))
-
-	// Verify
-	statusFiles := te.JSONDB.ReadStatusRecent(context.Background(), d.Location, 1)
-	require.Len(t, statusFiles, 1)
-	require.Equal(t, updatedStatus.RequestID, statusFiles[0].Status.RequestID)
-	require.Equal(t, updatedStatus.Status, statusFiles[0].Status.Status)
-	require.Equal(t, updatedStatus.PID, statusFiles[0].Status.PID)
 }

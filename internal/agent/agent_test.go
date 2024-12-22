@@ -407,8 +407,8 @@ func (h *mockResponseWriter) WriteHeader(statusCode int) {
 // testLoadDAG load the specified DAG file for testing
 // without base config or parameters.
 func testLoadDAG(t *testing.T, name string) *digraph.DAG {
-	file := filepath.Join(fileutil.MustGetwd(), "testdata", name)
-	dag, err := digraph.Load(context.Background(), "", file, "")
+	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", name)
+	dag, err := digraph.Load(context.Background(), "", filePath, "")
 	require.NoError(t, err)
 	return dag
 }

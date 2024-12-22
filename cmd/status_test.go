@@ -19,14 +19,14 @@ func TestStatusCommand(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			// Start a DAG to check the status.
-			args := []string{"start", dagFile}
+			args := []string{"start", dagFile.Path}
 			th.RunCommand(t, startCmd(), cmdTest{args: args})
 			close(done)
 		}()
 
 		hs := th.DataStore().HistoryStore()
 		require.Eventually(t, func() bool {
-			status := hs.ReadStatusRecent(th.Context, dagFile, 1)
+			status := hs.ReadStatusRecent(th.Context, dagFile.Path, 1)
 			if len(status) < 1 {
 				return false
 			}
@@ -36,12 +36,12 @@ func TestStatusCommand(t *testing.T) {
 
 		// Check the current status.
 		th.RunCommand(t, statusCmd(), cmdTest{
-			args:        []string{"status", dagFile},
+			args:        []string{"status", dagFile.Path},
 			expectedOut: []string{"status=running"},
 		})
 
 		// Stop the DAG.
-		args := []string{"stop", dagFile}
+		args := []string{"stop", dagFile.Path}
 		th.RunCommand(t, stopCmd(), cmdTest{args: args})
 		<-done
 	})

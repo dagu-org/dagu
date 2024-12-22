@@ -24,20 +24,19 @@ func TestRestartCommand(t *testing.T) {
 
 		go func() {
 			// Start a DAG to restart.
-			args := []string{"start", `--params="foo"`, dagFile}
+			args := []string{"start", `--params="foo"`, dagFile.Path}
 			th.RunCommand(t, startCmd(), cmdTest{args: args})
 		}()
 
 		time.Sleep(waitForStatusUpdate)
-		cli := th.Client()
 
 		// Wait for the DAG running.
-		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
+		dagFile.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		// Restart the DAG.
 		done := make(chan struct{})
 		go func() {
-			args := []string{"restart", dagFile}
+			args := []string{"restart", dagFile.Path}
 			th.RunCommand(t, restartCmd(), cmdTest{args: args})
 			close(done)
 		}()
@@ -45,18 +44,18 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG running again.
-		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
+		dagFile.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
-		th.RunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
+		th.RunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile.Path}})
 
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG is stopped.
-		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
+		dagFile.AssertCurrentStatus(t, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dag, err := digraph.Load(th.Context, th.Config.Paths.BaseConfig, dagFile, "")
+		dag, err := digraph.Load(th.Context, th.Config.Paths.BaseConfig, dagFile.Path, "")
 		require.NoError(t, err)
 
 		dataStore := newDataStores(th.Config)

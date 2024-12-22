@@ -28,11 +28,11 @@ func TestClient_GetStatus(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		th := test.Setup(t)
 
-		file := testDAG("sleep1.yaml")
+		filePath := testDAG("sleep1.yaml")
 
 		cli := th.Client()
 		ctx := context.Background()
-		dagStatus, err := cli.GetStatus(ctx, file)
+		dagStatus, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
 
 		socketServer, _ := sock.NewServer(
@@ -146,9 +146,9 @@ func TestClient_RunDAG(t *testing.T) {
 		th := test.Setup(t)
 
 		cli := th.Client()
-		file := testDAG("success.yaml")
+		filePath := testDAG("success.yaml")
 		ctx := context.Background()
-		dagStatus, err := cli.GetStatus(ctx, file)
+		dagStatus, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
 
 		err = cli.Start(ctx, dagStatus.DAG, client.StartOptions{})
@@ -162,9 +162,9 @@ func TestClient_RunDAG(t *testing.T) {
 		th := test.Setup(t)
 
 		cli := th.Client()
-		file := testDAG("sleep10.yaml")
+		filePath := testDAG("sleep10.yaml")
 		ctx := context.Background()
-		dagStatus, err := cli.GetStatus(ctx, file)
+		dagStatus, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
 
 		cli.StartAsync(ctx, dagStatus.DAG, client.StartOptions{})
@@ -185,9 +185,9 @@ func TestClient_RunDAG(t *testing.T) {
 		th := test.Setup(t)
 
 		cli := th.Client()
-		file := testDAG("success.yaml")
+		filePath := testDAG("success.yaml")
 		ctx := context.Background()
-		dagStatus, err := cli.GetStatus(ctx, file)
+		dagStatus, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
 
 		err = cli.Restart(ctx, dagStatus.DAG, client.RestartOptions{})
@@ -202,9 +202,9 @@ func TestClient_RunDAG(t *testing.T) {
 
 		ctx := context.Background()
 		cli := th.Client()
-		file := testDAG("retry.yaml")
+		filePath := testDAG("retry.yaml")
 
-		dagStatus, err := cli.GetStatus(ctx, file)
+		dagStatus, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
 
 		err = cli.Start(ctx, dagStatus.DAG, client.StartOptions{Params: "x y z"})
@@ -332,10 +332,10 @@ func TestClient_ReadHistory(t *testing.T) {
 		th := test.Setup(t)
 
 		cli := th.Client()
-		file := testDAG("success.yaml")
+		filePath := testDAG("success.yaml")
 		ctx := context.Background()
 
-		_, err := cli.GetStatus(ctx, file)
+		_, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
 	})
 	t.Run("TestClient_All", func(t *testing.T) {
