@@ -49,7 +49,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	dataStore := newDataStores(cfg)
 	cli := newClient(cfg, dataStore)

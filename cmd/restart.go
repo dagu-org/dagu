@@ -47,7 +47,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
 
 	specFilePath := args[0]
 

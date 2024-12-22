@@ -56,7 +56,7 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	}, nil
 }
 
-func (e *commandExecutor) Run() error {
+func (e *commandExecutor) Run(_ context.Context) error {
 	e.lock.Lock()
 	err := e.cmd.Start()
 	e.lock.Unlock()

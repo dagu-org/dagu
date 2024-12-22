@@ -48,7 +48,7 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	logger.Info(ctx, "Server initialization",
 		"host", cfg.Host,

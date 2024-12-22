@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -188,7 +189,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
-	dagCtx := digraph.NewContext(ctx, a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(ctx, a.dag, a.dataStore.DAGStore(), newOutputCollector(a.historyStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	// Update the finished status to the history database.
@@ -366,7 +367,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), newOutputCollector(a.historyStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	a.reporter.report(ctx, a.Status(), lastErr)
@@ -510,4 +511,41 @@ func encodeError(w http.ResponseWriter, err error) {
 	} else {
 		http.Error(w, httpErr.Error(), http.StatusInternalServerError)
 	}
+}
+
+var _ digraph.ResultCollector = &resultCollector{}
+
+type resultCollector struct {
+	historyStore persistence.HistoryStore
+}
+
+func newOutputCollector(store persistence.HistoryStore) *resultCollector {
+	return &resultCollector{historyStore: store}
+}
+
+func (o *resultCollector) CollectResult(ctx context.Context, name string, requestID string) (*digraph.Result, error) {
+	status, err := o.historyStore.FindByRequestID(ctx, name, requestID)
+	if err != nil {
+		return nil, err
+	}
+
+	outputVariables := map[string]string{}
+	for _, node := range status.Status.Nodes {
+		if node.Step.OutputVariables != nil {
+			node.Step.OutputVariables.Range(func(_, value any) bool {
+				// split the value by '=' to get the key and value
+				parts := strings.Split(value.(string), "=")
+				if len(parts) == 2 {
+					outputVariables[parts[0]] = parts[1]
+				}
+				return true
+			})
+		}
+	}
+
+	return &digraph.Result{
+		Outputs: outputVariables,
+		Name:    status.Status.Name,
+		Params:  status.Status.Params,
+	}, nil
 }

@@ -15,10 +15,13 @@ import (
 	"github.com/dagu-org/dagu/internal/util"
 )
 
-func buildLogger(cfg *config.Config) logger.Logger {
+func buildLogger(cfg *config.Config, quiet bool) logger.Logger {
 	var opts []logger.Option
 	if cfg.Debug {
 		opts = append(opts, logger.WithDebug())
+	}
+	if quiet {
+		opts = append(opts, logger.WithQuiet())
 	}
 	if cfg.LogFormat != "" {
 		opts = append(opts, logger.WithFormat(cfg.LogFormat))

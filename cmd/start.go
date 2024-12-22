@@ -32,6 +32,7 @@ func startCmd() *cobra.Command {
 
 func initStartFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("params", "p", "", "parameters")
+	cmd.Flags().StringP("requestID", "r", "", "specify request ID")
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
@@ -48,8 +49,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
+	// Get request ID if specified
+	requestID, err := cmd.Flags().GetString("requestID")
+	if err != nil {
+		return fmt.Errorf("failed to get request ID: %w", err)
+	}
+
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
 
 	// Get parameters
 	params, err := cmd.Flags().GetString("params")
@@ -58,10 +65,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize and run DAG
-	return executeDag(ctx, cfg, args[0], removeQuotes(params), quiet)
+	return executeDag(ctx, cfg, args[0], removeQuotes(params), quiet, requestID)
 }
 
-func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool) error {
+func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool, requestID string) error {
 	// Load DAG
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specPath, params)
 	if err != nil {
@@ -69,9 +76,12 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	}
 
 	// Generate request ID
-	requestID, err := generateRequestID()
-	if err != nil {
-		return fmt.Errorf("failed to generate request ID: %w", err)
+	if requestID == "" {
+		var err error
+		requestID, err = generateRequestID()
+		if err != nil {
+			return fmt.Errorf("failed to generate request ID: %w", err)
+		}
 	}
 
 	// Setup logging

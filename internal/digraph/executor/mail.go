@@ -77,7 +77,7 @@ message: %s
 -----
 `
 
-func (e *mail) Run() error {
+func (e *mail) Run(_ context.Context) error {
 	_, _ = e.stdout.Write(
 		[]byte(fmt.Sprintf(
 			mailLogTemplate,

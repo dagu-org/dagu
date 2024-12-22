@@ -147,7 +147,7 @@ func (e *http) writeTextResult(rsp *resty.Response) error {
 	return nil
 }
 
-func (e *http) Run() error {
+func (e *http) Run(_ context.Context) error {
 	rsp, err := e.req.Execute(strings.ToUpper(e.method), e.url)
 	if err != nil {
 		return err

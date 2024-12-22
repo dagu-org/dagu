@@ -136,7 +136,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	n.SetError(cmd.Run())
+	n.SetError(cmd.Run(ctx))
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
 		util.LogErr("close pipe writer", n.outputWriter.Close())

@@ -48,7 +48,7 @@ func (e *docker) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *docker) Run() error {
+func (e *docker) Run(_ context.Context) error {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	e.context = ctx
 	e.cancel = cancelFunc

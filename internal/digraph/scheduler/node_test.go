@@ -18,7 +18,7 @@ import (
 )
 
 func nodeTextCtxWithDagContext() context.Context {
-	return digraph.NewContext(context.Background(), nil, nil, "", "")
+	return digraph.NewContext(context.Background(), nil, nil, nil, "", "")
 }
 
 func TestExecute(t *testing.T) {

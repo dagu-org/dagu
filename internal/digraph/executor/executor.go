@@ -17,7 +17,7 @@ type Executor interface {
 	SetStdout(out io.Writer)
 	SetStderr(out io.Writer)
 	Kill(sig os.Signal) error
-	Run() error
+	Run(ctx context.Context) error
 }
 
 type Creator func(ctx context.Context, step digraph.Step) (Executor, error)

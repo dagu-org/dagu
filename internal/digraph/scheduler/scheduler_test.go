@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 }
 
 func schedulerTextCtxWithDagContext() context.Context {
-	return digraph.NewContext(context.Background(), nil, nil, "", "")
+	return digraph.NewContext(context.Background(), nil, nil, nil, "", "")
 }
 
 func TestScheduler(t *testing.T) {

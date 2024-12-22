@@ -149,7 +149,7 @@ func (e *sshExec) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *sshExec) Run() error {
+func (e *sshExec) Run(_ context.Context) error {
 	addr := net.JoinHostPort(e.config.IP, e.config.Port)
 	conn, err := ssh.Dial("tcp", addr, e.sshConfig)
 	if err != nil {
