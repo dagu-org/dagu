@@ -123,17 +123,21 @@ func (n *Node) Execute(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	// Add the log path to the environment
 	dagCtx = dagCtx.WithEnv(digraph.Env{
 		Key:   digraph.EnvKeyLogPath,
 		Value: n.data.State.Log,
 	})
+
 	ctx = digraph.WithDagContext(ctx, dagCtx)
 	cmd, err := n.setupExec(ctx)
 	if err != nil {
 		return err
 	}
+
 	n.SetError(cmd.Run())
+
 	if n.outputReader != nil && n.data.Step.Output != "" {
 		util.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
@@ -141,6 +145,11 @@ func (n *Node) Execute(ctx context.Context) error {
 		_, _ = io.Copy(&buf, n.outputReader)
 		ret := strings.TrimSpace(buf.String())
 		_ = os.Setenv(n.data.Step.Output, ret)
+
+		if n.data.Step.OutputVariables == nil {
+			n.data.Step.OutputVariables = &digraph.SyncMap{}
+		}
+
 		n.data.Step.OutputVariables.Store(
 			n.data.Step.Output,
 			fmt.Sprintf("%s=%s", n.data.Step.Output, ret),

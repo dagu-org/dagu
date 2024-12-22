@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -17,27 +16,24 @@ import (
 
 // ExecutionGraph represents a graph of steps.
 type ExecutionGraph struct {
-	startedAt       time.Time
-	finishedAt      time.Time
-	outputVariables *digraph.SyncMap
-	dict            map[int]*Node
-	nodes           []*Node
-	from            map[int][]int
-	to              map[int][]int
-	mu              sync.RWMutex
+	startedAt  time.Time
+	finishedAt time.Time
+	dict       map[int]*Node
+	nodes      []*Node
+	from       map[int][]int
+	to         map[int][]int
+	mu         sync.RWMutex
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		outputVariables: &digraph.SyncMap{},
-		dict:            make(map[int]*Node),
-		from:            make(map[int][]int),
-		to:              make(map[int][]int),
-		nodes:           []*Node{},
+		dict:  make(map[int]*Node),
+		from:  make(map[int][]int),
+		to:    make(map[int][]int),
+		nodes: []*Node{},
 	}
 	for _, step := range steps {
-		step.OutputVariables = graph.outputVariables
 		node := &Node{data: NodeData{Step: step}}
 		node.init()
 		graph.dict[node.id] = node
@@ -53,33 +49,12 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 // given nodes.
 func CreateRetryExecutionGraph(ctx context.Context, nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		outputVariables: &digraph.SyncMap{},
-		dict:            make(map[int]*Node),
-		from:            make(map[int][]int),
-		to:              make(map[int][]int),
-		nodes:           []*Node{},
+		dict:  make(map[int]*Node),
+		from:  make(map[int][]int),
+		to:    make(map[int][]int),
+		nodes: []*Node{},
 	}
 	for _, node := range nodes {
-		if node.data.Step.OutputVariables != nil {
-			node.data.Step.OutputVariables.Range(func(key, value any) bool {
-				k, ok := key.(string)
-				if !ok {
-					return false
-				}
-				v, ok := value.(string)
-				if !ok {
-					return false
-				}
-
-				graph.outputVariables.Store(key, value)
-				err := os.Setenv(k, v[len(key.(string))+1:])
-				if err != nil {
-					logger.Error(ctx, "Failed to set env", "error", err)
-				}
-				return true
-			})
-		}
-		node.data.Step.OutputVariables = graph.outputVariables
 		node.init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)

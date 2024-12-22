@@ -36,10 +36,16 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
 	cmd.Env = append(cmd.Env, dagContext.Envs.All()...)
-	step.OutputVariables.Range(func(_, value any) bool {
-		cmd.Env = append(cmd.Env, value.(string))
-		return true
-	})
+
+	// Get output variables from the step context and set them as environment
+	stepCtx := digraph.GetStepContext(ctx)
+	if stepCtx != nil && stepCtx.OutputVariables != nil {
+		stepCtx.OutputVariables.Range(func(_, value any) bool {
+			cmd.Env = append(cmd.Env, value.(string))
+			return true
+		})
+	}
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,

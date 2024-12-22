@@ -58,10 +58,16 @@ func newSubWorkflow(
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
 	cmd.Env = append(cmd.Env, step.Variables...)
-	step.OutputVariables.Range(func(_, value any) bool {
-		cmd.Env = append(cmd.Env, value.(string))
-		return true
-	})
+
+	// Get output variables from the step context and set them as environment
+	stepCtx := digraph.GetStepContext(ctx)
+	if stepCtx != nil && stepCtx.OutputVariables != nil {
+		stepCtx.OutputVariables.Range(func(_, value any) bool {
+			cmd.Env = append(cmd.Env, value.(string))
+			return true
+		})
+	}
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,
