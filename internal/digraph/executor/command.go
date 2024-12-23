@@ -62,6 +62,13 @@ func createCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
 	if shellCommand == "" {
 		// If the shell is not specified use the system shell
 		shellCommand = os.ExpandEnv("${SHELL}")
+		if shellCommand == "" {
+			// check if `sh` is available
+			absPath, err := exec.LookPath("sh")
+			if err == nil {
+				shellCommand = absPath
+			}
+		}
 	}
 	if shellCommand == "" {
 		// If shell can not be used, run the program directly
