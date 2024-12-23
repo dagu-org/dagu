@@ -28,17 +28,19 @@
 
 Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands as a [Directed Acyclic Graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) in a declarative [YAML format](https://dagu.readthedocs.io/en/latest/yaml_format.html). Dagu simplifies the management and execution of complex workflows. It natively supports running Docker containers, making HTTP requests, and executing commands over SSH.
 
--   [Documentation](https://dagu.readthedocs.io)
--   [Localized Documentation](#localized-documentation)
--   [Discord Community](https://discord.gg/gpahPUjGRk)
+- **Check out our** [Documentation](https://dagu.readthedocs.io)
+- **Join our** [Discord Community](https://discord.gg/gpahPUjGRk)
+- **Explore** [Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
+
+---
 
 ## **Highlights**
 
--   Single binary file installation
--   Declarative YAML format for defining DAGs
--   Web UI for visually managing, rerunning, and monitoring pipelines
--   Use existing programs without any modification
--   Self-contained, with no need for a DBMS
+- Single binary file installation
+- Declarative YAML format for defining DAGs
+- Web UI for visually managing, rerunning, and monitoring pipelines
+- Use existing programs without any modification
+- Self-contained, with no need for a DBMS
 
 ## **Table of Contents**
 
@@ -67,8 +69,10 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [Configuration](#configuration)
 - [**Localized Documentation**](#localized-documentation)
 - [**Documentation**](#documentation)
-- [**Running as a daemon**](#running-as-a-daemon)
 - [**Example DAG**](#example-dag)
+  - [Minimum examples](#minimum-examples)
+  - [Complex example](#complex-example)
+- [**Running as a daemon**](#running-as-a-daemon)
 - [**Motivation**](#motivation)
 - [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
 - [**How It Works**](#how-it-works)
@@ -77,82 +81,83 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
 ## **Features**
 
--   Web User Interface
--   Command Line Interface (CLI) with several commands for running and managing DAGs
--   YAML format for defining DAGs, with support for various features including:
-    -   Execution of custom code snippets
-    -   Parameters
-    -   Command substitution
-    -   Conditional logic
-    -   Redirection of stdout and stderr
-    -   Lifecycle hooks
-    -   Repeating task
-    -   Automatic retry
--   Executors for running different types of tasks:
-    -   Running arbitrary Docker containers
-    -   Making HTTP requests
-    -   Sending emails
-    -   Running jq command
-    -   Executing remote commands via SSH
--   Remote Node support for managing multiple Dagu instances:
-    -   Monitor DAGs across different environments
-    -   Switch between nodes through UI dropdown
-    -   Centralized management interface
--   Email notification
--   Scheduling with Cron expressions
--   REST API Interface
--   Basic Authentication over HTTPS
+- Web User Interface
+- Command Line Interface (CLI) with several commands for running and managing DAGs
+- YAML format for defining DAGs, with support for various features including:
+  - Execution of custom code snippets
+  - Parameters
+  - Command substitution
+  - Conditional logic
+  - Redirection of stdout and stderr
+  - Lifecycle hooks
+  - Repeating task
+  - Automatic retry
+- Executors for running different types of tasks:
+  - Running arbitrary Docker containers
+  - Making HTTP requests
+  - Sending emails
+  - Running jq command
+  - Executing remote commands via SSH
+- Remote Node support for managing multiple Dagu instances:
+  - Monitor DAGs across different environments
+  - Switch between nodes through UI dropdown
+  - Centralized management interface
+- Email notification
+- Scheduling with Cron expressions
+- REST API Interface
+- Basic Authentication over HTTPS
 
 ## **Use Cases**
 
--   **Data Pipeline Automation:** Schedule ETL tasks for data processing and centralization.
--   **Infrastructure Monitoring:** Periodically check infrastructure components with HTTP requests or SSH commands.
--   **Automated Reporting:** Generate and send periodic reports via email.
--   **Batch Processing:** Schedule batch jobs for tasks like data cleansing or model training.
--   **Task Dependency Management:** Manage complex workflows with interdependent tasks.
--   **Microservices Orchestration:** Define and manage dependencies between microservices.
--   **CI/CD Integration:** Automate code deployment, testing, and environment updates.
--   **Alerting System:** Create notifications based on specific triggers or conditions.
--   **Custom Task Automation:** Define and schedule custom tasks using code snippets.
+- **Data Pipeline Automation**: Schedule ETL tasks for data processing
+- **Infrastructure Monitoring**: Periodic health checks via HTTP or SSH
+- **Automated Reporting**: Generate and send routine email reports
+- **Batch Processing**: Automate data cleansing, model training, etc.
+- **Task Dependency Management**: Handle interdependent processes seamlessly
+- **Microservices Orchestration**: Manage and monitor microservice dependencies
+- **CI/CD Integration**: Automate code deployment and testing
+- **Alerting System**: Trigger notifications upon specific conditions
+- **Custom Task Automation**: Run arbitrary scripts or commands with ease
 
 ## **Web UI**
 
 ### DAG Details
 
-It shows the real-time status, logs, and DAG configurations. You can edit DAG configurations on a browser.
+Real-time statuses, logs, and configuration details for each DAG. Easily edit configurations in your browser.
 
 ![example](assets/images/demo.gif?raw=true)
 
-You can switch to the vertical graph with the button on the top right corner.
+Switch graph orientation with the toggle button at the top-right corner:
 
 ![Details-TD](assets/images/ui-details2.webp?raw=true)
 
 ### DAGs
 
-It shows all DAGs and the real-time status.
+View all DAGs in one place with live status updates.
 
 ![DAGs](assets/images/ui-dags.webp?raw=true)
 
 ### Search
 
-It greps given text across all DAG definitions.
+Search across all DAG definitions.
+
 ![History](assets/images/ui-search.webp?raw=true)
 
 ### Execution History
 
-It shows past execution results and logs.
+Review past DAG executions and logs at a glance.
 
 ![History](assets/images/ui-history.webp?raw=true)
 
 ### Log Viewer
 
-It shows the detail log and standard output of each execution and step.
+Examine detailed step-level logs and outputs.
 
 ![DAG Log](assets/images/ui-logoutput.webp?raw=true)
 
 ## **Installation**
 
-You can install Dagu quickly using Homebrew or by downloading the latest binary from the Releases page on GitHub.
+Dagu can be installed in multiple ways, such as using Homebrew or downloading a single binary from GitHub releases.
 
 ### Via Bash script
 
@@ -213,12 +218,12 @@ Example:
 ```yaml
 schedule: "* * * * *" # Run the DAG every minute
 steps:
-    - name: s1
-      command: echo Hello Dagu
-    - name: s2
-      command: echo done!
-      depends:
-          - s1
+  - name: s1
+    command: echo Hello Dagu
+  - name: s2
+    command: echo done!
+    depends:
+      - s1
 ```
 
 ### 4. Execute the DAG
@@ -263,9 +268,9 @@ dagu version
 
 Dagu supports managing multiple Dagu servers from a single UI through its remote node feature. This allows you to:
 
--   Monitor and manage DAGs across different environments (dev, staging, prod)
--   Access multiple Dagu instances from a centralized UI
--   Switch between nodes easily through the UI dropdown
+- Monitor and manage DAGs across different environments (dev, staging, prod)
+- Access multiple Dagu instances from a centralized UI
+- Switch between nodes easily through the UI dropdown
 
 See [Remote Node Configuration](https://dagu.readthedocs.io/en/latest/config_remote.html) for more details.
 
@@ -276,52 +281,165 @@ Remote nodes can be configured by creating `admin.yaml` in `$HOME/.config/dagu/`
 ```yaml
 # admin.yaml
 remoteNodes:
-    - name: "prod" # Name of the remote node
-      apiBaseUrl: "https://prod.example.com/api/v1" # Base URL of the remote node API
-    - name: "staging"
-      apiBaseUrl: "https://staging.example.com/api/v1"
+  - name: "prod" # Name of the remote node
+    apiBaseUrl: "https://prod.example.com/api/v1" # Base URL of the remote node API
+  - name: "staging"
+    apiBaseUrl: "https://staging.example.com/api/v1"
 ```
 
 ## **Localized Documentation**
 
--   [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
--   [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
+- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
+- [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
 
 ## **Documentation**
 
--   [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
--   ️[Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
--   [Command Line Interface](https://dagu.readthedocs.io/en/latest/cli.html)
--   [Web User Interface](https://dagu.readthedocs.io/en/latest/web_interface.html)
--   Writing DAG
-    -   [Minimal DAG Definition](https://dagu.readthedocs.io/en/latest/yaml_format.html#minimal-dag-definition)
-    -   [Running Arbitrary Code Snippets](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-arbitrary-code-snippets)
-    -   [Environment Variables](https://dagu.readthedocs.io/en/latest/yaml_format.html#defining-environment-variables)
-    -   [Parameters](https://dagu.readthedocs.io/en/latest/yaml_format.html#defining-and-using-parameters)
-    -   [Command Substitution](https://dagu.readthedocs.io/en/latest/yaml_format.html#using-command-substitution)
-    -   [Conditional Logic](https://dagu.readthedocs.io/en/latest/yaml_format.html#adding-conditional-logic)
-    -   [Environment Variables with Standard Output](https://dagu.readthedocs.io/en/latest/yaml_format.html#setting-environment-variables-with-standard-output)
-    -   [Redirecting Stdout and Stderr](https://dagu.readthedocs.io/en/latest/yaml_format.html#redirecting-stdout-and-stderr)
-    -   [Lifecycle Hooks](https://dagu.readthedocs.io/en/latest/yaml_format.html#adding-lifecycle-hooks)
-    -   [Repeating Task](https://dagu.readthedocs.io/en/latest/yaml_format.html#repeating-a-task-at-regular-intervals)
-    -   [Minimal DAG Definition](https://dagu.readthedocs.io/en/latest/yaml_format.html#minimal-dag-definition)
-    -   [Running Sub-DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-sub-dag)
-    -   [All Available Fields for a DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-dags)
-    -   [All Available Fields for a Step](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-steps)
--   Example DAGs
-    -   [Hello World](https://dagu.readthedocs.io/en/latest/examples.html#hello-world)
-    -   [Conditional Steps](https://dagu.readthedocs.io/en/latest/examples.html#conditional-steps)
-    -   [File Output](https://dagu.readthedocs.io/en/latest/examples.html#file-output)
-    -   [Passing Output to Next Step](https://dagu.readthedocs.io/en/latest/examples.html#passing-output-to-next-step)
-    -   [Running a Container Image](https://dagu.readthedocs.io/en/latest/examples.html#running-a-docker-container)
-    -   [Making HTTP Requests](https://dagu.readthedocs.io/en/latest/examples.html#sending-http-requests)
-    -   [JSON Processing](https://dagu.readthedocs.io/en/latest/examples.html#querying-json-data-with-jq)
-    -   [Email](https://dagu.readthedocs.io/en/latest/examples.html#sending-email)
--   [Configurations](https://dagu.readthedocs.io/en/latest/config.html)
--   [Remote Node](https://dagu.readthedocs.io/en/latest/config_remote.html)
--   [Scheduler](https://dagu.readthedocs.io/en/latest/scheduler.html)
--   [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
--   [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)
+- [Installation Instructions](https://dagu.readthedocs.io/en/latest/installation.html)
+- ️[Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
+- [Command Line Interface](https://dagu.readthedocs.io/en/latest/cli.html)
+- [Web User Interface](https://dagu.readthedocs.io/en/latest/web_interface.html)
+- Writing DAG
+  - [Minimal DAG Definition](https://dagu.readthedocs.io/en/latest/yaml_format.html#minimal-dag-definition)
+  - [Running Arbitrary Code Snippets](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-arbitrary-code-snippets)
+  - [Environment Variables](https://dagu.readthedocs.io/en/latest/yaml_format.html#defining-environment-variables)
+  - [Parameters](https://dagu.readthedocs.io/en/latest/yaml_format.html#defining-and-using-parameters)
+  - [Command Substitution](https://dagu.readthedocs.io/en/latest/yaml_format.html#using-command-substitution)
+  - [Conditional Logic](https://dagu.readthedocs.io/en/latest/yaml_format.html#adding-conditional-logic)
+  - [Environment Variables with Standard Output](https://dagu.readthedocs.io/en/latest/yaml_format.html#setting-environment-variables-with-standard-output)
+  - [Redirecting Stdout and Stderr](https://dagu.readthedocs.io/en/latest/yaml_format.html#redirecting-stdout-and-stderr)
+  - [Lifecycle Hooks](https://dagu.readthedocs.io/en/latest/yaml_format.html#adding-lifecycle-hooks)
+  - [Repeating Task](https://dagu.readthedocs.io/en/latest/yaml_format.html#repeating-a-task-at-regular-intervals)
+  - [Running Sub-DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-sub-dag)
+  - [All Available Fields for a DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-dags)
+  - [All Available Fields for a Step](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-steps)
+- Example DAGs
+  - [Hello World](https://dagu.readthedocs.io/en/latest/examples.html#hello-world)
+  - [Conditional Steps](https://dagu.readthedocs.io/en/latest/examples.html#conditional-steps)
+  - [File Output](https://dagu.readthedocs.io/en/latest/examples.html#file-output)
+  - [Passing Output to Next Step](https://dagu.readthedocs.io/en/latest/examples.html#passing-output-to-next-step)
+  - [Running a Container Image](https://dagu.readthedocs.io/en/latest/examples.html#running-a-docker-container)
+  - [Making HTTP Requests](https://dagu.readthedocs.io/en/latest/examples.html#sending-http-requests)
+  - [JSON Processing](https://dagu.readthedocs.io/en/latest/examples.html#querying-json-data-with-jq)
+  - [Email](https://dagu.readthedocs.io/en/latest/examples.html#sending-email)
+- [Configurations](https://dagu.readthedocs.io/en/latest/config.html)
+- [Remote Node](https://dagu.readthedocs.io/en/latest/config_remote.html)
+- [Scheduler](https://dagu.readthedocs.io/en/latest/scheduler.html)
+- [Docker Compose](https://dagu.readthedocs.io/en/latest/docker-compose.html)
+- [REST API Documentation](https://app.swaggerhub.com/apis/YOHAMTA_1/dagu)
+
+## **Example DAG**
+
+### Minimum examples
+
+A DAG with two steps:
+
+```yaml
+steps:
+  - name: step 1
+    command: echo hello
+  - name: step 2
+    command: echo world
+    depends:
+      - step 1
+```
+
+Using a pipe:
+
+```yaml
+steps:
+  - name: step 1
+    command: echo hello world | xargs echo
+```
+
+Specifying a shell:
+
+```yaml
+steps:
+  - name: step 1
+    command: echo hello world | xargs echo
+    shell: bash
+```
+
+Note: The default shell is `$SHELL` or `sh`.
+
+### Complex example
+
+A typical data pipeline for DevOps/Data Engineering scenarios:
+
+![Details-TD](assets/images/example.webp?raw=true)
+
+The YAML code below represents this DAG:
+
+```yaml
+# Environment variables used throughout the pipeline
+env:
+  - DATA_DIR: /data
+  - SCRIPT_DIR: /scripts
+  - LOG_DIR: /log
+  # ... other variables can be added here
+
+# Handlers to manage errors and cleanup after execution
+handlerOn:
+  failure:
+    command: "echo error"
+  exit:
+    command: "echo clean up"
+
+# The schedule for the DAG execution in cron format
+# This schedule runs the DAG daily at 12:00 AM
+schedule: "0 0 * * *"
+
+steps:
+  # Step 1: Pull the latest data from a data source
+  - name: pull_data
+    command: "sh"
+    script: |
+      echo `date '+%Y-%m-%d'`
+    output: DATE
+
+  # Step 2: Cleanse and prepare the data
+  - name: cleanse_data
+    command: echo cleansing ${DATA_DIR}/${DATE}.csv
+    depends:
+      - pull_data
+
+  # Step 3: Transform the data
+  - name: transform_data
+    command: echo transforming ${DATA_DIR}/${DATE}_clean.csv
+    depends:
+      - cleanse_data
+
+  # Parallel Step 1: Load the data into a database
+  - name: load_data
+    command: echo loading ${DATA_DIR}/${DATE}_transformed.csv
+    depends:
+      - transform_data
+
+  # Parallel Step 2: Generate a statistical report
+  - name: generate_report
+    command: echo generating report ${DATA_DIR}/${DATE}_transformed.csv
+    depends:
+      - transform_data
+
+  # Step 4: Run some analytics
+  - name: run_analytics
+    command: echo running analytics ${DATA_DIR}/${DATE}_transformed.csv
+    depends:
+      - load_data
+
+  # Step 5: Send an email report
+  - name: send_report
+    command: echo sending email ${DATA_DIR}/${DATE}_analytics.csv
+    depends:
+      - run_analytics
+      - generate_report
+
+  # Step 6: Cleanup temporary files
+  - name: cleanup
+    command: echo removing ${DATE}*.csv
+    depends:
+      - send_report
+```
 
 ## **Running as a daemon**
 
@@ -340,117 +458,6 @@ else
 fi
 
 exit
-```
-
-## **Example DAG**
-
-**Minimum examples**
-
-A DAG consists of one or more steps, each with a name and command. Here's the simplest possible DAG:
-
-```yaml
-steps:
-  - name: step 1
-    command: echo hello
-  - name: step 2
-    command: echo world
-    depends:
-      - step 1
-```
-
-You can use pipe for running the command.
-
-```yaml
-steps:
-  - name: step 1
-    command: echo hello world | xargs echo
-```
-
-You can specify shell for running the command. If not specified, the `$SHELL` will be used.
-
-```yaml
-steps:
-  - name: step 1
-    command: echo hello world | xargs echo
-    shell: bash
-```
-
-**More complex one**
-This example DAG showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
-
-![Details-TD](assets/images/example.webp?raw=true)
-
-The YAML code below represents this DAG:
-
-```yaml
-# Environment variables used throughout the pipeline
-env:
-    - DATA_DIR: /data
-    - SCRIPT_DIR: /scripts
-    - LOG_DIR: /log
-    # ... other variables can be added here
-
-# Handlers to manage errors and cleanup after execution
-handlerOn:
-    failure:
-        command: "echo error"
-    exit:
-        command: "echo clean up"
-
-# The schedule for the DAG execution in cron format
-# This schedule runs the DAG daily at 12:00 AM
-schedule: "0 0 * * *"
-
-steps:
-    # Step 1: Pull the latest data from a data source
-    - name: pull_data
-      command: "sh"
-      script: |
-          echo `date '+%Y-%m-%d'`
-      output: DATE
-
-    # Step 2: Cleanse and prepare the data
-    - name: cleanse_data
-      command: echo cleansing ${DATA_DIR}/${DATE}.csv
-      depends:
-          - pull_data
-
-    # Step 3: Transform the data
-    - name: transform_data
-      command: echo transforming ${DATA_DIR}/${DATE}_clean.csv
-      depends:
-          - cleanse_data
-
-    # Parallel Step 1: Load the data into a database
-    - name: load_data
-      command: echo loading ${DATA_DIR}/${DATE}_transformed.csv
-      depends:
-          - transform_data
-
-    # Parallel Step 2: Generate a statistical report
-    - name: generate_report
-      command: echo generating report ${DATA_DIR}/${DATE}_transformed.csv
-      depends:
-          - transform_data
-
-    # Step 4: Run some analytics
-    - name: run_analytics
-      command: echo running analytics ${DATA_DIR}/${DATE}_transformed.csv
-      depends:
-          - load_data
-
-    # Step 5: Send an email report
-    - name: send_report
-      command: echo sending email ${DATA_DIR}/${DATE}_analytics.csv
-      depends:
-          - run_analytics
-          - generate_report
-
-    # Step 6: Cleanup temporary files
-    - name: cleanup
-      command: echo removing ${DATE}*.csv
-      depends:
-          - send_report
 ```
 
 ## **Motivation**
