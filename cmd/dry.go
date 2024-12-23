@@ -24,7 +24,7 @@ func dryCmd() *cobra.Command {
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry [--params="param1 param2"] /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  runDry,
+		RunE:  wrapRunE(runDry),
 	}
 }
 

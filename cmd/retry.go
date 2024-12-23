@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/agent"
@@ -27,11 +28,12 @@ func retryCmd() *cobra.Command {
 		Short: "Retry the DAG execution",
 		Long:  `dagu retry --req=<request-id> /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  runRetry,
+		RunE:  wrapRunE(runRetry),
 	}
 
 	cmd.Flags().StringP("req", "r", "", "request-id")
 	_ = cmd.MarkFlagRequired("req")
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
 }
 
@@ -41,24 +43,32 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	// Get quiet flag
+	quiet, err := cmd.Flags().GetBool("quiet")
+	if err != nil {
+		return fmt.Errorf("failed to get quiet flag: %w", err)
+	}
+
 	requestID, err := cmd.Flags().GetString("req")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
 
 	specFilePath := args[0]
 
 	// Setup execution context
 	executionCtx, err := prepareExecutionContext(ctx, cfg, specFilePath, requestID)
 	if err != nil {
+		logger.Error(ctx, "Failed to prepare execution context", "path", specFilePath)
 		return fmt.Errorf("failed to prepare execution context: %w", err)
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, executionCtx, cfg); err != nil {
+	if err := executeRetry(ctx, executionCtx, cfg, quiet); err != nil {
+		logger.Error(ctx, "Failed to execute retry", "path", specFilePath)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 
@@ -100,7 +110,7 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 	}, nil
 }
 
-func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Config) error {
+func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Config, quiet bool) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)
@@ -126,7 +136,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 		"newRequestID", newRequestID,
 		"logFile", logFile.Name())
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
+	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
 
 	agt := agent.New(
 		newRequestID,
@@ -141,7 +151,13 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 	listenSignals(ctx, agt)
 
 	if err := agt.Run(ctx); err != nil {
-		return fmt.Errorf("failed to execute DAG %s: %w", execCtx.dag.Name, err)
+		if quiet {
+			os.Exit(1)
+		} else {
+			agt.PrintSummary(ctx)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", execCtx.dag.Name, newRequestID, err)
+		}
+
 	}
 
 	return nil

@@ -51,7 +51,8 @@ type Agent struct {
 	requestID string
 	finished  atomic.Bool
 
-	lock sync.RWMutex
+	lock    sync.RWMutex
+	lastErr error
 }
 
 // Options is the configuration for the Agent.
@@ -200,7 +201,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 
 	// Send the execution report if necessary.
-	a.reporter.report(ctx, finishedStatus, lastErr)
+	a.lastErr = lastErr
 	if err := a.reporter.send(a.dag, finishedStatus, lastErr); err != nil {
 		logger.Error(ctx, "Mail notification failed", "error", err)
 	}
@@ -210,6 +211,12 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Return the last error on the DAG execution.
 	return lastErr
+}
+
+func (a *Agent) PrintSummary(ctx context.Context) {
+	status := a.Status()
+	summary := a.reporter.getSummary(ctx, status, a.lastErr)
+	println(summary)
 }
 
 // Status collects the current running status of the DAG and returns it.
@@ -369,8 +376,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), newOutputCollector(a.historyStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
-
-	a.reporter.report(ctx, a.Status(), lastErr)
+	a.lastErr = lastErr
 
 	logger.Info(ctx, "Dry-run finished", "reqId", a.requestID)
 

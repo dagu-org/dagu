@@ -24,7 +24,7 @@ func serverCmd() *cobra.Command {
 		Short:   "Start the server",
 		Long:    `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		PreRunE: bindFlags,
-		RunE:    runServer,
+		RunE:    wrapRunE(runServer),
 	}
 
 	initServerFlags(cmd)

@@ -350,7 +350,9 @@ func (sc *Scheduler) execNode(ctx context.Context, graph *ExecutionGraph, node *
 	ctx = sc.buildStepContext(ctx, graph, node)
 
 	if !sc.dry {
-		return node.Execute(ctx)
+		if err := node.Execute(ctx); err != nil {
+			return fmt.Errorf("failed to execute step %q: %w", node.data.Step.Name, err)
+		}
 	}
 
 	return nil

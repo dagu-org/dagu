@@ -20,7 +20,7 @@ func startAllCmd() *cobra.Command {
 		Short:   "Launches both the Dagu web UI server and the scheduler process.",
 		Long:    `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		PreRunE: bindStartAllFlags,
-		RunE:    runStartAll,
+		RunE:    wrapRunE(runStartAll),
 	}
 
 	initStartAllFlags(cmd)

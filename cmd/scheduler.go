@@ -18,7 +18,7 @@ func schedulerCmd() *cobra.Command {
 		Use:   "scheduler",
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
-		RunE:  runScheduler,
+		RunE:  wrapRunE(runScheduler),
 	}
 
 	cmd.Flags().StringP(
