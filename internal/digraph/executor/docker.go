@@ -13,6 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/mitchellh/mapstructure"
@@ -101,7 +102,7 @@ func (e *docker) Run(_ context.Context) error {
 
 	// New container creation logic
 	if e.pull {
-		reader, err := cli.ImagePull(ctx, e.image, types.ImagePullOptions{})
+		reader, err := cli.ImagePull(ctx, e.image, image.PullOptions{})
 		if err != nil {
 			return err
 		}
@@ -131,7 +132,7 @@ func (e *docker) Run(_ context.Context) error {
 		}
 		removing = true
 		if err := cli.ContainerRemove(
-			ctx, resp.ID, types.ContainerRemoveOptions{
+			ctx, resp.ID, container.RemoveOptions{
 				Force: true,
 			},
 		); err != nil {
@@ -146,7 +147,7 @@ func (e *docker) Run(_ context.Context) error {
 	}
 
 	if err := cli.ContainerStart(
-		ctx, resp.ID, types.ContainerStartOptions{},
+		ctx, resp.ID, container.StartOptions{},
 	); err != nil {
 		return err
 	}
@@ -225,7 +226,7 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client) error 
 
 func (e *docker) attachAndWait(ctx context.Context, cli *client.Client, containerID string) error {
 	out, err := cli.ContainerLogs(
-		ctx, containerID, types.ContainerLogsOptions{
+		ctx, containerID, container.LogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     true,
