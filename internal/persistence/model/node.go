@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 func FromSteps(steps []digraph.Step) []*Node {
@@ -32,8 +32,8 @@ func FromNode(node scheduler.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
 		Log:        node.State.Log,
-		StartedAt:  util.FormatTime(node.State.StartedAt),
-		FinishedAt: util.FormatTime(node.State.FinishedAt),
+		StartedAt:  stringutil.FormatTime(node.State.StartedAt),
+		FinishedAt: stringutil.FormatTime(node.State.FinishedAt),
 		Status:     node.State.Status,
 		StatusText: node.State.Status.String(),
 		RetryCount: node.State.RetryCount,
@@ -55,8 +55,8 @@ type Node struct {
 }
 
 func (n *Node) ToNode() *scheduler.Node {
-	startedAt, _ := util.ParseTime(n.StartedAt)
-	finishedAt, _ := util.ParseTime(n.FinishedAt)
+	startedAt, _ := stringutil.ParseTime(n.StartedAt)
+	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
 		Log:        n.Log,

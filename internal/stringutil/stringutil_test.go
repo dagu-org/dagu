@@ -1,7 +1,7 @@
 // Copyright (C) 2024 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package util_test
+package stringutil_test
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,38 +38,38 @@ func Test_MustGetwd(t *testing.T) {
 func Test_FormatTime(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC)
-		formatted := util.FormatTime(tm)
+		formatted := stringutil.FormatTime(tm)
 		require.Equal(t, "2022-02-01T02:02:02Z", formatted)
 
-		parsed, err := util.ParseTime(formatted)
+		parsed, err := stringutil.ParseTime(formatted)
 		require.NoError(t, err)
 		require.Equal(t, tm, parsed)
 
 		// Test empty time
-		require.Equal(t, "-", util.FormatTime(time.Time{}))
-		parsed, err = util.ParseTime("-")
+		require.Equal(t, "-", stringutil.FormatTime(time.Time{}))
+		parsed, err = stringutil.ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
 	t.Run("Empty", func(t *testing.T) {
 		// Test empty time
-		require.Equal(t, "-", util.FormatTime(time.Time{}))
+		require.Equal(t, "-", stringutil.FormatTime(time.Time{}))
 	})
 }
 
 func Test_ParseTime(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		parsed, err := util.ParseTime("2022-02-01T02:02:02Z")
+		parsed, err := stringutil.ParseTime("2022-02-01T02:02:02Z")
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC), parsed)
 	})
 	t.Run("Valid_Legacy", func(t *testing.T) {
-		parsed, err := util.ParseTime("2022-02-01 02:02:02")
+		parsed, err := stringutil.ParseTime("2022-02-01 02:02:02")
 		require.NoError(t, err)
 		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location()), parsed)
 	})
 	t.Run("Empty", func(t *testing.T) {
-		parsed, err := util.ParseTime("-")
+		parsed, err := stringutil.ParseTime("-")
 		require.NoError(t, err)
 		require.Equal(t, time.Time{}, parsed)
 	})
@@ -88,7 +88,7 @@ func Test_LogErr(t *testing.T) {
 			log.SetOutput(origStdout)
 		}()
 
-		util.LogErr("test action", errors.New("test error"))
+		stringutil.LogErr("test action", errors.New("test error"))
 		os.Stdout = origStdout
 		_ = w.Close()
 
@@ -105,10 +105,10 @@ func Test_LogErr(t *testing.T) {
 func TestTruncString(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		// Test empty string
-		require.Equal(t, "", util.TruncString("", 8))
+		require.Equal(t, "", stringutil.TruncString("", 8))
 		// Test string with length less than limit
-		require.Equal(t, "1234567", util.TruncString("1234567", 8))
+		require.Equal(t, "1234567", stringutil.TruncString("1234567", 8))
 		// Test string with length equal to limit
-		require.Equal(t, "12345678", util.TruncString("123456789", 8))
+		require.Equal(t, "12345678", stringutil.TruncString("123456789", 8))
 	})
 }

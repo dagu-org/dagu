@@ -19,7 +19,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/grep"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 type dagStoreImpl struct {
@@ -283,13 +283,13 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 		After:    2,
 	}
 
-	util.LogErr("read DAGs directory", err)
+	stringutil.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
 			filePath := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(filePath)
 			if err != nil {
-				util.LogErr("read DAG file", err)
+				stringutil.LogErr("read DAG file", err)
 				continue
 			}
 			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)

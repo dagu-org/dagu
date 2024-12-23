@@ -21,7 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/mattn/go-shellwords"
 )
 
@@ -140,7 +140,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.SetError(cmd.Run(ctx))
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
-		util.LogErr("close pipe writer", n.outputWriter.Close())
+		stringutil.LogErr("close pipe writer", n.outputWriter.Close())
 		var buf bytes.Buffer
 		// TODO: Error handling
 		_, _ = io.Copy(&buf, n.outputReader)
@@ -265,7 +265,7 @@ func (n *Node) signal(sig os.Signal, allowOverride bool) {
 			sigsig = unix.SignalNum(n.data.Step.SignalOnStop)
 		}
 		log.Printf("Sending %s signal to %s", sigsig, n.data.Step.Name)
-		util.LogErr("sending signal", n.cmd.Kill(sigsig))
+		stringutil.LogErr("sending signal", n.cmd.Kill(sigsig))
 	}
 	if status == NodeStatusRunning {
 		n.data.State.Status = NodeStatusCancel
@@ -294,7 +294,7 @@ func (n *Node) setup(logDir string, requestID string) error {
 	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
 		fileutil.SafeName(n.data.Step.Name),
 		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
-		util.TruncString(requestID, 8),
+		stringutil.TruncString(requestID, 8),
 	))
 
 	// Replace the special environment variables in the command
