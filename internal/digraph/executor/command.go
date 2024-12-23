@@ -56,27 +56,49 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 		cmd: cmd,
 	}, nil
 }
-
 func createCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
-	shellCommand := step.Shell
+	shellCommand := getShellCommand(step.Shell)
+
 	if shellCommand == "" {
-		// If the shell is not specified use the system shell
-		shellCommand = os.ExpandEnv("${SHELL}")
-		if shellCommand == "" {
-			// check if `sh` is available
-			absPath, err := exec.LookPath("sh")
-			if err == nil {
-				shellCommand = absPath
-			}
-		}
+		return createDirectCommand(ctx, step)
 	}
-	if shellCommand == "" {
-		// If shell can not be used, run the program directly
-		// nolint: gosec
-		return exec.CommandContext(ctx, step.Command, step.Args...)
+	return createShellCommand(ctx, shellCommand, step)
+}
+
+// getShellCommand returns the shell to use for command execution
+func getShellCommand(configuredShell string) string {
+	if configuredShell != "" {
+		return configuredShell
 	}
-	command := fmt.Sprintf("%s %s", step.Command, strings.Join(step.Args, " "))
-	return exec.CommandContext(ctx, shellCommand, "-c", command)
+
+	// Try system shell first
+	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
+		return systemShell
+	}
+
+	// Fallback to sh if available
+	if shPath, err := exec.LookPath("sh"); err == nil {
+		return shPath
+	}
+
+	return ""
+}
+
+// createDirectCommand creates a command that runs directly without a shell
+func createDirectCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
+	// nolint: gosec
+	return exec.CommandContext(ctx, step.Command, step.Args...)
+}
+
+// createShellCommand creates a command that runs through a shell
+func createShellCommand(ctx context.Context, shell string, step digraph.Step) *exec.Cmd {
+	command := buildCommandString(step.Command, step.Args)
+	return exec.CommandContext(ctx, shell, "-c", command)
+}
+
+// buildCommandString combines the command and arguments into a single string
+func buildCommandString(command string, args []string) string {
+	return fmt.Sprintf("%s %s", command, strings.Join(args, " "))
 }
 
 func (e *commandExecutor) Run(_ context.Context) error {
