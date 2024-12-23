@@ -27,7 +27,6 @@ type DAG struct {
 	Tags []string `json:"Tags"`
 	// Description is the description of the DAG. optional.
 	Description string `json:"Description"`
-
 	// Schedule configuration.
 	// This is used by the scheduler to start / stop / restart the DAG.
 	Schedule        []Schedule `json:"Schedule"`

@@ -17,6 +17,8 @@ type Step struct {
 	Name string `json:"Name"`
 	// Description is the description of the step.
 	Description string `json:"Description,omitempty"`
+	// Shell is the shell program to execute the command. optional.
+	Shell string `json:"Shell,omitempty"`
 	// Variables contains the list of variables to be set.
 	Variables []string `json:"Variables,omitempty"`
 	// OutputVariables is a structure to store the output variables for the

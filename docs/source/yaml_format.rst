@@ -28,13 +28,22 @@ A DAG consists of one or more steps, each with a name and command. Here's the si
       depends:
         - step 1
 
-The command can be a string or list of strings. The list format is useful when passing arguments:
+You can use pipe for running the command.
 
 .. code-block:: yaml
 
   steps:
     - name: step 1
-      command: [echo, hello]
+      command: echo hello world | xargs echo
+
+You can specify shell for running the command. If not specified, the ``$SHELL`` will be used.
+
+.. code-block:: yaml
+
+  steps:
+    - name: step 1
+      command: echo hello world | xargs echo
+      shell: bash
 
 Schema Definition
 ~~~~~~~~~~~~~~~~

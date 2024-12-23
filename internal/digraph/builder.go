@@ -8,11 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"golang.org/x/sys/unix"
 )
 
@@ -285,7 +284,7 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 
 // buildLogDir builds the log directory for the DAG.
 func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
-	logDir, err := substituteCommands(os.ExpandEnv(spec.LogDir))
+	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(spec.LogDir))
 	if err != nil {
 		return err
 	}
@@ -410,6 +409,7 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 	step := &Step{
 		Name:           def.Name,
 		Description:    def.Description,
+		Shell:          def.Shell,
 		Script:         def.Script,
 		Stdout:         def.Stdout,
 		Stderr:         def.Stderr,
@@ -562,81 +562,6 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 	return convertMap(step.ExecutorConfig.Config)
 }
 
-// buildCommand parses the command field in the step definition.
-// Case 1: command is nil
-// Case 2: command is a string
-// Case 3: command is an array
-//
-// In case 3, the first element is the command and the rest are the arguments.
-// If the arguments are not strings, they are converted to strings.
-//
-// Example:
-// ```yaml
-// step:
-//   - name: "echo hello"
-//     command: "echo hello"
-//
-// ```
-// or
-// ```yaml
-// step:
-//   - name: "echo hello"
-//     command: ["echo", "hello"]
-//
-// ```
-// It returns an error if the command is not nil but empty.
-func buildCommand(_ BuildContext, def stepDef, step *Step) error {
-	command := def.Command
-
-	// Case 1: command is nil
-	if command == nil {
-		return nil
-	}
-
-	switch val := command.(type) {
-	case string:
-		// Case 2: command is a string
-		if val == "" {
-			return errStepCommandIsEmpty
-		}
-		// We need to split the command into command and args.
-		step.CmdWithArgs = val
-		step.Command, step.Args = splitCommand(val)
-
-	case []any:
-		// Case 3: command is an array
-		for _, v := range val {
-			val, ok := v.(string)
-			if !ok {
-				// If the value is not a string, convert it to a string.
-				// This is useful when the value is an integer for example.
-				val = fmt.Sprintf("%v", v)
-			}
-			if step.Command == "" {
-				step.Command = val
-				continue
-			}
-			step.Args = append(step.Args, val)
-		}
-
-	default:
-		// Unknown type for command field.
-		return errStepCommandMustBeArrayOrString
-
-	}
-
-	return nil
-}
-
-func splitCommand(cmd string) (cmdx string, args []string) {
-	splits := strings.SplitN(cmd, " ", 2)
-	if len(splits) == 1 {
-		return splits[0], []string{}
-	}
-
-	return splits[0], strings.Fields(splits[1])
-}
-
 // assignValues Assign values to command parameters
 func assignValues(command string, params map[string]string) string {
 	updatedCommand := command
@@ -744,35 +669,3 @@ const (
 	scheduleKeyStop    scheduleKey = "stop"
 	scheduleKeyRestart scheduleKey = "restart"
 )
-
-// tickerMatcher matches the command in the value string.
-// Example: "`date`"
-var tickerMatcher = regexp.MustCompile("`[^`]+`")
-
-// substituteCommands substitutes command in the value string.
-// This logic needs to be refactored to handle more complex cases.
-func substituteCommands(input string) (string, error) {
-	matches := tickerMatcher.FindAllString(strings.TrimSpace(input), -1)
-	if matches == nil {
-		return input, nil
-	}
-
-	ret := input
-	for i := 0; i < len(matches); i++ {
-		// Execute the command and replace the command with the output.
-		command := matches[i]
-
-		cmd, args := splitCommand(strings.ReplaceAll(command, "`", ""))
-
-		out, err := exec.Command(cmd, args...).Output()
-		if err != nil {
-			return "", err
-		}
-
-		ret = strings.ReplaceAll(
-			ret, command, strings.TrimSpace(string(out[:])),
-		)
-	}
-
-	return ret, nil
-}

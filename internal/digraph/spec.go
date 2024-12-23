@@ -50,6 +50,7 @@ type stepDef struct {
 	Dir           string
 	Executor      any
 	Command       any
+	Shell         string
 	Script        string
 	Stdout        string
 	Stderr        string

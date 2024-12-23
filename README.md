@@ -42,38 +42,38 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
 ## **Table of Contents**
 
--   [**Highlights**](#highlights)
--   [**Table of Contents**](#table-of-contents)
--   [**Features**](#features)
--   [**Use Cases**](#use-cases)
--   [**Web UI**](#web-ui)
-    -   [DAG Details](#dag-details)
-    -   [DAGs](#dags)
-    -   [Search](#search)
-    -   [Execution History](#execution-history)
-    -   [Log Viewer](#log-viewer)
--   [**Installation**](#installation)
-    -   [Via Bash script](#via-bash-script)
-    -   [Via GitHub Releases Page](#via-github-releases-page)
-    -   [Via Homebrew (macOS)](#via-homebrew-macos)
-    -   [Via Docker](#via-docker)
--   [**Quick Start Guide**](#quick-start-guide)
-    -   [1. Launch the Web UI](#1-launch-the-web-ui)
-    -   [2. Create a New DAG](#2-create-a-new-dag)
-    -   [3. Edit the DAG](#3-edit-the-dag)
-    -   [4. Execute the DAG](#4-execute-the-dag)
--   [**CLI**](#cli)
--   [**Remote Node Management support**](#remote-node-management-support)
-    -   [Configuration](#configuration)
--   [**Localized Documentation**](#localized-documentation)
--   [**Documentation**](#documentation)
--   [**Running as a daemon**](#running-as-a-daemon)
--   [**Example DAG**](#example-dag)
--   [**Motivation**](#motivation)
--   [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
--   [**How It Works**](#how-it-works)
--   [**License**](#license)
--   [**Support and Community**](#support-and-community)
+- [**Highlights**](#highlights)
+- [**Table of Contents**](#table-of-contents)
+- [**Features**](#features)
+- [**Use Cases**](#use-cases)
+- [**Web UI**](#web-ui)
+  - [DAG Details](#dag-details)
+  - [DAGs](#dags)
+  - [Search](#search)
+  - [Execution History](#execution-history)
+  - [Log Viewer](#log-viewer)
+- [**Installation**](#installation)
+  - [Via Bash script](#via-bash-script)
+  - [Via GitHub Releases Page](#via-github-releases-page)
+  - [Via Homebrew (macOS)](#via-homebrew-macos)
+  - [Via Docker](#via-docker)
+- [**Quick Start Guide**](#quick-start-guide)
+  - [1. Launch the Web UI](#1-launch-the-web-ui)
+  - [2. Create a New DAG](#2-create-a-new-dag)
+  - [3. Edit the DAG](#3-edit-the-dag)
+  - [4. Execute the DAG](#4-execute-the-dag)
+- [**CLI**](#cli)
+- [**Remote Node Management support**](#remote-node-management-support)
+  - [Configuration](#configuration)
+- [**Localized Documentation**](#localized-documentation)
+- [**Documentation**](#documentation)
+- [**Running as a daemon**](#running-as-a-daemon)
+- [**Example DAG**](#example-dag)
+- [**Motivation**](#motivation)
+- [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
+- [**How It Works**](#how-it-works)
+- [**License**](#license)
+- [**Support and Community**](#support-and-community)
 
 ## **Features**
 
@@ -344,6 +344,38 @@ exit
 
 ## **Example DAG**
 
+**Minimum examples**
+
+A DAG consists of one or more steps, each with a name and command. Here's the simplest possible DAG:
+
+```yaml
+steps:
+  - name: step 1
+    command: echo hello
+  - name: step 2
+    command: echo world
+    depends:
+      - step 1
+```
+
+You can use pipe for running the command.
+
+```yaml
+steps:
+  - name: step 1
+    command: echo hello world | xargs echo
+```
+
+You can specify shell for running the command. If not specified, the `$SHELL` will be used.
+
+```yaml
+steps:
+  - name: step 1
+    command: echo hello world | xargs echo
+    shell: bash
+```
+
+**More complex one**
 This example DAG showcases a data pipeline typically implemented in DevOps and Data Engineering scenarios. It demonstrates an end-to-end data processing cycle starting from data acquisition and cleansing to transformation, loading, analysis, reporting, and ultimately, cleanup.
 
 ![Details-TD](assets/images/example.webp?raw=true)

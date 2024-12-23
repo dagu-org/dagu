@@ -526,25 +526,3 @@ func testStep(t *testing.T, step Step, tc stepTestCase) {
 		}
 	}
 }
-
-func TestSplitCommand(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		cmd, args := splitCommand("ls -al test/")
-		require.Equal(t, "ls", cmd)
-		require.Len(t, args, 2)
-		require.Equal(t, "-al", args[0])
-		require.Equal(t, "test/", args[1])
-	})
-	t.Run("WithJSON", func(t *testing.T) {
-		cmd, args := splitCommand(`echo {"key":"value"}`)
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, `{"key":"value"}`, args[0])
-	})
-	t.Run("WithQuotedJSON", func(t *testing.T) {
-		cmd, args := splitCommand(`echo "{\"key\":\"value\"}"`)
-		require.Equal(t, "echo", cmd)
-		require.Len(t, args, 1)
-		require.Equal(t, `"{\"key\":\"value\"}"`, args[0])
-	})
-}
