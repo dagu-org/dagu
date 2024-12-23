@@ -11,7 +11,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -64,7 +63,7 @@ type docker struct {
 	hostConfig *container.HostConfig
 	// execConfig is configuration for exec in existing container
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
-	execConfig types.ExecConfig
+	execConfig container.ExecOptions
 }
 
 func (e *docker) SetStdout(out io.Writer) {
@@ -156,18 +155,18 @@ func (e *docker) Run(_ context.Context) error {
 }
 
 func (e *docker) execInContainer(ctx context.Context, cli *client.Client) error {
-	// Check if container exists and is running
-	container, err := cli.ContainerInspect(ctx, e.containerName)
+	// Check if containerInfo exists and is running
+	containerInfo, err := cli.ContainerInspect(ctx, e.containerName)
 	if err != nil {
 		return fmt.Errorf("failed to inspect container %s: %w", e.containerName, err)
 	}
 
-	if !container.State.Running {
+	if !containerInfo.State.Running {
 		return fmt.Errorf("container %s is not running", e.containerName)
 	}
 
 	// Create exec configuration
-	execConfig := types.ExecConfig{
+	execConfig := container.ExecOptions{
 		User:         e.execConfig.User,
 		Privileged:   e.execConfig.Privileged,
 		Tty:          e.execConfig.Tty,
@@ -186,7 +185,7 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client) error 
 	}
 
 	// Start exec instance
-	resp, err := cli.ContainerExecAttach(ctx, execID.ID, types.ExecStartCheck{})
+	resp, err := cli.ContainerExecAttach(ctx, execID.ID, container.ExecAttachOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to start exec: %w", err)
 	}
@@ -264,7 +263,7 @@ func newDocker(
 ) (Executor, error) {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
-	execConfig := types.ExecConfig{}
+	execConfig := container.ExecOptions{}
 	execCfg := step.ExecutorConfig
 
 	if cfg, ok := execCfg.Config["container"]; ok {
