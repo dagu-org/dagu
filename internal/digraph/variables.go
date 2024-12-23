@@ -6,6 +6,8 @@ package digraph
 import (
 	"fmt"
 	"os"
+
+	"github.com/dagu-org/dagu/internal/cmdutil"
 )
 
 // loadVariables loads the environment variables from the map.
@@ -45,7 +47,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 			// This also executes command substitution.
 			var err error
 
-			value, err = substituteCommands(os.ExpandEnv(value))
+			value, err = cmdutil.SubstituteCommands(os.ExpandEnv(value))
 			if err != nil {
 				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
 			}

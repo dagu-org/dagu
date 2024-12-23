@@ -16,7 +16,7 @@ Before diving into specific features, let's understand the basic structure of a 
 
 Minimal Example
 ~~~~~~~~~~~~~~
-A DAG consists of one or more steps, each with a name and command. Here's the simplest possible DAG:
+A DAG with two steps:
 
 .. code-block:: yaml
 
@@ -28,13 +28,22 @@ A DAG consists of one or more steps, each with a name and command. Here's the si
       depends:
         - step 1
 
-The command can be a string or list of strings. The list format is useful when passing arguments:
+Using a pipe:
 
 .. code-block:: yaml
 
   steps:
     - name: step 1
-      command: [echo, hello]
+      command: echo hello world | xargs echo
+
+Specifying a shell:
+
+.. code-block:: yaml
+
+  steps:
+    - name: step 1
+      command: echo hello world | xargs echo
+      shell: bash
 
 Schema Definition
 ~~~~~~~~~~~~~~~~
@@ -101,22 +110,28 @@ Use named parameters for better clarity:
 
 Code Snippets
 ~~~~~~~~~~~~
-Run inline scripts in any language:
+
+Run shell script with `$SHELL`:
 
 .. code-block:: yaml
 
   steps:
     - name: script step
-      command: "bash"
       script: |
         cd /tmp
         echo "hello world" > hello
         cat hello
-      output: RESULT
-    - name: use result
-      command: echo ${RESULT}
-      depends:
-        - script step
+
+You can run arbitrary script with the `script` field. The script will be executed with the program specified in the `command` field. If `command` is not specified, the default shell will be used.
+
+.. code-block:: yaml
+
+  steps:
+    - name: script step
+      command: python
+      script: |
+        import os
+        print(os.getcwd())
 
 Output Handling
 --------------

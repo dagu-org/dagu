@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"github.com/dagu-org/dagu/internal/cmdutil"
 )
 
 // Condition contains a condition and the expected value.
@@ -21,7 +23,7 @@ type Condition struct {
 // eval evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
 func (c Condition) eval() (string, error) {
-	return substituteCommands(os.ExpandEnv(c.Condition))
+	return cmdutil.SubstituteCommands(os.ExpandEnv(c.Condition))
 }
 
 var (
