@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -92,7 +94,6 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "command", fn: buildCommand},
 	{name: "executor", fn: buildExecutor},
 	{name: "subworkflow", fn: buildSubWorkflow},
-	{name: "miscs", fn: parseMiscs},
 }
 
 type stepBuilderEntry struct {
@@ -143,6 +144,35 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 	}
 
 	return dag, nil
+}
+
+// parseTags builds a list of tags from the value.
+// It converts the tags to lowercase and trims the whitespace.
+func parseTags(value any) []string {
+	var ret []string
+
+	switch v := value.(type) {
+	case string:
+		for _, v := range strings.Split(v, ",") {
+			tag := strings.ToLower(strings.TrimSpace(v))
+			if tag != "" {
+				ret = append(ret, tag)
+			}
+		}
+	case []any:
+		for _, v := range v {
+			switch v := v.(type) {
+			case string:
+				ret = append(ret, strings.ToLower(strings.TrimSpace(v)))
+			default:
+				ret = append(ret, strings.ToLower(
+					strings.TrimSpace(fmt.Sprintf("%v", v))),
+				)
+			}
+		}
+	}
+
+	return ret
 }
 
 // buildSchedule parses the schedule in different formats and builds the
@@ -208,15 +238,15 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 
 	// Parse each schedule as a cron expression.
 	var err error
-	dag.Schedule, err = parseSchedules(starts)
+	dag.Schedule, err = buildScheduler(starts)
 	if err != nil {
 		return err
 	}
-	dag.StopSchedule, err = parseSchedules(stops)
+	dag.StopSchedule, err = buildScheduler(stops)
 	if err != nil {
 		return err
 	}
-	dag.RestartSchedule, err = parseSchedules(restarts)
+	dag.RestartSchedule, err = buildScheduler(restarts)
 	return err
 }
 
@@ -261,24 +291,6 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	}
 	dag.LogDir = logDir
 	return err
-}
-
-// buildParams builds the parameters for the DAG.
-func buildParams(ctx BuildContext, spec *definition, dag *DAG) (err error) {
-	dag.DefaultParams = spec.Params
-
-	params := dag.DefaultParams
-	if ctx.opts.parameters != "" {
-		params = ctx.opts.parameters
-	}
-
-	var envs []string
-	dag.Params, envs, err = parseParams(params, !ctx.opts.noEval, ctx.opts)
-	if err == nil {
-		dag.Env = append(dag.Env, envs...)
-	}
-
-	return
 }
 
 // buildHandlers builds the handlers for the DAG.
@@ -331,58 +343,6 @@ func buildMiscs(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	}
 
 	return nil
-}
-
-// loadVariables loads the environment variables from the map.
-// Case 1: env is a map.
-// Case 2: env is an array of maps.
-// Case 3: is recommended because the order of the environment variables is
-// preserved.
-func loadVariables(ctx BuildContext, strVariables any) (
-	map[string]string, error,
-) {
-	var pairs []pair
-	switch a := strVariables.(type) {
-	case map[any]any:
-		// Case 1. env is a map.
-		if err := parseKeyValue(a, &pairs); err != nil {
-			return nil, err
-		}
-
-	case []any:
-		// Case 2. env is an array of maps.
-		for _, v := range a {
-			if aa, ok := v.(map[any]any); ok {
-				if err := parseKeyValue(aa, &pairs); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
-	// Parse each key-value pair and set the environment variable.
-	vars := map[string]string{}
-	for _, pair := range pairs {
-		value := pair.val
-
-		if !ctx.opts.noEval {
-			// Evaluate the value of the environment variable.
-			// This also executes command substitution.
-			var err error
-
-			value, err = substituteCommands(os.ExpandEnv(value))
-			if err != nil {
-				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
-			}
-
-			if err := os.Setenv(pair.key, value); err != nil {
-				return nil, err
-			}
-		}
-
-		vars[pair.key] = value
-	}
-	return vars, nil
 }
 
 // skipIfSuccessful sets the skipIfSuccessful field for the DAG.
@@ -460,6 +420,33 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 		MailOnError:    def.MailOnError,
 		Preconditions:  buildConditions(def.Preconditions),
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
+	}
+
+	if def.ContinueOn != nil {
+		step.ContinueOn.Skipped = def.ContinueOn.Skipped
+		step.ContinueOn.Failure = def.ContinueOn.Failure
+	}
+
+	if def.RetryPolicy != nil {
+		step.RetryPolicy = &RetryPolicy{
+			Limit:    def.RetryPolicy.Limit,
+			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
+		}
+	}
+
+	if def.RepeatPolicy != nil {
+		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
+		step.RepeatPolicy.Interval = time.Second *
+			time.Duration(def.RepeatPolicy.IntervalSec)
+	}
+
+	if def.SignalOnStop != nil {
+		sigDef := *def.SignalOnStop
+		sig := unix.SignalNum(sigDef)
+		if sig == 0 {
+			return nil, fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
+		}
+		step.SignalOnStop = sigDef
 	}
 
 	// TODO: remove the deprecated call field.
@@ -700,6 +687,15 @@ func convertMap(m map[string]any) error {
 	}
 
 	return nil
+}
+
+func parseKey(value any) (string, error) {
+	val, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("%w: %T", errInvalidKeyType, value)
+	}
+
+	return val, nil
 }
 
 // buildConfigEnv builds the environment variables from the map.
