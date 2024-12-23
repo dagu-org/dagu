@@ -71,6 +71,9 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 			step.Args = append(step.Args, val)
 		}
 
+		// Setup CmdWithArgs as it is used in command execution
+		step.CmdWithArgs = fmt.Sprintf("%s %v", step.Command, step.Args)
+
 	default:
 		// Unknown type for command field.
 		return errStepCommandMustBeArrayOrString

@@ -51,7 +51,7 @@ var (
 	errDuplicateFunction                  = errors.New("duplicate function")
 	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
 	errStepNameRequired                   = errors.New("step name must be specified")
-	errStepCommandOrCallRequired          = errors.New("either step command or step call must be specified if executor is nil")
+	errStepCommandIsRequired              = errors.New("step command is required")
 	errStepCommandIsEmpty                 = errors.New("step command is empty")
 	errStepCommandMustBeArrayOrString     = errors.New("step command must be an array of strings or a string")
 	errInvalidParamValue                  = errors.New("invalid parameter value")

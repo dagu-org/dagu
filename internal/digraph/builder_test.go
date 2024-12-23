@@ -25,7 +25,7 @@ func TestBuilder_Build(t *testing.T) {
 		{
 			Name:        "NoCommand",
 			InputFile:   "no_command.yaml",
-			ExpectedErr: errStepCommandOrCallRequired,
+			ExpectedErr: errStepCommandIsRequired,
 		},
 		{
 			Name:        "InvalidEnv",

@@ -6,6 +6,7 @@ package cmdutil
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"unicode"
@@ -208,4 +209,23 @@ func SubstituteCommands(input string) (string, error) {
 	}
 
 	return ret, nil
+}
+
+// GetShellCommand returns the shell to use for command execution
+func GetShellCommand(configuredShell string) string {
+	if configuredShell != "" {
+		return configuredShell
+	}
+
+	// Try system shell first
+	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
+		return systemShell
+	}
+
+	// Fallback to sh if available
+	if shPath, err := exec.LookPath("sh"); err == nil {
+		return shPath
+	}
+
+	return ""
 }

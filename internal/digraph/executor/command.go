@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
@@ -56,32 +57,14 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 		cmd: cmd,
 	}, nil
 }
+
 func createCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
-	shellCommand := getShellCommand(step.Shell)
+	shellCommand := cmdutil.GetShellCommand(step.Shell)
 
 	if shellCommand == "" {
 		return createDirectCommand(ctx, step)
 	}
 	return createShellCommand(ctx, shellCommand, step)
-}
-
-// getShellCommand returns the shell to use for command execution
-func getShellCommand(configuredShell string) string {
-	if configuredShell != "" {
-		return configuredShell
-	}
-
-	// Try system shell first
-	if systemShell := os.ExpandEnv("${SHELL}"); systemShell != "" {
-		return systemShell
-	}
-
-	// Fallback to sh if available
-	if shPath, err := exec.LookPath("sh"); err == nil {
-		return shPath
-	}
-
-	return ""
 }
 
 // createDirectCommand creates a command that runs directly without a shell

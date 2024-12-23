@@ -186,6 +186,11 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 		n.data.Step.Args = args
 	}
 
+	if n.data.Step.Command == "" {
+		// If the command is empty, use the default shell as the command
+		n.data.Step.Command = cmdutil.GetShellCommand("")
+	}
+
 	if n.scriptFile != nil {
 		var args []string
 		args = append(args, n.data.Step.Args...)
