@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,8 +59,8 @@ func TestReporter(t *testing.T) {
 						Args:    []string{"param-x"},
 					},
 					Status:     scheduler.NodeStatusRunning,
-					StartedAt:  util.FormatTime(time.Now()),
-					FinishedAt: util.FormatTime(time.Now().Add(time.Minute * 10)),
+					StartedAt:  stringutil.FormatTime(time.Now()),
+					FinishedAt: stringutil.FormatTime(time.Now().Add(time.Minute * 10)),
 				},
 			}
 

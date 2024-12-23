@@ -4,7 +4,7 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -18,31 +18,36 @@ func stopCmd() *cobra.Command {
 		Short: "Stop the running DAG",
 		Long:  `dagu stop /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-
-			ctx := cmd.Context()
-			ctx = logger.WithLogger(ctx, buildLogger(cfg))
-
-			dag, err := digraph.Load(cmd.Context(), cfg.Paths.BaseConfig, args[0], "")
-			if err != nil {
-				logger.Fatal(ctx, "DAG load failed", "error", err, "file", args[0])
-			}
-
-			logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore)
-
-			if err := cli.Stop(cmd.Context(), dag); err != nil {
-				logger.Fatal(ctx, "DAG stop operation failed", "error", err, "dag", dag.Name)
-			}
-
-			logger.Info(ctx, "DAG stopped", "dag", dag.Name)
-		},
+		RunE:  wrapRunE(runStop),
 	}
 	return cmd
+}
+
+func runStop(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	ctx := cmd.Context()
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+
+	dag, err := digraph.Load(cmd.Context(), cfg.Paths.BaseConfig, args[0], "")
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG", "err", err)
+		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+	}
+
+	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
+
+	dataStore := newDataStores(cfg)
+	cli := newClient(cfg, dataStore)
+
+	if err := cli.Stop(cmd.Context(), dag); err != nil {
+		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
+		return fmt.Errorf("failed to stop DAG: %w", err)
+	}
+
+	logger.Info(ctx, "DAG stopped", "dag", dag.Name)
+	return nil
 }

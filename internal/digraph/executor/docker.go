@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -48,7 +48,7 @@ func (e *docker) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *docker) Run() error {
+func (e *docker) Run(_ context.Context) error {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	e.context = ctx
 	e.cancel = cancelFunc
@@ -91,12 +91,13 @@ func (e *docker) Run() error {
 			return
 		}
 		removing = true
-		err := cli.ContainerRemove(
+		if err := cli.ContainerRemove(
 			ctx, resp.ID, types.ContainerRemoveOptions{
 				Force: true,
 			},
-		)
-		util.LogErr("docker executor: remove container", err)
+		); err != nil {
+			logger.Error(ctx, "docker executor: remove container", "err", err)
+		}
 	}
 
 	defer removeContainer()
@@ -123,8 +124,9 @@ func (e *docker) Run() error {
 	}
 
 	go func() {
-		_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
-		util.LogErr("docker executor: stdcopy", err)
+		if _, err := stdcopy.StdCopy(e.stdout, e.stdout, out); err != nil {
+			logger.Error(ctx, "docker executor: stdcopy", "err", err)
+		}
 	}()
 
 	statusCh, errCh := cli.ContainerWait(

@@ -35,7 +35,7 @@ func assertFunctions(fns []*funcDef) error {
 }
 
 // assertStepDef validates the step definition.
-func assertStepDef(def *stepDef, funcs []*funcDef) error {
+func assertStepDef(def stepDef, funcs []*funcDef) error {
 	// Step name is required.
 	if def.Name == "" {
 		return errStepNameRequired

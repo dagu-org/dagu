@@ -350,7 +350,9 @@ func (sc *Scheduler) execNode(ctx context.Context, graph *ExecutionGraph, node *
 	ctx = sc.buildStepContext(ctx, graph, node)
 
 	if !sc.dry {
-		return node.Execute(ctx)
+		if err := node.Execute(ctx); err != nil {
+			return fmt.Errorf("failed to execute step %q: %w", node.data.Step.Name, err)
+		}
 	}
 
 	return nil
@@ -360,17 +362,17 @@ func (sc *Scheduler) execNode(ctx context.Context, graph *ExecutionGraph, node *
 // for a node with repeat policy, it does not stop the node and
 // wait to finish current run.
 func (sc *Scheduler) Signal(
-	g *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
+	ctx context.Context, graph *ExecutionGraph, sig os.Signal, done chan bool, allowOverride bool,
 ) {
 	if !sc.isCanceled() {
 		sc.setCanceled()
 	}
 
-	for _, node := range g.Nodes() {
+	for _, node := range graph.Nodes() {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
 		if !node.data.Step.RepeatPolicy.Repeat {
-			node.signal(sig, allowOverride)
+			node.signal(ctx, sig, allowOverride)
 		}
 	}
 
@@ -379,7 +381,7 @@ func (sc *Scheduler) Signal(
 			done <- true
 		}()
 
-		for g.IsRunning() {
+		for graph.IsRunning() {
 			time.Sleep(sc.pause)
 		}
 	}

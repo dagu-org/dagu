@@ -12,13 +12,16 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
-func buildLogger(cfg *config.Config) logger.Logger {
+func buildLogger(cfg *config.Config, quiet bool) logger.Logger {
 	var opts []logger.Option
 	if cfg.Debug {
 		opts = append(opts, logger.WithDebug())
+	}
+	if quiet {
+		opts = append(opts, logger.WithQuiet())
 	}
 	if cfg.LogFormat != "" {
 		opts = append(opts, logger.WithFormat(cfg.LogFormat))
@@ -94,7 +97,7 @@ func setupLogDirectory(config logFileSettings) (string, error) {
 // buildLogFilename generates the log filename using the configured format
 func buildLogFilename(config logFileSettings) string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
-	truncatedRequestID := util.TruncString(config.RequestID, 8)
+	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
 	safeDagName := fileutil.SafeName(config.DAGName)
 
 	return fmt.Sprintf("%s%s.%s.%s.log",

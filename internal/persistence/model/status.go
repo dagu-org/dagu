@@ -12,7 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 func StatusFromJSON(s string) (*Status, error) {
@@ -84,10 +84,10 @@ func NewStatus(
 		Params:     Params(dag.Params),
 	}
 	if startTime != nil {
-		statusObj.StartedAt = util.FormatTime(*startTime)
+		statusObj.StartedAt = stringutil.FormatTime(*startTime)
 	}
 	if endTime != nil {
-		statusObj.FinishedAt = util.FormatTime(*endTime)
+		statusObj.FinishedAt = stringutil.FormatTime(*endTime)
 	}
 	return statusObj
 }
@@ -113,7 +113,7 @@ func FormatTime(val time.Time) string {
 	if val.IsZero() {
 		return ""
 	}
-	return util.FormatTime(val)
+	return stringutil.FormatTime(val)
 }
 
 func Time(t time.Time) *time.Time {

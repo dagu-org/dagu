@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/util"
+	"golang.org/x/sys/unix"
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -24,7 +24,6 @@ type BuildContext struct {
 	ctx            context.Context
 	opts           buildOpts
 	additionalEnvs []string
-	stepBuilder    stepBuilder
 }
 
 // buildOpts is used to control the behavior of the builder.
@@ -91,12 +90,25 @@ type builderEntry struct {
 	fn       BuilderFn
 }
 
+var stepBuilderRegistry = []stepBuilderEntry{
+	{name: "command", fn: buildCommand},
+	{name: "executor", fn: buildExecutor},
+	{name: "subworkflow", fn: buildSubWorkflow},
+}
+
+type stepBuilderEntry struct {
+	name string
+	fn   StepBuilderFn
+}
+
+// StepBuilderFn is a function that builds a part of the step.
+type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
+
 // build builds a DAG from the specification.
 func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs []string) (*DAG, error) {
 	buildCtx := BuildContext{
 		ctx:            ctx,
 		opts:           opts,
-		stepBuilder:    stepBuilder{noEval: opts.noEval},
 		additionalEnvs: additionalEnvs,
 	}
 
@@ -132,6 +144,35 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 	}
 
 	return dag, nil
+}
+
+// parseTags builds a list of tags from the value.
+// It converts the tags to lowercase and trims the whitespace.
+func parseTags(value any) []string {
+	var ret []string
+
+	switch v := value.(type) {
+	case string:
+		for _, v := range strings.Split(v, ",") {
+			tag := strings.ToLower(strings.TrimSpace(v))
+			if tag != "" {
+				ret = append(ret, tag)
+			}
+		}
+	case []any:
+		for _, v := range v {
+			switch v := v.(type) {
+			case string:
+				ret = append(ret, strings.ToLower(strings.TrimSpace(v)))
+			default:
+				ret = append(ret, strings.ToLower(
+					strings.TrimSpace(fmt.Sprintf("%v", v))),
+				)
+			}
+		}
+	}
+
+	return ret
 }
 
 // buildSchedule parses the schedule in different formats and builds the
@@ -197,15 +238,15 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 
 	// Parse each schedule as a cron expression.
 	var err error
-	dag.Schedule, err = parseSchedules(starts)
+	dag.Schedule, err = buildScheduler(starts)
 	if err != nil {
 		return err
 	}
-	dag.StopSchedule, err = parseSchedules(stops)
+	dag.StopSchedule, err = buildScheduler(stops)
 	if err != nil {
 		return err
 	}
-	dag.RestartSchedule, err = parseSchedules(restarts)
+	dag.RestartSchedule, err = buildScheduler(restarts)
 	return err
 }
 
@@ -252,60 +293,34 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	return err
 }
 
-// buildParams builds the parameters for the DAG.
-func buildParams(ctx BuildContext, spec *definition, dag *DAG) (err error) {
-	dag.DefaultParams = spec.Params
-
-	params := dag.DefaultParams
-	if ctx.opts.parameters != "" {
-		params = ctx.opts.parameters
-	}
-
-	var envs []string
-	dag.Params, envs, err = parseParams(params, !ctx.opts.noEval, ctx.opts)
-	if err == nil {
-		dag.Env = append(dag.Env, envs...)
-	}
-
-	return
-}
-
 // buildHandlers builds the handlers for the DAG.
 // The handlers are executed when the DAG is stopped, succeeded, failed, or
 // cancelled.
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Exit, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Exit, spec.Functions); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Success, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Success, spec.Functions); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Failure, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Failure, spec.Functions); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = ctx.stepBuilder.buildStep(
-			dag.Env, spec.HandlerOn.Cancel, spec.Functions,
-		); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
 			return
 		}
 	}
@@ -330,58 +345,6 @@ func buildMiscs(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	return nil
 }
 
-// loadVariables loads the environment variables from the map.
-// Case 1: env is a map.
-// Case 2: env is an array of maps.
-// Case 3: is recommended because the order of the environment variables is
-// preserved.
-func loadVariables(ctx BuildContext, strVariables any) (
-	map[string]string, error,
-) {
-	var pairs []pair
-	switch a := strVariables.(type) {
-	case map[any]any:
-		// Case 1. env is a map.
-		if err := parseKeyValue(a, &pairs); err != nil {
-			return nil, err
-		}
-
-	case []any:
-		// Case 2. env is an array of maps.
-		for _, v := range a {
-			if aa, ok := v.(map[any]any); ok {
-				if err := parseKeyValue(aa, &pairs); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
-	// Parse each key-value pair and set the environment variable.
-	vars := map[string]string{}
-	for _, pair := range pairs {
-		value := pair.val
-
-		if !ctx.opts.noEval {
-			// Evaluate the value of the environment variable.
-			// This also executes command substitution.
-			var err error
-
-			value, err = substituteCommands(os.ExpandEnv(value))
-			if err != nil {
-				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
-			}
-
-			if err := os.Setenv(pair.key, value); err != nil {
-				return nil, err
-			}
-		}
-
-		vars[pair.key] = value
-	}
-	return vars, nil
-}
-
 // skipIfSuccessful sets the skipIfSuccessful field for the DAG.
 func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 	dag.SkipIfSuccessful = spec.SkipIfSuccessful
@@ -392,9 +355,7 @@ func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	var steps []Step
 	for _, stepDef := range spec.Steps {
-		step, err := ctx.stepBuilder.buildStep(
-			dag.Env, stepDef, spec.Functions,
-		)
+		step, err := buildStep(ctx, dag.Env, stepDef, spec.Functions)
 		if err != nil {
 			return err
 		}
@@ -430,15 +391,18 @@ func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error)
 	return
 }
 
-// stepBuilder is used to build a step from the step definition.
-type stepBuilder struct {
-	noEval bool
+// buildMailConfig builds a MailConfig from the definition.
+func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
+	return &MailConfig{
+		From:       def.From,
+		To:         def.To,
+		Prefix:     def.Prefix,
+		AttachLogs: def.AttachLogs,
+	}, nil
 }
 
 // buildStep builds a step from the step definition.
-func (b *stepBuilder) buildStep(
-	variables []string, def *stepDef, fns []*funcDef,
-) (*Step, error) {
+func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef) (*Step, error) {
 	if err := assertStepDef(def, fns); err != nil {
 		return nil, err
 	}
@@ -458,50 +422,54 @@ func (b *stepBuilder) buildStep(
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
 
+	if def.ContinueOn != nil {
+		step.ContinueOn.Skipped = def.ContinueOn.Skipped
+		step.ContinueOn.Failure = def.ContinueOn.Failure
+	}
+
+	if def.RetryPolicy != nil {
+		step.RetryPolicy = &RetryPolicy{
+			Limit:    def.RetryPolicy.Limit,
+			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
+		}
+	}
+
+	if def.RepeatPolicy != nil {
+		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
+		step.RepeatPolicy.Interval = time.Second *
+			time.Duration(def.RepeatPolicy.IntervalSec)
+	}
+
+	if def.SignalOnStop != nil {
+		sigDef := *def.SignalOnStop
+		sig := unix.SignalNum(sigDef)
+		if sig == 0 {
+			return nil, fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
+		}
+		step.SignalOnStop = sigDef
+	}
+
+	// TODO: remove the deprecated call field.
 	if err := parseFuncCall(step, def.Call, fns); err != nil {
 		return nil, err
 	}
 
-	for _, fn := range stepBuilderFuncs {
-		if err := fn(def, step); err != nil {
-			return nil, err
+	for _, entry := range stepBuilderRegistry {
+		if err := entry.fn(ctx, def, step); err != nil {
+			return nil, fmt.Errorf("%s: %w", entry.name, err)
 		}
 	}
 
 	return step, nil
 }
 
-// buildMailConfig builds a MailConfig from the definition.
-func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
-	return &MailConfig{
-		From:       def.From,
-		To:         def.To,
-		Prefix:     def.Prefix,
-		AttachLogs: def.AttachLogs,
-	}, nil
-}
-
-// stepBuilderFunc is a function that builds a step from the step definition.
-type stepBuilderFunc func(def *stepDef, step *Step) error
-
-var (
-	// stepBuilderFuncs is a list of functions that build a step from the step
-	// definition.
-	stepBuilderFuncs = []stepBuilderFunc{
-		parseCommand,
-		parseExecutor,
-		parseSubWorkflow,
-		parseMiscs,
-	}
-)
-
 // commandRun is not a actual command.
 // subworkflow does not use this command field so it is used
 // just for display purposes.
 const commandRun = "run"
 
-// parseSubWorkflow parses the subworkflow definition and sets the step fields.
-func parseSubWorkflow(def *stepDef, step *Step) error {
+// buildSubWorkflow parses the subworkflow definition and sets the step fields.
+func buildSubWorkflow(_ BuildContext, def stepDef, step *Step) error {
 	name, params := def.Run, def.Params
 
 	// if the run field is not set, return nil.
@@ -523,11 +491,11 @@ const (
 	executorKeyConfig = "config"
 )
 
-// parseExecutor parses the executor field in the step definition.
+// buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
 // Case 2: executor is a string
 // Case 3: executor is a struct
-func parseExecutor(def *stepDef, step *Step) error {
+func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 	executor := def.Executor
 
 	// Case 1: executor is nil
@@ -594,7 +562,7 @@ func parseExecutor(def *stepDef, step *Step) error {
 	return convertMap(step.ExecutorConfig.Config)
 }
 
-// parseCommand parses the command field in the step definition.
+// buildCommand parses the command field in the step definition.
 // Case 1: command is nil
 // Case 2: command is a string
 // Case 3: command is an array
@@ -617,7 +585,7 @@ func parseExecutor(def *stepDef, step *Step) error {
 //
 // ```
 // It returns an error if the command is not nil but empty.
-func parseCommand(def *stepDef, step *Step) error {
+func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 	command := def.Command
 
 	// Case 1: command is nil
@@ -633,7 +601,7 @@ func parseCommand(def *stepDef, step *Step) error {
 		}
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
-		step.Command, step.Args = util.SplitCommand(val)
+		step.Command, step.Args = splitCommand(val)
 
 	case []any:
 		// Case 3: command is an array
@@ -658,6 +626,15 @@ func parseCommand(def *stepDef, step *Step) error {
 	}
 
 	return nil
+}
+
+func splitCommand(cmd string) (cmdx string, args []string) {
+	splits := strings.SplitN(cmd, " ", 2)
+	if len(splits) == 1 {
+		return splits[0], []string{}
+	}
+
+	return splits[0], strings.Fields(splits[1])
 }
 
 // assignValues Assign values to command parameters
@@ -710,6 +687,15 @@ func convertMap(m map[string]any) error {
 	}
 
 	return nil
+}
+
+func parseKey(value any) (string, error) {
+	val, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("%w: %T", errInvalidKeyType, value)
+	}
+
+	return val, nil
 }
 
 // buildConfigEnv builds the environment variables from the map.
@@ -776,7 +762,7 @@ func substituteCommands(input string) (string, error) {
 		// Execute the command and replace the command with the output.
 		command := matches[i]
 
-		cmd, args := util.SplitCommand(strings.ReplaceAll(command, "`", ""))
+		cmd, args := splitCommand(strings.ReplaceAll(command, "`", ""))
 
 		out, err := exec.Command(cmd, args...).Output()
 		if err != nil {

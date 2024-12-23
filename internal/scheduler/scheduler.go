@@ -165,7 +165,7 @@ func (s *Scheduler) start(ctx context.Context) {
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
 	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		logger.Error(ctx, "Scheduler failed to read DAG entries", "error", err)
+		logger.Error(ctx, "Scheduler failed to read DAG entries", "err", err)
 		return
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -185,7 +185,7 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 				} else if errors.Is(err, errJobSkipped) {
 					logger.Info(ctx, "DAG is skipped", "DAG", e.Job, "err", err)
 				} else {
-					logger.Error(ctx, "DAG execution failed", "DAG", e.Job, "operation", e.EntryType.String(), "error", err)
+					logger.Error(ctx, "DAG execution failed", "DAG", e.Job, "operation", e.EntryType.String(), "err", err)
 				}
 			}
 		}(e)

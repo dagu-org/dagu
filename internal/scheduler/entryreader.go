@@ -101,7 +101,7 @@ func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 		if fileutil.IsYAMLFile(fi.Name()) {
 			dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, fi.Name()))
 			if err != nil {
-				logger.Error(ctx, "DAG load failed", "error", err, "DAG", fi.Name())
+				logger.Error(ctx, "DAG load failed", "err", err, "DAG", fi.Name())
 				continue
 			}
 			er.dags[fi.Name()] = dag
@@ -116,7 +116,7 @@ func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 	watcher, err := filenotify.New(time.Minute)
 	if err != nil {
-		logger.Error(ctx, "Watcher creation failed", "error", err)
+		logger.Error(ctx, "Watcher creation failed", "err", err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
 				dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, filepath.Base(event.Name)))
 				if err != nil {
-					logger.Error(ctx, "DAG load failed", "error", err, "file", event.Name)
+					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
 				} else {
 					er.dags[filepath.Base(event.Name)] = dag
 					logger.Info(ctx, "DAG added/updated", "DAG", filepath.Base(event.Name))
@@ -155,7 +155,7 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			if !ok {
 				return
 			}
-			logger.Error(ctx, "Watcher error", "error", err)
+			logger.Error(ctx, "Watcher error", "err", err)
 		}
 	}
 

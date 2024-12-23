@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 }
 
 func schedulerTextCtxWithDagContext() context.Context {
-	return digraph.NewContext(context.Background(), nil, nil, "", "")
+	return digraph.NewContext(context.Background(), nil, nil, nil, "", "")
 }
 
 func TestScheduler(t *testing.T) {
@@ -407,7 +407,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 		defer timer.Stop()
 		<-timer.C
 
-		scheduler.Signal(graph, syscall.SIGTERM, nil, false)
+		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, nil, false)
 	}()
 
 	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
@@ -439,7 +439,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 		timer := time.NewTimer(time.Millisecond * 500)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Signal(graph, syscall.SIGTERM, done, false)
+		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
 	}()
 
 	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
@@ -580,7 +580,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 		timer := time.NewTimer(time.Millisecond * 100)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Signal(graph, syscall.SIGTERM, done, false)
+		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
 	}()
 
 	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
@@ -685,7 +685,12 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 }
 
 func step(name, command string, depends ...string) digraph.Step {
-	cmd, args := util.SplitCommand(command)
+	splits := strings.SplitN(command, " ", 2)
+	cmd := splits[0]
+	var args []string
+	if len(splits) == 2 {
+		args = strings.Fields(splits[1])
+	}
 	return digraph.Step{
 		Name:    name,
 		Command: cmd,

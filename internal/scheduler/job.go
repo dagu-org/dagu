@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	dagscheduler "github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/robfig/cron/v3"
 )
 
@@ -69,7 +69,7 @@ func (j *jobImpl) Start(ctx context.Context) error {
 	}
 
 	// check the last execution time
-	lastExecTime, err := util.ParseTime(latestStatus.StartedAt)
+	lastExecTime, err := stringutil.ParseTime(latestStatus.StartedAt)
 	if err == nil {
 		lastExecTime = lastExecTime.Truncate(time.Second * 60)
 		if lastExecTime.After(j.Next) || j.Next.Equal(lastExecTime) {
@@ -84,7 +84,7 @@ func (j *jobImpl) Start(ctx context.Context) error {
 			prev := j.Prev(ctx)
 			if lastExecTime.After(prev) || lastExecTime.Equal(prev) {
 				// Calculate the previous scheduled time
-				lastStartedAt, _ := util.ParseTime(latestStatus.StartedAt)
+				lastStartedAt, _ := stringutil.ParseTime(latestStatus.StartedAt)
 				return fmt.Errorf("%w: last successful run time: %s is after the previous scheduled time: %s", errJobSkipped, lastStartedAt, prev)
 			}
 		}

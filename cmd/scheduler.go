@@ -18,7 +18,7 @@ func schedulerCmd() *cobra.Command {
 		Use:   "scheduler",
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
-		RunE:  runScheduler,
+		RunE:  wrapRunE(runScheduler),
 	}
 
 	cmd.Flags().StringP(
@@ -39,7 +39,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {

@@ -16,7 +16,7 @@ type definition struct {
 	Env               any
 	HandlerOn         handlerOnDef
 	Functions         []*funcDef // deprecated
-	Steps             []*stepDef
+	Steps             []stepDef
 	SMTP              smtpConfigDef
 	MailOn            *mailOnDef
 	ErrorMail         mailConfigDef
@@ -62,11 +62,9 @@ type stepDef struct {
 	Preconditions []*conditionDef
 	SignalOnStop  *string
 	Env           string
-	Call          *callFuncDef
-	// Run is a sub workflow to run
-	Run string
-	// Params is a string of parameters to pass to the sub workflow
-	Params string
+	Call          *callFuncDef // deprecated
+	Run           string       // Run is a sub workflow to run
+	Params        string       // Params is the parameters for the sub workflow
 }
 
 type funcDef struct {

@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -29,7 +30,7 @@ func restartCmd() *cobra.Command {
 		Short: "Stop the running DAG and restart it",
 		Long:  `dagu restart /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  runRestart,
+		RunE:  wrapRunE(runRestart),
 	}
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
@@ -47,13 +48,14 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
 
 	specFilePath := args[0]
 
 	// Load initial DAG configuration
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specFilePath, "")
 	if err != nil {
+		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
 	}
 
@@ -62,6 +64,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 
 	// Handle the restart process
 	if err := handleRestartProcess(ctx, cli, cfg, dag, quiet, specFilePath); err != nil {
+		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
 
@@ -131,7 +134,12 @@ func executeDAG(ctx context.Context, cli client.Client, cfg *config.Config,
 
 	listenSignals(ctx, agt)
 	if err := agt.Run(ctx); err != nil {
-		return fmt.Errorf("DAG execution failed: %w", err)
+		if quiet {
+			os.Exit(1)
+		} else {
+			agt.PrintSummary(ctx)
+			return fmt.Errorf("DAG execution failed: %w", err)
+		}
 	}
 
 	return nil

@@ -21,7 +21,7 @@ LOCAL_BIN_DIR=$(LOCAL_DIR)/bin
 CONFIG_DIR=$(SCRIPT_DIR)/config
 
 # Local build settings
-BIN_DIR=$(SCRIPT_DIR)/bin
+BIN_DIR=$(SCRIPT_DIR)/.local/bin
 BUILD_VERSION=$(shell date +'%y%m%d%H%M%S')
 LDFLAGS=-X 'main.version=$(BUILD_VERSION)'
 

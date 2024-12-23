@@ -1,7 +1,3 @@
-# binaries
-bin/
-dist/
-
 # frontend assets
 internal/frontend/assets/fonts/*
 internal/frontend/assets/*

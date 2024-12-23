@@ -62,7 +62,7 @@ func (*jq) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *jq) Run() error {
+func (e *jq) Run(_ context.Context) error {
 	query, err := gojq.Parse(e.query)
 	if err != nil {
 		return err

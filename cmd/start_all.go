@@ -20,7 +20,7 @@ func startAllCmd() *cobra.Command {
 		Short:   "Launches both the Dagu web UI server and the scheduler process.",
 		Long:    `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
 		PreRunE: bindStartAllFlags,
-		RunE:    runStartAll,
+		RunE:    wrapRunE(runStartAll),
 	}
 
 	initStartAllFlags(cmd)
@@ -49,7 +49,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	}
 
 	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg))
+	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	dataStore := newDataStores(cfg)
 	cli := newClient(cfg, dataStore)

@@ -16,10 +16,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/grep"
-	"github.com/dagu-org/dagu/internal/util"
 )
 
 type dagStoreImpl struct {
@@ -277,33 +277,32 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 	}
 
 	fis, err := os.ReadDir(d.dir)
+	if err != nil {
+		logger.Error(ctx, "Failed to read directory", "dir", d.dir, "err", err)
+	}
+
 	opts := &grep.Options{
 		IsRegexp: true,
 		Before:   2,
 		After:    2,
 	}
 
-	util.LogErr("read DAGs directory", err)
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
 			filePath := filepath.Join(d.dir, fi.Name())
 			dat, err := os.ReadFile(filePath)
 			if err != nil {
-				util.LogErr("read DAG file", err)
+				logger.Error(ctx, "Failed to read DAG file", "file", fi.Name(), "err", err)
 				continue
 			}
 			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
-				errs = append(
-					errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err),
-				)
+				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
 				continue
 			}
 			dag, err := digraph.LoadMetadata(ctx, filePath)
 			if err != nil {
-				errs = append(
-					errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err),
-				)
+				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
 				continue
 			}
 			ret = append(ret, &persistence.GrepResult{

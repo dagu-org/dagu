@@ -25,7 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 var (
@@ -327,7 +327,7 @@ func (db *JSONDB) generateFilePath(key string, timestamp timeInUTC, requestID st
 	}
 	prefix := db.createPrefix(key)
 	timestampString := timestamp.Format(dateTimeFormatUTC)
-	requestID = util.TruncString(requestID, requestIDLenSafe)
+	requestID = stringutil.TruncString(requestID, requestIDLenSafe)
 	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestampString, requestID), nil
 }
 

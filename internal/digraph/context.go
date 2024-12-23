@@ -21,11 +21,24 @@ type Finder interface {
 	Find(ctx context.Context, name string) (*DAG, error)
 }
 
+// ResultCollector gets a result of a DAG execution.
+// This is used for subworkflow executor to get the output from the subworkflow.
+type ResultCollector interface {
+	CollectResult(ctx context.Context, name string, requestID string) (*Result, error)
+}
+
+type Result struct {
+	Name    string            `json:"name,omitempty"`
+	Params  string            `json:"params,omitempty"`
+	Outputs map[string]string `json:"outputs,omitempty"`
+}
+
 // Context contains the current DAG and Finder.
 type Context struct {
-	DAG    *DAG
-	Finder Finder
-	Envs   Envs
+	DAG             *DAG
+	Finder          Finder
+	ResultCollector ResultCollector
+	Envs            Envs
 }
 
 // Envs is a list of environment variables.
@@ -55,10 +68,11 @@ func (e Env) String() string {
 type ctxKey struct{}
 
 // NewContext creates a new context with the DAG and Finder.
-func NewContext(ctx context.Context, dag *DAG, finder Finder, requestID, logFile string) context.Context {
+func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ResultCollector, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
-		DAG:    dag,
-		Finder: finder,
+		DAG:             dag,
+		Finder:          finder,
+		ResultCollector: resultCollector,
 		Envs: []Env{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
 			{Key: EnvKeyRequestID, Value: requestID},

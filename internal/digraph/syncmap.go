@@ -34,3 +34,14 @@ func (m *SyncMap) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+func (m *SyncMap) MarshalJSONIndent(prefix, indent string) ([]byte, error) {
+	tmpMap := make(map[string]any)
+
+	m.Range(func(k, v any) bool {
+		tmpMap[k.(string)] = v
+		return true
+	})
+
+	return json.MarshalIndent(tmpMap, prefix, indent)
+}
