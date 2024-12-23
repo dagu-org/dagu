@@ -12,8 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/dagu-org/dagu/internal/util"
 )
 
 // BuilderFn is a function that builds a part of the DAG.
@@ -616,7 +614,7 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 		}
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
-		step.Command, step.Args = util.SplitCommand(val)
+		step.Command, step.Args = splitCommand(val)
 
 	case []any:
 		// Case 3: command is an array
@@ -641,6 +639,15 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 	}
 
 	return nil
+}
+
+func splitCommand(cmd string) (cmdx string, args []string) {
+	splits := strings.SplitN(cmd, " ", 2)
+	if len(splits) == 1 {
+		return splits[0], []string{}
+	}
+
+	return splits[0], strings.Fields(splits[1])
 }
 
 // assignValues Assign values to command parameters
@@ -759,7 +766,7 @@ func substituteCommands(input string) (string, error) {
 		// Execute the command and replace the command with the output.
 		command := matches[i]
 
-		cmd, args := util.SplitCommand(strings.ReplaceAll(command, "`", ""))
+		cmd, args := splitCommand(strings.ReplaceAll(command, "`", ""))
 
 		out, err := exec.Command(cmd, args...).Output()
 		if err != nil {

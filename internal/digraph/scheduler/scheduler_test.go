@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -685,7 +685,12 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 }
 
 func step(name, command string, depends ...string) digraph.Step {
-	cmd, args := util.SplitCommand(command)
+	splits := strings.SplitN(command, " ", 2)
+	cmd := splits[0]
+	var args []string
+	if len(splits) == 2 {
+		args = strings.Fields(splits[1])
+	}
 	return digraph.Step{
 		Name:    name,
 		Command: cmd,

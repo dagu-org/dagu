@@ -380,3 +380,25 @@ func runTestNode(t *testing.T, n *Node) {
 	err = n.teardown()
 	require.NoError(t, err)
 }
+
+func TestSplitCommandWithParse(t *testing.T) {
+	t.Run("CommandSubstitution", func(t *testing.T) {
+		cmd, args := splitCommandWithParse("echo `echo hello`")
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, "hello", args[0])
+	})
+	t.Run("QuotedCommandSubstitution", func(t *testing.T) {
+		cmd, args := splitCommandWithParse("echo `echo \"hello world\"`")
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, "hello world", args[0])
+	})
+	t.Run("EnvVar", func(t *testing.T) {
+		os.Setenv("TEST_ARG", "hello")
+		cmd, args := splitCommandWithParse("echo $TEST_ARG")
+		require.Equal(t, "echo", cmd)
+		require.Len(t, args, 1)
+		require.Equal(t, "hello", args[0])
+	})
+}

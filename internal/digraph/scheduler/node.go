@@ -22,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/util"
+	"github.com/mattn/go-shellwords"
 )
 
 // Node is a node in a DAG. It executes a command.
@@ -175,7 +176,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 
 	if n.data.Step.CmdWithArgs != "" {
 		n.data.Step.Command, n.data.Step.Args =
-			util.SplitCommandWithParse(n.data.Step.CmdWithArgs)
+			splitCommandWithParse(n.data.Step.CmdWithArgs)
 	}
 
 	if n.scriptFile != nil {
@@ -475,4 +476,45 @@ func (n *Node) init() {
 	if n.data.Step.Preconditions == nil {
 		n.data.Step.Preconditions = []digraph.Condition{}
 	}
+}
+
+var (
+	escapeReplacer = strings.NewReplacer(
+		`\t`, `\\t`,
+		`\r`, `\\r`,
+		`\n`, `\\n`,
+	)
+	unescapeReplacer = strings.NewReplacer(
+		`\\t`, `\t`,
+		`\\r`, `\r`,
+		`\\n`, `\n`,
+	)
+)
+
+// SplitCommandWithParse splits command string to program and arguments.
+func splitCommandWithParse(cmd string) (cmdx string, args []string) {
+	splits := strings.SplitN(cmd, " ", 2)
+	if len(splits) == 1 {
+		return splits[0], []string{}
+	}
+
+	cmdx = splits[0]
+
+	parser := shellwords.NewParser()
+	parser.ParseBacktick = true
+	parser.ParseEnv = false
+
+	args, err := parser.Parse(escapeReplacer.Replace(splits[1]))
+	if err != nil {
+		log.Printf("failed to parse arguments: %s", err)
+		// if parse shell world error use all string as argument
+		return cmdx, []string{splits[1]}
+	}
+
+	var ret []string
+	for _, v := range args {
+		ret = append(ret, os.ExpandEnv(unescapeReplacer.Replace(v)))
+	}
+
+	return cmdx, ret
 }
