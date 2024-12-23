@@ -188,7 +188,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 
 	if n.data.Step.Command == "" {
 		// If the command is empty, use the default shell as the command
-		n.data.Step.Command = cmdutil.GetShellCommand("")
+		n.data.Step.Command = cmdutil.GetShellCommand(n.data.Step.Shell)
 	}
 
 	if n.scriptFile != nil {
