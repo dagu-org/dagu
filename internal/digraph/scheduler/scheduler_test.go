@@ -153,10 +153,9 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 }
 
 func TestSchedulerCancel(t *testing.T) {
-
 	graph, _ := NewExecutionGraph(
 		step("1", testCommand),
-		step("2", "sleep 1000", "1"),
+		step("2", "sleep 100", "1"),
 		step("3", testCommandFail, "2"),
 	)
 	cfg := &Config{MaxActiveRuns: 1, LogDir: testHomeDir}
