@@ -52,7 +52,7 @@ func TestSignal(t *testing.T) {
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		n.signal(syscall.SIGTERM, false)
+		n.signal(context.Background(), syscall.SIGTERM, false)
 	}()
 
 	n.setStatus(NodeStatusRunning)
@@ -73,7 +73,7 @@ func TestSignalSpecified(t *testing.T) {
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		n.signal(syscall.SIGTERM, true)
+		n.signal(context.Background(), syscall.SIGTERM, true)
 	}()
 
 	n.setStatus(NodeStatusRunning)

@@ -103,7 +103,7 @@ func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
 func (e *client) StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) {
 	go func() {
 		if err := e.Start(ctx, dag, opts); err != nil {
-			logger.Error(ctx, "DAG start operation failed", "error", err)
+			logger.Error(ctx, "DAG start operation failed", "err", err)
 		}
 	}()
 }

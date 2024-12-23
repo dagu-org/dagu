@@ -4,7 +4,6 @@
 package stringutil
 
 import (
-	"log"
 	"time"
 )
 
@@ -31,13 +30,6 @@ func ParseTime(val string) (time.Time, error) {
 		return t, nil
 	}
 	return time.ParseInLocation(legacyTimeFormat, val, time.Local)
-}
-
-// LogErr logs error if it's not nil.
-func LogErr(action string, err error) {
-	if err != nil {
-		log.Printf("%s failed. %s", action, err)
-	}
 }
 
 // TruncString TurnString returns truncated string.

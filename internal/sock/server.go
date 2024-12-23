@@ -74,7 +74,7 @@ func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
 				if err != nil {
-					logger.Error(ctx, "read request", "error", err)
+					logger.Error(ctx, "read request", "err", err)
 				} else {
 					srv.handlerFunc(newHTTPResponseWriter(&conn), request)
 				}
@@ -93,7 +93,7 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 		if srv.listener != nil {
 			err := srv.listener.Close()
 			if err != nil && !errors.Is(err, os.ErrClosed) {
-				logger.Error(ctx, "close listener", "error", err)
+				logger.Error(ctx, "close listener", "err", err)
 			}
 			return err
 		}

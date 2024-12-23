@@ -62,7 +62,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Get parameters
 	params, err := cmd.Flags().GetString("params")
 	if err != nil {
-		logger.Error(ctx, "Failed to get parameters")
+		logger.Error(ctx, "Failed to get parameters", "err", err)
 		return fmt.Errorf("failed to get parameters: %w", err)
 	}
 
@@ -74,7 +74,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	// Load DAG
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specPath, params)
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", specPath)
+		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
 	}
 
@@ -83,7 +83,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 		var err error
 		requestID, err = generateRequestID()
 		if err != nil {
-			logger.Error(ctx, "Failed to generate request ID")
+			logger.Error(ctx, "Failed to generate request ID", "err", err)
 			return fmt.Errorf("failed to generate request ID: %w", err)
 		}
 	}

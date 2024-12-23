@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -91,12 +91,13 @@ func (e *docker) Run(_ context.Context) error {
 			return
 		}
 		removing = true
-		err := cli.ContainerRemove(
+		if err := cli.ContainerRemove(
 			ctx, resp.ID, types.ContainerRemoveOptions{
 				Force: true,
 			},
-		)
-		stringutil.LogErr("docker executor: remove container", err)
+		); err != nil {
+			logger.Error(ctx, "docker executor: remove container", "err", err)
+		}
 	}
 
 	defer removeContainer()
@@ -123,8 +124,9 @@ func (e *docker) Run(_ context.Context) error {
 	}
 
 	go func() {
-		_, err = stdcopy.StdCopy(e.stdout, e.stdout, out)
-		stringutil.LogErr("docker executor: stdcopy", err)
+		if _, err := stdcopy.StdCopy(e.stdout, e.stdout, out); err != nil {
+			logger.Error(ctx, "docker executor: stdcopy", "err", err)
+		}
 	}()
 
 	statusCh, errCh := cli.ContainerWait(

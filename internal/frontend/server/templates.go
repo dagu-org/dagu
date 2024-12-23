@@ -34,7 +34,7 @@ func (srv *Server) useTemplate(ctx context.Context, layout string, name string) 
 	return func(w http.ResponseWriter, data any) {
 		var buf bytes.Buffer
 		if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
-			logger.Error(ctx, "Template execution failed", "error", err)
+			logger.Error(ctx, "Template execution failed", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

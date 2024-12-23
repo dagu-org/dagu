@@ -407,7 +407,7 @@ func TestSchedulerOnSignal(t *testing.T) {
 		defer timer.Stop()
 		<-timer.C
 
-		scheduler.Signal(graph, syscall.SIGTERM, nil, false)
+		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, nil, false)
 	}()
 
 	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
@@ -439,7 +439,7 @@ func TestSchedulerOnCancel(t *testing.T) {
 		timer := time.NewTimer(time.Millisecond * 500)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Signal(graph, syscall.SIGTERM, done, false)
+		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
 	}()
 
 	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
@@ -580,7 +580,7 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 		timer := time.NewTimer(time.Millisecond * 100)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Signal(graph, syscall.SIGTERM, done, false)
+		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
 	}()
 
 	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)

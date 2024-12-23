@@ -21,6 +21,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/executor"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/mattn/go-shellwords"
 )
@@ -140,7 +141,9 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.SetError(cmd.Run(ctx))
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
-		stringutil.LogErr("close pipe writer", n.outputWriter.Close())
+		if err := n.outputWriter.Close(); err != nil {
+			logger.Error(ctx, "failed to close pipe writer", "err", err)
+		}
 		var buf bytes.Buffer
 		// TODO: Error handling
 		_, _ = io.Copy(&buf, n.outputReader)
@@ -255,7 +258,7 @@ func (n *Node) setErr(err error) {
 	n.data.State.Status = NodeStatusError
 }
 
-func (n *Node) signal(sig os.Signal, allowOverride bool) {
+func (n *Node) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.data.State.Status
@@ -265,7 +268,9 @@ func (n *Node) signal(sig os.Signal, allowOverride bool) {
 			sigsig = unix.SignalNum(n.data.Step.SignalOnStop)
 		}
 		log.Printf("Sending %s signal to %s", sigsig, n.data.Step.Name)
-		stringutil.LogErr("sending signal", n.cmd.Kill(sigsig))
+		if err := n.cmd.Kill(sigsig); err != nil {
+			logger.Error(ctx, "failed to send signal", "err", err)
+		}
 	}
 	if status == NodeStatusRunning {
 		n.data.State.Status = NodeStatusCancel

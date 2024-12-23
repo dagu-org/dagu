@@ -62,13 +62,13 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	// Setup execution context
 	executionCtx, err := prepareExecutionContext(ctx, cfg, specFilePath, requestID)
 	if err != nil {
-		logger.Error(ctx, "Failed to prepare execution context", "path", specFilePath)
+		logger.Error(ctx, "Failed to prepare execution context", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to prepare execution context: %w", err)
 	}
 
 	// Execute DAG retry
 	if err := executeRetry(ctx, executionCtx, cfg, quiet); err != nil {
-		logger.Error(ctx, "Failed to execute retry", "path", specFilePath)
+		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
 

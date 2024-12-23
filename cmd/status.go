@@ -35,7 +35,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Load the DAG
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], "")
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", args[0])
+		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
@@ -45,7 +45,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	status, err := cli.GetCurrentStatus(ctx, dag)
 	if err != nil {
-		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name)
+		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)
 	}
 

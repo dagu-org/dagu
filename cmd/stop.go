@@ -34,7 +34,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	dag, err := digraph.Load(cmd.Context(), cfg.Paths.BaseConfig, args[0], "")
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "error", err)
+		logger.Error(ctx, "Failed to load DAG", "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
@@ -44,7 +44,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 	cli := newClient(cfg, dataStore)
 
 	if err := cli.Stop(cmd.Context(), dag); err != nil {
-		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "error", err)
+		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}
 
