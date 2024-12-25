@@ -183,11 +183,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						case sc.isCanceled():
 							sc.setLastError(execErr)
 
-						case node.data.Step.RetryPolicy.Limit > node.getRetryCount():
+						case node.retryPolicy.Limit > node.getRetryCount():
 							// retry
 							node.incRetryCount()
 							logger.Info(ctx, "Step execution failed. Retrying...", "step", node.data.Step.Name, "error", execErr, "retry", node.getRetryCount())
-							time.Sleep(node.data.Step.RetryPolicy.Interval)
+							time.Sleep(node.retryPolicy.Interval)
 							node.setRetriedAt(time.Now())
 							node.setStatus(NodeStatusNone)
 

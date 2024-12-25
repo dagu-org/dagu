@@ -449,9 +449,22 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 
 func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RetryPolicy != nil {
-		step.RetryPolicy = RetryPolicy{
-			Limit:    def.RetryPolicy.Limit,
-			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
+		switch v := def.RetryPolicy.Limit.(type) {
+		case int:
+			step.RetryPolicy.Limit = v
+		case string:
+			step.RetryPolicy.LimitStr = v
+		default:
+			return fmt.Errorf("invalid type for retryPolicy.Limit: %T", v)
+		}
+
+		switch v := def.RetryPolicy.IntervalSec.(type) {
+		case int:
+			step.RetryPolicy.Interval = time.Second * time.Duration(v)
+		case string:
+			step.RetryPolicy.IntervalSecStr = v
+		default:
+			return fmt.Errorf("invalid type for retryPolicy.IntervalSec: %T", v)
 		}
 	}
 	return nil
