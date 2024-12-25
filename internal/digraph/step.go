@@ -47,7 +47,7 @@ type Step struct {
 	// ContinueOn contains the conditions to continue on failure or skipped.
 	ContinueOn ContinueOn `json:"ContinueOn,omitempty"`
 	// RetryPolicy contains the retry policy for the step.
-	RetryPolicy *RetryPolicy `json:"RetryPolicy,omitempty"`
+	RetryPolicy RetryPolicy `json:"RetryPolicy,omitempty"`
 	// RepeatPolicy contains the repeat policy for the step.
 	RepeatPolicy RepeatPolicy `json:"RepeatPolicy,omitempty"`
 	// MailOnError is the flag to send mail on error.
@@ -102,8 +102,14 @@ type ExecutorConfig struct {
 
 // RetryPolicy contains the retry policy for a step.
 type RetryPolicy struct {
-	Limit    int           // Limit is the number of retries allowed.
-	Interval time.Duration // Interval is the time to wait between retries.
+	// Limit is the number of retries allowed.
+	Limit int `json:"Limit,omitempty"`
+	// Interval is the time to wait between retries.
+	Interval time.Duration `json:"Interval,omitempty"`
+	// LimitStr is the string representation of the limit.
+	LimitStr string `json:"LimitStr,omitempty"`
+	// IntervalSecStr is the string representation of the interval.
+	IntervalSecStr string `json:"IntervalSecStr,omitempty"`
 }
 
 // RepeatPolicy contains the repeat policy for a step.

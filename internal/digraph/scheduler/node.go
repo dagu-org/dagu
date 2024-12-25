@@ -45,6 +45,7 @@ type Node struct {
 	outputReader *os.File
 	scriptFile   *os.File
 	done         bool
+	retryPolicy  retryPolicy
 }
 
 type NodeData struct {
@@ -342,6 +343,10 @@ func (n *Node) setup(logDir string, requestID string) error {
 	if err := n.setupStderr(); err != nil {
 		return err
 	}
+	if err := n.setupRetryPolicy(); err != nil {
+		return err
+	}
+
 	return n.setupScript()
 }
 
@@ -490,4 +495,38 @@ func (n *Node) init() {
 	if n.data.Step.Preconditions == nil {
 		n.data.Step.Preconditions = []digraph.Condition{}
 	}
+}
+
+type retryPolicy struct {
+	Limit    int
+	Interval time.Duration
+}
+
+func (n *Node) setupRetryPolicy() error {
+	var retryPolicy retryPolicy
+
+	if n.data.Step.RetryPolicy.Limit > 0 {
+		retryPolicy.Limit = n.data.Step.RetryPolicy.Limit
+	}
+	if n.data.Step.RetryPolicy.Interval > 0 {
+		retryPolicy.Interval = n.data.Step.RetryPolicy.Interval
+	}
+	// Evaluate the the configuration if it's configured as a string
+	// e.g. environment variable or command substitution
+	if n.data.Step.RetryPolicy.LimitStr != "" {
+		v, err := cmdutil.SubstituteWithEnvExpandInt(n.data.Step.RetryPolicy.LimitStr)
+		if err != nil {
+			return fmt.Errorf("failed to substitute retry limit %q: %w", n.data.Step.RetryPolicy.LimitStr, err)
+		}
+		retryPolicy.Limit = v
+	}
+	if n.data.Step.RetryPolicy.IntervalSecStr != "" {
+		v, err := cmdutil.SubstituteWithEnvExpandInt(n.data.Step.RetryPolicy.IntervalSecStr)
+		if err != nil {
+			return fmt.Errorf("failed to substitute retry interval %q: %w", n.data.Step.RetryPolicy.IntervalSecStr, err)
+		}
+		retryPolicy.Interval = time.Duration(v) * time.Second
+	}
+	n.retryPolicy = retryPolicy
+	return nil
 }

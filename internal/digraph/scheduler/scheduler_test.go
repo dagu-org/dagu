@@ -210,14 +210,14 @@ func TestSchedulerRetryFail(t *testing.T) {
 			Name:        "1",
 			Command:     cmd,
 			ContinueOn:  digraph.ContinueOn{Failure: true},
-			RetryPolicy: &digraph.RetryPolicy{Limit: 1},
+			RetryPolicy: digraph.RetryPolicy{Limit: 1},
 		},
 		digraph.Step{
 			Name:        "2",
 			Command:     cmd,
 			Args:        []string{"flag"},
 			ContinueOn:  digraph.ContinueOn{Failure: true},
-			RetryPolicy: &digraph.RetryPolicy{Limit: 1},
+			RetryPolicy: digraph.RetryPolicy{Limit: 1},
 			Depends:     []string{"1"},
 		},
 		digraph.Step{
@@ -256,7 +256,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 			Command: cmd,
 			Args:    []string{tmpFile},
 			Depends: []string{"1"},
-			RetryPolicy: &digraph.RetryPolicy{
+			RetryPolicy: digraph.RetryPolicy{
 				Limit:    10,
 				Interval: time.Millisecond * 800,
 			},

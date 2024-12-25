@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -178,6 +179,26 @@ func SplitCommand(cmd string) (string, []string, error) {
 	}
 
 	return command[0], command[1:], nil
+}
+
+// SubstituteWithEnvExpand substitutes environment variables and commands in the input string
+func SubstituteWithEnvExpand(input string) (string, error) {
+	expanded := os.ExpandEnv(input)
+	return SubstituteCommands(expanded)
+}
+
+// SubstituteWithEnvExpandInt substitutes environment variables and commands in the input string
+func SubstituteWithEnvExpandInt(input string) (int, error) {
+	expanded := os.ExpandEnv(input)
+	expanded, err := SubstituteCommands(expanded)
+	if err != nil {
+		return 0, err
+	}
+	v, err := strconv.Atoi(expanded)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert %q to int: %w", expanded, err)
+	}
+	return v, nil
 }
 
 // tickerMatcher matches the command in the value string.
