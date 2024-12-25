@@ -449,7 +449,7 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 
 func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RetryPolicy != nil {
-		step.RetryPolicy = &RetryPolicy{
+		step.RetryPolicy = RetryPolicy{
 			Limit:    def.RetryPolicy.Limit,
 			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
 		}
