@@ -48,7 +48,7 @@ func (td *testDAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) 
 	dag, err := digraph.Load(td.Context, td.Config.Paths.BaseConfig, td.Path, "")
 	require.NoError(t, err)
 
-	cli := td.GetClient()
+	cli := td.Client
 	require.Eventually(t, func() bool {
 		status, err := cli.GetCurrentStatus(td.Context, dag)
 		require.NoError(t, err)

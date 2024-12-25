@@ -125,7 +125,7 @@ func TestAgent_Run(t *testing.T) {
 		abortFunc := func(a *agent.Agent) { a.Signal(ctx, syscall.SIGTERM) }
 
 		dag := testLoadDAG(t, "sleep.yaml")
-		cli := th.GetClient()
+		cli := th.Client
 		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
 
 		go func() {
@@ -185,7 +185,7 @@ func TestAgent_DryRun(t *testing.T) {
 		require.Equal(t, scheduler.StatusSuccess, curStatus.Status)
 
 		// Check if the status is not saved
-		cli := th.GetClient()
+		cli := th.Client
 		history := cli.GetRecentHistory(ctx, dag, 1)
 		require.Equal(t, 0, len(history))
 	})
@@ -248,7 +248,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		cli := th.GetClient()
+		cli := th.Client
 		require.Eventually(t, func() bool {
 			status, _ := cli.GetLatestStatus(ctx, dag)
 			// require.NoError(t, err)
@@ -288,7 +288,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		cli := th.GetClient()
+		cli := th.Client
 		require.Eventually(t, func() bool {
 			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
@@ -324,7 +324,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		}()
 
 		// Wait for the DAG to start
-		cli := th.GetClient()
+		cli := th.Client
 		require.Eventually(t, func() bool {
 			status, err := cli.GetLatestStatus(ctx, dag)
 			require.NoError(t, err)
@@ -403,7 +403,7 @@ func newAgent(
 		dag,
 		logDir,
 		logFile,
-		th.GetClient(),
+		th.Client,
 		th.DataStore(),
 		opts,
 	)

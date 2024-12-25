@@ -109,11 +109,6 @@ func (h Helper) DataStore() persistence.DataStores {
 	)
 }
 
-// GetClient creates a new GetClient instance
-func (h Helper) GetClient() client.Client {
-	return client.New(h.DataStore(), h.Config.Paths.Executable, h.Config.WorkDir)
-}
-
 // Cleanup removes temporary test directories
 func (h Helper) Cleanup() {
 	_ = os.RemoveAll(h.tmpDir)
@@ -139,11 +134,10 @@ type DAG struct {
 
 func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
-	cli := d.GetClient()
 
 	var latestStatusValue scheduler.Status
 	assert.Eventually(t, func() bool {
-		latestStatus, err := cli.GetLatestStatus(d.Context, d.DAG)
+		latestStatus, err := d.Client.GetLatestStatus(d.Context, d.DAG)
 		require.NoError(t, err)
 		latestStatusValue = latestStatus.Status
 		return latestStatus.Status == expected
