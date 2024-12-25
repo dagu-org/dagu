@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -371,10 +370,10 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 // buildSMTPConfig builds the SMTP configuration for the DAG.
 func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	dag.SMTP = &SMTPConfig{
-		Host:     os.ExpandEnv(spec.SMTP.Host),
-		Port:     os.ExpandEnv(spec.SMTP.Port),
-		Username: os.ExpandEnv(spec.SMTP.Username),
-		Password: os.ExpandEnv(spec.SMTP.Password),
+		Host:     spec.SMTP.Host,
+		Port:     spec.SMTP.Port,
+		Username: spec.SMTP.Username,
+		Password: spec.SMTP.Password,
 	}
 
 	return nil

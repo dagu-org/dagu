@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/mitchellh/mapstructure"
@@ -31,13 +32,13 @@ type mailConfig struct {
 func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 	var cfg mailConfig
 	if err := decodeMailConfig(step.ExecutorConfig.Config, &cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode mail config: %w", err)
 	}
 
-	cfg.From = os.ExpandEnv(cfg.From)
-	cfg.To = os.ExpandEnv(cfg.To)
-	cfg.Subject = os.ExpandEnv(cfg.Subject)
-	cfg.Message = os.ExpandEnv(cfg.Message)
+	cfg, err := cmdutil.SubstituteStringFields(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
+	}
 
 	exec := &mail{cfg: &cfg}
 
@@ -45,12 +46,18 @@ func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := mailer.New(mailer.Config{
+
+	mailerConfig, err := cmdutil.SubstituteStringFields(mailer.Config{
 		Host:     dagCtx.DAG.SMTP.Host,
 		Port:     dagCtx.DAG.SMTP.Port,
 		Username: dagCtx.DAG.SMTP.Username,
 		Password: dagCtx.DAG.SMTP.Password,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
+	}
+
+	m := mailer.New(mailerConfig)
 	exec.mailer = m
 
 	return exec, nil
