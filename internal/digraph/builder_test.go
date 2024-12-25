@@ -294,11 +294,6 @@ func TestBuildStep(t *testing.T) {
 			},
 		}, th.Steps[0].ExecutorConfig.Config)
 	})
-	t.Run("SignalOnStop", func(t *testing.T) {
-		th := loadTestYAML(t, "signal_on_stop.yaml")
-		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, "SIGINT", th.Steps[0].SignalOnStop)
-	})
 	t.Run("SubWorkflow", func(t *testing.T) {
 		th := loadTestYAML(t, "subworkflow.yaml")
 		assert.Len(t, th.Steps, 1)
@@ -308,6 +303,37 @@ func TestBuildStep(t *testing.T) {
 			"sub_dag",
 			"param1=value1 param2=value2",
 		}, th.Steps[0].Args)
+	})
+	t.Run("ContinueOn", func(t *testing.T) {
+		th := loadTestYAML(t, "continue_on.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.True(t, th.Steps[0].ContinueOn.Failure)
+		assert.True(t, th.Steps[0].ContinueOn.Skipped)
+	})
+	t.Run("RetryPolicy", func(t *testing.T) {
+		th := loadTestYAML(t, "retry_policy.yaml")
+		assert.Len(t, th.Steps, 1)
+		require.NotNil(t, th.Steps[0].RetryPolicy)
+		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
+		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.Interval)
+	})
+	t.Run("RepeatPolicy", func(t *testing.T) {
+		th := loadTestYAML(t, "repeat_policy.yaml")
+		assert.Len(t, th.Steps, 1)
+		require.NotNil(t, th.Steps[0].RepeatPolicy)
+		assert.True(t, th.Steps[0].RepeatPolicy.Repeat)
+		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
+	})
+	t.Run("SignalOnStop", func(t *testing.T) {
+		th := loadTestYAML(t, "signal_on_stop.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "SIGINT", th.Steps[0].SignalOnStop)
+	})
+	t.Run("Preconditions", func(t *testing.T) {
+		th := loadTestYAML(t, "step_preconditions.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Len(t, th.Steps[0].Preconditions, 1)
+		assert.Equal(t, Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
 	})
 }
 

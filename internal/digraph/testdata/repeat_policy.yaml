@@ -1,0 +1,6 @@
+steps:
+  - name: "2"
+    command: "echo 2"
+    repeatPolicy:
+      repeat: true
+      intervalSec: 60
