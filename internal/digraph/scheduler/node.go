@@ -96,6 +96,12 @@ func (s NodeStatus) String() string {
 	}
 }
 
+func NodeWithData(data NodeData) *Node {
+	return &Node{
+		data: data,
+	}
+}
+
 func NewNode(step digraph.Step, state NodeState) *Node {
 	return &Node{
 		data: NodeData{Step: step, State: state},
@@ -106,6 +112,33 @@ func (n *Node) Data() NodeData {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data
+}
+
+func (n *Node) ScriptFilename() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if n.scriptFile != nil {
+		return n.scriptFile.Name()
+	}
+	return ""
+}
+
+func (n *Node) CloseLog() error {
+	n.logLock.Lock()
+	defer n.logLock.Unlock()
+	if n.logFile != nil {
+		return n.logFile.Close()
+	}
+	return nil
+}
+
+func (n *Node) LogFilename() string {
+	n.logLock.Lock()
+	defer n.logLock.Unlock()
+	if n.logFile != nil {
+		return n.logFile.Name()
+	}
+	return ""
 }
 
 func (n *Node) setError(err error) {
@@ -233,7 +266,7 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	return cmd, nil
 }
 
-func (n *Node) getRetryCount() int {
+func (n *Node) GetRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data.State.RetryCount
@@ -245,7 +278,7 @@ func (n *Node) setRetriedAt(retriedAt time.Time) {
 	n.data.State.RetriedAt = retriedAt
 }
 
-func (n *Node) getDoneCount() int {
+func (n *Node) GetDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data.State.DoneCount
@@ -255,7 +288,7 @@ func (n *Node) clearState() {
 	n.data.State = NodeState{}
 }
 
-func (n *Node) setStatus(status NodeStatus) {
+func (n *Node) SetStatus(status NodeStatus) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.Status = status
@@ -268,7 +301,7 @@ func (n *Node) markError(err error) {
 	n.data.State.Status = NodeStatusError
 }
 
-func (n *Node) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
+func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.data.State.Status
@@ -300,7 +333,7 @@ func (n *Node) cancel() {
 	}
 }
 
-func (n *Node) setup(logDir string, requestID string) error {
+func (n *Node) Setup(logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -420,7 +453,7 @@ func (n *Node) setupLog() error {
 	n.logWriter = bufio.NewWriter(n.logFile)
 	return nil
 }
-func (n *Node) teardown() error {
+func (n *Node) Teardown() error {
 	if n.done {
 		return nil
 	}
@@ -453,13 +486,13 @@ func (n *Node) teardown() error {
 	return lastErr
 }
 
-func (n *Node) incRetryCount() {
+func (n *Node) IncRetryCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.RetryCount++
 }
 
-func (n *Node) incDoneCount() {
+func (n *Node) IncDoneCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.DoneCount++
@@ -478,7 +511,7 @@ func getNextNodeID() int {
 	return v
 }
 
-func (n *Node) init() {
+func (n *Node) Init() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.id != 0 {

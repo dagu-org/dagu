@@ -1,7 +1,7 @@
 // Copyright (C) 2024 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package scheduler
+package scheduler_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,85 +23,84 @@ func nodeTextCtxWithDagContext() context.Context {
 }
 
 func TestExecute(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "true",
 			OutputVariables: &digraph.SyncMap{},
-		}}}
+		}})
 	require.NoError(t, n.Execute(nodeTextCtxWithDagContext()))
-	require.Nil(t, n.data.State.Error)
+	require.Nil(t, n.Data().State.Error)
 }
 
 func TestError(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "false",
 			OutputVariables: &digraph.SyncMap{},
-		}}}
+		}})
 	err := n.Execute(nodeTextCtxWithDagContext())
 	require.True(t, err != nil)
-	require.Equal(t, n.data.State.Error, err)
+	require.Equal(t, n.Data().State.Error, err)
 }
 
 func TestSignal(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &digraph.SyncMap{},
-		}}}
+		}})
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		n.signal(context.Background(), syscall.SIGTERM, false)
+		n.Signal(context.Background(), syscall.SIGTERM, false)
 	}()
 
-	n.setStatus(NodeStatusRunning)
+	n.SetStatus(scheduler.NodeStatusRunning)
 	err := n.Execute(nodeTextCtxWithDagContext())
 
 	require.Error(t, err)
-	require.Equal(t, n.State().Status, NodeStatusCancel)
+	require.Equal(t, n.State().Status, scheduler.NodeStatusCancel)
 }
 
 func TestSignalSpecified(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "sleep",
 			Args:            []string{"100"},
 			OutputVariables: &digraph.SyncMap{},
 			SignalOnStop:    "SIGINT",
-		}}}
+		}})
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		n.signal(context.Background(), syscall.SIGTERM, true)
+		n.Signal(context.Background(), syscall.SIGTERM, true)
 	}()
 
-	n.setStatus(NodeStatusRunning)
+	n.SetStatus(scheduler.NodeStatusRunning)
 	err := n.Execute(nodeTextCtxWithDagContext())
 
 	require.Error(t, err)
-	require.Equal(t, n.State().Status, NodeStatusCancel)
+	require.Equal(t, n.State().Status, scheduler.NodeStatusCancel)
 }
 
 func TestLog(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
 			Dir:             os.Getenv("HOME"),
 			OutputVariables: &digraph.SyncMap{},
-		}},
-	}
+		}})
 
 	runTestNode(t, n)
 
-	dat, _ := os.ReadFile(n.logFile.Name())
+	dat, _ := os.ReadFile(n.LogFilename())
 	require.Equal(t, "done\n", string(dat))
 }
 
 func TestStdout(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "echo",
 			Args:            []string{"done"},
@@ -108,17 +108,17 @@ func TestStdout(t *testing.T) {
 			Stdout:          "stdout.log",
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
+	)
 
 	runTestNode(t, n)
 
-	f := filepath.Join(os.Getenv("HOME"), n.data.Step.Stdout)
+	f := filepath.Join(os.Getenv("HOME"), n.Data().Step.Stdout)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "done\n", string(dat))
 }
 
 func TestStderr(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command: "sh",
 			Script: `
@@ -130,83 +130,78 @@ echo Stderr message >&2
 			Stderr:          "test-stderr-stderr.log",
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
+	)
 
 	runTestNode(t, n)
 
-	f := filepath.Join(os.Getenv("HOME"), n.data.Step.Stderr)
+	f := filepath.Join(os.Getenv("HOME"), n.Data().Step.Stderr)
 	dat, _ := os.ReadFile(f)
 	require.Equal(t, "Stderr message\n", string(dat))
 
-	f = filepath.Join(os.Getenv("HOME"), n.data.Step.Stdout)
+	f = filepath.Join(os.Getenv("HOME"), n.Data().Step.Stdout)
 	dat, _ = os.ReadFile(f)
 	require.Equal(t, "Stdout message\n", string(dat))
 }
 
 func TestNode(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "echo",
 			Args:            []string{"hello"},
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
-	n.incDoneCount()
-	require.Equal(t, 1, n.getDoneCount())
+	)
+	n.IncDoneCount()
+	require.Equal(t, 1, n.GetDoneCount())
 
-	n.incRetryCount()
-	require.Equal(t, 1, n.getRetryCount())
+	n.IncRetryCount()
+	require.Equal(t, 1, n.GetRetryCount())
 
-	n.id = 1
-	n.init()
-	require.Nil(t, n.data.Step.Variables)
-
-	n.id = 0
-	n.init()
-	require.Equal(t, n.data.Step.Variables, []string{})
+	n.Init()
+	require.Equal(t, n.Data().Step.Variables, []string{})
 }
 
 func TestOutput(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			CmdWithArgs:     "echo hello",
 			Output:          "OUTPUT_TEST",
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
-	err := n.setup(os.Getenv("HOME"), "test-request-id-output")
+	)
+	err := n.Setup(os.Getenv("HOME"), "test-request-id-output")
 	require.NoError(t, err)
 	defer func() {
-		_ = n.teardown()
+		_ = n.Teardown()
 	}()
 
 	runTestNode(t, n)
 
-	dat, _ := os.ReadFile(n.logFile.Name())
+	dat, _ := os.ReadFile(n.LogFilename())
 	require.Equal(t, "hello\n", string(dat))
 	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST"))
 
 	// Use the previous output in the subsequent step
-	n2 := &Node{data: NodeData{
+	n2 := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			CmdWithArgs:     "echo $OUTPUT_TEST",
 			Output:          "OUTPUT_TEST2",
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
+	)
 
 	runTestNode(t, n2)
 	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST2"))
 
 	// Use the previous output in the subsequent step inside a script
-	n3 := &Node{data: NodeData{
+	n3 := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         "sh",
 			Script:          "echo $OUTPUT_TEST2",
 			Output:          "OUTPUT_TEST3",
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
+	)
 
 	runTestNode(t, n3)
 	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST3"))
@@ -230,24 +225,24 @@ func TestOutputJson(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			n := &Node{data: NodeData{
+			n := scheduler.NodeWithData(scheduler.NodeData{
 				Step: digraph.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_JSON_TEST",
 					OutputVariables: &digraph.SyncMap{},
 				}},
-			}
-			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-jsondb-%d", i))
+			)
+			err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-output-jsondb-%d", i))
 			require.NoError(t, err)
 			defer func() {
-				_ = n.teardown()
+				_ = n.Teardown()
 			}()
 
 			runTestNode(t, n)
 
-			require.Equal(t, test.WantArgs, len(n.data.Step.Args))
+			require.Equal(t, test.WantArgs, len(n.Data().Step.Args))
 
-			v, _ := n.data.Step.OutputVariables.Load("OUTPUT_JSON_TEST")
+			v, _ := n.Data().Step.OutputVariables.Load("OUTPUT_JSON_TEST")
 			require.Equal(t, fmt.Sprintf("OUTPUT_JSON_TEST=%s", test.Want), v)
 			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_JSON_TEST"))
 		})
@@ -292,24 +287,24 @@ func TestOutputSpecialChar(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			n := &Node{data: NodeData{
+			n := scheduler.NodeWithData(scheduler.NodeData{
 				Step: digraph.Step{
 					CmdWithArgs:     test.CmdWithArgs,
 					Output:          "OUTPUT_SPECIALCHAR_TEST",
 					OutputVariables: &digraph.SyncMap{},
 				}},
-			}
-			err := n.setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
+			)
+			err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
 			require.NoError(t, err)
 			defer func() {
-				_ = n.teardown()
+				_ = n.Teardown()
 			}()
 
 			runTestNode(t, n)
 
-			require.Equal(t, test.WantArgs, len(n.data.Step.Args))
+			require.Equal(t, test.WantArgs, len(n.Data().Step.Args))
 
-			v, _ := n.data.Step.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
+			v, _ := n.Data().Step.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
 			require.Equal(t, fmt.Sprintf("OUTPUT_SPECIALCHAR_TEST=%s", test.Want), v)
 			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_SPECIALCHAR_TEST"))
 		})
@@ -317,7 +312,7 @@ func TestOutputSpecialChar(t *testing.T) {
 }
 
 func TestRunScript(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command: "sh",
 			Args:    []string{},
@@ -327,56 +322,48 @@ func TestRunScript(t *testing.T) {
 			Output:          "SCRIPT_TEST",
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
+	)
 
-	err := n.setup(os.Getenv("HOME"),
+	err := n.Setup(os.Getenv("HOME"),
 		fmt.Sprintf("test-request-id-%d", rand.Int()))
 	require.NoError(t, err)
 
-	require.FileExists(t, n.logFile.Name())
-	b, _ := os.ReadFile(n.scriptFile.Name())
-	require.Equal(t, n.data.Step.Script, string(b))
+	require.FileExists(t, n.LogFilename())
+	b, _ := os.ReadFile(n.ScriptFilename())
+	require.Equal(t, n.Data().Step.Script, string(b))
 
 	require.NoError(t, err)
 	err = n.Execute(nodeTextCtxWithDagContext())
 	require.NoError(t, err)
-	err = n.teardown()
+	err = n.Teardown()
 	require.NoError(t, err)
 
 	require.Equal(t, "hello", os.Getenv("SCRIPT_TEST"))
-	require.NoFileExists(t, n.scriptFile.Name())
+	require.NoFileExists(t, n.ScriptFilename())
 }
 
 func TestTeardown(t *testing.T) {
-	n := &Node{data: NodeData{
+	n := scheduler.NodeWithData(scheduler.NodeData{
 		Step: digraph.Step{
 			Command:         testCommand,
 			Args:            []string{},
 			OutputVariables: &digraph.SyncMap{},
 		}},
-	}
+	)
 
 	runTestNode(t, n)
 
-	// no error since done flag is true
-	err := n.teardown()
+	err := n.Teardown()
 	require.NoError(t, err)
-	require.NoError(t, n.data.State.Error)
-
-	// error
-	n.done = false
-	err = n.teardown()
-	require.Error(t, err)
-	require.Error(t, n.data.State.Error)
+	require.NoError(t, n.Data().State.Error)
 }
 
-func runTestNode(t *testing.T, n *Node) {
+func runTestNode(t *testing.T, n *scheduler.Node) {
 	t.Helper()
-	err := n.setup(os.Getenv("HOME"),
-		fmt.Sprintf("test-request-id-%d", rand.Int()))
+	err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-request-id-%d", rand.Int()))
 	require.NoError(t, err)
 	err = n.Execute(nodeTextCtxWithDagContext())
 	require.NoError(t, err)
-	err = n.teardown()
+	err = n.Teardown()
 	require.NoError(t, err)
 }

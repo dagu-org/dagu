@@ -1,7 +1,7 @@
 // Copyright (C) 2024 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package scheduler
+package scheduler_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/stretchr/testify/require"
 )
@@ -41,18 +42,18 @@ func schedulerTextCtxWithDagContext() context.Context {
 }
 
 func TestScheduler(t *testing.T) {
-	g, err := NewExecutionGraph(
+	g, err := scheduler.NewExecutionGraph(
 		step("1", testCommand),
 		step("2", testCommand, "1"),
 		step("3", testCommandFail, "2"),
 		step("4", testCommand, "3"),
 	)
 	require.NoError(t, err)
-	cfg := &Config{MaxActiveRuns: 1, LogDir: testHomeDir}
-	sc := New(cfg)
+	cfg := &scheduler.Config{MaxActiveRuns: 1, LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
 	var counter atomic.Int64
-	done := make(chan *Node)
+	done := make(chan *scheduler.Node)
 	go func() {
 		for range done {
 			counter.Add(1)
@@ -63,49 +64,49 @@ func TestScheduler(t *testing.T) {
 	require.Error(t, err)
 
 	require.Equal(t, counter.Load(), int64(3))
-	require.Equal(t, sc.Status(g), StatusError)
+	require.Equal(t, sc.Status(g), scheduler.StatusError)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatusError, nodes[2].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[3].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[3].State().Status)
 }
 
 func TestSchedulerParallel(t *testing.T) {
-	graph, scheduler := newTestScheduler(t,
-		&Config{MaxActiveRuns: 1000, LogDir: testHomeDir},
+	graph, sc := newTestScheduler(t,
+		&scheduler.Config{MaxActiveRuns: 1000, LogDir: testHomeDir},
 		step("1", testCommand),
 		step("2", testCommand),
 		step("3", testCommand),
 	)
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusSuccess)
+	require.Equal(t, sc.Status(graph), scheduler.StatusSuccess)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
 }
 
 func TestSchedulerFailPartially(t *testing.T) {
-	graph, scheduler, err := testSchedule(t,
+	graph, sc, err := testSchedule(t,
 		step("1", testCommand),
 		step("2", testCommandFail),
 		step("3", testCommand, "1"),
 		step("4", testCommand, "3"),
 	)
 	require.Error(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusError)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusError, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[3].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[3].State().Status)
 }
 
 func TestSchedulerContinueOnFailure(t *testing.T) {
-	graph, scheduler, err := testSchedule(t,
+	graph, sc, err := testSchedule(t,
 		step("1", testCommand),
 		digraph.Step{
 			Name:    "2",
@@ -118,16 +119,16 @@ func TestSchedulerContinueOnFailure(t *testing.T) {
 		step("3", testCommand, "2"),
 	)
 	require.Error(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusError)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusError, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
 }
 
 func TestSchedulerAllowSkipped(t *testing.T) {
-	graph, scheduler, err := testSchedule(t,
+	graph, sc, err := testSchedule(t,
 		step("1", testCommand),
 		digraph.Step{
 			Name:    "2",
@@ -144,42 +145,42 @@ func TestSchedulerAllowSkipped(t *testing.T) {
 		step("3", testCommand, "2"),
 	)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusSuccess)
+	require.Equal(t, sc.Status(graph), scheduler.StatusSuccess)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSkipped, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
 }
 
 func TestSchedulerCancel(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		step("1", testCommand),
 		step("2", "sleep 100", "1"),
 		step("3", testCommandFail, "2"),
 	)
-	cfg := &Config{MaxActiveRuns: 1, LogDir: testHomeDir}
-	scheduler := New(cfg)
+	cfg := &scheduler.Config{MaxActiveRuns: 1, LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
 	go func() {
 		time.Sleep(time.Millisecond * 300)
-		scheduler.Cancel(graph)
+		sc.Cancel(graph)
 	}()
 
-	_ = scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	_ = sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 
 	require.Eventually(t, func() bool {
-		return scheduler.Status(graph) == StatusCancel
+		return sc.Status(graph) == scheduler.StatusCancel
 	}, time.Second, time.Millisecond*10)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
-	require.Equal(t, NodeStatusNone, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[2].State().Status)
 }
 
 func TestSchedulerTimeout(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		step("1", "sleep 1"),
 		step("2", "sleep 1"),
 		step("3", "sleep 3"),
@@ -187,25 +188,25 @@ func TestSchedulerTimeout(t *testing.T) {
 		step("5", "sleep 1", "2"),
 		step("6", "sleep 1", "5"),
 	)
-	cfg := &Config{Timeout: time.Second * 2, LogDir: testHomeDir}
-	scheduler := New(cfg)
+	cfg := &scheduler.Config{Timeout: time.Second * 2, LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.Error(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusError)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[2].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[3].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[4].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[5].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[3].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[4].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[5].State().Status)
 }
 
 func TestSchedulerRetryFail(t *testing.T) {
 	cmd := filepath.Join(fileutil.MustGetwd(), "testdata/testfile.sh")
-	graph, scheduler, err := testSchedule(t,
+	graph, sc, err := testSchedule(t,
 		digraph.Step{
 			Name:        "1",
 			Command:     cmd,
@@ -228,13 +229,13 @@ func TestSchedulerRetryFail(t *testing.T) {
 		step("4", cmd, "3"),
 	)
 	require.True(t, err != nil)
-	require.Equal(t, scheduler.Status(graph), StatusError)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, NodeStatusError, nodes[1].State().Status)
-	require.Equal(t, NodeStatusError, nodes[2].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[3].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[3].State().Status)
 
 	require.Equal(t, nodes[0].State().RetryCount, 1)
 	require.Equal(t, nodes[1].State().RetryCount, 1)
@@ -248,8 +249,8 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(tmpDir)
 
-	graph, scheduler := newTestScheduler(
-		t, &Config{MaxActiveRuns: 2, LogDir: tmpDir},
+	graph, sc := newTestScheduler(
+		t, &scheduler.Config{MaxActiveRuns: 2, LogDir: tmpDir},
 		step("1", testCommand),
 		digraph.Step{
 			Name:    "2",
@@ -284,7 +285,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 
 		// scheduled for retry
 		require.Equal(t, 1, nodes[1].State().RetryCount)
-		require.Equal(t, NodeStatusRunning, nodes[1].State().Status)
+		require.Equal(t, scheduler.NodeStatusRunning, nodes[1].State().Status)
 		startedAt := nodes[1].State().StartedAt
 
 		// wait for retry
@@ -297,15 +298,15 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 		require.Greater(t, retriedAt.Sub(startedAt), time.Millisecond*500)
 	}()
 
-	err = scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err = sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 
 	require.NoError(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusSuccess)
+	require.Equal(t, sc.Status(graph), scheduler.StatusSuccess)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
 
 	if nodes[1].State().RetryCount == 0 {
 		t.Error("step 2 Should be retried")
@@ -313,7 +314,7 @@ func TestSchedulerRetrySuccess(t *testing.T) {
 }
 
 func TestStepPreCondition(t *testing.T) {
-	graph, scheduler, err := testSchedule(t,
+	graph, sc, err := testSchedule(t,
 		step("1", testCommand),
 		digraph.Step{
 			Name:    "2",
@@ -340,20 +341,20 @@ func TestStepPreCondition(t *testing.T) {
 		step("5", testCommand, "4"),
 	)
 	require.NoError(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusSuccess)
+	require.Equal(t, sc.Status(graph), scheduler.StatusSuccess)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSkipped, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSkipped, nodes[2].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[3].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[4].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[3].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[4].State().Status)
 }
 
 func TestSchedulerOnExit(t *testing.T) {
 	onExitStep := step("onExit", testCommand)
 	g, sc := newTestScheduler(t,
-		&Config{OnExit: &onExitStep, LogDir: testHomeDir},
+		&scheduler.Config{OnExit: &onExitStep, LogDir: testHomeDir},
 		step("1", testCommand),
 		step("2", testCommand, "1"),
 		step("3", testCommand),
@@ -363,67 +364,67 @@ func TestSchedulerOnExit(t *testing.T) {
 	require.NoError(t, err)
 
 	nodes := g.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
 
 	onExitNode := sc.HandlerNode(digraph.HandlerOnExit)
 	require.NotNil(t, onExitNode)
-	require.Equal(t, NodeStatusSuccess, onExitNode.State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, onExitNode.State().Status)
 }
 
 func TestSchedulerOnExitOnFail(t *testing.T) {
 	onExitStep := step("onExit", testCommand)
-	graph, scheduler := newTestScheduler(t,
-		&Config{OnExit: &onExitStep, LogDir: testHomeDir},
+	graph, sc := newTestScheduler(t,
+		&scheduler.Config{OnExit: &onExitStep, LogDir: testHomeDir},
 		step("1", testCommandFail),
 		step("2", testCommand, "1"),
 		step("3", testCommand),
 	)
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.Error(t, err)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[2].State().Status)
 
-	require.Equal(t, NodeStatusSuccess, scheduler.HandlerNode(digraph.HandlerOnExit).State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, sc.HandlerNode(digraph.HandlerOnExit).State().Status)
 }
 
 func TestSchedulerOnSignal(t *testing.T) {
-	graph, _ := NewExecutionGraph(digraph.Step{
+	graph, _ := scheduler.NewExecutionGraph(digraph.Step{
 		Name:    "1",
 		Command: "sleep",
 		Args:    []string{"10"},
 	})
-	cfg := &Config{LogDir: testHomeDir}
-	scheduler := New(cfg)
+	cfg := &scheduler.Config{LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 50)
 		defer timer.Stop()
 		<-timer.C
 
-		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, nil, false)
+		sc.Signal(context.Background(), graph, syscall.SIGTERM, nil, false)
 	}()
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
 
 	nodes := graph.Nodes()
 
-	require.Equal(t, scheduler.Status(graph), StatusCancel)
-	require.Equal(t, NodeStatusCancel, nodes[0].State().Status)
+	require.Equal(t, sc.Status(graph), scheduler.StatusCancel)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[0].State().Status)
 }
 
 func TestSchedulerOnCancel(t *testing.T) {
 	onSuccessStep := step("onSuccess", testCommand)
 	onFailureStep := step("onFailure", testCommand)
 	onCancelStep := step("onCancel", testCommand)
-	graph, scheduler := newTestScheduler(t,
-		&Config{
+	graph, sc := newTestScheduler(t,
+		&scheduler.Config{
 			OnSuccess: &onSuccessStep,
 			OnFailure: &onFailureStep,
 			OnCancel:  &onCancelStep,
@@ -438,28 +439,28 @@ func TestSchedulerOnCancel(t *testing.T) {
 		timer := time.NewTimer(time.Millisecond * 500)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
+		sc.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
 	}()
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
 	<-done // Wait for canceling finished
-	require.Equal(t, scheduler.Status(graph), StatusCancel)
+	require.Equal(t, sc.Status(graph), scheduler.StatusCancel)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusCancel, nodes[1].State().Status)
-	require.Equal(t, NodeStatusNone, scheduler.HandlerNode(digraph.HandlerOnSuccess).State().Status)
-	require.Equal(t, NodeStatusNone, scheduler.HandlerNode(digraph.HandlerOnFailure).State().Status)
-	require.Equal(t, NodeStatusSuccess, scheduler.HandlerNode(digraph.HandlerOnCancel).State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, sc.HandlerNode(digraph.HandlerOnSuccess).State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, sc.HandlerNode(digraph.HandlerOnFailure).State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, sc.HandlerNode(digraph.HandlerOnCancel).State().Status)
 }
 
 func TestSchedulerOnSuccess(t *testing.T) {
 	onExit := step("onExit", testCommand)
 	onSuccess := step("onSuccess", testCommand)
 	onFailure := step("onFailure", testCommand)
-	graph, scheduler := newTestScheduler(t,
-		&Config{
+	graph, sc := newTestScheduler(t,
+		&scheduler.Config{
 			OnExit:    &onExit,
 			OnSuccess: &onSuccess,
 			OnFailure: &onFailure,
@@ -468,14 +469,14 @@ func TestSchedulerOnSuccess(t *testing.T) {
 		step("1", testCommand),
 	)
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, scheduler.HandlerNode(digraph.HandlerOnExit).State().Status)
-	require.Equal(t, NodeStatusSuccess, scheduler.HandlerNode(digraph.HandlerOnSuccess).State().Status)
-	require.Equal(t, NodeStatusNone, scheduler.HandlerNode(digraph.HandlerOnFailure).State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, sc.HandlerNode(digraph.HandlerOnExit).State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, sc.HandlerNode(digraph.HandlerOnSuccess).State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, sc.HandlerNode(digraph.HandlerOnFailure).State().Status)
 }
 
 func TestSchedulerOnFailure(t *testing.T) {
@@ -483,8 +484,8 @@ func TestSchedulerOnFailure(t *testing.T) {
 	onSuccess := step("onSuccess", testCommand)
 	onFailure := step("onFailure", testCommand)
 	onCancel := step("onCancel", testCommand)
-	graph, scheduler := newTestScheduler(t,
-		&Config{
+	graph, sc := newTestScheduler(t,
+		&scheduler.Config{
 			OnExit:    &onExit,
 			OnSuccess: &onSuccess,
 			OnFailure: &onFailure,
@@ -494,19 +495,19 @@ func TestSchedulerOnFailure(t *testing.T) {
 		step("1", testCommandFail),
 	)
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.Error(t, err)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, scheduler.HandlerNode(digraph.HandlerOnExit).State().Status)
-	require.Equal(t, NodeStatusNone, scheduler.HandlerNode(digraph.HandlerOnSuccess).State().Status)
-	require.Equal(t, NodeStatusSuccess, scheduler.HandlerNode(digraph.HandlerOnFailure).State().Status)
-	require.Equal(t, NodeStatusNone, scheduler.HandlerNode(digraph.HandlerOnCancel).State().Status)
+	require.Equal(t, scheduler.NodeStatusError, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, sc.HandlerNode(digraph.HandlerOnExit).State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, sc.HandlerNode(digraph.HandlerOnSuccess).State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, sc.HandlerNode(digraph.HandlerOnFailure).State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, sc.HandlerNode(digraph.HandlerOnCancel).State().Status)
 }
 
 func TestRepeat(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		digraph.Step{
 			Name:    "1",
 			Command: "sleep",
@@ -517,28 +518,28 @@ func TestRepeat(t *testing.T) {
 			},
 		},
 	)
-	cfg := &Config{LogDir: testHomeDir}
-	scheduler := New(cfg)
+	cfg := &scheduler.Config{LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 3000)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Cancel(graph)
+		sc.Cancel(graph)
 	}()
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
 
 	nodes := graph.Nodes()
 
-	require.Equal(t, scheduler.Status(graph), StatusCancel)
-	require.Equal(t, NodeStatusCancel, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.State.DoneCount, 2)
+	require.Equal(t, sc.Status(graph), scheduler.StatusCancel)
+	require.Equal(t, scheduler.NodeStatusCancel, nodes[0].State().Status)
+	require.Equal(t, nodes[0].Data().State.DoneCount, 2)
 }
 
 func TestRepeatFail(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		digraph.Step{
 			Name:    "1",
 			Command: testCommandFail,
@@ -548,19 +549,19 @@ func TestRepeatFail(t *testing.T) {
 			},
 		},
 	)
-	cfg := &Config{LogDir: testHomeDir}
-	scheduler := New(cfg)
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	cfg := &scheduler.Config{LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.Error(t, err)
 
 	nodes := graph.Nodes()
-	require.Equal(t, scheduler.Status(graph), StatusError)
-	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.State.DoneCount, 1)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
+	require.Equal(t, scheduler.NodeStatusError, nodes[0].State().Status)
+	require.Equal(t, nodes[0].Data().State.DoneCount, 1)
 }
 
 func TestStopRepetitiveTaskGracefully(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		digraph.Step{
 			Name:    "1",
 			Command: "sleep",
@@ -571,53 +572,53 @@ func TestStopRepetitiveTaskGracefully(t *testing.T) {
 			},
 		},
 	)
-	cfg := &Config{LogDir: testHomeDir}
-	scheduler := New(cfg)
+	cfg := &scheduler.Config{LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
 	done := make(chan bool)
 	go func() {
 		timer := time.NewTimer(time.Millisecond * 100)
 		defer timer.Stop()
 		<-timer.C
-		scheduler.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
+		sc.Signal(context.Background(), graph, syscall.SIGTERM, done, false)
 	}()
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
 	<-done
 
 	nodes := graph.Nodes()
 
-	require.Equal(t, scheduler.Status(graph), StatusSuccess)
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.State.DoneCount, 1)
+	require.Equal(t, sc.Status(graph), scheduler.StatusSuccess)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, nodes[0].Data().State.DoneCount, 1)
 }
 
 func TestSchedulerStatusText(t *testing.T) {
-	for k, v := range map[Status]string{
-		StatusNone:    "not started",
-		StatusRunning: "running",
-		StatusError:   "failed",
-		StatusCancel:  "canceled",
-		StatusSuccess: "finished",
+	for k, v := range map[scheduler.Status]string{
+		scheduler.StatusNone:    "not started",
+		scheduler.StatusRunning: "running",
+		scheduler.StatusError:   "failed",
+		scheduler.StatusCancel:  "canceled",
+		scheduler.StatusSuccess: "finished",
 	} {
 		require.Equal(t, k.String(), v)
 	}
 
-	for k, v := range map[NodeStatus]string{
-		NodeStatusNone:    "not started",
-		NodeStatusRunning: "running",
-		NodeStatusError:   "failed",
-		NodeStatusCancel:  "canceled",
-		NodeStatusSuccess: "finished",
-		NodeStatusSkipped: "skipped",
+	for k, v := range map[scheduler.NodeStatus]string{
+		scheduler.NodeStatusNone:    "not started",
+		scheduler.NodeStatusRunning: "running",
+		scheduler.NodeStatusError:   "failed",
+		scheduler.NodeStatusCancel:  "canceled",
+		scheduler.NodeStatusSuccess: "finished",
+		scheduler.NodeStatusSkipped: "skipped",
 	} {
 		require.Equal(t, k.String(), v)
 	}
 }
 
 func TestNodeSetupFailure(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		digraph.Step{
 			Name:    "1",
 			Command: "sh",
@@ -625,42 +626,40 @@ func TestNodeSetupFailure(t *testing.T) {
 			Script:  "echo 1",
 		},
 	)
-	cfg := &Config{LogDir: testHomeDir}
-	scheduler := New(cfg)
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	cfg := &scheduler.Config{LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.Error(t, err)
-	require.Equal(t, scheduler.Status(graph), StatusError)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusError, nodes[0].State().Status)
-	require.Equal(t, nodes[0].data.State.DoneCount, 0)
+	require.Equal(t, scheduler.NodeStatusError, nodes[0].State().Status)
+	require.Equal(t, nodes[0].Data().State.DoneCount, 0)
 }
 
 func TestNodeTeardownFailure(t *testing.T) {
-	graph, _ := NewExecutionGraph(
+	graph, _ := scheduler.NewExecutionGraph(
 		digraph.Step{
 			Name:    "1",
 			Command: "sleep",
 			Args:    []string{"1"},
 		},
 	)
-	cfg := &Config{LogDir: testHomeDir}
-	scheduler := New(cfg)
+	cfg := &scheduler.Config{LogDir: testHomeDir}
+	sc := scheduler.New(cfg)
 
 	nodes := graph.Nodes()
 	go func() {
 		time.Sleep(time.Millisecond * 300)
-		nodes[0].mu.Lock()
-		_ = nodes[0].logFile.Close()
-		nodes[0].mu.Unlock()
+		_ = nodes[0].CloseLog()
 	}()
 
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	// file already closed
 	require.Error(t, err)
 
-	require.Equal(t, scheduler.Status(graph), StatusError)
-	require.Equal(t, NodeStatusError, nodes[0].State().Status)
+	require.Equal(t, sc.Status(graph), scheduler.StatusError)
+	require.Equal(t, scheduler.NodeStatusError, nodes[0].State().Status)
 	require.Error(t, nodes[0].State().Error)
 }
 
@@ -672,13 +671,13 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	s2.Script = "echo $PREV_OUT"
 	s2.Output = "TOOK_PREV_OUT"
 
-	graph, scheduler := newTestScheduler(t, &Config{LogDir: testHomeDir}, s1, s2)
-	err := scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
+	graph, sc := newTestScheduler(t, &scheduler.Config{LogDir: testHomeDir}, s1, s2)
+	err := sc.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 	require.NoError(t, err)
 
 	nodes := graph.Nodes()
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusSuccess, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status)
 
 	require.Equal(t, "take-output", os.ExpandEnv("$TOOK_PREV_OUT"))
 }
@@ -699,22 +698,22 @@ func step(name, command string, depends ...string) digraph.Step {
 }
 
 func testSchedule(t *testing.T, steps ...digraph.Step) (
-	*ExecutionGraph, *Scheduler, error,
+	*scheduler.ExecutionGraph, *scheduler.Scheduler, error,
 ) {
 	t.Helper()
 	graph, scheduler := newTestScheduler(t,
-		&Config{
+		&scheduler.Config{
 			MaxActiveRuns: 2,
 			LogDir:        testHomeDir,
 		}, steps...)
 	return graph, scheduler, scheduler.Schedule(schedulerTextCtxWithDagContext(), graph, nil)
 }
 
-func newTestScheduler(t *testing.T, cfg *Config, steps ...digraph.Step) (
-	*ExecutionGraph, *Scheduler,
+func newTestScheduler(t *testing.T, cfg *scheduler.Config, steps ...digraph.Step) (
+	*scheduler.ExecutionGraph, *scheduler.Scheduler,
 ) {
 	t.Helper()
-	graph, err := NewExecutionGraph(steps...)
+	graph, err := scheduler.NewExecutionGraph(steps...)
 	require.NoError(t, err)
-	return graph, New(cfg)
+	return graph, scheduler.New(cfg)
 }

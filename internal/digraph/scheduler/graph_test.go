@@ -1,13 +1,14 @@
 // Copyright (C) 2024 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package scheduler
+package scheduler_test
 
 import (
 	"context"
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,7 @@ func TestCycleDetection(t *testing.T) {
 	step2.Name = "2"
 	step2.Depends = []string{"1"}
 
-	_, err := NewExecutionGraph(step1, step2)
+	_, err := scheduler.NewExecutionGraph(step1, step2)
 
 	if err == nil {
 		t.Fatal("cycle detection should be detected.")
@@ -28,81 +29,80 @@ func TestCycleDetection(t *testing.T) {
 }
 
 func TestRetryExecution(t *testing.T) {
-	nodes := []*Node{
-		{
-			data: NodeData{
+	nodes := []*scheduler.Node{
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "1", Command: "true"},
-				State: NodeState{
-					Status: NodeStatusSuccess,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSuccess,
 				},
-			},
-		},
-		{
-			data: NodeData{
+			}),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "2", Command: "true", Depends: []string{"1"}},
-				State: NodeState{
-					Status: NodeStatusError,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusError,
 				},
 			},
-		},
-		{
-			data: NodeData{
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "3", Command: "true", Depends: []string{"2"}},
-				State: NodeState{
-					Status: NodeStatusCancel,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusCancel,
 				},
 			},
-		},
-		{
-			data: NodeData{
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "4", Command: "true", Depends: []string{}},
-				State: NodeState{
-					Status: NodeStatusSkipped,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSkipped,
 				},
 			},
-		},
-		{
-			data: NodeData{
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "5", Command: "true", Depends: []string{"4"}},
-				State: NodeState{
-					Status: NodeStatusError,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusError,
 				},
 			},
-		},
-		{
-			data: NodeData{
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "6", Command: "true", Depends: []string{"5"}},
-				State: NodeState{
-					Status: NodeStatusSuccess,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSuccess,
 				},
 			},
-		},
-		{
-			data: NodeData{
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "7", Command: "true", Depends: []string{"6"}},
-				State: NodeState{
-					Status: NodeStatusSkipped,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSkipped,
 				},
 			},
-		},
-		{
-			data: NodeData{
+		),
+		scheduler.NodeWithData(
+			scheduler.NodeData{
 				Step: digraph.Step{Name: "8", Command: "true", Depends: []string{}},
-				State: NodeState{
-					Status: NodeStatusSkipped,
+				State: scheduler.NodeState{
+					Status: scheduler.NodeStatusSkipped,
 				},
 			},
-		},
+		),
 	}
 	ctx := context.Background()
-	_, err := CreateRetryExecutionGraph(ctx, nodes...)
+	_, err := scheduler.CreateRetryExecutionGraph(ctx, nodes...)
 	require.NoError(t, err)
-	require.Equal(t, NodeStatusSuccess, nodes[0].State().Status)
-	require.Equal(t, NodeStatusNone, nodes[1].State().Status)
-	require.Equal(t, NodeStatusNone, nodes[2].State().Status)
-	require.Equal(t, NodeStatusSkipped, nodes[3].State().Status)
-	require.Equal(t, NodeStatusNone, nodes[4].State().Status)
-	require.Equal(t, NodeStatusNone, nodes[5].State().Status)
-	require.Equal(t, NodeStatusNone, nodes[6].State().Status)
-	require.Equal(t, NodeStatusSkipped, nodes[7].State().Status)
+	require.Equal(t, scheduler.NodeStatusSuccess, nodes[0].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[1].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[2].State().Status)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[3].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[4].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[5].State().Status)
+	require.Equal(t, scheduler.NodeStatusNone, nodes[6].State().Status)
+	require.Equal(t, scheduler.NodeStatusSkipped, nodes[7].State().Status)
 }
