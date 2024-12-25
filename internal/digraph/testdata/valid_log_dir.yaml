@@ -1,0 +1,4 @@
+logDir: /tmp/logs
+steps:
+  - name: "1"
+    command: "true"

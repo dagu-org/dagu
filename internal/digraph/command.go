@@ -5,6 +5,7 @@ package digraph
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 )
@@ -71,8 +72,15 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 			step.Args = append(step.Args, val)
 		}
 
-		// Setup CmdWithArgs as it is used in command execution
-		step.CmdWithArgs = fmt.Sprintf("%s %v", step.Command, step.Args)
+		// Setup CmdWithArgs (this will be actually used in the command execution)
+		var sb strings.Builder
+		for i, arg := range step.Args {
+			if i > 0 {
+				sb.WriteString(" ")
+			}
+			sb.WriteString(fmt.Sprintf("%q", arg))
+		}
+		step.CmdWithArgs = fmt.Sprintf("%s %s", step.Command, sb.String())
 
 	default:
 		// Unknown type for command field.

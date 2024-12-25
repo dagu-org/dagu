@@ -1,0 +1,7 @@
+steps:
+  - name: "1"
+    command: "true"
+
+mailOn:
+  failure: true
+  success: true

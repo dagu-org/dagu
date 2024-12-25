@@ -17,4 +17,4 @@ infoMail:
   from: "info@example.com"
   to: "user@example.com"
   prefix: "[INFO]"
-  attachLogs: false
+  attachLogs: true
