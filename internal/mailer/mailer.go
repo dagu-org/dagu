@@ -23,15 +23,15 @@ type Mailer struct {
 	password string
 }
 
-// NewMailerArgs is a config for SMTP mailer.
-type NewMailerArgs struct {
+// Config is a config for SMTP mailer.
+type Config struct {
 	Host     string
 	Port     string
 	Username string
 	Password string
 }
 
-func New(cfg *NewMailerArgs) *Mailer {
+func New(cfg Config) *Mailer {
 	return &Mailer{
 		host:     cfg.Host,
 		port:     cfg.Port,

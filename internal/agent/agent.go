@@ -314,7 +314,7 @@ func (a *Agent) setup(ctx context.Context) error {
 
 	a.scheduler = a.newScheduler()
 	a.reporter = newReporter(
-		mailer.New(&mailer.NewMailerArgs{
+		mailer.New(mailer.Config{
 			Host:     a.dag.SMTP.Host,
 			Port:     a.dag.SMTP.Port,
 			Username: a.dag.SMTP.Username,

@@ -45,7 +45,7 @@ func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := mailer.New(&mailer.NewMailerArgs{
+	m := mailer.New(mailer.Config{
 		Host:     dagCtx.DAG.SMTP.Host,
 		Port:     dagCtx.DAG.SMTP.Port,
 		Username: dagCtx.DAG.SMTP.Username,
