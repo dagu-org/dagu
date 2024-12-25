@@ -258,6 +258,7 @@ func processStructFields(v reflect.Value) error {
 			continue
 		}
 
+		// nolint:exhaustive
 		switch field.Kind() {
 		case reflect.String:
 			value := field.String()
