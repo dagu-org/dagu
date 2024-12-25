@@ -252,6 +252,16 @@ func TestSubstituteStringFields(t *testing.T) {
 	}
 }
 
+func TestSubstituteStringFields_AnonymousStruct(t *testing.T) {
+	obj, err := SubstituteStringFields(struct {
+		Field string
+	}{
+		Field: "`echo hello`",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "hello", obj.Field)
+}
+
 func TestSubstituteStringFields_NonStruct(t *testing.T) {
 	_, err := SubstituteStringFields("not a struct")
 	if err == nil {

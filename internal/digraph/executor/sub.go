@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/google/uuid"
@@ -41,10 +42,21 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to get dag context: %w", err)
 	}
 
-	subDAG, err := dagCtx.Finder.Find(ctx, step.SubWorkflow.Name)
+	config, err := cmdutil.SubstituteStringFields(struct {
+		Name   string
+		Params string
+	}{
+		Name:   step.SubWorkflow.Name,
+		Params: step.SubWorkflow.Params,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
+	}
+
+	subDAG, err := dagCtx.Finder.Find(ctx, config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to find subworkflow %q: %w", step.SubWorkflow.Name, err,
+			"failed to find subworkflow %q: %w", config.Name, err,
 		)
 	}
 
@@ -53,13 +65,11 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	params := os.ExpandEnv(step.SubWorkflow.Params)
-
 	args := []string{
 		"start",
 		fmt.Sprintf("--requestID=%s", requestID),
 		"--quiet",
-		fmt.Sprintf("--params=%q", params),
+		fmt.Sprintf("--params=%q", config.Params),
 		subDAG.Location,
 	}
 
