@@ -100,18 +100,6 @@ type Helper struct {
 	tmpDir string
 }
 
-// DataStore creates a new DataStores instance
-func (h Helper) DataStore() persistence.DataStores {
-	return dsclient.NewDataStores(
-		h.Config.Paths.DAGsDir,
-		h.Config.Paths.DataDir,
-		h.Config.Paths.SuspendFlagsDir,
-		dsclient.DataStoreOptions{
-			LatestStatusToday: h.Config.LatestStatusToday,
-		},
-	)
-}
-
 // Cleanup removes temporary test directories
 func (h Helper) Cleanup() {
 	_ = os.RemoveAll(h.tmpDir)
