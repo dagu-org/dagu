@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"golang.org/x/sys/unix"
 )
 
@@ -291,11 +290,7 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 
 // buildLogDir builds the log directory for the DAG.
 func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
-	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(spec.LogDir))
-	if err != nil {
-		return err
-	}
-	dag.LogDir = logDir
+	dag.LogDir = spec.LogDir
 	return err
 }
 
