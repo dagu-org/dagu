@@ -107,7 +107,7 @@ func (n *Node) Data() NodeData {
 	return n.data
 }
 
-func (n *Node) SetError(err error) {
+func (n *Node) setError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.Error = err
@@ -138,7 +138,7 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	n.SetError(cmd.Run(ctx))
+	n.setError(cmd.Run(ctx))
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
 		if err := n.outputWriter.Close(); err != nil {
@@ -260,7 +260,7 @@ func (n *Node) setStatus(status NodeStatus) {
 	n.data.State.Status = status
 }
 
-func (n *Node) setErr(err error) {
+func (n *Node) markError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.Error = err

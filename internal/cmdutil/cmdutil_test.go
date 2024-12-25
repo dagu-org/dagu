@@ -5,6 +5,7 @@ package cmdutil
 
 import (
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -167,4 +168,158 @@ func TestSplitCommandWithParse(t *testing.T) {
 		require.Len(t, args, 1)
 		require.Equal(t, "hello", args[0])
 	})
+}
+
+func TestSubstituteStringFields(t *testing.T) {
+	// Set up test environment variables
+	os.Setenv("TEST_VAR", "test_value")
+	os.Setenv("NESTED_VAR", "nested_value")
+	defer os.Unsetenv("TEST_VAR")
+	defer os.Unsetenv("NESTED_VAR")
+
+	type Nested struct {
+		NestedField   string
+		NestedCommand string
+		unexported    string
+	}
+
+	type TestStruct struct {
+		SimpleField  string
+		EnvField     string
+		CommandField string
+		MultiField   string
+		EmptyField   string
+		unexported   string
+		NestedStruct Nested
+	}
+
+	tests := []struct {
+		name    string
+		input   TestStruct
+		want    TestStruct
+		wantErr bool
+	}{
+		{
+			name: "basic substitution",
+			input: TestStruct{
+				SimpleField:  "hello",
+				EnvField:     "$TEST_VAR",
+				CommandField: "`echo hello`",
+				MultiField:   "$TEST_VAR and `echo command`",
+				EmptyField:   "",
+				NestedStruct: Nested{
+					NestedField:   "$NESTED_VAR",
+					NestedCommand: "`echo nested`",
+					unexported:    "should not change",
+				},
+				unexported: "should not change",
+			},
+			want: TestStruct{
+				SimpleField:  "hello",
+				EnvField:     "test_value",
+				CommandField: "hello",
+				MultiField:   "test_value and command",
+				EmptyField:   "",
+				NestedStruct: Nested{
+					NestedField:   "nested_value",
+					NestedCommand: "nested",
+					unexported:    "should not change",
+				},
+				unexported: "should not change",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid command",
+			input: TestStruct{
+				CommandField: "`invalid_command_that_does_not_exist`",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SubstituteStringFields(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SubstituteStringFields() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SubstituteStringFields() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSubstituteStringFields_NonStruct(t *testing.T) {
+	_, err := SubstituteStringFields("not a struct")
+	if err == nil {
+		t.Error("SubstituteStringFields() should return error for non-struct input")
+	}
+}
+
+func TestSubstituteStringFields_NestedStructs(t *testing.T) {
+	type DeepNested struct {
+		Field string
+	}
+
+	type Nested struct {
+		Field      string
+		DeepNested DeepNested
+	}
+
+	type Root struct {
+		Field  string
+		Nested Nested
+	}
+
+	input := Root{
+		Field: "$TEST_VAR",
+		Nested: Nested{
+			Field: "`echo nested`",
+			DeepNested: DeepNested{
+				Field: "$NESTED_VAR",
+			},
+		},
+	}
+
+	// Set up environment
+	os.Setenv("TEST_VAR", "test_value")
+	os.Setenv("NESTED_VAR", "deep_nested_value")
+	defer os.Unsetenv("TEST_VAR")
+	defer os.Unsetenv("NESTED_VAR")
+
+	want := Root{
+		Field: "test_value",
+		Nested: Nested{
+			Field: "nested",
+			DeepNested: DeepNested{
+				Field: "deep_nested_value",
+			},
+		},
+	}
+
+	got, err := SubstituteStringFields(input)
+	if err != nil {
+		t.Fatalf("SubstituteStringFields() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, want)
+	}
+}
+
+func TestSubstituteStringFields_EmptyStruct(t *testing.T) {
+	type Empty struct{}
+
+	input := Empty{}
+	got, err := SubstituteStringFields(input)
+	if err != nil {
+		t.Fatalf("SubstituteStringFields() error = %v", err)
+	}
+
+	if !reflect.DeepEqual(got, input) {
+		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, input)
+	}
 }

@@ -7,11 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"golang.org/x/sys/unix"
 )
 
@@ -72,15 +70,17 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "env", fn: buildEnvs},
 	{metadata: true, name: "schedule", fn: buildSchedule},
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
-	{metadata: true, name: "mailOn", fn: buildMailOn},
 	{metadata: true, name: "params", fn: buildParams},
+	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
 	{name: "logDir", fn: buildLogDir},
 	{name: "handlers", fn: buildHandlers},
 	{name: "smtpConfig", fn: buildSMTPConfig},
 	{name: "errMailConfig", fn: buildErrMailConfig},
 	{name: "infoMailConfig", fn: buildInfoMailConfig},
-	{name: "miscs", fn: buildMiscs},
+	{name: "maxHistoryRetentionDays", fn: maxHistoryRetentionDays},
+	{name: "maxCleanUpTime", fn: maxCleanUpTime},
+	{name: "preconditions", fn: buildPreconditions},
 }
 
 type builderEntry struct {
@@ -93,6 +93,10 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "command", fn: buildCommand},
 	{name: "executor", fn: buildExecutor},
 	{name: "subworkflow", fn: buildSubWorkflow},
+	{name: "continueOn", fn: buildContinueOn},
+	{name: "retryPolicy", fn: buildRetryPolicy},
+	{name: "repeatPolicy", fn: buildRepeatPolicy},
+	{name: "signalOnStop", fn: buildSignalOnStop},
 }
 
 type stepBuilderEntry struct {
@@ -112,13 +116,14 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 	}
 
 	dag := &DAG{
-		Name:        spec.Name,
-		Group:       spec.Group,
-		Description: spec.Description,
-		Timeout:     time.Second * time.Duration(spec.TimeoutSec),
-		Delay:       time.Second * time.Duration(spec.DelaySec),
-		RestartWait: time.Second * time.Duration(spec.RestartWaitSec),
-		Tags:        parseTags(spec.Tags),
+		Name:          spec.Name,
+		Group:         spec.Group,
+		Description:   spec.Description,
+		Timeout:       time.Second * time.Duration(spec.TimeoutSec),
+		Delay:         time.Second * time.Duration(spec.DelaySec),
+		RestartWait:   time.Second * time.Duration(spec.RestartWaitSec),
+		Tags:          parseTags(spec.Tags),
+		MaxActiveRuns: spec.MaxActiveRuns,
 	}
 
 	var errs errorList
@@ -284,11 +289,7 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 
 // buildLogDir builds the log directory for the DAG.
 func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
-	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(spec.LogDir))
-	if err != nil {
-		return err
-	}
-	dag.LogDir = logDir
+	dag.LogDir = spec.LogDir
 	return err
 }
 
@@ -327,20 +328,22 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	return nil
 }
 
-// buildMiscs builds the miscellaneous fields for the DAG.
-func buildMiscs(_ BuildContext, spec *definition, dag *DAG) (err error) {
+func buildPreconditions(_ BuildContext, spec *definition, dag *DAG) error {
+	dag.Preconditions = buildConditions(spec.Preconditions)
+	return nil
+}
+
+func maxCleanUpTime(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.MaxCleanUpTimeSec != nil {
+		dag.MaxCleanUpTime = time.Second * time.Duration(*spec.MaxCleanUpTimeSec)
+	}
+	return nil
+}
+
+func maxHistoryRetentionDays(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.HistRetentionDays != nil {
 		dag.HistRetentionDays = *spec.HistRetentionDays
 	}
-
-	dag.Preconditions = buildConditions(spec.Preconditions)
-	dag.MaxActiveRuns = spec.MaxActiveRuns
-
-	if spec.MaxCleanUpTimeSec != nil {
-		dag.MaxCleanUpTime = time.Second *
-			time.Duration(*spec.MaxCleanUpTimeSec)
-	}
-
 	return nil
 }
 
@@ -367,10 +370,10 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 // buildSMTPConfig builds the SMTP configuration for the DAG.
 func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
 	dag.SMTP = &SMTPConfig{
-		Host:     os.ExpandEnv(spec.SMTP.Host),
-		Port:     os.ExpandEnv(spec.SMTP.Port),
-		Username: os.ExpandEnv(spec.SMTP.Username),
-		Password: os.ExpandEnv(spec.SMTP.Password),
+		Host:     spec.SMTP.Host,
+		Port:     spec.SMTP.Port,
+		Username: spec.SMTP.Username,
+		Password: spec.SMTP.Password,
 	}
 
 	return nil
@@ -422,33 +425,6 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
 
-	if def.ContinueOn != nil {
-		step.ContinueOn.Skipped = def.ContinueOn.Skipped
-		step.ContinueOn.Failure = def.ContinueOn.Failure
-	}
-
-	if def.RetryPolicy != nil {
-		step.RetryPolicy = &RetryPolicy{
-			Limit:    def.RetryPolicy.Limit,
-			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
-		}
-	}
-
-	if def.RepeatPolicy != nil {
-		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
-		step.RepeatPolicy.Interval = time.Second *
-			time.Duration(def.RepeatPolicy.IntervalSec)
-	}
-
-	if def.SignalOnStop != nil {
-		sigDef := *def.SignalOnStop
-		sig := unix.SignalNum(sigDef)
-		if sig == 0 {
-			return nil, fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
-		}
-		step.SignalOnStop = sigDef
-	}
-
 	// TODO: remove the deprecated call field.
 	if err := parseFuncCall(step, def.Call, fns); err != nil {
 		return nil, err
@@ -461,6 +437,44 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 	}
 
 	return step, nil
+}
+
+func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
+	if def.ContinueOn != nil {
+		step.ContinueOn.Skipped = def.ContinueOn.Skipped
+		step.ContinueOn.Failure = def.ContinueOn.Failure
+	}
+	return nil
+}
+
+func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
+	if def.RetryPolicy != nil {
+		step.RetryPolicy = &RetryPolicy{
+			Limit:    def.RetryPolicy.Limit,
+			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
+		}
+	}
+	return nil
+}
+
+func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
+	if def.RepeatPolicy != nil {
+		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
+		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+	}
+	return nil
+}
+
+func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
+	if def.SignalOnStop != nil {
+		sigDef := *def.SignalOnStop
+		sig := unix.SignalNum(sigDef)
+		if sig == 0 {
+			return fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
+		}
+		step.SignalOnStop = sigDef
+	}
+	return nil
 }
 
 // commandRun is not a actual command.

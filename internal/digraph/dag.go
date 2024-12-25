@@ -45,9 +45,6 @@ type DAG struct {
 	// replaced with '_').
 	LogDir string `json:"LogDir"`
 
-	// LogFormat is the format of the log (text or json).
-	LogFormat string `json:"LogFormat"`
-
 	// Parameters configuration.
 	// The DAG definition contains only DefaultParams. Params are automatically
 	// set by the DAG loader.

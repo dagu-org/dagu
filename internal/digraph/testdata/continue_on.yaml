@@ -1,0 +1,6 @@
+steps:
+  - name: "1"
+    command: "echo 1"
+    continueOn:
+      skipped: true
+      failure: true

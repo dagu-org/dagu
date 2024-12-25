@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"strings"
 	"unicode"
@@ -228,4 +229,51 @@ func GetShellCommand(configuredShell string) string {
 	}
 
 	return ""
+}
+
+// SubstituteStringFields processes all string fields in a struct by expanding environment
+// variables and substituting command outputs. It takes a struct value and returns a new
+// modified struct value.
+func SubstituteStringFields[T any](obj T) (T, error) {
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Struct {
+		return obj, fmt.Errorf("input must be a struct, got %T", obj)
+	}
+
+	modified := reflect.New(v.Type()).Elem()
+	modified.Set(v)
+
+	if err := processStructFields(modified); err != nil {
+		return obj, fmt.Errorf("failed to process fields: %w", err)
+	}
+
+	return modified.Interface().(T), nil
+}
+
+func processStructFields(v reflect.Value) error {
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if !field.CanSet() {
+			continue
+		}
+
+		// nolint:exhaustive
+		switch field.Kind() {
+		case reflect.String:
+			value := field.String()
+			value = os.ExpandEnv(value)
+			processed, err := SubstituteCommands(value)
+			if err != nil {
+				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
+			}
+			field.SetString(processed)
+
+		case reflect.Struct:
+			if err := processStructFields(field); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

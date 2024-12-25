@@ -15,317 +15,326 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuilder_Build(t *testing.T) {
-	tests := []testCase{
-		{
-			Name:        "NoName",
-			InputFile:   "no_name.yaml",
-			ExpectedErr: errStepNameRequired,
-		},
-		{
-			Name:        "NoCommand",
-			InputFile:   "no_command.yaml",
-			ExpectedErr: errStepCommandIsRequired,
-		},
-		{
-			Name:        "InvalidEnv",
-			InputFile:   "invalid_env.yaml",
-			ExpectedErr: errInvalidEnvValue,
-		},
-		{
-			Name:        "InvalidParams",
-			InputFile:   "invalid_params.yaml",
-			ExpectedErr: errInvalidParamValue,
-		},
-		{
-			Name:        "InvalidSchedule",
-			InputFile:   "invalid_schedule.yaml",
-			ExpectedErr: errInvalidSchedule,
-		},
-		{
-			Name:      "ValidEnv",
-			InputFile: "valid_env.yaml",
-			Expected: map[string]any{
-				"env": map[string]string{"FOO": "123"},
-			},
-		},
-		{
-			Name:      "ValidEnvWithSubstitution",
-			InputFile: "valid_env_substitution.yaml",
-			Expected: map[string]any{
-				"env": map[string]string{"VAR": "123"},
-			},
-		},
-		{
-			Name:      "ValidEnvWithSubstitutionAndEnv",
-			InputFile: "valid_env_substitution_and_env.yaml",
-			Expected: map[string]any{
-				"env": map[string]string{"FOO": "BAR:BAZ:BAR:FOO"},
-			},
-		},
-		{
-			Name:      "ValidCommand",
-			InputFile: "valid_command.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"command": "echo",
-						"args":    []string{"1"},
-						"name":    "step 1",
-					},
-				},
-			},
-		},
-		{
-			Name:      "ValidCommandInArray",
-			InputFile: "valid_command_in_array.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"command": "echo",
-						"args":    []string{"1"},
-						"name":    "step 1",
-					},
-				},
-			},
-		},
-		{
-			Name:      "ValidCommandInList",
-			InputFile: "valid_command_in_list.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"command": "echo",
-						"args":    []string{"1"},
-						"name":    "step 1",
-					},
-				},
-			},
-		},
-		{
-			Name:      "ValidTags",
-			InputFile: "valid_tags.yaml",
-			Expected: map[string]any{
-				"tags": []string{"daily", "monthly"},
-			},
-		},
-		{
-			Name:      "ValidTagsList",
-			InputFile: "valid_tags_list.yaml",
-			Expected: map[string]any{
-				"tags": []string{"daily", "monthly"},
-			},
-		},
-		{
-			Name:      "ValidSchedule",
-			InputFile: "valid_schedule.yaml",
-			Expected: map[string]any{
-				"schedule": map[string][]string{
-					"start":   {"0 1 * * *"},
-					"stop":    {"0 2 * * *"},
-					"restart": {"0 12 * * *"},
-				},
-			},
-		},
-		{
-			Name:      "ScheduleInList",
-			InputFile: "schedule_in_list.yaml",
-			Expected: map[string]any{
-				"schedule": map[string][]string{
-					"start": {
-						"0 1 * * *",
-						"0 18 * * *",
-					},
-				},
-			},
-		},
-		{
-			Name:      "ScheduleWithMultipleValues",
-			InputFile: "schedule_with_multiple_values.yaml",
-			Expected: map[string]any{
-				"schedule": map[string][]string{
-					"start": {
-						"0 1 * * *",
-						"0 18 * * *",
-					},
-					"stop": {
-						"0 2 * * *",
-						"0 20 * * *",
-					},
-					"restart": {
-						"0 12 * * *",
-						"0 22 * * *",
-					},
-				},
-			},
-		},
-		{
-			Name:      "HTTPExecutor",
-			InputFile: "http_executor.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"executor": "http",
-					},
-				},
-			},
-		},
-		{
-			Name:      "HTTPExecutorWithConfig",
-			InputFile: "http_executor_with_config.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"executor": "http",
-						"executorConfig": map[string]any{
-							"key": "value",
-							"map": map[string]any{
-								"foo": "bar",
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			Name:      "SignalOnStop",
-			InputFile: "signal_on_stop.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"signalOnStop": "SIGINT",
-					},
-				},
-			},
-		},
-		{
-			Name:      "ParamsWithSubstitution",
-			InputFile: "params_with_substitution.yaml",
-			Expected: map[string]any{
-				"env": map[string]string{
-					"1": "x",
-					"2": "x",
-				},
-			},
-		},
-		{
-			Name:      "ParamsWithQuotedValues",
-			InputFile: "params_with_quoted_values.yaml",
-			Expected: map[string]any{
-				"env": map[string]string{
-					"x": "a b c",
-					"y": "d e f",
-				},
-			},
-		},
-		{
-			Name:      "ParamsWithComplexValues",
-			InputFile: "params_with_complex_values.yaml",
-			Expected: map[string]any{
-				"env": map[string]string{
-					"P1": "foo",
-					"P2": "TEXT",
-					"P3": "BAR",
-					"X":  "bar",
-					"Y":  "foo",
-					"Z":  "A B C",
-					"1":  "first",
-					"2":  `P1=foo`,
-					"3":  `P2=TEXT`,
-					"4":  `P3=BAR`,
-					"5":  `X=bar`,
-					"6":  `Y=foo`,
-					"7":  `Z=A B C`,
-				},
-			},
-		},
-		{
-			Name:      "ValidHandlers",
-			InputFile: "valid_handlers.yaml",
-			Expected: map[string]any{
-				"handlers": map[string]stepTestCase{
-					"exit": {
-						"name":    "onExit",
-						"command": "echo",
-						"args":    []string{"exit"},
-					},
-					"success": {
-						"name":    "onSuccess",
-						"command": "echo",
-						"args":    []string{"success"},
-					},
-					"failure": {
-						"name":    "onFailure",
-						"command": "echo",
-						"args":    []string{"failure"},
-					},
-					"cancel": {
-						"name":    "onCancel",
-						"command": "echo",
-						"args":    []string{"cancel"},
-					},
-				},
-			},
-		},
-		{
-			Name:      "ValidMailConfig",
-			InputFile: "valid_mail_config.yaml",
-			Expected: map[string]any{
-				"smtp": map[string]string{
-					"host":     "smtp.example.com",
-					"port":     "587",
-					"username": "user@example.com",
-					"password": "password",
-				},
-				"errorMail": map[string]any{
-					"from":       "error@example.com",
-					"to":         "admin@example.com",
-					"prefix":     "[ERROR]",
-					"attachLogs": true,
-				},
-				"infoMail": map[string]any{
-					"from":       "info@example.com",
-					"to":         "user@example.com",
-					"prefix":     "[INFO]",
-					"attachLogs": false,
-				},
-			},
-		},
-		{
-			Name:      "ValidSubWorkflow",
-			InputFile: "valid_subworkflow.yaml",
-			Expected: map[string]any{
-				"steps": []stepTestCase{
-					{
-						"name":     "sub_workflow_step",
-						"command":  "run",
-						"args":     []string{"sub_dag", "param1=value1 param2=value2"},
-						"executor": "subworkflow",
-						"subWorkflow": map[string]string{
-							"name":   "sub_dag",
-							"params": "param1=value1 param2=value2",
-						},
-					},
-				},
-			},
-		},
-		{
-			Name:      "ValidMiscs",
-			InputFile: "valid_miscs.yaml",
-			Expected: map[string]any{
-				"histRetentionDays": 7,
-				"maxActiveRuns":     3,
-				"maxCleanUpTime":    time.Duration(300 * time.Second),
-				"preconditions": []Condition{
-					{Condition: "test -f file.txt", Expected: "true"},
-				},
-			},
-		},
+type testHelper struct {
+	t         *testing.T
+	buildOpts buildOpts
+	*DAG
+}
+
+func (th *testHelper) AssertEnv(t *testing.T, key, val string) {
+	th.t.Helper()
+
+	for _, env := range th.Env {
+		if env == key+"="+val {
+			return
+		}
+	}
+	t.Errorf("expected env %s=%s not found", key, val)
+}
+
+func (th *testHelper) AssertParam(t *testing.T, params ...string) {
+	th.t.Helper()
+
+	assert.Len(t, th.Params, len(params), "expected %d params, got %d", len(params), len(th.Params))
+	for i, p := range params {
+		assert.Equal(t, p, th.Params[i])
+	}
+}
+
+type testOption func(*testHelper)
+
+func loadTestYAML(t *testing.T, inputFile string, opts ...testOption) *testHelper {
+	t.Helper()
+	ctx := context.Background()
+
+	th := &testHelper{t: t}
+
+	for _, opt := range opts {
+		opt(th)
 	}
 
-	for _, tc := range tests {
-		runTest(t, tc)
+	dag, err := loadYAML(ctx, readTestFile(t, inputFile), th.buildOpts)
+	require.NoError(t, err, "failed to load YAML %s", inputFile)
+
+	th.DAG = dag
+	return th
+}
+
+func loadTestYAMLError(t *testing.T, inputFile string, expectedErr error, opts ...testOption) {
+	t.Helper()
+	ctx := context.Background()
+
+	th := &testHelper{t: t}
+
+	for _, opt := range opts {
+		opt(th)
 	}
+
+	_, err := loadYAML(ctx, readTestFile(t, inputFile), th.buildOpts)
+	assert.Error(t, err, "expected error %v, got nil", expectedErr)
+	if errs, ok := err.(*errorList); ok && len(*errs) > 0 {
+		// check if the error is in the list of errors
+		found := false
+		for _, e := range *errs {
+			if errors.Is(e, expectedErr) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected error %v, got %v", expectedErr, err)
+		}
+	} else if !errors.Is(err, expectedErr) {
+		t.Errorf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestBuildDAGError(t *testing.T) {
+	t.Parallel()
+	t.Run("NoName", func(t *testing.T) {
+		loadTestYAMLError(t, "invalid_no_name.yaml", errStepNameRequired)
+	})
+	t.Run("InvalidEnv", func(t *testing.T) {
+		loadTestYAMLError(t, "invalid_env.yaml", errInvalidEnvValue)
+	})
+	t.Run("InvalidParams", func(t *testing.T) {
+		loadTestYAMLError(t, "invalid_params.yaml", errInvalidParamValue)
+	})
+	t.Run("InvalidSchedule", func(t *testing.T) {
+		loadTestYAMLError(t, "invalid_schedule.yaml", errInvalidSchedule)
+	})
+}
+
+func TestBuildStepError(t *testing.T) {
+	t.Parallel()
+	t.Run("NoCommand", func(t *testing.T) {
+		loadTestYAMLError(t, "invalid_no_command.yaml", errStepCommandIsRequired)
+	})
+}
+
+func TestBuildDAG(t *testing.T) {
+	t.Parallel()
+	t.Run("ValidEnv", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_env.yaml")
+		th.AssertEnv(t, "FOO", "123")
+	})
+	t.Run("ValidEnvWithSubstitution", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_env_substitution.yaml")
+		// find the env key in the map
+		var found bool
+		for _, env := range th.Env {
+			if env == "VAR=123" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected env key not found")
+	})
+	t.Run("ValidEnvWithSubstitutionAndEnv", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_env_substitution_and_env.yaml")
+		// find the env key in the map
+		var found bool
+		for _, env := range th.Env {
+			if env == "FOO=BAR:BAZ:BAR:FOO" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected env key not found")
+	})
+	t.Run("ValidSchedule", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_schedule.yaml")
+		assert.Len(t, th.Schedule, 1)
+		assert.Equal(t, "0 1 * * *", th.Schedule[0].Expression)
+
+		assert.Len(t, th.StopSchedule, 1)
+		assert.Equal(t, "0 2 * * *", th.StopSchedule[0].Expression)
+
+		assert.Len(t, th.RestartSchedule, 1)
+		assert.Equal(t, "0 12 * * *", th.RestartSchedule[0].Expression)
+	})
+	t.Run("ScheduleInList", func(t *testing.T) {
+		th := loadTestYAML(t, "schedule_in_list.yaml")
+		assert.Len(t, th.Schedule, 2)
+		assert.Equal(t, "0 1 * * *", th.Schedule[0].Expression)
+		assert.Equal(t, "0 18 * * *", th.Schedule[1].Expression)
+	})
+	t.Run("ScheduleWithMultipleValues", func(t *testing.T) {
+		th := loadTestYAML(t, "schedule_with_multiple_values.yaml")
+		assert.Len(t, th.Schedule, 2)
+		assert.Equal(t, "0 1 * * *", th.Schedule[0].Expression)
+		assert.Equal(t, "0 18 * * *", th.Schedule[1].Expression)
+
+		assert.Len(t, th.StopSchedule, 2)
+		assert.Equal(t, "0 2 * * *", th.StopSchedule[0].Expression)
+		assert.Equal(t, "0 20 * * *", th.StopSchedule[1].Expression)
+
+		assert.Len(t, th.RestartSchedule, 2)
+		assert.Equal(t, "0 12 * * *", th.RestartSchedule[0].Expression)
+		assert.Equal(t, "0 22 * * *", th.RestartSchedule[1].Expression)
+	})
+	t.Run("SkipIfSuccessful", func(t *testing.T) {
+		th := loadTestYAML(t, "skip_if_successful.yaml")
+		assert.True(t, th.SkipIfSuccessful)
+	})
+	t.Run("ParamsWithSubstitution", func(t *testing.T) {
+		th := loadTestYAML(t, "params_with_substitution.yaml")
+		th.AssertParam(t, "x", "x")
+	})
+	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
+		th := loadTestYAML(t, "params_with_quoted_values.yaml")
+		th.AssertParam(t, "x=a b c", "y=d e f")
+	})
+	t.Run("ParamsWithComplexValues", func(t *testing.T) {
+		th := loadTestYAML(t, "params_with_complex_values.yaml")
+		th.AssertParam(t,
+			"first",
+			"P1=foo",
+			"P2=TEXT",
+			"P3=BAR",
+			"X=bar",
+			"Y=foo",
+			"Z=A B C",
+		)
+	})
+	t.Run("mailOn", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_mail_on.yaml")
+		assert.True(t, th.MailOn.Failure)
+		assert.True(t, th.MailOn.Success)
+	})
+	t.Run("ValidTags", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_tags.yaml")
+		assert.True(t, th.HasTag("daily"))
+		assert.True(t, th.HasTag("monthly"))
+	})
+	t.Run("ValidTagsList", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_tags_list.yaml")
+		assert.True(t, th.HasTag("daily"))
+		assert.True(t, th.HasTag("monthly"))
+	})
+	t.Run("LogDir", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_log_dir.yaml")
+		assert.Equal(t, "/tmp/logs", th.LogDir)
+	})
+	t.Run("MailConfig", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_mail_config.yaml")
+		assert.Equal(t, "smtp.example.com", th.SMTP.Host)
+		assert.Equal(t, "587", th.SMTP.Port)
+		assert.Equal(t, "user@example.com", th.SMTP.Username)
+		assert.Equal(t, "password", th.SMTP.Password)
+
+		assert.Equal(t, "error@example.com", th.ErrorMail.From)
+		assert.Equal(t, "admin@example.com", th.ErrorMail.To)
+		assert.Equal(t, "[ERROR]", th.ErrorMail.Prefix)
+		assert.True(t, th.ErrorMail.AttachLogs)
+
+		assert.Equal(t, "info@example.com", th.InfoMail.From)
+		assert.Equal(t, "user@example.com", th.InfoMail.To)
+		assert.Equal(t, "[INFO]", th.InfoMail.Prefix)
+		assert.True(t, th.InfoMail.AttachLogs)
+	})
+	t.Run("MaxHistRetentionDays", func(t *testing.T) {
+		th := loadTestYAML(t, "hist_retention_days.yaml")
+		assert.Equal(t, 365, th.HistRetentionDays)
+	})
+	t.Run("CleanUpTime", func(t *testing.T) {
+		th := loadTestYAML(t, "max_cleanup_time.yaml")
+		assert.Equal(t, time.Duration(10*time.Second), th.MaxCleanUpTime)
+	})
+	t.Run("Preconditions", func(t *testing.T) {
+		th := loadTestYAML(t, "preconditions.yaml")
+		assert.Len(t, th.Preconditions, 1)
+		assert.Equal(t, Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
+	})
+	t.Run("MaxActiveRuns", func(t *testing.T) {
+		th := loadTestYAML(t, "max_active_runs.yaml")
+		assert.Equal(t, 3, th.MaxActiveRuns)
+	})
+}
+
+func TestBuildStep(t *testing.T) {
+	t.Parallel()
+	t.Run("ValidCommand", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_command.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "echo 1", th.Steps[0].CmdWithArgs)
+		assert.Equal(t, "echo", th.Steps[0].Command)
+		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
+		assert.Equal(t, "step 1", th.Steps[0].Name)
+	})
+	t.Run("ValidCommandInArray", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_command_in_array.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, `echo "1"`, th.Steps[0].CmdWithArgs)
+		assert.Equal(t, "echo", th.Steps[0].Command)
+		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
+		assert.Equal(t, "step 1", th.Steps[0].Name)
+	})
+	t.Run("ValidCommandInList", func(t *testing.T) {
+		th := loadTestYAML(t, "valid_command_in_list.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, `echo "1"`, th.Steps[0].CmdWithArgs)
+		assert.Equal(t, "echo", th.Steps[0].Command)
+		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
+		assert.Equal(t, "step 1", th.Steps[0].Name)
+	})
+	t.Run("HTTPExecutor", func(t *testing.T) {
+		th := loadTestYAML(t, "http_executor.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "http", th.Steps[0].ExecutorConfig.Type)
+	})
+	t.Run("HTTPExecutorWithConfig", func(t *testing.T) {
+		th := loadTestYAML(t, "http_executor_with_config.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "http", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, map[string]any{
+			"key": "value",
+			"map": map[string]any{
+				"foo": "bar",
+			},
+		}, th.Steps[0].ExecutorConfig.Config)
+	})
+	t.Run("SubWorkflow", func(t *testing.T) {
+		th := loadTestYAML(t, "subworkflow.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "subworkflow", th.Steps[0].ExecutorConfig.Type)
+		assert.Equal(t, "run", th.Steps[0].Command)
+		assert.Equal(t, []string{
+			"sub_dag",
+			"param1=value1 param2=value2",
+		}, th.Steps[0].Args)
+	})
+	t.Run("ContinueOn", func(t *testing.T) {
+		th := loadTestYAML(t, "continue_on.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.True(t, th.Steps[0].ContinueOn.Failure)
+		assert.True(t, th.Steps[0].ContinueOn.Skipped)
+	})
+	t.Run("RetryPolicy", func(t *testing.T) {
+		th := loadTestYAML(t, "retry_policy.yaml")
+		assert.Len(t, th.Steps, 1)
+		require.NotNil(t, th.Steps[0].RetryPolicy)
+		assert.Equal(t, 3, th.Steps[0].RetryPolicy.Limit)
+		assert.Equal(t, 10*time.Second, th.Steps[0].RetryPolicy.Interval)
+	})
+	t.Run("RepeatPolicy", func(t *testing.T) {
+		th := loadTestYAML(t, "repeat_policy.yaml")
+		assert.Len(t, th.Steps, 1)
+		require.NotNil(t, th.Steps[0].RepeatPolicy)
+		assert.True(t, th.Steps[0].RepeatPolicy.Repeat)
+		assert.Equal(t, 60*time.Second, th.Steps[0].RepeatPolicy.Interval)
+	})
+	t.Run("SignalOnStop", func(t *testing.T) {
+		th := loadTestYAML(t, "signal_on_stop.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Equal(t, "SIGINT", th.Steps[0].SignalOnStop)
+	})
+	t.Run("Preconditions", func(t *testing.T) {
+		th := loadTestYAML(t, "step_preconditions.yaml")
+		assert.Len(t, th.Steps, 1)
+		assert.Len(t, th.Steps[0].Preconditions, 1)
+		assert.Equal(t, Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+	})
 }
 
 func TestOverrideBaseConfig(t *testing.T) {
@@ -356,173 +365,9 @@ func TestOverrideBaseConfig(t *testing.T) {
 	})
 }
 
-type testCase struct {
-	Name        string
-	InputFile   string
-	Expected    map[string]any
-	ExpectedErr error
-}
-
-type stepTestCase map[string]any
-
 func readTestFile(t *testing.T, filename string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(testdataDir, filename))
 	require.NoError(t, err)
 	return data
-}
-
-func runTest(t *testing.T, tc testCase) {
-	t.Helper()
-	dag, err := loadYAML(context.Background(), readTestFile(t, tc.InputFile), buildOpts{})
-
-	if tc.ExpectedErr != nil {
-		assert.Error(t, err)
-		if errs, ok := err.(*errorList); ok && len(*errs) > 0 {
-			// check if the error is in the list of errors
-			found := false
-			for _, e := range *errs {
-				if errors.Is(e, tc.ExpectedErr) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
-			}
-		} else if !errors.Is(err, tc.ExpectedErr) {
-			t.Errorf("expected error %v, got %v", tc.ExpectedErr, err)
-		}
-		return
-	}
-
-	require.NoError(t, err)
-	for k, v := range tc.Expected {
-		switch k {
-		case "steps":
-			stepTestCases := v.([]stepTestCase)
-			require.Len(t, dag.Steps, len(stepTestCases))
-			for i, step := range dag.Steps {
-				testStep(t, step, stepTestCases[i])
-			}
-		case "env":
-			for envKey, envVal := range v.(map[string]string) {
-				assert.Equal(t, envVal, os.Getenv(envKey))
-			}
-		case "tags":
-			for _, tag := range v.([]string) {
-				assert.True(t, dag.HasTag(tag))
-			}
-		case "schedule":
-			schedules := v.(map[string][]string)
-			for scheduleType, expressions := range schedules {
-				var actual []Schedule
-				switch scheduleKey(scheduleType) {
-				case scheduleKeyStart:
-					actual = dag.Schedule
-				case scheduleKeyStop:
-					actual = dag.StopSchedule
-				case scheduleKeyRestart:
-					actual = dag.RestartSchedule
-				}
-				assert.Len(t, actual, len(expressions))
-				for i, expr := range expressions {
-					assert.Equal(t, expr, actual[i].Expression)
-				}
-			}
-		case "histRetentionDays":
-			assert.Equal(t, v.(int), dag.HistRetentionDays)
-		case "maxActiveRuns":
-			assert.Equal(t, v.(int), dag.MaxActiveRuns)
-		case "maxCleanUpTime":
-			assert.Equal(t, v.(time.Duration), dag.MaxCleanUpTime)
-		case "preconditions":
-			assert.Equal(t, v.([]Condition), dag.Preconditions)
-		case "handlers":
-			for handlerName, handler := range v.(map[string]stepTestCase) {
-				switch handlerName {
-				case "exit":
-					testStep(t, *dag.HandlerOn.Exit, handler)
-				case "success":
-					testStep(t, *dag.HandlerOn.Success, handler)
-				case "failure":
-					testStep(t, *dag.HandlerOn.Failure, handler)
-				case "cancel":
-					testStep(t, *dag.HandlerOn.Cancel, handler)
-				default:
-					panic("unexpected handler: " + handlerName)
-				}
-			}
-		case "smtp":
-			for key, val := range v.(map[string]string) {
-				switch key {
-				case "host":
-					assert.Equal(t, val, dag.SMTP.Host)
-				case "port":
-					assert.Equal(t, val, dag.SMTP.Port)
-				case "username":
-					assert.Equal(t, val, dag.SMTP.Username)
-				case "password":
-					assert.Equal(t, val, dag.SMTP.Password)
-				default:
-					panic("unexpected smtp key: " + key)
-				}
-			}
-		case "errorMail":
-			testMailConfig(t, *dag.ErrorMail, v.(map[string]any))
-		case "infoMail":
-			testMailConfig(t, *dag.InfoMail, v.(map[string]any))
-		default:
-			panic("unexpected key: " + k)
-		}
-	}
-}
-
-func testMailConfig(t *testing.T, mailConfig MailConfig, tc map[string]any) {
-	for key, val := range tc {
-		switch key {
-		case "from":
-			assert.Equal(t, val, mailConfig.From)
-		case "to":
-			assert.Equal(t, val, mailConfig.To)
-		case "prefix":
-			assert.Equal(t, val, mailConfig.Prefix)
-		case "attachLogs":
-			assert.Equal(t, val, mailConfig.AttachLogs)
-		default:
-			t.Errorf("unexpected mail key: %s", key)
-		}
-	}
-}
-
-func testStep(t *testing.T, step Step, tc stepTestCase) {
-	for k, v := range tc {
-		switch k {
-		case "name":
-			assert.Equal(t, v.(string), step.Name)
-		case "command":
-			assert.Equal(t, v.(string), step.Command)
-		case "args":
-			assert.Equal(t, v.([]string), step.Args)
-		case "executorConfig":
-			assert.Equal(t, v.(map[string]any), step.ExecutorConfig.Config)
-		case "executor":
-			assert.Equal(t, v.(string), step.ExecutorConfig.Type)
-		case "signalOnStop":
-			assert.Equal(t, v.(string), step.SignalOnStop)
-		case "subWorkflow":
-			for k, val := range v.(map[string]string) {
-				switch k {
-				case "name":
-					assert.Equal(t, val, step.SubWorkflow.Name)
-				case "params":
-					assert.Equal(t, val, step.SubWorkflow.Params)
-				default:
-					panic("unexpected subworkflow key: " + k)
-				}
-			}
-		default:
-			panic("unexpected key: " + k)
-		}
-	}
 }

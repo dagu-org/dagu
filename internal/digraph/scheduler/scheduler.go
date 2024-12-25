@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -129,7 +130,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				if err := digraph.EvalConditions(node.data.Step.Preconditions); err != nil {
 					logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.data.Step.Name)
 					node.setStatus(NodeStatusSkipped)
-					node.SetError(err)
+					node.setError(err)
 					continue NodesIteration
 				}
 			}
@@ -140,6 +141,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 			node.setStatus(NodeStatusRunning)
 			go func(node *Node) {
 				defer func() {
+					if panicObj := recover(); panicObj != nil {
+						stack := string(debug.Stack())
+						err := fmt.Errorf("panic recovered: %v\n%s", panicObj, stack)
+						logger.Error(ctx, "Panic occurred", "error", err, "step", node.data.Step.Name, "stack", stack)
+						node.markError(err)
+						sc.setLastError(err)
+					}
+				}()
+
+				defer func() {
 					node.finish()
 					wg.Done()
 				}()
@@ -147,8 +158,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				setupSucceed := true
 				if err := sc.setupNode(node); err != nil {
 					setupSucceed = false
-					sc.lastError = err
-					node.setErr(err)
+					sc.setLastError(err)
+					node.markError(err)
 				}
 
 				defer func() {
@@ -183,7 +194,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						default:
 							// finish the node
 							node.setStatus(NodeStatusError)
-							node.setErr(execErr)
+							node.markError(execErr)
 							sc.setLastError(execErr)
 
 						}
@@ -446,14 +457,14 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			if !n.data.Step.ContinueOn.Failure {
 				ready = false
 				node.setStatus(NodeStatusCancel)
-				node.SetError(errUpstreamFailed)
+				node.setError(errUpstreamFailed)
 			}
 
 		case NodeStatusSkipped:
 			if !n.data.Step.ContinueOn.Skipped {
 				ready = false
 				node.setStatus(NodeStatusSkipped)
-				node.SetError(errUpstreamSkipped)
+				node.setError(errUpstreamSkipped)
 			}
 
 		case NodeStatusCancel:

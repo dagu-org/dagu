@@ -1,0 +1,6 @@
+steps:
+  - name: "2"
+    command: "echo 2"
+    retryPolicy:
+      limit: 3
+      intervalSec: 10
