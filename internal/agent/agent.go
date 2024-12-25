@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -140,12 +141,12 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to setup unix socket server: %w", err)
 	}
 	listenerErrCh := make(chan error)
-	go func() {
+	go execWithRecovery(ctx, func() {
 		err := a.socketServer.Serve(ctx, listenerErrCh)
 		if err != nil && !errors.Is(err, sock.ErrServerRequestedShutdown) {
 			logger.Error(ctx, "Failed to start socket frontend", "err", err)
 		}
-	}()
+	})
 
 	// Stop the socket server when finishing the DAG execution.
 	defer func() {
@@ -164,7 +165,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// example, when started, stopped, or cancelled, etc.
 	done := make(chan *scheduler.Node)
 	defer close(done)
-	go func() {
+	go execWithRecovery(ctx, func() {
 		for node := range done {
 			status := a.Status()
 			if err := a.historyStore.Write(ctx, status); err != nil {
@@ -174,11 +175,11 @@ func (a *Agent) Run(ctx context.Context) error {
 				logger.Error(ctx, "Failed to report step", "err", err)
 			}
 		}
-	}()
+	})
 
 	// Write the first status just after the start to store the running status.
 	// If the DAG is already finished, skip it.
-	go func() {
+	go execWithRecovery(ctx, func() {
 		time.Sleep(waitForRunning)
 		if a.finished.Load() {
 			return
@@ -186,7 +187,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if err := a.historyStore.Write(ctx, a.Status()); err != nil {
 			logger.Error(ctx, "Status write failed", "err", err)
 		}
-	}()
+	})
 
 	// Start the DAG execution.
 	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
@@ -499,6 +500,21 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 		)
 	}
 	return nil
+}
+
+func execWithRecovery(ctx context.Context, fn func()) {
+	defer func() {
+		if panicObj := recover(); panicObj != nil {
+			err, ok := panicObj.(error)
+			if !ok {
+				err = fmt.Errorf("panic: %v", panicObj)
+			}
+			st := string(debug.Stack())
+			logger.Error(ctx, "Panic occurred", "err", err, "st", st)
+		}
+	}()
+
+	fn()
 }
 
 type httpError struct {
