@@ -93,6 +93,10 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "command", fn: buildCommand},
 	{name: "executor", fn: buildExecutor},
 	{name: "subworkflow", fn: buildSubWorkflow},
+	{name: "continueOn", fn: buildContinueOn},
+	{name: "retryPolicy", fn: buildRetryPolicy},
+	{name: "repeatPolicy", fn: buildRepeatPolicy},
+	{name: "signalOnStop", fn: buildSignalOnStop},
 }
 
 type stepBuilderEntry struct {
@@ -422,33 +426,6 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
 
-	if def.ContinueOn != nil {
-		step.ContinueOn.Skipped = def.ContinueOn.Skipped
-		step.ContinueOn.Failure = def.ContinueOn.Failure
-	}
-
-	if def.RetryPolicy != nil {
-		step.RetryPolicy = &RetryPolicy{
-			Limit:    def.RetryPolicy.Limit,
-			Interval: time.Second * time.Duration(def.RetryPolicy.IntervalSec),
-		}
-	}
-
-	if def.RepeatPolicy != nil {
-		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
-		step.RepeatPolicy.Interval = time.Second *
-			time.Duration(def.RepeatPolicy.IntervalSec)
-	}
-
-	if def.SignalOnStop != nil {
-		sigDef := *def.SignalOnStop
-		sig := unix.SignalNum(sigDef)
-		if sig == 0 {
-			return nil, fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
-		}
-		step.SignalOnStop = sigDef
-	}
-
 	// TODO: remove the deprecated call field.
 	if err := parseFuncCall(step, def.Call, fns); err != nil {
 		return nil, err
@@ -461,6 +438,42 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 	}
 
 	return step, nil
+}
+
+func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
+	if def.ContinueOn != nil {
+		step.ContinueOn.Skipped = def.ContinueOn.Skipped
+		step.ContinueOn.Failure = def.ContinueOn.Failure
+	}
+	return nil
+}
+
+func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
+	if def.RetryPolicy != nil {
+		step.RetryPolicy.Limit = def.RetryPolicy.Limit
+		step.RetryPolicy.Interval = time.Second * time.Duration(def.RetryPolicy.IntervalSec)
+	}
+	return nil
+}
+
+func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
+	if def.RepeatPolicy != nil {
+		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
+		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
+	}
+	return nil
+}
+
+func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
+	if def.SignalOnStop != nil {
+		sigDef := *def.SignalOnStop
+		sig := unix.SignalNum(sigDef)
+		if sig == 0 {
+			return fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
+		}
+		step.SignalOnStop = sigDef
+	}
+	return nil
 }
 
 // commandRun is not a actual command.
