@@ -30,7 +30,7 @@ func TestClient_GetStatus(t *testing.T) {
 
 		filePath := testDAG("sleep1.yaml")
 
-		cli := th.Client()
+		cli := th.GetClient()
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, filePath)
 		require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestClient_GetStatus(t *testing.T) {
 	t.Run("InvalidDAGName", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, testDAG("invalid_dag"))
@@ -82,7 +82,7 @@ func TestClient_GetStatus(t *testing.T) {
 			file      = testDAG("success.yaml")
 			requestID = "test-update-status"
 			now       = time.Now()
-			cli       = th.Client()
+			cli       = th.GetClient()
 		)
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, file)
@@ -122,7 +122,7 @@ func TestClient_GetStatus(t *testing.T) {
 		th := test.Setup(t)
 
 		var (
-			cli        = th.Client()
+			cli        = th.GetClient()
 			file       = testDAG("sleep1.yaml")
 			wrongReqID = "invalid-request-id"
 		)
@@ -145,7 +145,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		filePath := testDAG("success.yaml")
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, filePath)
@@ -161,7 +161,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("Stop", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		filePath := testDAG("sleep10.yaml")
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, filePath)
@@ -184,7 +184,7 @@ func TestClient_RunDAG(t *testing.T) {
 	t.Run("Restart", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		filePath := testDAG("success.yaml")
 		ctx := context.Background()
 		dagStatus, err := cli.GetStatus(ctx, filePath)
@@ -201,7 +201,7 @@ func TestClient_RunDAG(t *testing.T) {
 		th := test.Setup(t)
 
 		ctx := context.Background()
-		cli := th.Client()
+		cli := th.GetClient()
 		filePath := testDAG("retry.yaml")
 
 		dagStatus, err := cli.GetStatus(ctx, filePath)
@@ -239,7 +239,7 @@ func TestClient_UpdateDAG(t *testing.T) {
 	t.Run("Update", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		ctx := context.Background()
 
 		// valid DAG
@@ -268,7 +268,7 @@ steps:
 	t.Run("Remove", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		ctx := context.Background()
 
 		spec := `name: test DAG
@@ -295,7 +295,7 @@ steps:
 	t.Run("Create", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		ctx := context.Background()
 
 		id, err := cli.CreateDAG(ctx, "test-dag")
@@ -309,7 +309,7 @@ steps:
 	t.Run("Rename", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		ctx := context.Background()
 
 		// Create a DAG to rename.
@@ -331,7 +331,7 @@ func TestClient_ReadHistory(t *testing.T) {
 	t.Run("TestClient_Empty", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		filePath := testDAG("success.yaml")
 		ctx := context.Background()
 
@@ -341,7 +341,7 @@ func TestClient_ReadHistory(t *testing.T) {
 	t.Run("TestClient_All", func(t *testing.T) {
 		th := test.Setup(t)
 
-		cli := th.Client()
+		cli := th.GetClient()
 		ctx := context.Background()
 
 		// Create a DAG
@@ -383,7 +383,7 @@ func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status,
 func TestClient_GetTagList(t *testing.T) {
 	th := test.Setup(t)
 
-	cli := th.Client()
+	cli := th.GetClient()
 	ctx := context.Background()
 
 	// Create DAG List
