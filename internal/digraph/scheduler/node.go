@@ -167,7 +167,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	})
 
 	ctx = digraph.WithDagContext(ctx, dagCtx)
-	cmd, err := n.setupExec(ctx)
+	cmd, err := n.SetupExec(ctx)
 	if err != nil {
 		return err
 	}
@@ -197,13 +197,13 @@ func (n *Node) Execute(ctx context.Context) error {
 	return n.data.State.Error
 }
 
-func (n *Node) finish() {
+func (n *Node) Finish() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.FinishedAt = time.Now()
 }
 
-func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
+func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -272,7 +272,7 @@ func (n *Node) GetRetryCount() int {
 	return n.data.State.RetryCount
 }
 
-func (n *Node) setRetriedAt(retriedAt time.Time) {
+func (n *Node) SetRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.RetriedAt = retriedAt
@@ -284,7 +284,7 @@ func (n *Node) GetDoneCount() int {
 	return n.data.State.DoneCount
 }
 
-func (n *Node) clearState() {
+func (n *Node) ClearState() {
 	n.data.State = NodeState{}
 }
 
@@ -294,7 +294,7 @@ func (n *Node) SetStatus(status NodeStatus) {
 	n.data.State.Status = status
 }
 
-func (n *Node) markError(err error) {
+func (n *Node) MarkError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.Error = err
@@ -320,7 +320,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 }
 
-func (n *Node) cancel() {
+func (n *Node) Cancel() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.data.State.Status
@@ -353,7 +353,7 @@ func (n *Node) Setup(logDir string, requestID string) error {
 	//    we need to replace the name differently for each node.
 	envKeyLogPath := fmt.Sprintf("STEP_%d_DAG_EXECUTION_LOG_PATH", n.id)
 	if err := os.Setenv(envKeyLogPath, n.data.State.Log); err != nil {
-		return err
+		return fmt.Errorf("failed to set environment variable %q: %w", envKeyLogPath, err)
 	}
 
 	// Expand environment variables in the step
@@ -368,19 +368,66 @@ func (n *Node) Setup(logDir string, requestID string) error {
 	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
 
 	if err := n.setupLog(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup log: %w", err)
 	}
 	if err := n.setupStdout(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup stdout: %w", err)
 	}
 	if err := n.setupStderr(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup stderr: %w", err)
 	}
 	if err := n.setupRetryPolicy(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup retry policy: %w", err)
 	}
+	if err := n.setupScript(); err != nil {
+		return fmt.Errorf("failed to setup script: %w", err)
+	}
+	return nil
+}
 
-	return n.setupScript()
+func (n *Node) Teardown() error {
+	if n.done {
+		return nil
+	}
+	n.logLock.Lock()
+	n.done = true
+	var lastErr error
+	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
+		if w != nil {
+			if err := w.Flush(); err != nil {
+				lastErr = err
+			}
+		}
+	}
+	for _, f := range []*os.File{n.logFile, n.stdoutFile} {
+		if f != nil {
+			if err := f.Sync(); err != nil {
+				lastErr = err
+			}
+			_ = f.Close()
+		}
+	}
+	n.logLock.Unlock()
+
+	if n.scriptFile != nil {
+		_ = os.Remove(n.scriptFile.Name())
+	}
+	if lastErr != nil {
+		n.data.State.Error = lastErr
+	}
+	return lastErr
+}
+
+func (n *Node) IncRetryCount() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.State.RetryCount++
+}
+
+func (n *Node) IncDoneCount() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.State.DoneCount++
 }
 
 var (
@@ -452,50 +499,6 @@ func (n *Node) setupLog() error {
 	}
 	n.logWriter = bufio.NewWriter(n.logFile)
 	return nil
-}
-func (n *Node) Teardown() error {
-	if n.done {
-		return nil
-	}
-	n.logLock.Lock()
-	n.done = true
-	var lastErr error
-	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
-		if w != nil {
-			if err := w.Flush(); err != nil {
-				lastErr = err
-			}
-		}
-	}
-	for _, f := range []*os.File{n.logFile, n.stdoutFile} {
-		if f != nil {
-			if err := f.Sync(); err != nil {
-				lastErr = err
-			}
-			_ = f.Close()
-		}
-	}
-	n.logLock.Unlock()
-
-	if n.scriptFile != nil {
-		_ = os.Remove(n.scriptFile.Name())
-	}
-	if lastErr != nil {
-		n.data.State.Error = lastErr
-	}
-	return lastErr
-}
-
-func (n *Node) IncRetryCount() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.data.State.RetryCount++
-}
-
-func (n *Node) IncDoneCount() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.data.State.DoneCount++
 }
 
 var (

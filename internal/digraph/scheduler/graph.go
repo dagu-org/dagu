@@ -167,7 +167,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
 				logger.Info(ctx, "clear node state", "step", g.dict[u].data.Step.Name)
-				g.dict[u].clearState()
+				g.dict[u].ClearState()
 				retry[u] = true
 			}
 			for _, v := range g.from[u] {

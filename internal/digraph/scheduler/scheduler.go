@@ -145,13 +145,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						stack := string(debug.Stack())
 						err := fmt.Errorf("panic recovered: %v\n%s", panicObj, stack)
 						logger.Error(ctx, "Panic occurred", "error", err, "step", node.data.Step.Name, "stack", stack)
-						node.markError(err)
+						node.MarkError(err)
 						sc.setLastError(err)
 					}
 				}()
 
 				defer func() {
-					node.finish()
+					node.Finish()
 					wg.Done()
 				}()
 
@@ -159,7 +159,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				if err := sc.setupNode(node); err != nil {
 					setupSucceed = false
 					sc.setLastError(err)
-					node.markError(err)
+					node.MarkError(err)
 				}
 
 				defer func() {
@@ -188,13 +188,13 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							node.IncRetryCount()
 							logger.Info(ctx, "Step execution failed. Retrying...", "step", node.data.Step.Name, "error", execErr, "retry", node.GetRetryCount())
 							time.Sleep(node.retryPolicy.Interval)
-							node.setRetriedAt(time.Now())
+							node.SetRetriedAt(time.Now())
 							node.SetStatus(NodeStatusNone)
 
 						default:
 							// finish the node
 							node.SetStatus(NodeStatusError)
-							node.markError(execErr)
+							node.MarkError(execErr)
 							sc.setLastError(execErr)
 
 						}
@@ -402,7 +402,7 @@ func (sc *Scheduler) Signal(
 func (sc *Scheduler) Cancel(g *ExecutionGraph) {
 	sc.setCanceled()
 	for _, node := range g.Nodes() {
-		node.cancel()
+		node.Cancel()
 	}
 }
 
