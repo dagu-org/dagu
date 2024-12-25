@@ -92,7 +92,7 @@ func loadTestYAMLError(t *testing.T, inputFile string, expectedErr error, opts .
 func TestBuildDAGError(t *testing.T) {
 	t.Parallel()
 	t.Run("NoName", func(t *testing.T) {
-		loadTestYAMLError(t, "no_name.yaml", errStepNameRequired)
+		loadTestYAMLError(t, "invalid_no_name.yaml", errStepNameRequired)
 	})
 	t.Run("InvalidEnv", func(t *testing.T) {
 		loadTestYAMLError(t, "invalid_env.yaml", errInvalidEnvValue)
@@ -108,7 +108,7 @@ func TestBuildDAGError(t *testing.T) {
 func TestBuildStepError(t *testing.T) {
 	t.Parallel()
 	t.Run("NoCommand", func(t *testing.T) {
-		loadTestYAMLError(t, "no_command.yaml", errStepCommandIsRequired)
+		loadTestYAMLError(t, "invalid_no_command.yaml", errStepCommandIsRequired)
 	})
 }
 
