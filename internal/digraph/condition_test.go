@@ -64,6 +64,10 @@ func TestCondition_Eval(t *testing.T) {
 
 	// Set environment variable for testing
 	_ = os.Setenv("TEST_CONDITION", "100")
+	t.Cleanup(func() {
+		_ = os.Unsetenv("TEST_CONDITION")
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := EvalConditions(tt.condition)
