@@ -59,7 +59,7 @@ func (td *testDAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) 
 func (th *testDAG) AssertLastStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	hs := th.DataStore().HistoryStore()
+	hs := th.DataStores.HistoryStore()
 	require.Eventually(t, func() bool {
 		status := hs.ReadStatusRecent(th.Context, th.Path, 1)
 		if len(status) < 1 {

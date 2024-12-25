@@ -8,7 +8,10 @@ import (
 )
 
 func TestStartCommand(t *testing.T) {
+	t.Parallel()
+
 	th := testSetup(t)
+
 	tests := []cmdTest{
 		{
 			name:        "StartDAG",
