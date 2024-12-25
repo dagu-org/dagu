@@ -4,18 +4,12 @@
 package agent_test
 
 import (
-	"context"
 	"net/http"
 	"net/url"
-	"path/filepath"
-	"syscall"
 	"testing"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/test"
-	"github.com/google/uuid"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
@@ -24,210 +18,172 @@ import (
 )
 
 func TestAgent_Run(t *testing.T) {
-	th := test.Setup(t)
+	t.Parallel()
 
 	t.Run("RunDAG", func(t *testing.T) {
+		th := test.Setup(t)
 		dag := th.LoadDAGFile(t, "run.yaml")
-		agt := newAgent(th, genRequestID(), dag.DAG, &agent.Options{})
+		agt := dag.Agent()
 
 		dag.AssertLatestStatus(t, scheduler.StatusNone)
 
 		go func() {
-			err := agt.Run(th.Context)
-			require.NoError(t, err)
+			agt.RunSuccess(t)
 		}()
 
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
+		th := test.Setup(t)
+		dag := th.LoadDAGFile(t, "delete_old_history.yaml")
+		agt := dag.Agent()
+
 		// Create a history file by running a DAG
-		dag := th.LoadDAGFile(t, "simple.yaml")
-		agt := newAgent(th, genRequestID(), dag.DAG, &agent.Options{})
-		ctx := th.Context
+		agt.RunSuccess(t)
+		dag.AssertHistoryCount(t, 1)
 
-		err := agt.Run(ctx)
-		require.NoError(t, err)
-		history := th.Client.GetRecentHistory(ctx, dag.DAG, 2)
-		require.Equal(t, 1, len(history))
-
-		// Set the retention days to 0 and run the DAG again
+		// Set the retention days to 0 (delete all history files except the latest one)
 		dag.HistRetentionDays = 0
-		agt = newAgent(th, genRequestID(), dag.DAG, &agent.Options{})
-		err = agt.Run(ctx)
-		require.NoError(t, err)
+
+		// Run the DAG again
+		agt = dag.Agent()
+		agt.RunSuccess(t)
 
 		// Check if only the latest history file exists
-		history = th.Client.GetRecentHistory(ctx, dag.DAG, 2)
-		require.Equal(t, 1, len(history))
+		dag.AssertHistoryCount(t, 1)
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
-		dag := testLoadDAG(t, "is_running.yaml")
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
-		ctx := th.Context
+		th := test.Setup(t)
+		dag := th.LoadDAGFile(t, "is_running.yaml")
+		agt := dag.Agent()
 
 		go func() {
-			_ = agt.Run(ctx)
+			// Run the DAG in the background so that it is running
+			agt.RunSuccess(t)
 		}()
 
-		time.Sleep(time.Millisecond * 30)
+		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
-		curStatus := agt.Status()
-		require.NotNil(t, curStatus)
-		require.Equal(t, curStatus.Status, scheduler.StatusRunning)
-
-		agt = newAgent(th, genRequestID(), dag, &agent.Options{})
-		err := agt.Run(ctx)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "is already running")
+		// Try to run the DAG again while it is running
+		agt = dag.Agent()
+		agt.RunCheckErr(t, "is already running")
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
-		dag := testLoadDAG(t, "multiple_steps.yaml")
+		th := test.Setup(t)
+		dag := th.LoadDAGFile(t, "multiple_steps.yaml")
 
-		// Precondition is not met
-		dag.Preconditions = []digraph.Condition{{Condition: "`echo 1`", Expected: "0"}}
+		// Set a precondition that always fails
+		dag.Preconditions = []digraph.Condition{
+			{Condition: "`echo 1`", Expected: "0"},
+		}
 
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
-		ctx := th.Context
-		err := agt.Run(ctx)
-		require.Error(t, err)
+		agt := dag.Agent()
+		agt.RunCheckErr(t, "condition was not met")
 
 		// Check if all nodes are not executed
 		status := agt.Status()
-		require.Equal(t, scheduler.StatusCancel, status.Status)
-		require.Equal(t, scheduler.NodeStatusNone, status.Nodes[0].Status)
-		require.Equal(t, scheduler.NodeStatusNone, status.Nodes[1].Status)
+		require.Equal(t, scheduler.StatusCancel.String(), status.Status.String())
+		require.Equal(t, scheduler.NodeStatusNone.String(), status.Nodes[0].Status.String())
+		require.Equal(t, scheduler.NodeStatusNone.String(), status.Nodes[1].Status.String())
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
-		// Run a DAG that fails
-		errDAG := testLoadDAG(t, "error.yaml")
-		agt := newAgent(th, genRequestID(), errDAG, &agent.Options{})
-		ctx := th.Context
-		err := agt.Run(ctx)
-		require.Error(t, err)
+		th := test.Setup(t)
+		errDAG := th.LoadDAGFile(t, "error.yaml")
+		agt := errDAG.Agent()
+		agt.RunError(t)
 
 		// Check if the status is saved correctly
 		require.Equal(t, scheduler.StatusError, agt.Status().Status)
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
-		// Run a DAG that timeout
-		timeoutDAG := testLoadDAG(t, "timeout.yaml")
-		agt := newAgent(th, genRequestID(), timeoutDAG, &agent.Options{})
-		ctx := th.Context
-		err := agt.Run(ctx)
-		require.Error(t, err)
+		th := test.Setup(t)
+		timeoutDAG := th.LoadDAGFile(t, "timeout.yaml")
+		agt := timeoutDAG.Agent()
+		agt.RunError(t)
 
 		// Check if the status is saved correctly
 		require.Equal(t, scheduler.StatusError, agt.Status().Status)
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
-		ctx := th.Context
-
-		abortFunc := func(a *agent.Agent) { a.Signal(ctx, syscall.SIGTERM) }
-
-		dag := testLoadDAG(t, "sleep.yaml")
-		cli := th.Client
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
+		th := test.Setup(t)
+		dag := th.LoadDAGFile(t, "sleep.yaml")
+		agt := dag.Agent()
 
 		go func() {
-			_ = agt.Run(ctx)
+			agt.RunCancel(t)
 		}()
 
 		// wait for the DAG to start
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusRunning
-		}, time.Second*1, time.Millisecond*100)
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		// send a signal to cancel the DAG
-		abortFunc(agt)
+		agt.Abort()
 
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusCancel
-		}, time.Second*1, time.Millisecond*100)
+		// wait for the DAG to be canceled
+		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
-		dag := testLoadDAG(t, "on_exit.yaml")
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
-		ctx := th.Context
-		err := agt.Run(ctx)
-		require.NoError(t, err)
+		th := test.Setup(t)
+		dag := th.LoadDAGFile(t, "on_exit.yaml")
+		agt := dag.Agent()
+		agt.RunSuccess(t)
 
 		// Check if the DAG is executed successfully
 		status := agt.Status()
-		require.Equal(t, scheduler.StatusSuccess, status.Status)
+		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 		for _, s := range status.Nodes {
-			require.Equal(t, scheduler.NodeStatusSuccess, s.Status)
+			require.Equal(t, scheduler.NodeStatusSuccess.String(), s.Status.String())
 		}
 
 		// Check if the exit handler is executed
-		require.Equal(t, scheduler.NodeStatusSuccess, status.OnExit.Status)
+		require.Equal(t, scheduler.NodeStatusSuccess.String(), status.OnExit.Status.String())
 	})
 }
 
 func TestAgent_DryRun(t *testing.T) {
-	th := test.Setup(t)
 	t.Run("DryRun", func(t *testing.T) {
+		th := test.Setup(t)
 
-		dag := testLoadDAG(t, "dry.yaml")
-		ctx := th.Context
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{
-			Dry: true,
-		})
+		dag := th.LoadDAGFile(t, "dry.yaml")
+		agt := dag.Agent(test.WithAgentOptions(&agent.Options{Dry: true}))
 
-		err := agt.Run(ctx)
-		require.NoError(t, err)
+		agt.RunSuccess(t)
 
 		curStatus := agt.Status()
-		require.NoError(t, err)
 		require.Equal(t, scheduler.StatusSuccess, curStatus.Status)
 
 		// Check if the status is not saved
-		cli := th.Client
-		history := cli.GetRecentHistory(ctx, dag, 1)
-		require.Equal(t, 0, len(history))
+		dag.AssertHistoryCount(t, 0)
 	})
 }
 
 func TestAgent_Retry(t *testing.T) {
 	t.Parallel()
 
-	th := test.Setup(t)
 	t.Run("RetryDAG", func(t *testing.T) {
+		th := test.Setup(t)
 		// retry.yaml has a DAG that fails
-		dag := testLoadDAG(t, "retry.yaml")
+		dag := th.LoadDAGFile(t, "retry.yaml")
+		agt := dag.Agent()
 
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
-		ctx := th.Context
-
-		err := agt.Run(ctx)
-		require.Error(t, err)
-
-		// Check if the DAG failed
-		status := agt.Status()
-		require.Equal(t, scheduler.StatusError, status.Status)
+		agt.RunError(t)
 
 		// Modify the DAG to make it successful
-		for _, node := range status.Nodes {
-			node.Step.CmdWithArgs = "true"
+		status := agt.Status()
+		for i := range status.Nodes {
+			status.Nodes[i].Step.CmdWithArgs = "true"
 		}
 
 		// Retry the DAG and check if it is successful
-		agt = newAgent(th, genRequestID(), dag, &agent.Options{
+		agt = dag.Agent(test.WithAgentOptions(&agent.Options{
 			RetryTarget: status,
-		})
-		err = agt.Run(ctx)
-		require.NoError(t, err)
+		}))
+		agt.RunSuccess(t)
 
-		status = agt.Status()
-		require.Equal(t, scheduler.StatusSuccess, status.Status)
-
-		for _, node := range status.Nodes {
+		for _, node := range agt.Status().Nodes {
 			if node.Status != scheduler.NodeStatusSuccess &&
 				node.Status != scheduler.NodeStatusSkipped {
-				t.Errorf("invalid status: %s", node.Status.String())
+				t.Errorf("node %q is not successful: %s", node.Step.Name, node.Status)
 			}
 		}
 	})
@@ -235,25 +191,19 @@ func TestAgent_Retry(t *testing.T) {
 
 func TestAgent_HandleHTTP(t *testing.T) {
 	t.Parallel()
-	th := test.Setup(t)
-
 	t.Run("HTTP_Valid", func(t *testing.T) {
+		th := test.Setup(t)
+
 		// Start a long-running DAG
-		dag := testLoadDAG(t, "handle_http.yaml")
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
+		dag := th.LoadDAGFile(t, "handle_http_valid.yaml")
+		agt := dag.Agent()
 		ctx := th.Context
 		go func() {
-			err := agt.Run(ctx)
-			require.NoError(t, err)
+			agt.RunCancel(t)
 		}()
 
 		// Wait for the DAG to start
-		cli := th.Client
-		require.Eventually(t, func() bool {
-			status, _ := cli.GetLatestStatus(ctx, dag)
-			// require.NoError(t, err)
-			return status.Status == scheduler.StatusRunning
-		}, time.Second*2, time.Millisecond*100)
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		// Get the status of the DAG
 		var mockResponseWriter = mockResponseWriter{}
@@ -268,72 +218,53 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, scheduler.StatusRunning, status.Status)
 
 		// Stop the DAG
-		agt.Signal(ctx, syscall.SIGTERM)
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusCancel
-		}, time.Second*2, time.Millisecond*100)
-
+		agt.Abort()
+		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 	})
 	t.Run("HTTP_InvalidRequest", func(t *testing.T) {
+		th := test.Setup(t)
+
 		// Start a long-running DAG
-		dag := testLoadDAG(t, "handle_http2.yaml")
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
-		ctx := th.Context
+		dag := th.LoadDAGFile(t, "handle_http_invalid.yaml")
+		agt := dag.Agent()
 
 		go func() {
-			err := agt.Run(ctx)
-			require.NoError(t, err)
+			agt.RunCancel(t)
 		}()
 
 		// Wait for the DAG to start
-		cli := th.Client
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusRunning
-		}, time.Second*2, time.Millisecond*100)
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		var mockResponseWriter = mockResponseWriter{}
 
 		// Request with an invalid path
-		agt.HandleHTTP(ctx)(&mockResponseWriter, &http.Request{
+		agt.HandleHTTP(th.Context)(&mockResponseWriter, &http.Request{
 			Method: "GET",
 			URL:    &url.URL{Path: "/invalid-path"},
 		})
 		require.Equal(t, http.StatusNotFound, mockResponseWriter.status)
 
 		// Stop the DAG
-		agt.Signal(ctx, syscall.SIGTERM)
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusCancel
-		}, time.Second*2, time.Millisecond*100)
+		agt.Abort()
+		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 	})
 	t.Run("HTTP_HandleCancel", func(t *testing.T) {
+		th := test.Setup(t)
+
 		// Start a long-running DAG
-		dag := testLoadDAG(t, "handle_http3.yaml")
-		agt := newAgent(th, genRequestID(), dag, &agent.Options{})
-		ctx := th.Context
+		dag := th.LoadDAGFile(t, "handle_http_cancel.yaml")
+		agt := dag.Agent()
 
 		go func() {
-			err := agt.Run(ctx)
-			require.NoError(t, err)
+			agt.RunCancel(t)
 		}()
 
 		// Wait for the DAG to start
-		cli := th.Client
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusRunning
-		}, time.Second*2, time.Millisecond*100)
+		dag.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		// Cancel the DAG
 		var mockResponseWriter = mockResponseWriter{}
-		agt.HandleHTTP(ctx)(&mockResponseWriter, &http.Request{
+		agt.HandleHTTP(th.Context)(&mockResponseWriter, &http.Request{
 			Method: "POST",
 			URL:    &url.URL{Path: "/stop"},
 		})
@@ -341,11 +272,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, "OK", mockResponseWriter.body)
 
 		// Wait for the DAG to stop
-		require.Eventually(t, func() bool {
-			status, err := cli.GetLatestStatus(ctx, dag)
-			require.NoError(t, err)
-			return status.Status == scheduler.StatusCancel
-		}, time.Second*10, time.Millisecond*100)
+		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 	})
 }
 
@@ -372,39 +299,4 @@ func (h *mockResponseWriter) Write(body []byte) (int, error) {
 
 func (h *mockResponseWriter) WriteHeader(statusCode int) {
 	h.status = statusCode
-}
-
-// testLoadDAG load the specified DAG file for testing
-// without base config or parameters.
-func testLoadDAG(t *testing.T, name string) *digraph.DAG {
-	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", name)
-	dag, err := digraph.Load(context.Background(), "", filePath, "")
-	require.NoError(t, err)
-	return dag
-}
-
-func genRequestID() string {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		panic(err)
-	}
-	return id.String()
-}
-
-func newAgent(
-	th test.Helper,
-	requestID string,
-	dag *digraph.DAG,
-	opts *agent.Options,
-) *agent.Agent {
-	logDir, logFile := th.Config.Paths.LogDir, ""
-	return agent.New(
-		requestID,
-		dag,
-		logDir,
-		logFile,
-		th.Client,
-		th.DataStore(),
-		opts,
-	)
 }

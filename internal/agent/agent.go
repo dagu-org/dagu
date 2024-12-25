@@ -116,6 +116,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Check if the DAG is already running.
 	if err := a.checkIsAlreadyRunning(ctx); err != nil {
+		a.scheduler.Cancel(a.graph)
 		return err
 	}
 

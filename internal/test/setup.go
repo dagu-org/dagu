@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -20,6 +22,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,7 +144,126 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		require.NoError(t, err)
 		latestStatusValue = latestStatus.Status
 		return latestStatus.Status == expected
-	}, time.Second*3, time.Millisecond*100, "expected latest status to be %q, got %q", expected, latestStatusValue)
+	}, time.Second*2, time.Millisecond*50, "expected latest status to be %q, got %q", expected, latestStatusValue)
+}
+
+func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
+	t.Helper()
+
+	// the +1 to the limit is needed to ensure that the number of the history
+	// entries is exactly the expected number
+	history := d.Client.GetRecentHistory(d.Context, d.DAG, expected+1)
+	require.Len(t, history, expected)
+}
+
+func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
+	t.Helper()
+
+	var lastCurrentStatus scheduler.Status
+	assert.Eventuallyf(t, func() bool {
+		currentStatus, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
+		require.NoError(t, err)
+		lastCurrentStatus = currentStatus.Status
+		return currentStatus.Status == expected
+	}, time.Second*2, time.Millisecond*50, "expected current status to be %q, got %q", expected, lastCurrentStatus)
+}
+
+type AgentOption func(*Agent)
+
+func WithAgentOptions(options *agent.Options) AgentOption {
+	return func(a *Agent) {
+		a.opts = options
+	}
+}
+
+func (d *DAG) Agent(opts ...AgentOption) *Agent {
+	requestID := genRequestID()
+	logDir := d.Config.Paths.LogDir
+	logFile := filepath.Join(d.Config.Paths.LogDir, requestID+".log")
+
+	helper := &Agent{
+		Helper: d.Helper,
+		DAG:    d.DAG,
+	}
+
+	for _, opt := range opts {
+		opt(helper)
+	}
+
+	if helper.opts == nil {
+		helper.opts = &agent.Options{}
+	}
+
+	helper.Agent = agent.New(
+		requestID,
+		d.DAG,
+		logDir,
+		logFile,
+		d.Client,
+		d.DataStores,
+		helper.opts,
+	)
+
+	return helper
+}
+
+func genRequestID() string {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
+	return id.String()
+}
+
+type Agent struct {
+	*Helper
+	*digraph.DAG
+	*agent.Agent
+	opts *agent.Options
+}
+
+func (a *Agent) RunError(t *testing.T) {
+	t.Helper()
+
+	err := a.Agent.Run(a.Context)
+	assert.Error(t, err)
+
+	status := a.Agent.Status().Status
+	require.Equal(t, scheduler.StatusError.String(), status.String())
+}
+
+func (a *Agent) RunCancel(t *testing.T) {
+	t.Helper()
+
+	err := a.Agent.Run(a.Context)
+	assert.NoError(t, err)
+
+	status := a.Agent.Status().Status
+	require.Equal(t, scheduler.StatusCancel.String(), status.String())
+}
+
+func (a *Agent) RunCheckErr(t *testing.T, expectedErr string) {
+	t.Helper()
+
+	err := a.Agent.Run(a.Context)
+	require.Error(t, err, "expected error %q, got nil", expectedErr)
+	require.Contains(t, err.Error(), expectedErr)
+	status := a.Agent.Status()
+	require.Equal(t, scheduler.StatusCancel.String(), status.Status.String())
+}
+
+func (a *Agent) RunSuccess(t *testing.T) {
+	t.Helper()
+
+	err := a.Agent.Run(a.Context)
+	assert.NoError(t, err)
+
+	status := a.Agent.Status().Status
+	require.Equal(t, scheduler.StatusSuccess.String(), status.String())
+}
+
+func (a *Agent) Abort() {
+	a.Signal(a.Context, syscall.SIGTERM)
 }
 
 // SyncBuffer provides thread-safe buffer operations
