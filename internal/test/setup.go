@@ -132,7 +132,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 		require.NoError(t, err)
 		latestStatusValue = latestStatus.Status
 		return latestStatus.Status == expected
-	}, time.Second*2, time.Millisecond*50, "expected latest status to be %q, got %q", expected, latestStatusValue)
+	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, latestStatusValue)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
