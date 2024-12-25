@@ -72,15 +72,17 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "env", fn: buildEnvs},
 	{metadata: true, name: "schedule", fn: buildSchedule},
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
-	{metadata: true, name: "mailOn", fn: buildMailOn},
 	{metadata: true, name: "params", fn: buildParams},
+	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
 	{name: "logDir", fn: buildLogDir},
 	{name: "handlers", fn: buildHandlers},
 	{name: "smtpConfig", fn: buildSMTPConfig},
 	{name: "errMailConfig", fn: buildErrMailConfig},
 	{name: "infoMailConfig", fn: buildInfoMailConfig},
-	{name: "miscs", fn: buildMiscs},
+	{name: "maxHistoryRetentionDays", fn: maxHistoryRetentionDays},
+	{name: "maxCleanUpTime", fn: maxCleanUpTime},
+	{name: "preconditions", fn: buildPreconditions},
 }
 
 type builderEntry struct {
@@ -116,13 +118,14 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 	}
 
 	dag := &DAG{
-		Name:        spec.Name,
-		Group:       spec.Group,
-		Description: spec.Description,
-		Timeout:     time.Second * time.Duration(spec.TimeoutSec),
-		Delay:       time.Second * time.Duration(spec.DelaySec),
-		RestartWait: time.Second * time.Duration(spec.RestartWaitSec),
-		Tags:        parseTags(spec.Tags),
+		Name:          spec.Name,
+		Group:         spec.Group,
+		Description:   spec.Description,
+		Timeout:       time.Second * time.Duration(spec.TimeoutSec),
+		Delay:         time.Second * time.Duration(spec.DelaySec),
+		RestartWait:   time.Second * time.Duration(spec.RestartWaitSec),
+		Tags:          parseTags(spec.Tags),
+		MaxActiveRuns: spec.MaxActiveRuns,
 	}
 
 	var errs errorList
@@ -331,20 +334,22 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	return nil
 }
 
-// buildMiscs builds the miscellaneous fields for the DAG.
-func buildMiscs(_ BuildContext, spec *definition, dag *DAG) (err error) {
+func buildPreconditions(_ BuildContext, spec *definition, dag *DAG) error {
+	dag.Preconditions = buildConditions(spec.Preconditions)
+	return nil
+}
+
+func maxCleanUpTime(_ BuildContext, spec *definition, dag *DAG) error {
+	if spec.MaxCleanUpTimeSec != nil {
+		dag.MaxCleanUpTime = time.Second * time.Duration(*spec.MaxCleanUpTimeSec)
+	}
+	return nil
+}
+
+func maxHistoryRetentionDays(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.HistRetentionDays != nil {
 		dag.HistRetentionDays = *spec.HistRetentionDays
 	}
-
-	dag.Preconditions = buildConditions(spec.Preconditions)
-	dag.MaxActiveRuns = spec.MaxActiveRuns
-
-	if spec.MaxCleanUpTimeSec != nil {
-		dag.MaxCleanUpTime = time.Second *
-			time.Duration(*spec.MaxCleanUpTimeSec)
-	}
-
 	return nil
 }
 
