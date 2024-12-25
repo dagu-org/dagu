@@ -16,6 +16,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
@@ -83,26 +84,36 @@ func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create decoder: %w", err)
 	}
 
 	if err := md.Decode(step.ExecutorConfig.Config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
 	}
 
-	cfg := &sshExecConfig{
+	var port string
+	switch v := def.Port.(type) {
+	case int:
+		port = fmt.Sprintf("%d", v)
+	case string:
+		port = v
+	default:
+		port = fmt.Sprintf("%v", def.Port)
+	}
+	if port == "" {
+		port = "22"
+	}
+
+	cfg, err := cmdutil.SubstituteStringFields(sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
 		Key:      def.Key,
 		Password: def.Password,
+		Port:     port,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute string fields for ssh config: %w", err)
 	}
-
-	// Handle Port as either string or int
-	port := os.ExpandEnv(fmt.Sprintf("%v", def.Port))
-	if port == "" {
-		port = "22"
-	}
-	cfg.Port = port
 
 	// StrictHostKeyChecking is not supported yet.
 	if def.StrictHostKeyChecking {
@@ -110,7 +121,7 @@ func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 	}
 
 	// Select the authentication method.
-	authMethod, err := selectSSHAuthMethod(cfg)
+	authMethod, err := selectSSHAuthMethod(&cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +137,7 @@ func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 
 	return &sshExec{
 		step:      step,
-		config:    cfg,
+		config:    &cfg,
 		sshConfig: sshConfig,
 		stdout:    os.Stdout,
 	}, nil
