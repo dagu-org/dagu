@@ -48,7 +48,7 @@ func (td *testDAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) 
 	dag, err := digraph.Load(td.Context, td.Config.Paths.BaseConfig, td.Path, "")
 	require.NoError(t, err)
 
-	cli := td.Client()
+	cli := td.Client
 	require.Eventually(t, func() bool {
 		status, err := cli.GetCurrentStatus(td.Context, dag)
 		require.NoError(t, err)
@@ -59,7 +59,7 @@ func (td *testDAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) 
 func (th *testDAG) AssertLastStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	hs := th.DataStore().HistoryStore()
+	hs := th.DataStores.HistoryStore()
 	require.Eventually(t, func() bool {
 		status := hs.ReadStatusRecent(th.Context, th.Path, 1)
 		if len(status) < 1 {

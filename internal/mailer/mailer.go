@@ -5,14 +5,16 @@ package mailer
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // Mailer is a mailer that sends emails.
@@ -50,16 +52,13 @@ var (
 
 // SendMail sends an email.
 func (m *Mailer) Send(
+	ctx context.Context,
 	from string,
 	to []string,
 	subject, body string,
 	attachments []string,
 ) error {
-	log.Printf(
-		"Sending an email to %s, subject is \"%s\"",
-		strings.Join(to, ","),
-		subject,
-	)
+	logger.Info(ctx, "Sending an email", "to", to, "subject", subject)
 	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}

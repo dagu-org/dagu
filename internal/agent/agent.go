@@ -116,6 +116,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Check if the DAG is already running.
 	if err := a.checkIsAlreadyRunning(ctx); err != nil {
+		a.scheduler.Cancel(ctx, a.graph)
 		return err
 	}
 
@@ -203,7 +204,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Send the execution report if necessary.
 	a.lastErr = lastErr
-	if err := a.reporter.send(a.dag, finishedStatus, lastErr); err != nil {
+	if err := a.reporter.send(ctx, a.dag, finishedStatus, lastErr); err != nil {
 		logger.Error(ctx, "Mail notification failed", "err", err)
 	}
 
@@ -314,14 +315,13 @@ func (a *Agent) setup(ctx context.Context) error {
 	defer a.lock.Unlock()
 
 	a.scheduler = a.newScheduler()
-	a.reporter = newReporter(
-		mailer.New(mailer.Config{
-			Host:     a.dag.SMTP.Host,
-			Port:     a.dag.SMTP.Port,
-			Username: a.dag.SMTP.Username,
-			Password: a.dag.SMTP.Password,
-		}),
-	)
+	mailer := mailer.New(mailer.Config{
+		Host:     a.dag.SMTP.Host,
+		Port:     a.dag.SMTP.Port,
+		Username: a.dag.SMTP.Username,
+		Password: a.dag.SMTP.Password,
+	})
+	a.reporter = newReporter(mailer)
 
 	return a.setupGraph(ctx)
 }
@@ -482,7 +482,7 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 	// If one of the conditions does not met, cancel the execution.
 	if err := digraph.EvalConditions(a.dag.Preconditions); err != nil {
 		logger.Error(ctx, "Preconditions are not met", "err", err)
-		a.scheduler.Cancel(a.graph)
+		a.scheduler.Cancel(ctx, a.graph)
 		return err
 	}
 	return nil

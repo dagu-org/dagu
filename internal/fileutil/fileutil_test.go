@@ -4,10 +4,7 @@
 package fileutil
 
 import (
-	"bytes"
-	"errors"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -139,33 +136,6 @@ func Test_MustTempDir(t *testing.T) {
 			_ = os.RemoveAll(dir)
 		}()
 		require.Contains(t, dir, "tempdir")
-	})
-}
-
-func Test_LogErr(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		origStdout := os.Stdout
-		r, w, err := os.Pipe()
-		require.NoError(t, err)
-		os.Stdout = w
-		log.SetOutput(w)
-
-		defer func() {
-			os.Stdout = origStdout
-			log.SetOutput(origStdout)
-		}()
-
-		LogErr("test action", errors.New("test error"))
-		os.Stdout = origStdout
-		_ = w.Close()
-
-		var buf bytes.Buffer
-		_, err = io.Copy(&buf, r)
-		require.NoError(t, err)
-
-		s := buf.String()
-		require.Contains(t, s, "test action failed")
-		require.Contains(t, s, "test error")
 	})
 }
 

@@ -84,7 +84,7 @@ message: %s
 -----
 `
 
-func (e *mail) Run(_ context.Context) error {
+func (e *mail) Run(ctx context.Context) error {
 	_, _ = e.stdout.Write(
 		[]byte(fmt.Sprintf(
 			mailLogTemplate,
@@ -95,6 +95,7 @@ func (e *mail) Run(_ context.Context) error {
 		)),
 	)
 	err := e.mailer.Send(
+		ctx,
 		e.cfg.From,
 		[]string{e.cfg.To},
 		e.cfg.Subject,

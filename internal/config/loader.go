@@ -64,7 +64,10 @@ func (l *ConfigLoader) Load() (*Config, error) {
 }
 
 func (l *ConfigLoader) setupViper() error {
-	homeDir := l.getHomeDir()
+	homeDir, err := l.getHomeDir()
+	if err != nil {
+		return err
+	}
 	xdgConfig := l.getXDGConfig(homeDir)
 	resolver := newResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
 
@@ -75,13 +78,12 @@ func (l *ConfigLoader) setupViper() error {
 	return l.setExecutableDefault()
 }
 
-func (l *ConfigLoader) getHomeDir() string {
+func (l *ConfigLoader) getHomeDir() (string, error) {
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("could not determine home directory: %v", err)
-		return ""
+		return "", fmt.Errorf("could not determine home directory: %w", err)
 	}
-	return dir
+	return dir, nil
 }
 
 func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {

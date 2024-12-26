@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -75,7 +76,7 @@ func testErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*model.
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
-	_ = rp.send(dag, &model.Status{
+	_ = rp.send(context.Background(), dag, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -91,7 +92,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*mode
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
-	err := rp.send(dag, &model.Status{
+	err := rp.send(context.Background(), dag, &model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -106,7 +107,7 @@ func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*mode
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
-	err := rp.send(dag, &model.Status{
+	err := rp.send(context.Background(), dag, &model.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -125,13 +126,13 @@ func testRenderSummary(t *testing.T, _ *reporter, dag *digraph.DAG, nodes []*mod
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}
-	summary := renderSummary(status, errors.New("test error"))
+	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
 }
 
 func testRenderTable(t *testing.T, _ *reporter, _ *digraph.DAG, nodes []*model.Node) {
-	summary := renderTable(nodes)
+	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Contains(t, summary, nodes[0].Step.Args[0])
 }
@@ -144,7 +145,7 @@ type mockSender struct {
 	count   int
 }
 
-func (m *mockSender) Send(from string, to []string, subject, body string, _ []string) error {
+func (m *mockSender) Send(_ context.Context, from string, to []string, subject, body string, _ []string) error {
 	m.count += 1
 	m.from = from
 	m.to = to

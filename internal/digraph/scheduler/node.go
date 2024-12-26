@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,6 +95,12 @@ func (s NodeStatus) String() string {
 	}
 }
 
+func NodeWithData(data NodeData) *Node {
+	return &Node{
+		data: data,
+	}
+}
+
 func NewNode(step digraph.Step, state NodeState) *Node {
 	return &Node{
 		data: NodeData{Step: step, State: state},
@@ -106,6 +111,33 @@ func (n *Node) Data() NodeData {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data
+}
+
+func (n *Node) ScriptFilename() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if n.scriptFile != nil {
+		return n.scriptFile.Name()
+	}
+	return ""
+}
+
+func (n *Node) CloseLog() error {
+	n.logLock.Lock()
+	defer n.logLock.Unlock()
+	if n.logFile != nil {
+		return n.logFile.Close()
+	}
+	return nil
+}
+
+func (n *Node) LogFilename() string {
+	n.logLock.Lock()
+	defer n.logLock.Unlock()
+	if n.logFile != nil {
+		return n.logFile.Name()
+	}
+	return ""
 }
 
 func (n *Node) setError(err error) {
@@ -134,7 +166,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	})
 
 	ctx = digraph.WithDagContext(ctx, dagCtx)
-	cmd, err := n.setupExec(ctx)
+	cmd, err := n.SetupExec(ctx)
 	if err != nil {
 		return err
 	}
@@ -164,13 +196,13 @@ func (n *Node) Execute(ctx context.Context) error {
 	return n.data.State.Error
 }
 
-func (n *Node) finish() {
+func (n *Node) Finish() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.FinishedAt = time.Now()
 }
 
-func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
+func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -233,42 +265,42 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	return cmd, nil
 }
 
-func (n *Node) getRetryCount() int {
+func (n *Node) GetRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data.State.RetryCount
 }
 
-func (n *Node) setRetriedAt(retriedAt time.Time) {
+func (n *Node) SetRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.RetriedAt = retriedAt
 }
 
-func (n *Node) getDoneCount() int {
+func (n *Node) GetDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data.State.DoneCount
 }
 
-func (n *Node) clearState() {
+func (n *Node) ClearState() {
 	n.data.State = NodeState{}
 }
 
-func (n *Node) setStatus(status NodeStatus) {
+func (n *Node) SetStatus(status NodeStatus) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.Status = status
 }
 
-func (n *Node) markError(err error) {
+func (n *Node) MarkError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.data.State.Error = err
 	n.data.State.Status = NodeStatusError
 }
 
-func (n *Node) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
+func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.data.State.Status
@@ -277,9 +309,9 @@ func (n *Node) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		if allowOverride && n.data.Step.SignalOnStop != "" {
 			sigsig = unix.SignalNum(n.data.Step.SignalOnStop)
 		}
-		log.Printf("Sending %s signal to %s", sigsig, n.data.Step.Name)
+		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.data.Step.Name)
 		if err := n.cmd.Kill(sigsig); err != nil {
-			logger.Error(ctx, "failed to send signal", "err", err)
+			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.data.Step.Name)
 		}
 	}
 	if status == NodeStatusRunning {
@@ -287,7 +319,7 @@ func (n *Node) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 }
 
-func (n *Node) cancel() {
+func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.data.State.Status
@@ -295,22 +327,31 @@ func (n *Node) cancel() {
 		n.data.State.Status = NodeStatusCancel
 	}
 	if n.cancelFunc != nil {
-		log.Printf("canceling node: %s", n.data.Step.Name)
+		logger.Info(ctx, "canceling node", "step", n.data.Step.Name)
 		n.cancelFunc()
 	}
 }
 
-func (n *Node) setup(logDir string, requestID string) error {
+func (n *Node) Setup(logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	// Set the log file path
-	n.data.State.StartedAt = time.Now()
-	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
-		fileutil.SafeName(n.data.Step.Name),
-		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
-		stringutil.TruncString(requestID, 8),
-	))
+	startedAt := time.Now()
+
+	safeName := fileutil.SafeName(n.data.Step.Name)
+	timestamp := startedAt.Format("20060102.15:04:05.000")
+	postfix := stringutil.TruncString(requestID, 8)
+	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
+	if !fileutil.FileExists(logDir) {
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return fmt.Errorf("failed to create log directory %q: %w", logDir, err)
+		}
+	}
+
+	filePath := filepath.Join(logDir, logFilename)
+	n.data.State.Log = filePath
+	n.data.State.StartedAt = startedAt
 
 	// Replace the special environment variables in the command
 	// Why this is necessary:
@@ -320,7 +361,7 @@ func (n *Node) setup(logDir string, requestID string) error {
 	//    we need to replace the name differently for each node.
 	envKeyLogPath := fmt.Sprintf("STEP_%d_DAG_EXECUTION_LOG_PATH", n.id)
 	if err := os.Setenv(envKeyLogPath, n.data.State.Log); err != nil {
-		return err
+		return fmt.Errorf("failed to set environment variable %q: %w", envKeyLogPath, err)
 	}
 
 	// Expand environment variables in the step
@@ -335,19 +376,66 @@ func (n *Node) setup(logDir string, requestID string) error {
 	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
 
 	if err := n.setupLog(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup log: %w", err)
 	}
 	if err := n.setupStdout(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup stdout: %w", err)
 	}
 	if err := n.setupStderr(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup stderr: %w", err)
 	}
 	if err := n.setupRetryPolicy(); err != nil {
-		return err
+		return fmt.Errorf("failed to setup retry policy: %w", err)
 	}
+	if err := n.setupScript(); err != nil {
+		return fmt.Errorf("failed to setup script: %w", err)
+	}
+	return nil
+}
 
-	return n.setupScript()
+func (n *Node) Teardown() error {
+	if n.done {
+		return nil
+	}
+	n.logLock.Lock()
+	n.done = true
+	var lastErr error
+	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
+		if w != nil {
+			if err := w.Flush(); err != nil {
+				lastErr = err
+			}
+		}
+	}
+	for _, f := range []*os.File{n.logFile, n.stdoutFile} {
+		if f != nil {
+			if err := f.Sync(); err != nil {
+				lastErr = err
+			}
+			_ = f.Close()
+		}
+	}
+	n.logLock.Unlock()
+
+	if n.scriptFile != nil {
+		_ = os.Remove(n.scriptFile.Name())
+	}
+	if lastErr != nil {
+		n.data.State.Error = lastErr
+	}
+	return lastErr
+}
+
+func (n *Node) IncRetryCount() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.State.RetryCount++
+}
+
+func (n *Node) IncDoneCount() {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.State.DoneCount++
 }
 
 var (
@@ -420,50 +508,6 @@ func (n *Node) setupLog() error {
 	n.logWriter = bufio.NewWriter(n.logFile)
 	return nil
 }
-func (n *Node) teardown() error {
-	if n.done {
-		return nil
-	}
-	n.logLock.Lock()
-	n.done = true
-	var lastErr error
-	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
-		if w != nil {
-			if err := w.Flush(); err != nil {
-				lastErr = err
-			}
-		}
-	}
-	for _, f := range []*os.File{n.logFile, n.stdoutFile} {
-		if f != nil {
-			if err := f.Sync(); err != nil {
-				lastErr = err
-			}
-			_ = f.Close()
-		}
-	}
-	n.logLock.Unlock()
-
-	if n.scriptFile != nil {
-		_ = os.Remove(n.scriptFile.Name())
-	}
-	if lastErr != nil {
-		n.data.State.Error = lastErr
-	}
-	return lastErr
-}
-
-func (n *Node) incRetryCount() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.data.State.RetryCount++
-}
-
-func (n *Node) incDoneCount() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.data.State.DoneCount++
-}
 
 var (
 	nextNodeID = 1
@@ -478,7 +522,7 @@ func getNextNodeID() int {
 	return v
 }
 
-func (n *Node) init() {
+func (n *Node) Init() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if n.id != 0 {

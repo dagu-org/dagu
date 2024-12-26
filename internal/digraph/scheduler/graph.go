@@ -35,7 +35,7 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 	}
 	for _, step := range steps {
 		node := &Node{data: NodeData{Step: step}}
-		node.init()
+		node.Init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
 	}
@@ -55,7 +55,7 @@ func CreateRetryExecutionGraph(ctx context.Context, nodes ...*Node) (*ExecutionG
 		nodes: []*Node{},
 	}
 	for _, node := range nodes {
-		node.init()
+		node.Init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
 	}
@@ -167,7 +167,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
 				logger.Info(ctx, "clear node state", "step", g.dict[u].data.Step.Name)
-				g.dict[u].clearState()
+				g.dict[u].ClearState()
 				retry[u] = true
 			}
 			for _, v := range g.from[u] {
