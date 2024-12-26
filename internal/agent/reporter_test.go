@@ -145,7 +145,7 @@ type mockSender struct {
 	count   int
 }
 
-func (m *mockSender) Send(ctx context.Context, from string, to []string, subject, body string, _ []string) error {
+func (m *mockSender) Send(_ context.Context, from string, to []string, subject, body string, _ []string) error {
 	m.count += 1
 	m.from = from
 	m.to = to
