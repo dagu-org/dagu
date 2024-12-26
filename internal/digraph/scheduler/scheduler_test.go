@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -16,8 +15,124 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+type testHelper struct {
+	test.Helper
+
+	Scheduler *scheduler.Scheduler
+	Config    *scheduler.Config
+}
+
+type schedulerOption func(*scheduler.Config)
+
+func withMaxActiveRuns(n int) schedulerOption {
+	return func(cfg *scheduler.Config) {
+		cfg.MaxActiveRuns = n
+	}
+}
+
+func setup(t *testing.T, opts ...schedulerOption) testHelper {
+	t.Helper()
+
+	th := test.Setup(t)
+
+	cfg := &scheduler.Config{
+		LogDir: th.Config.Paths.LogDir,
+		ReqID:  uuid.Must(uuid.NewRandom()).String(),
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	sc := scheduler.New(cfg)
+
+	return testHelper{
+		Helper:    test.Setup(t),
+		Scheduler: sc,
+		Config:    cfg,
+	}
+}
+
+func (th testHelper) newGraph(t *testing.T, steps ...digraph.Step) graphHelper {
+	t.Helper()
+
+	graph, err := scheduler.NewExecutionGraph(steps...)
+	require.NoError(t, err)
+
+	return graphHelper{
+		testHelper:     th,
+		ExecutionGraph: graph,
+	}
+}
+
+type graphHelper struct {
+	testHelper
+	*scheduler.ExecutionGraph
+}
+
+func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) scheduleResult {
+	ctx := digraph.NewContext(gh.Context, &digraph.DAG{}, nil, nil, gh.Config.ReqID, "logFile")
+
+	var doneNodes []*scheduler.Node
+	nodeCompletedChan := make(chan *scheduler.Node)
+
+	go func() {
+		for node := range nodeCompletedChan {
+			doneNodes = append(doneNodes, node)
+		}
+	}()
+
+	err := gh.Scheduler.Schedule(ctx, gh.ExecutionGraph, nodeCompletedChan)
+
+	switch expectedStatus {
+	case scheduler.StatusSuccess, scheduler.StatusCancel:
+		require.NoError(t, err)
+
+	case scheduler.StatusError:
+		require.Error(t, err)
+
+	case scheduler.StatusRunning, scheduler.StatusNone:
+		t.Errorf("unexpected status %s", expectedStatus)
+
+	}
+
+	require.Equal(t, gh.Scheduler.Status(gh.ExecutionGraph), expectedStatus,
+		"expected status %s, got %s", expectedStatus, gh.Scheduler.Status(gh.ExecutionGraph))
+
+	return scheduleResult{
+		graphHelper: gh,
+		Done:        doneNodes,
+	}
+}
+
+type scheduleResult struct {
+	graphHelper
+	Done []*scheduler.Node
+}
+
+func (sr scheduleResult) AssertDoneCount(t *testing.T, expected int) {
+	t.Helper()
+
+	require.Len(t, sr.Done, expected, "expected %d done nodes, got %d", expected, len(sr.Done))
+}
+
+func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expected scheduler.NodeStatus) {
+	t.Helper()
+
+	nodes := sr.ExecutionGraph.Nodes()
+	var found bool
+	for _, node := range nodes {
+		if node.Data().Step.Name == stepName {
+			found = true
+			require.Equal(t, expected, node.State().Status, "expected status %s, got %s", expected, node.State().Status)
+		}
+	}
+
+	require.True(t, found, "step %s not found", stepName)
+}
 
 var (
 	testCommand     = "true"
@@ -42,33 +157,24 @@ func schedulerTextCtxWithDagContext() context.Context {
 }
 
 func TestScheduler(t *testing.T) {
-	g, err := scheduler.NewExecutionGraph(
-		step("1", testCommand),
-		step("2", testCommand, "1"),
-		step("3", testCommandFail, "2"),
-		step("4", testCommand, "3"),
+	sc := setup(t, withMaxActiveRuns(1))
+
+	// 1 -> 2 -> 3 -> 4
+	graph := sc.newGraph(t,
+		successStep("1"),
+		successStep("2", "1"),
+		failStep("3", "2"),
+		successStep("4", "3"),
 	)
-	require.NoError(t, err)
-	cfg := &scheduler.Config{MaxActiveRuns: 1, LogDir: testHomeDir}
-	sc := scheduler.New(cfg)
 
-	var counter atomic.Int64
-	done := make(chan *scheduler.Node)
-	go func() {
-		for range done {
-			counter.Add(1)
-		}
-	}()
+	result := graph.Schedule(t, scheduler.StatusError)
 
-	err = sc.Schedule(schedulerTextCtxWithDagContext(), g, done)
-	require.Error(t, err)
-
-	require.Equal(t, counter.Load(), int64(3))
-	require.Equal(t, sc.Status(g), scheduler.StatusError)
-
-	nodes := g.Nodes()
-	require.Equal(t, scheduler.NodeStatusError, nodes[2].State().Status)
-	require.Equal(t, scheduler.NodeStatusCancel, nodes[3].State().Status)
+	// 1, 2, 3 should be executed and 4 should be canceled because 3 failed
+	result.AssertDoneCount(t, 3)
+	result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+	result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	result.AssertNodeStatus(t, "3", scheduler.NodeStatusError)
+	result.AssertNodeStatus(t, "4", scheduler.NodeStatusCancel)
 }
 
 func TestSchedulerParallel(t *testing.T) {
@@ -680,6 +786,14 @@ func TestTakeOutputFromPrevStep(t *testing.T) {
 	require.Equal(t, scheduler.NodeStatusSuccess, nodes[1].State().Status)
 
 	require.Equal(t, "take-output", os.ExpandEnv("$TOOK_PREV_OUT"))
+}
+
+func successStep(name string, depends ...string) digraph.Step {
+	return step(name, testCommand, depends...)
+}
+
+func failStep(name string, depends ...string) digraph.Step {
+	return step(name, testCommandFail, depends...)
 }
 
 func step(name, command string, depends ...string) digraph.Step {
