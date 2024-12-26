@@ -208,6 +208,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						if execErr == nil || node.data.Step.ContinueOn.Failure {
 							if !sc.isCanceled() {
 								time.Sleep(node.data.Step.RepeatPolicy.Interval)
+								if done != nil {
+									done <- node
+								}
 								continue ExecRepeat
 							}
 						}
@@ -502,6 +505,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 		err = node.Execute(ctx)
 		if err != nil {
 			node.SetStatus(NodeStatusError)
+			return err
 		} else {
 			node.SetStatus(NodeStatusSuccess)
 		}

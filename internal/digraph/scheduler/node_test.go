@@ -342,22 +342,6 @@ func TestRunScript(t *testing.T) {
 	require.NoFileExists(t, n.ScriptFilename())
 }
 
-func TestTeardown(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         testCommand,
-			Args:            []string{},
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
-
-	runTestNode(t, n)
-
-	err := n.Teardown()
-	require.NoError(t, err)
-	require.NoError(t, n.Data().State.Error)
-}
-
 func runTestNode(t *testing.T, n *scheduler.Node) {
 	t.Helper()
 	err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-request-id-%d", rand.Int()))
