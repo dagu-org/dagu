@@ -5,7 +5,6 @@ package fileutil
 
 import (
 	"errors"
-	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -97,13 +96,6 @@ func MustTempDir(pattern string) string {
 		panic(err)
 	}
 	return t
-}
-
-// LogErr logs error if it's not nil.
-func LogErr(action string, err error) {
-	if err != nil {
-		log.Printf("%s failed. %s", action, err)
-	}
 }
 
 // TruncString TurnString returns truncated string.

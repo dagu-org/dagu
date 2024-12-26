@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -310,9 +309,9 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 		if allowOverride && n.data.Step.SignalOnStop != "" {
 			sigsig = unix.SignalNum(n.data.Step.SignalOnStop)
 		}
-		log.Printf("Sending %s signal to %s", sigsig, n.data.Step.Name)
+		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.data.Step.Name)
 		if err := n.cmd.Kill(sigsig); err != nil {
-			logger.Error(ctx, "failed to send signal", "err", err)
+			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.data.Step.Name)
 		}
 	}
 	if status == NodeStatusRunning {
@@ -320,7 +319,7 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	}
 }
 
-func (n *Node) Cancel() {
+func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	status := n.data.State.Status
@@ -328,7 +327,7 @@ func (n *Node) Cancel() {
 		n.data.State.Status = NodeStatusCancel
 	}
 	if n.cancelFunc != nil {
-		log.Printf("canceling node: %s", n.data.Step.Name)
+		logger.Info(ctx, "canceling node", "step", n.data.Step.Name)
 		n.cancelFunc()
 	}
 }

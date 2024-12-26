@@ -402,10 +402,10 @@ func (sc *Scheduler) Signal(
 }
 
 // Cancel sends -1 signal to all nodes.
-func (sc *Scheduler) Cancel(g *ExecutionGraph) {
+func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
 	sc.setCanceled()
 	for _, node := range g.Nodes() {
-		node.Cancel()
+		node.Cancel(ctx)
 	}
 }
 

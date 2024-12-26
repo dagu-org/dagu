@@ -706,7 +706,7 @@ func (gh graphHelper) Signal(sig syscall.Signal) {
 func (gh graphHelper) Cancel(t *testing.T) {
 	t.Helper()
 
-	gh.Scheduler.Cancel(gh.ExecutionGraph)
+	gh.Scheduler.Cancel(gh.Context, gh.ExecutionGraph)
 }
 
 type scheduleResult struct {
