@@ -6,348 +6,246 @@ package scheduler_test
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
-	"path/filepath"
+	"path"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/test"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func nodeTextCtxWithDagContext() context.Context {
-	return digraph.NewContext(context.Background(), nil, nil, nil, "", "")
+type nodeHelper struct {
+	*scheduler.Node
+	test.Helper
+	reqID string
 }
 
-func TestExecute(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "true",
-			OutputVariables: &digraph.SyncMap{},
-		}})
-	require.NoError(t, n.Execute(nodeTextCtxWithDagContext()))
-	require.Nil(t, n.Data().State.Error)
+type nodeOption func(*scheduler.NodeData)
+
+func withNodeCmdArgs(cmd string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.CmdWithArgs = cmd
+	}
 }
 
-func TestError(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "false",
-			OutputVariables: &digraph.SyncMap{},
-		}})
-	err := n.Execute(nodeTextCtxWithDagContext())
-	require.True(t, err != nil)
-	require.Equal(t, n.Data().State.Error, err)
+func withNodeCommand(command string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.Command = command
+	}
 }
 
-func TestSignal(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "sleep",
-			Args:            []string{"100"},
-			OutputVariables: &digraph.SyncMap{},
-		}})
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		n.Signal(context.Background(), syscall.SIGTERM, false)
-	}()
-
-	n.SetStatus(scheduler.NodeStatusRunning)
-	err := n.Execute(nodeTextCtxWithDagContext())
-
-	require.Error(t, err)
-	require.Equal(t, n.State().Status, scheduler.NodeStatusCancel)
+func withNodeSignalOnStop(signal string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.SignalOnStop = signal
+	}
 }
 
-func TestSignalSpecified(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "sleep",
-			Args:            []string{"100"},
-			OutputVariables: &digraph.SyncMap{},
-			SignalOnStop:    "SIGINT",
-		}})
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		n.Signal(context.Background(), syscall.SIGTERM, true)
-	}()
-
-	n.SetStatus(scheduler.NodeStatusRunning)
-	err := n.Execute(nodeTextCtxWithDagContext())
-
-	require.Error(t, err)
-	require.Equal(t, n.State().Status, scheduler.NodeStatusCancel)
+func withNodeStdout(stdout string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.Stdout = stdout
+	}
 }
 
-func TestLog(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "echo",
-			Args:            []string{"done"},
-			Dir:             os.Getenv("HOME"),
-			OutputVariables: &digraph.SyncMap{},
-		}})
-
-	runTestNode(t, n)
-
-	dat, _ := os.ReadFile(n.LogFilename())
-	require.Equal(t, "done\n", string(dat))
+func withNodeStderr(stderr string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.Stderr = stderr
+	}
 }
 
-func TestStdout(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "echo",
-			Args:            []string{"done"},
-			Dir:             os.Getenv("HOME"),
-			Stdout:          "stdout.log",
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
-
-	runTestNode(t, n)
-
-	f := filepath.Join(os.Getenv("HOME"), n.Data().Step.Stdout)
-	dat, _ := os.ReadFile(f)
-	require.Equal(t, "done\n", string(dat))
+func withNodeScript(script string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.Script = script
+	}
 }
 
-func TestStderr(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command: "sh",
-			Script: `
-echo Stdout message >&1
-echo Stderr message >&2
-			`,
-			Dir:             os.Getenv("HOME"),
-			Stdout:          "test-stderr-stdout.log",
-			Stderr:          "test-stderr-stderr.log",
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
+func withNodeOutput(output string) nodeOption {
+	return func(data *scheduler.NodeData) {
+		data.Step.Output = output
+	}
+}
 
-	runTestNode(t, n)
+func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
+	th := test.Setup(t)
 
-	f := filepath.Join(os.Getenv("HOME"), n.Data().Step.Stderr)
-	dat, _ := os.ReadFile(f)
-	require.Equal(t, "Stderr message\n", string(dat))
+	data := scheduler.NodeData{Step: digraph.Step{}}
+	for _, opt := range opts {
+		opt(&data)
+	}
 
-	f = filepath.Join(os.Getenv("HOME"), n.Data().Step.Stdout)
-	dat, _ = os.ReadFile(f)
-	require.Equal(t, "Stdout message\n", string(dat))
+	node := scheduler.NodeWithData(data)
+	reqID := uuid.Must(uuid.NewRandom()).String()
+
+	return nodeHelper{node, th, reqID}
+}
+
+func (n nodeHelper) Execute(t *testing.T) {
+	err := n.Node.Setup(n.Config.Paths.LogDir, n.reqID)
+	require.NoError(t, err, "failed to setup node")
+
+	err = n.Node.Execute(n.execContext())
+	require.NoError(t, err, "failed to execute node")
+
+	err = n.Teardown()
+	require.NoError(t, err, "failed to teardown node")
+}
+
+func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
+	err := n.Node.Execute(n.execContext())
+	require.Error(t, err, "expected error")
+	require.Contains(t, err.Error(), expectedErr, "unexpected error")
+}
+
+func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
+	dat, err := os.ReadFile(n.Node.LogFilename())
+	require.NoErrorf(t, err, "failed to read log file %q", n.Node.LogFilename())
+	require.Contains(t, string(dat), expected, "log file does not contain expected string")
+}
+
+func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
+	require.NotNil(t, n.Node.Data().Step.OutputVariables, "output variables not set")
+	data, ok := n.Node.Data().Step.OutputVariables.Load(key)
+	require.True(t, ok, "output variable not found")
+	require.Equal(t, fmt.Sprintf("%s=%s", key, value), data, "output variable value mismatch")
+}
+
+func (n nodeHelper) execContext() context.Context {
+	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, nil, n.reqID, "logFile")
 }
 
 func TestNode(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "echo",
-			Args:            []string{"hello"},
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
-	n.IncDoneCount()
-	require.Equal(t, 1, n.GetDoneCount())
+	t.Parallel()
 
-	n.IncRetryCount()
-	require.Equal(t, 1, n.GetRetryCount())
+	t.Run("Execute", func(t *testing.T) {
+		node := setupNode(t, withNodeCommand("true"))
+		node.Execute(t)
+	})
+	t.Run("Error", func(t *testing.T) {
+		node := setupNode(t, withNodeCommand("false"))
+		node.ExecuteFail(t, "exit status 1")
+	})
+	t.Run("Signal", func(t *testing.T) {
+		node := setupNode(t, withNodeCommand("sleep 3"))
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			node.Signal(node.Context, syscall.SIGTERM, false)
+		}()
 
-	n.Init()
-	require.Equal(t, n.Data().Step.Variables, []string{})
-}
+		node.SetStatus(scheduler.NodeStatusRunning)
 
-func TestOutput(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			CmdWithArgs:     "echo hello",
-			Output:          "OUTPUT_TEST",
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
-	err := n.Setup(os.Getenv("HOME"), "test-request-id-output")
-	require.NoError(t, err)
-	defer func() {
-		_ = n.Teardown()
-	}()
+		node.ExecuteFail(t, "signal: terminated")
+		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
+	})
+	t.Run("SignalOnStop", func(t *testing.T) {
+		node := setupNode(t, withNodeCommand("sleep 3"), withNodeSignalOnStop("SIGINT"))
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
+		}()
 
-	runTestNode(t, n)
+		node.SetStatus(scheduler.NodeStatusRunning)
 
-	dat, _ := os.ReadFile(n.LogFilename())
-	require.Equal(t, "hello\n", string(dat))
-	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST"))
+		node.ExecuteFail(t, "signal: interrupt")
+		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
+	})
+	t.Run("LogOutput", func(t *testing.T) {
+		node := setupNode(t, withNodeCommand("echo hello"))
+		node.Execute(t)
+		node.AssertLogContains(t, "hello")
+	})
+	t.Run("Stdout", func(t *testing.T) {
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
+		defer os.Remove(random)
 
-	// Use the previous output in the subsequent step
-	n2 := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			CmdWithArgs:     "echo $OUTPUT_TEST",
-			Output:          "OUTPUT_TEST2",
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
+		node := setupNode(t, withNodeCommand("echo hello"), withNodeStdout(random))
+		node.Execute(t)
 
-	runTestNode(t, n2)
-	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST2"))
+		file := node.Data().Step.Stdout
+		dat, _ := os.ReadFile(file)
+		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
+	})
+	t.Run("Stderr", func(t *testing.T) {
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
+		defer os.Remove(random)
 
-	// Use the previous output in the subsequent step inside a script
-	n3 := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command:         "sh",
-			Script:          "echo $OUTPUT_TEST2",
-			Output:          "OUTPUT_TEST3",
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
+		node := setupNode(t,
+			withNodeCommand("sh"),
+			withNodeStderr(random),
+			withNodeScript("echo hello >&2"),
+		)
+		node.Execute(t)
 
-	runTestNode(t, n3)
-	require.Equal(t, "hello", os.ExpandEnv("$OUTPUT_TEST3"))
-}
+		file := node.Data().Step.Stderr
+		dat, _ := os.ReadFile(file)
+		require.Equalf(t, "hello\n", string(dat), "unexpected stderr content: %s", string(dat))
+	})
+	t.Run("Output", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs("echo hello"), withNodeOutput("OUTPUT_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT_TEST", "hello")
+	})
+	t.Run("OutputJSON", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key": "value"}`)
+	})
+	t.Run("OutputJSONUnescaped", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
+	})
+	t.Run("OutputSpecialChar", func(t *testing.T) {
+		t.Parallel()
 
-func TestOutputJson(t *testing.T) {
-	for i, test := range []struct {
-		CmdWithArgs string
-		Want        string
-		WantArgs    int
-	}{
-		{
-			CmdWithArgs: `echo {\"key\":\"value\"}`,
-			Want:        `{"key":"value"}`,
-			WantArgs:    1,
-		},
-		{
-			CmdWithArgs: `echo "{\"key\": \"value\"}"`,
-			Want:        `{"key": "value"}`,
-			WantArgs:    1,
-		},
-	} {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			n := scheduler.NodeWithData(scheduler.NodeData{
-				Step: digraph.Step{
-					CmdWithArgs:     test.CmdWithArgs,
-					Output:          "OUTPUT_JSON_TEST",
-					OutputVariables: &digraph.SyncMap{},
-				}},
-			)
-			err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-output-jsondb-%d", i))
-			require.NoError(t, err)
-			defer func() {
-				_ = n.Teardown()
-			}()
+		testCases := []struct {
+			CmdWithArgs string
+			Want        string
+		}{
+			{
+				CmdWithArgs: `echo "hello\tworld"`,
+				Want:        `hello\tworld`,
+			},
+			{
+				CmdWithArgs: `echo hello"\t"world`,
+				Want:        `hello\tworld`,
+			},
+			{
+				CmdWithArgs: `echo hello\tworld`,
+				Want:        `hello\tworld`,
+			},
+			{
+				CmdWithArgs: `echo hello\nworld`,
+				Want:        `hello\nworld`,
+			},
+			{
+				CmdWithArgs: `echo {\"key\":\"value\"}`,
+				Want:        `{"key":"value"}`,
+			},
+			{
+				CmdWithArgs: `echo "{\"key\":\"value\"}"`,
+				Want:        `{"key":"value"}`,
+			},
+		}
 
-			runTestNode(t, n)
-
-			require.Equal(t, test.WantArgs, len(n.Data().Step.Args))
-
-			v, _ := n.Data().Step.OutputVariables.Load("OUTPUT_JSON_TEST")
-			require.Equal(t, fmt.Sprintf("OUTPUT_JSON_TEST=%s", test.Want), v)
-			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_JSON_TEST"))
-		})
-	}
-}
-
-func TestOutputSpecialChar(t *testing.T) {
-	for i, test := range []struct {
-		CmdWithArgs string
-		Want        string
-		WantArgs    int
-	}{
-		{
-			CmdWithArgs: `echo "hello\tworld"`,
-			Want:        `hello\tworld`,
-			WantArgs:    1,
-		},
-		{
-			CmdWithArgs: `echo hello"\t"world`,
-			Want:        `hello\tworld`,
-			WantArgs:    1,
-		},
-		{
-			CmdWithArgs: `echo hello\tworld`,
-			Want:        `hello\tworld`,
-			WantArgs:    1,
-		},
-		{
-			CmdWithArgs: `echo hello\nworld`,
-			Want:        `hello\nworld`,
-			WantArgs:    1,
-		},
-		{
-			CmdWithArgs: `echo {\"key\":\"value\"}`,
-			Want:        `{"key":"value"}`,
-			WantArgs:    1,
-		},
-		{
-			CmdWithArgs: `echo "{\"key\":\"value\"}"`,
-			Want:        `{"key":"value"}`,
-			WantArgs:    1,
-		},
-	} {
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-			n := scheduler.NodeWithData(scheduler.NodeData{
-				Step: digraph.Step{
-					CmdWithArgs:     test.CmdWithArgs,
-					Output:          "OUTPUT_SPECIALCHAR_TEST",
-					OutputVariables: &digraph.SyncMap{},
-				}},
-			)
-			err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-output-specialchar-%d", i))
-			require.NoError(t, err)
-			defer func() {
-				_ = n.Teardown()
-			}()
-
-			runTestNode(t, n)
-
-			require.Equal(t, test.WantArgs, len(n.Data().Step.Args))
-
-			v, _ := n.Data().Step.OutputVariables.Load("OUTPUT_SPECIALCHAR_TEST")
-			require.Equal(t, fmt.Sprintf("OUTPUT_SPECIALCHAR_TEST=%s", test.Want), v)
-			require.Equal(t, test.Want, os.ExpandEnv("$OUTPUT_SPECIALCHAR_TEST"))
-		})
-	}
-}
-
-func TestRunScript(t *testing.T) {
-	n := scheduler.NodeWithData(scheduler.NodeData{
-		Step: digraph.Step{
-			Command: "sh",
-			Args:    []string{},
-			Script: `
-			  echo hello
-			`,
-			Output:          "SCRIPT_TEST",
-			OutputVariables: &digraph.SyncMap{},
-		}},
-	)
-
-	err := n.Setup(os.Getenv("HOME"),
-		fmt.Sprintf("test-request-id-%d", rand.Int()))
-	require.NoError(t, err)
-
-	require.FileExists(t, n.LogFilename())
-	b, _ := os.ReadFile(n.ScriptFilename())
-	require.Equal(t, n.Data().Step.Script, string(b))
-
-	require.NoError(t, err)
-	err = n.Execute(nodeTextCtxWithDagContext())
-	require.NoError(t, err)
-	err = n.Teardown()
-	require.NoError(t, err)
-
-	require.Equal(t, "hello", os.Getenv("SCRIPT_TEST"))
-	require.NoFileExists(t, n.ScriptFilename())
-}
-
-func runTestNode(t *testing.T, n *scheduler.Node) {
-	t.Helper()
-	err := n.Setup(os.Getenv("HOME"), fmt.Sprintf("test-request-id-%d", rand.Int()))
-	require.NoError(t, err)
-	err = n.Execute(nodeTextCtxWithDagContext())
-	require.NoError(t, err)
-	err = n.Teardown()
-	require.NoError(t, err)
+		for i, tc := range testCases {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				node := setupNode(t, withNodeCmdArgs(tc.CmdWithArgs), withNodeOutput("OUTPUT_SPECIALCHAR_TEST"))
+				node.Execute(t)
+				node.AssertOutput(t, "OUTPUT_SPECIALCHAR_TEST", tc.Want)
+			})
+		}
+	})
+	t.Run("Script", func(t *testing.T) {
+		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "SCRIPT_TEST", "hello")
+		// check script file is removed
+		scriptFilePath := node.ScriptFilename()
+		require.NotEmpty(t, scriptFilePath)
+		require.NoFileExists(t, scriptFilePath, "script file not removed")
+	})
 }

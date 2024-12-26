@@ -6,6 +6,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -55,13 +56,15 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
 
-	tmpDir := fileutil.MustTempDir("test")
+	random := uuid.New().String()
+	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
 
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
 	cfg.Paths.Executable = executablePath
+	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 
 	dataStores := dsclient.NewDataStores(
 		cfg.Paths.DAGsDir,

@@ -338,12 +338,21 @@ func (n *Node) Setup(logDir string, requestID string) error {
 	defer n.mu.Unlock()
 
 	// Set the log file path
-	n.data.State.StartedAt = time.Now()
-	n.data.State.Log = filepath.Join(logDir, fmt.Sprintf("%s.%s.%s.log",
-		fileutil.SafeName(n.data.Step.Name),
-		n.data.State.StartedAt.Format("20060102.15:04:05.000"),
-		stringutil.TruncString(requestID, 8),
-	))
+	startedAt := time.Now()
+
+	safeName := fileutil.SafeName(n.data.Step.Name)
+	timestamp := startedAt.Format("20060102.15:04:05.000")
+	postfix := stringutil.TruncString(requestID, 8)
+	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
+	if !fileutil.FileExists(logDir) {
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return fmt.Errorf("failed to create log directory %q: %w", logDir, err)
+		}
+	}
+
+	filePath := filepath.Join(logDir, logFilename)
+	n.data.State.Log = filePath
+	n.data.State.StartedAt = startedAt
 
 	// Replace the special environment variables in the command
 	// Why this is necessary:

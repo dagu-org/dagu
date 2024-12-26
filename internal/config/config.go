@@ -30,22 +30,38 @@ type Config struct {
 
 	// Legacy fields for backward compatibility - Start
 	// Note: These fields are used for backward compatibility and should not be used in new code
-	DAGs                  string `mapstructure:"dags"`
-	Executable            string `mapstructure:"executable"`
-	LogDir                string `mapstructure:"logDir"`
-	DataDir               string `mapstructure:"dataDir"`
-	SuspendFlagsDir       string `mapstructure:"suspendFlagsDir"`
-	AdminLogsDir          string `mapstructure:"adminLogsDir"`
-	BaseConfig            string `mapstructure:"baseConfig"`
-	IsBasicAuth           bool   `mapstructure:"isBasicAuth"`
-	BasicAuthUsername     string `mapstructure:"basicAuthUsername"`
-	BasicAuthPassword     string `mapstructure:"basicAuthPassword"`
-	IsAuthToken           bool   `mapstructure:"isAuthToken"`
-	AuthToken             string `mapstructure:"authToken"`
-	LogEncodingCharset    string `mapstructure:"logEncodingCharset"`
-	NavbarColor           string `mapstructure:"navbarColor"`
-	NavbarTitle           string `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
+	// Deprecated: Use Auth.Basic.Enabled instead
+	DAGs string `mapstructure:"dags"`
+	// Deprecated: Use Paths.Executable instead
+	Executable string `mapstructure:"executable"`
+	// Deprecated: Use Paths.LogDir instead
+	LogDir string `mapstructure:"logDir"`
+	// Deprecated: Use Paths.DataDir instead
+	DataDir string `mapstructure:"dataDir"`
+	// Deprecated: Use Paths.SuspendFlagsDir instead
+	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
+	// Deprecated: Use Paths.AdminLogsDir instead
+	AdminLogsDir string `mapstructure:"adminLogsDir"`
+	// Deprecated: Use Paths.BaseConfig instead
+	BaseConfig string `mapstructure:"baseConfig"`
+	// Deprecated: Use Auth.Token.Enabled instead
+	IsBasicAuth bool `mapstructure:"isBasicAuth"`
+	// Deprecated: Use Auth.Basic.Username instead
+	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
+	// Deprecated: Use Auth.Basic.Password instead
+	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
+	// Deprecated: Use Auth.Token.Enabled instead
+	IsAuthToken bool `mapstructure:"isAuthToken"`
+	// Deprecated: Use Auth.Token.Value instead
+	AuthToken string `mapstructure:"authToken"`
+	// Deprecated: Use UI.LogEncodingCharset instead
+	LogEncodingCharset string `mapstructure:"logEncodingCharset"`
+	// Deprecated: Use UI.NavbarColor instead
+	NavbarColor string `mapstructure:"navbarColor"`
+	// Deprecated: Use UI.NavbarTitle instead
+	NavbarTitle string `mapstructure:"navbarTitle"`
+	// Deprecated: Use UI.MaxDashboardPageLimit instead
+	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
 	// Legacy fields for backward compatibility - End
 
 	// Other settings

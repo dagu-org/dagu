@@ -255,8 +255,10 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		dag := th.LoadDAGFile(t, "handle_http_cancel.yaml")
 		dagAgent := dag.Agent()
 
+		done := make(chan struct{})
 		go func() {
 			dagAgent.RunCancel(t)
+			close(done)
 		}()
 
 		// Wait for the DAG to start
@@ -272,6 +274,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		require.Equal(t, "OK", mockResponseWriter.body)
 
 		// Wait for the DAG to stop
+		<-done
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 	})
 }
