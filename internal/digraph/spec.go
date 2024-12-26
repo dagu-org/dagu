@@ -45,27 +45,48 @@ type handlerOnDef struct {
 }
 
 type stepDef struct {
-	Name          string
-	Description   string
-	Dir           string
-	Executor      any
-	Command       any
-	Shell         string
-	Script        string
-	Stdout        string
-	Stderr        string
-	Output        string
-	Depends       []string
-	ContinueOn    *continueOnDef
-	RetryPolicy   *retryPolicyDef
-	RepeatPolicy  *repeatPolicyDef
-	MailOnError   bool
+	// Name is the name of the step.
+	Name string
+	// Description is the description of the step.
+	Description string
+	// Dir is the working directory of the step.
+	Dir string
+	// Executor is the executor configuration.
+	Executor any
+	// Command is the command to run (on shell).
+	Command any
+	// Shell is the shell to run the command. Default is `$SHELL` or `sh`.
+	Shell string
+	// Script is the script to run.
+	Script string
+	// Stdout is the file to write the stdout.
+	Stdout string
+	// Stderr is the file to write the stderr.
+	Stderr string
+	// Output is the variable name to store the output.
+	Output string
+	// Depends is the list of steps to depend on.
+	Depends []string
+	// ContinueOn is the condition to continue on.
+	ContinueOn *continueOnDef
+	// RetryPolicy is the retry policy.
+	RetryPolicy *retryPolicyDef
+	// RepeatPolicy is the repeat policy.
+	RepeatPolicy *repeatPolicyDef
+	// MailOnError is the flag to send mail on error.
+	MailOnError bool
+	// Precondition is the condition to run the step.
 	Preconditions []*conditionDef
-	SignalOnStop  *string
-	Env           string
-	Call          *callFuncDef // deprecated
-	Run           string       // Run is a sub workflow to run
-	Params        string       // Params is the parameters for the sub workflow
+	// SignalOnStop is the signal when the step is requested to stop.
+	// When it is empty, the same signal as the parent process is sent.
+	// It can be KILL when the process does not stop over the timeout.
+	SignalOnStop *string
+	// Deprecated: Don't use this field
+	Call *callFuncDef // deprecated
+	// Run is a sub workflow to run
+	Run string
+	// Params is the parameters for the sub workflow
+	Params string
 }
 
 type funcDef struct {
