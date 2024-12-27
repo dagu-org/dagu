@@ -31,7 +31,7 @@ func TestStatusSerialization(t *testing.T) {
 		HandlerOn: digraph.HandlerOn{},
 		Steps: []digraph.Step{
 			{
-				Name: "1", Description: "", Variables: []string{},
+				Name: "1", Description: "",
 				Dir: "dir", Command: "echo 1", Args: []string{},
 				Depends: []string{}, ContinueOn: digraph.ContinueOn{},
 				RetryPolicy: digraph.RetryPolicy{}, MailOnError: false,

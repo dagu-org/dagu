@@ -79,7 +79,7 @@ func newSubWorkflow(
 	}
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, os.Environ()...)
-	cmd.Env = append(cmd.Env, step.Variables...)
+	cmd.Env = append(cmd.Env, dagCtx.DAG.Env...)
 
 	// Get output variables from the step context and set them as environment
 	stepCtx := digraph.GetStepContext(ctx)

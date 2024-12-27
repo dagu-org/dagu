@@ -422,8 +422,6 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 		MailOnError:    def.MailOnError,
 		Preconditions:  buildConditions(def.Preconditions),
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
-		// TODO: add support for variables for the step local
-		Variables: []string{},
 	}
 
 	// TODO: remove the deprecated call field.

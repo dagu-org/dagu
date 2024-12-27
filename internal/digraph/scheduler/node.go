@@ -529,13 +529,6 @@ func (n *Node) Init() {
 		return
 	}
 	n.id = getNextNodeID()
-
-	if n.data.Step.Variables == nil {
-		n.data.Step.Variables = []string{}
-	}
-	if n.data.Step.Variables == nil {
-		n.data.Step.Variables = []string{}
-	}
 	if n.data.Step.Preconditions == nil {
 		n.data.Step.Preconditions = []digraph.Condition{}
 	}
