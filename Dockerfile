@@ -28,6 +28,7 @@ ARG USER_GID=$USER_UID
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y \
+    sudo \
     git \
     curl \
     wget \
@@ -48,28 +49,25 @@ RUN apt-get update && \
 COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 COPY ./entrypoint.sh /entrypoint.sh
 
-# Create user and set permissions
-RUN \
-    # Try to create group with specified GID, fallback to any available GID if exists
-    (groupadd -g ${USER_GID} ${USER} || groupadd ${USER}) && \
-    # Try to create user with specified UID, fallback to any available UID if exists
-    # -m: Create home directory
-    # -d: Set home directory path
-    # -u: Set UID
-    # -g: Set primary group (using getent to fetch actual GID)
-    # -s: Set login shell
+RUN set -eux; \
+    # Try to create group with specified GID, fallback if GID in use
+    (groupadd -g "${USER_GID}" "${USER}" || groupadd "${USER}") && \
+    # Try to create user with specified UID, fallback if UID in use
     (useradd -m -d /config \
-            -u ${USER_UID} \
-            -g $(getent group ${USER} | cut -d: -f3) \
-            -s /bin/bash \
-            ${USER} \
-    || useradd -m -d /config \
-              -g $(getent group ${USER} | cut -d: -f3) \
+              -u "${USER_UID}" \
+              -g "$(getent group "${USER}" | cut -d: -f3)" \
               -s /bin/bash \
-              ${USER}) && \
-    # Set proper ownership and permissions
-    chown -R ${USER}:${USER} /config && \
+              "${USER}" \
+    || useradd -m -d /config \
+               -g "$(getent group "${USER}" | cut -d: -f3)" \
+               -s /bin/bash \
+               "${USER}") && \
+    chown -R "${USER}:${USER}" /config && \
     chmod +x /entrypoint.sh
+
+# Create user and set permissions
+RUN echo "dagu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/99-dagu \
+    && chmod 440 /etc/sudoers.d/99-dagu
 
 WORKDIR /config
 ENV DAGU_HOST=0.0.0.0
