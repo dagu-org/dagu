@@ -26,7 +26,7 @@ ARG USER_GID=$USER_UID
 COPY --from=go-builder /app/bin/dagu /usr/local/bin/
 COPY ./entrypoint.sh /entrypoint.sh
 
-# Install common GitHub Actions tools
+# Install common tools
 RUN apt-get update && \
     apt-get install -y \
     git \
@@ -36,6 +36,14 @@ RUN apt-get update && \
     unzip \
     sudo \
     tzdata \
+    build-essential \
+    jq \
+    python3 \
+    python3-pip \
+    openjdk-11-jdk \
+    nodejs \
+    npm \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* && \
     # Create user and set permissions
     groupadd -g ${USER_GID} ${USER} && \
