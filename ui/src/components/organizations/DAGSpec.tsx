@@ -73,6 +73,7 @@ function DAGSpec({ data }: Props) {
                     steps={data.DAG.DAG.Steps}
                     type="config"
                     flowchart={flowchart}
+                    showIcons={false}
                   />
                 </Box>
               </BorderedBox>
