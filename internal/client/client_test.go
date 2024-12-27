@@ -32,9 +32,7 @@ func TestClient_GetStatus(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := model.NewStatusFactory(dag.DAG).Create(
-					nil, scheduler.StatusRunning, 0, nil, nil,
-				)
+				status := model.NewStatusFactory(dag.DAG).Create(scheduler.StatusRunning, 0, time.Now())
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJSON()
 				_, _ = w.Write(b)
@@ -307,13 +305,11 @@ func TestClient_ReadHistory(t *testing.T) {
 }
 
 func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
-	nodeData := scheduler.NodeData{
-		State: scheduler.NodeState{Status: nodeStatus},
-	}
+	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	startedAt := model.Time(time.Now())
-	statusData := model.NewStatusFactory(dag).Create([]scheduler.NodeData{nodeData}, status, 0, startedAt, nil)
-	statusData.RequestID = requestID
-	return statusData
+	return model.NewStatusFactory(dag).Create(
+		status, 0, *startedAt, model.WithNodes(nodes), model.WithRequestID(requestID),
+	)
 }
 
 func TestClient_GetTagList(t *testing.T) {

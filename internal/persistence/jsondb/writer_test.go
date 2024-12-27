@@ -21,12 +21,10 @@ func TestWriter(t *testing.T) {
 
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
-		status := model.NewStatusFactory(dag.DAG).Create(
-			nil, scheduler.StatusRunning, 10000, nil, nil,
-		)
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-		status.RequestID = requestID
-
+		status := model.NewStatusFactory(dag.DAG).Create(
+			scheduler.StatusRunning, 10000, time.Now(), model.WithRequestID(requestID),
+		)
 		writer := dag.Writer(t, requestID, time.Now())
 		writer.Write(t, status)
 
@@ -41,9 +39,8 @@ func TestWriter(t *testing.T) {
 		writer := dag.Writer(t, requestID, startedAt)
 
 		status := model.NewStatusFactory(dag.DAG).Create(
-			nil, scheduler.StatusCancel, 10000, nil, nil,
+			scheduler.StatusCancel, 10000, time.Now(), model.WithRequestID(requestID),
 		)
-		status.RequestID = requestID
 
 		// Write initial status
 		writer.Write(t, status)
@@ -76,9 +73,7 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
-		status := model.NewStatusFactory(dag.DAG).Create(
-			nil, scheduler.StatusRunning, 10000, nil, nil,
-		)
+		status := model.NewStatusFactory(dag.DAG).Create(scheduler.StatusRunning, 10000, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -97,7 +92,7 @@ func TestWriterRename(t *testing.T) {
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
 	status := model.NewStatusFactory(dag.DAG).Create(
-		nil, scheduler.StatusRunning, 10000, nil, nil,
+		scheduler.StatusRunning, 10000, time.Now(),
 	)
 	writer.Write(t, status)
 	writer.Close(t)

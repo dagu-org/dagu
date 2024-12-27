@@ -26,7 +26,7 @@ func TestPID(t *testing.T) {
 }
 
 func TestStatusSerialization(t *testing.T) {
-	start, end := time.Now(), time.Now().Add(time.Second*1)
+	startedAt, finishedAt := time.Now(), time.Now().Add(time.Second*1)
 	dag := &digraph.DAG{
 		HandlerOn: digraph.HandlerOn{},
 		Steps: []digraph.Step{
@@ -43,27 +43,24 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
-	status := NewStatusFactory(dag).Create(
-		nil, scheduler.StatusSuccess, 10000, &start, &end,
+	statusToPersist := NewStatusFactory(dag).Create(
+		scheduler.StatusSuccess, 10000, startedAt, WithFinishedAt(finishedAt),
 	)
 
-	rawJSON, err := status.ToJSON()
+	rawJSON, err := statusToPersist.ToJSON()
 	require.NoError(t, err)
 
-	unmarshalled, err := StatusFromJSON(string(rawJSON))
+	statusObject, err := StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
-	require.Equal(t, status.Name, unmarshalled.Name)
-	require.Equal(t, 1, len(unmarshalled.Nodes))
-	require.Equal(t, dag.Steps[0].Name, unmarshalled.Nodes[0].Step.Name)
+	require.Equal(t, statusToPersist.Name, statusObject.Name)
+	require.Equal(t, 1, len(statusObject.Nodes))
+	require.Equal(t, dag.Steps[0].Name, statusObject.Nodes[0].Step.Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
-	status := NewStatusFactory(dag).Create(
-		nil, scheduler.StatusRunning,
-		10000, nil, nil,
-	)
+	status := NewStatusFactory(dag).Create(scheduler.StatusRunning, 10000, time.Now())
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }

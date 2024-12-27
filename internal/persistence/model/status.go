@@ -24,7 +24,20 @@ func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
 }
 
 func (f *StatusFactory) CreateDefault() *Status {
-	return f.Create(nil, scheduler.StatusNone, int(pidNotRunning), nil, nil)
+	return &Status{
+		Name:       f.dag.Name,
+		Status:     scheduler.StatusNone,
+		StatusText: scheduler.StatusNone.String(),
+		PID:        PID(pidNotRunning),
+		Nodes:      FromSteps(f.dag.Steps),
+		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
+		OnFailure:  nodeOrNil(f.dag.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(f.dag.HandlerOn.Cancel),
+		Params:     Params(f.dag.Params),
+		StartedAt:  stringutil.FormatTime(time.Time{}),
+		FinishedAt: stringutil.FormatTime(time.Time{}),
+	}
 }
 
 type StatusOption func(*Status)
@@ -35,30 +48,34 @@ func WithRequestID(reqID string) StatusOption {
 	}
 }
 
+func WithNodes(nodes []scheduler.NodeData) StatusOption {
+	return func(s *Status) {
+		s.Nodes = FromNodes(nodes)
+	}
+}
+
+func WithFinishedAt(t time.Time) StatusOption {
+	return func(s *Status) {
+		s.FinishedAt = FormatTime(t)
+	}
+}
+
 func (f *StatusFactory) Create(
-	nodes []scheduler.NodeData,
 	status scheduler.Status,
 	pid int,
-	startTime, endTime *time.Time,
+	startedAt time.Time,
+	opts ...StatusOption,
 ) *Status {
-	statusObj := &Status{
-		Name:       f.dag.Name,
-		Status:     status,
-		StatusText: status.String(),
-		PID:        PID(pid),
-		Nodes:      FromNodesOrSteps(nodes, f.dag.Steps),
-		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
-		OnFailure:  nodeOrNil(f.dag.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(f.dag.HandlerOn.Cancel),
-		Params:     Params(f.dag.Params),
+	statusObj := f.CreateDefault()
+	statusObj.Status = status
+	statusObj.StatusText = status.String()
+	statusObj.PID = PID(pid)
+	statusObj.StartedAt = FormatTime(startedAt)
+
+	for _, opt := range opts {
+		opt(statusObj)
 	}
-	if startTime != nil {
-		statusObj.StartedAt = stringutil.FormatTime(*startTime)
-	}
-	if endTime != nil {
-		statusObj.FinishedAt = stringutil.FormatTime(*endTime)
-	}
+
 	return statusObj
 }
 
