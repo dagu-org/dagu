@@ -31,7 +31,7 @@ func newReporter(sender Sender) *reporter {
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *digraph.DAG, status *model.Status, node *scheduler.Node,
+	ctx context.Context, dag *digraph.DAG, status model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
@@ -49,7 +49,7 @@ func (r *reporter) reportStep(
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) getSummary(_ context.Context, status *model.Status, err error) string {
+func (r *reporter) getSummary(_ context.Context, status model.Status, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -61,7 +61,7 @@ func (r *reporter) getSummary(_ context.Context, status *model.Status, err error
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status *model.Status, err error) error {
+func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status model.Status, err error) error {
 	if err != nil || status.Status == scheduler.StatusError {
 		if dag.MailOn != nil && dag.MailOn.Failure {
 			fromAddress := dag.ErrorMail.From
@@ -94,7 +94,7 @@ var dagHeader = table.Row{
 	"Error",
 }
 
-func renderDAGSummary(status *model.Status, err error) string {
+func renderDAGSummary(status model.Status, err error) string {
 	dataRow := table.Row{
 		status.RequestID,
 		status.Name,

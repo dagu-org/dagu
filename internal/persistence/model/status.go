@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
@@ -23,8 +22,8 @@ func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
 	return &StatusFactory{dag: dag}
 }
 
-func (f *StatusFactory) CreateDefault() *Status {
-	return &Status{
+func (f *StatusFactory) CreateDefault() Status {
+	return Status{
 		Name:       f.dag.Name,
 		Status:     scheduler.StatusNone,
 		StatusText: scheduler.StatusNone.String(),
@@ -98,7 +97,7 @@ func (f *StatusFactory) Create(
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
-) *Status {
+) Status {
 	statusObj := f.CreateDefault()
 	statusObj.RequestID = requestID
 	statusObj.Status = status
@@ -107,7 +106,7 @@ func (f *StatusFactory) Create(
 	statusObj.StartedAt = FormatTime(startedAt)
 
 	for _, opt := range opts {
-		opt(statusObj)
+		opt(&statusObj)
 	}
 
 	return statusObj
@@ -153,7 +152,6 @@ type Status struct {
 	FinishedAt string           `json:"FinishedAt"`
 	Log        string           `json:"Log"`
 	Params     string           `json:"Params"`
-	mu         sync.RWMutex
 }
 
 func (st *Status) CorrectRunningStatus() {
@@ -161,16 +159,6 @@ func (st *Status) CorrectRunningStatus() {
 		st.Status = scheduler.StatusError
 		st.StatusText = st.Status.String()
 	}
-}
-
-func (st *Status) ToJSON() ([]byte, error) {
-	st.mu.RLock()
-	defer st.mu.RUnlock()
-	js, err := json.Marshal(st)
-	if err != nil {
-		return []byte{}, err
-	}
-	return js, nil
 }
 
 func FormatTime(val time.Time) string {

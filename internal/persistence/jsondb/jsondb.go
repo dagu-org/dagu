@@ -63,6 +63,8 @@ func DefaultConfig() Config {
 	}
 }
 
+var _ persistence.HistoryStore = (*JSONDB)(nil)
+
 // JSONDB manages DAGs status files in local storage.
 type JSONDB struct {
 	location string
@@ -89,7 +91,7 @@ func New(location string, cfg Config) *JSONDB {
 	return db
 }
 
-func (db *JSONDB) Update(ctx context.Context, key, requestID string, status *model.Status) error {
+func (db *JSONDB) Update(ctx context.Context, key, requestID string, status model.Status) error {
 	statusFile, err := db.FindByRequestID(ctx, key, requestID)
 	if err != nil {
 		return err
@@ -122,7 +124,7 @@ func (db *JSONDB) Open(_ context.Context, key string, timestamp time.Time, reque
 	return nil
 }
 
-func (db *JSONDB) Write(_ context.Context, status *model.Status) error {
+func (db *JSONDB) Write(_ context.Context, status model.Status) error {
 	return db.writer.write(status)
 }
 
@@ -251,7 +253,7 @@ func (db *JSONDB) Compact(_ context.Context, targetFilePath string) error {
 	}
 	defer writer.close()
 
-	if err := writer.write(status); err != nil {
+	if err := writer.write(*status); err != nil {
 		if removeErr := os.Remove(tempFilePath); removeErr != nil {
 			return fmt.Errorf("%w: %s", err, removeErr)
 		}

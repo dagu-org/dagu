@@ -48,7 +48,7 @@ func TestStatusSerialization(t *testing.T) {
 		requestID, scheduler.StatusSuccess, 0, startedAt, WithFinishedAt(finishedAt),
 	)
 
-	rawJSON, err := statusToPersist.ToJSON()
+	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
 
 	statusObject, err := StatusFromJSON(string(rawJSON))

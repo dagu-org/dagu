@@ -27,7 +27,7 @@ type Client interface {
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*model.Status, error)
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
 	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []*model.StatusFile
-	UpdateStatus(ctx context.Context, dag *digraph.DAG, status *model.Status) error
+	UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error
 	UpdateDAG(ctx context.Context, id string, spec string) error
 	DeleteDAG(ctx context.Context, id, loc string) error
 	GetAllStatus(ctx context.Context) (statuses []*DAGStatus, errs []string, err error)

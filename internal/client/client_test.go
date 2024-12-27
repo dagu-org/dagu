@@ -4,6 +4,7 @@
 package client_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -37,8 +38,12 @@ func TestClient_GetStatus(t *testing.T) {
 					requestID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
-				b, _ := status.ToJSON()
-				_, _ = w.Write(b)
+				jsonData, err := json.Marshal(status)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				_, _ = w.Write(jsonData)
 			},
 		)
 
@@ -85,9 +90,9 @@ func TestClient_GetStatus(t *testing.T) {
 		_ = historyStore.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		status, err = cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
+		statusToCheck, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
 		// Update the status.
 		newStatus := scheduler.NodeStatusError
@@ -307,7 +312,7 @@ func TestClient_ReadHistory(t *testing.T) {
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) model.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	startedAt := model.Time(time.Now())
 	return model.NewStatusFactory(dag).Create(

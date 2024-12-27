@@ -76,7 +76,7 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 	}
 }
 
-func (w writerTestHelper) Write(t *testing.T, status *model.Status) {
+func (w writerTestHelper) Write(t *testing.T, status model.Status) {
 	t.Helper()
 
 	err := w.Writer.write(status)

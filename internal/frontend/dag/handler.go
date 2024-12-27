@@ -901,7 +901,7 @@ func (h *Handler) processUpdateStatus(
 	status.Nodes[idxToUpdate].Status = to
 	status.Nodes[idxToUpdate].StatusText = to.String()
 
-	if err := h.client.UpdateStatus(ctx, dagStatus.DAG, status); err != nil {
+	if err := h.client.UpdateStatus(ctx, dagStatus.DAG, *status); err != nil {
 		return nil, newInternalError(err)
 	}
 

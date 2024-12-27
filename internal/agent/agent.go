@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -222,7 +223,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() *model.Status {
+func (a *Agent) Status() model.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -270,7 +271,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			// Return the current status of the execution.
 			status := a.Status()
 			status.Status = scheduler.StatusRunning
-			statusJSON, err := status.ToJSON()
+			statusJSON, err := json.Marshal(status)
 			if err != nil {
 				encodeError(w, err)
 				return

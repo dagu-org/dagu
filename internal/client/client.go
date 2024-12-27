@@ -175,7 +175,8 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Sta
 			return nil, err
 		}
 		// The DAG is not running so return the default status
-		return model.NewStatusFactory(dag).CreateDefault(), nil
+		status := model.NewStatusFactory(dag).CreateDefault()
+		return &status, nil
 	}
 	return model.StatusFromJSON(ret)
 }
@@ -215,9 +216,9 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.
 		if errors.Is(err, persistence.ErrNoStatusDataToday) ||
 			errors.Is(err, persistence.ErrNoStatusData) {
 			// No status for today
-			return status, nil
+			return &status, nil
 		}
-		return status, err
+		return &status, err
 	}
 	status.CorrectRunningStatus()
 	return status, nil
@@ -227,7 +228,7 @@ func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) 
 	return e.dataStore.HistoryStore().ReadStatusRecent(ctx, dag.Location, n)
 }
 
-func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status *model.Status) error {
+func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error {
 	client := sock.NewClient(dag.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
