@@ -20,7 +20,7 @@ type Step struct {
 	// Shell is the shell program to execute the command. optional.
 	Shell string `json:"Shell,omitempty"`
 	// Variables contains the list of variables to be set.
-	Variables []string `json:"Variables,omitempty"`
+	Variables []string `json:"-"` // Do not save in the JSON file.
 	// OutputVariables is a structure to store the output variables for the
 	// following steps. It only contains the local output variables.
 	OutputVariables *SyncMap `json:"OutputVariables,omitempty"`

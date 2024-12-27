@@ -299,28 +299,28 @@ func buildLogDir(_ BuildContext, spec *definition, dag *DAG) (err error) {
 func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	if spec.HandlerOn.Exit != nil {
 		spec.HandlerOn.Exit.Name = HandlerOnExit.String()
-		if dag.HandlerOn.Exit, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Exit, spec.Functions); err != nil {
+		if dag.HandlerOn.Exit, err = buildStep(ctx, *spec.HandlerOn.Exit, spec.Functions); err != nil {
 			return err
 		}
 	}
 
 	if spec.HandlerOn.Success != nil {
 		spec.HandlerOn.Success.Name = HandlerOnSuccess.String()
-		if dag.HandlerOn.Success, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Success, spec.Functions); err != nil {
+		if dag.HandlerOn.Success, err = buildStep(ctx, *spec.HandlerOn.Success, spec.Functions); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Failure != nil {
 		spec.HandlerOn.Failure.Name = HandlerOnFailure.String()
-		if dag.HandlerOn.Failure, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Failure, spec.Functions); err != nil {
+		if dag.HandlerOn.Failure, err = buildStep(ctx, *spec.HandlerOn.Failure, spec.Functions); err != nil {
 			return
 		}
 	}
 
 	if spec.HandlerOn.Cancel != nil {
 		spec.HandlerOn.Cancel.Name = HandlerOnCancel.String()
-		if dag.HandlerOn.Cancel, err = buildStep(ctx, dag.Env, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
+		if dag.HandlerOn.Cancel, err = buildStep(ctx, *spec.HandlerOn.Cancel, spec.Functions); err != nil {
 			return
 		}
 	}
@@ -357,7 +357,7 @@ func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 	var steps []Step
 	for _, stepDef := range spec.Steps {
-		step, err := buildStep(ctx, dag.Env, stepDef, spec.Functions)
+		step, err := buildStep(ctx, stepDef, spec.Functions)
 		if err != nil {
 			return err
 		}
@@ -404,7 +404,7 @@ func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
 }
 
 // buildStep builds a step from the step definition.
-func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef) (*Step, error) {
+func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 	if err := assertStepDef(def, fns); err != nil {
 		return nil, err
 	}
@@ -418,11 +418,12 @@ func buildStep(ctx BuildContext, variables []string, def stepDef, fns []*funcDef
 		Stderr:         def.Stderr,
 		Output:         def.Output,
 		Dir:            def.Dir,
-		Variables:      variables,
 		Depends:        def.Depends,
 		MailOnError:    def.MailOnError,
 		Preconditions:  buildConditions(def.Preconditions),
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
+		// TODO: add support for variables for the step local
+		Variables: []string{},
 	}
 
 	// TODO: remove the deprecated call field.
