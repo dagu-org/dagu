@@ -29,7 +29,7 @@ func convertToDAG(dag *digraph.DAG) *models.Dag {
 	}
 }
 
-func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
+func convertToStatusDetail(s model.Status) *models.DagStatusDetail {
 	status := &models.DagStatusDetail{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),

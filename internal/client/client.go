@@ -195,7 +195,7 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
 	}
-	return ret.Status, err
+	return &ret.Status, err
 }
 
 func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
@@ -207,10 +207,10 @@ func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error) {
+func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error) {
 	currStatus, _ := e.currentStatus(ctx, dag)
 	if currStatus != nil {
-		return currStatus, nil
+		return *currStatus, nil
 	}
 	status, err := e.dataStore.HistoryStore().ReadStatusToday(ctx, dag.Location)
 	if err != nil {
@@ -218,12 +218,12 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.
 		if errors.Is(err, persistence.ErrNoStatusDataToday) ||
 			errors.Is(err, persistence.ErrNoStatusData) {
 			// No status for today
-			return &status, nil
+			return status, nil
 		}
-		return &status, err
+		return status, err
 	}
 	status.CorrectRunningStatus()
-	return status, nil
+	return *status, nil
 }
 
 func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {

@@ -157,7 +157,7 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 		}
 		ret = append(ret, model.StatusFile{
 			File:   file,
-			Status: status,
+			Status: *status,
 		})
 	}
 
@@ -195,7 +195,7 @@ func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID strin
 		if status != nil && status.RequestID == requestID {
 			return &model.StatusFile{
 				File:   match,
-				Status: status,
+				Status: *status,
 			}, nil
 		}
 	}

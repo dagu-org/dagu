@@ -123,7 +123,7 @@ func StatusFromJSON(s string) (*Status, error) {
 
 type StatusFile struct {
 	File   string
-	Status *Status
+	Status Status
 }
 
 type StatusResponse struct {

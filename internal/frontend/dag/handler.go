@@ -588,19 +588,19 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if params.File != nil {
-		s, err := jsondb.ParseStatusFile(*params.File)
+		parsedStatus, err := jsondb.ParseStatusFile(*params.File)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
-		status = s
+		status = parsedStatus
 	}
 
 	if status == nil {
-		s, err := h.client.GetLatestStatus(ctx, dag)
+		latestStatus, err := h.client.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
-		status = s
+		status = &latestStatus
 	}
 
 	// Find the step in the status to get the log file.
