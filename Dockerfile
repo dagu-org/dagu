@@ -23,10 +23,9 @@ FROM --platform=$TARGETPLATFORM ubuntu:24.04
 ARG USER="dagu"
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-COPY --from=go-builder /app/bin/dagu /usr/local/bin/
-COPY ./entrypoint.sh /entrypoint.sh
 
 # Install common tools
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y \
     git \
@@ -44,10 +43,31 @@ RUN apt-get update && \
     nodejs \
     npm \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* && \
-    # Create user and set permissions
-    groupadd --force -g ${USER_GID} ${USER} || true  && \
-    useradd -m -d /config -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USER} && \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=go-builder /app/bin/dagu /usr/local/bin/
+COPY ./entrypoint.sh /entrypoint.sh
+
+# Create user and set permissions
+RUN \
+    # Try to create group with specified GID, fallback to any available GID if exists
+    (groupadd -g ${USER_GID} ${USER} || groupadd ${USER}) && \
+    # Try to create user with specified UID, fallback to any available UID if exists
+    # -m: Create home directory
+    # -d: Set home directory path
+    # -u: Set UID
+    # -g: Set primary group (using getent to fetch actual GID)
+    # -s: Set login shell
+    (useradd -m -d /config \
+            -u ${USER_UID} \
+            -g $(getent group ${USER} | cut -d: -f3) \
+            -s /bin/bash \
+            ${USER} \
+    || useradd -m -d /config \
+              -g $(getent group ${USER} | cut -d: -f3) \
+              -s /bin/bash \
+              ${USER}) && \
+    # Set proper ownership and permissions
     chown -R ${USER}:${USER} /config && \
     chmod +x /entrypoint.sh
 
