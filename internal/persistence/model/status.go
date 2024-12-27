@@ -60,6 +60,44 @@ func WithFinishedAt(t time.Time) StatusOption {
 	}
 }
 
+func WithOnExitNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnExit = FromNode(node.Data())
+		}
+	}
+}
+
+func WithOnSuccessNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnSuccess = FromNode(node.Data())
+		}
+	}
+}
+
+func WithOnFailureNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnFailure = FromNode(node.Data())
+		}
+	}
+}
+
+func WithOnCancelNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnCancel = FromNode(node.Data())
+		}
+	}
+}
+
+func WithLogFilePath(logFilePath string) StatusOption {
+	return func(s *Status) {
+		s.Log = logFilePath
+	}
+}
+
 func (f *StatusFactory) Create(
 	status scheduler.Status,
 	pid int,
