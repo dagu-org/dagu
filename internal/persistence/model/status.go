@@ -15,6 +15,53 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
+type StatusFactory struct {
+	dag *digraph.DAG
+}
+
+func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
+	return &StatusFactory{dag: dag}
+}
+
+func (f *StatusFactory) CreateDefault() *Status {
+	return f.Create(nil, scheduler.StatusNone, int(pidNotRunning), nil, nil)
+}
+
+type StatusOption func(*Status)
+
+func WithRequestID(reqID string) StatusOption {
+	return func(s *Status) {
+		s.RequestID = reqID
+	}
+}
+
+func (f *StatusFactory) Create(
+	nodes []scheduler.NodeData,
+	status scheduler.Status,
+	pid int,
+	startTime, endTime *time.Time,
+) *Status {
+	statusObj := &Status{
+		Name:       f.dag.Name,
+		Status:     status,
+		StatusText: status.String(),
+		PID:        PID(pid),
+		Nodes:      FromNodesOrSteps(nodes, f.dag.Steps),
+		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
+		OnFailure:  nodeOrNil(f.dag.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(f.dag.HandlerOn.Cancel),
+		Params:     Params(f.dag.Params),
+	}
+	if startTime != nil {
+		statusObj.StartedAt = stringutil.FormatTime(*startTime)
+	}
+	if endTime != nil {
+		statusObj.FinishedAt = stringutil.FormatTime(*endTime)
+	}
+	return statusObj
+}
+
 func StatusFromJSON(s string) (*Status, error) {
 	status := new(Status)
 	err := json.Unmarshal([]byte(s), status)
@@ -56,40 +103,6 @@ type Status struct {
 	Log        string           `json:"Log"`
 	Params     string           `json:"Params"`
 	mu         sync.RWMutex
-}
-
-func NewStatusDefault(dag *digraph.DAG) *Status {
-	return NewStatus(
-		dag, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
-	)
-}
-
-func NewStatus(
-	dag *digraph.DAG,
-	nodes []scheduler.NodeData,
-	status scheduler.Status,
-	pid int,
-	startTime, endTime *time.Time,
-) *Status {
-	statusObj := &Status{
-		Name:       dag.Name,
-		Status:     status,
-		StatusText: status.String(),
-		PID:        PID(pid),
-		Nodes:      FromNodesOrSteps(nodes, dag.Steps),
-		OnExit:     nodeOrNil(dag.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(dag.HandlerOn.Success),
-		OnFailure:  nodeOrNil(dag.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(dag.HandlerOn.Cancel),
-		Params:     Params(dag.Params),
-	}
-	if startTime != nil {
-		statusObj.StartedAt = stringutil.FormatTime(*startTime)
-	}
-	if endTime != nil {
-		statusObj.FinishedAt = stringutil.FormatTime(*endTime)
-	}
-	return statusObj
 }
 
 func (st *Status) CorrectRunningStatus() {

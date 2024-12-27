@@ -43,7 +43,9 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
-	status := NewStatus(dag, nil, scheduler.StatusSuccess, 10000, &start, &end)
+	status := NewStatusFactory(dag).Create(
+		nil, scheduler.StatusSuccess, 10000, &start, &end,
+	)
 
 	rawJSON, err := status.ToJSON()
 	require.NoError(t, err)
@@ -58,8 +60,10 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
-	status := NewStatus(dag, nil, scheduler.StatusRunning,
-		10000, nil, nil)
+	status := NewStatusFactory(dag).Create(
+		nil, scheduler.StatusRunning,
+		10000, nil, nil,
+	)
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }
