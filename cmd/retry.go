@@ -145,7 +145,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 		logFile.Name(),
 		cli,
 		execCtx.dataStore,
-		&agent.Options{RetryTarget: execCtx.originalState.Status},
+		&agent.Options{RetryTarget: &execCtx.originalState.Status},
 	)
 
 	listenSignals(ctx, agt)

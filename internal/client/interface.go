@@ -25,14 +25,14 @@ type Client interface {
 	Retry(ctx context.Context, dag *digraph.DAG, requestID string) error
 	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
 	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*model.Status, error)
-	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
-	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []*model.StatusFile
-	UpdateStatus(ctx context.Context, dag *digraph.DAG, status *model.Status) error
+	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error)
+	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile
+	UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error
 	UpdateDAG(ctx context.Context, id string, spec string) error
 	DeleteDAG(ctx context.Context, id, loc string) error
-	GetAllStatus(ctx context.Context) (statuses []*DAGStatus, errs []string, err error)
-	GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
-	GetStatus(ctx context.Context, dagLocation string) (*DAGStatus, error)
+	GetAllStatus(ctx context.Context) (statuses []DAGStatus, errs []string, err error)
+	GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error)
+	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
 	IsSuspended(ctx context.Context, id string) bool
 	ToggleSuspend(ctx context.Context, id string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
@@ -51,7 +51,7 @@ type DAGStatus struct {
 	File      string
 	Dir       string
 	DAG       *digraph.DAG
-	Status    *model.Status
+	Status    model.Status
 	Suspended bool
 	Error     error
 	ErrorT    *string
@@ -63,13 +63,13 @@ type DagListPaginationSummaryResult struct {
 }
 
 func newDAGStatus(
-	dag *digraph.DAG, s *model.Status, suspended bool, err error,
-) *DAGStatus {
-	ret := &DAGStatus{
+	dag *digraph.DAG, status model.Status, suspended bool, err error,
+) DAGStatus {
+	ret := DAGStatus{
 		File:      filepath.Base(dag.Location),
 		Dir:       filepath.Dir(dag.Location),
 		DAG:       dag,
-		Status:    s,
+		Status:    status,
 		Suspended: suspended,
 		Error:     err,
 	}

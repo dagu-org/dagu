@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testPID = 12345
+
 func TestJSONDB_Basic(t *testing.T) {
 	th := testSetup(t)
 
@@ -28,8 +30,9 @@ func TestJSONDB_Basic(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
-		status.RequestID = requestID
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusRunning, testPID, time.Now(),
+		)
 		err = th.DB.Write(th.Context, status)
 		require.NoError(t, err)
 
@@ -46,8 +49,9 @@ func TestJSONDB_Basic(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
-		status.RequestID = requestID
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusRunning, testPID, time.Now(),
+		)
 		err = th.DB.Write(th.Context, status)
 		require.NoError(t, err)
 		err = th.DB.Close(th.Context)
@@ -79,7 +83,9 @@ func TestJSONDB_ReadStatus(t *testing.T) {
 			err := th.DB.Open(th.Context, dag.Location, now, requestID)
 			require.NoError(t, err)
 
-			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+			status := model.NewStatusFactory(dag.DAG).Create(
+				requestID, scheduler.StatusRunning, testPID, time.Now(),
+			)
 			status.RequestID = requestID
 			err = th.DB.Write(th.Context, status)
 			require.NoError(t, err)
@@ -101,7 +107,9 @@ func TestJSONDB_ReadStatus(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusRunning, testPID, time.Now(),
+		)
 		status.RequestID = requestID
 		err = th.DB.Write(th.Context, status)
 		require.NoError(t, err)
@@ -134,8 +142,9 @@ func TestJSONDB_ReadStatusRecent_EdgeCases(t *testing.T) {
 
 			err := th.DB.Open(th.Context, dag.Location, now, requestID)
 			require.NoError(t, err)
-			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
-			status.RequestID = requestID
+			status := model.NewStatusFactory(dag.DAG).Create(
+				requestID, scheduler.StatusRunning, testPID, time.Now(),
+			)
 			err = th.DB.Write(th.Context, status)
 			require.NoError(t, err)
 			err = th.DB.Close(th.Context)
@@ -160,7 +169,9 @@ func TestJSONDB_ReadStatusToday_EdgeCases(t *testing.T) {
 
 		err := th.DB.Open(th.Context, dag.Location, yesterdayTime, requestID)
 		require.NoError(t, err)
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusSuccess, testPID, time.Now(),
+		)
 		status.RequestID = requestID
 		err = th.DB.Write(th.Context, status)
 		require.NoError(t, err)
@@ -192,8 +203,9 @@ func TestJSONDB_RemoveAll(t *testing.T) {
 
 			err := th.DB.Open(th.Context, dag.Location, now, requestID)
 			require.NoError(t, err)
-			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
-			status.RequestID = requestID
+			status := model.NewStatusFactory(dag.DAG).Create(
+				requestID, scheduler.StatusRunning, testPID, time.Now(),
+			)
 			err = th.DB.Write(th.Context, status)
 			require.NoError(t, err)
 			err = th.DB.Close(th.Context)
@@ -227,14 +239,20 @@ func TestJSONDB_Update_EdgeCases(t *testing.T) {
 
 	t.Run("UpdateNonExistentStatus", func(t *testing.T) {
 		dag := th.DAG("test_update_nonexistent")
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		requestID := "request-id-nonexistent"
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusSuccess, testPID, time.Now(),
+		)
 		err := th.DB.Update(th.Context, dag.Location, "nonexistent-id", status)
 		assert.ErrorIs(t, err, persistence.ErrRequestIDNotFound)
 	})
 
 	t.Run("UpdateWithEmptyRequestID", func(t *testing.T) {
 		dag := th.DAG("test_update_empty_id")
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
+		requestID := ""
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusSuccess, testPID, time.Now(),
+		)
 		err := th.DB.Update(th.Context, dag.Location, "", status)
 		assert.ErrorIs(t, err, errRequestIDNotFound)
 	})
@@ -275,8 +293,9 @@ func TestJSONDB_FileManagement(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, oldTime, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatus(dag.DAG, nil, scheduler.StatusSuccess, 10000, nil, nil)
-		status.RequestID = requestID
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusSuccess, testPID, time.Now(),
+		)
 
 		err = th.DB.Write(th.Context, status)
 		require.NoError(t, err)
@@ -309,8 +328,9 @@ func TestJSONDB_FileManagement(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 3; i++ {
-			status := model.NewStatus(dag.DAG, nil, scheduler.StatusRunning, 10000, nil, nil)
-			status.RequestID = requestID
+			status := model.NewStatusFactory(dag.DAG).Create(
+				requestID, scheduler.StatusRunning, testPID, time.Now(),
+			)
 			err = th.DB.Write(th.Context, status)
 			require.NoError(t, err)
 		}

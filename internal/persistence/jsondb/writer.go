@@ -57,7 +57,7 @@ func (w *writer) open() error {
 }
 
 // write appends the status to the local file.
-func (w *writer) write(st *model.Status) error {
+func (w *writer) write(st model.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

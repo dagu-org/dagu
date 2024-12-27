@@ -76,7 +76,7 @@ func testErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*model.
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
-	_ = rp.send(context.Background(), dag, &model.Status{
+	_ = rp.send(context.Background(), dag, model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
@@ -92,7 +92,7 @@ func testNoErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*mode
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, &model.Status{
+	err := rp.send(context.Background(), dag, model.Status{
 		Status: scheduler.StatusError,
 		Nodes:  nodes,
 	}, nil)
@@ -107,7 +107,7 @@ func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*mode
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
-	err := rp.send(context.Background(), dag, &model.Status{
+	err := rp.send(context.Background(), dag, model.Status{
 		Status: scheduler.StatusSuccess,
 		Nodes:  nodes,
 	}, nil)
@@ -121,11 +121,7 @@ func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*mode
 }
 
 func testRenderSummary(t *testing.T, _ *reporter, dag *digraph.DAG, nodes []*model.Node) {
-	status := &model.Status{
-		Name:   dag.Name,
-		Status: scheduler.StatusError,
-		Nodes:  nodes,
-	}
+	status := model.NewStatusFactory(dag).Create("request-id", scheduler.StatusError, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)

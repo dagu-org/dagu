@@ -522,7 +522,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	for _, env := range dagCtx.Envs {
+	for _, env := range dagCtx.AdditionalEnvs {
 		os.Setenv(env.Key, env.Value)
 	}
 

@@ -202,7 +202,9 @@ func TestScheduler(t *testing.T) {
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
 	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
-		const file = "flag_test_retry_success"
+		file := filepath.Join(
+			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewRandom()).String()),
+		)
 
 		sc := setup(t)
 

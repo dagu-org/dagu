@@ -160,7 +160,7 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	// Add the log path to the environment
-	dagCtx = dagCtx.WithEnv(digraph.Env{
+	dagCtx = dagCtx.WithAdditionalEnv(digraph.Env{
 		Key:   digraph.EnvKeyLogPath,
 		Value: n.data.State.Log,
 	})
@@ -529,13 +529,6 @@ func (n *Node) Init() {
 		return
 	}
 	n.id = getNextNodeID()
-
-	if n.data.Step.Variables == nil {
-		n.data.Step.Variables = []string{}
-	}
-	if n.data.Step.Variables == nil {
-		n.data.Step.Variables = []string{}
-	}
 	if n.data.Step.Preconditions == nil {
 		n.data.Step.Preconditions = []digraph.Condition{}
 	}

@@ -38,7 +38,7 @@ type Context struct {
 	DAG             *DAG
 	Finder          Finder
 	ResultCollector ResultCollector
-	Envs            Envs
+	AdditionalEnvs  Envs
 }
 
 // Envs is a list of environment variables.
@@ -73,15 +73,15 @@ func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector Re
 		DAG:             dag,
 		Finder:          finder,
 		ResultCollector: resultCollector,
-		Envs: []Env{
+		AdditionalEnvs: []Env{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
 			{Key: EnvKeyRequestID, Value: requestID},
 		},
 	})
 }
 
-func (c Context) WithEnv(env Env) Context {
-	c.Envs = append([]Env{env}, c.Envs...)
+func (c Context) WithAdditionalEnv(env Env) Context {
+	c.AdditionalEnvs = append([]Env{env}, c.AdditionalEnvs...)
 	return c
 }
 

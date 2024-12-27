@@ -4,6 +4,7 @@
 package client_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -29,14 +30,20 @@ func TestClient_GetStatus(t *testing.T) {
 		dag := th.LoadDAGFile(t, "valid.yaml")
 		ctx := th.Context
 
+		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := model.NewStatus(dag.DAG, nil,
-					scheduler.StatusRunning, 0, nil, nil)
+				status := model.NewStatusFactory(dag.DAG).Create(
+					requestID, scheduler.StatusRunning, 0, time.Now(),
+				)
 				w.WriteHeader(http.StatusOK)
-				b, _ := status.ToJSON()
-				_, _ = w.Write(b)
+				jsonData, err := json.Marshal(status)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				_, _ = w.Write(jsonData)
 			},
 		)
 
@@ -83,9 +90,9 @@ func TestClient_GetStatus(t *testing.T) {
 		_ = historyStore.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
-		status, err = cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
+		statusToCheck, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
 		require.NoError(t, err)
-		require.Equal(t, scheduler.NodeStatusSuccess, status.Nodes[0].Status)
+		require.Equal(t, scheduler.NodeStatusSuccess, statusToCheck.Nodes[0].Status)
 
 		// Update the status.
 		newStatus := scheduler.NodeStatusError
@@ -305,14 +312,12 @@ func TestClient_ReadHistory(t *testing.T) {
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) *model.Status {
-	nodeData := scheduler.NodeData{
-		State: scheduler.NodeState{Status: nodeStatus},
-	}
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) model.Status {
+	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	startedAt := model.Time(time.Now())
-	statusModel := model.NewStatus(dag, []scheduler.NodeData{nodeData}, status, 0, startedAt, nil)
-	statusModel.RequestID = requestID
-	return statusModel
+	return model.NewStatusFactory(dag).Create(
+		requestID, status, 0, *startedAt, model.WithNodes(nodes),
+	)
 }
 
 func TestClient_GetTagList(t *testing.T) {

@@ -29,7 +29,7 @@ func convertToDAG(dag *digraph.DAG) *models.Dag {
 	}
 }
 
-func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
+func convertToStatusDetail(s model.Status) *models.DagStatusDetail {
 	status := &models.DagStatusDetail{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),
@@ -100,7 +100,8 @@ func convertToStepObject(step digraph.Step) *models.StepObject {
 		Preconditions: conditions,
 		RepeatPolicy:  repeatPolicy,
 		Script:        swag.String(step.Script),
-		Variables:     step.Variables,
+		// Deprecated: Removed field but keeping for backward compatibility.
+		Variables: []string{},
 	}
 	if step.SubWorkflow != nil {
 		so.Run = step.SubWorkflow.Name

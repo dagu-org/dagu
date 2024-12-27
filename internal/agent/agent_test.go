@@ -176,7 +176,7 @@ func TestAgent_Retry(t *testing.T) {
 
 		// Retry the DAG and check if it is successful
 		dagAgent = dag.Agent(test.WithAgentOptions(&agent.Options{
-			RetryTarget: status,
+			RetryTarget: &status,
 		}))
 		dagAgent.RunSuccess(t)
 

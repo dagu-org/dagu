@@ -434,14 +434,9 @@ func (h *Handler) getDetail(
 	}
 
 	dagStatus, err := h.client.GetStatus(ctx, dagID)
-	if dagStatus == nil {
-		return nil, newNotFoundError(err)
-	}
-
-	dag := dagStatus.DAG
 
 	var steps []*models.StepObject
-	for _, step := range dag.Steps {
+	for _, step := range dagStatus.DAG.Steps {
 		steps = append(steps, convertToStepObject(step))
 	}
 
@@ -462,20 +457,21 @@ func (h *Handler) getDetail(
 	}
 
 	var schedules []*models.Schedule
-	for _, s := range dag.Schedule {
+	for _, s := range dagStatus.DAG.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	var preconditions []*models.Condition
-	for _, p := range dag.Preconditions {
+	for _, p := range dagStatus.DAG.Preconditions {
 		preconditions = append(preconditions, &models.Condition{
 			Condition: p.Condition,
 			Expected:  p.Expected,
 		})
 	}
 
+	dag := dagStatus.DAG
 	dagDetail := &models.DagDetail{
 		DefaultParams:     swag.String(dag.DefaultParams),
 		Delay:             swag.Int64(int64(dag.Delay)),
@@ -592,19 +588,19 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if params.File != nil {
-		s, err := jsondb.ParseStatusFile(*params.File)
+		parsedStatus, err := jsondb.ParseStatusFile(*params.File)
 		if err != nil {
 			return nil, newBadRequestError(err)
 		}
-		status = s
+		status = parsedStatus
 	}
 
 	if status == nil {
-		s, err := h.client.GetLatestStatus(ctx, dag)
+		latestStatus, err := h.client.GetLatestStatus(ctx, dag)
 		if err != nil {
 			return nil, newInternalError(err)
 		}
-		status = s
+		status = &latestStatus
 	}
 
 	// Find the step in the status to get the log file.
@@ -777,7 +773,7 @@ func (h *Handler) postAction(
 		return nil, newBadRequestError(errInvalidArgs)
 	}
 
-	var dagStatus *client.DAGStatus
+	var dagStatus client.DAGStatus
 
 	if *params.Body.Action != "save" {
 		s, err := h.client.GetStatus(ctx, params.DagID)
@@ -861,7 +857,7 @@ func (h *Handler) postAction(
 func (h *Handler) processUpdateStatus(
 	ctx context.Context,
 	params dags.PostDagActionParams,
-	dagStatus *client.DAGStatus, to scheduler.NodeStatus,
+	dagStatus client.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
 		return nil, newBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
@@ -901,7 +897,7 @@ func (h *Handler) processUpdateStatus(
 	status.Nodes[idxToUpdate].Status = to
 	status.Nodes[idxToUpdate].StatusText = to.String()
 
-	if err := h.client.UpdateStatus(ctx, dagStatus.DAG, status); err != nil {
+	if err := h.client.UpdateStatus(ctx, dagStatus.DAG, *status); err != nil {
 		return nil, newInternalError(err)
 	}
 

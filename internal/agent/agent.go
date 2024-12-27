@@ -5,6 +5,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -222,7 +223,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() *model.Status {
+func (a *Agent) Status() model.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -234,34 +235,20 @@ func (a *Agent) Status() *model.Status {
 	}
 
 	// Create the status object to record the current status.
-	status := &model.Status{
-		RequestID:  a.requestID,
-		Name:       a.dag.Name,
-		Status:     schedulerStatus,
-		StatusText: schedulerStatus.String(),
-		PID:        model.PID(os.Getpid()),
-		Nodes:      model.FromNodesOrSteps(a.graph.NodeData(), a.dag.Steps),
-		StartedAt:  model.FormatTime(a.graph.StartAt()),
-		FinishedAt: model.FormatTime(a.graph.FinishAt()),
-		Log:        a.logFile,
-		Params:     model.Params(a.dag.Params),
-	}
-
-	// Collect the handler nodes.
-	if node := a.scheduler.HandlerNode(digraph.HandlerOnExit); node != nil {
-		status.OnExit = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(digraph.HandlerOnSuccess); node != nil {
-		status.OnSuccess = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(digraph.HandlerOnFailure); node != nil {
-		status.OnFailure = model.FromNode(node.Data())
-	}
-	if node := a.scheduler.HandlerNode(digraph.HandlerOnCancel); node != nil {
-		status.OnCancel = model.FromNode(node.Data())
-	}
-
-	return status
+	return model.NewStatusFactory(a.dag).
+		Create(
+			a.requestID,
+			schedulerStatus,
+			os.Getpid(),
+			a.graph.StartAt(),
+			model.WithFinishedAt(a.graph.FinishAt()),
+			model.WithNodes(a.graph.NodeData()),
+			model.WithLogFilePath(a.logFile),
+			model.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
+			model.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
+			model.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
+			model.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+		)
 }
 
 // Signal sends the signal to the processes running
@@ -284,7 +271,7 @@ func (a *Agent) HandleHTTP(ctx context.Context) sock.HTTPHandlerFunc {
 			// Return the current status of the execution.
 			status := a.Status()
 			status.Status = scheduler.StatusRunning
-			statusJSON, err := status.ToJSON()
+			statusJSON, err := json.Marshal(status)
 			if err != nil {
 				encodeError(w, err)
 				return

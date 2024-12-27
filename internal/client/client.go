@@ -36,6 +36,8 @@ func New(
 	}
 }
 
+var _ Client = (*client)(nil)
+
 type client struct {
 	dataStore  persistence.DataStores
 	executable string
@@ -174,7 +176,9 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Sta
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(dag), nil
+		// The DAG is not running so return the default status
+		status := model.NewStatusFactory(dag).CreateDefault()
+		return &status, nil
 	}
 	return model.StatusFromJSON(ret)
 }
@@ -191,7 +195,7 @@ func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, req
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
 	}
-	return ret.Status, err
+	return &ret.Status, err
 }
 
 func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
@@ -203,28 +207,30 @@ func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error) {
+func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error) {
 	currStatus, _ := e.currentStatus(ctx, dag)
 	if currStatus != nil {
-		return currStatus, nil
+		return *currStatus, nil
 	}
 	status, err := e.dataStore.HistoryStore().ReadStatusToday(ctx, dag.Location)
-	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
-		errors.Is(err, persistence.ErrNoStatusData) {
-		return model.NewStatusDefault(dag), nil
-	}
 	if err != nil {
-		return model.NewStatusDefault(dag), err
+		status := model.NewStatusFactory(dag).CreateDefault()
+		if errors.Is(err, persistence.ErrNoStatusDataToday) ||
+			errors.Is(err, persistence.ErrNoStatusData) {
+			// No status for today
+			return status, nil
+		}
+		return status, err
 	}
 	status.CorrectRunningStatus()
-	return status, nil
+	return *status, nil
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []*model.StatusFile {
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {
 	return e.dataStore.HistoryStore().ReadStatusRecent(ctx, dag.Location, n)
 }
 
-func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status *model.Status) error {
+func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error {
 	client := sock.NewClient(dag.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
@@ -256,12 +262,12 @@ func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
 }
 
 func (e *client) GetAllStatus(ctx context.Context) (
-	statuses []*DAGStatus, errs []string, err error,
+	statuses []DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
 	dagList, errs, err := dagStore.List(ctx)
 
-	var ret []*DAGStatus
+	var ret []DAGStatus
 	for _, d := range dagList {
 		status, err := e.readStatus(ctx, d)
 		if err != nil {
@@ -277,13 +283,12 @@ func (e *client) getPageCount(total int, limit int) int {
 	return (total-1)/(limit) + 1
 }
 
-func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
+func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
 	var (
 		dagListPaginationResult *persistence.DagListPaginationResult
 		err                     error
 		dagStore                = e.dataStore.DAGStore()
-		dagStatusList           = make([]*DAGStatus, 0)
-		currentStatus           *DAGStatus
+		dagStatusList           = make([]DAGStatus, 0)
 	)
 
 	page := 1
@@ -305,6 +310,10 @@ func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDag
 	}
 
 	for _, currentDag := range dagListPaginationResult.DagList {
+		var (
+			currentStatus DAGStatus
+			err           error
+		)
 		if currentStatus, err = e.readStatus(ctx, currentDag); err != nil {
 			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
 		}
@@ -323,7 +332,7 @@ func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) 
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(ctx context.Context, id string) (*DAGStatus, error) {
+func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
 	dag, err := e.getDAG(ctx, id)
 	if dag == nil {
 		// TODO: fix not to use location
@@ -344,7 +353,7 @@ func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (*DAGStatus, error) {
+func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {
 	latestStatus, err := e.GetLatestStatus(ctx, dag)
 	id := strings.TrimSuffix(
 		filepath.Base(dag.Location),
