@@ -30,9 +30,9 @@ type Client interface {
 	UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error
 	UpdateDAG(ctx context.Context, id string, spec string) error
 	DeleteDAG(ctx context.Context, id, loc string) error
-	GetAllStatus(ctx context.Context) (statuses []*DAGStatus, errs []string, err error)
-	GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error)
-	GetStatus(ctx context.Context, dagLocation string) (*DAGStatus, error)
+	GetAllStatus(ctx context.Context) (statuses []DAGStatus, errs []string, err error)
+	GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error)
+	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
 	IsSuspended(ctx context.Context, id string) bool
 	ToggleSuspend(ctx context.Context, id string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
@@ -64,8 +64,8 @@ type DagListPaginationSummaryResult struct {
 
 func newDAGStatus(
 	dag *digraph.DAG, s *model.Status, suspended bool, err error,
-) *DAGStatus {
-	ret := &DAGStatus{
+) DAGStatus {
+	ret := DAGStatus{
 		File:      filepath.Base(dag.Location),
 		Dir:       filepath.Dir(dag.Location),
 		DAG:       dag,

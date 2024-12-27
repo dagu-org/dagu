@@ -262,12 +262,12 @@ func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
 }
 
 func (e *client) GetAllStatus(ctx context.Context) (
-	statuses []*DAGStatus, errs []string, err error,
+	statuses []DAGStatus, errs []string, err error,
 ) {
 	dagStore := e.dataStore.DAGStore()
 	dagList, errs, err := dagStore.List(ctx)
 
-	var ret []*DAGStatus
+	var ret []DAGStatus
 	for _, d := range dagList {
 		status, err := e.readStatus(ctx, d)
 		if err != nil {
@@ -283,13 +283,12 @@ func (e *client) getPageCount(total int, limit int) int {
 	return (total-1)/(limit) + 1
 }
 
-func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]*DAGStatus, *DagListPaginationSummaryResult, error) {
+func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
 	var (
 		dagListPaginationResult *persistence.DagListPaginationResult
 		err                     error
 		dagStore                = e.dataStore.DAGStore()
-		dagStatusList           = make([]*DAGStatus, 0)
-		currentStatus           *DAGStatus
+		dagStatusList           = make([]DAGStatus, 0)
 	)
 
 	page := 1
@@ -311,6 +310,10 @@ func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDag
 	}
 
 	for _, currentDag := range dagListPaginationResult.DagList {
+		var (
+			currentStatus DAGStatus
+			err           error
+		)
 		if currentStatus, err = e.readStatus(ctx, currentDag); err != nil {
 			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
 		}
@@ -329,7 +332,7 @@ func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) 
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(ctx context.Context, id string) (*DAGStatus, error) {
+func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
 	dag, err := e.getDAG(ctx, id)
 	if dag == nil {
 		// TODO: fix not to use location
@@ -350,7 +353,7 @@ func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error
 	return flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (*DAGStatus, error) {
+func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {
 	latestStatus, err := e.GetLatestStatus(ctx, dag)
 	id := strings.TrimSuffix(
 		filepath.Base(dag.Location),
