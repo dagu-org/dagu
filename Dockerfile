@@ -46,7 +46,7 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* && \
     # Create user and set permissions
-    groupadd -g ${USER_GID} ${USER} && \
+    groupadd --force -g ${USER_GID} ${USER} || true  && \
     useradd -m -d /config -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USER} && \
     chown -R ${USER}:${USER} /config && \
     chmod +x /entrypoint.sh
