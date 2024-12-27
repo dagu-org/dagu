@@ -28,7 +28,7 @@ body {
 }
 
 .MuiTableRow-root th {
-  background-color: #F2F4F8;
+  background-color: #f2f4f8;
   font-weight: 500;
 }
 
@@ -71,4 +71,13 @@ body {
 }
 .gray-100 {
   color: #000000;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
