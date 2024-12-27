@@ -101,13 +101,13 @@ const Graph: React.FC<Props> = ({
             // Dashed line for error state
             dat.push(`${depId} -.- ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#ef4444,stroke-width:1px,stroke-dasharray:3`
+              `linkStyle ${linkIndex} stroke:#ef4444,stroke-width:1.8px,stroke-dasharray:3`
             );
           } else if (status === NodeStatus.Success) {
             // Solid line with success color
             dat.push(`${depId} --> ${id};`);
             linkStyles.push(
-              `linkStyle ${linkIndex} stroke:#16a34a,stroke-width:1px`
+              `linkStyle ${linkIndex} stroke:#16a34a,stroke-width:1.8px`
             );
           } else {
             // Default connection style
