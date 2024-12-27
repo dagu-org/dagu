@@ -23,7 +23,7 @@ func TestWriter(t *testing.T) {
 		dag := th.DAG("test_write_status")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		status := model.NewStatusFactory(dag.DAG).Create(
-			scheduler.StatusRunning, 10000, time.Now(), model.WithRequestID(requestID),
+			requestID, scheduler.StatusRunning, testPID, time.Now(),
 		)
 		writer := dag.Writer(t, requestID, time.Now())
 		writer.Write(t, status)
@@ -39,7 +39,7 @@ func TestWriter(t *testing.T) {
 		writer := dag.Writer(t, requestID, startedAt)
 
 		status := model.NewStatusFactory(dag.DAG).Create(
-			scheduler.StatusCancel, 10000, time.Now(), model.WithRequestID(requestID),
+			requestID, scheduler.StatusCancel, testPID, time.Now(),
 		)
 
 		// Write initial status
@@ -73,7 +73,8 @@ func TestWriterErrorHandling(t *testing.T) {
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
-		status := model.NewStatusFactory(dag.DAG).Create(scheduler.StatusRunning, 10000, time.Now())
+		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+		status := model.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, testPID, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -91,8 +92,9 @@ func TestWriterRename(t *testing.T) {
 	// Create a status file with old path
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
+	requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 	status := model.NewStatusFactory(dag.DAG).Create(
-		scheduler.StatusRunning, 10000, time.Now(),
+		requestID, scheduler.StatusRunning, testPID, time.Now(),
 	)
 	writer.Write(t, status)
 	writer.Close(t)

@@ -236,10 +236,10 @@ func (a *Agent) Status() *model.Status {
 	// Create the status object to record the current status.
 	return model.NewStatusFactory(a.dag).
 		Create(
+			a.requestID,
 			schedulerStatus,
 			os.Getpid(),
 			a.graph.StartAt(),
-			model.WithRequestID(a.requestID),
 			model.WithFinishedAt(a.graph.FinishAt()),
 			model.WithNodes(a.graph.NodeData()),
 			model.WithLogFilePath(a.logFile),

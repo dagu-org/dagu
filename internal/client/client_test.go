@@ -29,10 +29,13 @@ func TestClient_GetStatus(t *testing.T) {
 		dag := th.LoadDAGFile(t, "valid.yaml")
 		ctx := th.Context
 
+		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := model.NewStatusFactory(dag.DAG).Create(scheduler.StatusRunning, 0, time.Now())
+				status := model.NewStatusFactory(dag.DAG).Create(
+					requestID, scheduler.StatusRunning, 0, time.Now(),
+				)
 				w.WriteHeader(http.StatusOK)
 				b, _ := status.ToJSON()
 				_, _ = w.Write(b)
@@ -308,7 +311,7 @@ func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, 
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
 	startedAt := model.Time(time.Now())
 	return model.NewStatusFactory(dag).Create(
-		status, 0, *startedAt, model.WithNodes(nodes), model.WithRequestID(requestID),
+		requestID, status, 0, *startedAt, model.WithNodes(nodes),
 	)
 }
 

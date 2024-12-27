@@ -43,8 +43,9 @@ func TestStatusSerialization(t *testing.T) {
 		InfoMail:  &digraph.MailConfig{},
 		SMTP:      &digraph.SMTPConfig{},
 	}
+	requestID := "request-id-testI"
 	statusToPersist := NewStatusFactory(dag).Create(
-		scheduler.StatusSuccess, 10000, startedAt, WithFinishedAt(finishedAt),
+		requestID, scheduler.StatusSuccess, 0, startedAt, WithFinishedAt(finishedAt),
 	)
 
 	rawJSON, err := statusToPersist.ToJSON()
@@ -60,7 +61,8 @@ func TestStatusSerialization(t *testing.T) {
 
 func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
-	status := NewStatusFactory(dag).Create(scheduler.StatusRunning, 10000, time.Now())
+	requestID := "request-id-testII"
+	status := NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }

@@ -42,12 +42,6 @@ func (f *StatusFactory) CreateDefault() *Status {
 
 type StatusOption func(*Status)
 
-func WithRequestID(reqID string) StatusOption {
-	return func(s *Status) {
-		s.RequestID = reqID
-	}
-}
-
 func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	return func(s *Status) {
 		s.Nodes = FromNodes(nodes)
@@ -99,12 +93,14 @@ func WithLogFilePath(logFilePath string) StatusOption {
 }
 
 func (f *StatusFactory) Create(
+	requestID string,
 	status scheduler.Status,
 	pid int,
 	startedAt time.Time,
 	opts ...StatusOption,
 ) *Status {
 	statusObj := f.CreateDefault()
+	statusObj.RequestID = requestID
 	statusObj.Status = status
 	statusObj.StatusText = status.String()
 	statusObj.PID = PID(pid)
