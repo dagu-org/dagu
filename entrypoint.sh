@@ -65,4 +65,4 @@ else
 fi
 
 # Run the command as the dagu user and optionally the docker group
-su-exec $PUID:$RUN_GID "$@"
+exec sudo -E -n -u "#${PUID}" -g "#${RUN_GID}" -- "$@"
