@@ -29,8 +29,6 @@ import (
 )
 
 var (
-	_ persistence.HistoryStore = (*JSONDB)(nil)
-
 	errRequestIDNotFound  = errors.New("request ID not found")
 	errCreateNewDirectory = errors.New("failed to create new directory")
 	errKeyEmpty           = errors.New("dagFile is empty")
@@ -146,8 +144,8 @@ func (db *JSONDB) Close(ctx context.Context) error {
 	return db.writer.close()
 }
 
-func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []*model.StatusFile {
-	var ret []*model.StatusFile
+func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []model.StatusFile {
+	var ret []model.StatusFile
 
 	files := db.getLatestMatches(db.globPattern(key), itemLimit)
 	for _, file := range files {
@@ -157,7 +155,7 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 		if err != nil {
 			continue
 		}
-		ret = append(ret, &model.StatusFile{
+		ret = append(ret, model.StatusFile{
 			File:   file,
 			Status: status,
 		})

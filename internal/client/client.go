@@ -36,6 +36,8 @@ func New(
 	}
 }
 
+var _ Client = (*client)(nil)
+
 type client struct {
 	dataStore  persistence.DataStores
 	executable string
@@ -224,7 +226,7 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (*model.
 	return status, nil
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []*model.StatusFile {
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {
 	return e.dataStore.HistoryStore().ReadStatusRecent(ctx, dag.Location, n)
 }
 

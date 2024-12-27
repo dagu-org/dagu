@@ -121,13 +121,6 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
-func FromNodesOrSteps(nodes []scheduler.NodeData, steps []digraph.Step) []*Node {
-	if len(nodes) != 0 {
-		return FromNodes(nodes)
-	}
-	return FromSteps(steps)
-}
-
 type StatusFile struct {
 	File   string
 	Status *Status

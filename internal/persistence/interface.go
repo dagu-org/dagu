@@ -30,7 +30,7 @@ type HistoryStore interface {
 	Write(ctx context.Context, status model.Status) error
 	Close(ctx context.Context) error
 	Update(ctx context.Context, key, requestID string, status model.Status) error
-	ReadStatusRecent(ctx context.Context, key string, itemLimit int) []*model.StatusFile
+	ReadStatusRecent(ctx context.Context, key string, itemLimit int) []model.StatusFile
 	ReadStatusToday(ctx context.Context, key string) (*model.Status, error)
 	FindByRequestID(ctx context.Context, key string, requestID string) (*model.StatusFile, error)
 	RemoveAll(ctx context.Context, key string) error
