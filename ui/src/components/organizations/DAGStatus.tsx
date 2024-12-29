@@ -127,6 +127,7 @@ function DAGStatus({ DAG, name, refresh }: Props) {
                 type="status"
                 flowchart={flowchart}
                 onClickNode={onSelectStepOnGraph}
+                showIcons={DAG.Status.Status != SchedulerStatus.None}
               ></Graph>
             ) : (
               <TimelineChart status={DAG.Status}></TimelineChart>

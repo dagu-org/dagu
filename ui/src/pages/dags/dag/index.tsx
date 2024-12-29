@@ -128,24 +128,29 @@ function DAGDetails() {
               <CalendarToday sx={{ mr: 0.5 }} />
               {data?.DAG?.Status?.FinishedAt
                 ? moment(data.DAG.Status.FinishedAt).format(
-                    'MMM D, YYYY HH:mm:ss'
+                    'MMM D, YYYY HH:mm:ss Z'
                   )
                 : '--'}
             </Stack>
 
-            {data?.DAG?.Status?.StartedAt && data?.DAG?.Status?.FinishedAt ? (
-              <Stack
-                direction="row"
-                color={'text.secondary'}
-                sx={{ alignItems: 'center', ml: 1 }}
-              >
-                <TimerSharp sx={{ mr: 0.5 }} />
-                {formatDuration(
-                  data?.DAG?.Status?.StartedAt,
-                  data?.DAG?.Status?.FinishedAt
-                )}
-              </Stack>
-            ) : null}
+            <Stack
+              direction="row"
+              color={'text.secondary'}
+              sx={{ alignItems: 'center', ml: 1 }}
+            >
+              <TimerSharp sx={{ mr: 0.5 }} />
+              {data?.DAG?.Status?.FinishedAt
+                ? formatDuration(
+                    data?.DAG?.Status?.StartedAt,
+                    data?.DAG?.Status?.FinishedAt
+                  )
+                : data?.DAG?.Status?.StartedAt
+                ? formatDuration(
+                    data?.DAG?.Status?.StartedAt,
+                    moment().toISOString()
+                  )
+                : '--'}
+            </Stack>
           </Stack>
         ) : null}
 
