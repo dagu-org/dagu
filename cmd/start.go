@@ -63,7 +63,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Get parameters
 	// Get parameters from the new syntax
 	var params string
-	if len(args) > 1 {
+	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		params = strings.Join(args[1:], " ")
 		args = args[:1]
 	} else {
