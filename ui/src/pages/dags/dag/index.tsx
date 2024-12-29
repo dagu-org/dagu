@@ -16,6 +16,7 @@ import useSWR from 'swr';
 import StatusChip from '../../../components/atoms/StatusChip';
 import { CalendarToday, TimerSharp } from '@mui/icons-material';
 import moment from 'moment-timezone';
+import { SchedulerStatus } from '../../../models';
 
 type Params = {
   name: string;
@@ -107,39 +108,46 @@ function DAGDetails() {
           />
         </Box>
 
-        <Stack direction="row" spacing={2} sx={{ mx: 4, alignItems: 'center' }}>
-          {data.DAG?.Status?.Status && (
-            <StatusChip status={data.DAG.Status.Status}>
-              {data.DAG.Status.StatusText || ''}
-            </StatusChip>
-          )}
+        {data.DAG?.Status?.Status != SchedulerStatus.None ? (
           <Stack
             direction="row"
-            color={'text.secondary'}
-            sx={{ alignItems: 'center', ml: 1 }}
+            spacing={2}
+            sx={{ mx: 4, alignItems: 'center' }}
           >
-            <CalendarToday sx={{ mr: 0.5 }} />
-            {data?.DAG?.Status?.FinishedAt
-              ? moment(data.DAG.Status.FinishedAt).format(
-                  'MMM D, YYYY HH:mm:ss'
-                )
-              : '--'}
-          </Stack>
+            {data.DAG?.Status?.Status ? (
+              <StatusChip status={data.DAG.Status.Status}>
+                {data.DAG.Status.StatusText || ''}
+              </StatusChip>
+            ) : null}
 
-          {data?.DAG?.Status?.StartedAt && data?.DAG?.Status?.FinishedAt ? (
             <Stack
               direction="row"
               color={'text.secondary'}
               sx={{ alignItems: 'center', ml: 1 }}
             >
-              <TimerSharp sx={{ mr: 0.5 }} />
-              {formatDuration(
-                data?.DAG?.Status?.StartedAt,
-                data?.DAG?.Status?.FinishedAt
-              )}
+              <CalendarToday sx={{ mr: 0.5 }} />
+              {data?.DAG?.Status?.FinishedAt
+                ? moment(data.DAG.Status.FinishedAt).format(
+                    'MMM D, YYYY HH:mm:ss'
+                  )
+                : '--'}
             </Stack>
-          ) : null}
-        </Stack>
+
+            {data?.DAG?.Status?.StartedAt && data?.DAG?.Status?.FinishedAt ? (
+              <Stack
+                direction="row"
+                color={'text.secondary'}
+                sx={{ alignItems: 'center', ml: 1 }}
+              >
+                <TimerSharp sx={{ mr: 0.5 }} />
+                {formatDuration(
+                  data?.DAG?.Status?.StartedAt,
+                  data?.DAG?.Status?.FinishedAt
+                )}
+              </Stack>
+            ) : null}
+          </Stack>
+        ) : null}
 
         <Stack
           sx={{
