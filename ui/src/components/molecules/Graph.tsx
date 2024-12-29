@@ -135,22 +135,22 @@ const Graph: React.FC<Props> = ({
 
     // Define node styles for different states with refined colors
     dat.push(
-      'classDef none color:#4a5568,fill:white,stroke:lightblue,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
+      'classDef none color:#4a5568,fill:#f0f9ff,stroke:lightblue,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
     );
     dat.push(
-      'classDef running color:#4a5568,fill:white,stroke:lime,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
+      'classDef running color:#4a5568,fill:#f0fdf4,stroke:lime,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
     );
     dat.push(
-      'classDef error color:red,fill:white,stroke:red,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
+      'classDef error color:red,fill:#fef2f2,stroke:red,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
     );
     dat.push(
-      'classDef cancel color:#4a5568,fill:white,stroke:pink,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
+      'classDef cancel color:#4a5568,fill:#fdf2f8,stroke:pink,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
     );
     dat.push(
-      'classDef done color:green,fill:white,stroke:green,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
+      'classDef done color:green,fill:#f0fdf4,stroke:green,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
     );
     dat.push(
-      'classDef skipped color:#4a5568,fill:white,stroke:gray,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
+      'classDef skipped color:#4a5568,fill:#f8fafc,stroke:gray,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
     );
 
     // Add custom link styles
