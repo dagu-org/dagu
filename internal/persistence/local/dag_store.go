@@ -152,12 +152,11 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
-func (d *dagStoreImpl) searchName(fileName string, searchText *string) bool {
-	if searchText == nil {
+func (d *dagStoreImpl) containsSearchText(text string, search *string) bool {
+	if search == nil {
 		return true
 	}
-	fileName = strings.TrimSuffix(fileName, path.Ext(fileName))
-	ret := strings.Contains(strings.ToLower(fileName), strings.ToLower(*searchText))
+	ret := strings.Contains(strings.ToLower(text), strings.ToLower(*search))
 	return ret
 }
 
@@ -191,20 +190,31 @@ func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DA
 		currentDag *digraph.DAG
 	)
 
-	if err := filepath.WalkDir(d.dir, func(_ string, dir fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(d.dir, func(_ string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if dir.IsDir() || !checkExtension(dir.Name()) {
+		if entry.IsDir() || !checkExtension(entry.Name()) {
 			return nil
 		}
 
-		if currentDag, err = d.GetMetadata(ctx, dir.Name()); err != nil {
-			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dir.Name(), err))
+		baseName := path.Base(entry.Name())
+		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
+		if params.Tag == nil || *params.Tag == "" {
+			// if tag is not provided, check before reading the file
+			if !d.containsSearchText(dagName, params.Name) {
+				// skip the file if the name
+				return nil
+			}
 		}
 
-		if !d.searchName(dir.Name(), params.Name) || currentDag == nil || !d.searchTags(currentDag.Tags, params.Tag) {
+		// if tag is provided, read the file and check the tag
+		if currentDag, err = d.GetMetadata(ctx, dagName); err != nil {
+			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
+		}
+
+		if !d.containsSearchText(dagName, params.Name) || currentDag == nil || !d.searchTags(currentDag.Tags, params.Tag) {
 			return nil
 		}
 
