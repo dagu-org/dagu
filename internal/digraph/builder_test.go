@@ -199,6 +199,18 @@ func TestBuildDAG(t *testing.T) {
 			"BAZ=baz",
 		)
 	})
+	t.Run("ParamsAsMapOverride", func(t *testing.T) {
+		th := loadTestYAML(t, "params_as_map.yaml", withBuildOpts(
+			buildOpts{
+				parameters: "FOO=X BAZ=Y",
+			},
+		))
+		th.AssertParam(t,
+			"FOO=X",
+			"BAR=bar",
+			"BAZ=Y",
+		)
+	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
 		th := loadTestYAML(t, "params_with_complex_values.yaml")
 		th.AssertParam(t,
