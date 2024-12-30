@@ -43,6 +43,12 @@ func (th *testHelper) AssertParam(t *testing.T, params ...string) {
 
 type testOption func(*testHelper)
 
+func withBuildOpts(opts buildOpts) testOption {
+	return func(th *testHelper) {
+		th.buildOpts = opts
+	}
+}
+
 func loadTestYAML(t *testing.T, inputFile string, opts ...testOption) *testHelper {
 	t.Helper()
 	ctx := context.Background()
@@ -184,6 +190,14 @@ func TestBuildDAG(t *testing.T) {
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
 		th := loadTestYAML(t, "params_with_quoted_values.yaml")
 		th.AssertParam(t, "x=a b c", "y=d e f")
+	})
+	t.Run("ParamsAsMap", func(t *testing.T) {
+		th := loadTestYAML(t, "params_as_map.yaml")
+		th.AssertParam(t,
+			"FOO=foo",
+			"BAR=bar",
+			"BAZ=baz",
+		)
 	})
 	t.Run("ParamsWithComplexValues", func(t *testing.T) {
 		th := loadTestYAML(t, "params_with_complex_values.yaml")

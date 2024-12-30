@@ -44,12 +44,12 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 		// Override the default parameters with the command line parameters
 		pairsIndex := make(map[string]int)
 		for i, paramPair := range paramPairs {
-			if paramPair.name != "" {
-				pairsIndex[paramPair.name] = i
+			if paramPair.Name != "" {
+				pairsIndex[paramPair.Name] = i
 			}
 		}
 		for i, paramPair := range overridePairs {
-			if paramPair.name == "" {
+			if paramPair.Name == "" {
 				// For positional parameters
 				if i < len(paramPairs) {
 					paramPairs[i] = paramPair
@@ -59,7 +59,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 				continue
 			}
 
-			if foundIndex, ok := pairsIndex[paramPair.name]; ok {
+			if foundIndex, ok := pairsIndex[paramPair.Name]; ok {
 				paramPairs[foundIndex] = paramPair
 			} else {
 				paramPairs = append(paramPairs, paramPair)
@@ -80,45 +80,45 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 
 	// Convert the parameters to a string in the form of "key=value"
-	var paramStrs []string
+	var paramStrings []string
 	for _, paramPair := range paramPairs {
-		paramStrs = append(paramStrs, paramPair.String())
+		paramStrings = append(paramStrings, paramPair.String())
 	}
 
 	// Set the parameters as environment variables for the command
 	dag.Env = append(dag.Env, envs...)
-	dag.Params = append(dag.Params, paramStrs...)
+	dag.Params = append(dag.Params, paramStrings...)
 
 	return nil
 }
 
 // parseParams parses and processes the parameters for the DAG.
 func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]string) error {
-	var parsedPairs []paramPair
+	var paramPairs []paramPair
 
-	parsedPairs, err := parseParamValue(ctx, value)
+	paramPairs, err := parseParamValue(ctx, value)
 	if err != nil {
 		return fmt.Errorf("%w: %s", errInvalidParamValue, err)
 	}
 
-	for index, paramPair := range parsedPairs {
+	for index, paramPair := range paramPairs {
 		if !ctx.opts.noEval {
-			paramPair.value = os.ExpandEnv(paramPair.value)
+			paramPair.Value = os.ExpandEnv(paramPair.Value)
 		}
 
 		*params = append(*params, paramPair)
 
-		paramStr := paramPair.String()
+		paramString := paramPair.String()
 
 		// Set the parameter as an environment variable for the command
 		// $1, $2, $3, ...
-		if err := os.Setenv(strconv.Itoa(index+1), paramStr); err != nil {
+		if err := os.Setenv(strconv.Itoa(index+1), paramString); err != nil {
 			return fmt.Errorf("failed to set environment variable: %w", err)
 		}
 
-		if !ctx.opts.noEval && paramPair.name != "" {
-			*envs = append(*envs, paramStr)
-			if err := os.Setenv(paramPair.name, paramPair.value); err != nil {
+		if !ctx.opts.noEval && paramPair.Name != "" {
+			*envs = append(*envs, paramString)
+			if err := os.Setenv(paramPair.Name, paramPair.Value); err != nil {
 				return fmt.Errorf("failed to set environment variable: %w", err)
 			}
 		}
@@ -136,7 +136,7 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case string:
 		return parseStringParams(ctx, v)
 
-	case []map[string]string:
+	case []any:
 		return parseMapParams(ctx, v)
 
 	default:
@@ -145,31 +145,60 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	}
 }
 
-func parseMapParams(ctx BuildContext, input []map[string]string) ([]paramPair, error) {
+func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 	var params []paramPair
 
 	for _, m := range input {
-		for name, value := range m {
-			if !ctx.opts.noEval {
-				parsed, err := cmdutil.SubstituteWithEnvExpand(value)
-				if err != nil {
-					return nil, fmt.Errorf("%w: %s", errInvalidParamValue, err)
+		switch m := m.(type) {
+		case map[any]any:
+			for name, value := range m {
+				var nameStr string
+				var valueStr string
+
+				switch v := value.(type) {
+				case string:
+					valueStr = v
+
+				default:
+					return nil, fmt.Errorf("%w: %T", errInvalidParamValue, v)
+
 				}
-				value = parsed
+
+				switch n := name.(type) {
+				case string:
+					nameStr = n
+
+				default:
+					return nil, fmt.Errorf("%w: %T", errInvalidParamValue, n)
+
+				}
+
+				if !ctx.opts.noEval {
+					parsed, err := cmdutil.SubstituteWithEnvExpand(valueStr)
+					if err != nil {
+						return nil, fmt.Errorf("%w: %s", errInvalidParamValue, err)
+					}
+					valueStr = parsed
+				}
+
+				paramPair := paramPair{nameStr, valueStr}
+				params = append(params, paramPair)
 			}
 
-			paramPair := paramPair{name, value}
-			params = append(params, paramPair)
+		default:
+			return nil, fmt.Errorf("%w: %T", errInvalidParamValue, m)
 		}
 	}
 
 	return params, nil
 }
 
+// paramRegex is a regex to match the parameters in the command.
+var paramRegex = regexp.MustCompile(
+	`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
+)
+
 func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
-	paramRegex := regexp.MustCompile(
-		`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
-	)
 	matches := paramRegex.FindAllStringSubmatch(input, -1)
 
 	var params []paramPair
@@ -217,25 +246,20 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 }
 
 type paramPair struct {
-	name  string
-	value string
+	Name  string
+	Value string
 }
 
 func (p paramPair) String() string {
-	if p.name != "" {
-		return fmt.Sprintf("%s=%s", p.name, p.value)
+	if p.Name != "" {
+		return fmt.Sprintf("%s=%s", p.Name, p.Value)
 	}
-	return p.value
+	return p.Value
 }
 
 func (p paramPair) Escaped() string {
-	if p.name != "" {
-		return fmt.Sprintf("%s=%q", p.name, p.value)
+	if p.Name != "" {
+		return fmt.Sprintf("%s=%q", p.Name, p.Value)
 	}
-	return fmt.Sprintf("%q", p.value)
+	return fmt.Sprintf("%q", p.Value)
 }
-
-var (
-	// paramRegex is a regex to match the parameters in the command.
-	paramRegex = regexp.MustCompile(`\$\w+`)
-)
