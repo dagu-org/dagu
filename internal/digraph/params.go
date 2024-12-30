@@ -22,7 +22,7 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	}
 
 	var envs []string
-	dag.Params, envs, err = parseParams(params, !ctx.opts.noEval, ctx.opts)
+	dag.Params, envs, err = parseParams(ctx, params)
 	if err == nil {
 		dag.Env = append(dag.Env, envs...)
 	}
@@ -31,21 +31,21 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 }
 
 // parseParams parses and processes the parameters for the DAG.
-func parseParams(value string, eval bool, options buildOpts) (
+func parseParams(ctx BuildContext, value string) (
 	params []string,
 	envs []string,
 	err error,
 ) {
 	var parsedParams []paramPair
 
-	parsedParams, err = parseParamValue(value, eval)
+	parsedParams, err = parseParamValue(ctx, value)
 	if err != nil {
 		return
 	}
 
 	var ret []string
 	for i, p := range parsedParams {
-		if eval {
+		if !ctx.opts.noEval {
 			p.value = os.ExpandEnv(p.value)
 		}
 
@@ -60,7 +60,7 @@ func parseParams(value string, eval bool, options buildOpts) (
 			return
 		}
 
-		if !options.noEval && p.name != "" {
+		if !ctx.opts.noEval && p.name != "" {
 			envs = append(envs, strParam)
 			err = os.Setenv(p.name, p.value)
 			if err != nil {
@@ -74,7 +74,7 @@ func parseParams(value string, eval bool, options buildOpts) (
 
 // parseParamValue parses the parameters for the DAG.
 func parseParamValue(
-	input string, executeCommandSubstitution bool,
+	ctx BuildContext, input string,
 ) ([]paramPair, error) {
 	paramRegex := regexp.MustCompile(
 		`(?:([^\s=]+)=)?("(?:\\"|[^"])*"|` + "`(" + `?:\\"|[^"]*)` + "`" + `|[^"\s]+)`,
@@ -93,7 +93,7 @@ func parseParamValue(
 				value = strings.ReplaceAll(value, `\"`, `"`)
 			}
 
-			if executeCommandSubstitution {
+			if !ctx.opts.noEval {
 				// Perform backtick command substitution
 				backtickRegex := regexp.MustCompile("`[^`]*`")
 
