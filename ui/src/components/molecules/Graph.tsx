@@ -50,6 +50,10 @@ const Graph: React.FC<Props> = ({
     minHeight: '200px',
     padding: '2em',
     borderRadius: '0.5em',
+    background: `
+      linear-gradient(90deg, #f8fafc 1px, transparent 1px),
+      linear-gradient(180deg, #f8fafc 1px, transparent 1px)
+    `,
     backgroundSize: '20px 20px',
   };
 
@@ -88,7 +92,7 @@ const Graph: React.FC<Props> = ({
 
       // Construct node label with icon if enabled
       const icon = showIcons ? statusIcons[status] || '' : '';
-      const label = `${icon} ${step.Name}`;
+      const label = `${icon} &nbsp; ${step.Name}`;
 
       // Add node definition
       dat.push(`${id}[${label}]${c};`);
@@ -134,24 +138,12 @@ const Graph: React.FC<Props> = ({
     }
 
     // Define node styles for different states with refined colors
-    dat.push(
-      'classDef none color:#4a5568,fill:#f8fafc,stroke:#3b82f6,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
-    );
-    dat.push(
-      'classDef running color:#4a5568,fill:#aaf2aa,stroke:#22c55e,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
-    );
-    dat.push(
-      'classDef error color:#4a5568,fill:#fee2e2,stroke:#ef4444,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
-    );
-    dat.push(
-      'classDef cancel color:#4a5568,fill:#fdf2f8,stroke:#ec4899,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
-    );
-    dat.push(
-      'classDef done color:#4a5568,fill:#f0fdf4,stroke:#16a34a,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
-    );
-    dat.push(
-      'classDef skipped color:#4a5568,fill:#f8fafc,stroke:#64748b,stroke-width:1.2px,white-space:nowrap,line-height:1.5'
-    );
+    dat.push('classDef none fill:#f0f9ff,stroke:#93c5fd,color:#1e40af,stroke-width:1.2px,white-space:nowrap');
+    dat.push('classDef running fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap');
+    dat.push('classDef error fill:#fef2f2,stroke:#fca5a5,color:#aa1010,stroke-width:1.2px,white-space:nowrap');
+    dat.push('classDef cancel fill:#fdf2f8,stroke:#f9a8d4,color:#9d174d,stroke-width:1.2px,white-space:nowrap');
+    dat.push('classDef done fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap');
+    dat.push('classDef skipped fill:#f8fafc,stroke:#cbd5e1,color:#475569,stroke-width:1.2px,white-space:nowrap');
 
     // Add custom link styles
     dat.push(...linkStyles);
