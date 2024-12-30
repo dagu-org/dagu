@@ -49,7 +49,7 @@ type definition struct {
 	// MaxActiveRuns is the maximum number of concurrent steps.
 	MaxActiveRuns int
 	// Params is the default parameters for the steps.
-	Params string
+	Params any
 	// MaxCleanUpTimeSec is the maximum time in seconds to clean up the DAG.
 	// It is a wait time to kill the processes when it is requested to stop.
 	// If the time is exceeded, the process is killed.
