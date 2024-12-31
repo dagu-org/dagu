@@ -61,7 +61,9 @@ func runRestart(cmd *cobra.Command, args []string) error {
 
 	dataStore := newDataStores(cfg)
 	dagStore := newDAGStore(cfg)
-	cli := newClient(cfg, dataStore, dagStore)
+	historyStore := newHistoryStore(cfg)
+
+	cli := newClient(cfg, dataStore, dagStore, historyStore)
 
 	// Handle the restart process
 	if err := handleRestartProcess(ctx, cli, cfg, dag, quiet, specFilePath); err != nil {
@@ -132,6 +134,7 @@ func executeDAG(ctx context.Context, cli client.Client, cfg *config.Config,
 		cli,
 		newDataStores(cfg),
 		newDAGStore(cfg),
+		newHistoryStore(cfg),
 		&agent.Options{Dry: false})
 
 	listenSignals(ctx, agt)

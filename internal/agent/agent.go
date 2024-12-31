@@ -78,18 +78,20 @@ func New(
 	cli client.Client,
 	dataStore persistence.DataStores,
 	dagStore persistence.DAGStore,
+	historyStore persistence.HistoryStore,
 	opts *Options,
 ) *Agent {
 	return &Agent{
-		requestID:   requestID,
-		dag:         dag,
-		dry:         opts.Dry,
-		retryTarget: opts.RetryTarget,
-		logDir:      logDir,
-		logFile:     logFile,
-		client:      cli,
-		dataStore:   dataStore,
-		dagStore:    dagStore,
+		requestID:    requestID,
+		dag:          dag,
+		dry:          opts.Dry,
+		retryTarget:  opts.RetryTarget,
+		logDir:       logDir,
+		logFile:      logFile,
+		client:       cli,
+		dataStore:    dataStore,
+		dagStore:     dagStore,
+		historyStore: historyStore,
 	}
 }
 
@@ -444,7 +446,6 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 
 // setup database prepare database connection and remove old history data.
 func (a *Agent) setupDatabase(ctx context.Context) error {
-	a.historyStore = a.dataStore.HistoryStore()
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(ctx, location, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)

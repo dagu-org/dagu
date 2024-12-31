@@ -57,8 +57,9 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir, local.WithFileCache(dagCache))
+	historyStore := newHistoryStore(cfg)
 
-	cli := newClient(cfg, dataStore, dagStore)
+	cli := newClient(cfg, dataStore, dagStore, historyStore)
 
 	sc := scheduler.New(cfg, cli)
 	if err := sc.Start(ctx); err != nil {

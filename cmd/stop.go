@@ -42,7 +42,9 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	dataStore := newDataStores(cfg)
 	dagStore := newDAGStore(cfg)
-	cli := newClient(cfg, dataStore, dagStore)
+	historyStore := newHistoryStore(cfg)
+
+	cli := newClient(cfg, dataStore, dagStore, historyStore)
 
 	if err := cli.Stop(cmd.Context(), dag); err != nil {
 		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)

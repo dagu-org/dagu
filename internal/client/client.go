@@ -27,24 +27,27 @@ import (
 func New(
 	dataStore persistence.DataStores,
 	dagStore persistence.DAGStore,
+	historyStore persistence.HistoryStore,
 	executable string,
 	workDir string,
 ) Client {
 	return &client{
-		dataStore:  dataStore,
-		dagStore:   dagStore,
-		executable: executable,
-		workDir:    workDir,
+		dataStore:    dataStore,
+		dagStore:     dagStore,
+		historyStore: historyStore,
+		executable:   executable,
+		workDir:      workDir,
 	}
 }
 
 var _ Client = (*client)(nil)
 
 type client struct {
-	dataStore  persistence.DataStores
-	dagStore   persistence.DAGStore
-	executable string
-	workDir    string
+	dataStore    persistence.DataStores
+	dagStore     persistence.DAGStore
+	historyStore persistence.HistoryStore
+	executable   string
+	workDir      string
 }
 
 var (
@@ -90,8 +93,7 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	if err != nil {
 		return err
 	}
-	historyStore := e.dataStore.HistoryStore()
-	return historyStore.Rename(ctx, oldDAG.Location, newDAG.Location)
+	return e.historyStore.Rename(ctx, oldDAG.Location, newDAG.Location)
 }
 
 func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
@@ -185,7 +187,7 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Sta
 func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*model.Status, error,
 ) {
-	ret, err := e.dataStore.HistoryStore().FindByRequestID(ctx, dag.Location, requestID)
+	ret, err := e.historyStore.FindByRequestID(ctx, dag.Location, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +213,7 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.S
 	if currStatus != nil {
 		return *currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().ReadStatusToday(ctx, dag.Location)
+	status, err := e.historyStore.ReadStatusToday(ctx, dag.Location)
 	if err != nil {
 		status := model.NewStatusFactory(dag).CreateDefault()
 		if errors.Is(err, persistence.ErrNoStatusDataToday) ||
@@ -226,7 +228,7 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.S
 }
 
 func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {
-	return e.dataStore.HistoryStore().ReadStatusRecent(ctx, dag.Location, n)
+	return e.historyStore.ReadStatusRecent(ctx, dag.Location, n)
 }
 
 func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error {
@@ -243,7 +245,7 @@ func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status mode
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStore.HistoryStore().Update(ctx, dag.Location, status.RequestID, status)
+	return e.historyStore.Update(ctx, dag.Location, status.RequestID, status)
 }
 
 func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
@@ -251,7 +253,7 @@ func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
 }
 
 func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
-	err := e.dataStore.HistoryStore().RemoveAll(ctx, loc)
+	err := e.historyStore.RemoveAll(ctx, loc)
 	if err != nil {
 		return err
 	}

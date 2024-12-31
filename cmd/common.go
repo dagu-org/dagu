@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -33,10 +34,12 @@ func newClient(
 	cfg *config.Config,
 	dataStore persistence.DataStores,
 	dagStore persistence.DAGStore,
+	historyStore persistence.HistoryStore,
 ) client.Client {
 	return client.New(
 		dataStore,
 		dagStore,
+		historyStore,
 		cfg.Paths.Executable,
 		cfg.WorkDir,
 	)
@@ -55,6 +58,12 @@ func newDataStores(cfg *config.Config) persistence.DataStores {
 
 func newDAGStore(cfg *config.Config) persistence.DAGStore {
 	return local.NewDAGStore(cfg.Paths.DAGsDir)
+}
+
+func newHistoryStore(cfg *config.Config) persistence.HistoryStore {
+	return jsondb.New(cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
+		cfg.LatestStatusToday,
+	))
 }
 
 // generateRequestID generates a new request ID.

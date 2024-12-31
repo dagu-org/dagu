@@ -12,7 +12,9 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -59,11 +61,19 @@ func runServer(cmd *cobra.Command, _ []string) error {
 		"port", cfg.Port)
 
 	dataStore := newDataStores(cfg)
+
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir, local.WithFileCache(dagCache))
 
-	cli := newClient(cfg, dataStore, dagStore)
+	historyCache := filecache.New[*model.Status](0, time.Hour*12)
+	historyCache.StartEviction(ctx)
+	historyStore := jsondb.New(cfg.Paths.DataDir,
+		jsondb.WithLatestStatusToday(cfg.LatestStatusToday),
+		jsondb.WithFileCache(historyCache),
+	)
+
+	cli := newClient(cfg, dataStore, dagStore, historyStore)
 
 	server := frontend.New(cfg, cli)
 	if err := server.Serve(cmd.Context()); err != nil {

@@ -24,9 +24,8 @@ func TestStatusCommand(t *testing.T) {
 			close(done)
 		}()
 
-		hs := th.DataStores.HistoryStore()
 		require.Eventually(t, func() bool {
-			status := hs.ReadStatusRecent(th.Context, dagFile.Path, 1)
+			status := th.HistoryStore.ReadStatusRecent(th.Context, dagFile.Path, 1)
 			if len(status) < 1 {
 				return false
 			}

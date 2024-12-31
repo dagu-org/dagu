@@ -29,7 +29,7 @@ func testSetup(t *testing.T) testHelper {
 
 	th := testHelper{
 		Context: context.Background(),
-		DB:      New(tmpDir, DefaultConfig()),
+		DB:      New(tmpDir),
 		tmpDir:  tmpDir,
 	}
 

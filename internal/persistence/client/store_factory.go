@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 )
@@ -53,16 +52,6 @@ func (f *dataStores) InitDagDir() error {
 	}
 
 	return nil
-}
-
-func (f *dataStores) HistoryStore() persistence.HistoryStore {
-	// TODO: Add support for other data stores (e.g. sqlite, postgres, etc.)
-	if f.historyStore == nil {
-		cfg := jsondb.DefaultConfig()
-		cfg.LatestStatusToday = f.latestStatusToday
-		f.historyStore = jsondb.New(f.dataDir, cfg)
-	}
-	return f.historyStore
 }
 
 func (f *dataStores) FlagStore() persistence.FlagStore {
