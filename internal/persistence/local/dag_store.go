@@ -22,40 +22,42 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/grep"
 )
 
+var _ persistence.DAGStore = (*dagStoreImpl)(nil)
+var _ digraph.Finder = (*dagStoreImpl)(nil)
+
 type dagStoreImpl struct {
 	dir       string
 	metaCache *filecache.Cache[*digraph.DAG]
 }
 
-type NewDAGStoreArgs struct {
-	Dir string
-}
+const defaultCacheTTL = time.Hour * 24
 
-func NewDAGStore(args *NewDAGStoreArgs) persistence.DAGStore {
-	dagStore := &dagStoreImpl{
-		dir:       args.Dir,
-		metaCache: filecache.New[*digraph.DAG](0, time.Hour*24),
+func NewDAGStore(dir string) persistence.DAGStore {
+	metaCache := filecache.New[*digraph.DAG](0, defaultCacheTTL)
+	metaCache.StartEviction()
+
+	return &dagStoreImpl{
+		dir:       dir,
+		metaCache: metaCache,
 	}
-	dagStore.metaCache.StartEviction()
-	return dagStore
 }
 
 func (d *dagStoreImpl) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
-	loc, err := d.fileLocation(name)
+	filePath, err := d.getFilePath(name)
 	if err != nil {
 		return nil, err
 	}
-	return d.metaCache.LoadLatest(loc, func() (*digraph.DAG, error) {
-		return digraph.LoadMetadata(ctx, loc)
+	return d.metaCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
+		return digraph.LoadMetadata(ctx, filePath)
 	})
 }
 
 func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
-	loc, err := d.fileLocation(name)
+	filePath, err := d.getFilePath(name)
 	if err != nil {
 		return nil, err
 	}
-	dat, err := digraph.LoadWithoutEval(ctx, loc)
+	dat, err := digraph.LoadWithoutEval(ctx, filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -63,11 +65,11 @@ func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DA
 }
 
 func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
-	loc, err := d.fileLocation(name)
+	filePath, err := d.getFilePath(name)
 	if err != nil {
 		return "", err
 	}
-	dat, err := os.ReadFile(loc)
+	dat, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}
@@ -85,18 +87,17 @@ func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte)
 	if err != nil {
 		return err
 	}
-	loc, err := d.fileLocation(name)
+	filePath, err := d.getFilePath(name)
 	if err != nil {
 		return err
 	}
-	if !exists(loc) {
-		return fmt.Errorf("%w: %s", errDOGFileNotExist, loc)
+	if !exists(filePath) {
+		return fmt.Errorf("%w: %s", errDOGFileNotExist, filePath)
 	}
-	err = os.WriteFile(loc, spec, defaultPerm)
-	if err != nil {
+	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return err
 	}
-	d.metaCache.Invalidate(loc)
+	d.metaCache.Invalidate(filePath)
 	return nil
 }
 
@@ -106,27 +107,27 @@ func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (stri
 	if err := d.ensureDirExist(); err != nil {
 		return "", err
 	}
-	loc, err := d.fileLocation(name)
+	filePath, err := d.getFilePath(name)
 	if err != nil {
 		return "", err
 	}
-	if exists(loc) {
-		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, loc)
+	if exists(filePath) {
+		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, filePath)
 	}
 	// nolint: gosec
-	return name, os.WriteFile(loc, spec, 0644)
+	return name, os.WriteFile(filePath, spec, 0644)
 }
 
 func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
-	loc, err := d.fileLocation(name)
+	filePath, err := d.getFilePath(name)
 	if err != nil {
 		return err
 	}
-	err = os.Remove(loc)
+	err = os.Remove(filePath)
 	if err != nil {
 		return err
 	}
-	d.metaCache.Invalidate(loc)
+	d.metaCache.Invalidate(filePath)
 	return nil
 }
 
@@ -135,7 +136,7 @@ func exists(file string) bool {
 	return !os.IsNotExist(err)
 }
 
-func (d *dagStoreImpl) fileLocation(name string) (string, error) {
+func (d *dagStoreImpl) getFilePath(name string) (string, error) {
 	if strings.Contains(name, "/") {
 		// this is for backward compatibility
 		return name, nil
@@ -152,28 +153,6 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
-func (d *dagStoreImpl) containsSearchText(text string, search *string) bool {
-	if search == nil {
-		return true
-	}
-	ret := strings.Contains(strings.ToLower(text), strings.ToLower(*search))
-	return ret
-}
-
-func (d *dagStoreImpl) searchTags(tags []string, searchTag *string) bool {
-	if searchTag == nil {
-		return true
-	}
-
-	for _, tag := range tags {
-		if tag == *searchTag {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (d *dagStoreImpl) getTagList(tagSet map[string]struct{}) []string {
 	tagList := make([]string, 0, len(tagSet))
 	for tag := range tagSet {
@@ -184,10 +163,9 @@ func (d *dagStoreImpl) getTagList(tagSet map[string]struct{}) []string {
 
 func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
 	var (
-		dagList    = make([]*digraph.DAG, 0)
-		errList    = make([]string, 0)
-		count      int
-		currentDag *digraph.DAG
+		dagList []*digraph.DAG
+		errList []string
+		count   int
 	)
 
 	if err := filepath.WalkDir(d.dir, func(_ string, entry fs.DirEntry, err error) error {
@@ -195,32 +173,39 @@ func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DA
 			return err
 		}
 
-		if entry.IsDir() || !checkExtension(entry.Name()) {
+		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
 			return nil
 		}
 
 		baseName := path.Base(entry.Name())
 		dagName := strings.TrimSuffix(baseName, path.Ext(baseName))
-		if params.Tag == nil || *params.Tag == "" {
-			// if tag is not provided, check before reading the file
-			if !d.containsSearchText(dagName, params.Name) {
-				// skip the file if the name
+		if params.Name != "" && params.Tag == "" {
+			// If tag is not provided, check before reading the file to avoid
+			// unnecessary file read and parsing.
+			if !containsSearchText(dagName, params.Name) {
+				// Return early if the name does not match the search text.
 				return nil
 			}
 		}
 
-		// if tag is provided, read the file and check the tag
-		if currentDag, err = d.GetMetadata(ctx, dagName); err != nil {
+		// Read the file and parse the DAG.
+		parsedDAG, err := d.GetMetadata(ctx, dagName)
+		if err != nil {
 			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dagName, err))
+			return nil
 		}
 
-		if !d.containsSearchText(dagName, params.Name) || currentDag == nil || !d.searchTags(currentDag.Tags, params.Tag) {
+		if params.Name != "" && !containsSearchText(dagName, params.Name) {
+			return nil
+		}
+
+		if params.Tag != "" && !containsTag(parsedDAG.Tags, params.Tag) {
 			return nil
 		}
 
 		count++
 		if count > (params.Page-1)*params.Limit && len(dagList) < params.Limit {
-			dagList = append(dagList, currentDag)
+			dagList = append(dagList, parsedDAG)
 		}
 
 		return nil
@@ -250,7 +235,7 @@ func (d *dagStoreImpl) List(ctx context.Context) (ret []*digraph.DAG, errs []str
 		return
 	}
 	for _, fi := range fis {
-		if checkExtension(fi.Name()) {
+		if fileutil.IsYAMLFile(fi.Name()) {
 			dat, err := d.GetMetadata(ctx, fi.Name())
 			if err == nil {
 				ret = append(ret, dat)
@@ -262,18 +247,6 @@ func (d *dagStoreImpl) List(ctx context.Context) (ret []*digraph.DAG, errs []str
 		}
 	}
 	return ret, errs, nil
-}
-
-var extensions = []string{".yaml", ".yml"}
-
-func checkExtension(file string) bool {
-	ext := filepath.Ext(file)
-	for _, e := range extensions {
-		if e == ext {
-			return true
-		}
-	}
-	return false
 }
 
 func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
@@ -326,26 +299,26 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 }
 
 func (d *dagStoreImpl) Rename(_ context.Context, oldID, newID string) error {
-	oldLoc, err := d.fileLocation(oldID)
+	oldFilePath, err := d.getFilePath(oldID)
 	if err != nil {
 		return err
 	}
-	newLoc, err := d.fileLocation(newID)
+	newFilePath, err := d.getFilePath(newID)
 	if err != nil {
 		return err
 	}
-	return os.Rename(oldLoc, newLoc)
+	return os.Rename(oldFilePath, newFilePath)
 }
 
-func (d *dagStoreImpl) Find(ctx context.Context, name string) (*digraph.DAG, error) {
-	file, err := d.resolve(name)
+func (d *dagStoreImpl) FindByName(ctx context.Context, name string) (*digraph.DAG, error) {
+	file, err := d.locateDAG(name)
 	if err != nil {
 		return nil, err
 	}
 	return digraph.LoadWithoutEval(ctx, file)
 }
 
-func (d *dagStoreImpl) resolve(name string) (string, error) {
+func (d *dagStoreImpl) locateDAG(name string) (string, error) {
 	// check if the name is a file path
 	if strings.Contains(name, string(filepath.Separator)) {
 		if !fileutil.FileExists(name) {
@@ -406,7 +379,7 @@ func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) 
 			return err
 		}
 
-		if dir.IsDir() || !checkExtension(dir.Name()) {
+		if dir.IsDir() || !fileutil.IsYAMLFile(dir.Name()) {
 			return nil
 		}
 
@@ -428,4 +401,18 @@ func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) 
 	}
 
 	return d.getTagList(tagSet), errList, nil
+}
+
+func containsSearchText(text string, search string) bool {
+	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
+}
+
+func containsTag(tags []string, searchTag string) bool {
+	for _, tag := range tags {
+		if strings.EqualFold(tag, searchTag) {
+			return true
+		}
+	}
+
+	return false
 }

@@ -49,15 +49,15 @@ type DAGStore interface {
 	Rename(ctx context.Context, oldID, newID string) error
 	GetSpec(ctx context.Context, name string) (string, error)
 	UpdateSpec(ctx context.Context, name string, spec []byte) error
-	Find(ctx context.Context, name string) (*digraph.DAG, error)
+	FindByName(ctx context.Context, name string) (*digraph.DAG, error)
 	TagList(ctx context.Context) ([]string, []string, error)
 }
 
 type DAGListPaginationArgs struct {
 	Page  int
 	Limit int
-	Name  *string
-	Tag   *string
+	Name  string
+	Tag   string
 }
 
 type DagListPaginationResult struct {

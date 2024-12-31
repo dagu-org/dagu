@@ -80,14 +80,14 @@ func (e *client) Grep(ctx context.Context, pattern string) (
 
 func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	dagStore := e.dataStore.DAGStore()
-	oldDAG, err := dagStore.Find(ctx, oldID)
+	oldDAG, err := dagStore.FindByName(ctx, oldID)
 	if err != nil {
 		return err
 	}
 	if err := dagStore.Rename(ctx, oldID, newID); err != nil {
 		return err
 	}
-	newDAG, err := dagStore.Find(ctx, newID)
+	newDAG, err := dagStore.FindByName(ctx, newID)
 	if err != nil {
 		return err
 	}
@@ -303,8 +303,8 @@ func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDag
 	if dagListPaginationResult, err = dagStore.ListPagination(ctx, persistence.DAGListPaginationArgs{
 		Page:  page,
 		Limit: limit,
-		Name:  params.SearchName,
-		Tag:   params.SearchTag,
+		Name:  fromPtr(params.SearchName),
+		Tag:   fromPtr(params.SearchTag),
 	}); err != nil {
 		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
 	}
@@ -395,4 +395,12 @@ func escapeArg(input string) string {
 
 func (e *client) GetTagList(ctx context.Context) ([]string, []string, error) {
 	return e.dataStore.DAGStore().TagList(ctx)
+}
+
+func fromPtr[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }

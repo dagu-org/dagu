@@ -18,7 +18,7 @@ type dataStores struct {
 	historyStore persistence.HistoryStore
 	dagStore     persistence.DAGStore
 
-	dags              string
+	dagsDir           string
 	dataDir           string
 	suspendFlagsDir   string
 	latestStatusToday bool
@@ -29,13 +29,13 @@ type DataStoreOptions struct {
 }
 
 func NewDataStores(
-	dags string,
+	dagsDir string,
 	dataDir string,
 	suspendFlagsDir string,
 	opts DataStoreOptions,
 ) persistence.DataStores {
 	dataStoreImpl := &dataStores{
-		dags:              dags,
+		dagsDir:           dagsDir,
 		dataDir:           dataDir,
 		suspendFlagsDir:   suspendFlagsDir,
 		latestStatusToday: opts.LatestStatusToday,
@@ -45,9 +45,9 @@ func NewDataStores(
 }
 
 func (f *dataStores) InitDagDir() error {
-	_, err := os.Stat(f.dags)
+	_, err := os.Stat(f.dagsDir)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(f.dags, 0755); err != nil {
+		if err := os.MkdirAll(f.dagsDir, 0755); err != nil {
 			return err
 		}
 	}
@@ -67,7 +67,7 @@ func (f *dataStores) HistoryStore() persistence.HistoryStore {
 
 func (f *dataStores) DAGStore() persistence.DAGStore {
 	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(&local.NewDAGStoreArgs{Dir: f.dags})
+		f.dagStore = local.NewDAGStore(f.dagsDir)
 	}
 	return f.dagStore
 }
