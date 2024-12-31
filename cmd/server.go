@@ -55,7 +55,8 @@ func runServer(cmd *cobra.Command, _ []string) error {
 		"port", cfg.Port)
 
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	dagStore := newDAGStore(cfg)
+	cli := newClient(cfg, dataStore, dagStore)
 
 	server := frontend.New(cfg, cli)
 	if err := server.Serve(cmd.Context()); err != nil {

@@ -21,7 +21,6 @@ var (
 
 type DataStores interface {
 	HistoryStore() HistoryStore
-	DAGStore() DAGStore
 	FlagStore() FlagStore
 }
 

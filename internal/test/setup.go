@@ -23,6 +23,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,12 +75,14 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 			LatestStatusToday: cfg.LatestStatusToday,
 		},
 	)
+	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
 
 	helper := Helper{
 		Context:    createDefaultContext(),
 		Config:     cfg,
-		Client:     client.New(dataStores, cfg.Paths.Executable, cfg.WorkDir),
+		Client:     client.New(dataStores, dagStore, cfg.Paths.Executable, cfg.WorkDir),
 		DataStores: dataStores,
+		DAGStore:   dagStore,
 
 		tmpDir: tmpDir,
 	}
@@ -99,6 +102,7 @@ type Helper struct {
 	LoggingOutput *SyncBuffer
 	Client        client.Client
 	DataStores    persistence.DataStores
+	DAGStore      persistence.DAGStore
 
 	tmpDir string
 }
@@ -192,6 +196,7 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logFile,
 		d.Client,
 		d.DataStores,
+		d.DAGStore,
 		helper.opts,
 	)
 

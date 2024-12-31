@@ -67,7 +67,8 @@ func runDry(cmd *cobra.Command, args []string) error {
 
 	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	dagStore := newDAGStore(cfg)
+	cli := newClient(cfg, dataStore, dagStore)
 
 	agt := agent.New(
 		requestID,
@@ -76,6 +77,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		logFile.Name(),
 		cli,
 		dataStore,
+		dagStore,
 		&agent.Options{Dry: true},
 	)
 

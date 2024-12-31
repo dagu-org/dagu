@@ -65,13 +65,6 @@ func (f *dataStores) HistoryStore() persistence.HistoryStore {
 	return f.historyStore
 }
 
-func (f *dataStores) DAGStore() persistence.DAGStore {
-	if f.dagStore == nil {
-		f.dagStore = local.NewDAGStore(f.dagsDir)
-	}
-	return f.dagStore
-}
-
 func (f *dataStores) FlagStore() persistence.FlagStore {
 	return local.NewFlagStore(storage.NewStorage(f.suspendFlagsDir))
 }

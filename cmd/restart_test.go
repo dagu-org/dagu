@@ -59,7 +59,8 @@ func TestRestartCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		dataStore := newDataStores(th.Config)
-		client := newClient(th.Config, dataStore)
+		dagStore := newDAGStore(th.Config)
+		client := newClient(th.Config, dataStore, dagStore)
 		recentHistory := client.GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)

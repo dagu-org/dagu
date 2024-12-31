@@ -52,7 +52,8 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	dagStore := newDAGStore(cfg)
+	cli := newClient(cfg, dataStore, dagStore)
 
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)

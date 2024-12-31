@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -28,8 +29,17 @@ func wrapRunE(f func(cmd *cobra.Command, args []string) error) func(cmd *cobra.C
 	}
 }
 
-func newClient(cfg *config.Config, ds persistence.DataStores) client.Client {
-	return client.New(ds, cfg.Paths.Executable, cfg.WorkDir)
+func newClient(
+	cfg *config.Config,
+	dataStore persistence.DataStores,
+	dagStore persistence.DAGStore,
+) client.Client {
+	return client.New(
+		dataStore,
+		dagStore,
+		cfg.Paths.Executable,
+		cfg.WorkDir,
+	)
 }
 
 func newDataStores(cfg *config.Config) persistence.DataStores {
@@ -41,6 +51,10 @@ func newDataStores(cfg *config.Config) persistence.DataStores {
 			LatestStatusToday: cfg.LatestStatusToday,
 		},
 	)
+}
+
+func newDAGStore(cfg *config.Config) persistence.DAGStore {
+	return local.NewDAGStore(cfg.Paths.DAGsDir)
 }
 
 // generateRequestID generates a new request ID.

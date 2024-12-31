@@ -14,6 +14,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/local"
 
 	"github.com/stretchr/testify/require"
 
@@ -103,6 +104,7 @@ func setupTest(t *testing.T) (string, client.Client) {
 			LatestStatusToday: cfg.LatestStatusToday,
 		},
 	)
+	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
 
-	return tmpDir, client.New(dataStore, "", cfg.WorkDir)
+	return tmpDir, client.New(dataStore, dagStore, "", cfg.WorkDir)
 }

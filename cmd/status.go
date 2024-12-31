@@ -41,7 +41,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Initialize services and get status
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	dagStore := newDAGStore(cfg)
+	cli := newClient(cfg, dataStore, dagStore)
 
 	status, err := cli.GetCurrentStatus(ctx, dag)
 	if err != nil {

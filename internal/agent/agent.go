@@ -39,6 +39,7 @@ type Agent struct {
 	dry          bool
 	retryTarget  *model.Status
 	dataStore    persistence.DataStores
+	dagStore     persistence.DAGStore
 	client       client.Client
 	scheduler    *scheduler.Scheduler
 	graph        *scheduler.ExecutionGraph
@@ -76,6 +77,7 @@ func New(
 	logFile string,
 	cli client.Client,
 	dataStore persistence.DataStores,
+	dagStore persistence.DAGStore,
 	opts *Options,
 ) *Agent {
 	return &Agent{
@@ -87,6 +89,7 @@ func New(
 		logFile:     logFile,
 		client:      cli,
 		dataStore:   dataStore,
+		dagStore:    dagStore,
 	}
 }
 
@@ -193,7 +196,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
-	dagCtx := digraph.NewContext(ctx, a.dag, a.dataStore.DAGStore(), newOutputCollector(a.historyStore), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(ctx, a.dag, a.dagStore, newOutputCollector(a.historyStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	// Update the finished status to the history database.
@@ -362,7 +365,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dataStore.DAGStore(), newOutputCollector(a.historyStore), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dagStore, newOutputCollector(a.historyStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 

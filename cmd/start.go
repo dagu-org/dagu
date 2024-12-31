@@ -104,7 +104,8 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 
 	// Initialize services
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	dagStore := newDAGStore(cfg)
+	cli := newClient(cfg, dataStore, dagStore)
 
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
@@ -117,6 +118,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 		logFile.Name(),
 		cli,
 		dataStore,
+		dagStore,
 		&agent.Options{},
 	)
 

@@ -78,6 +78,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 type executionContext struct {
 	dag           *digraph.DAG
 	dataStore     persistence.DataStores
+	dagStore      persistence.DAGStore
 	originalState *model.StatusFile
 	absolutePath  string
 }
@@ -89,6 +90,7 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 	}
 
 	dataStore := newDataStores(cfg)
+	dagStore := newDAGStore(cfg)
 	historyStore := dataStore.HistoryStore()
 
 	status, err := historyStore.FindByRequestID(ctx, absolutePath, requestID)
@@ -105,6 +107,7 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 	return &executionContext{
 		dag:           dag,
 		dataStore:     dataStore,
+		dagStore:      dagStore,
 		originalState: status,
 		absolutePath:  absolutePath,
 	}, nil
@@ -128,7 +131,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 	}
 	defer logFile.Close()
 
-	cli := newClient(cfg, execCtx.dataStore)
+	cli := newClient(cfg, execCtx.dataStore, execCtx.dagStore)
 
 	logger.Info(ctx, "DAG retry initiated",
 		"DAG", execCtx.dag.Name,
@@ -145,6 +148,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 		logFile.Name(),
 		cli,
 		execCtx.dataStore,
+		execCtx.dagStore,
 		&agent.Options{RetryTarget: &execCtx.originalState.Status},
 	)
 

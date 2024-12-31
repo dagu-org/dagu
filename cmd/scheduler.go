@@ -51,7 +51,8 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 		"logFormat", cfg.LogFormat)
 
 	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	dagStore := newDAGStore(cfg)
+	cli := newClient(cfg, dataStore, dagStore)
 
 	sc := scheduler.New(cfg, cli)
 	if err := sc.Start(ctx); err != nil {
