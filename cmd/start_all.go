@@ -48,8 +48,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		cfg.Paths.DAGsDir = dagsDir
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx := setup.loggerContext(cmd.Context(), false)
 
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)

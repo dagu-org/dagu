@@ -10,7 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +58,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 	defer logFile.Close()
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
+	ctx = setup.loggerContextWithFile(ctx, false, logFile)
 
 	agt := agent.New(
 		requestID,

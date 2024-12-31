@@ -58,8 +58,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	// Get parameters
 	params, err := cmd.Flags().GetString("params")
@@ -98,8 +97,9 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 	}
 	defer logFile.Close()
 
+	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
+
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
 
 	// Create and run agent
 	agt := agent.New(

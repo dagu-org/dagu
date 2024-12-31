@@ -48,8 +48,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
 
@@ -109,12 +108,9 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 	}
 	defer logFile.Close()
 
-	logger.Info(ctx, "DAG restart initiated",
-		"DAG", dag.Name,
-		"requestID", requestID,
-		"logFile", logFile.Name())
+	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
+	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 	agt := agent.New(
 		requestID,
 		dag,

@@ -16,8 +16,10 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/frontend/server"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -25,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/scheduler"
+	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +48,31 @@ type setup struct {
 
 func newSetup(cfg *config.Config) *setup {
 	return &setup{cfg: cfg}
+}
+
+func (s *setup) loggerContext(ctx context.Context, quiet bool) context.Context {
+	var opts []logger.Option
+	if s.cfg.Debug {
+		opts = append(opts, logger.WithDebug())
+	}
+	if quiet {
+		opts = append(opts, logger.WithQuiet())
+	}
+	if s.cfg.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(s.cfg.LogFormat))
+	}
+	return logger.WithLogger(ctx, logger.NewLogger(opts...))
+}
+
+func (s *setup) loggerContextWithFile(ctx context.Context, quiet bool, f *os.File) context.Context {
+	var opts []logger.Option
+	if quiet {
+		opts = append(opts, logger.WithQuiet())
+	}
+	if f != nil {
+		opts = append(opts, logger.WithWriter(f))
+	}
+	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
 func (s *setup) dataStores() persistence.DataStores {
@@ -200,4 +228,69 @@ func listenSignals(ctx context.Context, listener signalListener) {
 			listener.Signal(ctx, sig)
 		}
 	}()
+}
+
+// logFileSettings contains the settings for the log file.
+type logFileSettings struct {
+	Prefix    string
+	LogDir    string
+	DAGLogDir string
+	DAGName   string
+	RequestID string
+}
+
+// validateSettings ensures all required fields are properly set
+func validateSettings(config logFileSettings) error {
+	if config.DAGName == "" {
+		return fmt.Errorf("DAGName cannot be empty")
+	}
+	if config.LogDir == "" && config.DAGLogDir == "" {
+		return fmt.Errorf("either LogDir or DAGLogDir must be specified")
+	}
+	return nil
+}
+
+// setupLogDirectory creates and returns the appropriate log directory
+func setupLogDirectory(config logFileSettings) (string, error) {
+	safeName := fileutil.SafeName(config.DAGName)
+
+	// Determine the base directory
+	baseDir := config.LogDir
+	if config.DAGLogDir != "" {
+		baseDir = config.DAGLogDir
+	}
+
+	logDir := filepath.Join(baseDir, safeName)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", logDir, err)
+	}
+
+	return logDir, nil
+}
+
+// buildLogFilename generates the log filename using the configured format
+func buildLogFilename(config logFileSettings) string {
+	timestamp := time.Now().Format("20060102.15:04:05.000")
+	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
+	safeDagName := fileutil.SafeName(config.DAGName)
+
+	return fmt.Sprintf("%s%s.%s.%s.log",
+		config.Prefix,
+		safeDagName,
+		timestamp,
+		truncatedRequestID,
+	)
+}
+
+// createLogFile opens or creates a log file with appropriate permissions
+func createLogFile(filepath string) (*os.File, error) {
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
+	permissions := os.FileMode(0644)
+
+	file, err := os.OpenFile(filepath, flags, permissions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/open log file %s: %w", filepath, err)
+	}
+
+	return file, nil
 }

@@ -31,8 +31,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	setup := newSetup(cfg)
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx := setup.loggerContext(cmd.Context(), false)
 
 	// Load the DAG
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], "")

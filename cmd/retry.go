@@ -55,8 +55,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
 
@@ -100,13 +99,9 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 	}
 	defer logFile.Close()
 
-	logger.Info(ctx, "DAG retry initiated",
-		"DAG", dag.Name,
-		"originalRequestID", originalStatus.Status.RequestID,
-		"newRequestID", newRequestID,
-		"logFile", logFile.Name())
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "originalRequestID", originalStatus.Status.RequestID, "newRequestID", newRequestID, "logFile", logFile.Name())
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
+	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
 
 	agt := agent.New(
 		newRequestID,
