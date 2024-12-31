@@ -95,7 +95,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 
 	logFile, err := setup.openLogFile(retryPrefix, dag, newRequestID)
 	if err != nil {
-		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
@@ -103,14 +103,26 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 
 	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
 
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
+
 	agt := agent.New(
 		newRequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		setup.client(),
+		cli,
 		setup.dataStores(),
-		setup.dagStore(),
+		dagStore,
 		setup.historyStore(),
 		&agent.Options{RetryTarget: &originalStatus.Status},
 	)

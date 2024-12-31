@@ -28,6 +28,7 @@ func New(
 	dataStore persistence.DataStores,
 	dagStore persistence.DAGStore,
 	historyStore persistence.HistoryStore,
+	flagStore persistence.FlagStore,
 	executable string,
 	workDir string,
 ) Client {
@@ -35,6 +36,7 @@ func New(
 		dataStore:    dataStore,
 		dagStore:     dagStore,
 		historyStore: historyStore,
+		flagStore:    flagStore,
 		executable:   executable,
 		workDir:      workDir,
 	}
@@ -46,6 +48,7 @@ type client struct {
 	dataStore    persistence.DataStores
 	dagStore     persistence.DAGStore
 	historyStore persistence.HistoryStore
+	flagStore    persistence.FlagStore
 	executable   string
 	workDir      string
 }
@@ -345,8 +348,7 @@ func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
 }
 
 func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error {
-	flagStore := e.dataStore.FlagStore()
-	return flagStore.ToggleSuspend(id, suspend)
+	return e.flagStore.ToggleSuspend(id, suspend)
 }
 
 func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {
@@ -369,8 +371,7 @@ func (*client) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.DAG 
 }
 
 func (e *client) IsSuspended(_ context.Context, id string) bool {
-	flagStore := e.dataStore.FlagStore()
-	return flagStore.IsSuspended(id)
+	return e.flagStore.IsSuspended(id)
 }
 
 func escapeArg(input string) string {

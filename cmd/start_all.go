@@ -50,22 +50,31 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
+	scheduler, err := setup.scheduler()
+	if err != nil {
+		return fmt.Errorf("failed to initialize scheduler: %w", err)
+	}
+
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		logger.Info(ctx, "Scheduler initialization", "dags", cfg.Paths.DAGsDir)
 
-		if err := setup.scheduler().Start(ctx); err != nil {
+		if err := scheduler.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
 			return
 		}
 		errChan <- nil
 	}()
 
+	server, err := setup.server(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+
 	// Start server in main thread
 	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	server := setup.server(ctx)
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := server.Serve(ctx); err != nil {

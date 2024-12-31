@@ -54,20 +54,30 @@ func runDry(cmd *cobra.Command, args []string) error {
 
 	logFile, err := setup.openLogFile(dryPrefix, dag, requestID)
 	if err != nil {
-		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
 	ctx = setup.loggerContextWithFile(ctx, false, logFile)
+
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
 
 	agt := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		setup.client(),
+		cli,
 		setup.dataStores(),
-		setup.dagStore(),
+		dagStore,
 		setup.historyStore(),
 		&agent.Options{Dry: true},
 	)

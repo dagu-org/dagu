@@ -51,7 +51,12 @@ func runServer(cmd *cobra.Command, _ []string) error {
 
 	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	if err := setup.server(ctx).Serve(cmd.Context()); err != nil {
+	server, err := setup.server(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+
+	if err := server.Serve(cmd.Context()); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 

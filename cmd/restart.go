@@ -69,7 +69,10 @@ func runRestart(cmd *cobra.Command, args []string) error {
 }
 
 func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, quiet bool, specFilePath string) error {
-	cli := setup.client()
+	cli, err := setup.client()
+	if err != nil {
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
 
 	// Stop if running
 	if err := stopDAGIfRunning(ctx, cli, dag); err != nil {
@@ -104,13 +107,20 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 
 	logFile, err := setup.openLogFile(restartPrefix, dag, requestID)
 	if err != nil {
-		return fmt.Errorf("failed to create log file: %w", err)
+		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
 	defer logFile.Close()
 
 	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
 
 	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
 	agt := agent.New(
 		requestID,
 		dag,
@@ -118,7 +128,7 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		logFile.Name(),
 		cli,
 		setup.dataStores(),
-		setup.dagStore(),
+		dagStore,
 		setup.historyStore(),
 		&agent.Options{Dry: false})
 

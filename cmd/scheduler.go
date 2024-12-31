@@ -47,7 +47,12 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 
 	logger.Info(ctx, "Scheduler initialization", "specsDirectory", cfg.Paths.DAGsDir, "logFormat", cfg.LogFormat)
 
-	if err := setup.scheduler().Start(ctx); err != nil {
+	scheduler, err := setup.scheduler()
+	if err != nil {
+		return fmt.Errorf("failed to initialize scheduler: %w", err)
+	}
+
+	if err := scheduler.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
 			cfg.Paths.DAGsDir, err)
 	}

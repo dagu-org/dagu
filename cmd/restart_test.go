@@ -59,7 +59,9 @@ func TestRestartCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		setup := newSetup(th.Config)
-		client := setup.client()
+		client, err := setup.client()
+		require.NoError(t, err)
+
 		recentHistory := client.GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)

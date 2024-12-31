@@ -25,6 +25,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -105,30 +106,38 @@ func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
 	}
 }
 
-func (s *setup) client(opts ...clientOption) client.Client {
+func (s *setup) client(opts ...clientOption) (client.Client, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 	dagStore := options.dagStore
 	if dagStore == nil {
-		dagStore = s.dagStore()
+		var err error
+		dagStore, err = s.dagStore()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize DAG store: %w", err)
+		}
 	}
 	historyStore := options.historyStore
 	if historyStore == nil {
 		historyStore = s.historyStore()
 	}
+	flagStore := local.NewFlagStore(storage.NewStorage(
+		s.cfg.Paths.SuspendFlagsDir,
+	))
 
 	return client.New(
 		s.dataStores(),
 		dagStore,
 		historyStore,
+		flagStore,
 		s.cfg.Paths.Executable,
 		s.cfg.WorkDir,
-	)
+	), nil
 }
 
-func (s *setup) server(ctx context.Context) *server.Server {
+func (s *setup) server(ctx context.Context) (*server.Server, error) {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := s.dagStoreWithCache(dagCache)
@@ -137,16 +146,31 @@ func (s *setup) server(ctx context.Context) *server.Server {
 	historyCache.StartEviction(ctx)
 	historyStore := s.historyStoreWithCache(historyCache)
 
-	cli := s.client(withDAGStore(dagStore), withHistoryStore(historyStore))
-	return frontend.New(s.cfg, cli)
+	cli, err := s.client(withDAGStore(dagStore), withHistoryStore(historyStore))
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize client: %w", err)
+	}
+	return frontend.New(s.cfg, cli), nil
 }
 
-func (s *setup) scheduler() *scheduler.Scheduler {
-	return scheduler.New(s.cfg, s.client())
+func (s *setup) scheduler() (*scheduler.Scheduler, error) {
+	cli, err := s.client()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize client: %w", err)
+	}
+	return scheduler.New(s.cfg, cli), nil
 }
 
-func (s *setup) dagStore() persistence.DAGStore {
-	return local.NewDAGStore(s.cfg.Paths.DAGsDir)
+func (s *setup) dagStore() (persistence.DAGStore, error) {
+	baseDir := s.cfg.Paths.DAGsDir
+	_, err := os.Stat(baseDir)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to initialize directory %s: %w", baseDir, err)
+		}
+	}
+
+	return local.NewDAGStore(s.cfg.Paths.DAGsDir), nil
 }
 
 func (s *setup) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
@@ -262,7 +286,7 @@ func setupLogDirectory(config logFileSettings) (string, error) {
 
 	logDir := filepath.Join(baseDir, safeName)
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory %s: %w", logDir, err)
+		return "", fmt.Errorf("failed to initialize directory %s: %w", logDir, err)
 	}
 
 	return logDir, nil

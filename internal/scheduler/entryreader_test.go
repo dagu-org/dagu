@@ -16,6 +16,7 @@ import (
 	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 
 	"github.com/stretchr/testify/require"
 
@@ -107,6 +108,9 @@ func setupTest(t *testing.T) (string, client.Client) {
 	)
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
 	historyStore := jsondb.New(cfg.Paths.DataDir)
+	flagStore := local.NewFlagStore(
+		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
+	)
 
-	return tmpDir, client.New(dataStore, dagStore, historyStore, "", cfg.WorkDir)
+	return tmpDir, client.New(dataStore, dagStore, historyStore, flagStore, "", cfg.WorkDir)
 }

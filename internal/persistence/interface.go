@@ -20,7 +20,6 @@ var (
 )
 
 type DataStores interface {
-	FlagStore() FlagStore
 }
 
 type HistoryStore interface {

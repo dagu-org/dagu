@@ -92,8 +92,8 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 	// Setup logging
 	logFile, err := setup.openLogFile(startPrefix, dag, requestID)
 	if err != nil {
-		logger.Error(ctx, "Failed to create log file", "DAG", dag.Name, "err", err)
-		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
+		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
@@ -101,15 +101,27 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
+
 	// Create and run agent
 	agt := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		setup.client(),
+		cli,
 		setup.dataStores(),
-		setup.dagStore(),
+		dagStore,
 		setup.historyStore(),
 		&agent.Options{},
 	)
