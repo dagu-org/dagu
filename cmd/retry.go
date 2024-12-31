@@ -42,6 +42,8 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	// Get quiet flag
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -58,15 +60,27 @@ func runRetry(cmd *cobra.Command, args []string) error {
 
 	specFilePath := args[0]
 
-	// Setup execution context
-	executionCtx, err := prepareExecutionContext(ctx, cfg, specFilePath, requestID)
+	absolutePath, err := filepath.Abs(specFilePath)
 	if err != nil {
-		logger.Error(ctx, "Failed to prepare execution context", "path", specFilePath, "err", err)
-		return fmt.Errorf("failed to prepare execution context: %w", err)
+		logger.Error(ctx, "Failed to resolve absolute path", "path", specFilePath, "err", err)
+		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
+	}
+
+	status, err := setup.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	if err != nil {
+		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
+		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
+	}
+
+	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, absolutePath, status.Status.Params)
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
+		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
+			specFilePath, status.Status.Params, err)
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, executionCtx, quiet); err != nil {
+	if err := executeRetry(ctx, dag, setup, status, quiet); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -74,41 +88,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type executionContext struct {
-	dag           *digraph.DAG
-	setup         *setup
-	originalState *model.StatusFile
-	absolutePath  string
-}
-
-func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePath, requestID string) (*executionContext, error) {
-	absolutePath, err := filepath.Abs(specFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
-	}
-
-	setup := newSetup(cfg)
-
-	status, err := setup.historyStore().FindByRequestID(ctx, absolutePath, requestID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
-	}
-
-	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, absolutePath, status.Status.Params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
-			specFilePath, status.Status.Params, err)
-	}
-
-	return &executionContext{
-		dag:           dag,
-		setup:         setup,
-		originalState: status,
-		absolutePath:  absolutePath,
-	}, nil
-}
-
-func executeRetry(ctx context.Context, execCtx *executionContext, quiet bool) error {
+func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalStatus *model.StatusFile, quiet bool) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)
@@ -116,19 +96,19 @@ func executeRetry(ctx context.Context, execCtx *executionContext, quiet bool) er
 
 	logFile, err := openLogFile(logFileSettings{
 		Prefix:    retryPrefix,
-		LogDir:    execCtx.setup.cfg.Paths.LogDir,
-		DAGLogDir: execCtx.dag.LogDir,
-		DAGName:   execCtx.dag.Name,
+		LogDir:    setup.cfg.Paths.LogDir,
+		DAGLogDir: dag.LogDir,
+		DAGName:   dag.Name,
 		RequestID: newRequestID,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create log file for DAG %s: %w", execCtx.dag.Name, err)
+		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
 	logger.Info(ctx, "DAG retry initiated",
-		"DAG", execCtx.dag.Name,
-		"originalRequestID", execCtx.originalState.Status.RequestID,
+		"DAG", dag.Name,
+		"originalRequestID", originalStatus.Status.RequestID,
 		"newRequestID", newRequestID,
 		"logFile", logFile.Name())
 
@@ -136,14 +116,14 @@ func executeRetry(ctx context.Context, execCtx *executionContext, quiet bool) er
 
 	agt := agent.New(
 		newRequestID,
-		execCtx.dag,
+		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		execCtx.setup.client(),
-		execCtx.setup.dataStores(),
-		execCtx.setup.dagStore(),
-		execCtx.setup.historyStore(),
-		&agent.Options{RetryTarget: &execCtx.originalState.Status},
+		setup.client(),
+		setup.dataStores(),
+		setup.dagStore(),
+		setup.historyStore(),
+		&agent.Options{RetryTarget: &originalStatus.Status},
 	)
 
 	listenSignals(ctx, agt)
@@ -153,7 +133,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, quiet bool) er
 			os.Exit(1)
 		} else {
 			agt.PrintSummary(ctx)
-			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", execCtx.dag.Name, newRequestID, err)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
 		}
 
 	}
