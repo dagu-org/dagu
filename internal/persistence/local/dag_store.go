@@ -79,7 +79,7 @@ func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte)
 		return err
 	}
 	filePath := resolveFilePath(d.dir, name)
-	if !exists(filePath) {
+	if !fileExists(filePath) {
 		return fmt.Errorf("%w: %s", errDOGFileNotExist, filePath)
 	}
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
@@ -96,7 +96,7 @@ func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (stri
 		return "", err
 	}
 	filePath := resolveFilePath(d.dir, name)
-	if exists(filePath) {
+	if fileExists(filePath) {
 		return "", fmt.Errorf("%w: %s", errDAGFileAlreadyExists, filePath)
 	}
 	// nolint: gosec
@@ -113,20 +113,12 @@ func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
 }
 
 func (d *dagStoreImpl) ensureDirExist() error {
-	if !exists(d.dir) {
+	if !fileExists(d.dir) {
 		if err := os.MkdirAll(d.dir, 0755); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func (d *dagStoreImpl) getTagList(tagSet map[string]struct{}) []string {
-	tagList := make([]string, 0, len(tagSet))
-	for tag := range tagSet {
-		tagList = append(tagList, tag)
-	}
-	return tagList
 }
 
 func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
@@ -232,12 +224,6 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 		logger.Error(ctx, "Failed to read directory", "dir", d.dir, "err", err)
 	}
 
-	opts := &grep.Options{
-		IsRegexp: true,
-		Before:   2,
-		After:    2,
-	}
-
 	for _, entry := range entries {
 		if fileutil.IsYAMLFile(entry.Name()) {
 			filePath := filepath.Join(d.dir, entry.Name())
@@ -246,7 +232,7 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 				logger.Error(ctx, "Failed to read DAG file", "file", entry.Name(), "err", err)
 				continue
 			}
-			matches, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
+			matches, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), grep.DefaultOptions)
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
@@ -280,39 +266,29 @@ func (d *dagStoreImpl) FindByName(ctx context.Context, name string) (*digraph.DA
 	return digraph.LoadWithoutEval(ctx, file)
 }
 
-func (d *dagStoreImpl) locateDAG(name string) (string, error) {
-	// check if the name is a file path
-	if strings.Contains(name, string(filepath.Separator)) {
-		if !fileutil.FileExists(name) {
-			return "", fmt.Errorf("DAG %s not found", name)
+func (d *dagStoreImpl) locateDAG(nameOrPath string) (string, error) {
+	if strings.Contains(nameOrPath, string(filepath.Separator)) {
+		foundPath, err := findDAGFile(nameOrPath)
+		if err == nil {
+			return foundPath, nil
 		}
-		return name, nil
 	}
 
-	// check if the name is a file path
-	if strings.Contains(name, string(filepath.Separator)) {
-		foundPath, err := find(name)
-		if err != nil {
-			return "", fmt.Errorf("DAG %s not found", name)
-		}
-		return foundPath, nil
-	}
-
-	// find the DAG definition
-	for _, dir := range []string{".", d.dir} {
-		subWorkflowPath := filepath.Join(dir, name)
-		foundPath, err := find(subWorkflowPath)
+	searchPaths := []string{".", d.dir}
+	for _, dir := range searchPaths {
+		candidatePath := filepath.Join(dir, nameOrPath)
+		foundPath, err := findDAGFile(candidatePath)
 		if err == nil {
 			return foundPath, nil
 		}
 	}
 
 	// DAG not found
-	return "", fmt.Errorf("workflow %s not found", name)
+	return "", fmt.Errorf("workflow %s not found", nameOrPath)
 }
 
-// find finds the sub workflow file with the given name.
-func find(name string) (string, error) {
+// findDAGFile finds the sub workflow file with the given name.
+func findDAGFile(name string) (string, error) {
 	ext := path.Ext(name)
 	if ext == "" {
 		// try all supported extensions
@@ -325,35 +301,30 @@ func find(name string) (string, error) {
 		// the name has an extension
 		return filepath.Abs(name)
 	}
-	return "", fmt.Errorf("sub workflow %s not found", name)
+	return "", fmt.Errorf("file %s not found", name)
 }
 
 func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) {
 	var (
-		errList    = make([]string, 0)
-		tagSet     = make(map[string]struct{})
-		currentDag *digraph.DAG
-		err        error
+		errList []string
+		tagSet  = make(map[string]struct{})
 	)
 
-	if err = filepath.WalkDir(d.dir, func(_ string, dir fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(d.dir, func(_ string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if dir.IsDir() || !fileutil.IsYAMLFile(dir.Name()) {
+		if entry.IsDir() || !fileutil.IsYAMLFile(entry.Name()) {
 			return nil
 		}
 
-		if currentDag, err = d.GetMetadata(ctx, dir.Name()); err != nil {
-			errList = append(errList, fmt.Sprintf("reading %s failed: %s", dir.Name(), err))
+		parsedDAG, err := d.GetMetadata(ctx, entry.Name())
+		if err != nil {
+			errList = append(errList, fmt.Sprintf("reading %s failed: %s", entry.Name(), err))
 		}
 
-		if currentDag == nil {
-			return nil
-		}
-
-		for _, tag := range currentDag.Tags {
+		for _, tag := range parsedDAG.Tags {
 			tagSet[tag] = struct{}{}
 		}
 
@@ -362,7 +333,11 @@ func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) 
 		return nil, append(errList, err.Error()), err
 	}
 
-	return d.getTagList(tagSet), errList, nil
+	tagList := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tagList = append(tagList, tag)
+	}
+	return tagList, errList, nil
 }
 
 func containsSearchText(text string, search string) bool {
@@ -379,15 +354,17 @@ func containsTag(tags []string, searchTag string) bool {
 	return false
 }
 
-func exists(file string) bool {
+func fileExists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
 }
 
 func resolveFilePath(dir, name string) string {
-	if filepath.IsAbs(name) {
-		// If the name is an absolute path, return it as is.
-		return name
+	if strings.Contains(name, string(filepath.Separator)) {
+		filePath, err := filepath.Abs(name)
+		if err == nil {
+			return filePath
+		}
 	}
 	filePath := fileutil.EnsureYAMLExtension(path.Join(dir, name))
 	return filepath.Clean(filePath)
