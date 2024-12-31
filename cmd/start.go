@@ -120,7 +120,6 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		setup.dataStores(),
 		dagStore,
 		setup.historyStore(),
 		&agent.Options{},

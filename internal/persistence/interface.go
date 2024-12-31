@@ -19,9 +19,6 @@ var (
 	ErrNoStatusData      = fmt.Errorf("no status data")
 )
 
-type DataStores interface {
-}
-
 type HistoryStore interface {
 	Open(ctx context.Context, key string, timestamp time.Time, requestID string) error
 	Write(ctx context.Context, status model.Status) error

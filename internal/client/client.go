@@ -25,7 +25,6 @@ import (
 // New creates a new Client instance.
 // The Client is used to interact with the DAG.
 func New(
-	dataStore persistence.DataStores,
 	dagStore persistence.DAGStore,
 	historyStore persistence.HistoryStore,
 	flagStore persistence.FlagStore,
@@ -33,7 +32,6 @@ func New(
 	workDir string,
 ) Client {
 	return &client{
-		dataStore:    dataStore,
 		dagStore:     dagStore,
 		historyStore: historyStore,
 		flagStore:    flagStore,
@@ -45,7 +43,6 @@ func New(
 var _ Client = (*client)(nil)
 
 type client struct {
-	dataStore    persistence.DataStores
 	dagStore     persistence.DAGStore
 	historyStore persistence.HistoryStore
 	flagStore    persistence.FlagStore

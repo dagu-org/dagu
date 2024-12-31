@@ -38,7 +38,6 @@ type Agent struct {
 	dag          *digraph.DAG
 	dry          bool
 	retryTarget  *model.Status
-	dataStore    persistence.DataStores
 	dagStore     persistence.DAGStore
 	client       client.Client
 	scheduler    *scheduler.Scheduler
@@ -76,7 +75,6 @@ func New(
 	logDir string,
 	logFile string,
 	cli client.Client,
-	dataStore persistence.DataStores,
 	dagStore persistence.DAGStore,
 	historyStore persistence.HistoryStore,
 	opts *Options,
@@ -89,7 +87,6 @@ func New(
 		logDir:       logDir,
 		logFile:      logFile,
 		client:       cli,
-		dataStore:    dataStore,
 		dagStore:     dagStore,
 		historyStore: historyStore,
 	}

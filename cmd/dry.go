@@ -76,7 +76,6 @@ func runDry(cmd *cobra.Command, args []string) error {
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		setup.dataStores(),
 		dagStore,
 		setup.historyStore(),
 		&agent.Options{Dry: true},

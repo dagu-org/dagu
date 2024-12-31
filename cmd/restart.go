@@ -127,7 +127,6 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		setup.dataStores(),
 		dagStore,
 		setup.historyStore(),
 		&agent.Options{Dry: false})

@@ -21,7 +21,6 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/server"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
@@ -76,17 +75,6 @@ func (s *setup) loggerContextWithFile(ctx context.Context, quiet bool, f *os.Fil
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
-func (s *setup) dataStores() persistence.DataStores {
-	return dsclient.NewDataStores(
-		s.cfg.Paths.DAGsDir,
-		s.cfg.Paths.DataDir,
-		s.cfg.Paths.SuspendFlagsDir,
-		dsclient.DataStoreOptions{
-			LatestStatusToday: s.cfg.LatestStatusToday,
-		},
-	)
-}
-
 type clientOption func(*clientOptions)
 
 type clientOptions struct {
@@ -128,7 +116,6 @@ func (s *setup) client(opts ...clientOption) (client.Client, error) {
 	))
 
 	return client.New(
-		s.dataStores(),
 		dagStore,
 		historyStore,
 		flagStore,

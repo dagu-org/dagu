@@ -121,7 +121,6 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		setup.dataStores(),
 		dagStore,
 		setup.historyStore(),
 		&agent.Options{RetryTarget: &originalStatus.Status},
