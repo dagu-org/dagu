@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
 )
@@ -67,7 +66,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, executionCtx, cfg, quiet); err != nil {
+	if err := executeRetry(ctx, executionCtx, quiet); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -77,9 +76,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 
 type executionContext struct {
 	dag           *digraph.DAG
-	dataStore     persistence.DataStores
-	dagStore      persistence.DAGStore
-	historyStore  persistence.HistoryStore
+	setup         *setup
 	originalState *model.StatusFile
 	absolutePath  string
 }
@@ -90,11 +87,9 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 		return nil, fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
 	}
 
-	dataStore := newDataStores(cfg)
-	dagStore := newDAGStore(cfg)
-	historyStore := newHistoryStore(cfg)
+	setup := newSetup(cfg)
 
-	status, err := historyStore.FindByRequestID(ctx, absolutePath, requestID)
+	status, err := setup.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
 	}
@@ -107,15 +102,13 @@ func prepareExecutionContext(ctx context.Context, cfg *config.Config, specFilePa
 
 	return &executionContext{
 		dag:           dag,
-		dataStore:     dataStore,
-		dagStore:      dagStore,
-		historyStore:  historyStore,
+		setup:         setup,
 		originalState: status,
 		absolutePath:  absolutePath,
 	}, nil
 }
 
-func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Config, quiet bool) error {
+func executeRetry(ctx context.Context, execCtx *executionContext, quiet bool) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)
@@ -123,7 +116,7 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 
 	logFile, err := openLogFile(logFileSettings{
 		Prefix:    retryPrefix,
-		LogDir:    cfg.Paths.LogDir,
+		LogDir:    execCtx.setup.cfg.Paths.LogDir,
 		DAGLogDir: execCtx.dag.LogDir,
 		DAGName:   execCtx.dag.Name,
 		RequestID: newRequestID,
@@ -132,8 +125,6 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 		return fmt.Errorf("failed to create log file for DAG %s: %w", execCtx.dag.Name, err)
 	}
 	defer logFile.Close()
-
-	cli := newClient(cfg, execCtx.dataStore, execCtx.dagStore, execCtx.historyStore)
 
 	logger.Info(ctx, "DAG retry initiated",
 		"DAG", execCtx.dag.Name,
@@ -148,10 +139,10 @@ func executeRetry(ctx context.Context, execCtx *executionContext, cfg *config.Co
 		execCtx.dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
-		execCtx.dataStore,
-		execCtx.dagStore,
-		execCtx.historyStore,
+		execCtx.setup.client(),
+		execCtx.setup.dataStores(),
+		execCtx.setup.dagStore(),
+		execCtx.setup.historyStore(),
 		&agent.Options{RetryTarget: &execCtx.originalState.Status},
 	)
 

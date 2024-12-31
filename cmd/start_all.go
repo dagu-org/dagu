@@ -5,17 +5,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -49,6 +41,8 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		cfg.Paths.DAGsDir = dagsDir
@@ -57,28 +51,12 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	ctx := cmd.Context()
 	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
-	dataStore := newDataStores(cfg)
-
-	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
-	dagCache.StartEviction(ctx)
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir, local.WithFileCache(dagCache))
-
-	historyCache := filecache.New[*model.Status](0, time.Hour*12)
-	historyCache.StartEviction(ctx)
-	historyStore := jsondb.New(cfg.Paths.DataDir,
-		jsondb.WithLatestStatusToday(cfg.LatestStatusToday),
-		jsondb.WithFileCache(historyCache),
-	)
-
-	cli := newClient(cfg, dataStore, dagStore, historyStore)
-
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		logger.Info(ctx, "Scheduler initialization", "dags", cfg.Paths.DAGsDir)
 
-		sc := scheduler.New(cfg, cli)
-		if err := sc.Start(ctx); err != nil {
+		if err := setup.scheduler().Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
 			return
 		}
@@ -88,7 +66,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	// Start server in main thread
 	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	server := frontend.New(cfg, cli)
+	server := setup.server(ctx)
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := server.Serve(ctx); err != nil {

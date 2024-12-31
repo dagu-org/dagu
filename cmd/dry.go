@@ -33,6 +33,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+	setup := newSetup(cfg)
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	params, err := cmd.Flags().GetString("params")
@@ -41,6 +42,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
+
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], removeQuotes(params))
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -66,20 +68,16 @@ func runDry(cmd *cobra.Command, args []string) error {
 	defer logFile.Close()
 
 	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
-	dataStore := newDataStores(cfg)
-	dagStore := newDAGStore(cfg)
-	historyStore := newHistoryStore(cfg)
-	cli := newClient(cfg, dataStore, dagStore, historyStore)
 
 	agt := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
-		dataStore,
-		dagStore,
-		historyStore,
+		setup.client(),
+		setup.dataStores(),
+		setup.dagStore(),
+		setup.historyStore(),
 		&agent.Options{Dry: true},
 	)
 

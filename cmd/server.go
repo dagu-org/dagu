@@ -5,16 +5,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,31 +45,14 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
+	setup := newSetup(cfg)
 
 	ctx := cmd.Context()
 	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
-	logger.Info(ctx, "Server initialization",
-		"host", cfg.Host,
-		"port", cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	dataStore := newDataStores(cfg)
-
-	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
-	dagCache.StartEviction(ctx)
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir, local.WithFileCache(dagCache))
-
-	historyCache := filecache.New[*model.Status](0, time.Hour*12)
-	historyCache.StartEviction(ctx)
-	historyStore := jsondb.New(cfg.Paths.DataDir,
-		jsondb.WithLatestStatusToday(cfg.LatestStatusToday),
-		jsondb.WithFileCache(historyCache),
-	)
-
-	cli := newClient(cfg, dataStore, dagStore, historyStore)
-
-	server := frontend.New(cfg, cli)
-	if err := server.Serve(cmd.Context()); err != nil {
+	if err := setup.server(ctx).Serve(cmd.Context()); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 

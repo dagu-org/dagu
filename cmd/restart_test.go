@@ -58,11 +58,8 @@ func TestRestartCommand(t *testing.T) {
 		dag, err := digraph.Load(th.Context, th.Config.Paths.BaseConfig, dagFile.Path, "")
 		require.NoError(t, err)
 
-		dataStore := newDataStores(th.Config)
-		dagStore := newDAGStore(th.Config)
-		historyStore := newHistoryStore(th.Config)
-
-		client := newClient(th.Config, dataStore, dagStore, historyStore)
+		setup := newSetup(th.Config)
+		client := setup.client()
 		recentHistory := client.GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)

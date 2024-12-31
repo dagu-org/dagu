@@ -29,6 +29,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	ctx := cmd.Context()
 	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
@@ -39,14 +41,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	// Initialize services and get status
-	dataStore := newDataStores(cfg)
-	dagStore := newDAGStore(cfg)
-	historyStore := newHistoryStore(cfg)
-
-	cli := newClient(cfg, dataStore, dagStore, historyStore)
-
-	status, err := cli.GetCurrentStatus(ctx, dag)
+	status, err := setup.client().GetCurrentStatus(ctx, dag)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to retrieve current status: %w", err)

@@ -29,6 +29,8 @@ func runStop(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	ctx := cmd.Context()
 	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
 
@@ -40,13 +42,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
-	dataStore := newDataStores(cfg)
-	dagStore := newDAGStore(cfg)
-	historyStore := newHistoryStore(cfg)
-
-	cli := newClient(cfg, dataStore, dagStore, historyStore)
-
-	if err := cli.Stop(cmd.Context(), dag); err != nil {
+	if err := setup.client().Stop(cmd.Context(), dag); err != nil {
 		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}

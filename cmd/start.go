@@ -44,6 +44,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	// Get quiet flag
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -67,12 +69,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize and run DAG
-	return executeDag(ctx, cfg, args[0], removeQuotes(params), quiet, requestID)
+	return executeDag(ctx, setup, args[0], removeQuotes(params), quiet, requestID)
 }
 
-func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool, requestID string) error {
+func executeDag(ctx context.Context, setup *setup, specPath, params string, quiet bool, requestID string) error {
 	// Load DAG
-	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specPath, params)
+	dag, err := digraph.Load(ctx, setup.cfg.Paths.BaseConfig, specPath, params)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
@@ -91,7 +93,7 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	// Setup logging
 	logFile, err := openLogFile(logFileSettings{
 		Prefix:    startPrefix,
-		LogDir:    cfg.Paths.LogDir,
+		LogDir:    setup.cfg.Paths.LogDir,
 		DAGLogDir: dag.LogDir,
 		DAGName:   dag.Name,
 		RequestID: requestID,
@@ -102,13 +104,6 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	}
 	defer logFile.Close()
 
-	// Initialize services
-	dataStore := newDataStores(cfg)
-	dagStore := newDAGStore(cfg)
-	historyStore := newHistoryStore(cfg)
-
-	cli := newClient(cfg, dataStore, dagStore, historyStore)
-
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
 
@@ -118,10 +113,10 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 		dag,
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
-		cli,
-		dataStore,
-		dagStore,
-		historyStore,
+		setup.client(),
+		setup.dataStores(),
+		setup.dagStore(),
+		setup.historyStore(),
 		&agent.Options{},
 	)
 
