@@ -5,9 +5,13 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence/filecache"
+	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,12 +50,14 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 		cfg.Paths.DAGsDir = dagsDir
 	}
 
-	logger.Info(ctx, "Scheduler initialization",
-		"specsDirectory", cfg.Paths.DAGsDir,
-		"logFormat", cfg.LogFormat)
+	logger.Info(ctx, "Scheduler initialization", "specsDirectory", cfg.Paths.DAGsDir, "logFormat", cfg.LogFormat)
 
 	dataStore := newDataStores(cfg)
-	dagStore := newDAGStore(cfg)
+
+	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
+	dagCache.StartEviction(ctx)
+	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir, local.WithFileCache(dagCache))
+
 	cli := newClient(cfg, dataStore, dagStore)
 
 	sc := scheduler.New(cfg, cli)

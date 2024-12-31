@@ -12,7 +12,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
@@ -25,26 +24,41 @@ import (
 var _ persistence.DAGStore = (*dagStoreImpl)(nil)
 var _ digraph.Finder = (*dagStoreImpl)(nil)
 
-type dagStoreImpl struct {
-	dir       string
-	metaCache *filecache.Cache[*digraph.DAG]
+type DAGStoreOption func(*DAGStoreOptions)
+
+type DAGStoreOptions struct {
+	FileCache *filecache.Cache[*digraph.DAG]
 }
 
-const defaultCacheTTL = time.Hour * 24
+func WithFileCache(cache *filecache.Cache[*digraph.DAG]) DAGStoreOption {
+	return func(o *DAGStoreOptions) {
+		o.FileCache = cache
+	}
+}
 
-func NewDAGStore(dir string) persistence.DAGStore {
-	metaCache := filecache.New[*digraph.DAG](0, defaultCacheTTL)
-	metaCache.StartEviction()
+type dagStoreImpl struct {
+	dir       string
+	fileCache *filecache.Cache[*digraph.DAG]
+}
+
+func NewDAGStore(dir string, opts ...DAGStoreOption) persistence.DAGStore {
+	options := &DAGStoreOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 
 	return &dagStoreImpl{
 		dir:       dir,
-		metaCache: metaCache,
+		fileCache: options.FileCache,
 	}
 }
 
 func (d *dagStoreImpl) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
 	filePath := resolveFilePath(d.dir, name)
-	return d.metaCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
+	if d.fileCache == nil {
+		return digraph.LoadMetadata(ctx, filePath)
+	}
+	return d.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
 		return digraph.LoadMetadata(ctx, filePath)
 	})
 }
@@ -85,7 +99,9 @@ func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte)
 	if err := os.WriteFile(filePath, spec, defaultPerm); err != nil {
 		return err
 	}
-	d.metaCache.Invalidate(filePath)
+	if d.fileCache != nil {
+		d.fileCache.Invalidate(filePath)
+	}
 	return nil
 }
 
@@ -108,7 +124,9 @@ func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
 	if err := os.Remove(filePath); err != nil {
 		return err
 	}
-	d.metaCache.Invalidate(filePath)
+	if d.fileCache != nil {
+		d.fileCache.Invalidate(filePath)
+	}
 	return nil
 }
 

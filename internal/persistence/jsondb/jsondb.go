@@ -85,7 +85,8 @@ func New(location string, cfg Config) *JSONDB {
 		location: location,
 		cache:    filecache.New[*model.Status](cfg.CacheSize, cfg.CacheTTL),
 	}
-	db.cache.StartEviction()
+	// TODO: Fix this!!!!!!
+	db.cache.StartEviction(context.Background())
 	return db
 }
 

@@ -4,6 +4,7 @@
 package filecache
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -42,11 +43,13 @@ func (c *Cache[T]) Stop() {
 	close(c.stopCh)
 }
 
-func (c *Cache[T]) StartEviction() {
+func (c *Cache[T]) StartEviction(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(time.Minute)
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-timer.C:
 				timer.Reset(time.Minute)
 				c.evict()
