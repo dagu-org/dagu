@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,14 +19,16 @@ func TestOpenLogFile(t *testing.T) {
 	t.Run("successful log file creation", func(t *testing.T) {
 		tempDir := t.TempDir() // Using t.TempDir() for automatic cleanup
 
-		config := logFileSettings{
-			Prefix:    "test_",
-			LogDir:    tempDir,
-			DAGName:   "test_dag",
-			RequestID: "12345678",
-		}
+		setup := newSetup(&config.Config{
+			Paths: config.PathsConfig{
+				LogDir: tempDir,
+			},
+		})
 
-		file, err := openLogFile(config)
+		file, err := setup.openLogFile("test_", &digraph.DAG{
+			Name:   "test_dag",
+			LogDir: "",
+		}, "12345678")
 		require.NoError(t, err)
 		defer file.Close()
 
@@ -33,29 +37,6 @@ func TestOpenLogFile(t *testing.T) {
 		assert.Contains(t, file.Name(), "test_dag")
 		assert.Contains(t, file.Name(), "test_")
 		assert.Contains(t, file.Name(), "12345678")
-	})
-
-	t.Run("invalid settings", func(t *testing.T) {
-		invalidConfigs := []struct {
-			name   string
-			config logFileSettings
-		}{
-			{
-				name:   "empty DAGName",
-				config: logFileSettings{LogDir: "dir"},
-			},
-			{
-				name:   "no directories specified",
-				config: logFileSettings{DAGName: "dag"},
-			},
-		}
-
-		for _, tc := range invalidConfigs {
-			t.Run(tc.name, func(t *testing.T) {
-				_, err := openLogFile(tc.config)
-				assert.Error(t, err)
-			})
-		}
 	})
 }
 

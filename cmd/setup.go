@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/frontend"
@@ -134,6 +136,39 @@ func (s *setup) historyStoreWithCache(cache *filecache.Cache[*model.Status]) per
 		jsondb.WithLatestStatusToday(s.cfg.LatestStatusToday),
 		jsondb.WithFileCache(cache),
 	)
+}
+
+func (s *setup) openLogFile(
+	prefix string,
+	dag *digraph.DAG,
+	requestID string,
+) (*os.File, error) {
+	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(
+		s.cfg.Paths.LogDir,
+	))
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand log directory: %w", err)
+	}
+
+	config := logFileSettings{
+		Prefix:    prefix,
+		LogDir:    logDir,
+		DAGLogDir: dag.LogDir,
+		DAGName:   dag.Name,
+		RequestID: requestID,
+	}
+
+	if err := validateSettings(config); err != nil {
+		return nil, fmt.Errorf("invalid log settings: %w", err)
+	}
+
+	outputDir, err := setupLogDirectory(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup log directory: %w", err)
+	}
+
+	filename := buildLogFilename(config)
+	return createLogFile(filepath.Join(outputDir, filename))
 }
 
 // generateRequestID generates a new request ID.

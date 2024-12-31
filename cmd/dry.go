@@ -53,15 +53,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logSettings := logFileSettings{
-		Prefix:    dryPrefix,
-		LogDir:    cfg.Paths.LogDir,
-		DAGLogDir: dag.LogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
-	}
-
-	logFile, err := openLogFile(logSettings)
+	logFile, err := setup.openLogFile(dryPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
 	}

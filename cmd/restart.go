@@ -103,13 +103,7 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := openLogFile(logFileSettings{
-		Prefix:    restartPrefix,
-		LogDir:    setup.cfg.Paths.LogDir,
-		DAGLogDir: dag.LogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
-	})
+	logFile, err := setup.openLogFile(restartPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to create log file: %w", err)
 	}

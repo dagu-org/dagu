@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -48,28 +47,6 @@ type logFileSettings struct {
 	DAGLogDir string
 	DAGName   string
 	RequestID string
-}
-
-// openLogFile creates and opens a log file based on the provided settings.
-// It creates the necessary directory structure and returns the file handle.
-func openLogFile(config logFileSettings) (*os.File, error) {
-	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(config.LogDir))
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand log directory: %w", err)
-	}
-	config.LogDir = logDir
-
-	if err := validateSettings(config); err != nil {
-		return nil, fmt.Errorf("invalid log settings: %w", err)
-	}
-
-	outputDir, err := setupLogDirectory(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup log directory: %w", err)
-	}
-
-	filename := buildLogFilename(config)
-	return createLogFile(filepath.Join(outputDir, filename))
 }
 
 // validateSettings ensures all required fields are properly set

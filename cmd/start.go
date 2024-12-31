@@ -91,13 +91,7 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 	}
 
 	// Setup logging
-	logFile, err := openLogFile(logFileSettings{
-		Prefix:    startPrefix,
-		LogDir:    setup.cfg.Paths.LogDir,
-		DAGLogDir: dag.LogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
-	})
+	logFile, err := setup.openLogFile(startPrefix, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to create log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
