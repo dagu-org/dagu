@@ -18,7 +18,7 @@ const (
 // Finder finds a DAG by name.
 // This is used to find the DAG when a node references another DAG.
 type Finder interface {
-	Find(ctx context.Context, name string) (*DAG, error)
+	FindByName(ctx context.Context, name string) (*DAG, error)
 }
 
 // ResultCollector gets a result of a DAG execution.

@@ -44,6 +44,8 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	// Get quiet flag
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -56,8 +58,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, quiet))
+	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	// Get parameters
 	params, err := cmd.Flags().GetString("params")
@@ -67,12 +68,12 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize and run DAG
-	return executeDag(ctx, cfg, args[0], removeQuotes(params), quiet, requestID)
+	return executeDag(ctx, setup, args[0], removeQuotes(params), quiet, requestID)
 }
 
-func executeDag(ctx context.Context, cfg *config.Config, specPath, params string, quiet bool, requestID string) error {
+func executeDag(ctx context.Context, setup *setup, specPath, params string, quiet bool, requestID string) error {
 	// Load DAG
-	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specPath, params)
+	dag, err := digraph.Load(ctx, setup.cfg.Paths.BaseConfig, specPath, params)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
@@ -89,25 +90,28 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 	}
 
 	// Setup logging
-	logFile, err := openLogFile(logFileSettings{
-		Prefix:    startPrefix,
-		LogDir:    cfg.Paths.LogDir,
-		DAGLogDir: dag.LogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
-	})
+	logFile, err := setup.openLogFile(startPrefix, dag, requestID)
 	if err != nil {
-		logger.Error(ctx, "Failed to create log file", "DAG", dag.Name, "err", err)
-		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
+		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	// Initialize services
-	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
 
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, quiet))
+
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
 
 	// Create and run agent
 	agt := agent.New(
@@ -116,7 +120,8 @@ func executeDag(ctx context.Context, cfg *config.Config, specPath, params string
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		dataStore,
+		dagStore,
+		setup.historyStore(),
 		&agent.Options{},
 	)
 

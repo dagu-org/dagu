@@ -12,6 +12,7 @@ type Props = {
   steps?: Step[] | Node[];
   onClickNode?: onClickNode;
   showIcons?: boolean;
+  animate?: boolean;
 };
 
 declare global {
@@ -26,6 +27,7 @@ const Graph: React.FC<Props> = ({
   type = 'status',
   onClickNode,
   showIcons = true,
+  animate = true,
 }) => {
   // Calculate width based on flowchart type and graph breadth
   const width = React.useMemo(() => {
@@ -58,11 +60,11 @@ const Graph: React.FC<Props> = ({
   };
 
   // Define FontAwesome icons for each status with colors and animations
-  const statusIcons = {
+  const statusIcons: { [key: number]: string } = {
     [NodeStatus.None]:
-      "<i class='fas fa-circle-notch fa-spin' style='color: #3b82f6; animation: spin 2s linear infinite'></i>",
+      "<i class='fas fa-circle-notch' style='color: #3b82f6; animation: spin 2s linear infinite;'></i>",
     [NodeStatus.Running]:
-      "<i class='fas fa-spinner fa-spin' style='color: #22c55e; animation: spin 1s linear infinite'></i>",
+      "<i class='fas fa-spinner' style='color: #22c55e; animation: spin 1s linear infinite;'></i>",
     [NodeStatus.Error]:
       "<i class='fas fa-exclamation-circle' style='color: #ef4444'></i>",
     [NodeStatus.Cancel]: "<i class='fas fa-ban' style='color: #ec4899'></i>",
@@ -71,6 +73,12 @@ const Graph: React.FC<Props> = ({
     [NodeStatus.Skipped]:
       "<i class='fas fa-forward' style='color: #64748b'></i>",
   };
+  if (!animate) {
+    // Remove animations if disabled
+    Object.keys(statusIcons).forEach((key: string) => {
+      statusIcons[+key] = statusIcons[+key].replace(/animation:.*?;/g, '');
+    });
+  }
 
   const graph = React.useMemo(() => {
     if (!steps) return '';
@@ -138,12 +146,24 @@ const Graph: React.FC<Props> = ({
     }
 
     // Define node styles for different states with refined colors
-    dat.push('classDef none fill:#f0f9ff,stroke:#93c5fd,color:#1e40af,stroke-width:1.2px,white-space:nowrap');
-    dat.push('classDef running fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap');
-    dat.push('classDef error fill:#fef2f2,stroke:#fca5a5,color:#aa1010,stroke-width:1.2px,white-space:nowrap');
-    dat.push('classDef cancel fill:#fdf2f8,stroke:#f9a8d4,color:#9d174d,stroke-width:1.2px,white-space:nowrap');
-    dat.push('classDef done fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap');
-    dat.push('classDef skipped fill:#f8fafc,stroke:#cbd5e1,color:#475569,stroke-width:1.2px,white-space:nowrap');
+    dat.push(
+      'classDef none fill:#f0f9ff,stroke:#93c5fd,color:#1e40af,stroke-width:1.2px,white-space:nowrap'
+    );
+    dat.push(
+      'classDef running fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap'
+    );
+    dat.push(
+      'classDef error fill:#fef2f2,stroke:#fca5a5,color:#aa1010,stroke-width:1.2px,white-space:nowrap'
+    );
+    dat.push(
+      'classDef cancel fill:#fdf2f8,stroke:#f9a8d4,color:#9d174d,stroke-width:1.2px,white-space:nowrap'
+    );
+    dat.push(
+      'classDef done fill:#f0fdf4,stroke:#86efac,color:#166534,stroke-width:1.2px,white-space:nowrap'
+    );
+    dat.push(
+      'classDef skipped fill:#f8fafc,stroke:#cbd5e1,color:#475569,stroke-width:1.2px,white-space:nowrap'
+    );
 
     // Add custom link styles
     dat.push(...linkStyles);

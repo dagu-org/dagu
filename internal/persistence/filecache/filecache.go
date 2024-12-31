@@ -4,6 +4,7 @@
 package filecache
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -42,11 +43,13 @@ func (c *Cache[T]) Stop() {
 	close(c.stopCh)
 }
 
-func (c *Cache[T]) StartEviction() {
+func (c *Cache[T]) StartEviction(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(time.Minute)
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-timer.C:
 				timer.Reset(time.Minute)
 				c.evict()
@@ -91,9 +94,9 @@ func (c *Cache[T]) Invalidate(fileName string) {
 }
 
 func (c *Cache[T]) LoadLatest(
-	fileName string, loader func() (T, error),
+	filePath string, loader func() (T, error),
 ) (T, error) {
-	stale, lastModified, err := c.IsStale(fileName, c.Entry(fileName))
+	stale, lastModified, err := c.IsStale(filePath, c.Entry(filePath))
 	if err != nil {
 		var zero T
 		return zero, err
@@ -104,10 +107,10 @@ func (c *Cache[T]) LoadLatest(
 			var zero T
 			return zero, err
 		}
-		c.Store(fileName, data, lastModified)
+		c.Store(filePath, data, lastModified)
 		return data, nil
 	}
-	item, _ := c.entries.Load(fileName)
+	item, _ := c.entries.Load(filePath)
 	entry := item.(Entry[T])
 	return entry.Data, nil
 }

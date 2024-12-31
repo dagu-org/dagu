@@ -29,8 +29,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	setup := newSetup(cfg)
+
+	ctx := setup.loggerContext(cmd.Context(), false)
 
 	// Load the DAG
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], "")
@@ -39,9 +40,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	// Initialize services and get status
-	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
 
 	status, err := cli.GetCurrentStatus(ctx, dag)
 	if err != nil {
