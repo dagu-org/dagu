@@ -227,7 +227,7 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 		return
 	}
 
-	fis, err := os.ReadDir(d.dir)
+	entries, err := os.ReadDir(d.dir)
 	if err != nil {
 		logger.Error(ctx, "Failed to read directory", "dir", d.dir, "err", err)
 	}
@@ -238,28 +238,28 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 		After:    2,
 	}
 
-	for _, fi := range fis {
-		if fileutil.IsYAMLFile(fi.Name()) {
-			filePath := filepath.Join(d.dir, fi.Name())
+	for _, entry := range entries {
+		if fileutil.IsYAMLFile(entry.Name()) {
+			filePath := filepath.Join(d.dir, entry.Name())
 			dat, err := os.ReadFile(filePath)
 			if err != nil {
-				logger.Error(ctx, "Failed to read DAG file", "file", fi.Name(), "err", err)
+				logger.Error(ctx, "Failed to read DAG file", "file", entry.Name(), "err", err)
 				continue
 			}
-			m, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
+			matches, err := grep.Grep(dat, fmt.Sprintf("(?i)%s", pattern), opts)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("grep %s failed: %s", fi.Name(), err))
+				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
 			}
 			dag, err := digraph.LoadMetadata(ctx, filePath)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("check %s failed: %s", fi.Name(), err))
+				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
 			}
 			ret = append(ret, &persistence.GrepResult{
-				Name:    strings.TrimSuffix(fi.Name(), path.Ext(fi.Name())),
+				Name:    strings.TrimSuffix(entry.Name(), path.Ext(entry.Name())),
 				DAG:     dag,
-				Matches: m,
+				Matches: matches,
 			})
 		}
 	}
