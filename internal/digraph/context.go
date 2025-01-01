@@ -5,7 +5,8 @@ package digraph
 
 import (
 	"context"
-	"errors"
+
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 type Context struct {
@@ -55,12 +56,13 @@ func (c Context) WithEnv(key, value string) Context {
 	return c
 }
 
-func GetContext(ctx context.Context) (Context, error) {
-	dagCtx, ok := ctx.Value(ctxKey{}).(Context)
+func GetContext(ctx context.Context) Context {
+	contextValue, ok := ctx.Value(ctxKey{}).(Context)
 	if !ok {
-		return Context{}, errors.New("context does not have a DAG context")
+		logger.Error(ctx, "failed to get the DAG context")
+		return Context{}
 	}
-	return dagCtx, nil
+	return contextValue
 }
 
 func WithContext(ctx context.Context, dagContext Context) context.Context {

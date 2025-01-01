@@ -37,10 +37,7 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dag context: %w", err)
-	}
+	dagCtx := digraph.GetContext(ctx)
 
 	config, err := cmdutil.SubstituteStringFields(struct {
 		Name   string
@@ -114,11 +111,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the subworkflow
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get dag context: %w", err)
-	}
-
+	dagCtx := digraph.GetContext(ctx)
 	result, err := dagCtx.ResultCollector.GatherExecutionResult(ctx, e.subDAG, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)

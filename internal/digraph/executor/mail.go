@@ -41,11 +41,7 @@ func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 	}
 
 	exec := &mail{cfg: &cfg}
-
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+	dagCtx := digraph.GetContext(ctx)
 
 	mailerConfig, err := cmdutil.SubstituteStringFields(mailer.Config{
 		Host:     dagCtx.DAG.SMTP.Host,

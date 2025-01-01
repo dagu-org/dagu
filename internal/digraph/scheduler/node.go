@@ -154,10 +154,7 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return err
-	}
+	dagCtx := digraph.GetContext(ctx)
 
 	// Add the log path to the environment
 	dagCtx = dagCtx.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)

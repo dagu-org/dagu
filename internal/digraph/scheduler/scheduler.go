@@ -517,11 +517,8 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 }
 
 func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	// set global environment variables
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return err
-	}
+	dagCtx := digraph.GetContext(ctx)
+
 	for _, env := range dagCtx.AdditionalEnvs {
 		os.Setenv(env.Key, env.Value)
 	}

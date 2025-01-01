@@ -28,10 +28,7 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
 	}
 
-	dagContext, err := digraph.GetContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+	dagContext := digraph.GetContext(ctx)
 
 	cmd := createCommand(ctx, step)
 	cmd.Dir = step.Dir
