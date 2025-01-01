@@ -5,6 +5,7 @@ package digraph
 
 import (
 	"context"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/mailer"
@@ -70,5 +71,11 @@ func GetStepContext(ctx context.Context) StepContext {
 type stepCtxKey struct{}
 
 func EvalStringFields[T any](stepContext StepContext, obj T) (T, error) {
-	return cmdutil.SubstituteStringFields(obj)
+	vars := make(map[string]string)
+	stepContext.outputVariables.Range(func(_, value any) bool {
+		splits := strings.SplitN(value.(string), "=", 2)
+		vars[splits[0]] = splits[1]
+		return true
+	})
+	return cmdutil.SubstituteStringFields(obj, cmdutil.WithVariables(vars))
 }

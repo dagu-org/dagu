@@ -333,3 +333,74 @@ func TestSubstituteStringFields_EmptyStruct(t *testing.T) {
 		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, input)
 	}
 }
+
+func TestReplaceVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		template string
+		vars     map[string]string
+		want     string
+	}{
+		{
+			name:     "basic substitution",
+			template: "${FOO}",
+			vars:     map[string]string{"FOO": "BAR"},
+			want:     "BAR",
+		},
+		{
+			name:     "short syntax",
+			template: "$FOO",
+			vars:     map[string]string{"FOO": "BAR"},
+			want:     "BAR",
+		},
+		{
+			name:     "no substitution",
+			template: "$FOO_",
+			vars:     map[string]string{"FOO": "BAR"},
+			want:     "$FOO_",
+		},
+		{
+			name:     "in middle of string",
+			template: "prefix $FOO suffix",
+			vars:     map[string]string{"FOO": "BAR"},
+			want:     "prefix BAR suffix",
+		},
+		{
+			name:     "in middle of string and no substitution",
+			template: "prefix $FOO1 suffix",
+			vars:     map[string]string{"FOO": "BAR"},
+			want:     "prefix $FOO1 suffix",
+		},
+		{
+			name:     "missing var",
+			template: "${MISSING}",
+			vars:     map[string]string{"FOO": "BAR"},
+			want:     "${MISSING}",
+		},
+		{
+			name:     "multiple vars",
+			template: "$FOO ${BAR} $BAZ",
+			vars: map[string]string{
+				"FOO": "1",
+				"BAR": "2",
+				"BAZ": "3",
+			},
+			want: "1 2 3",
+		},
+		{
+			name:     "nested vars not supported",
+			template: "${FOO${BAR}}",
+			vars:     map[string]string{"FOO": "1", "BAR": "2"},
+			want:     "${FOO${BAR}}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := replaceVars(tt.template, tt.vars)
+			if got != tt.want {
+				t.Errorf("replaceVars() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

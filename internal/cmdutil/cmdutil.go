@@ -252,10 +252,27 @@ func GetShellCommand(configuredShell string) string {
 	return ""
 }
 
+type SubstituteOptions struct {
+	Variables map[string]string
+}
+
+type SubstituteOption func(*SubstituteOptions)
+
+func WithVariables(vars map[string]string) SubstituteOption {
+	return func(opts *SubstituteOptions) {
+		opts.Variables = vars
+	}
+}
+
 // SubstituteStringFields processes all string fields in a struct by expanding environment
 // variables and substituting command outputs. It takes a struct value and returns a new
 // modified struct value.
-func SubstituteStringFields[T any](obj T) (T, error) {
+func SubstituteStringFields[T any](obj T, opts ...SubstituteOption) (T, error) {
+	options := &SubstituteOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Struct {
 		return obj, fmt.Errorf("input must be a struct, got %T", obj)
@@ -264,14 +281,14 @@ func SubstituteStringFields[T any](obj T) (T, error) {
 	modified := reflect.New(v.Type()).Elem()
 	modified.Set(v)
 
-	if err := processStructFields(modified); err != nil {
+	if err := processStructFields(modified, options); err != nil {
 		return obj, fmt.Errorf("failed to process fields: %w", err)
 	}
 
 	return modified.Interface().(T), nil
 }
 
-func processStructFields(v reflect.Value) error {
+func processStructFields(v reflect.Value, opts *SubstituteOptions) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
@@ -283,6 +300,8 @@ func processStructFields(v reflect.Value) error {
 		switch field.Kind() {
 		case reflect.String:
 			value := field.String()
+			value = replaceVars(value, opts.Variables)
+
 			value = os.ExpandEnv(value)
 			processed, err := SubstituteCommands(value)
 			if err != nil {
@@ -291,10 +310,28 @@ func processStructFields(v reflect.Value) error {
 			field.SetString(processed)
 
 		case reflect.Struct:
-			if err := processStructFields(field); err != nil {
+			if err := processStructFields(field, opts); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func replaceVars(template string, vars map[string]string) string {
+	re := regexp.MustCompile(`\$\{([^}]+)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)`)
+
+	return re.ReplaceAllStringFunc(template, func(match string) string {
+		var key string
+		if strings.HasPrefix(match, "${") {
+			key = match[2 : len(match)-1]
+		} else {
+			key = match[1:]
+		}
+
+		if val, ok := vars[key]; ok {
+			return val
+		}
+		return match
+	})
 }
