@@ -37,7 +37,7 @@ func (c Context) AllEnvs() []string {
 }
 
 func (c Context) MailerConfig() (mailer.Config, error) {
-	return EvalStringFields(c.ctx, mailer.Config{
+	return EvalStringFields(c, mailer.Config{
 		Host:     c.dag.SMTP.Host,
 		Port:     c.dag.SMTP.Port,
 		Username: c.dag.SMTP.Username,
@@ -45,7 +45,7 @@ func (c Context) MailerConfig() (mailer.Config, error) {
 	})
 }
 
-func EvalStringFields[T any](_ context.Context, obj T) (T, error) {
+func EvalStringFields[T any](dagContext Context, obj T) (T, error) {
 	return cmdutil.SubstituteStringFields(obj)
 }
 
