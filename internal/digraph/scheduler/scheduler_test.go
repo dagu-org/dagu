@@ -507,6 +507,20 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
+	t.Run("SpecialVars_DAG_STEP_LOG_PATH", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_STEP_LOG_PATH"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+	})
 	t.Run("SpecialVars_DAG_REQUEST_ID", func(t *testing.T) {
 		sc := setup(t)
 
