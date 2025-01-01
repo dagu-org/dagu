@@ -82,7 +82,7 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
 - **env** (list of key-value, optional):
 
-  Environment variables available to all steps in the DAG. These can use shell expansions, references to other environment variables, or command substitutions.
+  Environment variables available to all steps in the DAG. These can use shell expansions, references to other environment variables, or command substitutions. They won't be stored in execution history data for security reasons, so if you want to retry a failed run, you need to have the same environment variables available.
 
   **Example**:
 
@@ -184,47 +184,6 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
   A list of steps (tasks) to execute. Steps define your workflow logic and can depend on each other. See :ref:`Step Fields <step-fields>` below for details.
 
-
-Example DAG-Level Config
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: yaml
-
-    name: DAG name
-    description: run a DAG               
-    schedule: "0 * * * *"                
-    group: DailyJobs                     
-    tags: example                        
-    env:                                 
-      - LOG_DIR: ${HOME}/logs
-      - PATH: /usr/local/bin:${PATH}
-    logDir: ${LOG_DIR}                   
-    restartWaitSec: 60                   
-    histRetentionDays: 3
-    timeoutSec: 3600
-    delaySec: 1                          
-    maxActiveRuns: 1                     
-    params: param1 param2                
-    preconditions:                       
-      - condition: "`echo $2`"           
-        expected: "param2"               
-    mailOn:
-      failure: true                      
-      success: true                      
-    MaxCleanUpTimeSec: 300               
-    handlerOn:                           
-      success:
-        command: echo "succeed"          
-      failure:
-        command: echo "failed"           
-      cancel:
-        command: echo "canceled"         
-      exit:
-        command: echo "finished"         
-    steps:
-      - name: main
-        command: echo "Hello!"
-
 ------------
 
 .. _step-fields:
@@ -310,41 +269,12 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
 
 - **params** (string or list of key-value, optional):
 
-  Parameters to pass into a sub workflow if this step references one (via ``run``). If you’re just using ``command``, you can also treat these as environment variables for this step.
+  Parameters to pass into a sub workflow if this step references one (via ``run``). You can also treat these as environment variables in the workflow.
 
-Example Step Config
-~~~~~~~~~~~~~~~~~~
-.. code-block:: yaml
+- **executor** (dictionary, optional):
 
-  steps:
-    - name: complete example
-      description: demonstrates all fields
-      dir: ${HOME}/logs
-      command: bash
-      stdout: /tmp/outfile
-      output: RESULT_VARIABLE
-      script: |
-        echo "any script"
-      signalOnStop: "SIGINT"
-      mailOn:
-        failure: true
-        success: true
-      continueOn:
-        failure: true
-        skipped: true
-      retryPolicy:
-        limit: 2
-        intervalSec: 5
-      repeatPolicy:
-        repeat: true
-        intervalSec: 60
-      preconditions:
-        - condition: "`echo $1`"
-          expected: "param1"
-      depends:
-        - other_step_name
-      run: sub_dag.yaml
-      params: "FOO=BAR"
+  An executor configuration specifying how the command or script is run (e.g., Docker, SSH, HTTP, Mail, JSON).  
+  For more details, see :ref:`Executors <Executors>`.
 
 ------------
 
@@ -399,8 +329,8 @@ Run the same step multiple times in a single DAG run, with a configurable delay 
     repeat: true
     intervalSec: 60  # run every minute
 
-Sub-Worfklows
-~~~~~~~~~~~~~~~
+Sub-Workflows
+~~~~~~~~~~~~~
 Use the ``run`` field within a step to call another YAML file. This helps organize large workflows. You can pass parameters:
 
 .. code-block:: yaml
@@ -445,3 +375,239 @@ Example:
     success: true
     failure: true
 
+------------
+
+.. _Executors:
+
+Executors
+----------
+
+Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. You can configure an executor in any step by specifying:
+
+.. code-block:: yaml
+
+  steps:
+    - name: example
+      executor:
+        type: docker
+        config:
+          image: "alpine:latest"
+      command: echo "Hello from Docker!"
+
+Contributions of new `executors <https://github.com/dagu-org/dagu/tree/main/internal/dag/executor>`_ are welcome.
+
+Docker Executor
+~~~~~~~~~~~~~~~
+.. _docker-executor:
+
+**Execute an Image**
+
+*Note: Requires Docker daemon running on the host.*
+
+The ``docker`` executor runs commands inside Docker containers. This can help you isolate environments or ensure reproducibility. Example:
+
+.. code-block:: yaml
+
+   steps:
+     - name: deno_hello_world
+       executor:
+         type: docker
+         config:
+           image: "denoland/deno:latest"
+           autoRemove: true
+       command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+
+By default, Dagu pulls the Docker image. If you’re using a local image, set :code:`pull: false`.
+
+You can also configure volumes, environment variables, etc.:
+
+.. code-block:: yaml
+
+    steps:
+      - name: deno_hello_world
+        executor:
+          type: docker
+          config:
+            image: "denoland/deno:latest"
+            container:
+              volumes:
+                /app:/app:
+              env:
+                - FOO=BAR
+            autoRemove: true
+        command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+
+
+**Execute Commands in Existing Containers**
+
+You can also run commands in existing containers (like `docker exec`):
+
+.. code-block:: yaml
+
+   steps:
+     - name: exec-in-existing
+       executor:
+         type: docker
+         config:
+           containerName: "my-running-container"
+           autoRemove: true
+           exec:
+             user: root
+             workingDir: /app
+             env:
+               - MY_VAR=value
+       command: echo "Hello from existing container"
+
+**exec** config includes:
+
+- `containerName`: Name or ID of the existing container (required)
+- `user`: Username or UID
+- `workingDir`: Directory in which the command runs
+- `env`: Environment variables
+
+Use Host's Docker Environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If Dagu itself runs in a container, you can still communicate with the host Docker:
+
+1. Mount Docker socket and set the group ID, or
+2. Run a `socat` container:
+
+.. code-block:: sh
+
+  docker run -v /var/run/docker.sock:/var/run/docker.sock -p 2376:2375 bobrik/socat \
+    TCP4-LISTEN:2375,fork,reuseaddr UNIX-CONNECT:/var/run/docker.sock
+
+Then set `DOCKER_HOST`:
+
+.. code-block:: yaml
+
+  env:
+    - DOCKER_HOST: "tcp://host.docker.internal:2376"
+  steps:
+    - name: deno_hello_world
+      executor:
+        type: docker
+        config:
+          image: "denoland/deno:1.10.3"
+          autoRemove: true
+      command: run https://examples.deno.land/hello-world.ts
+
+HTTP Executor
+~~~~~~~~~~~~~
+The ``http`` executor can make arbitrary HTTP requests. This is handy for interacting with web services or APIs.
+
+.. code-block:: yaml
+
+   steps:
+     - name: send POST request
+       command: POST https://foo.bar.com
+       executor:
+         type: http
+         config:
+           timeout: 10
+           headers:
+             Authorization: "Bearer $TOKEN"
+           silent: true
+           query:
+             key: "value"
+           body: "post body"
+
+Mail Executor
+~~~~~~~~~~~~~
+The ``mail`` executor sends email—useful for notifications or alerts.
+
+.. code-block:: yaml
+
+    smtp:
+      host: "smtp.foo.bar"
+      port: "587"
+      username: "<username>"
+      password: "<password>"
+
+    params: RECIPIENT=XXX
+
+    steps:
+      - name: step1
+        executor:
+          type: mail
+          config:
+            to: <to address>
+            from: <from address>
+            subject: "Exciting New Features Now Available"
+            message: |
+              Hello [RECIPIENT],
+
+              We hope you're enjoying your experience with MyApp!
+              We're thrilled to announce that MyApp v2.0 is now available,
+              and we've added some fantastic new features based on
+              your valuable feedback.
+
+              Thank you for choosing MyApp and for your continued support.
+
+              Best regards,
+              The Team
+
+SSH Executor
+~~~~~~~~~~~~~
+.. _command-execution-over-ssh:
+
+Run commands on remote hosts via SSH.
+
+.. code-block:: yaml
+
+    steps:
+      - name: step1
+        executor: 
+          type: ssh
+          config:
+            user: dagu
+            ip: XXX.XXX.XXX.XXX
+            port: 22
+            key: /Users/dagu/.ssh/private.pem
+        command: /usr/sbin/ifconfig
+
+JSON Executor
+-------------
+
+The ``jq`` executor can be used to transform, query, and format JSON.
+
+Querying data
+~~~~~~~~~~~~~
+.. code-block:: yaml
+
+  steps:
+    - name: run query
+      executor: jq
+      command: '{(.id): .["10"].b}'
+      script: |
+        {"id": "sample", "10": {"b": 42}}
+
+Expected Output:
+
+.. code-block:: json
+
+    {
+        "sample": 42
+    }
+
+Formatting JSON
+~~~~~~~~~~~~~~~
+
+.. code-block:: yaml
+
+    steps:
+      - name: format json
+        executor: jq
+        script: |
+          {"id": "sample", "10": {"b": 42}}
+
+Output:
+
+.. code-block:: json
+
+    {
+        "10": {
+            "b": 42
+        },
+        "id": "sample"
+    }

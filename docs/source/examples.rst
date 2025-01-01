@@ -11,14 +11,15 @@ Hello World
 
 .. code-block:: yaml
 
-  name: hello world
+  params:
+    - NAME: "Dagu"
   steps:
-    - name: s1
-      command: echo hello world
-    - name: s2
-      command: echo done!
+    - name: Hello world
+      command: echo Hello $NAME
+    - name: Done
+      command: echo Done!
       depends:
-        - s1
+        - Hello world
 
 
 Conditional Steps
