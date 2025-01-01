@@ -1,7 +1,7 @@
 .. _Executors:
 
 Executors
-==========================
+==========
 
 .. contents::
     :local:
