@@ -154,12 +154,6 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
-	stepContext := digraph.GetStepContext(ctx)
-
-	// Add the log path to the environment
-	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
-
-	ctx = digraph.WithStepContext(ctx, stepContext)
 	cmd, err := n.SetupExec(ctx)
 	if err != nil {
 		return err
@@ -330,6 +324,8 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
+	stepContext := digraph.GetStepContext(ctx)
+
 	// Set the log file path
 	startedAt := time.Now()
 
@@ -347,15 +343,8 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	n.data.State.Log = filePath
 	n.data.State.StartedAt = startedAt
 
-	if err := n.setStepSpecificEnvVar(digraph.EnvKeyLogPath, n.data.State.Log); err != nil {
-		return fmt.Errorf("failed to set log path environment variable: %w", err)
-	}
-	if err := n.setStepSpecificEnvVar(digraph.EnvKeyDAGStepName, n.data.Step.Name); err != nil {
-		return fmt.Errorf("failed to set step name environment variable: %w", err)
-	}
-
-	stepContext := digraph.GetStepContext(ctx)
-
+	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
+	stepContext = stepContext.WithEnv(digraph.EnvKeyDAGStepName, n.data.Step.Name)
 	stdout, err := stepContext.EvalString(n.data.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)

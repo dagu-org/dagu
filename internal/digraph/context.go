@@ -15,7 +15,7 @@ type Context struct {
 	ctx    context.Context
 	dag    *DAG
 	client DBClient
-	envs   kvPairs
+	envs   map[string]string
 }
 
 func (c Context) GetDAGByName(name string) (*DAG, error) {
@@ -27,29 +27,44 @@ func (c Context) GetResult(name, requestID string) (*Status, error) {
 }
 
 func (c Context) AllEnvs() []string {
-	envs := append([]string{}, os.Environ()...)
-	envs = append(envs, c.dag.Env...)
-	for _, env := range c.envs {
-		envs = append(envs, env.String())
+	seen := make(map[string]struct{})
+	var envs []string
+	for k, v := range c.envs {
+		envs = append(envs, k+"="+v)
+		seen[k] = struct{}{}
+	}
+	for _, env := range c.dag.Env {
+		if _, ok := seen[env]; ok {
+			continue
+		}
+		envs = append(envs, env)
+		seen[env] = struct{}{}
+	}
+	for _, env := range os.Environ() {
+		if _, ok := seen[env]; ok {
+			continue
+		}
+		envs = append(envs, env)
+		seen[env] = struct{}{}
 	}
 	return envs
 }
 
 func (c Context) ApplyEnvs() {
-	for _, env := range c.envs {
-		if err := os.Setenv(env.Key, env.Value); err != nil {
-			logger.Error(c.ctx, "failed to set environment variable %q: %v", env.Key, err)
+	for k, v := range c.envs {
+		if err := os.Setenv(k, v); err != nil {
+			logger.Error(c.ctx, "failed to set environment variable %q: %v", k, err)
 		}
 	}
 }
 
 func (c Context) WithEnv(key, value string) Context {
-	c.envs = append([]kvPair{{Key: key, Value: value}}, c.envs...)
+	c.envs[key] = value
 	return c
 }
 
 func (c Context) EvalString(s string) (string, error) {
-	return cmdutil.SubstituteCommands(os.ExpandEnv(s))
+	return cmdutil.EvalString(s, cmdutil.WithVariables(c.envs))
 }
 
 func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {
@@ -57,10 +72,10 @@ func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFi
 		ctx:    ctx,
 		dag:    dag,
 		client: client,
-		envs: []kvPair{
-			{Key: EnvKeySchedulerLogPath, Value: logFile},
-			{Key: EnvKeyRequestID, Value: requestID},
-			{Key: EnvKeyDAGName, Value: dag.Name},
+		envs: map[string]string{
+			EnvKeySchedulerLogPath: logFile,
+			EnvKeyRequestID:        requestID,
+			EnvKeyDAGName:          dag.Name,
 		},
 	})
 }
@@ -81,17 +96,6 @@ func WithContext(ctx context.Context, dagContext Context) context.Context {
 func IsContext(ctx context.Context) bool {
 	_, ok := ctx.Value(ctxKey{}).(Context)
 	return ok
-}
-
-type kvPairs []kvPair
-
-type kvPair struct {
-	Key   string
-	Value string
-}
-
-func (e kvPair) String() string {
-	return e.Key + "=" + e.Value
 }
 
 type ctxKey struct{}

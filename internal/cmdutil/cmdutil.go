@@ -233,14 +233,14 @@ func GetShellCommand(configuredShell string) string {
 }
 
 type EvalOptions struct {
-	Variables map[string]string
+	Variables []map[string]string
 }
 
 type EvalOption func(*EvalOptions)
 
 func WithVariables(vars map[string]string) EvalOption {
 	return func(opts *EvalOptions) {
-		opts.Variables = vars
+		opts.Variables = append(opts.Variables, vars)
 	}
 }
 
@@ -250,7 +250,10 @@ func EvalString(input string, opts ...EvalOption) (string, error) {
 	for _, opt := range opts {
 		opt(options)
 	}
-	value := replaceVars(input, options.Variables)
+	value := input
+	for _, vars := range options.Variables {
+		value = replaceVars(value, vars)
+	}
 	value = os.ExpandEnv(value)
 	value, err := SubstituteCommands(value)
 	if err != nil {
@@ -265,7 +268,10 @@ func EvalIntString(input string, opts ...EvalOption) (int, error) {
 	for _, opt := range opts {
 		opt(options)
 	}
-	value := replaceVars(input, options.Variables)
+	value := input
+	for _, vars := range options.Variables {
+		value = replaceVars(value, vars)
+	}
 	value = os.ExpandEnv(value)
 	value, err := SubstituteCommands(value)
 	if err != nil {
@@ -314,8 +320,9 @@ func processStructFields(v reflect.Value, opts *EvalOptions) error {
 		switch field.Kind() {
 		case reflect.String:
 			value := field.String()
-			value = replaceVars(value, opts.Variables)
-
+			for _, vars := range opts.Variables {
+				value = replaceVars(value, vars)
+			}
 			value = os.ExpandEnv(value)
 			processed, err := SubstituteCommands(value)
 			if err != nil {
