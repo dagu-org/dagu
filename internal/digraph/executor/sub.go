@@ -50,7 +50,7 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := dagCtx.Finder.FindByName(ctx, config.Name)
+	subDAG, err := dagCtx.GetDAGByName(config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to find subworkflow %q: %w", config.Name, err,

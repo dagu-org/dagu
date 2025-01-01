@@ -11,16 +11,20 @@ import (
 )
 
 type Context struct {
-	Context         context.Context
-	DAG             *DAG
-	Finder          Finder
-	resultCollector ExecutionResultCollector
+	DAG *DAG
 
-	envs kvPairs
+	ctx             context.Context
+	finder          Finder
+	resultCollector ExecutionResultCollector
+	envs            kvPairs
+}
+
+func (c Context) GetDAGByName(name string) (*DAG, error) {
+	return c.finder.FindByName(c.ctx, name)
 }
 
 func (c Context) GetResult(name, requestID string) (*ExecutionResult, error) {
-	return c.resultCollector.GetResult(c.Context, name, requestID)
+	return c.resultCollector.GetResult(c.ctx, name, requestID)
 }
 
 func (c Context) ListEnvs() []string {
@@ -47,10 +51,10 @@ type ctxKey struct{}
 
 func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ExecutionResultCollector, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
-		Context: ctx,
-		DAG:     dag,
-		Finder:  finder,
+		ctx: ctx,
+		DAG: dag,
 
+		finder:          finder,
 		resultCollector: resultCollector,
 		envs: []kvPair{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
@@ -63,7 +67,7 @@ func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector Ex
 func (c Context) ApplyEnvs() {
 	for _, env := range c.envs {
 		if err := os.Setenv(env.Key, env.Value); err != nil {
-			logger.Error(c.Context, "failed to set environment variable %q: %v", env.Key, err)
+			logger.Error(c.ctx, "failed to set environment variable %q: %v", env.Key, err)
 		}
 	}
 }
