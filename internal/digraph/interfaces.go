@@ -10,13 +10,13 @@ type Finder interface {
 	FindByName(ctx context.Context, name string) (*DAG, error)
 }
 
-// ExecutionResultCollector gets a result of a DAG execution.
-type ExecutionResultCollector interface {
-	GetResult(ctx context.Context, name string, requestID string) (*ExecutionResult, error)
+// HistoryStoreClient gets a result of a DAG execution.
+type HistoryStoreClient interface {
+	GetStatus(ctx context.Context, name string, requestID string) (*HistoryStatus, error)
 }
 
-// ExecutionResult is the result of a DAG execution.
-type ExecutionResult struct {
+// HistoryStatus is the result of a DAG execution.
+type HistoryStatus struct {
 	// Name represents the name of the executed DAG.
 	Name string `json:"name,omitempty"`
 	// Params is the parameters of the DAG execution

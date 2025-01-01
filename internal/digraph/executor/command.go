@@ -31,7 +31,7 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	dagContext := digraph.GetContext(ctx)
 
 	cmd := createCommand(ctx, step)
-	cmd.Env = append(cmd.Env, dagContext.ListEnvs()...)
+	cmd.Env = append(cmd.Env, dagContext.AllEnvs()...)
 	cmd.Dir = step.Dir
 
 	// Get output variables from the step context and set them as environment

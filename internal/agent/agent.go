@@ -523,17 +523,17 @@ func encodeError(w http.ResponseWriter, err error) {
 	}
 }
 
-var _ digraph.ExecutionResultCollector = &resultCollector{}
+var _ digraph.HistoryStoreClient = &historyStoreClient{}
 
-type resultCollector struct {
+type historyStoreClient struct {
 	historyStore persistence.HistoryStore
 }
 
-func newOutputCollector(store persistence.HistoryStore) *resultCollector {
-	return &resultCollector{historyStore: store}
+func newOutputCollector(store persistence.HistoryStore) *historyStoreClient {
+	return &historyStoreClient{historyStore: store}
 }
 
-func (o *resultCollector) GetResult(ctx context.Context, name string, requestID string) (*digraph.ExecutionResult, error) {
+func (o *historyStoreClient) GetStatus(ctx context.Context, name string, requestID string) (*digraph.HistoryStatus, error) {
 	status, err := o.historyStore.FindByRequestID(ctx, name, requestID)
 	if err != nil {
 		return nil, err
@@ -553,7 +553,7 @@ func (o *resultCollector) GetResult(ctx context.Context, name string, requestID 
 		}
 	}
 
-	return &digraph.ExecutionResult{
+	return &digraph.HistoryStatus{
 		Outputs: outputVariables,
 		Name:    status.Status.Name,
 		Params:  status.Status.Params,

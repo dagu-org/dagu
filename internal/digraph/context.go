@@ -13,25 +13,24 @@ import (
 )
 
 type Context struct {
-	DAG *DAG
-
-	ctx             context.Context
-	finder          Finder
-	resultCollector ExecutionResultCollector
-	envs            kvPairs
+	ctx    context.Context
+	dag    *DAG
+	finder Finder
+	client HistoryStoreClient
+	envs   kvPairs
 }
 
 func (c Context) GetDAGByName(name string) (*DAG, error) {
 	return c.finder.FindByName(c.ctx, name)
 }
 
-func (c Context) GetResult(name, requestID string) (*ExecutionResult, error) {
-	return c.resultCollector.GetResult(c.ctx, name, requestID)
+func (c Context) GetResult(name, requestID string) (*HistoryStatus, error) {
+	return c.client.GetStatus(c.ctx, name, requestID)
 }
 
-func (c Context) ListEnvs() []string {
+func (c Context) AllEnvs() []string {
 	envs := append([]string{}, os.Environ()...)
-	envs = append(envs, c.DAG.Env...)
+	envs = append(envs, c.dag.Env...)
 	for _, env := range c.envs {
 		envs = append(envs, env.String())
 	}
@@ -40,14 +39,14 @@ func (c Context) ListEnvs() []string {
 
 func (c Context) MailerConfig() (mailer.Config, error) {
 	return EvalStringFields(c.ctx, mailer.Config{
-		Host:     c.DAG.SMTP.Host,
-		Port:     c.DAG.SMTP.Port,
-		Username: c.DAG.SMTP.Username,
-		Password: c.DAG.SMTP.Password,
+		Host:     c.dag.SMTP.Host,
+		Port:     c.dag.SMTP.Port,
+		Username: c.dag.SMTP.Username,
+		Password: c.dag.SMTP.Password,
 	})
 }
 
-func EvalStringFields[T any](ctx context.Context, obj T) (T, error) {
+func EvalStringFields[T any](_ context.Context, obj T) (T, error) {
 	return cmdutil.SubstituteStringFields(obj)
 }
 
@@ -64,13 +63,12 @@ func (e kvPair) String() string {
 
 type ctxKey struct{}
 
-func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ExecutionResultCollector, requestID, logFile string) context.Context {
+func NewContext(ctx context.Context, dag *DAG, finder Finder, client HistoryStoreClient, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
-		ctx: ctx,
-		DAG: dag,
-
-		finder:          finder,
-		resultCollector: resultCollector,
+		ctx:    ctx,
+		dag:    dag,
+		finder: finder,
+		client: client,
 		envs: []kvPair{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
 			{Key: EnvKeyRequestID, Value: requestID},
