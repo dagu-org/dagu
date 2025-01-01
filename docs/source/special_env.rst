@@ -9,6 +9,7 @@ Special Environment Variables
 Inside a DAG, you can use the following environment variables to access special values:
 
 - ``DAG_NAME``: The name of the current DAG.
+- ``DAG_STEP_NAME``: The name of the current step.
 - ``DAG_REQUEST_ID``: The unique ID for the current execution request.
 - ``DAG_EXECUTION_LOG_PATH``: The path to the log file for the current step.
 - ``DAG_SCHEDULER_LOG_PATH``: The path to the log file for the scheduler.

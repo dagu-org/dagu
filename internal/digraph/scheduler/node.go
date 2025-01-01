@@ -353,23 +353,12 @@ func (n *Node) Setup(logDir string, requestID string) error {
 	n.data.State.Log = filePath
 	n.data.State.StartedAt = startedAt
 
-	// Replace the special environment variables in the command
-	// Why this is necessary:
-	// 1. We need to expand the environment variables when setup the node.
-	// 2. The environment variables need to be set in the current process.
-	// 3. But since the values of the log path are different for each node,
-	//    we need to replace the name differently for each node.
-	envKeyLogPath := fmt.Sprintf("STEP_%d_DAG_EXECUTION_LOG_PATH", n.id)
-	if err := os.Setenv(envKeyLogPath, n.data.State.Log); err != nil {
-		return fmt.Errorf("failed to set environment variable %q: %w", envKeyLogPath, err)
+	if err := n.setStepSpecificEnvVar(digraph.EnvKeyLogPath, n.data.State.Log); err != nil {
+		return fmt.Errorf("failed to set log path environment variable: %w", err)
 	}
-
-	// Expand environment variables in the step
-	n.data.Step.CmdWithArgs = strings.ReplaceAll(
-		n.data.Step.CmdWithArgs,
-		digraph.EnvKeyLogPath,
-		envKeyLogPath,
-	)
+	if err := n.setStepSpecificEnvVar(digraph.EnvKeyDAGStepName, n.data.Step.Name); err != nil {
+		return fmt.Errorf("failed to set step name environment variable: %w", err)
+	}
 
 	n.data.Step.Stdout = os.ExpandEnv(n.data.Step.Stdout)
 	n.data.Step.Stderr = os.ExpandEnv(n.data.Step.Stderr)
@@ -390,6 +379,26 @@ func (n *Node) Setup(logDir string, requestID string) error {
 	if err := n.setupScript(); err != nil {
 		return fmt.Errorf("failed to setup script: %w", err)
 	}
+	return nil
+}
+
+// Add this helper function
+func (n *Node) setStepSpecificEnvVar(key string, value string) error {
+	// Create step-specific environment variable name
+	stepEnvKey := fmt.Sprintf("STEP_%d_%s", n.id, key)
+
+	// Set the environment variable
+	if err := os.Setenv(stepEnvKey, value); err != nil {
+		return fmt.Errorf("failed to set step environment variable %q: %w", stepEnvKey, err)
+	}
+
+	// Replace in command string
+	n.data.Step.CmdWithArgs = strings.ReplaceAll(
+		n.data.Step.CmdWithArgs,
+		fmt.Sprintf("$%s", key),
+		value,
+	)
+
 	return nil
 }
 

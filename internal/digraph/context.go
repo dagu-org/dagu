@@ -14,6 +14,7 @@ const (
 	EnvKeySchedulerLogPath = "DAG_SCHEDULER_LOG_PATH"
 	EnvKeyRequestID        = "DAG_REQUEST_ID"
 	EnvKeyDAGName          = "DAG_NAME"
+	EnvKeyDAGStepName      = "DAG_STEP_NAME"
 )
 
 // Finder finds a DAG by name.
