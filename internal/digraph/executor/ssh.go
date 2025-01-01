@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -65,21 +64,10 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 	return ssh.Password(cfg.Password), nil
 }
 
-// expandEnvHook is a mapstructure decode hook that expands environment variables in string fields
-func expandEnvHook(f reflect.Type, t reflect.Type, data any) (any, error) {
-	if f.Kind() != reflect.String || t.Kind() != reflect.String {
-		return data, nil
-	}
-	return os.ExpandEnv(data.(string)), nil
-}
-
 func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	def := new(sshExecConfigDefinition)
 	md, err := mapstructure.NewDecoder(
-		&mapstructure.DecoderConfig{
-			Result:     def,
-			DecodeHook: expandEnvHook,
-		},
+		&mapstructure.DecoderConfig{Result: def},
 	)
 
 	if err != nil {
@@ -89,6 +77,8 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	if err := md.Decode(step.ExecutorConfig.Config); err != nil {
 		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
 	}
+
+	stepContext := digraph.GetStepContext(ctx)
 
 	var port string
 	switch v := def.Port.(type) {
@@ -103,7 +93,6 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		port = "22"
 	}
 
-	stepContext := digraph.GetStepContext(ctx)
 	cfg, err := digraph.EvalStringFields(stepContext, sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
@@ -118,6 +107,11 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	// StrictHostKeyChecking is not supported yet.
 	if def.StrictHostKeyChecking {
 		return nil, errStrictHostKey
+	}
+
+	cfg, err = digraph.EvalStringFields(stepContext, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to substitute string fields for ssh config: %w", err)
 	}
 
 	// Select the authentication method.

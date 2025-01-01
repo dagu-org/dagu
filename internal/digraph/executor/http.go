@@ -44,9 +44,10 @@ type httpJSONResult struct {
 }
 
 func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
+	stepContext := digraph.GetStepContext(ctx)
 	var reqCfg httpConfig
 	if len(step.Script) > 0 {
-		if err := decodeHTTPConfigFromString(step.Script, &reqCfg); err != nil {
+		if err := decodeHTTPConfigFromString(ctx, step.Script, &reqCfg); err != nil {
 			return nil, err
 		}
 	} else if step.ExecutorConfig.Config != nil {
@@ -55,9 +56,24 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		); err != nil {
 			return nil, err
 		}
-		reqCfg.Body = os.ExpandEnv(reqCfg.Body)
+		body, err := stepContext.EvalString(reqCfg.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate body: %w", err)
+		}
+		reqCfg.Body = body
 		for k, v := range reqCfg.Headers {
-			reqCfg.Headers[k] = os.ExpandEnv(v)
+			header, err := stepContext.EvalString(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to evaluate header %q: %w", k, err)
+			}
+			reqCfg.Headers[k] = header
+		}
+		for k, v := range reqCfg.Query {
+			query, err := stepContext.EvalString(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to evaluate query %q: %w", k, err)
+			}
+			reqCfg.Query[k] = query
 		}
 	}
 
@@ -179,10 +195,14 @@ func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 	return md.Decode(dat)
 }
 
-func decodeHTTPConfigFromString(s string, cfg *httpConfig) error {
+func decodeHTTPConfigFromString(ctx context.Context, s string, cfg *httpConfig) error {
+	stepContext := digraph.GetStepContext(ctx)
 	if len(s) > 0 {
-		ss := os.ExpandEnv(s)
-		if err := json.Unmarshal([]byte(ss), &cfg); err != nil {
+		configString, err := stepContext.EvalString(s)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate http config: %w", err)
+		}
+		if err := json.Unmarshal([]byte(configString), &cfg); err != nil {
 			return err
 		}
 	}

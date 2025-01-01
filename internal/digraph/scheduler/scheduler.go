@@ -139,7 +139,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			logger.Info(ctx, "Step execution started", "step", node.data.Step.Name)
 			node.SetStatus(NodeStatusRunning)
-			go func(node *Node) {
+			go func(ctx context.Context, node *Node) {
 				defer func() {
 					if panicObj := recover(); panicObj != nil {
 						stack := string(debug.Stack())
@@ -155,8 +155,10 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 					wg.Done()
 				}()
 
+				ctx = sc.setupContext(ctx, graph, node)
+
 				setupSucceed := true
-				if err := sc.setupNode(node); err != nil {
+				if err := sc.setupNode(ctx, node); err != nil {
 					setupSucceed = false
 					sc.setLastError(err)
 					node.MarkError(err)
@@ -168,7 +170,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			ExecRepeat: // repeat execution
 				for setupSucceed && !sc.isCanceled() {
-					execErr := sc.execNode(ctx, graph, node)
+					execErr := sc.execNode(ctx, node)
 					if execErr != nil {
 						status := node.State().Status
 						switch {
@@ -237,7 +239,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				if done != nil {
 					done <- node
 				}
-			}(node)
+			}(ctx, node)
 
 			time.Sleep(sc.delay) // TODO: check if this is necessary
 		}
@@ -289,9 +291,9 @@ func (sc *Scheduler) setLastError(err error) {
 	sc.lastError = err
 }
 
-func (sc *Scheduler) setupNode(node *Node) error {
+func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
-		return node.Setup(sc.logDir, sc.requestID)
+		return node.Setup(ctx, sc.logDir, sc.requestID)
 	}
 	return nil
 }
@@ -346,9 +348,7 @@ func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *Exec
 	return digraph.WithStepContext(ctx, stepCtx)
 }
 
-func (sc *Scheduler) execNode(ctx context.Context, graph *ExecutionGraph, node *Node) error {
-	ctx = sc.setupContext(ctx, graph, node)
-
+func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
 		if err := node.Execute(ctx); err != nil {
 			return fmt.Errorf("failed to execute step %q: %w", node.data.Step.Name, err)
@@ -479,7 +479,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 	node.SetStatus(NodeStatusRunning)
 
 	if !sc.dry {
-		if err := node.Setup(sc.logDir, sc.requestID); err != nil {
+		if err := node.Setup(ctx, sc.logDir, sc.requestID); err != nil {
 			node.SetStatus(NodeStatusError)
 			return nil
 		}

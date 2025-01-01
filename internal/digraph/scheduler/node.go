@@ -326,7 +326,7 @@ func (n *Node) Cancel(ctx context.Context) {
 	}
 }
 
-func (n *Node) Setup(logDir string, requestID string) error {
+func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -354,9 +354,25 @@ func (n *Node) Setup(logDir string, requestID string) error {
 		return fmt.Errorf("failed to set step name environment variable: %w", err)
 	}
 
-	n.data.Step.Stdout = os.ExpandEnv(n.data.Step.Stdout)
-	n.data.Step.Stderr = os.ExpandEnv(n.data.Step.Stderr)
-	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
+	stepContext := digraph.GetStepContext(ctx)
+
+	stdout, err := stepContext.EvalString(n.data.Step.Stdout)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate stdout field: %w", err)
+	}
+	n.data.Step.Stdout = stdout
+
+	stderr, err := stepContext.EvalString(n.data.Step.Stderr)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate stderr field: %w", err)
+	}
+	n.data.Step.Stderr = stderr
+
+	dir, err := stepContext.EvalString(n.data.Step.Dir)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate dir field: %w", err)
+	}
+	n.data.Step.Dir = dir
 
 	if err := n.setupLog(); err != nil {
 		return fmt.Errorf("failed to setup log: %w", err)
