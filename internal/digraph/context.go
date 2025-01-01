@@ -15,16 +15,15 @@ import (
 type Context struct {
 	ctx    context.Context
 	dag    *DAG
-	finder Finder
-	client HistoryStoreClient
+	client DBClient
 	envs   kvPairs
 }
 
 func (c Context) GetDAGByName(name string) (*DAG, error) {
-	return c.finder.FindByName(c.ctx, name)
+	return c.client.GetDAG(c.ctx, name)
 }
 
-func (c Context) GetResult(name, requestID string) (*HistoryStatus, error) {
+func (c Context) GetResult(name, requestID string) (*Status, error) {
 	return c.client.GetStatus(c.ctx, name, requestID)
 }
 
@@ -63,11 +62,10 @@ func (e kvPair) String() string {
 
 type ctxKey struct{}
 
-func NewContext(ctx context.Context, dag *DAG, finder Finder, client HistoryStoreClient, requestID, logFile string) context.Context {
+func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
 		ctx:    ctx,
 		dag:    dag,
-		finder: finder,
 		client: client,
 		envs: []kvPair{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},

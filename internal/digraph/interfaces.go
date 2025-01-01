@@ -5,18 +5,14 @@ package digraph
 
 import "context"
 
-// Finder finds a DAG by name.
-type Finder interface {
-	FindByName(ctx context.Context, name string) (*DAG, error)
+// DBClient gets a result of a DAG execution.
+type DBClient interface {
+	GetDAG(ctx context.Context, name string) (*DAG, error)
+	GetStatus(ctx context.Context, name string, requestID string) (*Status, error)
 }
 
-// HistoryStoreClient gets a result of a DAG execution.
-type HistoryStoreClient interface {
-	GetStatus(ctx context.Context, name string, requestID string) (*HistoryStatus, error)
-}
-
-// HistoryStatus is the result of a DAG execution.
-type HistoryStatus struct {
+// Status is the result of a DAG execution.
+type Status struct {
 	// Name represents the name of the executed DAG.
 	Name string `json:"name,omitempty"`
 	// Params is the parameters of the DAG execution

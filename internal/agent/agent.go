@@ -195,7 +195,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
-	dagCtx := digraph.NewContext(ctx, a.dag, a.dagStore, newOutputCollector(a.historyStore), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 
 	// Update the finished status to the history database.
@@ -364,7 +364,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dagStore, newOutputCollector(a.historyStore), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -523,17 +523,26 @@ func encodeError(w http.ResponseWriter, err error) {
 	}
 }
 
-var _ digraph.HistoryStoreClient = &historyStoreClient{}
+var _ digraph.DBClient = &dbClient{}
 
-type historyStoreClient struct {
+type dbClient struct {
+	dagStore     persistence.DAGStore
 	historyStore persistence.HistoryStore
 }
 
-func newOutputCollector(store persistence.HistoryStore) *historyStoreClient {
-	return &historyStoreClient{historyStore: store}
+func newDBClient(hsStore persistence.HistoryStore, dagStore persistence.DAGStore) *dbClient {
+	return &dbClient{
+		historyStore: hsStore,
+		dagStore:     dagStore,
+	}
 }
 
-func (o *historyStoreClient) GetStatus(ctx context.Context, name string, requestID string) (*digraph.HistoryStatus, error) {
+// GetDAG implements digraph.DBClient.
+func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
+	return o.dagStore.GetDetails(ctx, name)
+}
+
+func (o *dbClient) GetStatus(ctx context.Context, name string, requestID string) (*digraph.Status, error) {
 	status, err := o.historyStore.FindByRequestID(ctx, name, requestID)
 	if err != nil {
 		return nil, err
@@ -553,7 +562,7 @@ func (o *historyStoreClient) GetStatus(ctx context.Context, name string, request
 		}
 	}
 
-	return &digraph.HistoryStatus{
+	return &digraph.Status{
 		Outputs: outputVariables,
 		Name:    status.Status.Name,
 		Params:  status.Status.Params,

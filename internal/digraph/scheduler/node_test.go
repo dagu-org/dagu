@@ -114,7 +114,7 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext() context.Context {
-	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, nil, n.reqID, "logFile")
+	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, n.reqID, "logFile")
 }
 
 func TestNode(t *testing.T) {
