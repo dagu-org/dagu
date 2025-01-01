@@ -45,22 +45,26 @@ func (c Context) MailerConfig() (mailer.Config, error) {
 	})
 }
 
+func (c Context) ApplyEnvs() {
+	for _, env := range c.envs {
+		if err := os.Setenv(env.Key, env.Value); err != nil {
+			logger.Error(c.ctx, "failed to set environment variable %q: %v", env.Key, err)
+		}
+	}
+}
+
+func (c Context) WithEnv(key, value string) Context {
+	c.envs = append([]kvPair{{Key: key, Value: value}}, c.envs...)
+	return c
+}
+
+func (c Context) EvalString(s string) (string, error) {
+	return cmdutil.SubstituteCommands(os.ExpandEnv(s))
+}
+
 func EvalStringFields[T any](dagContext Context, obj T) (T, error) {
 	return cmdutil.SubstituteStringFields(obj)
 }
-
-type kvPairs []kvPair
-
-type kvPair struct {
-	Key   string
-	Value string
-}
-
-func (e kvPair) String() string {
-	return e.Key + "=" + e.Value
-}
-
-type ctxKey struct{}
 
 func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
@@ -75,19 +79,6 @@ func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFi
 	})
 }
 
-func (c Context) ApplyEnvs() {
-	for _, env := range c.envs {
-		if err := os.Setenv(env.Key, env.Value); err != nil {
-			logger.Error(c.ctx, "failed to set environment variable %q: %v", env.Key, err)
-		}
-	}
-}
-
-func (c Context) WithEnv(key, value string) Context {
-	c.envs = append([]kvPair{{Key: key, Value: value}}, c.envs...)
-	return c
-}
-
 func GetContext(ctx context.Context) Context {
 	contextValue, ok := ctx.Value(ctxKey{}).(Context)
 	if !ok {
@@ -100,3 +91,16 @@ func GetContext(ctx context.Context) Context {
 func WithContext(ctx context.Context, dagContext Context) context.Context {
 	return context.WithValue(ctx, ctxKey{}, dagContext)
 }
+
+type kvPairs []kvPair
+
+type kvPair struct {
+	Key   string
+	Value string
+}
+
+func (e kvPair) String() string {
+	return e.Key + "=" + e.Value
+}
+
+type ctxKey struct{}

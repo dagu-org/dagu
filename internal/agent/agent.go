@@ -107,6 +107,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Create a new context for the DAG execution
+	dbClient := newDBClient(a.historyStore, a.dagStore)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile)
+
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
 		return err
@@ -195,8 +199,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
-	dagCtx := digraph.NewContext(ctx, a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
-	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
+	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
@@ -468,7 +471,7 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 		return nil
 	}
 	// If one of the conditions does not met, cancel the execution.
-	if err := digraph.EvalConditions(a.dag.Preconditions); err != nil {
+	if err := digraph.EvalConditions(ctx, a.dag.Preconditions); err != nil {
 		logger.Error(ctx, "Preconditions are not met", "err", err)
 		a.scheduler.Cancel(ctx, a.graph)
 		return err
