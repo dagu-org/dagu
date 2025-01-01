@@ -520,6 +520,20 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
+	t.Run("SpecialVars_DAG_NAME", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
+	})
 }
 
 func successStep(name string, depends ...string) digraph.Step {
@@ -700,7 +714,9 @@ type graphHelper struct {
 func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) scheduleResult {
 	t.Helper()
 
-	ctx := digraph.NewContext(gh.Context, &digraph.DAG{}, nil, nil, gh.Config.ReqID, "logFile")
+	ctx := digraph.NewContext(gh.Context, &digraph.DAG{
+		Name: "test_dag",
+	}, nil, nil, gh.Config.ReqID, "logFile")
 
 	var doneNodes []*scheduler.Node
 	nodeCompletedChan := make(chan *scheduler.Node)

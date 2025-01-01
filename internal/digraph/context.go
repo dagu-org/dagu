@@ -13,6 +13,7 @@ const (
 	EnvKeyLogPath          = "DAG_EXECUTION_LOG_PATH"
 	EnvKeySchedulerLogPath = "DAG_SCHEDULER_LOG_PATH"
 	EnvKeyRequestID        = "DAG_REQUEST_ID"
+	EnvKeyDAGName          = "DAG_NAME"
 )
 
 // Finder finds a DAG by name.
@@ -76,6 +77,7 @@ func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector Re
 		AdditionalEnvs: []Env{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
 			{Key: EnvKeyRequestID, Value: requestID},
+			{Key: EnvKeyDAGName, Value: dag.Name},
 		},
 	})
 }
