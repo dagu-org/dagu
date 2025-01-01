@@ -7,9 +7,9 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Dagu'
-copyright = '2023, Dagu Developers'
-author = 'Dagu Developers'
-# release = '1.10'
+copyright = '2024 Yota Hamada'
+author = 'Yota Hamada'
+
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

@@ -1,7 +1,7 @@
 .. _Executors:
 
 Executors
-==========================
+==========
 
 .. contents::
     :local:
@@ -76,6 +76,48 @@ See the Docker's API documentation for all available options.
 
 - For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
 - For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.
+
+Execute Commands in Existing Containers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Docker executor also supports executing commands in already-running containers using Docker's exec functionality, similar to `docker exec`. This is useful when you need to run commands in containers that are already running as part of your infrastructure.
+
+.. code-block:: yaml
+
+   steps:
+     - name: exec-in-existing
+       executor:
+         type: docker
+         config:
+           containerName: "my-running-container"  # Name of existing container
+           autoRemove: true
+           exec:
+             user: root          # Optional: user to run as
+             workingDir: /app   # Optional: working directory
+             env:               # Optional: environment variables
+               - MY_VAR=value
+       command: echo "Hello from existing container"
+
+Available exec configuration options:
+
+- `containerName`: Name or ID of the existing container (required)
+- `exec`:
+    - `user`: Username or UID to execute command as (optional)
+    - `workingDir`: Working directory for command execution (optional)
+    - `env`: List of environment variables (optional)
+
+For comparison, here's how you would create and run in a new container:
+
+.. code-block:: yaml
+
+   steps:
+     - name: create-new
+       executor:
+         type: docker
+         config:
+           image: alpine:latest
+           autoRemove: true
+       command: echo "Hello from new container"
 
 
 Use Host's Docker Environment

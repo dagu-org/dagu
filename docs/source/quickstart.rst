@@ -23,24 +23,16 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
 
 .. code-block:: yaml
 
-    schedule: "0 0 * * *"
-    tags: Daily
+    schedule: "* * * * *" # Run the DAG every minute
+    params:
+      - NAME: "Dagu"
     steps:
-      - name: "S1"
-        command: "sleep 2"
-      - name: "S2"
-        command: "sleep 2"
+      - name: Hello world
+        command: echo Hello $NAME
+      - name: Done
+        command: echo Done!
         depends:
-          - "S1"
-      - name: "S3"
-        command: "sleep 2"
-        depends:
-          - "S1"
-      - name: "S4"
-        command: "sleep 2"
-        depends:
-          - "S2"
-          - "S3"
+          - Hello world
 
 4. Execute the DAG
 -------------------

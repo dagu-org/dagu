@@ -15,11 +15,5 @@ readme = "README.md"
 requires-python = ">= 3.11"
 
 [tool.rye.scripts]
-serve = "sphinx-autobuild --watch docs --port 8000 --open-browser --delay 1 source build/html"
+serve = "sphinx-autobuild --watch . --port 8000 --open-browser --delay 1 source build/html"
 build = "sphinx-build -b html -D language='en' source/ build/html"
-
-build-zh = "sphinx-build -b html -D language='zh' source/ build/html"
-update-zh = "sphinx-intl update -p build/gettext -l zh"
-
-build-ja = "sphinx-build -b html -D language='ja' source/ build/html"
-update-ja = "sphinx-intl update -p build/gettext -l ja"

@@ -26,108 +26,52 @@
 
 <h1><b>Dagu</b></h1>
 
-Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands as a [Directed Acyclic Graph (DAG)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) in a declarative [YAML format](https://dagu.readthedocs.io/en/latest/yaml_format.html). Dagu simplifies the management and execution of complex workflows. It natively supports running Docker containers, making HTTP requests, and executing commands over SSH.
-
-- **Check out our** [Documentation](https://dagu.readthedocs.io)
-- **Join our** [Discord Community](https://discord.gg/gpahPUjGRk)
-- **Explore** [Quick Start Guide](https://dagu.readthedocs.io/en/latest/quickstart.html)
+A powerful, self-contained Cron alternative with a clean Web UI and a [declarative YAML-based workflow definition](https://dagu.readthedocs.io/en/latest/yaml_format.html). Dagu simplifies complex job dependencies and scheduling with minimal overhead.
 
 ---
 
 ## **Highlights**
 
-- Single binary file installation
-- Declarative YAML format for defining DAGs
-- Web UI for visually managing, rerunning, and monitoring pipelines
-- Use existing programs without any modification
-- Self-contained, with no need for a DBMS
-
-## **Table of Contents**
-
-- [**Highlights**](#highlights)
-- [**Table of Contents**](#table-of-contents)
-- [**Features**](#features)
-- [**Use Cases**](#use-cases)
-- [**Web UI**](#web-ui)
-  - [DAG Details](#dag-details)
-  - [DAGs](#dags)
-  - [Search](#search)
-  - [Execution History](#execution-history)
-  - [Log Viewer](#log-viewer)
-- [**Installation**](#installation)
-  - [Via Bash script](#via-bash-script)
-  - [Via GitHub Releases Page](#via-github-releases-page)
-  - [Via Homebrew (macOS)](#via-homebrew-macos)
-  - [Via Docker](#via-docker)
-- [**Quick Start Guide**](#quick-start-guide)
-  - [1. Launch the Web UI](#1-launch-the-web-ui)
-  - [2. Create a New DAG](#2-create-a-new-dag)
-  - [3. Edit the DAG](#3-edit-the-dag)
-  - [4. Execute the DAG](#4-execute-the-dag)
-- [**CLI**](#cli)
-- [**Remote Node Management support**](#remote-node-management-support)
-  - [Configuration](#configuration)
-- [**Localized Documentation**](#localized-documentation)
-- [**Documentation**](#documentation)
-- [**Example DAG**](#example-dag)
-  - [Minimum examples](#minimum-examples)
-  - [Complex example](#complex-example)
-- [**Running as a daemon**](#running-as-a-daemon)
-- [**Motivation**](#motivation)
-- [**Why Not Use an Existing DAG Scheduler Like Airflow?**](#why-not-use-an-existing-dag-scheduler-like-airflow)
-- [**How It Works**](#how-it-works)
-- [**License**](#license)
-- [**Support and Community**](#support-and-community)
+- **Simple Installation**: Single binary, no dependencies
+- **Intuitive Web UI**: Visualize, monitor, and control workflows
+- **YAML-based**: Define workflows in simple YAML files
+- **Built-in Executors**: Support for Docker, HTTP, SSH, and more
+- **Zero Config**: No database required, works out of the box
 
 ## **Features**
 
-- Web User Interface
-- Command Line Interface (CLI) with several commands for running and managing DAGs
-- YAML format for defining DAGs, with support for various features including:
-  - Execution of custom code snippets
-  - Parameters
-  - Command substitution
-  - Conditional logic
+- Web UI & CLI
+- Web API Interface
+- Powerful DAG definition in YAML format:
+  - Code snippets, parameters, environment variables
+  - Command substitution, piping, conditional logic
   - Redirection of stdout and stderr
-  - Lifecycle hooks
-  - Repeating task
-  - Automatic retry
-- Executors for running different types of tasks:
-  - Running arbitrary Docker containers
-  - Making HTTP requests
-  - Sending emails
-  - Running jq command
-  - Executing remote commands via SSH
-- Remote Node support for managing multiple Dagu instances:
-  - Monitor DAGs across different environments
-  - Switch between nodes through UI dropdown
-  - Centralized management interface
+  - Lifecycle hooks (on failure, on exit, etc.)
+  - Repeating tasks, automatic/manual retry
+  - Run sub-DAGs
+- Handy built-in executors:
+  - Docker containers
+  - HTTP requests
+  - Email sending
+  - JSON query with jq
+  - SSH remote commands
+- Remote Dagu node management
 - Email notification
 - Scheduling with Cron expressions
-- REST API Interface
-- Basic Authentication over HTTPS
 
-## **Use Cases**
+## **Community**
 
-- **Data Pipeline Automation**: Schedule ETL tasks for data processing
-- **Infrastructure Monitoring**: Periodic health checks via HTTP or SSH
-- **Automated Reporting**: Generate and send routine email reports
-- **Batch Processing**: Automate data cleansing, model training, etc.
-- **Task Dependency Management**: Handle interdependent processes seamlessly
-- **Microservices Orchestration**: Manage and monitor microservice dependencies
-- **CI/CD Integration**: Automate code deployment and testing
-- **Alerting System**: Trigger notifications upon specific conditions
-- **Custom Task Automation**: Run arbitrary scripts or commands with ease
+- Issues: [GitHub Issues](https://github.com/dagu-org/dagu/issues)
+- Discussion: [GitHub Discussions](https://github.com/dagu-org/dagu/discussions)
+- Chat: [Discord](https://discord.gg/gpahPUjGRk)
 
 ## **Web UI**
 
 ### DAG Details
 
-Real-time statuses, logs, and configuration details for each DAG. Easily edit configurations in your browser.
+Real-time status, logs, and configuration for each DAG. Toggle graph orientation from the top-right corner.
 
 ![example](assets/images/demo.gif?raw=true)
-
-Switch graph orientation with the toggle button at the top-right corner:
 
 ![Details-TD](assets/images/ui-details2.webp?raw=true)
 
@@ -189,11 +133,11 @@ docker run \
 -p 8080:8080 \
 -v $HOME/.config/dagu/dags:/home/dagu/.config/dagu/dags \
 -v $HOME/.local/share/dagu:/home/dagu/.local/share/dagu \
--e DAGU_TZ=Asia/Tokyo \
+-e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```
 
-Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and server. You can set it to your local timezone.
+Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and server. You can set it to your local timezone (e.g. `America/New_York`).
 
 See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
 
@@ -217,13 +161,15 @@ Example:
 
 ```yaml
 schedule: "* * * * *" # Run the DAG every minute
+params:
+  - NAME: "Dagu"
 steps:
-  - name: s1
-    command: echo Hello Dagu
-  - name: s2
-    command: echo done!
+  - name: Hello world
+    command: echo Hello $NAME
+  - name: Done
+    command: echo Done!
     depends:
-      - s1
+      - Hello world
 ```
 
 ### 4. Execute the DAG
@@ -264,7 +210,7 @@ dagu scheduler [--dags=<path to directory>]
 dagu version
 ```
 
-## **Remote Node Management support**
+## **Remote Node Management**
 
 Dagu supports managing multiple Dagu servers from a single UI through its remote node feature. This allows you to:
 
@@ -276,21 +222,15 @@ See [Remote Node Configuration](https://dagu.readthedocs.io/en/latest/config_rem
 
 ### Configuration
 
-Remote nodes can be configured by creating `admin.yaml` in `$HOME/.config/dagu/`:
+Create `admin.yaml` in `$HOME/.config/dagu/`:
 
 ```yaml
-# admin.yaml
 remoteNodes:
-  - name: "prod" # Name of the remote node
-    apiBaseUrl: "https://prod.example.com/api/v1" # Base URL of the remote node API
+  - name: "prod"
+    apiBaseUrl: "https://prod.example.com/api/v1"
   - name: "staging"
     apiBaseUrl: "https://staging.example.com/api/v1"
 ```
-
-## **Localized Documentation**
-
-- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
-- [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
 
 ## **Documentation**
 
@@ -329,18 +269,20 @@ remoteNodes:
 
 ## **Example DAG**
 
-### Minimum examples
+### Minimal DAG Definition
 
 A DAG with two steps:
 
 ```yaml
+params:
+  - NAME: "Dagu"
 steps:
-  - name: step 1
-    command: echo hello
-  - name: step 2
-    command: echo world
+  - name: Hello world
+    command: echo Hello $NAME
+  - name: Done
+    command: echo Done!
     depends:
-      - step 1
+      - Hello world
 ```
 
 Using a pipe:
@@ -362,7 +304,7 @@ steps:
 
 Note: The default shell is `$SHELL` or `sh`.
 
-### Complex example
+### Complex DAG Definition
 
 A typical data pipeline for DevOps/Data Engineering scenarios:
 
@@ -483,7 +425,3 @@ We welcome any and all contributions!
 ## **License**
 
 This project is licensed under the GNU GPLv3.
-
-## **Support and Community**
-
-Join our [Discord community](https://discord.gg/gpahPUjGRk) to ask questions, request features, and share your ideas.

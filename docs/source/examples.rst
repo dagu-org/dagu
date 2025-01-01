@@ -1,6 +1,6 @@
-.. _Example DAGs:
+.. _Examples:
 
-Example DAGs
+Examples
 ============
 
 .. contents::
