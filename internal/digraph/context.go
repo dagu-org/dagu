@@ -27,25 +27,10 @@ func (c Context) GetResult(name, requestID string) (*Status, error) {
 }
 
 func (c Context) AllEnvs() []string {
-	seen := make(map[string]struct{})
-	var envs []string
+	envs := os.Environ()
+	envs = append(envs, c.dag.Env...)
 	for k, v := range c.envs {
 		envs = append(envs, k+"="+v)
-		seen[k] = struct{}{}
-	}
-	for _, env := range c.dag.Env {
-		if _, ok := seen[env]; ok {
-			continue
-		}
-		envs = append(envs, env)
-		seen[env] = struct{}{}
-	}
-	for _, env := range os.Environ() {
-		if _, ok := seen[env]; ok {
-			continue
-		}
-		envs = append(envs, env)
-		seen[env] = struct{}{}
 	}
 	return envs
 }

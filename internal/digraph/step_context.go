@@ -31,26 +31,14 @@ func NewStepContext(ctx context.Context, step Step) StepContext {
 }
 
 func (c StepContext) AllEnvs() []string {
-	var envs []string
-	var seen = make(map[string]struct{})
-	c.outputVariables.Range(func(key, value any) bool {
+	envs := c.Context.AllEnvs()
+	for k, v := range c.envs {
+		envs = append(envs, k+"="+v)
+	}
+	c.outputVariables.Range(func(_, value any) bool {
 		envs = append(envs, value.(string))
-		seen[key.(string)] = struct{}{}
 		return true
 	})
-	for k, v := range c.envs {
-		if _, ok := seen[k]; ok {
-			continue
-		}
-		envs = append(envs, k+"="+v)
-		seen[k] = struct{}{}
-	}
-	for _, env := range c.Context.AllEnvs() {
-		if _, ok := seen[env]; ok {
-			continue
-		}
-		envs = append(envs, env)
-	}
 	return envs
 }
 

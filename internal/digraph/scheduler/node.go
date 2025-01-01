@@ -326,6 +326,7 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 
 	stepContext := digraph.GetStepContext(ctx)
 	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
+	stepContext = stepContext.WithEnv(digraph.EnvKeyDAGStepLogPath, n.data.State.Log)
 
 	return digraph.WithStepContext(ctx, stepContext)
 }
