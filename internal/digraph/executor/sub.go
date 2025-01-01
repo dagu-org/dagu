@@ -36,8 +36,9 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	dagCtx := digraph.GetContext(ctx)
-	config, err := digraph.EvalStringFields(dagCtx, struct {
+	stepContext := digraph.GetStepContext(ctx)
+
+	config, err := digraph.EvalStringFields(stepContext, struct {
 		Name   string
 		Params string
 	}{
@@ -48,7 +49,7 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := dagCtx.GetDAGByName(config.Name)
+	subDAG, err := stepContext.GetDAGByName(config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to find subworkflow %q: %w", config.Name, err,
@@ -73,16 +74,7 @@ func newSubWorkflow(
 		return nil, errWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir
-	cmd.Env = append(cmd.Env, dagCtx.AllEnvs()...)
-
-	// Get output variables from the step context and set them as environment
-	stepCtx := digraph.GetStepContext(ctx)
-	if stepCtx != nil && stepCtx.OutputVariables != nil {
-		stepCtx.OutputVariables.Range(func(_, value any) bool {
-			cmd.Env = append(cmd.Env, value.(string))
-			return true
-		})
-	}
+	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,

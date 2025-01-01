@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/mailer"
 )
 
 type Context struct {
@@ -36,15 +35,6 @@ func (c Context) AllEnvs() []string {
 	return envs
 }
 
-func (c Context) MailerConfig() (mailer.Config, error) {
-	return EvalStringFields(c, mailer.Config{
-		Host:     c.dag.SMTP.Host,
-		Port:     c.dag.SMTP.Port,
-		Username: c.dag.SMTP.Username,
-		Password: c.dag.SMTP.Password,
-	})
-}
-
 func (c Context) ApplyEnvs() {
 	for _, env := range c.envs {
 		if err := os.Setenv(env.Key, env.Value); err != nil {
@@ -60,10 +50,6 @@ func (c Context) WithEnv(key, value string) Context {
 
 func (c Context) EvalString(s string) (string, error) {
 	return cmdutil.SubstituteCommands(os.ExpandEnv(s))
-}
-
-func EvalStringFields[T any](dagContext Context, obj T) (T, error) {
-	return cmdutil.SubstituteStringFields(obj)
 }
 
 func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {

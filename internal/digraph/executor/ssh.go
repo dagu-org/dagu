@@ -103,8 +103,8 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		port = "22"
 	}
 
-	dagCtx := digraph.GetContext(ctx)
-	cfg, err := digraph.EvalStringFields(dagCtx, sshExecConfig{
+	stepContext := digraph.GetStepContext(ctx)
+	cfg, err := digraph.EvalStringFields(stepContext, sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
 		Key:      def.Key,

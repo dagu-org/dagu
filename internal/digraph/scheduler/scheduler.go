@@ -305,7 +305,7 @@ func (sc *Scheduler) teardownNode(node *Node) error {
 
 // setupContext builds the context for a step.
 func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	stepCtx := digraph.NewStepContext(ctx)
+	stepCtx := digraph.NewStepContext(ctx, node.data.Step)
 
 	// get output variables that are available to the next steps
 	curr := node.id
@@ -324,22 +324,15 @@ func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, no
 			continue
 		}
 
-		node.data.Step.OutputVariables.Range(func(key, value any) bool {
-			// skip if the variable is already defined
-			if _, ok := stepCtx.OutputVariables.Load(key); ok {
-				return true
-			}
-			stepCtx.OutputVariables.Store(key, value)
-			return true
-		})
+		stepCtx.LoadOutputVariables(node.data.Step.OutputVariables)
 	}
 
 	return digraph.WithStepContext(ctx, stepCtx)
 }
 
 // buildStepContextForHandler builds the context for a handler.
-func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph) context.Context {
-	stepCtx := &digraph.StepContext{OutputVariables: &digraph.SyncMap{}}
+func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	stepCtx := digraph.NewStepContext(ctx, node.data.Step)
 
 	// get all output variables
 	for _, node := range graph.Nodes() {
@@ -347,14 +340,7 @@ func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *Exec
 			continue
 		}
 
-		node.data.Step.OutputVariables.Range(func(key, value any) bool {
-			// skip if the variable is already defined
-			if _, ok := stepCtx.OutputVariables.Load(key); ok {
-				return true
-			}
-			stepCtx.OutputVariables.Store(key, value)
-			return true
-		})
+		stepCtx.LoadOutputVariables(node.data.Step.OutputVariables)
 	}
 
 	return digraph.WithStepContext(ctx, stepCtx)
@@ -493,22 +479,22 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 	node.SetStatus(NodeStatusRunning)
 
 	if !sc.dry {
-		err := node.Setup(sc.logDir, sc.requestID)
-		if err != nil {
+		if err := node.Setup(sc.logDir, sc.requestID); err != nil {
 			node.SetStatus(NodeStatusError)
 			return nil
 		}
+
 		defer func() {
 			_ = node.Teardown()
 		}()
-		ctx = sc.buildStepContextForHandler(ctx, graph)
-		err = node.Execute(ctx)
-		if err != nil {
+
+		ctx = sc.buildStepContextForHandler(ctx, graph, node)
+		if err := node.Execute(ctx); err != nil {
 			node.SetStatus(NodeStatusError)
 			return err
-		} else {
-			node.SetStatus(NodeStatusSuccess)
 		}
+
+		node.SetStatus(NodeStatusSuccess)
 	} else {
 		node.SetStatus(NodeStatusSuccess)
 	}
