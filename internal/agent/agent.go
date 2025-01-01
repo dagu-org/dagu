@@ -556,7 +556,7 @@ func (o *dbClient) GetStatus(ctx context.Context, name string, requestID string)
 		if node.Step.OutputVariables != nil {
 			node.Step.OutputVariables.Range(func(_, value any) bool {
 				// split the value by '=' to get the key and value
-				parts := strings.Split(value.(string), "=")
+				parts := strings.SplitN(value.(string), "=", 2)
 				if len(parts) == 2 {
 					outputVariables[parts[0]] = parts[1]
 				}

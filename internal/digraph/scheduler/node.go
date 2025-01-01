@@ -554,14 +554,14 @@ func (n *Node) setupRetryPolicy() error {
 	// Evaluate the the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if n.data.Step.RetryPolicy.LimitStr != "" {
-		v, err := cmdutil.SubstituteWithEnvExpandInt(n.data.Step.RetryPolicy.LimitStr)
+		v, err := cmdutil.EvalIntString(n.data.Step.RetryPolicy.LimitStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry limit %q: %w", n.data.Step.RetryPolicy.LimitStr, err)
 		}
 		retryPolicy.Limit = v
 	}
 	if n.data.Step.RetryPolicy.IntervalSecStr != "" {
-		v, err := cmdutil.SubstituteWithEnvExpandInt(n.data.Step.RetryPolicy.IntervalSecStr)
+		v, err := cmdutil.EvalIntString(n.data.Step.RetryPolicy.IntervalSecStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry interval %q: %w", n.data.Step.RetryPolicy.IntervalSecStr, err)
 		}

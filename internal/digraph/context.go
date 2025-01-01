@@ -78,6 +78,11 @@ func WithContext(ctx context.Context, dagContext Context) context.Context {
 	return context.WithValue(ctx, ctxKey{}, dagContext)
 }
 
+func IsContext(ctx context.Context) bool {
+	_, ok := ctx.Value(ctxKey{}).(Context)
+	return ok
+}
+
 type kvPairs []kvPair
 
 type kvPair struct {

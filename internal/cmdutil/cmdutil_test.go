@@ -240,7 +240,7 @@ func TestSubstituteStringFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SubstituteStringFields(tt.input)
+			got, err := EvalStringFields(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SubstituteStringFields() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -253,7 +253,7 @@ func TestSubstituteStringFields(t *testing.T) {
 }
 
 func TestSubstituteStringFields_AnonymousStruct(t *testing.T) {
-	obj, err := SubstituteStringFields(struct {
+	obj, err := EvalStringFields(struct {
 		Field string
 	}{
 		Field: "`echo hello`",
@@ -263,7 +263,7 @@ func TestSubstituteStringFields_AnonymousStruct(t *testing.T) {
 }
 
 func TestSubstituteStringFields_NonStruct(t *testing.T) {
-	_, err := SubstituteStringFields("not a struct")
+	_, err := EvalStringFields("not a struct")
 	if err == nil {
 		t.Error("SubstituteStringFields() should return error for non-struct input")
 	}
@@ -310,7 +310,7 @@ func TestSubstituteStringFields_NestedStructs(t *testing.T) {
 		},
 	}
 
-	got, err := SubstituteStringFields(input)
+	got, err := EvalStringFields(input)
 	if err != nil {
 		t.Fatalf("SubstituteStringFields() error = %v", err)
 	}
@@ -324,7 +324,7 @@ func TestSubstituteStringFields_EmptyStruct(t *testing.T) {
 	type Empty struct{}
 
 	input := Empty{}
-	got, err := SubstituteStringFields(input)
+	got, err := EvalStringFields(input)
 	if err != nil {
 		t.Fatalf("SubstituteStringFields() error = %v", err)
 	}

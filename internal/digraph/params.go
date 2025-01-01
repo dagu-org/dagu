@@ -174,7 +174,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 				}
 
 				if !ctx.opts.noEval {
-					parsed, err := cmdutil.SubstituteWithEnvExpand(valueStr)
+					parsed, err := cmdutil.EvalString(valueStr)
 					if err != nil {
 						return nil, fmt.Errorf("%w: %s", errInvalidParamValue, err)
 					}

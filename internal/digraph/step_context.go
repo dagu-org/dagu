@@ -5,7 +5,6 @@ package digraph
 
 import (
 	"context"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/mailer"
@@ -56,6 +55,10 @@ func (c StepContext) MailerConfig() (mailer.Config, error) {
 	})
 }
 
+func (c StepContext) EvalString(s string) (string, error) {
+	return cmdutil.EvalString(s, cmdutil.WithVariables(c.outputVariables.Variables()))
+}
+
 func WithStepContext(ctx context.Context, stepContext StepContext) context.Context {
 	return context.WithValue(ctx, stepCtxKey{}, stepContext)
 }
@@ -68,14 +71,14 @@ func GetStepContext(ctx context.Context) StepContext {
 	return contextValue
 }
 
+func IsStepContext(ctx context.Context) bool {
+	_, ok := ctx.Value(stepCtxKey{}).(StepContext)
+	return ok
+}
+
 type stepCtxKey struct{}
 
 func EvalStringFields[T any](stepContext StepContext, obj T) (T, error) {
-	vars := make(map[string]string)
-	stepContext.outputVariables.Range(func(_, value any) bool {
-		splits := strings.SplitN(value.(string), "=", 2)
-		vars[splits[0]] = splits[1]
-		return true
-	})
-	return cmdutil.SubstituteStringFields(obj, cmdutil.WithVariables(vars))
+	return cmdutil.EvalStringFields(obj,
+		cmdutil.WithVariables(stepContext.outputVariables.Variables()))
 }
