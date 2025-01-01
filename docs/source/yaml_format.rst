@@ -103,7 +103,9 @@ Use named parameters for better clarity:
 
 .. code-block:: yaml
 
-  params: FOO=1 BAR=`echo 2`
+  params:
+    - FOO: 1
+    - BAR: "`echo 2`"
   steps:
     - name: named params task
       command: python main.py ${FOO} ${BAR}
