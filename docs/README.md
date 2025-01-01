@@ -1,13 +1,11 @@
 # Dagu Documentation
 
-This is the documentation for the Dagu project.
+This is the documentation for Dagu.
 
 ## Prerequisites
 
-Make sure you have the following installed:
-
--   Python (version >= 3.11)
--   Rye
+- Python (version >= 3.11)
+- Rye
 
 ## Getting Started
 
@@ -44,13 +42,13 @@ Open your web browser and visit http://localhost:8000 to view the documentation.
 
 To build the documentation, use one of the following commands:
 
--   For English documentation:
+- For English documentation:
 
 ```sh
 rye run build
 ```
 
--   For Japanese documentation:
+- For Japanese documentation:
 
 ```sh
 rye run build-ja
@@ -94,10 +92,10 @@ See [Sphinx Internationalization](https://www.sphinx-doc.org/en/master/usage/adv
 
 The project dependencies are managed using Rye and specified in the `pyproject.toml` file. The main dependencies include:
 
--   Sphinx (version 5.3.0)
--   sphinx-rtd-theme (version 2.0.0)
--   sphinx-autobuild (version >= 2024.4.16)
+- Sphinx (version 5.3.0)
+- sphinx-rtd-theme (version 2.0.0)
+- sphinx-autobuild (version >= 2024.4.16)
 
 ## Contributing
 
-We welcome contributions to improve the documentation. If you find any issues or have suggestions for enhancements, please feel free to open an issue or submit a pull request.
+We welcome contributions to improve the documentation. Please feel free to open an issue or submit a pull request.
