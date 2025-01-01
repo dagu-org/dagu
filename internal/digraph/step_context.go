@@ -24,7 +24,9 @@ func NewStepContext(ctx context.Context, step Step) StepContext {
 
 		outputVariables: &SyncMap{},
 		step:            step,
-		envs:            make(map[string]string),
+		envs: map[string]string{
+			EnvKeyDAGStepName: step.Name,
+		},
 	}
 }
 

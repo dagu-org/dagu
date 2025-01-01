@@ -166,7 +166,7 @@ func TestSplitCommandWithParse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
-		require.Equal(t, "hello", args[0])
+		require.Equal(t, "$TEST_ARG", args[0]) // env var should not be expanded
 	})
 }
 

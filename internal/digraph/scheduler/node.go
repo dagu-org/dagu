@@ -320,6 +320,16 @@ func (n *Node) Cancel(ctx context.Context) {
 	}
 }
 
+func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	stepContext := digraph.GetStepContext(ctx)
+	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
+
+	return digraph.WithStepContext(ctx, stepContext)
+}
+
 func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -343,8 +353,6 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	n.data.State.Log = filePath
 	n.data.State.StartedAt = startedAt
 
-	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
-	stepContext = stepContext.WithEnv(digraph.EnvKeyDAGStepName, n.data.Step.Name)
 	stdout, err := stepContext.EvalString(n.data.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
@@ -378,26 +386,6 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	if err := n.setupScript(); err != nil {
 		return fmt.Errorf("failed to setup script: %w", err)
 	}
-	return nil
-}
-
-// Add this helper function
-func (n *Node) setStepSpecificEnvVar(key string, value string) error {
-	// Create step-specific environment variable name
-	stepEnvKey := fmt.Sprintf("STEP_%d_%s", n.id, key)
-
-	// Set the environment variable
-	if err := os.Setenv(stepEnvKey, value); err != nil {
-		return fmt.Errorf("failed to set step environment variable %q: %w", stepEnvKey, err)
-	}
-
-	// Replace in command string
-	n.data.Step.CmdWithArgs = strings.ReplaceAll(
-		n.data.Step.CmdWithArgs,
-		fmt.Sprintf("$%s", key),
-		value,
-	)
-
 	return nil
 }
 

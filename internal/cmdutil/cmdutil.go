@@ -107,8 +107,7 @@ func SplitCommandWithEval(cmd string) (string, []string, error) {
 			continue
 		}
 		for i, arg := range command {
-			// Expand environment variables in the command.
-			command[i] = os.ExpandEnv(arg)
+			command[i] = arg
 			// escape the command
 			command[i] = escapeReplacer.Replace(command[i])
 			// Substitute command in the command.

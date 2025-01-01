@@ -164,6 +164,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 					node.MarkError(err)
 				}
 
+				ctx = node.SetupContextBeforeExec(ctx)
+
 				defer func() {
 					_ = sc.teardownNode(node)
 				}()
