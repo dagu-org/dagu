@@ -107,8 +107,7 @@ func SplitCommandWithEval(cmd string) (string, []string, error) {
 			continue
 		}
 		for i, arg := range command {
-			// Expand environment variables in the command.
-			command[i] = os.ExpandEnv(arg)
+			command[i] = arg
 			// escape the command
 			command[i] = escapeReplacer.Replace(command[i])
 			// Substitute command in the command.
@@ -181,26 +180,6 @@ func SplitCommand(cmd string) (string, []string, error) {
 	return command[0], command[1:], nil
 }
 
-// SubstituteWithEnvExpand substitutes environment variables and commands in the input string
-func SubstituteWithEnvExpand(input string) (string, error) {
-	expanded := os.ExpandEnv(input)
-	return SubstituteCommands(expanded)
-}
-
-// SubstituteWithEnvExpandInt substitutes environment variables and commands in the input string
-func SubstituteWithEnvExpandInt(input string) (int, error) {
-	expanded := os.ExpandEnv(input)
-	expanded, err := SubstituteCommands(expanded)
-	if err != nil {
-		return 0, err
-	}
-	v, err := strconv.Atoi(expanded)
-	if err != nil {
-		return 0, fmt.Errorf("failed to convert %q to int: %w", expanded, err)
-	}
-	return v, nil
-}
-
 // tickerMatcher matches the command in the value string.
 // Example: "`date`"
 var tickerMatcher = regexp.MustCompile("`[^`]+`")
@@ -252,10 +231,67 @@ func GetShellCommand(configuredShell string) string {
 	return ""
 }
 
-// SubstituteStringFields processes all string fields in a struct by expanding environment
+type EvalOptions struct {
+	Variables []map[string]string
+}
+
+type EvalOption func(*EvalOptions)
+
+func WithVariables(vars map[string]string) EvalOption {
+	return func(opts *EvalOptions) {
+		opts.Variables = append(opts.Variables, vars)
+	}
+}
+
+// EvalString substitutes environment variables and commands in the input string
+func EvalString(input string, opts ...EvalOption) (string, error) {
+	options := &EvalOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	value := input
+	for _, vars := range options.Variables {
+		value = replaceVars(value, vars)
+	}
+	value = os.ExpandEnv(value)
+	value, err := SubstituteCommands(value)
+	if err != nil {
+		return "", fmt.Errorf("failed to substitute string in %q: %w", input, err)
+	}
+	return value, nil
+}
+
+// EvalIntString substitutes environment variables and commands in the input string
+func EvalIntString(input string, opts ...EvalOption) (int, error) {
+	options := &EvalOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	value := input
+	for _, vars := range options.Variables {
+		value = replaceVars(value, vars)
+	}
+	value = os.ExpandEnv(value)
+	value, err := SubstituteCommands(value)
+	if err != nil {
+		return 0, err
+	}
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert %q to int: %w", value, err)
+	}
+	return v, nil
+}
+
+// EvalStringFields processes all string fields in a struct by expanding environment
 // variables and substituting command outputs. It takes a struct value and returns a new
 // modified struct value.
-func SubstituteStringFields[T any](obj T) (T, error) {
+func EvalStringFields[T any](obj T, opts ...EvalOption) (T, error) {
+	options := &EvalOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	v := reflect.ValueOf(obj)
 	if v.Kind() != reflect.Struct {
 		return obj, fmt.Errorf("input must be a struct, got %T", obj)
@@ -264,14 +300,14 @@ func SubstituteStringFields[T any](obj T) (T, error) {
 	modified := reflect.New(v.Type()).Elem()
 	modified.Set(v)
 
-	if err := processStructFields(modified); err != nil {
+	if err := processStructFields(modified, options); err != nil {
 		return obj, fmt.Errorf("failed to process fields: %w", err)
 	}
 
 	return modified.Interface().(T), nil
 }
 
-func processStructFields(v reflect.Value) error {
+func processStructFields(v reflect.Value, opts *EvalOptions) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
@@ -283,6 +319,9 @@ func processStructFields(v reflect.Value) error {
 		switch field.Kind() {
 		case reflect.String:
 			value := field.String()
+			for _, vars := range opts.Variables {
+				value = replaceVars(value, vars)
+			}
 			value = os.ExpandEnv(value)
 			processed, err := SubstituteCommands(value)
 			if err != nil {
@@ -291,10 +330,28 @@ func processStructFields(v reflect.Value) error {
 			field.SetString(processed)
 
 		case reflect.Struct:
-			if err := processStructFields(field); err != nil {
+			if err := processStructFields(field, opts); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func replaceVars(template string, vars map[string]string) string {
+	re := regexp.MustCompile(`\$\{([^}]+)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)`)
+
+	return re.ReplaceAllStringFunc(template, func(match string) string {
+		var key string
+		if strings.HasPrefix(match, "${") {
+			key = match[2 : len(match)-1]
+		} else {
+			key = match[1:]
+		}
+
+		if val, ok := vars[key]; ok {
+			return val
+		}
+		return match
+	})
 }

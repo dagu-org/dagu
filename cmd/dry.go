@@ -10,7 +10,6 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +32,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+	setup := newSetup(cfg)
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
 	params, err := cmd.Flags().GetString("params")
@@ -41,6 +41,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := cmd.Context()
+
 	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], removeQuotes(params))
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -51,23 +52,23 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logSettings := logFileSettings{
-		Prefix:    dryPrefix,
-		LogDir:    cfg.Paths.LogDir,
-		DAGLogDir: dag.LogDir,
-		DAGName:   dag.Name,
-		RequestID: requestID,
-	}
-
-	logFile, err := openLogFile(logSettings)
+	logFile, err := setup.openLogFile(dryPrefix, dag, requestID)
 	if err != nil {
-		return fmt.Errorf("failed to create log file for DAG %s: %w", dag.Name, err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx = logger.WithLogger(ctx, buildLoggerWithFile(logFile, false))
-	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	ctx = setup.loggerContextWithFile(ctx, false, logFile)
+
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
 
 	agt := agent.New(
 		requestID,
@@ -75,7 +76,8 @@ func runDry(cmd *cobra.Command, args []string) error {
 		filepath.Dir(logFile.Name()),
 		logFile.Name(),
 		cli,
-		dataStore,
+		dagStore,
+		setup.historyStore(),
 		&agent.Options{Dry: true},
 	)
 

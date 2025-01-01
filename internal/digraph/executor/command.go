@@ -28,34 +28,18 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 		return nil, fmt.Errorf("directory %q does not exist", step.Dir)
 	}
 
-	dagContext, err := digraph.GetContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+	stepContext := digraph.GetStepContext(ctx)
 
 	cmd := createCommand(ctx, step)
+	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
 	cmd.Dir = step.Dir
-	cmd.Env = append(cmd.Env, os.Environ()...)
-	cmd.Env = append(cmd.Env, dagContext.DAG.Env...)
-	cmd.Env = append(cmd.Env, dagContext.AdditionalEnvs.All()...)
-
-	// Get output variables from the step context and set them as environment
-	stepCtx := digraph.GetStepContext(ctx)
-	if stepCtx != nil && stepCtx.OutputVariables != nil {
-		stepCtx.OutputVariables.Range(func(_, value any) bool {
-			cmd.Env = append(cmd.Env, value.(string))
-			return true
-		})
-	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 		Pgid:    0,
 	}
 
-	return &commandExecutor{
-		cmd: cmd,
-	}, nil
+	return &commandExecutor{cmd: cmd}, nil
 }
 
 func createCommand(ctx context.Context, step digraph.Step) *exec.Cmd {

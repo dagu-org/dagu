@@ -31,10 +31,6 @@ install-libs:
 build:
 	sphinx-build -b html -D language=ja_JP source/ build/html
 
-gettext-ja:
-	sphinx-build -b gettext source/ build/html
-	sphinx-intl update -p _build/gettext -l ja
-
 PYTHON_VER = 3.7.16
 
 venv:
@@ -43,3 +39,6 @@ venv:
 
 install-python:
 	@pyenv install $(PYTHON_VER)
+
+gen-pot-files:
+	sphinx-intl update -p build/gettext -l zh -l ja

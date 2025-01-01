@@ -40,8 +40,7 @@ var (
 type Config struct {
 	Location          string
 	LatestStatusToday bool
-	CacheSize         int
-	CacheTTL          time.Duration
+	FileCache         *filecache.Cache[*model.Status]
 }
 
 const (
@@ -52,41 +51,48 @@ const (
 	dateFormat        = "20060102"
 )
 
-// DefaultConfig returns default configuration
-func DefaultConfig() Config {
-	return Config{
-		CacheSize:         300,
-		CacheTTL:          3 * time.Hour,
-		LatestStatusToday: true,
-	}
-}
-
 var _ persistence.HistoryStore = (*JSONDB)(nil)
 
 // JSONDB manages DAGs status files in local storage.
 type JSONDB struct {
-	location string
-	config   Config
-	writer   *writer
-	cache    *filecache.Cache[*model.Status]
+	baseDir           string
+	latestStatusToday bool
+	fileCache         *filecache.Cache[*model.Status]
+	writer            *writer
 }
 
-// New creates a new JSONDB with default configuration.
-func New(location string, cfg Config) *JSONDB {
-	if cfg.CacheSize <= 0 {
-		cfg.CacheSize = DefaultConfig().CacheSize
-	}
-	if cfg.CacheTTL <= 0 {
-		cfg.CacheTTL = DefaultConfig().CacheTTL
-	}
+type Option func(*Options)
 
-	db := &JSONDB{
-		config:   cfg,
-		location: location,
-		cache:    filecache.New[*model.Status](cfg.CacheSize, cfg.CacheTTL),
+type Options struct {
+	FileCache         *filecache.Cache[*model.Status]
+	LatestStatusToday bool
+}
+
+func WithFileCache(cache *filecache.Cache[*model.Status]) Option {
+	return func(o *Options) {
+		o.FileCache = cache
 	}
-	db.cache.StartEviction()
-	return db
+}
+
+func WithLatestStatusToday(latestStatusToday bool) Option {
+	return func(o *Options) {
+		o.LatestStatusToday = latestStatusToday
+	}
+}
+
+// New creates a new JSONDB instance.
+func New(baseDir string, opts ...Option) *JSONDB {
+	options := &Options{
+		LatestStatusToday: true,
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+	return &JSONDB{
+		baseDir:           baseDir,
+		latestStatusToday: options.LatestStatusToday,
+		fileCache:         options.FileCache,
+	}
 }
 
 func (db *JSONDB) Update(ctx context.Context, key, requestID string, status model.Status) error {
@@ -99,11 +105,16 @@ func (db *JSONDB) Update(ctx context.Context, key, requestID string, status mode
 	if err := writer.open(); err != nil {
 		return err
 	}
-
 	defer func() {
-		db.cache.Invalidate(statusFile.File)
 		_ = writer.close()
 	}()
+
+	if db.fileCache != nil {
+		defer func() {
+			db.fileCache.Invalidate(statusFile.File)
+		}()
+	}
+
 	return writer.write(status)
 }
 
@@ -140,7 +151,9 @@ func (db *JSONDB) Close(ctx context.Context) error {
 		return err
 	}
 
-	db.cache.Invalidate(db.writer.target)
+	if db.fileCache != nil {
+		db.fileCache.Invalidate(db.writer.target)
+	}
 	return db.writer.close()
 }
 
@@ -149,9 +162,7 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 
 	files := db.getLatestMatches(db.globPattern(key), itemLimit)
 	for _, file := range files {
-		status, err := db.cache.LoadLatest(file, func() (*model.Status, error) {
-			return ParseStatusFile(file)
-		})
+		status, err := db.parseStatusFile(file)
 		if err != nil {
 			continue
 		}
@@ -165,14 +176,11 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 }
 
 func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*model.Status, error) {
-	file, err := db.latestToday(key, time.Now(), db.config.LatestStatusToday)
+	file, err := db.latestToday(key, time.Now(), db.latestStatusToday)
 	if err != nil {
 		return nil, err
 	}
-
-	return db.cache.LoadLatest(file, func() (*model.Status, error) {
-		return ParseStatusFile(file)
-	})
+	return db.parseStatusFile(file)
 }
 
 func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (*model.StatusFile, error) {
@@ -308,6 +316,15 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 	return nil
 }
 
+func (db *JSONDB) parseStatusFile(file string) (*model.Status, error) {
+	if db.fileCache != nil {
+		return db.fileCache.LoadLatest(file, func() (*model.Status, error) {
+			return ParseStatusFile(file)
+		})
+	}
+	return ParseStatusFile(file)
+}
+
 func (db *JSONDB) getDirectory(key string, prefix string) string {
 	if key != prefix {
 		// Add a hash postfix to the directory name to avoid conflicts.
@@ -315,10 +332,10 @@ func (db *JSONDB) getDirectory(key string, prefix string) string {
 		h := md5.New()
 		_, _ = h.Write([]byte(key))
 		v := hex.EncodeToString(h.Sum(nil))
-		return filepath.Join(db.location, fmt.Sprintf("%s-%s", prefix, v))
+		return filepath.Join(db.baseDir, fmt.Sprintf("%s-%s", prefix, v))
 	}
 
-	return filepath.Join(db.location, key)
+	return filepath.Join(db.baseDir, key)
 }
 
 func (db *JSONDB) generateFilePath(key string, timestamp timeInUTC, requestID string) (string, error) {

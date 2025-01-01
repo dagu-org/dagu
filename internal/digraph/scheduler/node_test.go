@@ -84,7 +84,7 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 }
 
 func (n nodeHelper) Execute(t *testing.T) {
-	err := n.Node.Setup(n.Config.Paths.LogDir, n.reqID)
+	err := n.Node.Setup(n.Context, n.Config.Paths.LogDir, n.reqID)
 	require.NoError(t, err, "failed to setup node")
 
 	err = n.Node.Execute(n.execContext())
@@ -114,7 +114,7 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 }
 
 func (n nodeHelper) execContext() context.Context {
-	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, nil, n.reqID, "logFile")
+	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, n.reqID, "logFile")
 }
 
 func TestNode(t *testing.T) {

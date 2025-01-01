@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,18 +45,17 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
+	setup := newSetup(cfg)
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx := setup.loggerContext(cmd.Context(), false)
 
-	logger.Info(ctx, "Server initialization",
-		"host", cfg.Host,
-		"port", cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	server, err := setup.server(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize server: %w", err)
+	}
 
-	server := frontend.New(cfg, cli)
 	if err := server.Serve(cmd.Context()); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}

@@ -4,11 +4,8 @@
 package digraph
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"os"
-
-	"github.com/dagu-org/dagu/internal/cmdutil"
 )
 
 // Condition contains a condition and the expected value.
@@ -22,33 +19,24 @@ type Condition struct {
 
 // eval evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
-func (c Condition) eval() (string, error) {
-	return cmdutil.SubstituteCommands(os.ExpandEnv(c.Condition))
-}
+func (c Condition) eval(ctx context.Context) (string, error) {
+	if IsStepContext(ctx) {
+		return GetStepContext(ctx).EvalString(c.Condition)
+	}
 
-var (
-	errConditionNotMet = errors.New("condition was not met")
-	errEvalCondition   = errors.New("failed to evaluate condition")
-)
+	return GetContext(ctx).EvalString(c.Condition)
+}
 
 // evalCondition evaluates a single condition and checks the result.
 // It returns an error if the condition was not met.
-func evalCondition(c Condition) error {
-	actual, err := c.eval()
+func evalCondition(ctx context.Context, c Condition) error {
+	actual, err := c.eval(ctx)
 	if err != nil {
-		return fmt.Errorf(
-			"%w. Condition=%s Error=%v", errEvalCondition, c.Condition, err,
-		)
+		return fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
 	}
 
 	if c.Expected != actual {
-		return fmt.Errorf(
-			"%w. Condition=%s Expected=%s Actual=%s",
-			errConditionNotMet,
-			c.Condition,
-			c.Expected,
-			actual,
-		)
+		return fmt.Errorf("error condition was not met: Condition=%s Expected=%s Actual=%s", c.Condition, c.Expected, actual)
 	}
 
 	return nil
@@ -56,9 +44,9 @@ func evalCondition(c Condition) error {
 
 // EvalConditions evaluates a list of conditions and checks the results.
 // It returns an error if any of the conditions were not met.
-func EvalConditions(cond []Condition) error {
+func EvalConditions(ctx context.Context, cond []Condition) error {
 	for _, c := range cond {
-		if err := evalCondition(c); err != nil {
+		if err := evalCondition(ctx, c); err != nil {
 			return err
 		}
 	}

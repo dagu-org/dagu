@@ -5,117 +5,82 @@ package digraph
 
 import (
 	"context"
-	"errors"
+	"os"
+
+	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
-// Special environment variables.
-const (
-	EnvKeyLogPath          = "DAG_EXECUTION_LOG_PATH"
-	EnvKeySchedulerLogPath = "DAG_SCHEDULER_LOG_PATH"
-	EnvKeyRequestID        = "DAG_REQUEST_ID"
-)
-
-// Finder finds a DAG by name.
-// This is used to find the DAG when a node references another DAG.
-type Finder interface {
-	Find(ctx context.Context, name string) (*DAG, error)
-}
-
-// ResultCollector gets a result of a DAG execution.
-// This is used for subworkflow executor to get the output from the subworkflow.
-type ResultCollector interface {
-	CollectResult(ctx context.Context, name string, requestID string) (*Result, error)
-}
-
-type Result struct {
-	Name    string            `json:"name,omitempty"`
-	Params  string            `json:"params,omitempty"`
-	Outputs map[string]string `json:"outputs,omitempty"`
-}
-
-// Context contains the current DAG and Finder.
 type Context struct {
-	DAG             *DAG
-	Finder          Finder
-	ResultCollector ResultCollector
-	AdditionalEnvs  Envs
+	ctx    context.Context
+	dag    *DAG
+	client DBClient
+	envs   map[string]string
 }
 
-// Envs is a list of environment variables.
-type Envs []Env
+func (c Context) GetDAGByName(name string) (*DAG, error) {
+	return c.client.GetDAG(c.ctx, name)
+}
 
-// All returns all the environment variables as a list of strings.
-func (e Envs) All() []string {
-	envs := make([]string, 0, len(e))
-	for _, env := range e {
-		envs = append(envs, env.String())
+func (c Context) GetResult(name, requestID string) (*Status, error) {
+	return c.client.GetStatus(c.ctx, name, requestID)
+}
+
+func (c Context) AllEnvs() []string {
+	envs := os.Environ()
+	envs = append(envs, c.dag.Env...)
+	for k, v := range c.envs {
+		envs = append(envs, k+"="+v)
 	}
 	return envs
 }
 
-// Env is an environment variable.
-type Env struct {
-	Key   string
-	Value string
+func (c Context) ApplyEnvs() {
+	for k, v := range c.envs {
+		if err := os.Setenv(k, v); err != nil {
+			logger.Error(c.ctx, "failed to set environment variable %q: %v", k, err)
+		}
+	}
 }
 
-// String returns the environment variable as a string.
-func (e Env) String() string {
-	return e.Key + "=" + e.Value
+func (c Context) WithEnv(key, value string) Context {
+	c.envs[key] = value
+	return c
 }
 
-// ctxKey is used as the key for storing the DAG in the context.
-type ctxKey struct{}
+func (c Context) EvalString(s string) (string, error) {
+	return cmdutil.EvalString(s, cmdutil.WithVariables(c.envs))
+}
 
-// NewContext creates a new context with the DAG and Finder.
-func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ResultCollector, requestID, logFile string) context.Context {
+func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
-		DAG:             dag,
-		Finder:          finder,
-		ResultCollector: resultCollector,
-		AdditionalEnvs: []Env{
-			{Key: EnvKeySchedulerLogPath, Value: logFile},
-			{Key: EnvKeyRequestID, Value: requestID},
+		ctx:    ctx,
+		dag:    dag,
+		client: client,
+		envs: map[string]string{
+			EnvKeySchedulerLogPath: logFile,
+			EnvKeyRequestID:        requestID,
+			EnvKeyDAGName:          dag.Name,
 		},
 	})
 }
 
-func (c Context) WithAdditionalEnv(env Env) Context {
-	c.AdditionalEnvs = append([]Env{env}, c.AdditionalEnvs...)
-	return c
-}
-
-var (
-	errFailedCtxAssertion = errors.New("failed to assert DAG context")
-)
-
-// GetContext returns the DAG Context from the context.
-// It returns an error if the context does not contain a DAG Context.
-func GetContext(ctx context.Context) (Context, error) {
-	dagCtx, ok := ctx.Value(ctxKey{}).(Context)
+func GetContext(ctx context.Context) Context {
+	contextValue, ok := ctx.Value(ctxKey{}).(Context)
 	if !ok {
-		return Context{}, errFailedCtxAssertion
+		logger.Error(ctx, "failed to get the DAG context")
+		return Context{}
 	}
-	return dagCtx, nil
+	return contextValue
 }
 
-func WithDagContext(ctx context.Context, dagContext Context) context.Context {
+func WithContext(ctx context.Context, dagContext Context) context.Context {
 	return context.WithValue(ctx, ctxKey{}, dagContext)
 }
 
-// StepContext contains the information needed to execute a step.
-type StepContext struct{ OutputVariables *SyncMap }
-
-type stepContextKey struct{}
-
-func WithStepContext(ctx context.Context, stepContext *StepContext) context.Context {
-	return context.WithValue(ctx, stepContextKey{}, stepContext)
+func IsContext(ctx context.Context) bool {
+	_, ok := ctx.Value(ctxKey{}).(Context)
+	return ok
 }
 
-// GetStepContext returns the StepContext from the context.
-func GetStepContext(ctx context.Context) *StepContext {
-	if v := ctx.Value(stepContextKey{}); v != nil {
-		return v.(*StepContext)
-	}
-	return nil
-}
+type ctxKey struct{}

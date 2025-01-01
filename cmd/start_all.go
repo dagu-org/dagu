@@ -7,9 +7,7 @@ import (
 	"fmt"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/frontend"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,34 +41,40 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	setup := newSetup(cfg)
+
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		cfg.Paths.DAGsDir = dagsDir
 	}
 
-	ctx := cmd.Context()
-	ctx = logger.WithLogger(ctx, buildLogger(cfg, false))
+	ctx := setup.loggerContext(cmd.Context(), false)
 
-	dataStore := newDataStores(cfg)
-	cli := newClient(cfg, dataStore)
+	scheduler, err := setup.scheduler()
+	if err != nil {
+		return fmt.Errorf("failed to initialize scheduler: %w", err)
+	}
 
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		logger.Info(ctx, "Scheduler initialization", "dags", cfg.Paths.DAGsDir)
 
-		sc := scheduler.New(cfg, cli)
-		if err := sc.Start(ctx); err != nil {
+		if err := scheduler.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
 			return
 		}
 		errChan <- nil
 	}()
 
+	server, err := setup.server(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize server: %w", err)
+	}
+
 	// Start server in main thread
 	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	server := frontend.New(cfg, cli)
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := server.Serve(ctx); err != nil {

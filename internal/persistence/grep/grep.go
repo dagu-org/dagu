@@ -43,12 +43,15 @@ type Match struct {
 	StartLine  int
 }
 
+var DefaultOptions = Options{
+	IsRegexp: true,
+	Before:   2,
+	After:    2,
+}
+
 // Grep reads data and returns lines that match the given pattern.
 // If opts is nil, default options will be used.
-func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
-	if opts == nil {
-		opts = new(Options)
-	}
+func Grep(dat []byte, pattern string, opts Options) ([]*Match, error) {
 	if pattern == "" {
 		return nil, ErrEmptyPattern
 	}
@@ -67,7 +70,7 @@ func Grep(dat []byte, pattern string, opts *Options) ([]*Match, error) {
 }
 
 // getMatcher returns a matcher based on the pattern and options.
-func getMatcher(pattern string, opts *Options) (Matcher, error) {
+func getMatcher(pattern string, opts Options) (Matcher, error) {
 	if opts.Matcher != nil {
 		return opts.Matcher, nil
 	}
@@ -97,7 +100,7 @@ func scanLines(dat []byte, matcher Matcher) ([]string, []int, error) {
 }
 
 // buildMatches constructs Match objects from matched line indices.
-func buildMatches(lines []string, matches []int, opts *Options) []*Match {
+func buildMatches(lines []string, matches []int, opts Options) []*Match {
 	var ret []*Match
 
 	for _, m := range matches {
@@ -114,7 +117,7 @@ func buildMatches(lines []string, matches []int, opts *Options) []*Match {
 	return ret
 }
 
-func defaultMatcher(pattern string, opts *Options) (Matcher, error) {
+func defaultMatcher(pattern string, opts Options) (Matcher, error) {
 	if opts.IsRegexp {
 		reg, err := regexp.Compile(pattern)
 		if err != nil {

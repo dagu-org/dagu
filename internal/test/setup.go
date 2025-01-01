@@ -22,7 +22,9 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	dsclient "github.com/dagu-org/dagu/internal/persistence/client"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,20 +68,20 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
 
-	dataStores := dsclient.NewDataStores(
-		cfg.Paths.DAGsDir,
-		cfg.Paths.DataDir,
-		cfg.Paths.SuspendFlagsDir,
-		dsclient.DataStoreOptions{
-			LatestStatusToday: cfg.LatestStatusToday,
-		},
+	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
+	historyStore := jsondb.New(cfg.Paths.DataDir)
+	flagStore := local.NewFlagStore(
+		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
 	)
 
+	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.WorkDir)
+
 	helper := Helper{
-		Context:    createDefaultContext(),
-		Config:     cfg,
-		Client:     client.New(dataStores, cfg.Paths.Executable, cfg.WorkDir),
-		DataStores: dataStores,
+		Context:      createDefaultContext(),
+		Config:       cfg,
+		Client:       client,
+		DAGStore:     dagStore,
+		HistoryStore: historyStore,
 
 		tmpDir: tmpDir,
 	}
@@ -98,7 +100,8 @@ type Helper struct {
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	Client        client.Client
-	DataStores    persistence.DataStores
+	HistoryStore  persistence.HistoryStore
+	DAGStore      persistence.DAGStore
 
 	tmpDir string
 }
@@ -191,7 +194,8 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 		logDir,
 		logFile,
 		d.Client,
-		d.DataStores,
+		d.DAGStore,
+		d.HistoryStore,
 		helper.opts,
 	)
 

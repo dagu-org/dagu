@@ -14,26 +14,28 @@ Core Concepts
 ------------
 Before diving into specific features, let's understand the basic structure of a DAG file and how steps are defined.
 
-Minimal Example
-~~~~~~~~~~~~~~
-A DAG with two steps:
+Hello World
+~~~~~~~~~~~~
 
 .. code-block:: yaml
 
+  schedule: "* * * * *" # Run the DAG every minute
+  params:
+    - NAME: "Dagu"
   steps:
-    - name: step 1
-      command: echo hello
-    - name: step 2
-      command: echo world
+    - name: Hello world
+      command: echo Hello $NAME
+    - name: Done
+      command: echo Done!
       depends:
-        - step 1
+        - Hello world
 
-Using a pipe:
+Using pipes (``|``) in commands:
 
 .. code-block:: yaml
 
   steps:
-    - name: step 1
+    - name: Hello world with pipe
       command: echo hello world | xargs echo
 
 Specifying a shell:
@@ -41,9 +43,20 @@ Specifying a shell:
 .. code-block:: yaml
 
   steps:
-    - name: step 1
+    - name: Hello world with shell
       command: echo hello world | xargs echo
       shell: bash
+
+Running a script:
+
+.. code-block:: yaml
+
+  steps:
+    - name: Hello world with script
+      command: bash
+      script: |
+        echo hello world
+        echo goodbye world
 
 Schema Definition
 ~~~~~~~~~~~~~~~~
@@ -103,7 +116,9 @@ Use named parameters for better clarity:
 
 .. code-block:: yaml
 
-  params: FOO=1 BAR=`echo 2`
+  params:
+    - FOO: 1
+    - BAR: "`echo 2`"
   steps:
     - name: named params task
       command: python main.py ${FOO} ${BAR}
@@ -259,16 +274,45 @@ Automatically retry failed steps:
 Advanced Features
 ---------------
 
-Running Sub-DAGs
-~~~~~~~~~~~~~~
-Organize complex workflows using sub-DAGs:
+Running sub workflows
+~~~~~~~~~~~~~~~~~~~~~~~~
+Organize complex workflows using sub workflow:
 
 .. code-block:: yaml
 
   steps:
     - name: sub workflow
-      run: sub_dag.yaml
+      run: sub_workflow
       params: "FOO=BAR"
+
+The result of the sub workflow will be available from the standard output of the sub workflow in JSON format.
+
+Example:
+
+.. code-block:: json
+
+  {
+    "name": "sub_workflow"
+    "params": "FOO=BAR",
+    "outputs": {
+      "RESULT": "ok",
+    }
+  }
+
+You can access the output of the sub workflow using the `output` field:
+
+.. code-block:: yaml
+
+  steps:
+    - name: sub workflow
+      run: sub_workflow
+      params: "FOO=BAR"
+      output: SUB_RESULT
+
+    - name: use sub workflow output
+      command: echo $SUB_RESULT
+      depends:
+        - sub workflow
 
 Command Substitution
 ~~~~~~~~~~~~~~~~~
@@ -426,8 +470,8 @@ Configuration options available for individual steps:
 - ``repeatPolicy``: Repeat configuration
 - ``preconditions``: Step conditions
 - ``depends``: Dependencies
-- ``run``: Sub-DAG reference
-- ``params``: Sub-DAG parameters
+- ``run``: Sub workflow name
+- ``params``: Sub workflow parameters
 
 Example step configuration:
 

@@ -154,18 +154,6 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Add the log path to the environment
-	dagCtx = dagCtx.WithAdditionalEnv(digraph.Env{
-		Key:   digraph.EnvKeyLogPath,
-		Value: n.data.State.Log,
-	})
-
-	ctx = digraph.WithDagContext(ctx, dagCtx)
 	cmd, err := n.SetupExec(ctx)
 	if err != nil {
 		return err
@@ -332,9 +320,22 @@ func (n *Node) Cancel(ctx context.Context) {
 	}
 }
 
-func (n *Node) Setup(logDir string, requestID string) error {
+func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	stepContext := digraph.GetStepContext(ctx)
+	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
+	stepContext = stepContext.WithEnv(digraph.EnvKeyDAGStepLogPath, n.data.State.Log)
+
+	return digraph.WithStepContext(ctx, stepContext)
+}
+
+func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+
+	stepContext := digraph.GetStepContext(ctx)
 
 	// Set the log file path
 	startedAt := time.Now()
@@ -353,27 +354,23 @@ func (n *Node) Setup(logDir string, requestID string) error {
 	n.data.State.Log = filePath
 	n.data.State.StartedAt = startedAt
 
-	// Replace the special environment variables in the command
-	// Why this is necessary:
-	// 1. We need to expand the environment variables when setup the node.
-	// 2. The environment variables need to be set in the current process.
-	// 3. But since the values of the log path are different for each node,
-	//    we need to replace the name differently for each node.
-	envKeyLogPath := fmt.Sprintf("STEP_%d_DAG_EXECUTION_LOG_PATH", n.id)
-	if err := os.Setenv(envKeyLogPath, n.data.State.Log); err != nil {
-		return fmt.Errorf("failed to set environment variable %q: %w", envKeyLogPath, err)
+	stdout, err := stepContext.EvalString(n.data.Step.Stdout)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
+	n.data.Step.Stdout = stdout
 
-	// Expand environment variables in the step
-	n.data.Step.CmdWithArgs = strings.ReplaceAll(
-		n.data.Step.CmdWithArgs,
-		digraph.EnvKeyLogPath,
-		envKeyLogPath,
-	)
+	stderr, err := stepContext.EvalString(n.data.Step.Stderr)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate stderr field: %w", err)
+	}
+	n.data.Step.Stderr = stderr
 
-	n.data.Step.Stdout = os.ExpandEnv(n.data.Step.Stdout)
-	n.data.Step.Stderr = os.ExpandEnv(n.data.Step.Stderr)
-	n.data.Step.Dir = os.ExpandEnv(n.data.Step.Dir)
+	dir, err := stepContext.EvalString(n.data.Step.Dir)
+	if err != nil {
+		return fmt.Errorf("failed to evaluate dir field: %w", err)
+	}
+	n.data.Step.Dir = dir
 
 	if err := n.setupLog(); err != nil {
 		return fmt.Errorf("failed to setup log: %w", err)
@@ -551,14 +548,14 @@ func (n *Node) setupRetryPolicy() error {
 	// Evaluate the the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if n.data.Step.RetryPolicy.LimitStr != "" {
-		v, err := cmdutil.SubstituteWithEnvExpandInt(n.data.Step.RetryPolicy.LimitStr)
+		v, err := cmdutil.EvalIntString(n.data.Step.RetryPolicy.LimitStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry limit %q: %w", n.data.Step.RetryPolicy.LimitStr, err)
 		}
 		retryPolicy.Limit = v
 	}
 	if n.data.Step.RetryPolicy.IntervalSecStr != "" {
-		v, err := cmdutil.SubstituteWithEnvExpandInt(n.data.Step.RetryPolicy.IntervalSecStr)
+		v, err := cmdutil.EvalIntString(n.data.Step.RetryPolicy.IntervalSecStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry interval %q: %w", n.data.Step.RetryPolicy.IntervalSecStr, err)
 		}

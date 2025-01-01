@@ -19,7 +19,7 @@ func TestGrep(t *testing.T) {
 		Name    string
 		File    string
 		Pattern string
-		Opts    *Options
+		Opts    Options
 		Want    []*Match
 		IsErr   bool
 	}{
@@ -38,7 +38,7 @@ func TestGrep(t *testing.T) {
 			Name:    "regexp",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "^b.",
-			Opts: &Options{
+			Opts: Options{
 				IsRegexp: true,
 			},
 			Want: []*Match{
@@ -52,7 +52,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "b",
-			Opts: &Options{
+			Opts: Options{
 				Before: 1,
 			},
 			Want: []*Match{
@@ -66,7 +66,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before+after",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "cc",
-			Opts: &Options{
+			Opts: Options{
 				Before: 2,
 				After:  2,
 			},
@@ -81,7 +81,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before+after,firstline",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "aa",
-			Opts: &Options{
+			Opts: Options{
 				Before: 1,
 				After:  1,
 			},
@@ -96,7 +96,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before+after,lastline",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "ee",
-			Opts: &Options{
+			Opts: Options{
 				Before: 1,
 				After:  1,
 			},
@@ -129,7 +129,7 @@ func TestGrep(t *testing.T) {
 			Name:    "invalid regexp",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "(aa",
-			Opts: &Options{
+			Opts: Options{
 				IsRegexp: true,
 			},
 			IsErr: true,
