@@ -71,8 +71,10 @@ linters-settings:
     values:
       const:
         AUTHOR: Yota Hamada
+      regexp:
+        YEAR: 20\d\d
     template: |-
-      Copyright (C) 20[0-9][0-9] {{ AUTHOR }}
+      Copyright (C) {{YEAR}} {{ AUTHOR }}
       SPDX-License-Identifier: GPL-3.0-or-later
 
 run:
