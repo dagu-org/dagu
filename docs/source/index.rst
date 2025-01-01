@@ -37,9 +37,13 @@ Quick Start
 
 :ref:`Examples`
    Examples of DAGs.
+   Writing DAGs.
 
 :ref:`Configuration Options`
    Configuration options.
+
+:ref:`schema-reference`
+   Schema reference.
 
 .. toctree::
    :caption: Installation
@@ -65,6 +69,7 @@ Quick Start
    base_config
    examples
    special_env
+   schema
 
 .. toctree::
    :caption: Configuration
