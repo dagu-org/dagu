@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,7 +66,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Get parameters from the new syntax
 	var params string
 	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
-		params = strings.Join(args[1:], " ")
+		params = strings.Join(args[argsLenAtDash:], " ")
+		log.Print(args[argsLenAtDash:])
+		log.Print(params)
 		args = args[:1]
 	} else {
 		// Get parameters from the deprecated flag
