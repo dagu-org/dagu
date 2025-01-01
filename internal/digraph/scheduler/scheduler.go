@@ -303,9 +303,9 @@ func (sc *Scheduler) teardownNode(node *Node) error {
 	return nil
 }
 
-// buildStepContext builds the context for a step.
-func (sc *Scheduler) buildStepContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	stepCtx := &digraph.StepContext{OutputVariables: &digraph.SyncMap{}}
+// setupContext builds the context for a step.
+func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	stepCtx := digraph.NewStepContext(ctx)
 
 	// get output variables that are available to the next steps
 	curr := node.id
@@ -361,7 +361,7 @@ func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *Exec
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, graph *ExecutionGraph, node *Node) error {
-	ctx = sc.buildStepContext(ctx, graph, node)
+	ctx = sc.setupContext(ctx, graph, node)
 
 	if !sc.dry {
 		if err := node.Execute(ctx); err != nil {

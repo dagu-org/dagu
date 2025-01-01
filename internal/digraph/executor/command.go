@@ -48,9 +48,7 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 		Pgid:    0,
 	}
 
-	return &commandExecutor{
-		cmd: cmd,
-	}, nil
+	return &commandExecutor{cmd: cmd}, nil
 }
 
 func createCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
