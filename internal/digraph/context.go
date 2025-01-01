@@ -5,27 +5,29 @@ package digraph
 
 import (
 	"context"
+	"os"
 
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
 type Context struct {
+	Context         context.Context
 	DAG             *DAG
 	Finder          Finder
 	ResultCollector ExecutionResultCollector
-	AdditionalEnvs  kvPairs
+	envs            kvPairs
 }
 
-type kvPairs []kvPair
-
-// ListAllEnvs returns all the environment variables as a list of strings.
-func (e kvPairs) ListAllEnvs() []string {
-	envs := make([]string, 0, len(e))
-	for _, env := range e {
+func (c Context) ListEnvs() []string {
+	envs := append([]string{}, os.Environ()...)
+	envs = append(envs, c.DAG.Env...)
+	for _, env := range c.envs {
 		envs = append(envs, env.String())
 	}
 	return envs
 }
+
+type kvPairs []kvPair
 
 type kvPair struct {
 	Key   string
@@ -40,10 +42,11 @@ type ctxKey struct{}
 
 func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ExecutionResultCollector, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
+		Context:         ctx,
 		DAG:             dag,
 		Finder:          finder,
 		ResultCollector: resultCollector,
-		AdditionalEnvs: []kvPair{
+		envs: []kvPair{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
 			{Key: EnvKeyRequestID, Value: requestID},
 			{Key: EnvKeyDAGName, Value: dag.Name},
@@ -51,8 +54,16 @@ func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector Ex
 	})
 }
 
+func (c Context) ApplyEnvs() {
+	for _, env := range c.envs {
+		if err := os.Setenv(env.Key, env.Value); err != nil {
+			logger.Error(c.Context, "failed to set environment variable %q: %v", env.Key, err)
+		}
+	}
+}
+
 func (c Context) WithEnv(key, value string) Context {
-	c.AdditionalEnvs = append([]kvPair{{Key: key, Value: value}}, c.AdditionalEnvs...)
+	c.envs = append([]kvPair{{Key: key, Value: value}}, c.envs...)
 	return c
 }
 
