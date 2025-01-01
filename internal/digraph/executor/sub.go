@@ -112,7 +112,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 
 	// get results from the subworkflow
 	dagCtx := digraph.GetContext(ctx)
-	result, err := dagCtx.ResultCollector.GatherExecutionResult(ctx, e.subDAG, e.requestID)
+	result, err := dagCtx.GetResult(e.subDAG, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}

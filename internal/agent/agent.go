@@ -533,7 +533,7 @@ func newOutputCollector(store persistence.HistoryStore) *resultCollector {
 	return &resultCollector{historyStore: store}
 }
 
-func (o *resultCollector) GatherExecutionResult(ctx context.Context, name string, requestID string) (*digraph.ExecutionResult, error) {
+func (o *resultCollector) GetResult(ctx context.Context, name string, requestID string) (*digraph.ExecutionResult, error) {
 	status, err := o.historyStore.FindByRequestID(ctx, name, requestID)
 	if err != nil {
 		return nil, err

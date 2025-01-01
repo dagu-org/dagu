@@ -14,8 +14,13 @@ type Context struct {
 	Context         context.Context
 	DAG             *DAG
 	Finder          Finder
-	ResultCollector ExecutionResultCollector
-	envs            kvPairs
+	resultCollector ExecutionResultCollector
+
+	envs kvPairs
+}
+
+func (c Context) GetResult(name, requestID string) (*ExecutionResult, error) {
+	return c.resultCollector.GetResult(c.Context, name, requestID)
 }
 
 func (c Context) ListEnvs() []string {
@@ -42,10 +47,11 @@ type ctxKey struct{}
 
 func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ExecutionResultCollector, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
-		Context:         ctx,
-		DAG:             dag,
-		Finder:          finder,
-		ResultCollector: resultCollector,
+		Context: ctx,
+		DAG:     dag,
+		Finder:  finder,
+
+		resultCollector: resultCollector,
 		envs: []kvPair{
 			{Key: EnvKeySchedulerLogPath, Value: logFile},
 			{Key: EnvKeyRequestID, Value: requestID},

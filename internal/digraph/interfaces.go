@@ -12,7 +12,7 @@ type Finder interface {
 
 // ExecutionResultCollector gets a result of a DAG execution.
 type ExecutionResultCollector interface {
-	GatherExecutionResult(ctx context.Context, name string, requestID string) (*ExecutionResult, error)
+	GetResult(ctx context.Context, name string, requestID string) (*ExecutionResult, error)
 }
 
 // ExecutionResult is the result of a DAG execution.
