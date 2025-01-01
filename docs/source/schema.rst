@@ -237,24 +237,28 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
 - **continueOn** (dictionary, optional):
 
   Controls how Dagu handles cases where the step is skipped or fails.  
+
   - **failure**: If true, continue the DAG even if this step fails.  
   - **skipped**: If true, continue the DAG even if preconditions cause this step to skip.
 
 - **retryPolicy** (dictionary, optional):
 
   Defines automatic retries for this step when it fails.  
+
   - **limit** (integer): How many times to retry.  
   - **intervalSec** (integer): How many seconds to wait between retries.
 
 - **repeatPolicy** (dictionary, optional):
 
   Allows repeating a step multiple times in a single run.  
+
   - **repeat** (boolean): Whether to repeat.  
   - **intervalSec** (integer): Interval in seconds between repeats.
 
 - **preconditions** (list of condition blocks, optional):
 
   Conditions that must be met for this step to run. Each condition block has:
+
   - **condition** (string): A command or expression to evaluate.
   - **expected** (string): The expected output. If the output matches, the step runs; otherwise, it is skipped.
 
