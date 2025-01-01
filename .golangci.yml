@@ -72,7 +72,7 @@ linters-settings:
       const:
         AUTHOR: Yota Hamada
     template: |-
-      Copyright (C) {{ YEAR }} {{ AUTHOR }}
+      Copyright (C) 20[0-9][0-9] {{ AUTHOR }}
       SPDX-License-Identifier: GPL-3.0-or-later
 
 run:
