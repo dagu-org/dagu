@@ -160,12 +160,9 @@ func (n *Node) Execute(ctx context.Context) error {
 	}
 
 	// Add the log path to the environment
-	dagCtx = dagCtx.WithAdditionalEnv(digraph.Env{
-		Key:   digraph.EnvKeyLogPath,
-		Value: n.data.State.Log,
-	})
+	dagCtx = dagCtx.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
 
-	ctx = digraph.WithDagContext(ctx, dagCtx)
+	ctx = digraph.WithContext(ctx, dagCtx)
 	cmd, err := n.SetupExec(ctx)
 	if err != nil {
 		return err
