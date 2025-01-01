@@ -15,6 +15,7 @@ type StepContext struct {
 
 	outputVariables *SyncMap
 	step            Step
+	envs            kvPairs
 }
 
 func NewStepContext(ctx context.Context, step Step) StepContext {
@@ -26,22 +27,26 @@ func NewStepContext(ctx context.Context, step Step) StepContext {
 	}
 }
 
-func (s StepContext) AllEnvs() []string {
-	envs := s.Context.AllEnvs()
-	s.outputVariables.Range(func(_, value any) bool {
+func (c StepContext) AllEnvs() []string {
+	var envs []string
+	c.outputVariables.Range(func(_, value any) bool {
 		envs = append(envs, value.(string))
 		return true
 	})
+	for _, env := range c.envs {
+		envs = append(envs, env.String())
+	}
+	envs = append(envs, c.Context.AllEnvs()...)
 	return envs
 }
 
-func (s StepContext) LoadOutputVariables(vars *SyncMap) {
+func (c StepContext) LoadOutputVariables(vars *SyncMap) {
 	vars.Range(func(key, value any) bool {
 		// Skip if the key already exists
-		if _, ok := s.outputVariables.Load(key); ok {
+		if _, ok := c.outputVariables.Load(key); ok {
 			return true
 		}
-		s.outputVariables.Store(key, value)
+		c.outputVariables.Store(key, value)
 		return true
 	})
 }
@@ -57,6 +62,11 @@ func (c StepContext) MailerConfig() (mailer.Config, error) {
 
 func (c StepContext) EvalString(s string) (string, error) {
 	return cmdutil.EvalString(s, cmdutil.WithVariables(c.outputVariables.Variables()))
+}
+
+func (c StepContext) WithEnv(key, value string) StepContext {
+	c.envs = append([]kvPair{{Key: key, Value: value}}, c.envs...)
+	return c
 }
 
 func WithStepContext(ctx context.Context, stepContext StepContext) context.Context {

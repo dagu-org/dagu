@@ -154,12 +154,12 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
-	dagCtx := digraph.GetContext(ctx)
+	stepContext := digraph.GetStepContext(ctx)
 
 	// Add the log path to the environment
-	dagCtx = dagCtx.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
+	stepContext = stepContext.WithEnv(digraph.EnvKeyLogPath, n.data.State.Log)
 
-	ctx = digraph.WithContext(ctx, dagCtx)
+	ctx = digraph.WithStepContext(ctx, stepContext)
 	cmd, err := n.SetupExec(ctx)
 	if err != nil {
 		return err
