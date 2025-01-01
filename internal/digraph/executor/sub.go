@@ -13,7 +13,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/google/uuid"
@@ -38,8 +37,7 @@ func newSubWorkflow(
 	}
 
 	dagCtx := digraph.GetContext(ctx)
-
-	config, err := cmdutil.SubstituteStringFields(struct {
+	config, err := digraph.EvalStringFields(dagCtx, struct {
 		Name   string
 		Params string
 	}{

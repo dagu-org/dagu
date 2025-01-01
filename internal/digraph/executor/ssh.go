@@ -16,7 +16,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
@@ -74,7 +73,7 @@ func expandEnvHook(f reflect.Type, t reflect.Type, data any) (any, error) {
 	return os.ExpandEnv(data.(string)), nil
 }
 
-func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
+func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	def := new(sshExecConfigDefinition)
 	md, err := mapstructure.NewDecoder(
 		&mapstructure.DecoderConfig{
@@ -104,7 +103,8 @@ func newSSHExec(_ context.Context, step digraph.Step) (Executor, error) {
 		port = "22"
 	}
 
-	cfg, err := cmdutil.SubstituteStringFields(sshExecConfig{
+	dagCtx := digraph.GetContext(ctx)
+	cfg, err := digraph.EvalStringFields(dagCtx, sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
 		Key:      def.Key,
