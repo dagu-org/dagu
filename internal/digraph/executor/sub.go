@@ -119,7 +119,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to get dag context: %w", err)
 	}
 
-	result, err := dagCtx.ResultCollector.CollectResult(ctx, e.subDAG, e.requestID)
+	result, err := dagCtx.ResultCollector.GatherExecutionResult(ctx, e.subDAG, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}

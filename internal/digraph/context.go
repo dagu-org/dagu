@@ -8,38 +8,11 @@ import (
 	"errors"
 )
 
-// Special environment variables.
-const (
-	EnvKeyLogPath          = "DAG_EXECUTION_LOG_PATH"
-	EnvKeySchedulerLogPath = "DAG_SCHEDULER_LOG_PATH"
-	EnvKeyRequestID        = "DAG_REQUEST_ID"
-	EnvKeyDAGName          = "DAG_NAME"
-	EnvKeyDAGStepName      = "DAG_STEP_NAME"
-)
-
-// Finder finds a DAG by name.
-// This is used to find the DAG when a node references another DAG.
-type Finder interface {
-	FindByName(ctx context.Context, name string) (*DAG, error)
-}
-
-// ResultCollector gets a result of a DAG execution.
-// This is used for subworkflow executor to get the output from the subworkflow.
-type ResultCollector interface {
-	CollectResult(ctx context.Context, name string, requestID string) (*Result, error)
-}
-
-type Result struct {
-	Name    string            `json:"name,omitempty"`
-	Params  string            `json:"params,omitempty"`
-	Outputs map[string]string `json:"outputs,omitempty"`
-}
-
 // Context contains the current DAG and Finder.
 type Context struct {
 	DAG             *DAG
 	Finder          Finder
-	ResultCollector ResultCollector
+	ResultCollector ExecutionResultCollector
 	AdditionalEnvs  Envs
 }
 
@@ -70,7 +43,7 @@ func (e Env) String() string {
 type ctxKey struct{}
 
 // NewContext creates a new context with the DAG and Finder.
-func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ResultCollector, requestID, logFile string) context.Context {
+func NewContext(ctx context.Context, dag *DAG, finder Finder, resultCollector ExecutionResultCollector, requestID, logFile string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Context{
 		DAG:             dag,
 		Finder:          finder,
