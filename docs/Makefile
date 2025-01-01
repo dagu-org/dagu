@@ -39,3 +39,6 @@ venv:
 
 install-python:
 	@pyenv install $(PYTHON_VER)
+
+gen-pot-files:
+	sphinx-intl update -p build/gettext -l zh -l ja

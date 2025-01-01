@@ -1,0 +1,83 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 15:19+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: zh\n"
+"Language-Team: zh <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: ../../source/examples.rst:4 4a800b383a764371a6866e845461a0f0
+msgid "Example DAGs"
+msgstr ""
+
+#: ../../source/examples.rst:10 e89241ffee5f4ab29e351972437f790f
+msgid "Hello World"
+msgstr ""
+
+#: ../../source/examples.rst:25 c1425b0214a349f08f7e7deca839c20d
+msgid "Conditional Steps"
+msgstr ""
+
+#: ../../source/examples.rst:52 03bcf41fbcf6474085ceae6fa2cae9fa
+msgid "File Output"
+msgstr ""
+
+#: ../../source/examples.rst:62 1045920f0bde472899818988b785676c
+msgid "Passing Output to Next Step"
+msgstr ""
+
+#: ../../source/examples.rst:78 1b51eff3992148ab8f2eacbccbb75426
+msgid "Running a Docker Container"
+msgstr ""
+
+#: ../../source/examples.rst:91 c4af674eb61646d887b1ba165a3f80af
+msgid "See :ref:`docker executor` for more details."
+msgstr ""
+
+#: ../../source/examples.rst:94 a1e2667e52d44ae5921918857aa67fd6
+msgid "Sending HTTP Requests"
+msgstr ""
+
+#: ../../source/examples.rst:113 0608d0faf773445383345dc9b9a1074c
+msgid "Querying JSON Data with jq"
+msgstr ""
+
+#: ../../source/examples.rst:124 ../../source/examples.rst:144
+#: ../../source/examples.rst:171 3483e3ec37ae43f5bd32350c7643feec
+#: cbbd0f6c123f49b5bcde0949b2d0d29a f2c5839a25654fd59effcac578f6073b
+msgid "Expected Output:"
+msgstr ""
+
+#: ../../source/examples.rst:134 03ad10e7afb0419694cb1fc2f43917c8
+msgid "Formatting JSON Data with jq"
+msgstr ""
+
+#: ../../source/examples.rst:157 9b7f644befac4796b31200c1b62337d7
+msgid "Outputting Raw Values with jq"
+msgstr ""
+
+#: ../../source/examples.rst:179 e51cc8e2155b4e16b22a59fd92831efe
+msgid "Sending Email Notifications"
+msgstr ""
+
+#: ../../source/examples.rst:211 08bddeb61fc04fe7a50fa3315883dab0
+msgid "Sending Email"
+msgstr ""
+
+#: ../../source/examples.rst:234 9bb25332b5c64a35a0c2c0c37ed359b7
+msgid "Customizing Signal Handling on Stop"
+msgstr ""
+

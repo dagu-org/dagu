@@ -1,0 +1,58 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 15:19+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: ../../source/installation.rst:2 77f05d53265047d195c3fbf2d5ffd90f
+msgid "Installation"
+msgstr ""
+
+#: ../../source/installation.rst:7 2b91d3f80d3f4d82b5e162b884c7bb57
+msgid ""
+"You can install Dagu quickly using Homebrew or by downloading the latest "
+"binary from the Releases page on GitHub."
+msgstr ""
+
+#: ../../source/installation.rst:10 9446d8bc9ad147ff9c358b29400d6db5
+msgid "Via Homebrew"
+msgstr ""
+
+#: ../../source/installation.rst:16 d5735835cf7343ab9fa21cace7c2f225
+msgid "Upgrade to the latest version:"
+msgstr ""
+
+#: ../../source/installation.rst:23 c06f248f49cb43a08586f41bc5551cd3
+msgid "Via Bash script"
+msgstr ""
+
+#: ../../source/installation.rst:30 4911729ca0084abfa0ff0129cf0b51b4
+msgid "Via Docker"
+msgstr ""
+
+#: ../../source/installation.rst:42 202e0473aaf04880bcedd7d351f4068e
+msgid "Via GitHub Release Page"
+msgstr ""
+
+#: ../../source/installation.rst:44 b6723b3b9c11434c9d8b3fe0ca12e6ce
+msgid ""
+"Download the latest binary from the `Releases page <https://github.com"
+"/dagu-org/dagu/releases>`_ and place it in your ``$PATH`` (e.g. "
+"``/usr/local/bin``)."
+msgstr ""
+

@@ -1,0 +1,484 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 15:19+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: zh\n"
+"Language-Team: zh <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: ../../source/yaml_format.rst:4 54ae21061ab644848e4860c8f6b32e55
+msgid "Writing DAGs"
+msgstr ""
+
+#: ../../source/yaml_format.rst:10 7341049db9634e29bb47b3740be40a02
+msgid "Introduction"
+msgstr ""
+
+#: ../../source/yaml_format.rst:11 da0d8beefd5c48b2a2bdc6251d2bf7b1
+msgid ""
+"Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for "
+"workflow orchestration. This document covers everything you need to know "
+"about writing DAG definitions, from basic usage to advanced features."
+msgstr ""
+
+#: ../../source/yaml_format.rst:14 5e7e465454c14db6bf7d612f8b4c3d16
+msgid "Core Concepts"
+msgstr ""
+
+#: ../../source/yaml_format.rst:15 cd8c382d096f4b0eb395fb3b80472c58
+msgid ""
+"Before diving into specific features, let's understand the basic "
+"structure of a DAG file and how steps are defined."
+msgstr ""
+
+#: ../../source/yaml_format.rst:18 172f84111e5e4e09aedee851c84649f7
+msgid "Minimal Example"
+msgstr ""
+
+#: ../../source/yaml_format.rst:19 09069962b8284491969d4c7857a4ce5e
+msgid "A DAG with two steps:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:31 678bbe420f99400d8f1e411fda1a9087
+msgid "Using a pipe:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:39 490590b3e99946f4a0b04e72cc3a82c7
+msgid "Specifying a shell:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:49 bcce005ddf71480c924bbf3edc906743
+msgid "Schema Definition"
+msgstr ""
+
+#: ../../source/yaml_format.rst:50 7326e43f65ca4fd4864f76367b14c8ab
+msgid ""
+"We provide a JSON schema to validate DAG files and enable IDE auto-"
+"completion:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:59 ed5167e01115433986b278614406d94b
+msgid ""
+"The schema is available at `dag.schema.json <https://github.com/dagu-"
+"org/dagu/blob/main/schemas/dag.schema.json>`_."
+msgstr ""
+
+#: ../../source/yaml_format.rst:62 7a0d499842ff46a582c442192e30fdb6
+msgid "Working Directory"
+msgstr ""
+
+#: ../../source/yaml_format.rst:63 b33e821b5c7d4da6b0253256eadda478
+msgid "Control where each step executes:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:73 edebda1e68034d4488a09e5c2b86e6c9
+msgid "Basic Features"
+msgstr ""
+
+#: ../../source/yaml_format.rst:76 f999dd6462044634bcab1b86a910b192
+msgid "Environment Variables"
+msgstr ""
+
+#: ../../source/yaml_format.rst:77 7433a823a5c84c839842d22385c25349
+msgid "Define variables accessible throughout the DAG:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:90 e27ebcbb4feb4ce3a994d36071833e09
+msgid "Parameters"
+msgstr ""
+
+#: ../../source/yaml_format.rst:91 278c2d039d074242a66efff063b64e04
+msgid "Pass positional parameters to steps:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:101 c38b1d8ff16e4ccba4434b07e5390d85
+msgid "Named Parameters"
+msgstr ""
+
+#: ../../source/yaml_format.rst:102 13cfe74cece04970879c2db891884865
+msgid "Use named parameters for better clarity:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:112 94d0799909c84392ab73a01b6edaf995
+msgid "Code Snippets"
+msgstr ""
+
+#: ../../source/yaml_format.rst:114 db81bd59e32645c2b2a2150f033ec038
+msgid "Run shell script with `$SHELL`:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:125 ac74cc6de9e748f4b3666ba61800eed2
+msgid ""
+"You can run arbitrary script with the `script` field. The script will be "
+"executed with the program specified in the `command` field. If `command` "
+"is not specified, the default shell will be used."
+msgstr ""
+
+#: ../../source/yaml_format.rst:137 cedd59a3c0d84dadb39529b5a0567772
+msgid "Output Handling"
+msgstr ""
+
+#: ../../source/yaml_format.rst:140 9775936e01ca4e6bb2119e77fc7991a8
+msgid "Capture Output"
+msgstr ""
+
+#: ../../source/yaml_format.rst:141 35a4897f94db4f4f9e6ec51184972c7e
+msgid "Store command output in variables:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:151 61af3eb9c8dc4bcbbe6d9fff96e79fe4
+msgid "Redirect Output"
+msgstr ""
+
+#: ../../source/yaml_format.rst:152 927950c27cac41329af45bfac5a21dec
+msgid "Send output to files:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:166 9ca014ff3dad45cba1ae76df7f7ab818
+msgid "Conditional Execution"
+msgstr ""
+
+#: ../../source/yaml_format.rst:169 3021c91f88b045e3bf92e465b53f8f48
+msgid "Preconditions"
+msgstr ""
+
+#: ../../source/yaml_format.rst:170 0411308e7e94491192ecd670bab78a40
+msgid "Run steps only when conditions are met:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:182 43c2718a823c4da080ade1a46fca2515
+msgid "Continue on Failure"
+msgstr ""
+
+#: ../../source/yaml_format.rst:183 5dbd4feb752c416b95c24a1562fcae49
+msgid "Control flow when conditions aren't met:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:197 391050c0a81d4a6887285eec251595fd
+msgid "Scheduling"
+msgstr ""
+
+#: ../../source/yaml_format.rst:200 9dff6cb4f51c4606a3b3560fa5d48911
+msgid "Basic Scheduling"
+msgstr ""
+
+#: ../../source/yaml_format.rst:201 ada850c30513485fa50cf9db30914a2a
+msgid "Use cron expressions to schedule DAGs:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:211 46cc8d120b114741805fd8a6947a048e
+msgid "Skip Redundant Runs"
+msgstr ""
+
+#: ../../source/yaml_format.rst:212 ecec2eb519b34753ab2a3230ef7dac2d
+msgid "Prevent unnecessary executions:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:231 35f8f3051b2942ad838dbd6dba841788
+msgid ""
+"When ``skipIfSuccessful`` is ``true``, Dagu checks if there's already "
+"been a successful run since the last scheduled time. If yes, it skips the"
+" execution. This is useful for:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:233 e80c4405939c497eb70849d155a278b2
+msgid "Resource-intensive tasks"
+msgstr ""
+
+#: ../../source/yaml_format.rst:234 bf951079b2a1494fa956056c27261b8b
+msgid "Data processing jobs that shouldn't run twice"
+msgstr ""
+
+#: ../../source/yaml_format.rst:235 58ed0f0c87314e8090ef7e370d3e8abe
+msgid "Tasks that are expensive to run"
+msgstr ""
+
+#: ../../source/yaml_format.rst:237 9a96a2ba415449fd8e3a7454f867b93d
+msgid "Note: Manual triggers always execute regardless of this setting."
+msgstr ""
+
+#: ../../source/yaml_format.rst:239 3bb26c462452482d801b9ed0fa604d44
+msgid ""
+"Example timeline: - Schedule: Every 4 hours (00:00, 04:00, 08:00, ...) - "
+"At 04:00: Runs successfully - At 05:00: Manual trigger → Runs (manual "
+"triggers always run) - At 06:00: Schedule trigger → Skips (already "
+"succeeded since 04:00) - At 08:00: Schedule trigger → Runs (new schedule "
+"window)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:247 254e950689d34b56b41046f35dc1a24a
+msgid "Retry Policies"
+msgstr ""
+
+#: ../../source/yaml_format.rst:248 28c783b4648f48fb803e2377e0e959ec
+msgid "Automatically retry failed steps:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:260 4b17e3aa0c474b549149d652a9c7e94e
+msgid "Advanced Features"
+msgstr ""
+
+#: ../../source/yaml_format.rst:263 bf78919c6ecf46af91fd9ef33c8ee3ca
+msgid "Running Sub-DAGs"
+msgstr ""
+
+#: ../../source/yaml_format.rst:264 6deb3b8f6cfb4ce9a0f9c79b9eb4f9d8
+msgid "Organize complex workflows using sub-DAGs:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:274 ce386e53d6c4418f81f4c2d747a7b89f
+msgid "Command Substitution"
+msgstr ""
+
+#: ../../source/yaml_format.rst:275 d6811163b59749a6afd2174f580e1f40
+msgid "Use command output in configurations:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:286 a3e353006e8c449ea6fa43252c4eb9ea
+msgid "Lifecycle Hooks"
+msgstr ""
+
+#: ../../source/yaml_format.rst:287 078807191b944321a6268630fb5e6ffa
+msgid "React to DAG state changes:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:305 1bded655994f4e71bf647228fa26bb78
+msgid "Repeat Steps"
+msgstr ""
+
+#: ../../source/yaml_format.rst:306 73facf038da144eaadd31b4497d056d5
+msgid "Execute steps periodically:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:318 0dd54fdb10da4caaa3f17ae81f253a09
+msgid "User Defined Functions"
+msgstr ""
+
+#: ../../source/yaml_format.rst:319 fee1c97285144dd3a891247b52b80056
+msgid "Create reusable task templates:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:337 116dd452f4454353b74b60207ad1b897
+msgid "Field Reference"
+msgstr ""
+
+#: ../../source/yaml_format.rst:340 026efccb89ec45738caef9e5534481fd
+msgid "Quick Reference"
+msgstr ""
+
+#: ../../source/yaml_format.rst:341 7f258a578ad442b4a30d3d471a2b151d
+msgid "Common fields you'll use most often:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:343 6c66845fe44d4d3888034aeb28620b92
+msgid "``name``: DAG name"
+msgstr ""
+
+#: ../../source/yaml_format.rst:344 4631babefb0f4f398d31512ff6db8b41
+msgid "``schedule``: Cron schedule"
+msgstr ""
+
+#: ../../source/yaml_format.rst:345 8efee68961af45d7a7681679e3770ad5
+msgid "``steps``: Task definitions"
+msgstr ""
+
+#: ../../source/yaml_format.rst:346 e4d337612a674ccfba4bc01281a20118
+msgid "``depends``: Step dependencies"
+msgstr ""
+
+#: ../../source/yaml_format.rst:347 c4e5e29eb4f84db0a5da40162456fd64
+msgid "``skipIfSuccessful``: Skip redundant runs"
+msgstr ""
+
+#: ../../source/yaml_format.rst:348 ../../source/yaml_format.rst:361
+#: 6f3a611e45e445dcaf8f3f68c9af2830 d24f171ca615456b8af6c9f143e0d71c
+msgid "``env``: Environment variables"
+msgstr ""
+
+#: ../../source/yaml_format.rst:349 ../../source/yaml_format.rst:425
+#: 4b3def0490f7469197fd00a05605a0e9 60333979977c46169b8e98c3bbfeae20
+msgid "``retryPolicy``: Retry configuration"
+msgstr ""
+
+#: ../../source/yaml_format.rst:352 505bbe2aa54749baa2b7b067a84cb303
+msgid "DAG Fields"
+msgstr ""
+
+#: ../../source/yaml_format.rst:353 2c20a1d169e241dd8a7c8425d99583dc
+msgid "Complete list of DAG-level configuration options:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:355 a6ec856cd8a24b1680012372dd11cb88
+msgid "``name``: The name of the DAG (optional, defaults to filename)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:356 aa11f13762324cee80166bb307c68cad
+msgid "``description``: Brief description of the DAG"
+msgstr ""
+
+#: ../../source/yaml_format.rst:357 c0cb1be84dcb4bc78fe8dc060270709e
+msgid "``schedule``: Cron expression for scheduling"
+msgstr ""
+
+#: ../../source/yaml_format.rst:358 1ae3b39223734fdcaac5ec62a532a946
+msgid ""
+"``skipIfSuccessful``: Skip if already succeeded since last schedule time "
+"(default: false)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:359 d878a921c6aa435f95f68ef274bc3f98
+msgid "``group``: Optional grouping for organization"
+msgstr ""
+
+#: ../../source/yaml_format.rst:360 c224eeed772a46cb9ae85d6a29a75881
+msgid "``tags``: Comma-separated categorization tags"
+msgstr ""
+
+#: ../../source/yaml_format.rst:362 d53728389807451c842c626f174fd15a
+msgid "``logDir``: Output directory (default: ${HOME}/.local/share/logs)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:363 ee156b6a0c374b65bf777b103b40742c
+msgid "``restartWaitSec``: Seconds to wait before restart"
+msgstr ""
+
+#: ../../source/yaml_format.rst:364 c9127af39efb42df9d2e87975bf4e8b4
+msgid "``histRetentionDays``: Days to keep execution history"
+msgstr ""
+
+#: ../../source/yaml_format.rst:365 344fa23234a34e96980a08b2b15b0940
+msgid "``timeoutSec``: DAG timeout in seconds"
+msgstr ""
+
+#: ../../source/yaml_format.rst:366 27bb1e39c2d54178a656102f1956f392
+msgid "``delaySec``: Delay between steps"
+msgstr ""
+
+#: ../../source/yaml_format.rst:367 ff794bd0f0314e3388ba3c4b5ef68d96
+msgid "``maxActiveRuns``: Maximum parallel steps"
+msgstr ""
+
+#: ../../source/yaml_format.rst:368 895ac997087d4d88a000c85a39c5c016
+msgid "``params``: Default parameters"
+msgstr ""
+
+#: ../../source/yaml_format.rst:369 be9a6fe0b8e24a5c8c332082a1d0c7f3
+msgid "``preconditions``: DAG-level conditions"
+msgstr ""
+
+#: ../../source/yaml_format.rst:370 2d0118daa0b94a13b2d465886dcb58e1
+msgid "``mailOn``: Email notification settings"
+msgstr ""
+
+#: ../../source/yaml_format.rst:371 0b93ef702d2a43c68ec22c4c34bd8250
+msgid "``MaxCleanUpTimeSec``: Cleanup timeout"
+msgstr ""
+
+#: ../../source/yaml_format.rst:372 bc40c8a611a34f88a06d7e7d957cb942
+msgid "``handlerOn``: Lifecycle event handlers"
+msgstr ""
+
+#: ../../source/yaml_format.rst:373 8350ade6825547e6b3cfedfe76505075
+msgid "``steps``: List of steps to execute"
+msgstr ""
+
+#: ../../source/yaml_format.rst:375 377b4876bf4a4ea990b419d3ed6984ba
+msgid "Example DAG configuration:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:412 3288fd85b39840a58b754e407db9528c
+msgid "Step Fields"
+msgstr ""
+
+#: ../../source/yaml_format.rst:413 18903b8d097b4d029934ce52ec7a86db
+msgid "Configuration options available for individual steps:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:415 865f264116a34d15936fc49b7b6de080
+msgid "``name``: Step name (required)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:416 8b41f13f991446e4841f6a30516036a5
+msgid "``description``: Step description"
+msgstr ""
+
+#: ../../source/yaml_format.rst:417 3969f4e0bd0e4c389b5324919f045471
+msgid "``dir``: Working directory"
+msgstr ""
+
+#: ../../source/yaml_format.rst:418 49c980a4146849da8cd5affbdf3a676d
+msgid "``command``: Command to execute"
+msgstr ""
+
+#: ../../source/yaml_format.rst:419 cdac18e366864f7994e75373868cdea5
+msgid "``stdout``: Standard output file"
+msgstr ""
+
+#: ../../source/yaml_format.rst:420 cfa4f65666074ac5852f0f270751feb7
+msgid "``output``: Output variable name"
+msgstr ""
+
+#: ../../source/yaml_format.rst:421 96c36ea84dd64a2281ed351d2ca09ad6
+msgid "``script``: Inline script content"
+msgstr ""
+
+#: ../../source/yaml_format.rst:422 0737955d2b5846df975336122f74b837
+msgid "``signalOnStop``: Stop signal (e.g., SIGINT)"
+msgstr ""
+
+#: ../../source/yaml_format.rst:423 c0a78c6335a6447c9a27d87c7cc191d1
+msgid "``mailOn``: Step-level notifications"
+msgstr ""
+
+#: ../../source/yaml_format.rst:424 6dca0f6304e14916b7cd157f39b48f07
+msgid "``continueOn``: Failure handling"
+msgstr ""
+
+#: ../../source/yaml_format.rst:426 b71c7f671ef843bcbf543ac93348520d
+msgid "``repeatPolicy``: Repeat configuration"
+msgstr ""
+
+#: ../../source/yaml_format.rst:427 7959c7ea749e4408b760be263754c026
+msgid "``preconditions``: Step conditions"
+msgstr ""
+
+#: ../../source/yaml_format.rst:428 475b51feda0344fca76a5f39f0bb20f1
+msgid "``depends``: Dependencies"
+msgstr ""
+
+#: ../../source/yaml_format.rst:429 45e5e25100bf425cb2bd02850ec7b412
+msgid "``run``: Sub-DAG reference"
+msgstr ""
+
+#: ../../source/yaml_format.rst:430 ffc47b8ed8cb48c6a6e3883b077dd2eb
+msgid "``params``: Sub-DAG parameters"
+msgstr ""
+
+#: ../../source/yaml_format.rst:432 6193bfc832c54c3d98ae9f7a871af194
+msgid "Example step configuration:"
+msgstr ""
+
+#: ../../source/yaml_format.rst:467 7c55bf4d2b6c43b4942dd543ebae801a
+msgid "Global Configuration"
+msgstr ""
+
+#: ../../source/yaml_format.rst:468 3c539e3cd8154b69877c159ecf9aaa5e
+msgid ""
+"Common settings can be shared using ``$HOME/.config/dagu/base.yaml``. "
+"This is useful for setting default values for: - ``logDir`` - ``env`` - "
+"Email settings - Other organizational defaults"
+msgstr ""
+

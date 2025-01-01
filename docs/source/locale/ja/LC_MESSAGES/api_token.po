@@ -1,0 +1,80 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 15:19+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: ../../source/api_token.rst:4 ff7ded2f19ce454397592457bf35ed3c
+msgid "API Token"
+msgstr ""
+
+#: ../../source/api_token.rst:9 7d064f4abd55499a9f7a73cfd8643410
+msgid "To enable API token for Dagu, follow these steps:"
+msgstr ""
+
+#: ../../source/api_token.rst:11 585db9e0b6424babadcd3069ec89bdca
+msgid "Set the environment variables to configure basic authentication:"
+msgstr ""
+
+#: ../../source/api_token.rst:18 a5e984966baa48918714406c6acebabf
+msgid ""
+"Replace ``<arbitrary token string>`` with a random string of your choice."
+" This string will be used as the API token for Dagu."
+msgstr ""
+
+#: ../../source/api_token.rst:20 fe88e1a4e6ab4f59afbe63ef7d090603
+msgid ""
+"Alternatively, create an ``admin.yaml`` file in ``$HOME/.config/dagu/`` "
+"to override the default configuration values."
+msgstr ""
+
+#: ../../source/api_token.rst:28 79f3f54fd2664192a9a43aee70584056
+msgid "You can enable HTTPS by configuring the following environment variables:"
+msgstr ""
+
+#: ../../source/api_token.rst:35 5c0be6d8a8ff4487ae37e7f2872b1e39
+msgid ""
+"Replace ``<path-to-cert-file>`` and ``<path-to-key-file>`` with the paths"
+" to your certificate and key files."
+msgstr ""
+
+#: ../../source/api_token.rst:37 50b534756ca94bdd842ff1e9a2ca2ba5
+msgid ""
+"See :ref:`Configuration Options` for more information on the "
+"configuration file."
+msgstr ""
+
+#: ../../source/api_token.rst:39 a5242247fcf9447fae5763688b0868fe
+msgid ""
+"Enable Basic Authentication as well if you want to use the Web UI along "
+"with the API token. **Without basic authentication config, you will not "
+"be able to access the Web UI.**"
+msgstr ""
+
+#: ../../source/api_token.rst:47 0d05f773ae4f41a38dcdfc85a9dd43a7
+msgid "Replace ``<username>`` and ``<password>`` with your username and password."
+msgstr ""
+
+#: ../../source/api_token.rst:49 4b9b07e23409426ea4e3485158edccf3
+msgid "See :ref:`Basic Auth` for more information on the basic authentication."
+msgstr ""
+
+#: ../../source/api_token.rst:51 8b92955437924b5e8f55f01ba14f9d84
+msgid "See :ref:`REST API` for more information on the REST API."
+msgstr ""
+

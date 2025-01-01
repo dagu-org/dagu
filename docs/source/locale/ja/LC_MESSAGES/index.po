@@ -1,0 +1,132 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 15:19+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: ../../source/index.rst:50
+msgid "Installation"
+msgstr ""
+
+#: ../../source/index.rst:57
+msgid "Interface"
+msgstr ""
+
+#: ../../source/index.rst:66
+msgid "Writing DAGs"
+msgstr ""
+
+#: ../../source/index.rst:76
+msgid "Configuration"
+msgstr ""
+
+#: ../../source/index.rst:86
+msgid "Container Setup"
+msgstr ""
+
+#: ../../source/index.rst:93
+msgid "Development"
+msgstr ""
+
+#: ../../source/index.rst:7 8910fb3dfd98428bb8960337fc734a0b
+msgid "Dagu"
+msgstr ""
+
+#: ../../source/index.rst:-1 32af3ee101124f7bbb9f4279771ecdda
+msgid "Dew overview"
+msgstr ""
+
+#: ../../source/index.rst:21 f3f2577f02d24ead9cd6cc50a4f46a74
+msgid ""
+"Dagu is a powerful Cron alternative that comes with a Web UI. It allows "
+"you to define dependencies between commands as a `Directed Acyclic Graph "
+"(DAG) <https://en.wikipedia.org/wiki/Directed_acyclic_graph>`_ in a "
+"declarative :ref:`YAML Format`. Additionally, Dagu natively supports "
+"running Docker containers, making HTTP requests, and executing commands "
+"over SSH. Dagu was designed to be easy to use, self-contained, and "
+"require no coding, making it ideal for small projects."
+msgstr ""
+
+#: ../../source/index.rst:24 7b3064209fc647db9ffa382c7ad673b7
+msgid "Quick Start"
+msgstr ""
+
+#: ../../source/index.rst:27 33d308b1f09145cfadd80cb0cee75b0b
+msgid ":doc:`installation`"
+msgstr ""
+
+#: ../../source/index.rst:27 4f1258d20b604b078e5ea2430d33734d
+msgid "How to install Dagu."
+msgstr ""
+
+#: ../../source/index.rst:30 14a16d441b8944cfb11042308e6321c2
+msgid ":doc:`quickstart`"
+msgstr ""
+
+#: ../../source/index.rst:30 f6a0c849090e44488600c5f84a56f116
+msgid "A quick start guide to get you up and running."
+msgstr ""
+
+#: ../../source/index.rst:33 80daf58ec77e43d6a1b8d86f55bc6f12
+msgid ":ref:`cli`"
+msgstr ""
+
+#: ../../source/index.rst:33 31546ee41317488f83b3e30195551d7b
+msgid "Command line interface reference."
+msgstr ""
+
+#: ../../source/index.rst:36 297acbe061cf4470be8b1295612e7861
+msgid ":ref:`YAML Format`"
+msgstr ""
+
+#: ../../source/index.rst:36 118a7a31129c4c27b7bb5eede0c2d6cb
+msgid "Writing DAGs."
+msgstr ""
+
+#: ../../source/index.rst:39 051c3c0f7d484b5082b5cf417c816af8
+msgid ":ref:`Executors`"
+msgstr ""
+
+#: ../../source/index.rst:39 814b60e516bf40ab8729b7c45dc464d1
+msgid "Various Executors."
+msgstr ""
+
+#: ../../source/index.rst:42 8b40fbaf3b324f8e99bb4ede330632c8
+msgid ":ref:`Example DAGs`"
+msgstr ""
+
+#: ../../source/index.rst:42 9bbea1b2b76e4eecb98d1c8bba757925
+msgid "Examples of DAGs."
+msgstr ""
+
+#: ../../source/index.rst:45 5d7923e7964f4d36962c2d2f3a69440f
+msgid ":ref:`Configuration Options`"
+msgstr ""
+
+#: ../../source/index.rst:45 a555fa0e3b914cb087f038e9d507cf84
+msgid "Configuration options."
+msgstr ""
+
+#: ../../source/index.rst:48 61a45f38a87a469497e2603313931bc0
+msgid ":ref:`Remote Node Configuration`"
+msgstr ""
+
+#: ../../source/index.rst:48 281ca72d42f34cb4b7b0151a6cd0f2f4
+msgid "Remote Node Configuration."
+msgstr ""
+

@@ -1,0 +1,77 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2023, Dagu Developers
+# This file is distributed under the same license as the Dagu package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dagu \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-01 15:19+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ja\n"
+"Language-Team: ja <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: ../../source/faq.rst:2 075361c105224cb7a4ea429a038b7796
+msgid "FAQ"
+msgstr ""
+
+#: ../../source/faq.rst:5 4dee2900a4204da9938dc13ef49b9e9a
+msgid "How Long Will the History Data be Stored?"
+msgstr ""
+
+#: ../../source/faq.rst:7 92dd8813adf24805a50a286b8571545a
+msgid ""
+"By default, the execution history data is retained for 30 days. However, "
+"you can customize this setting by modifying the `histRetentionDays` field"
+" in a YAML file."
+msgstr ""
+
+#: ../../source/faq.rst:10 51f485c7881f4cb2b060b9188dd9e40f
+msgid "How to Use Specific Host and Port or `dagu server`?"
+msgstr ""
+
+#: ../../source/faq.rst:12 f9f74f1de81b4531ae6428de1e20d503
+msgid ""
+"To configure the host and port for `dagu server`, you can set the "
+"environment variables `DAGU_HOST` and `DAGU_PORT`. Refer to the "
+":ref:`Configuration Options` for more details."
+msgstr ""
+
+#: ../../source/faq.rst:15 51e89312f2214f0fa5f7e8fdabe9de3d
+msgid "How to Specify the DAGs Directory for `dagu server` and `dagu scheduler`?"
+msgstr ""
+
+#: ../../source/faq.rst:17 f06ea3e0e8b74427acbe72c8e11e1149
+msgid ""
+"You can customize the directory used to store DAG files by setting the "
+"environment variable `DAGU_DAGS`. See :ref:`Configuration Options` for "
+"more information."
+msgstr ""
+
+#: ../../source/faq.rst:20 a3972a9218644a24a65a335a61636f41
+msgid "How Can I Retry a DAG from a Specific Task?"
+msgstr ""
+
+#: ../../source/faq.rst:22 dfbbf94f5c554eaf87db0b1e99c99135
+msgid ""
+"If you want to retry a DAG from a specific task, you can set the status "
+"of that task to `failed` by clicking the step in the Web UI. When you "
+"rerun the DAG, it will execute the failed task and any subsequent tasks."
+msgstr ""
+
+#: ../../source/faq.rst:25 991e5b9b3648414fa6a31b4cf9e502f4
+msgid "How Does It Track Running Processes Without DBMS?"
+msgstr ""
+
+#: ../../source/faq.rst:27 4529f9a4bd8248ae9883bd9cfb5fdf3d
+msgid "`dagu` uses Unix sockets to communicate with running processes."
+msgstr ""
+
