@@ -43,7 +43,6 @@ type DAGStore interface {
 	Rename(ctx context.Context, oldID, newID string) error
 	GetSpec(ctx context.Context, name string) (string, error)
 	UpdateSpec(ctx context.Context, name string, spec []byte) error
-	FindByName(ctx context.Context, name string) (*digraph.DAG, error)
 	TagList(ctx context.Context) ([]string, []string, error)
 }
 

@@ -4,6 +4,7 @@
 package digraph
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -70,7 +71,7 @@ func TestCondition_Eval(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := EvalConditions(tt.condition)
+			err := EvalConditions(context.Background(), tt.condition)
 			require.Equal(t, tt.wantErr, err != nil)
 		})
 	}

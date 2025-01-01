@@ -57,12 +57,6 @@ var (
 `)
 )
 
-var (
-	errCreateDAGFile = errors.New("failed to create DAG file")
-	errGetStatus     = errors.New("failed to get status")
-	errDAGIsRunning  = errors.New("the DAG is running")
-)
-
 func (e *client) GetDAGSpec(ctx context.Context, id string) (string, error) {
 	return e.dagStore.GetSpec(ctx, id)
 }
@@ -70,7 +64,7 @@ func (e *client) GetDAGSpec(ctx context.Context, id string) (string, error) {
 func (e *client) CreateDAG(ctx context.Context, name string) (string, error) {
 	id, err := e.dagStore.Create(ctx, name, dagTemplate)
 	if err != nil {
-		return "", fmt.Errorf("%w: %s", errCreateDAGFile, err)
+		return "", fmt.Errorf("failed to create DAG: %w", err)
 	}
 	return id, nil
 }
@@ -82,18 +76,21 @@ func (e *client) Grep(ctx context.Context, pattern string) (
 }
 
 func (e *client) Rename(ctx context.Context, oldID, newID string) error {
-	oldDAG, err := e.dagStore.FindByName(ctx, oldID)
+	oldDAG, err := e.dagStore.GetMetadata(ctx, oldID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get metadata for %s: %w", oldID, err)
 	}
 	if err := e.dagStore.Rename(ctx, oldID, newID); err != nil {
 		return err
 	}
-	newDAG, err := e.dagStore.FindByName(ctx, newID)
+	newDAG, err := e.dagStore.GetMetadata(ctx, newID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get metadata for %s: %w", newID, err)
 	}
-	return e.historyStore.Rename(ctx, oldDAG.Location, newDAG.Location)
+	if err := e.historyStore.Rename(ctx, oldDAG.Location, newDAG.Location); err != nil {
+		return fmt.Errorf("failed to rename history for %s: %w", oldID, err)
+	}
+	return nil
 }
 
 func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
@@ -203,7 +200,7 @@ func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status
 	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
+		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
 	return model.StatusFromJSON(ret)
 }
@@ -230,6 +227,8 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.S
 func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {
 	return e.historyStore.ReadStatusRecent(ctx, dag.Location, n)
 }
+
+var errDAGIsRunning = errors.New("the DAG is running")
 
 func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error {
 	client := sock.NewClient(dag.SockAddr())

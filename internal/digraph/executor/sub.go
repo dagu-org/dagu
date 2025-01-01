@@ -13,7 +13,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/google/uuid"
@@ -37,12 +36,9 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get dag context: %w", err)
-	}
+	stepContext := digraph.GetStepContext(ctx)
 
-	config, err := cmdutil.SubstituteStringFields(struct {
+	config, err := digraph.EvalStringFields(stepContext, struct {
 		Name   string
 		Params string
 	}{
@@ -53,7 +49,7 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := dagCtx.Finder.FindByName(ctx, config.Name)
+	subDAG, err := stepContext.GetDAGByName(config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to find subworkflow %q: %w", config.Name, err,
@@ -78,17 +74,7 @@ func newSubWorkflow(
 		return nil, errWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir
-	cmd.Env = append(cmd.Env, os.Environ()...)
-	cmd.Env = append(cmd.Env, dagCtx.DAG.Env...)
-
-	// Get output variables from the step context and set them as environment
-	stepCtx := digraph.GetStepContext(ctx)
-	if stepCtx != nil && stepCtx.OutputVariables != nil {
-		stepCtx.OutputVariables.Range(func(_, value any) bool {
-			cmd.Env = append(cmd.Env, value.(string))
-			return true
-		})
-	}
+	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
@@ -114,12 +100,8 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the subworkflow
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get dag context: %w", err)
-	}
-
-	result, err := dagCtx.ResultCollector.CollectResult(ctx, e.subDAG, e.requestID)
+	stepContext := digraph.GetStepContext(ctx)
+	result, err := stepContext.GetResult(e.subDAG, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}

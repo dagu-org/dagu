@@ -274,16 +274,45 @@ Automatically retry failed steps:
 Advanced Features
 ---------------
 
-Running Sub-DAGs
-~~~~~~~~~~~~~~
-Organize complex workflows using sub-DAGs:
+Running sub workflows
+~~~~~~~~~~~~~~~~~~~~~~~~
+Organize complex workflows using sub workflow:
 
 .. code-block:: yaml
 
   steps:
     - name: sub workflow
-      run: sub_dag.yaml
+      run: sub_workflow
       params: "FOO=BAR"
+
+The result of the sub workflow will be available from the standard output of the sub workflow in JSON format.
+
+Example:
+
+.. code-block:: json
+
+  {
+    "name": "sub_workflow"
+    "params": "FOO=BAR",
+    "outputs": {
+      "RESULT": "ok",
+    }
+  }
+
+You can access the output of the sub workflow using the `output` field:
+
+.. code-block:: yaml
+
+  steps:
+    - name: sub workflow
+      run: sub_workflow
+      params: "FOO=BAR"
+      output: SUB_RESULT
+
+    - name: use sub workflow output
+      command: echo $SUB_RESULT
+      depends:
+        - sub workflow
 
 Command Substitution
 ~~~~~~~~~~~~~~~~~
@@ -441,8 +470,8 @@ Configuration options available for individual steps:
 - ``repeatPolicy``: Repeat configuration
 - ``preconditions``: Step conditions
 - ``depends``: Dependencies
-- ``run``: Sub-DAG reference
-- ``params``: Sub-DAG parameters
+- ``run``: Sub workflow name
+- ``params``: Sub workflow parameters
 
 Example step configuration:
 

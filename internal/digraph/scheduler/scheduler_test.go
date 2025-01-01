@@ -6,6 +6,7 @@ package scheduler_test
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"syscall"
 	"testing"
@@ -478,6 +479,90 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
+	t.Run("SpecialVars_DAG_EXECUTION_LOG_PATH", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_EXECUTION_LOG_PATH"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+	})
+	t.Run("SpecialVars_DAG_SCHEDULER_LOG_PATH", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_SCHEDULER_LOG_PATH"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+	})
+	t.Run("SpecialVars_DAG_STEP_LOG_PATH", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_STEP_LOG_PATH"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
+	})
+	t.Run("SpecialVars_DAG_REQUEST_ID", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_REQUEST_ID"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
+	})
+	t.Run("SpecialVars_DAG_NAME", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo $DAG_NAME"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "1")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
+	})
+	t.Run("SpecialVars_DAG_STEP_NAME", func(t *testing.T) {
+		sc := setup(t)
+
+		graph := sc.newGraph(t,
+			newStep("step_test", withCommand("echo $DAG_STEP_NAME"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+		node := result.Node(t, "step_test")
+
+		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		require.True(t, ok, "output variable not found")
+		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
+	})
 }
 
 func successStep(name string, depends ...string) digraph.Step {
@@ -658,7 +743,11 @@ type graphHelper struct {
 func (gh graphHelper) Schedule(t *testing.T, expectedStatus scheduler.Status) scheduleResult {
 	t.Helper()
 
-	ctx := digraph.NewContext(gh.Context, &digraph.DAG{}, nil, nil, gh.Config.ReqID, "logFile")
+	dag := &digraph.DAG{Name: "test_dag"}
+	logFilename := fmt.Sprintf("%s_%s.log", dag.Name, gh.Config.ReqID)
+	logFilePath := path.Join(gh.Config.LogDir, logFilename)
+
+	ctx := digraph.NewContext(gh.Context, dag, nil, gh.Config.ReqID, logFilePath)
 
 	var doneNodes []*scheduler.Node
 	nodeCompletedChan := make(chan *scheduler.Node)

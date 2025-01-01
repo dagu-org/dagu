@@ -18,7 +18,7 @@ Dagu
    :alt: Dew overview
    :width: 800px
 
-Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands in a declarative :ref:`YAML Format`. Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+A powerful, self-contained Cron alternative with a clean Web UI and a `declarative YAML-based workflow definition <https://dagu.readthedocs.io/en/latest/yaml_format.html>`_. Dagu simplifies complex job dependencies and scheduling with minimal overhead.
 
 Quick Start
 ------------
@@ -37,9 +37,13 @@ Quick Start
 
 :ref:`Examples`
    Examples of DAGs.
+   Writing DAGs.
 
 :ref:`Configuration Options`
    Configuration options.
+
+:ref:`schema-reference`
+   Schema reference.
 
 .. toctree::
    :caption: Installation
@@ -65,6 +69,7 @@ Quick Start
    base_config
    examples
    special_env
+   schema
 
 .. toctree::
    :caption: Configuration

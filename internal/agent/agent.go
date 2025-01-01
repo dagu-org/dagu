@@ -107,6 +107,10 @@ func (a *Agent) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Create a new context for the DAG execution
+	dbClient := newDBClient(a.historyStore, a.dagStore)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile)
+
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
 		return err
@@ -195,8 +199,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Start the DAG execution.
 	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
-	dagCtx := digraph.NewContext(ctx, a.dag, a.dagStore, newOutputCollector(a.historyStore), a.requestID, a.logFile)
-	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
+	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
@@ -364,7 +367,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, a.dagStore, newOutputCollector(a.historyStore), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -468,7 +471,7 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 		return nil
 	}
 	// If one of the conditions does not met, cancel the execution.
-	if err := digraph.EvalConditions(a.dag.Preconditions); err != nil {
+	if err := digraph.EvalConditions(ctx, a.dag.Preconditions); err != nil {
 		logger.Error(ctx, "Preconditions are not met", "err", err)
 		a.scheduler.Cancel(ctx, a.graph)
 		return err
@@ -523,17 +526,26 @@ func encodeError(w http.ResponseWriter, err error) {
 	}
 }
 
-var _ digraph.ResultCollector = &resultCollector{}
+var _ digraph.DBClient = &dbClient{}
 
-type resultCollector struct {
+type dbClient struct {
+	dagStore     persistence.DAGStore
 	historyStore persistence.HistoryStore
 }
 
-func newOutputCollector(store persistence.HistoryStore) *resultCollector {
-	return &resultCollector{historyStore: store}
+func newDBClient(hsStore persistence.HistoryStore, dagStore persistence.DAGStore) *dbClient {
+	return &dbClient{
+		historyStore: hsStore,
+		dagStore:     dagStore,
+	}
 }
 
-func (o *resultCollector) CollectResult(ctx context.Context, name string, requestID string) (*digraph.Result, error) {
+// GetDAG implements digraph.DBClient.
+func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error) {
+	return o.dagStore.GetDetails(ctx, name)
+}
+
+func (o *dbClient) GetStatus(ctx context.Context, name string, requestID string) (*digraph.Status, error) {
 	status, err := o.historyStore.FindByRequestID(ctx, name, requestID)
 	if err != nil {
 		return nil, err
@@ -544,7 +556,7 @@ func (o *resultCollector) CollectResult(ctx context.Context, name string, reques
 		if node.Step.OutputVariables != nil {
 			node.Step.OutputVariables.Range(func(_, value any) bool {
 				// split the value by '=' to get the key and value
-				parts := strings.Split(value.(string), "=")
+				parts := strings.SplitN(value.(string), "=", 2)
 				if len(parts) == 2 {
 					outputVariables[parts[0]] = parts[1]
 				}
@@ -553,7 +565,7 @@ func (o *resultCollector) CollectResult(ctx context.Context, name string, reques
 		}
 	}
 
-	return &digraph.Result{
+	return &digraph.Status{
 		Outputs: outputVariables,
 		Name:    status.Status.Name,
 		Params:  status.Status.Params,

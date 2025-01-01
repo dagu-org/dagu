@@ -48,7 +48,7 @@ A powerful, self-contained Cron alternative with a clean Web UI and a [declarati
   - Redirection of stdout and stderr
   - Lifecycle hooks (on failure, on exit, etc.)
   - Repeating tasks, automatic/manual retry
-  - Run sub-DAGs
+  - Run sub workflows
 - Handy built-in executors:
   - Docker containers
   - HTTP requests
@@ -249,7 +249,7 @@ remoteNodes:
   - [Redirecting Stdout and Stderr](https://dagu.readthedocs.io/en/latest/yaml_format.html#redirecting-stdout-and-stderr)
   - [Lifecycle Hooks](https://dagu.readthedocs.io/en/latest/yaml_format.html#adding-lifecycle-hooks)
   - [Repeating Task](https://dagu.readthedocs.io/en/latest/yaml_format.html#repeating-a-task-at-regular-intervals)
-  - [Running Sub-DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-sub-dag)
+  - [Running Sub-workflow](https://dagu.readthedocs.io/en/latest/yaml_format.html#running-sub-dag)
   - [All Available Fields for a DAG](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-dags)
   - [All Available Fields for a Step](https://dagu.readthedocs.io/en/latest/yaml_format.html#all-available-fields-for-steps)
 - Example DAGs

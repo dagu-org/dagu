@@ -127,7 +127,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 			// Check preconditions
 			if len(node.data.Step.Preconditions) > 0 {
 				logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.data.Step.Name)
-				if err := digraph.EvalConditions(node.data.Step.Preconditions); err != nil {
+				if err := digraph.EvalConditions(ctx, node.data.Step.Preconditions); err != nil {
 					logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.data.Step.Name)
 					node.SetStatus(NodeStatusSkipped)
 					node.setError(err)
@@ -139,7 +139,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			logger.Info(ctx, "Step execution started", "step", node.data.Step.Name)
 			node.SetStatus(NodeStatusRunning)
-			go func(node *Node) {
+			go func(ctx context.Context, node *Node) {
 				defer func() {
 					if panicObj := recover(); panicObj != nil {
 						stack := string(debug.Stack())
@@ -155,12 +155,16 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 					wg.Done()
 				}()
 
+				ctx = sc.setupContext(ctx, graph, node)
+
 				setupSucceed := true
-				if err := sc.setupNode(node); err != nil {
+				if err := sc.setupNode(ctx, node); err != nil {
 					setupSucceed = false
 					sc.setLastError(err)
 					node.MarkError(err)
 				}
+
+				ctx = node.SetupContextBeforeExec(ctx)
 
 				defer func() {
 					_ = sc.teardownNode(node)
@@ -168,7 +172,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 			ExecRepeat: // repeat execution
 				for setupSucceed && !sc.isCanceled() {
-					execErr := sc.execNode(ctx, graph, node)
+					execErr := sc.execNode(ctx, node)
 					if execErr != nil {
 						status := node.State().Status
 						switch {
@@ -237,7 +241,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				if done != nil {
 					done <- node
 				}
-			}(node)
+			}(ctx, node)
 
 			time.Sleep(sc.delay) // TODO: check if this is necessary
 		}
@@ -289,9 +293,9 @@ func (sc *Scheduler) setLastError(err error) {
 	sc.lastError = err
 }
 
-func (sc *Scheduler) setupNode(node *Node) error {
+func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
-		return node.Setup(sc.logDir, sc.requestID)
+		return node.Setup(ctx, sc.logDir, sc.requestID)
 	}
 	return nil
 }
@@ -303,9 +307,9 @@ func (sc *Scheduler) teardownNode(node *Node) error {
 	return nil
 }
 
-// buildStepContext builds the context for a step.
-func (sc *Scheduler) buildStepContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	stepCtx := &digraph.StepContext{OutputVariables: &digraph.SyncMap{}}
+// setupContext builds the context for a step.
+func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	stepCtx := digraph.NewStepContext(ctx, node.data.Step)
 
 	// get output variables that are available to the next steps
 	curr := node.id
@@ -324,22 +328,15 @@ func (sc *Scheduler) buildStepContext(ctx context.Context, graph *ExecutionGraph
 			continue
 		}
 
-		node.data.Step.OutputVariables.Range(func(key, value any) bool {
-			// skip if the variable is already defined
-			if _, ok := stepCtx.OutputVariables.Load(key); ok {
-				return true
-			}
-			stepCtx.OutputVariables.Store(key, value)
-			return true
-		})
+		stepCtx.LoadOutputVariables(node.data.Step.OutputVariables)
 	}
 
 	return digraph.WithStepContext(ctx, stepCtx)
 }
 
 // buildStepContextForHandler builds the context for a handler.
-func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph) context.Context {
-	stepCtx := &digraph.StepContext{OutputVariables: &digraph.SyncMap{}}
+func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	stepCtx := digraph.NewStepContext(ctx, node.data.Step)
 
 	// get all output variables
 	for _, node := range graph.Nodes() {
@@ -347,22 +344,13 @@ func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *Exec
 			continue
 		}
 
-		node.data.Step.OutputVariables.Range(func(key, value any) bool {
-			// skip if the variable is already defined
-			if _, ok := stepCtx.OutputVariables.Load(key); ok {
-				return true
-			}
-			stepCtx.OutputVariables.Store(key, value)
-			return true
-		})
+		stepCtx.LoadOutputVariables(node.data.Step.OutputVariables)
 	}
 
 	return digraph.WithStepContext(ctx, stepCtx)
 }
 
-func (sc *Scheduler) execNode(ctx context.Context, graph *ExecutionGraph, node *Node) error {
-	ctx = sc.buildStepContext(ctx, graph, node)
-
+func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
 		if err := node.Execute(ctx); err != nil {
 			return fmt.Errorf("failed to execute step %q: %w", node.data.Step.Name, err)
@@ -493,22 +481,22 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 	node.SetStatus(NodeStatusRunning)
 
 	if !sc.dry {
-		err := node.Setup(sc.logDir, sc.requestID)
-		if err != nil {
+		if err := node.Setup(ctx, sc.logDir, sc.requestID); err != nil {
 			node.SetStatus(NodeStatusError)
 			return nil
 		}
+
 		defer func() {
 			_ = node.Teardown()
 		}()
-		ctx = sc.buildStepContextForHandler(ctx, graph)
-		err = node.Execute(ctx)
-		if err != nil {
+
+		ctx = sc.buildStepContextForHandler(ctx, graph, node)
+		if err := node.Execute(ctx); err != nil {
 			node.SetStatus(NodeStatusError)
 			return err
-		} else {
-			node.SetStatus(NodeStatusSuccess)
 		}
+
+		node.SetStatus(NodeStatusSuccess)
 	} else {
 		node.SetStatus(NodeStatusSuccess)
 	}
@@ -517,14 +505,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 }
 
 func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	// set global environment variables
-	dagCtx, err := digraph.GetContext(ctx)
-	if err != nil {
-		return err
-	}
-	for _, env := range dagCtx.AdditionalEnvs {
-		os.Setenv(env.Key, env.Value)
-	}
+	digraph.GetContext(ctx).ApplyEnvs()
 
 	if !sc.dry {
 		if err = os.MkdirAll(sc.logDir, 0755); err != nil {
