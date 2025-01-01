@@ -14,26 +14,28 @@ Core Concepts
 ------------
 Before diving into specific features, let's understand the basic structure of a DAG file and how steps are defined.
 
-Minimal Example
-~~~~~~~~~~~~~~
-A DAG with two steps:
+Hello World
+~~~~~~~~~~~~
 
 .. code-block:: yaml
 
+  schedule: "* * * * *" # Run the DAG every minute
+  params:
+    - NAME: "Dagu"
   steps:
-    - name: step 1
-      command: echo hello
-    - name: step 2
-      command: echo world
+    - name: Hello world
+      command: echo Hello $NAME
+    - name: Done
+      command: echo Done!
       depends:
-        - step 1
+        - Hello world
 
-Using a pipe:
+Using pipes (``|``) in commands:
 
 .. code-block:: yaml
 
   steps:
-    - name: step 1
+    - name: Hello world with pipe
       command: echo hello world | xargs echo
 
 Specifying a shell:
@@ -41,9 +43,20 @@ Specifying a shell:
 .. code-block:: yaml
 
   steps:
-    - name: step 1
+    - name: Hello world with shell
       command: echo hello world | xargs echo
       shell: bash
+
+Running a script:
+
+.. code-block:: yaml
+
+  steps:
+    - name: Hello world with script
+      command: bash
+      script: |
+        echo hello world
+        echo goodbye world
 
 Schema Definition
 ~~~~~~~~~~~~~~~~

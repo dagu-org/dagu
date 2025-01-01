@@ -26,7 +26,7 @@
 
 <h1><b>Dagu</b></h1>
 
-Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands in a declarative [YAML format](https://dagu.readthedocs.io/en/latest/yaml_format.html). Dagu simplifies the management and execution of complex workflows. It is self-contained, with no need for a database, and can be installed as a single binary.
+A powerful, self-contained Cron alternative with a clean Web UI and a [declarative YAML-based workflow definition](https://dagu.readthedocs.io/en/latest/yaml_format.html). Dagu simplifies complex job dependencies and scheduling with minimal overhead.
 
 ---
 
@@ -40,48 +40,38 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 
 ## **Features**
 
-- Web UI
-- CLI
+- Web UI & CLI
 - Web API Interface
 - Powerful DAG definition in YAML format:
-  - Custom code snippets
-  - Parameters
-  - Environment variables
-  - Command substitution
-  - Command Piping
-  - Conditional logic
+  - Code snippets, parameters, environment variables
+  - Command substitution, piping, conditional logic
   - Redirection of stdout and stderr
   - Lifecycle hooks (on failure, on exit, etc.)
-  - Repeating task
-  - Automatic / manual retry
-  - Running sub-DAG
+  - Repeating tasks, automatic/manual retry
+  - Run sub-DAGs
 - Handy built-in executors:
-  - Running Docker containers
-  - Making HTTP requests
-  - Sending emails
-  - Querying JSON data with `jq`
-  - Executing a command on a remote server via SSH
-- Remote Node Management support:
-  - Monitor DAGs across different environments
-  - Switch between nodes through UI dropdown
-  - Centralized management interface
+  - Docker containers
+  - HTTP requests
+  - Email sending
+  - JSON query with jq
+  - SSH remote commands
+- Remote Dagu node management
 - Email notification
 - Scheduling with Cron expressions
 
 ## **Community**
 
 - Issues: [GitHub Issues](https://github.com/dagu-org/dagu/issues)
+- Discussion: [GitHub Discussions](https://github.com/dagu-org/dagu/discussions)
 - Chat: [Discord](https://discord.gg/gpahPUjGRk)
 
 ## **Web UI**
 
 ### DAG Details
 
-Real-time statuses, logs, and configuration details for each DAG. Easily edit configurations in your browser.
+Real-time status, logs, and configuration for each DAG. Toggle graph orientation from the top-right corner.
 
 ![example](assets/images/demo.gif?raw=true)
-
-Switch graph orientation with the toggle button at the top-right corner:
 
 ![Details-TD](assets/images/ui-details2.webp?raw=true)
 
@@ -171,13 +161,15 @@ Example:
 
 ```yaml
 schedule: "* * * * *" # Run the DAG every minute
+params:
+  - NAME: "Dagu"
 steps:
-  - name: hello world
-    command: echo Hello Dagu
-  - name: done
-    command: echo done!
+  - name: Hello world
+    command: echo Hello $NAME
+  - name: Done
+    command: echo Done!
     depends:
-      - hello
+      - Hello world
 ```
 
 ### 4. Execute the DAG
@@ -218,7 +210,7 @@ dagu scheduler [--dags=<path to directory>]
 dagu version
 ```
 
-## **Remote Node Management support**
+## **Remote Node Management**
 
 Dagu supports managing multiple Dagu servers from a single UI through its remote node feature. This allows you to:
 
@@ -230,21 +222,15 @@ See [Remote Node Configuration](https://dagu.readthedocs.io/en/latest/config_rem
 
 ### Configuration
 
-Remote nodes can be configured by creating `admin.yaml` in `$HOME/.config/dagu/`:
+Create `admin.yaml` in `$HOME/.config/dagu/`:
 
 ```yaml
-# admin.yaml
 remoteNodes:
-  - name: "prod" # Name of the remote node
-    apiBaseUrl: "https://prod.example.com/api/v1" # Base URL of the remote node API
+  - name: "prod"
+    apiBaseUrl: "https://prod.example.com/api/v1"
   - name: "staging"
     apiBaseUrl: "https://staging.example.com/api/v1"
 ```
-
-## **Localized Documentation**
-
-- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
-- [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
 
 ## **Documentation**
 
@@ -288,13 +274,15 @@ remoteNodes:
 A DAG with two steps:
 
 ```yaml
+params:
+  - NAME: "Dagu"
 steps:
-  - name: step 1
-    command: echo hello
-  - name: step 2
-    command: echo world
+  - name: Hello world
+    command: echo Hello $NAME
+  - name: Done
+    command: echo Done!
     depends:
-      - step 1
+      - Hello world
 ```
 
 Using a pipe:
