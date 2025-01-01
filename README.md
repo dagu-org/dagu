@@ -67,6 +67,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
 - [**CLI**](#cli)
 - [**Remote Node Management support**](#remote-node-management-support)
   - [Configuration](#configuration)
+- [**Localized Documentation**](#localized-documentation)
 - [**Documentation**](#documentation)
 - [**Example DAG**](#example-dag)
   - [Minimum examples](#minimum-examples)
@@ -285,6 +286,11 @@ remoteNodes:
   - name: "staging"
     apiBaseUrl: "https://staging.example.com/api/v1"
 ```
+
+## **Localized Documentation**
+
+- [中文文档 (Chinese Documentation)](https://dagu.readthedocs.io/zh)
+- [日本語ドキュメント (Japanese Documentation)](https://dagu.readthedocs.io/ja)
 
 ## **Documentation**
 
