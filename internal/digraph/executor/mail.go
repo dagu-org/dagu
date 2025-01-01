@@ -42,13 +42,7 @@ func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 
 	exec := &mail{cfg: &cfg}
 	dagCtx := digraph.GetContext(ctx)
-
-	mailerConfig, err := cmdutil.SubstituteStringFields(mailer.Config{
-		Host:     dagCtx.DAG.SMTP.Host,
-		Port:     dagCtx.DAG.SMTP.Port,
-		Username: dagCtx.DAG.SMTP.Username,
-		Password: dagCtx.DAG.SMTP.Password,
-	})
+	mailerConfig, err := dagCtx.MailerConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}

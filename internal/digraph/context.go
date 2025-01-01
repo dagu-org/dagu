@@ -7,7 +7,9 @@ import (
 	"context"
 	"os"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/mailer"
 )
 
 type Context struct {
@@ -34,6 +36,19 @@ func (c Context) ListEnvs() []string {
 		envs = append(envs, env.String())
 	}
 	return envs
+}
+
+func (c Context) MailerConfig() (mailer.Config, error) {
+	return EvalStringFields(c.ctx, mailer.Config{
+		Host:     c.DAG.SMTP.Host,
+		Port:     c.DAG.SMTP.Port,
+		Username: c.DAG.SMTP.Username,
+		Password: c.DAG.SMTP.Password,
+	})
+}
+
+func EvalStringFields[T any](ctx context.Context, obj T) (T, error) {
+	return cmdutil.SubstituteStringFields(obj)
 }
 
 type kvPairs []kvPair
