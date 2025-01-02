@@ -77,14 +77,6 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	})
 }
 
-// LoadWithoutEval loads config without evaluating dynamic fields.
-func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
-	return loadDAG(ctx, dag, buildOpts{
-		onlyMetadata: false,
-		noEval:       true,
-	})
-}
-
 // LoadMetadata loads only basic information from the DAG.
 // E.g. name, description, schedule, etc.
 func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {

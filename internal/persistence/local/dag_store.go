@@ -70,7 +70,7 @@ func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DA
 	if err != nil {
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
-	dat, err := digraph.LoadWithoutEval(ctx, filePath)
+	dat, err := digraph.Load(ctx, filePath, digraph.WithoutEval())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load DAG %s: %w", name, err)
 	}
