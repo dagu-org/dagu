@@ -61,6 +61,7 @@ var (
 	errExecutorConfigValueMustBeMap       = errors.New("executor.config value must be a map")
 	errExecutorHasInvalidKey              = errors.New("executor has invalid key")
 	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
+	errDotenvMustBeStringOrArray          = errors.New("dotenv must be a string or an array of strings")
 )
 
 // errorList is just a list of errors.

@@ -5,12 +5,18 @@ package digraph
 
 import (
 	// nolint // gosec
+	"context"
 	"crypto/md5"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
 
@@ -25,10 +31,14 @@ const (
 type DAG struct {
 	// Location is the absolute path to the DAG file.
 	Location string `json:"Location"`
+	// Base is the base DAG file for the current DAG. This is optional.
+	Base string `json:"-"`
 	// Group is the group name of the DAG. This is optional.
 	Group string `json:"Group"`
 	// Name is the name of the DAG. The default is the filename without the extension.
 	Name string `json:"Name"`
+	// Dotenv is the path to the dotenv file. This is optional.
+	Dotenv []string `json:"Dotenv"`
 	// Tags contains the list of tags for the DAG. This is optional.
 	Tags []string `json:"Tags"`
 	// Description is the description of the DAG. This is optional.
@@ -140,6 +150,100 @@ var handlerMapping = map[string]HandlerType{
 	"onExit":    HandlerOnExit,
 }
 
+// HasTag checks if the DAG has the given tag.
+func (d *DAG) HasTag(tag string) bool {
+	for _, t := range d.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// LoadEnvs loads the environment variables for the DAG.
+func (d *DAG) LoadEnvs(ctx context.Context) error {
+	resolver := fileutil.NewFileResolver([]string{d.Location, d.Base})
+	for _, filePath := range d.Dotenv {
+		resolvedPath, err := resolver.ResolveFilePath(filePath)
+		if err != nil {
+			continue
+		}
+		logger.Infof(ctx, "Loading dotenv file: %s", resolvedPath)
+		if err := godotenv.Load(resolvedPath); err != nil {
+			return fmt.Errorf("failed to load dotenv file %s: %w", filePath, err)
+		}
+	}
+
+	for _, env := range d.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid environment variable: %s", env)
+		}
+		if err := os.Setenv(parts[0], parts[1]); err != nil {
+			return fmt.Errorf("failed to set environment variable %s: %w", parts[0], err)
+		}
+	}
+
+	for index, param := range d.Params {
+		if strings.Contains(param, "=") {
+			parts := strings.SplitN(param, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid parameter: %s", param)
+			}
+			if err := os.Setenv(parts[0], parts[1]); err != nil {
+				return fmt.Errorf("failed to set parameter %s: %w", parts[0], err)
+			}
+			continue
+		}
+
+		// Parameters without values are set as positional parameters
+		if err := os.Setenv(strconv.Itoa(index+1), param); err != nil {
+			return fmt.Errorf("failed to set parameter %s: %w", param, err)
+		}
+	}
+
+	return nil
+}
+
+// SockAddr returns the unix socket address for the DAG.
+// The address is used to communicate with the agent process.
+func (d *DAG) SockAddr() string {
+	// Normalize the location path
+	normalizedPath := strings.ReplaceAll(d.Location, " ", "_")
+	name := strings.TrimSuffix(filepath.Base(normalizedPath), filepath.Ext(filepath.Base(normalizedPath)))
+
+	// Generate hash for uniqueness
+	hash := md5.New() // nolint // gosec
+	hash.Write([]byte(normalizedPath))
+	hashSum := hash.Sum(nil)
+
+	// Truncate name if necessary
+	if len(name) > maxSocketNameLength {
+		name = name[:maxSocketNameLength-1]
+	}
+
+	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, hashSum))
+}
+
+// String implements the Stringer interface.
+// String returns a formatted string representation of the DAG
+func (d *DAG) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("{\n")
+	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
+	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
+	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
+	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
+
+	for i, step := range d.Steps {
+		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
+	}
+
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
 // setup sets the default values for the DAG.
 func (d *DAG) setup() {
 	// Set default history retention days to 30 if not specified.
@@ -180,51 +284,29 @@ func (d *DAG) setupHandlers(workDir string) {
 	}
 }
 
-// HasTag checks if the DAG has the given tag.
-func (d *DAG) HasTag(tag string) bool {
-	for _, t := range d.Tags {
-		if t == tag {
-			return true
+func resolveFilePath(dagLocation, baseLocation string, file string) (string, error) {
+	if filepath.IsAbs(file) {
+		if fileutil.FileExists(file) {
+			return file, nil
+		}
+		return "", os.ErrNotExist
+	}
+
+	dagDir := filepath.Dir(dagLocation)
+	baseConfigDir := filepath.Dir(baseLocation)
+	candidates := []string{
+		filepath.Join(dagDir, file),
+		filepath.Join(baseConfigDir, file),
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(homeDir, file))
+	}
+
+	for _, candidate := range candidates {
+		if fileutil.FileExists(candidate) {
+			return candidate, nil
 		}
 	}
-	return false
-}
 
-// SockAddr returns the unix socket address for the DAG.
-// The address is used to communicate with the agent process.
-func (d *DAG) SockAddr() string {
-	// Normalize the location path
-	normalizedPath := strings.ReplaceAll(d.Location, " ", "_")
-	name := strings.TrimSuffix(filepath.Base(normalizedPath), filepath.Ext(filepath.Base(normalizedPath)))
-
-	// Generate hash for uniqueness
-	hash := md5.New() // nolint // gosec
-	hash.Write([]byte(normalizedPath))
-	hashSum := hash.Sum(nil)
-
-	// Truncate name if necessary
-	if len(name) > maxSocketNameLength {
-		name = name[:maxSocketNameLength-1]
-	}
-
-	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, hashSum))
-}
-
-// String implements the Stringer interface.
-// String returns a formatted string representation of the DAG
-func (d *DAG) String() string {
-	var sb strings.Builder
-
-	sb.WriteString("{\n")
-	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
-	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
-	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
-	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
-
-	for i, step := range d.Steps {
-		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
-	}
-
-	sb.WriteString("}\n")
-	return sb.String()
+	return file, os.ErrNotExist
 }

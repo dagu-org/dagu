@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -28,46 +27,6 @@ func Test_MustGetwd(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		wd, _ := os.Getwd()
 		require.Equal(t, MustGetwd(), wd)
-	})
-}
-
-func Test_FormatTime(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		tm := time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC)
-		formatted := FormatTime(tm)
-		require.Equal(t, "2022-02-01T02:02:02Z", formatted)
-
-		parsed, err := ParseTime(formatted)
-		require.NoError(t, err)
-		require.Equal(t, tm, parsed)
-
-		// Test empty time
-		require.Equal(t, "-", FormatTime(time.Time{}))
-		parsed, err = ParseTime("-")
-		require.NoError(t, err)
-		require.Equal(t, time.Time{}, parsed)
-	})
-	t.Run("Empty", func(t *testing.T) {
-		// Test empty time
-		require.Equal(t, "-", FormatTime(time.Time{}))
-	})
-}
-
-func Test_ParseTime(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		parsed, err := ParseTime("2022-02-01T02:02:02Z")
-		require.NoError(t, err)
-		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.UTC), parsed)
-	})
-	t.Run("Valid_Legacy", func(t *testing.T) {
-		parsed, err := ParseTime("2022-02-01 02:02:02")
-		require.NoError(t, err)
-		require.Equal(t, time.Date(2022, 2, 1, 2, 2, 2, 0, time.Now().Location()), parsed)
-	})
-	t.Run("Empty", func(t *testing.T) {
-		parsed, err := ParseTime("-")
-		require.NoError(t, err)
-		require.Equal(t, time.Time{}, parsed)
 	})
 }
 

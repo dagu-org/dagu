@@ -79,15 +79,11 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 		}
 	}
 
-	// Convert the parameters to a string in the form of "key=value"
-	var paramStrings []string
 	for _, paramPair := range paramPairs {
-		paramStrings = append(paramStrings, paramPair.String())
+		dag.Params = append(dag.Params, paramPair.String())
 	}
 
-	// Set the parameters as environment variables for the command
 	dag.Env = append(dag.Env, envs...)
-	dag.Params = append(dag.Params, paramStrings...)
 
 	return nil
 }

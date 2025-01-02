@@ -13,6 +13,8 @@ type definition struct {
 	Group string
 	// Description is the description of the DAG.
 	Description string
+	// Dotenv is the path to the dotenv file (string or []string).
+	Dotenv any
 	// Schedule is the cron schedule to run the DAG.
 	Schedule any
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is

@@ -42,6 +42,7 @@ var builderRegistry = []builderEntry{
 	{metadata: true, name: "schedule", fn: buildSchedule},
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
 	{metadata: true, name: "params", fn: buildParams},
+	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
 	{name: "logDir", fn: buildLogDir},
@@ -223,6 +224,28 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	return err
 }
 
+func buildDotenv(_ BuildContext, spec *definition, dag *DAG) error {
+	switch v := spec.Dotenv.(type) {
+	case nil:
+		return nil
+	case string:
+		dag.Dotenv = append(dag.Dotenv, v)
+		return nil
+	case []any:
+		for _, e := range v {
+			switch e := e.(type) {
+			case string:
+				dag.Dotenv = append(dag.Dotenv, e)
+			default:
+				return wrapError("dotenv", e, errDotenvMustBeStringOrArray)
+			}
+		}
+		return nil
+	default:
+		return wrapError("dotenv", v, errDotenvMustBeStringOrArray)
+	}
+}
+
 func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.MailOn == nil {
 		return nil
@@ -248,11 +271,15 @@ func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
 	// configuration. If the environment variable is already defined in
 	// the DAG, it is not added.
 	for _, e := range ctx.additionalEnvs {
-		key := strings.SplitN(e, "=", 2)[0]
-		if _, ok := env[key]; !ok {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("Invalid environment variable: %s", e)
+		}
+		if _, ok := env[parts[0]]; !ok {
 			dag.Env = append(dag.Env, e)
 		}
 	}
+
 	return nil
 }
 

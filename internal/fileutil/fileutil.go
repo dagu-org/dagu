@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 )
 
 var (
@@ -31,29 +30,13 @@ func MustGetwd() string {
 	return wd
 }
 
-const (
-	legacyTimeFormat = "2006-01-02 15:04:05"
-	timeEmpty        = "-"
-)
-
-// FormatTime returns formatted time.
-func FormatTime(t time.Time) string {
-	if t.IsZero() {
-		return timeEmpty
+// IsDir returns true if path is a directory.
+func IsDir(path string) bool {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
 	}
-
-	return t.Format(time.RFC3339)
-}
-
-// ParseTime parses time string.
-func ParseTime(val string) (time.Time, error) {
-	if val == timeEmpty {
-		return time.Time{}, nil
-	}
-	if t, err := time.ParseInLocation(time.RFC3339, val, time.Local); err == nil {
-		return t, nil
-	}
-	return time.ParseInLocation(legacyTimeFormat, val, time.Local)
+	return stat.IsDir()
 }
 
 // FileExists returns true if file exists.

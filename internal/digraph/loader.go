@@ -171,6 +171,9 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 
 	// Set the absolute path to the file.
 	dest.Location = filePath
+	if opts.base != "" {
+		dest.Base = filepath.Clean(opts.base)
+	}
 
 	// Set the name if not set.
 	if dest.Name == "" {
