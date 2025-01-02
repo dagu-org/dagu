@@ -38,7 +38,7 @@ func init() {
 	rootCmd.PersistentFlags().
 		StringVar(
 			&cfgFile, "config", "",
-			"config file (default is $HOME/.config/dagu/admin.yaml)",
+			"config file (default is $HOME/.config/dagu/config.yaml)",
 		)
 
 	cobra.OnInitialize(func() {

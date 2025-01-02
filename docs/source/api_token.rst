@@ -17,7 +17,7 @@ To enable API token for Dagu, follow these steps:
   
    Replace ``<arbitrary token string>`` with a random string of your choice. This string will be used as the API token for Dagu.
 
-#. Alternatively, create an ``admin.yaml`` file in ``$HOME/.config/dagu/`` to override the default configuration values.
+#. Alternatively, create an ``config.yaml`` file in ``$HOME/.config/dagu/`` to override the default configuration values.
 
    .. code-block:: yaml
   

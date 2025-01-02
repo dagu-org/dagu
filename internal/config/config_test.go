@@ -162,7 +162,7 @@ func TestConfigLoader_Load(t *testing.T) {
 	}
 
 	// Create test config file
-	configFile := filepath.Join(configDir, "admin.yaml")
+	configFile := filepath.Join(configDir, "config.yaml")
 	testConfig := []byte(`
 host: "127.0.0.1"
 port: 8080
