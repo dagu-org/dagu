@@ -259,12 +259,13 @@ func (e *docker) attachAndWait(ctx context.Context, cli *client.Client, containe
 }
 
 func newDocker(
-	_ context.Context, step digraph.Step,
+	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
 	execConfig := container.ExecOptions{}
 	execCfg := step.ExecutorConfig
+	stepContext := digraph.GetStepContext(ctx)
 
 	if cfg, ok := execCfg.Config["container"]; ok {
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -276,6 +277,11 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
+		replaced, err := digraph.EvalStringFields(stepContext, *containerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
+		}
+		*containerConfig = replaced
 	}
 
 	if cfg, ok := execCfg.Config["host"]; ok {
@@ -288,6 +294,11 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
+		replaced, err := digraph.EvalStringFields(stepContext, *hostConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
+		}
+		*hostConfig = replaced
 	}
 
 	if cfg, ok := execCfg.Config["exec"]; ok {
@@ -300,6 +311,11 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
+		replaced, err := digraph.EvalStringFields(stepContext, execConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
+		}
+		execConfig = replaced
 	}
 
 	autoRemove := false
@@ -309,15 +325,19 @@ func newDocker(
 	}
 
 	if a, ok := execCfg.Config["autoRemove"]; ok {
-		if a, ok := a.(bool); ok {
-			autoRemove = a
+		var err error
+		autoRemove, err = stepContext.EvalBool(a)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
 		}
 	}
 
 	pull := true
 	if p, ok := execCfg.Config["pull"]; ok {
-		if p, ok := p.(bool); ok {
-			pull = p
+		var err error
+		pull, err = stepContext.EvalBool(p)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate pull value: %w", err)
 		}
 	}
 
@@ -333,13 +353,21 @@ func newDocker(
 
 	// Check for existing container name first
 	if containerName, ok := execCfg.Config["containerName"].(string); ok {
-		exec.containerName = containerName
+		value, err := stepContext.EvalString(containerName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
+		}
+		exec.containerName = value
 		return exec, nil
 	}
 
 	// Fall back to image if no container name is provided
 	if img, ok := execCfg.Config["image"].(string); ok {
-		exec.image = img
+		value, err := stepContext.EvalString(img)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate image: %w", err)
+		}
+		exec.image = value
 		return exec, nil
 	}
 
