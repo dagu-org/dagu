@@ -17,6 +17,9 @@ type FieldError struct {
 }
 
 func (e *FieldError) Error() string {
+	if e.Value == nil {
+		return fmt.Sprintf("field '%s': %v", e.Field, e.Err)
+	}
 	return fmt.Sprintf("field '%s': %v (value: %+v)", e.Field, e.Err, e.Value)
 }
 

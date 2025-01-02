@@ -103,7 +103,7 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 			continue
 		}
 		if err := builder.fn(buildCtx, spec, dag); err != nil {
-			errs.Add(fmt.Errorf("%s: %w", builder.name, err))
+			errs.Add(WrapError(builder.name, nil, err))
 		}
 	}
 
@@ -187,9 +187,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
-				return fmt.Errorf(
-					"%w, got %T: ", errScheduleMustBeStringOrArray, s,
-				)
+				return WrapError("schedule", s, errScheduleMustBeStringOrArray)
 			}
 			starts = append(starts, s)
 		}
@@ -207,7 +205,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 
 	default:
 		// If schedule is of an invalid type, return an error.
-		return fmt.Errorf("%w: %T", errInvalidScheduleType, spec.Schedule)
+		return WrapError("schedule", spec.Schedule, errInvalidScheduleType)
 
 	}
 
@@ -417,6 +415,7 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
+// buildRetryPolicy builds the retry policy for a step.
 func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RetryPolicy != nil {
 		switch v := def.RetryPolicy.Limit.(type) {
@@ -425,7 +424,7 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		case string:
 			step.RetryPolicy.LimitStr = v
 		default:
-			return fmt.Errorf("invalid type for retryPolicy.Limit: %T", v)
+			return WrapError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		switch v := def.RetryPolicy.IntervalSec.(type) {
@@ -434,7 +433,7 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		case string:
 			step.RetryPolicy.IntervalSecStr = v
 		default:
-			return fmt.Errorf("invalid type for retryPolicy.IntervalSec: %T", v)
+			return WrapError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
 		}
 	}
 	return nil
@@ -513,7 +512,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 		for k, v := range val {
 			key, ok := k.(string)
 			if !ok {
-				return errExecutorConfigMustBeString
+				return WrapError("executor.config", k, errExecutorConfigMustBeString)
 			}
 
 			switch key {
@@ -521,7 +520,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// Executor type is a string.
 				typ, ok := v.(string)
 				if !ok {
-					return errExecutorTypeMustBeString
+					return WrapError("executor.type", v, errExecutorTypeMustBeString)
 				}
 				step.ExecutorConfig.Type = typ
 
@@ -531,26 +530,26 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// It is up to the executor to parse the values.
 				executorConfig, ok := v.(map[any]any)
 				if !ok {
-					return errExecutorConfigValueMustBeMap
+					return WrapError("executor.config", v, errExecutorConfigValueMustBeMap)
 				}
 				for k, v := range executorConfig {
 					configKey, ok := k.(string)
 					if !ok {
-						return errExecutorConfigMustBeString
+						return WrapError("executor.config", k, errExecutorConfigMustBeString)
 					}
 					step.ExecutorConfig.Config[configKey] = v
 				}
 
 			default:
 				// Unknown key in the executor config.
-				return fmt.Errorf("%w: %s", errExecutorHasInvalidKey, key)
+				return WrapError("executor.config", key, fmt.Errorf("%w: %s", errExecutorHasInvalidKey, key))
 
 			}
 		}
 
 	default:
 		// Unknown key for executor field.
-		return errExecutorConfigMustBeStringOrMap
+		return WrapError("executor", val, errExecutorConfigMustBeStringOrMap)
 
 	}
 
