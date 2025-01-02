@@ -372,7 +372,7 @@ func TestOverrideBaseConfig(t *testing.T) {
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
 		filePath := filepath.Join(testdataDir, "overwrite.yaml")
-		dag, err := Load(context.Background(), filePath, WithBaseDAG(baseConfig))
+		dag, err := Load(context.Background(), filePath, WithBaseConfig(baseConfig))
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
@@ -384,7 +384,7 @@ func TestOverrideBaseConfig(t *testing.T) {
 
 		// no_overwrite.yaml does not have the MailOn key.
 		filePath := filepath.Join(testdataDir, "no_overwrite.yaml")
-		dag, err := Load(context.Background(), filePath, WithBaseDAG(baseConfig))
+		dag, err := Load(context.Background(), filePath, WithBaseConfig(baseConfig))
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.

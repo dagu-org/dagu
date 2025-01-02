@@ -44,7 +44,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 
 	strParams := removeQuotes(params)
 	dag, err := digraph.Load(ctx, args[0],
-		digraph.WithBaseDAG(cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(cfg.Paths.BaseConfig),
 		digraph.WithParams(strParams),
 	)
 	if err != nil {

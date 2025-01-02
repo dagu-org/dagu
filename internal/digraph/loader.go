@@ -31,7 +31,7 @@ type LoadOptions struct {
 
 type LoadOption func(*LoadOptions)
 
-func WithBaseDAG(baseDAG string) LoadOption {
+func WithBaseConfig(baseDAG string) LoadOption {
 	return func(o *LoadOptions) {
 		o.baseDAG = baseDAG
 	}
@@ -62,7 +62,7 @@ func OnlyMetadata() LoadOption {
 	}
 }
 
-// Load loads the DAG from the given file.
+// Load load the DAG from the given file.
 func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
 	for _, opt := range opts {

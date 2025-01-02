@@ -71,7 +71,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
 	}
 
-	dag, err := digraph.Load(ctx, absolutePath, digraph.WithBaseDAG(cfg.Paths.BaseConfig),
+	dag, err := digraph.Load(ctx, absolutePath, digraph.WithBaseConfig(cfg.Paths.BaseConfig),
 		digraph.WithParams(status.Status.Params))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
