@@ -45,13 +45,13 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 	case string:
 		// Case 2: command is a string
 		if val == "" {
-			return WrapError("command", val, errStepCommandIsEmpty)
+			return wrapError("command", val, errStepCommandIsEmpty)
 		}
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
 		cmd, args, err := cmdutil.SplitCommand(val)
 		if err != nil {
-			return WrapError("command", val, fmt.Errorf("failed to parse command: %w", err))
+			return wrapError("command", val, fmt.Errorf("failed to parse command: %w", err))
 		}
 		step.Command = cmd
 		step.Args = args
@@ -84,7 +84,7 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 
 	default:
 		// Unknown type for command field.
-		return WrapError("command", val, errStepCommandMustBeArrayOrString)
+		return wrapError("command", val, errStepCommandMustBeArrayOrString)
 
 	}
 

@@ -9,27 +9,27 @@ import (
 	"strings"
 )
 
-// FieldError represents an error in a specific field of the configuration
-type FieldError struct {
+// LoadError represents an error in a specific field of the configuration
+type LoadError struct {
 	Field string
 	Value any
 	Err   error
 }
 
-func (e *FieldError) Error() string {
+func (e *LoadError) Error() string {
 	if e.Value == nil {
 		return fmt.Sprintf("field '%s': %v", e.Field, e.Err)
 	}
 	return fmt.Sprintf("field '%s': %v (value: %+v)", e.Field, e.Err, e.Value)
 }
 
-func (e *FieldError) Unwrap() error {
+func (e *LoadError) Unwrap() error {
 	return e.Err
 }
 
-// WrapError wraps an error with field context
-func WrapError(field string, value any, err error) error {
-	return &FieldError{
+// wrapError wraps an error with field context
+func wrapError(field string, value any, err error) error {
+	return &LoadError{
 		Field: field,
 		Value: value,
 		Err:   err,
