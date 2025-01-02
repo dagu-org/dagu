@@ -21,12 +21,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	errConfigFileRequired = errors.New("config file was not specified")
-	errReadFile           = errors.New("failed to read file")
-)
-
-// Load loads config from file.
+// Load loads the DAG from the given file.
 func Load(ctx context.Context, base, dag, params string) (*DAG, error) {
 	return loadDAG(ctx, dag, buildOpts{
 		base:         base,
@@ -36,7 +31,7 @@ func Load(ctx context.Context, base, dag, params string) (*DAG, error) {
 	})
 }
 
-// LoadWithoutEval loads config from file without evaluating env variables.
+// LoadWithoutEval loads config without evaluating dynamic fields.
 func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
 	return loadDAG(ctx, dag, buildOpts{
 		metadataOnly: false,
@@ -44,7 +39,8 @@ func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
 	})
 }
 
-// LoadMetadata loads config from file and returns only the headline data.
+// LoadMetadata loads only basic information from the DAG.
+// E.g. name, description, schedule, etc.
 func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {
 	return loadDAG(ctx, dag, buildOpts{
 		metadataOnly: true,
@@ -156,6 +152,8 @@ func defaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
+var errConfigFileRequired = errors.New("config file was not specified")
+
 func resolveYamlFilePath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
@@ -215,7 +213,7 @@ func (*mergeTransformer) Transformer(
 func readFile(file string) (cfg map[string]any, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
+		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
 	}
 
 	return unmarshalData(data)
