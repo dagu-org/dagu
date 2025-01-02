@@ -115,7 +115,7 @@ func (h Helper) LoadDAGFile(t *testing.T, filename string) DAG {
 	t.Helper()
 
 	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", filename)
-	dag, err := digraph.Load(h.Context, "", filePath, "")
+	dag, err := digraph.Load(h.Context, filePath)
 	require.NoError(t, err)
 
 	return DAG{
@@ -164,7 +164,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 
 type AgentOption func(*Agent)
 
-func WithAgentOptions(options *agent.Options) AgentOption {
+func WithAgentOptions(options agent.Options) AgentOption {
 	return func(a *Agent) {
 		a.opts = options
 	}
@@ -182,10 +182,6 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 
 	for _, opt := range opts {
 		opt(helper)
-	}
-
-	if helper.opts == nil {
-		helper.opts = &agent.Options{}
 	}
 
 	helper.Agent = agent.New(
@@ -214,7 +210,7 @@ type Agent struct {
 	*Helper
 	*digraph.DAG
 	*agent.Agent
-	opts *agent.Options
+	opts agent.Options
 }
 
 func (a *Agent) RunError(t *testing.T) {

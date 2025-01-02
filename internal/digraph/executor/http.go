@@ -77,7 +77,18 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		}
 	}
 
+	url, err := stepContext.EvalString(step.Args[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate url: %w", err)
+	}
+
+	method, err := stepContext.EvalString(step.Command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate method: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
+
 	client := resty.New()
 	if reqCfg.Debug {
 		client.SetDebug(true)
@@ -98,8 +109,8 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		stdout:    os.Stdout,
 		req:       req,
 		reqCancel: cancel,
-		method:    step.Command,
-		url:       step.Args[0],
+		method:    method,
+		url:       url,
 		cfg:       &reqCfg,
 	}, nil
 }
@@ -189,8 +200,9 @@ func (e *http) Run(_ context.Context) error {
 
 func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: false,
-		Result:      cfg,
+		WeaklyTypedInput: true,
+		ErrorUnused:      false,
+		Result:           cfg,
 	})
 	return md.Decode(dat)
 }

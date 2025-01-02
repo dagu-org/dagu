@@ -31,8 +31,8 @@ DAG-Level Fields
 ----------------
 These fields apply to the entire DAG. They appear at the root of the YAML file.
 
-- **name** (string, optional):
-  
+``name``
+~~~~~~~~
   The name of the DAG. If omitted, Dagu defaults the name to the YAML filename without the extension.
   
   **Example**:
@@ -41,8 +41,8 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
     name: My Daily DAG
 
-- **description** (string, optional):
-
+``description``
+~~~~~~~~~~~~~~
   A short description of what the DAG does.
 
   **Example**:
@@ -51,8 +51,8 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
     description: This DAG processes daily data and sends notifications.
 
-- **schedule** (string, optional):
-
+``schedule``
+~~~~~~~~~~~
   A cron expression (``* * * * *``) that determines how often the DAG runs.  
   If omitted, the DAG will only run manually (unless triggered via CLI or another mechanism).
 
@@ -62,8 +62,26 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
     schedule: "5 4 * * *"  # runs daily at 04:05
 
-- **skipIfSuccessful** (boolean, default: false):
+``dotenv``
+~~~~~~~~~~
+  Path to a `.env` file or a list of paths to load environment variables from.  
+  Dagu reads these files before running the DAG.
 
+  **Example**:
+
+  .. code-block:: yaml
+
+    dotenv: /path/to/.env
+
+  Files can be specified as:
+  
+  - Absolute paths
+  - Relative to the DAG file directory
+  - Relative to the base config directory
+  - Relative to the user's home directory
+
+``skipIfSuccessful``
+~~~~~~~~~~~~~~~~~~~
   If true, Dagu checks whether this DAG has already succeeded since the last scheduled time. If it did, Dagu will skip the current scheduled run. Manual triggers always run regardless of this setting.
 
   **Example**:
@@ -72,16 +90,16 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
     skipIfSuccessful: true
 
-- **group** (string, optional):
-
+``group``
+~~~~~~~~~
   An organizational label you can use to group DAGs (e.g., "DailyJobs", "Analytics").
 
-- **tags** (string, optional):
-
+``tags``
+~~~~~~~~
   A comma-separated list of tags. Useful for searching, grouping, or labeling runs (e.g., "finance, daily").
 
-- **env** (list of key-value, optional):
-
+``env``
+~~~~~~~
   Environment variables available to all steps in the DAG. These can use shell expansions, references to other environment variables, or command substitutions. They won't be stored in execution history data for security reasons, so if you want to retry a failed run, you need to have the same environment variables available.
 
   **Example**:
@@ -92,32 +110,32 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       - LOG_DIR: ${HOME}/logs
       - PATH: /usr/local/bin:${PATH}
 
-- **logDir** (string, default: ``${HOME}/.local/share/logs``):
-
+``logDir``
+~~~~~~~~~~
   The base directory in which logs for this DAG are stored.
 
-- **restartWaitSec** (integer, optional):
-
+``restartWaitSec``
+~~~~~~~~~~~~~~~~~
   Number of seconds to wait before restarting a failed or stopped DAG. Typically used with a process supervisor.
 
-- **histRetentionDays** (integer, optional):
-
+``histRetentionDays``
+~~~~~~~~~~~~~~~~~~~~
   How many days of historical run data to retain for this DAG. After this period, older run logs/history can be purged.
 
-- **timeoutSec** (integer, optional):
+``timeoutSec``
+~~~~~~~~~~~~~
+  Maximum number of seconds for the entire DAG to finish. If the DAG hasn't finished after this time, it's considered timed out.
 
-  Maximum number of seconds for the entire DAG to finish. If the DAG hasn’t finished after this time, it’s considered timed out.
-
-- **delaySec** (integer, optional):
-
+``delaySec``
+~~~~~~~~~~~
   Delay (in seconds) before starting each step in a DAG run. This can be useful to stagger workloads.
 
-- **maxActiveRuns** (integer, optional):
-
+``maxActiveRuns``
+~~~~~~~~~~~~~~~
   Limit on how many runs of this DAG can be active at once (especially relevant if the DAG has a frequent schedule).
 
-- **params** (string or list of key-value, optional):
-
+``params``
+~~~~~~~~~
   Default parameters for the entire DAG, either positional or named. Steps can reference these as environment variables (``$1, $2, ...`` for positional or ``$KEY`` for named).
 
   **Example (positional)**:
@@ -134,8 +152,8 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       - FOO: 1
       - BAR: "`echo 2`"
 
-- **preconditions** (list of condition blocks, optional):
-
+``preconditions``
+~~~~~~~~~~~~~~~
   A list of conditions that must be satisfied before the DAG can run. Each condition can use shell expansions or command substitutions to validate external states.
 
   **Example**:
@@ -146,8 +164,8 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       - condition: "`echo $2`" 
         expected: "param2"
 
-- **mailOn** (dictionary, optional):
-
+``mailOn``
+~~~~~~~~~
   Email notifications at DAG-level events, such as ``failure`` or ``success``. Also supports ``cancel`` and ``exit``.
 
   **Example**:
@@ -158,12 +176,12 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       failure: true
       success: false
 
-- **MaxCleanUpTimeSec** (integer, optional):
-
+``MaxCleanUpTimeSec``
+~~~~~~~~~~~~~~~~~~~
   Maximum number of seconds Dagu will spend cleaning up (stopping steps, finalizing logs, etc.) before forcing shutdown.
 
-- **handlerOn** (dictionary, optional):
-
+``handlerOn``
+~~~~~~~~~~~~
   Lifecycle event hooks at the DAG level. For each event (``success``, ``failure``, ``cancel``, ``exit``), you can run an additional command or script.
 
   **Example**:
@@ -180,8 +198,8 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       exit:
         command: echo "all done!"
 
-- **steps** (list of step objects, required):
-
+``steps``
+~~~~~~~~
   A list of steps (tasks) to execute. Steps define your workflow logic and can depend on each other. See :ref:`Step Fields <step-fields>` below for details.
 
 ------------
@@ -192,177 +210,129 @@ Step Fields
 -----------
 Each element in the top-level ``steps`` list has its own fields for customization. A step object looks like this:
 
-- **name** (string, required):
-
+``name``
+~~~~~~~~
   A unique identifier for the step within this DAG.
 
-- **description** (string, optional):
-
+``description``
+~~~~~~~~~~~~~
   Brief description of what this step does.
 
-- **dir** (string, optional):
+``dir``
+~~~~~~
+  Working directory in which this step's command or script is executed.
 
-  Working directory in which this step’s command or script is executed.
-
-- **command** (string, optional if ``script`` is used; otherwise required):
-
+``command``
+~~~~~~~~~~
   The command or executable to run for this step.  
   Examples include ``bash``, ``python``, or direct shell commands like ``echo hello``.
 
-- **script** (string, optional):
-
+``script``
+~~~~~~~~~
   Multi-line inline script content that will be piped into the command.  
-  If ``command`` is omitted, the script is executed with the system’s default shell.
+  If ``command`` is omitted, the script is executed with the system's default shell.
 
-- **stdout** (string, optional):
+``stdout``
+~~~~~~~~~
+  Path to a file in which to store the standard output (STDOUT) of the step's command.
 
-  Path to a file in which to store the standard output (STDOUT) of the step’s command.
+``stderr``
+~~~~~~~~~
+  Path to a file in which to store the standard error (STDERR) of the step's command.
 
-- **stderr** (string, optional):
+``output``
+~~~~~~~~~
+  A variable name to store the command's STDOUT contents. You can reuse this variable in subsequent steps.
 
-  Path to a file in which to store the standard error (STDERR) of the step’s command.
-
-- **output** (string, optional):
-
-  A variable name to store the command’s STDOUT contents. You can reuse this variable in subsequent steps.
-
-- **signalOnStop** (string, optional):
-
+``signalOnStop``
+~~~~~~~~~~~~~~
   If you manually stop this step (e.g., via CLI), the signal that Dagu sends to kill the process (e.g., ``SIGINT``).
 
-- **mailOn** (dictionary, optional):
-
+``mailOn``
+~~~~~~~~~
   Email notifications at the step level (same structure as DAG-level ``mailOn``).
 
-- **continueOn** (dictionary, optional):
-
+``continueOn``
+~~~~~~~~~~~~
   Controls how Dagu handles cases where the step is skipped or fails.  
 
   - **failure**: If true, continue the DAG even if this step fails.  
   - **skipped**: If true, continue the DAG even if preconditions cause this step to skip.
 
-- **retryPolicy** (dictionary, optional):
-
+``retryPolicy``
+~~~~~~~~~~~~~
   Defines automatic retries for this step when it fails.  
 
   - **limit** (integer): How many times to retry.  
   - **intervalSec** (integer): How many seconds to wait between retries.
 
-- **repeatPolicy** (dictionary, optional):
+  .. code-block:: yaml
+  
+    retryPolicy:
+      limit: 3
+      intervalSec: 5
 
+``repeatPolicy``
+~~~~~~~~~~~~~
   Allows repeating a step multiple times in a single run.  
 
   - **repeat** (boolean): Whether to repeat.  
   - **intervalSec** (integer): Interval in seconds between repeats.
 
-- **preconditions** (list of condition blocks, optional):
+  .. code-block:: yaml
+  
+    repeatPolicy:
+      repeat: true
+      intervalSec: 60  # run every minute
 
+``preconditions``
+~~~~~~~~~~~~~~
   Conditions that must be met for this step to run. Each condition block has:
 
   - **condition** (string): A command or expression to evaluate.
   - **expected** (string): The expected output. If the output matches, the step runs; otherwise, it is skipped.
 
-- **depends** (list of strings, optional):
+  .. code-block:: yaml
+  
+    steps:
+      - name: monthly task
+        command: monthly.sh
+        preconditions:
+          - condition: "`date '+%d'`"
+            expected: "01"
 
+``depends``
+~~~~~~~~~
   Names of other steps that must complete before this step can run.
 
-- **run** (string, optional):
-
+``run``
+~~~~~~
   Reference to another YAML file (sub workflow) to run at this step.  
   If present, the sub workflow is executed in place of a command.
 
-- **params** (string or list of key-value, optional):
+  .. code-block:: yaml
+  
+    steps:
+      - name: sub workflow
+        run: sub_dag.yaml
+        params: FOO=BAR
 
+``params``
+~~~~~~~~
   Parameters to pass into a sub workflow if this step references one (via ``run``). You can also treat these as environment variables in the workflow.
 
-- **executor** (dictionary, optional):
-
+``executor``
+~~~~~~~~~~
   An executor configuration specifying how the command or script is run (e.g., Docker, SSH, HTTP, Mail, JSON).  
   For more details, see :ref:`Executors <Executors>`.
 
 ------------
 
-Additional Constructs
----------------------
-
-Parameters
-~~~~~~~~~~
-Dagu supports both positional and named parameters at the DAG level. Steps can then override or add parameters. Access them in commands/scripts as environment variables.
-
-.. code-block:: yaml
-
-  params: param1 param2
-
-  steps:
-    - name: example
-      command: echo "First param: $1, second param: $2"
-
-Or with named parameters:
-
-.. code-block:: yaml
-
-  params:
-    - FOO: 1
-    - BAR: "`echo 2`"
-
-  steps:
-    - name: named example
-      command: echo "FOO is ${FOO}, BAR is ${BAR}"
-
-Preconditions
-~~~~~~~~~~~~~
-You can define preconditions at both DAG and step levels. Each precondition runs a shell expression and checks if its output matches an ``expected`` string. If it doesn’t match, the DAG or step is skipped (unless otherwise controlled by ``continueOn``).
-
-Retry Policy
-~~~~~~~~~~~~
-Define how many times a failing step should retry, plus a wait interval:
-
-.. code-block:: yaml
-
-  retryPolicy:
-    limit: 3
-    intervalSec: 5
-
-Repeat Policy
-~~~~~~~~~~~~~
-Run the same step multiple times in a single DAG run, with a configurable delay between repeats:
-
-.. code-block:: yaml
-
-  repeatPolicy:
-    repeat: true
-    intervalSec: 60  # run every minute
-
-Sub-Workflows
-~~~~~~~~~~~~~
-Use the ``run`` field within a step to call another YAML file. This helps organize large workflows. You can pass parameters:
-
-.. code-block:: yaml
-
-  steps:
-    - name: sub workflow
-      run: sub_dag.yaml
-      params: FOO=BAR
-
-Lifecycle Hooks (handlerOn)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-React to DAG-wide events like success, failure, cancel, and exit:
-
-.. code-block:: yaml
-
-  handlerOn:
-    success:
-      command: echo "DAG succeeded!"
-    failure:
-      command: echo "DAG failed!"
-    exit:
-      command: echo "DAG exited!"
-
 Global Configuration
 --------------------
 You can place global defaults in ``$HOME/.config/dagu/base.yaml``. This file can contain:
 
-- Default environment variables
+- Default environment variables or dotenv files
 - Email notification settings
 - A global ``logDir``
 - Common organizational patterns
@@ -375,6 +345,8 @@ Example:
   logDir: /var/log/dagu
   env:
     - GLOBAL_VAR: "HelloFromGlobalConfig"
+  dotenv:
+    - /path/to/.env
   mailOn:
     success: true
     failure: true
@@ -421,7 +393,7 @@ The ``docker`` executor runs commands inside Docker containers. This can help yo
            autoRemove: true
        command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
 
-By default, Dagu pulls the Docker image. If you’re using a local image, set :code:`pull: false`.
+By default, Dagu pulls the Docker image. If you're using a local image, set :code:`pull: false`.
 
 You can also configure volumes, environment variables, etc.:
 

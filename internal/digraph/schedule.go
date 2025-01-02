@@ -54,7 +54,7 @@ func parseScheduleMap(
 		// Key must be a string.
 		key, ok := k.(string)
 		if !ok {
-			return errScheduleKeyMustBeString
+			return wrapError("schedule", k, errScheduleKeyMustBeString)
 		}
 		var values []string
 
@@ -69,7 +69,7 @@ func parseScheduleMap(
 			for _, s := range v {
 				s, ok := s.(string)
 				if !ok {
-					return errScheduleMustBeStringOrArray
+					return wrapError("schedule", s, errScheduleMustBeStringOrArray)
 				}
 				values = append(values, s)
 			}
@@ -92,7 +92,7 @@ func parseScheduleMap(
 
 		for _, v := range values {
 			if _, err := cronParser.Parse(v); err != nil {
-				return fmt.Errorf("%w: %s", errInvalidSchedule, err)
+				return wrapError("schedule", v, fmt.Errorf("%w: %s", errInvalidSchedule, err))
 			}
 			*targets = append(*targets, v)
 		}

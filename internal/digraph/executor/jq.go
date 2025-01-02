@@ -98,8 +98,9 @@ func (e *jq) Run(_ context.Context) error {
 
 func decodeJqConfig(dat map[string]any, cfg *jqConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: false,
-		Result:      cfg,
+		WeaklyTypedInput: true,
+		ErrorUnused:      false,
+		Result:           cfg,
 	})
 	return md.Decode(dat)
 }

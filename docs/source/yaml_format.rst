@@ -99,29 +99,50 @@ Define variables accessible throughout the DAG:
       dir: ${SOME_DIR}
       command: python main.py ${SOME_FILE}
 
-Parameters
-~~~~~~~~~~
-Pass positional parameters to steps:
+Dotenv Files
+~~~~~~~~~~~
+Specify candidate ``.env`` files to load environment variables from. By default, no env files are loaded unless explicitly specified.
 
 .. code-block:: yaml
 
-  params: param1 param2
+  dotenv: .env  # Specify a candidate dotenv file
+
+  # Or specify multiple candidate files
+  dotenv:
+    - .env
+    - .env.local
+    - configs/.env.prod
+
+Files can be specified as:
+
+- Absolute paths
+- Relative to the DAG file directory
+- Relative to the base config directory
+- Relative to the user's home directory
+
+Parameters
+~~~~~~~~~~
+Define default positional parameters that can be overridden:
+
+.. code-block:: yaml
+
+  params: param1 param2  # Default values for $1 and $2
   steps:
     - name: parameterized task
-      command: python main.py $1 $2
+      command: python main.py $1 $2      # Will use command-line args or defaults
 
 Named Parameters
 ~~~~~~~~~~~~~~
-Use named parameters for better clarity:
+Define default named parameters that can be overridden:
 
 .. code-block:: yaml
 
   params:
-    - FOO: 1
-    - BAR: "`echo 2`"
+    - FOO: 1           # Default value for ${FOO}
+    - BAR: "`echo 2`"  # Default value for ${BAR}, using command substitution
   steps:
     - name: named params task
-      command: python main.py ${FOO} ${BAR}
+      command: python main.py ${FOO} ${BAR}  # Will use command-line args or defaults
 
 Code Snippets
 ~~~~~~~~~~~~

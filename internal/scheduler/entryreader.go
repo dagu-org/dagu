@@ -99,7 +99,7 @@ func (er *entryReaderImpl) initDAGs(ctx context.Context) error {
 	var fileNames []string
 	for _, fi := range fis {
 		if fileutil.IsYAMLFile(fi.Name()) {
-			dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, fi.Name()))
+			dag, err := digraph.Load(ctx, filepath.Join(er.dagsDir, fi.Name()), digraph.OnlyMetadata(), digraph.WithoutEval())
 			if err != nil {
 				logger.Error(ctx, "DAG load failed", "err", err, "DAG", fi.Name())
 				continue
@@ -138,7 +138,8 @@ func (er *entryReaderImpl) watchDags(ctx context.Context, done chan any) {
 			}
 			er.dagsLock.Lock()
 			if event.Op == fsnotify.Create || event.Op == fsnotify.Write {
-				dag, err := digraph.LoadMetadata(ctx, filepath.Join(er.dagsDir, filepath.Base(event.Name)))
+				filePath := filepath.Join(er.dagsDir, filepath.Base(event.Name))
+				dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 				if err != nil {
 					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
 				} else {

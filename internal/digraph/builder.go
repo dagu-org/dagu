@@ -5,11 +5,12 @@ package digraph
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/joho/godotenv"
 	"golang.org/x/sys/unix"
 )
 
@@ -18,59 +19,44 @@ type BuilderFn func(ctx BuildContext, spec *definition, dag *DAG) error
 
 // BuildContext is the context for building a DAG.
 type BuildContext struct {
-	ctx            context.Context
-	opts           buildOpts
-	additionalEnvs []string
+	ctx  context.Context
+	file string
+	opts buildOpts
+}
+
+func (c BuildContext) WithOpts(opts buildOpts) BuildContext {
+	copy := c
+	copy.opts = opts
+	return copy
+}
+
+func (c BuildContext) WithFile(file string) BuildContext {
+	copy := c
+	copy.file = file
+	return copy
 }
 
 // buildOpts is used to control the behavior of the builder.
 type buildOpts struct {
 	// base specifies the base configuration file for the DAG.
 	base string
-	// metadataOnly specifies whether to build only the metadata.
-	metadataOnly bool
+	// onlyMetadata specifies whether to build only the metadata.
+	onlyMetadata bool
 	// parameters specifies the parameters to the DAG.
-	// parameters are used to override the default parameters for
-	// executing the DAG.
+	// parameters are used to override the default parameters in the DAG.
 	parameters string
-	// noEval specifies whether to evaluate environment variables.
-	// This is useful when loading details for a DAG, but not
-	// for execution.
+	// parametersList specifies the parameters to the DAG.
+	parametersList []string
+	// noEval specifies whether to evaluate dynamic fields.
 	noEval bool
 }
-
-// errors on building a DAG.
-var (
-	errInvalidSchedule                    = errors.New("invalid schedule")
-	errScheduleMustBeStringOrArray        = errors.New("schedule must be a string or an array of strings")
-	errInvalidScheduleType                = errors.New("invalid schedule type")
-	errInvalidKeyType                     = errors.New("invalid key type")
-	errExecutorConfigMustBeString         = errors.New("executor config key must be string")
-	errDuplicateFunction                  = errors.New("duplicate function")
-	errFuncParamsMismatch                 = errors.New("func params and args given to func command do not match")
-	errStepNameRequired                   = errors.New("step name must be specified")
-	errStepCommandIsRequired              = errors.New("step command is required")
-	errStepCommandIsEmpty                 = errors.New("step command is empty")
-	errStepCommandMustBeArrayOrString     = errors.New("step command must be an array of strings or a string")
-	errInvalidParamValue                  = errors.New("invalid parameter value")
-	errCallFunctionNotFound               = errors.New("call must specify a functions that exists")
-	errNumberOfParamsMismatch             = errors.New("the number of parameters defined in the function does not match the number of parameters given")
-	errRequiredParameterNotFound          = errors.New("required parameter not found")
-	errScheduleKeyMustBeString            = errors.New("schedule key must be a string")
-	errInvalidSignal                      = errors.New("invalid signal")
-	errInvalidEnvValue                    = errors.New("invalid value for env")
-	errArgsMustBeConvertibleToIntOrString = errors.New("args must be convertible to either int or string")
-	errExecutorTypeMustBeString           = errors.New("executor.type value must be string")
-	errExecutorConfigValueMustBeMap       = errors.New("executor.config value must be a map")
-	errExecutorHasInvalidKey              = errors.New("executor has invalid key")
-	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
-)
 
 var builderRegistry = []builderEntry{
 	{metadata: true, name: "env", fn: buildEnvs},
 	{metadata: true, name: "schedule", fn: buildSchedule},
 	{metadata: true, name: "skipIfSuccessful", fn: skipIfSuccessful},
 	{metadata: true, name: "params", fn: buildParams},
+	{name: "dotenv", fn: buildDotenv},
 	{name: "mailOn", fn: buildMailOn},
 	{name: "steps", fn: buildSteps},
 	{name: "logDir", fn: buildLogDir},
@@ -108,14 +94,9 @@ type stepBuilderEntry struct {
 type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
 
 // build builds a DAG from the specification.
-func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs []string) (*DAG, error) {
-	buildCtx := BuildContext{
-		ctx:            ctx,
-		opts:           opts,
-		additionalEnvs: additionalEnvs,
-	}
-
+func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
+		Location:      ctx.file,
 		Name:          spec.Name,
 		Group:         spec.Group,
 		Description:   spec.Description,
@@ -128,15 +109,15 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 
 	var errs errorList
 	for _, builder := range builderRegistry {
-		if !builder.metadata && opts.metadataOnly {
+		if !builder.metadata && ctx.opts.onlyMetadata {
 			continue
 		}
-		if err := builder.fn(buildCtx, spec, dag); err != nil {
-			errs.Add(fmt.Errorf("%s: %w", builder.name, err))
+		if err := builder.fn(ctx, spec, dag); err != nil {
+			errs.Add(wrapError(builder.name, nil, err))
 		}
 	}
 
-	if !opts.metadataOnly {
+	if !ctx.opts.onlyMetadata {
 		// TODO: Remove functions feature.
 		if err := assertFunctions(spec.Functions); err != nil {
 			errs.Add(err)
@@ -216,9 +197,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
-				return fmt.Errorf(
-					"%w, got %T: ", errScheduleMustBeStringOrArray, s,
-				)
+				return wrapError("schedule", s, errScheduleMustBeStringOrArray)
 			}
 			starts = append(starts, s)
 		}
@@ -236,7 +215,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 
 	default:
 		// If schedule is of an invalid type, return an error.
-		return fmt.Errorf("%w: %T", errInvalidScheduleType, spec.Schedule)
+		return wrapError("schedule", spec.Schedule, errInvalidScheduleType)
 
 	}
 
@@ -254,6 +233,52 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	return err
 }
 
+func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
+	switch v := spec.Dotenv.(type) {
+	case nil:
+		return nil
+
+	case string:
+		dag.Dotenv = append(dag.Dotenv, v)
+
+	case []any:
+		for _, e := range v {
+			switch e := e.(type) {
+			case string:
+				dag.Dotenv = append(dag.Dotenv, e)
+			default:
+				return wrapError("dotenv", e, errDotenvMustBeStringOrArray)
+			}
+		}
+	default:
+		return wrapError("dotenv", v, errDotenvMustBeStringOrArray)
+	}
+
+	if ctx.opts.noEval {
+		return nil
+	}
+
+	var relativeTos []string
+	if ctx.file != "" {
+		relativeTos = append(relativeTos, ctx.file)
+	}
+
+	resolver := fileutil.NewFileResolver(relativeTos)
+	for _, filePath := range dag.Dotenv {
+		resolvedPath, err := resolver.ResolveFilePath(filePath)
+		if err != nil {
+			continue
+		}
+		if err := godotenv.Load(resolvedPath); err != nil {
+			return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
+		}
+		// Break after the first successful load.
+		break
+	}
+
+	return nil
+}
+
 func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 	if spec.MailOn == nil {
 		return nil
@@ -269,21 +294,15 @@ func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 // Case 1: env is an array of maps with string keys and string values.
 // Case 2: env is a map with string keys and string values.
 func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
-	env, err := loadVariables(ctx, spec.Env)
+	vars, err := loadVariables(ctx, spec.Env)
 	if err != nil {
 		return err
 	}
-	dag.Env = buildConfigEnv(env)
 
-	// Add the environment variables that are defined in the base
-	// configuration. If the environment variable is already defined in
-	// the DAG, it is not added.
-	for _, e := range ctx.additionalEnvs {
-		key := strings.SplitN(e, "=", 2)[0]
-		if _, ok := env[key]; !ok {
-			dag.Env = append(dag.Env, e)
-		}
+	for k, v := range vars {
+		dag.Env = append(dag.Env, fmt.Sprintf("%s=%s", k, v))
 	}
+
 	return nil
 }
 
@@ -446,6 +465,7 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	return nil
 }
 
+// buildRetryPolicy builds the retry policy for a step.
 func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 	if def.RetryPolicy != nil {
 		switch v := def.RetryPolicy.Limit.(type) {
@@ -454,7 +474,7 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		case string:
 			step.RetryPolicy.LimitStr = v
 		default:
-			return fmt.Errorf("invalid type for retryPolicy.Limit: %T", v)
+			return wrapError("retryPolicy.Limit", v, fmt.Errorf("invalid type: %T", v))
 		}
 
 		switch v := def.RetryPolicy.IntervalSec.(type) {
@@ -463,7 +483,7 @@ func buildRetryPolicy(_ BuildContext, def stepDef, step *Step) error {
 		case string:
 			step.RetryPolicy.IntervalSecStr = v
 		default:
-			return fmt.Errorf("invalid type for retryPolicy.IntervalSec: %T", v)
+			return wrapError("retryPolicy.IntervalSec", v, fmt.Errorf("invalid type: %T", v))
 		}
 	}
 	return nil
@@ -542,7 +562,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 		for k, v := range val {
 			key, ok := k.(string)
 			if !ok {
-				return errExecutorConfigMustBeString
+				return wrapError("executor.config", k, errExecutorConfigMustBeString)
 			}
 
 			switch key {
@@ -550,7 +570,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// Executor type is a string.
 				typ, ok := v.(string)
 				if !ok {
-					return errExecutorTypeMustBeString
+					return wrapError("executor.type", v, errExecutorTypeMustBeString)
 				}
 				step.ExecutorConfig.Type = typ
 
@@ -560,26 +580,26 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// It is up to the executor to parse the values.
 				executorConfig, ok := v.(map[any]any)
 				if !ok {
-					return errExecutorConfigValueMustBeMap
+					return wrapError("executor.config", v, errExecutorConfigValueMustBeMap)
 				}
 				for k, v := range executorConfig {
 					configKey, ok := k.(string)
 					if !ok {
-						return errExecutorConfigMustBeString
+						return wrapError("executor.config", k, errExecutorConfigMustBeString)
 					}
 					step.ExecutorConfig.Config[configKey] = v
 				}
 
 			default:
 				// Unknown key in the executor config.
-				return fmt.Errorf("%w: %s", errExecutorHasInvalidKey, key)
+				return wrapError("executor.config", key, fmt.Errorf("%w: %s", errExecutorHasInvalidKey, key))
 
 			}
 		}
 
 	default:
 		// Unknown key for executor field.
-		return errExecutorConfigMustBeStringOrMap
+		return wrapError("executor", val, errExecutorConfigMustBeStringOrMap)
 
 	}
 
@@ -647,16 +667,6 @@ func parseKey(value any) (string, error) {
 	}
 
 	return val, nil
-}
-
-// buildConfigEnv builds the environment variables from the map.
-func buildConfigEnv(vars map[string]string) []string {
-	var ret []string
-	for k, v := range vars {
-		ret = append(ret, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	return ret
 }
 
 // buildConditions builds a list of conditions from the definition.

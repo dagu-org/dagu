@@ -29,7 +29,7 @@ type sshExec struct {
 type sshExecConfigDefinition struct {
 	User                  string
 	IP                    string
-	Port                  any
+	Port                  string
 	Key                   string
 	Password              string
 	StrictHostKeyChecking bool
@@ -67,7 +67,7 @@ func selectSSHAuthMethod(cfg *sshExecConfig) (ssh.AuthMethod, error) {
 func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 	def := new(sshExecConfigDefinition)
 	md, err := mapstructure.NewDecoder(
-		&mapstructure.DecoderConfig{Result: def},
+		&mapstructure.DecoderConfig{Result: def, WeaklyTypedInput: true},
 	)
 
 	if err != nil {
@@ -78,27 +78,17 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		return nil, fmt.Errorf("failed to decode ssh config: %w", err)
 	}
 
+	if def.Port == "0" || def.Port == "" {
+		def.Port = "22"
+	}
+
 	stepContext := digraph.GetStepContext(ctx)
-
-	var port string
-	switch v := def.Port.(type) {
-	case int:
-		port = fmt.Sprintf("%d", v)
-	case string:
-		port = v
-	default:
-		port = fmt.Sprintf("%v", def.Port)
-	}
-	if port == "" {
-		port = "22"
-	}
-
 	cfg, err := digraph.EvalStringFields(stepContext, sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
 		Key:      def.Key,
 		Password: def.Password,
-		Port:     port,
+		Port:     def.Port,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields for ssh config: %w", err)

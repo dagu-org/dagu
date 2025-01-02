@@ -42,54 +42,71 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 			return err
 		}
 		// Override the default parameters with the command line parameters
-		pairsIndex := make(map[string]int)
-		for i, paramPair := range paramPairs {
-			if paramPair.Name != "" {
-				pairsIndex[paramPair.Name] = i
-			}
-		}
-		for i, paramPair := range overridePairs {
-			if paramPair.Name == "" {
-				// For positional parameters
-				if i < len(paramPairs) {
-					paramPairs[i] = paramPair
-				} else {
-					paramPairs = append(paramPairs, paramPair)
-				}
-				continue
-			}
-
-			if foundIndex, ok := pairsIndex[paramPair.Name]; ok {
-				paramPairs[foundIndex] = paramPair
-			} else {
-				paramPairs = append(paramPairs, paramPair)
-			}
-		}
-
-		envsIndex := make(map[string]int)
-		for i, env := range envs {
-			envsIndex[env] = i
-		}
-		for _, env := range overrideEnvs {
-			if i, ok := envsIndex[env]; !ok {
-				envs = append(envs, env)
-			} else {
-				envs[i] = env
-			}
-		}
+		overrideParams(&paramPairs, overridePairs)
+		overrideEnvirons(&envs, overrideEnvs)
 	}
 
-	// Convert the parameters to a string in the form of "key=value"
-	var paramStrings []string
+	if len(ctx.opts.parametersList) > 0 {
+		var (
+			overridePairs []paramPair
+			overrideEnvs  []string
+		)
+		if err := parseParams(ctx, ctx.opts.parametersList, &overridePairs, &overrideEnvs); err != nil {
+			return err
+		}
+		// Override the default parameters with the command line parameters
+		overrideParams(&paramPairs, overridePairs)
+		overrideEnvirons(&envs, overrideEnvs)
+	}
+
 	for _, paramPair := range paramPairs {
-		paramStrings = append(paramStrings, paramPair.String())
+		dag.Params = append(dag.Params, paramPair.String())
 	}
 
-	// Set the parameters as environment variables for the command
 	dag.Env = append(dag.Env, envs...)
-	dag.Params = append(dag.Params, paramStrings...)
 
 	return nil
+}
+
+func overrideParams(paramPairs *[]paramPair, override []paramPair) {
+	// Override the default parameters with the command line parameters
+	pairsIndex := make(map[string]int)
+	for i, paramPair := range *paramPairs {
+		if paramPair.Name != "" {
+			pairsIndex[paramPair.Name] = i
+		}
+	}
+	for i, paramPair := range override {
+		if paramPair.Name == "" {
+			// For positional parameters
+			if i < len(*paramPairs) {
+				(*paramPairs)[i] = paramPair
+			} else {
+				*paramPairs = append(*paramPairs, paramPair)
+			}
+			continue
+		}
+
+		if foundIndex, ok := pairsIndex[paramPair.Name]; ok {
+			(*paramPairs)[foundIndex] = paramPair
+		} else {
+			*paramPairs = append(*paramPairs, paramPair)
+		}
+	}
+}
+
+func overrideEnvirons(envs *[]string, override []string) {
+	envsIndex := make(map[string]int)
+	for i, env := range *envs {
+		envsIndex[env] = i
+	}
+	for _, env := range override {
+		if i, ok := envsIndex[env]; !ok {
+			*envs = append(*envs, env)
+		} else {
+			(*envs)[i] = env
+		}
+	}
 }
 
 // parseParams parses and processes the parameters for the DAG.
@@ -98,7 +115,7 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 
 	paramPairs, err := parseParamValue(ctx, value)
 	if err != nil {
-		return fmt.Errorf("%w: %s", errInvalidParamValue, err)
+		return wrapError("params", value, fmt.Errorf("%w: %s", errInvalidParamValue, err))
 	}
 
 	for index, paramPair := range paramPairs {
@@ -113,13 +130,13 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 		// Set the parameter as an environment variable for the command
 		// $1, $2, $3, ...
 		if err := os.Setenv(strconv.Itoa(index+1), paramString); err != nil {
-			return fmt.Errorf("failed to set environment variable: %w", err)
+			return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
 		}
 
 		if !ctx.opts.noEval && paramPair.Name != "" {
 			*envs = append(*envs, paramString)
 			if err := os.Setenv(paramPair.Name, paramPair.Value); err != nil {
-				return fmt.Errorf("failed to set environment variable: %w", err)
+				return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
 			}
 		}
 	}
@@ -139,10 +156,27 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case []any:
 		return parseMapParams(ctx, v)
 
+	case []string:
+		return parseListParams(ctx, v)
+
 	default:
-		return nil, fmt.Errorf("%w: %T", errInvalidParamValue, v)
+		return nil, wrapError("params", v, fmt.Errorf("%w: %T", errInvalidParamValue, v))
 
 	}
+}
+
+func parseListParams(ctx BuildContext, input []string) ([]paramPair, error) {
+	var params []paramPair
+
+	for _, v := range input {
+		parsedParams, err := parseStringParams(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, parsedParams...)
+	}
+
+	return params, nil
 }
 
 func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
@@ -150,6 +184,13 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 
 	for _, m := range input {
 		switch m := m.(type) {
+		case string:
+			parsedParams, err := parseStringParams(ctx, m)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, parsedParams...)
+
 		case map[any]any:
 			for name, value := range m {
 				var nameStr string
@@ -160,7 +201,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 					valueStr = v
 
 				default:
-					return nil, fmt.Errorf("%w: %T", errInvalidParamValue, v)
+					return nil, wrapError("params", value, fmt.Errorf("%w: %T", errInvalidParamValue, v))
 
 				}
 
@@ -169,14 +210,14 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 					nameStr = n
 
 				default:
-					return nil, fmt.Errorf("%w: %T", errInvalidParamValue, n)
+					return nil, wrapError("params", name, fmt.Errorf("%w: %T", errInvalidParamValue, n))
 
 				}
 
 				if !ctx.opts.noEval {
 					parsed, err := cmdutil.EvalString(valueStr)
 					if err != nil {
-						return nil, fmt.Errorf("%w: %s", errInvalidParamValue, err)
+						return nil, wrapError("params", valueStr, fmt.Errorf("%w: %s", errInvalidParamValue, err))
 					}
 					valueStr = parsed
 				}
@@ -186,7 +227,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 			}
 
 		default:
-			return nil, fmt.Errorf("%w: %T", errInvalidParamValue, m)
+			return nil, wrapError("params", m, fmt.Errorf("%w: %T", errInvalidParamValue, m))
 		}
 	}
 
@@ -234,7 +275,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				)
 
 				if cmdErr != nil {
-					return nil, fmt.Errorf("%w: %s", errInvalidParamValue, cmdErr)
+					return nil, wrapError("params", value, fmt.Errorf("%w: %s", errInvalidParamValue, cmdErr))
 				}
 			}
 		}

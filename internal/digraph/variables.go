@@ -23,7 +23,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 	case map[any]any:
 		// Case 1. env is a map.
 		if err := parseKeyValue(a, &pairs); err != nil {
-			return nil, err
+			return nil, wrapError("env", a, err)
 		}
 
 	case []any:
@@ -31,7 +31,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 		for _, v := range a {
 			if aa, ok := v.(map[any]any); ok {
 				if err := parseKeyValue(aa, &pairs); err != nil {
-					return nil, err
+					return nil, wrapError("env", v, err)
 				}
 			}
 		}
@@ -49,11 +49,11 @@ func loadVariables(ctx BuildContext, strVariables any) (
 
 			value, err = cmdutil.SubstituteCommands(os.ExpandEnv(value))
 			if err != nil {
-				return nil, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val)
+				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val))
 			}
 
 			if err := os.Setenv(pair.key, value); err != nil {
-				return nil, err
+				return nil, wrapError("env", pair.key, err)
 			}
 		}
 
@@ -74,7 +74,7 @@ func parseKeyValue(m map[any]any, pairs *[]pair) error {
 	for k, v := range m {
 		key, ok := k.(string)
 		if !ok {
-			return errInvalidKeyType
+			return wrapError("env", k, errInvalidKeyType)
 		}
 
 		var val string

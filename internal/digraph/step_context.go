@@ -5,6 +5,8 @@ package digraph
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/mailer"
@@ -67,6 +69,21 @@ func (c StepContext) EvalString(s string) (string, error) {
 		cmdutil.WithVariables(c.envs),
 		cmdutil.WithVariables(c.outputVariables.Variables()),
 	)
+}
+
+func (c StepContext) EvalBool(value any) (bool, error) {
+	switch v := value.(type) {
+	case string:
+		s, err := c.EvalString(v)
+		if err != nil {
+			return false, err
+		}
+		return strconv.ParseBool(s)
+	case bool:
+		return v, nil
+	default:
+		return false, fmt.Errorf("unsupported type %T for bool (value: %+v)", value, value)
+	}
 }
 
 func (c StepContext) WithEnv(key, value string) StepContext {

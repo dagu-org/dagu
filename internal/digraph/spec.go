@@ -13,6 +13,8 @@ type definition struct {
 	Group string
 	// Description is the description of the DAG.
 	Description string
+	// Dotenv is the path to the dotenv file (string or []string).
+	Dotenv any
 	// Schedule is the cron schedule to run the DAG.
 	Schedule any
 	// SkipIfSuccessful is the flag to skip the DAG on schedule when it is
@@ -44,7 +46,7 @@ type definition struct {
 	RestartWaitSec int
 	// HistRetentionDays is the retention days of the history.
 	HistRetentionDays *int
-	// Precondition is the condition to run the DAG.
+	// Preconditions is the condition to run the DAG.
 	Preconditions []*conditionDef
 	// MaxActiveRuns is the maximum number of concurrent steps.
 	MaxActiveRuns int
@@ -58,18 +60,21 @@ type definition struct {
 	Tags any
 }
 
+// conditionDef defines a condition and its expected value.
 type conditionDef struct {
-	Condition string
-	Expected  string
+	Condition string // Condition to evaluate
+	Expected  string // Expected value
 }
 
+// handlerOnDef defines the steps to be executed on different events.
 type handlerOnDef struct {
-	Failure *stepDef
-	Success *stepDef
-	Cancel  *stepDef
-	Exit    *stepDef
+	Failure *stepDef // Step to execute on failure
+	Success *stepDef // Step to execute on success
+	Cancel  *stepDef // Step to execute on cancel
+	Exit    *stepDef // Step to execute on exit
 }
 
+// stepDef defines a step in the DAG.
 type stepDef struct {
 	// Name is the name of the step.
 	Name string
@@ -101,7 +106,7 @@ type stepDef struct {
 	RepeatPolicy *repeatPolicyDef
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool
-	// Precondition is the condition to run the step.
+	// Preconditions is the condition to run the step.
 	Preconditions []*conditionDef
 	// SignalOnStop is the signal when the step is requested to stop.
 	// When it is empty, the same signal as the parent process is sent.
@@ -115,47 +120,55 @@ type stepDef struct {
 	Params string
 }
 
+// funcDef defines a function in the DAG.
 type funcDef struct {
-	Name    string
-	Params  string
-	Command string
+	Name    string // Name of the function
+	Params  string // Parameters for the function
+	Command string // Command to execute the function
 }
 
+// callFuncDef defines a function call in the DAG.
 type callFuncDef struct {
-	Function string
-	Args     map[string]any
+	Function string         // Name of the function to call
+	Args     map[string]any // Arguments for the function call
 }
 
+// continueOnDef defines the conditions to continue on failure or skipped.
 type continueOnDef struct {
-	Failure bool
-	Skipped bool
+	Failure bool // Continue on failure
+	Skipped bool // Continue on skipped
 }
 
+// repeatPolicyDef defines the repeat policy for a step.
 type repeatPolicyDef struct {
-	Repeat      bool
-	IntervalSec int
+	Repeat      bool // Flag to indicate if the step should be repeated
+	IntervalSec int  // Interval in seconds between repeats
 }
 
+// retryPolicyDef defines the retry policy for a step.
 type retryPolicyDef struct {
-	Limit       any
-	IntervalSec any
+	Limit       any // Limit on the number of retries
+	IntervalSec any // Interval in seconds between retries
 }
 
+// smtpConfigDef defines the SMTP configuration.
 type smtpConfigDef struct {
-	Host     string
-	Port     string
-	Username string
-	Password string
+	Host     string // SMTP host
+	Port     string // SMTP port
+	Username string // SMTP username
+	Password string // SMTP password
 }
 
+// mailConfigDef defines the mail configuration.
 type mailConfigDef struct {
-	From       string
-	To         string
-	Prefix     string
-	AttachLogs bool
+	From       string // Sender email address
+	To         string // Recipient email address
+	Prefix     string // Prefix for the email subject
+	AttachLogs bool   // Flag to attach logs to the email
 }
 
+// mailOnDef defines the conditions to send mail.
 type mailOnDef struct {
-	Failure bool
-	Success bool
+	Failure bool // Send mail on failure
+	Success bool // Send mail on success
 }

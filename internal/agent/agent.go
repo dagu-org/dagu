@@ -77,7 +77,7 @@ func New(
 	cli client.Client,
 	dagStore persistence.DAGStore,
 	historyStore persistence.HistoryStore,
-	opts *Options,
+	opts Options,
 ) *Agent {
 	return &Agent{
 		requestID:    requestID,
@@ -92,15 +92,6 @@ func New(
 	}
 }
 
-var (
-	// wait before read the running status
-	waitForRunning = time.Millisecond * 100
-
-	// errors on running DAG
-	errFailedSetupUnixSocket = errors.New("failed to start the unix socket")
-	errDAGIsAlreadyRunning   = errors.New("the DAG is already running")
-)
-
 // Run setups the scheduler and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
 	if err := a.setup(ctx); err != nil {
@@ -113,6 +104,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
+		logger.Info(ctx, "Preconditions are not met", "err", err)
 		return err
 	}
 
@@ -165,7 +157,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// It returns error if it failed to start the unix socket server.
 	if err := <-listenerErrCh; err != nil {
-		return errFailedSetupUnixSocket
+		return fmt.Errorf("failed to start the unix socket server: %w", err)
 	}
 
 	// Setup channels to receive status updates for each node in the DAG.
@@ -260,6 +252,9 @@ func (a *Agent) Status() model.Status {
 func (a *Agent) Signal(ctx context.Context, sig os.Signal) {
 	a.signal(ctx, sig, false)
 }
+
+// wait before read the running status
+const waitForRunning = time.Millisecond * 100
 
 // Simple regular expressions for request routing
 var (
@@ -365,7 +360,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 		}
 	}()
 
-	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
+	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
 	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
@@ -486,9 +481,7 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 		return err
 	}
 	if status.Status != scheduler.StatusNone {
-		return fmt.Errorf(
-			"%w. socket=%s", errDAGIsAlreadyRunning, a.dag.SockAddr(),
-		)
+		return fmt.Errorf("the DAG is already running. status=%s, socket=%s", status.Status, a.dag.SockAddr())
 	}
 	return nil
 }

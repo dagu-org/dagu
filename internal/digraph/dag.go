@@ -14,80 +14,65 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+// Constants for configuration defaults
+const (
+	defaultHistoryRetentionDays = 30
+	defaultMaxCleanUpTime       = 60 * time.Second
+	maxSocketNameLength         = 50 // Maximum length for socket name (108 - 16 - 34 - 8 = 50)
+)
+
 // DAG contains all information about a workflow.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
 	Location string `json:"Location"`
 	// Group is the group name of the DAG. This is optional.
 	Group string `json:"Group"`
-	// Name is the name of the DAG. The default is the filename without the
-	// extension.
+	// Name is the name of the DAG. The default is the filename without the extension.
 	Name string `json:"Name"`
-	// Tags contains the list of tags for the DAG. optional.
+	// Dotenv is the path to the dotenv file. This is optional.
+	Dotenv []string `json:"Dotenv"`
+	// Tags contains the list of tags for the DAG. This is optional.
 	Tags []string `json:"Tags"`
-	// Description is the description of the DAG. optional.
+	// Description is the description of the DAG. This is optional.
 	Description string `json:"Description"`
-	// Schedule configuration.
-	// This is used by the scheduler to start / stop / restart the DAG.
+	// Schedule configuration for starting, stopping, and restarting the DAG.
 	Schedule        []Schedule `json:"Schedule"`
 	StopSchedule    []Schedule `json:"StopSchedule"`
 	RestartSchedule []Schedule `json:"RestartSchedule"`
-
-	// Skip if successful.
+	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
+	// E.g., when the DAG has already been executed manually before the scheduled time.
 	SkipIfSuccessful bool `json:"SkipIfSuccessful"`
-
-	// Env contains a list of environment variables to be set before running
-	// the DAG.
+	// Env contains a list of environment variables to be set before running the DAG.
 	Env []string `json:"Env"`
-
 	// LogDir is the directory where the logs are stored.
-	// The actual log directory is LogDir + Name (with invalid characters
-	// replaced with '_').
 	LogDir string `json:"LogDir"`
-
-	// Parameters configuration.
-	// The DAG definition contains only DefaultParams. Params are automatically
-	// set by the DAG loader.
 	// DefaultParams contains the default parameters to be passed to the DAG.
 	DefaultParams string `json:"DefaultParams"`
 	// Params contains the list of parameters to be passed to the DAG.
 	Params []string `json:"Params"`
-
-	// Commands configuration to be executed in the DAG.
 	// Steps contains the list of steps in the DAG.
 	Steps []Step `json:"Steps"`
 	// HandlerOn contains the steps to be executed on different events.
 	HandlerOn HandlerOn `json:"HandlerOn"`
-
 	// Preconditions contains the conditions to be met before running the DAG.
-	// If the conditions are not met, the whole DAG is skipped.
 	Preconditions []Condition `json:"Preconditions"`
-
-	// Mail notification configuration.
-	// MailOn contains the conditions to send mail.
 	// SMTP contains the SMTP configuration.
-	// If you don't want to repeat the SMTP configuration for each DAG, you can
-	// set it in the base configuration.
 	SMTP *SMTPConfig `json:"Smtp"`
-	// ErrorMail contains the mail configuration for error.
+	// ErrorMail contains the mail configuration for errors.
 	ErrorMail *MailConfig `json:"ErrorMail"`
-	// InfoMail contains the mail configuration for info.
+	// InfoMail contains the mail configuration for informational messages.
 	InfoMail *MailConfig `json:"InfoMail"`
 	// MailOn contains the conditions to send mail.
 	MailOn *MailOn `json:"MailOn"`
-
-	// Timeout is a field to specify the maximum execution time of the DAG task
+	// Timeout specifies the maximum execution time of the DAG task.
 	Timeout time.Duration `json:"Timeout"`
-	// Misc configuration for DAG execution.
 	// Delay is the delay before starting the DAG.
 	Delay time.Duration `json:"Delay"`
 	// RestartWait is the time to wait before restarting the DAG.
 	RestartWait time.Duration `json:"RestartWait"`
-	// MaxActiveRuns specifies the maximum concurrent steps to run in an
-	// execution.
+	// MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
 	MaxActiveRuns int `json:"MaxActiveRuns"`
-	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is
-	// stopped.
+	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
 	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime"`
 	// HistRetentionDays is the number of days to keep the history.
 	HistRetentionDays int `json:"HistRetentionDays"`
@@ -125,12 +110,10 @@ type SMTPConfig struct {
 
 // MailConfig contains the mail configuration.
 type MailConfig struct {
-	From string `json:"From"`
-	To   string `json:"To"`
-	// Prefix is the prefix for the subject of the mail.
-	Prefix string `json:"Prefix"`
-	// AttachLogs is the flag to attach the logs in the mail.
-	AttachLogs bool `json:"AttachLogs"`
+	From       string `json:"From"`
+	To         string `json:"To"`
+	Prefix     string `json:"Prefix"`
+	AttachLogs bool   `json:"AttachLogs"`
 }
 
 // HandlerType is the type of the handler.
@@ -143,65 +126,20 @@ const (
 	HandlerOnExit    HandlerType = "onExit"
 )
 
-func (e HandlerType) String() string {
-	return string(e)
+func (h HandlerType) String() string {
+	return string(h)
 }
 
 // ParseHandlerType converts a string to a HandlerType.
 func ParseHandlerType(s string) HandlerType {
-	return nameToHandlerType[s]
+	return handlerMapping[s]
 }
 
-var (
-	nameToHandlerType = map[string]HandlerType{
-		"onSuccess": HandlerOnSuccess,
-		"onFailure": HandlerOnFailure,
-		"onCancel":  HandlerOnCancel,
-		"onExit":    HandlerOnExit,
-	}
-)
-
-var (
-	defaultHistoryRetentionDays = 30
-	defaultMaxCleanUpTime       = time.Second * 60
-)
-
-// setup sets the default values for the DAG.
-func (d *DAG) setup() {
-	// The default history retention days is 30 days.
-	// It is the number of days to keep the history.
-	// The older history is deleted when the DAG is executed.
-	if d.HistRetentionDays == 0 {
-		d.HistRetentionDays = defaultHistoryRetentionDays
-	}
-
-	// The default max cleanup time is 60 seconds.
-	// It is the maximum time to wait for cleanup when the DAG gets a stop
-	// signal. If the cleanup takes more than this time, the process of the DAG
-	// is killed.
-	if d.MaxCleanUpTime == 0 {
-		d.MaxCleanUpTime = defaultMaxCleanUpTime
-	}
-
-	// set the default working directory for the steps if not set
-	dir := filepath.Dir(d.Location)
-	for i := range d.Steps {
-		d.Steps[i].setup(dir)
-	}
-
-	// set the default working directory for the handler steps if not set
-	if d.HandlerOn.Exit != nil {
-		d.HandlerOn.Exit.setup(dir)
-	}
-	if d.HandlerOn.Success != nil {
-		d.HandlerOn.Success.setup(dir)
-	}
-	if d.HandlerOn.Failure != nil {
-		d.HandlerOn.Failure.setup(dir)
-	}
-	if d.HandlerOn.Cancel != nil {
-		d.HandlerOn.Cancel.setup(dir)
-	}
+var handlerMapping = map[string]HandlerType{
+	"onSuccess": HandlerOnSuccess,
+	"onFailure": HandlerOnFailure,
+	"onCancel":  HandlerOnCancel,
+	"onExit":    HandlerOnExit,
 }
 
 // HasTag checks if the DAG has the given tag.
@@ -211,45 +149,84 @@ func (d *DAG) HasTag(tag string) bool {
 			return true
 		}
 	}
-
 	return false
 }
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-// TODO: It needs to be unique for each process so that multiple processes can
-// run in parallel.
 func (d *DAG) SockAddr() string {
-	s := strings.ReplaceAll(d.Location, " ", "_")
-	name := strings.Replace(filepath.Base(s), filepath.Ext(filepath.Base(s)), "", 1)
-	// nolint // gosec
-	h := md5.New()
-	_, _ = h.Write([]byte(s))
-	bs := h.Sum(nil)
-	// Socket name length must be shorter than 108 characters,
-	// so we truncate the name.
-	// 108 - 16 (length of the hash) - 34 (length remaining non-name) - 8 padding = 50
-	lengthLimit := 50
-	if len(name) > lengthLimit {
-		name = name[:lengthLimit-1]
+	// Normalize the location path
+	normalizedPath := strings.ReplaceAll(d.Location, " ", "_")
+	name := strings.TrimSuffix(filepath.Base(normalizedPath), filepath.Ext(filepath.Base(normalizedPath)))
+
+	// Generate hash for uniqueness
+	hash := md5.New() // nolint // gosec
+	hash.Write([]byte(normalizedPath))
+	hashSum := hash.Sum(nil)
+
+	// Truncate name if necessary
+	if len(name) > maxSocketNameLength {
+		name = name[:maxSocketNameLength-1]
 	}
-	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
+
+	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, hashSum))
 }
 
 // String implements the Stringer interface.
-// It returns the string representation of the DAG.
-// TODO: Remove if not needed.
+// String returns a formatted string representation of the DAG
 func (d *DAG) String() string {
-	ret := "{\n"
-	ret = fmt.Sprintf("%s\tName: %s\n", ret, d.Name)
-	ret = fmt.Sprintf(
-		"%s\tDescription: %s\n", ret, strings.TrimSpace(d.Description),
-	)
-	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(d.Env, ", "))
-	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, d.LogDir)
-	for i, s := range d.Steps {
-		ret = fmt.Sprintf("%s\tStep%d: %s\n", ret, i, s.String())
+	var sb strings.Builder
+
+	sb.WriteString("{\n")
+	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
+	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
+	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
+	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
+
+	for i, step := range d.Steps {
+		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
 	}
-	ret = fmt.Sprintf("%s}\n", ret)
-	return ret
+
+	sb.WriteString("}\n")
+	return sb.String()
+}
+
+// setup sets the default values for the DAG.
+func (d *DAG) setup() {
+	// Set default history retention days to 30 if not specified.
+	if d.HistRetentionDays == 0 {
+		d.HistRetentionDays = defaultHistoryRetentionDays
+	}
+
+	// Set default max cleanup time to 60 seconds if not specified.
+	if d.MaxCleanUpTime == 0 {
+		d.MaxCleanUpTime = defaultMaxCleanUpTime
+	}
+
+	workDir := filepath.Dir(d.Location)
+	d.setupSteps(workDir)
+	d.setupHandlers(workDir)
+}
+
+// setupSteps initializes all workflow steps
+func (d *DAG) setupSteps(workDir string) {
+	for i := range d.Steps {
+		d.Steps[i].setup(workDir)
+	}
+}
+
+// setupHandlers initializes all event handlers
+func (d *DAG) setupHandlers(workDir string) {
+	handlers := []*Step{
+		d.HandlerOn.Exit,
+		d.HandlerOn.Success,
+		d.HandlerOn.Failure,
+		d.HandlerOn.Cancel,
+	}
+
+	for _, handler := range handlers {
+		if handler != nil {
+			handler.setup(workDir)
+		}
+	}
 }

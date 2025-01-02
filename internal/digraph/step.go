@@ -11,16 +11,16 @@ import (
 
 // Step contains the runtime information for a step in a DAG.
 // A step is created from parsing a DAG file written in YAML.
-// It marshal/unmarshal to/from JSON when it is saved in the execution history.
+// It marshals/unmarshals to/from JSON when it is saved in the execution history.
 type Step struct {
 	// Name is the name of the step.
 	Name string `json:"Name"`
-	// Description is the description of the step.
+	// Description is the description of the step. This is optional.
 	Description string `json:"Description,omitempty"`
-	// Shell is the shell program to execute the command. optional.
+	// Shell is the shell program to execute the command. This is optional.
 	Shell string `json:"Shell,omitempty"`
-	// OutputVariables is a structure to store the output variables for the
-	// following steps. It only contains the local output variables.
+	// OutputVariables stores the output variables for the following steps.
+	// It only contains the local output variables.
 	OutputVariables *SyncMap `json:"OutputVariables,omitempty"`
 	// Dir is the working directory for the step.
 	Dir string `json:"Dir,omitempty"`
@@ -60,24 +60,31 @@ type Step struct {
 
 // setup sets the default values for the step.
 func (s *Step) setup(workDir string) {
-	// if the working directory is not set, use the directory of the DAG file.
+	// If the working directory is not set, use the directory of the DAG file.
 	if s.Dir == "" {
 		s.Dir = workDir
 	}
 }
 
-// String implements the Stringer interface.
-// TODO: Remove if not needed.
+// String returns a formatted string representation of the step
 func (s *Step) String() string {
-	values := []string{
-		fmt.Sprintf("Name: %s", s.Name),
-		fmt.Sprintf("Dir: %s", s.Dir),
-		fmt.Sprintf("Command: %s", s.Command),
-		fmt.Sprintf("Args: %s", s.Args),
-		fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")),
+	fields := []struct {
+		name  string
+		value string
+	}{
+		{"Name", s.Name},
+		{"Dir", s.Dir},
+		{"Command", s.Command},
+		{"Args", fmt.Sprintf("%v", s.Args)},
+		{"Depends", fmt.Sprintf("[%s]", strings.Join(s.Depends, ", "))},
 	}
 
-	return strings.Join(values, "\t")
+	var parts []string
+	for _, field := range fields {
+		parts = append(parts, fmt.Sprintf("%s: %s", field.name, field.value))
+	}
+
+	return strings.Join(parts, "\t")
 }
 
 // SubWorkflow contains information about a sub DAG to be executed.
@@ -92,10 +99,10 @@ const ExecutorTypeSubWorkflow = "subworkflow"
 
 // ExecutorConfig contains the configuration for the executor.
 type ExecutorConfig struct {
-	// Type represents one of the registered executor.
+	// Type represents one of the registered executors.
 	// See `executor.Register` in `internal/executor/executor.go`.
 	Type   string
-	Config map[string]any // Config contains executor specific configuration.
+	Config map[string]any // Config contains executor-specific configuration.
 }
 
 // RetryPolicy contains the retry policy for a step.
@@ -112,8 +119,10 @@ type RetryPolicy struct {
 
 // RepeatPolicy contains the repeat policy for a step.
 type RepeatPolicy struct {
-	Repeat   bool          // Repeat determines if the step should be repeated.
-	Interval time.Duration // Interval is the time to wait between repeats.
+	// Repeat determines if the step should be repeated.
+	Repeat bool
+	// Interval is the time to wait between repeats.
+	Interval time.Duration
 }
 
 // ContinueOn contains the conditions to continue on failure or skipped.

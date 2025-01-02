@@ -180,7 +180,13 @@ You can execute the example by pressing the `Start` button. You can see "Hello D
 
 ```sh
 # Runs the DAG
-dagu start [--params=<params>] <file>
+dagu start <file>
+
+# Runs the DAG with named parameters
+dagu start <file> [-- <key>=<value> ...]
+
+# Runs the DAG with positional parameters
+dagu start <file> [-- value1 value2 ...]
 
 # Displays the current status of the DAG
 dagu status <file>
@@ -195,7 +201,7 @@ dagu stop <file>
 dagu restart <file>
 
 # Dry-runs the DAG
-dagu dry [--params=<params>] <file>
+dagu dry <file> [-- <key>=<value> ...]
 
 # Launches both the web UI server and scheduler process
 dagu start-all [--host=<host>] [--port=<port>] [--dags=<path to directory>]

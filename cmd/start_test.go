@@ -28,6 +28,11 @@ func TestStartCommand(t *testing.T) {
 			args:        []string{"start", `--params="p3 p4"`, th.DAGFile("params.yaml").Path},
 			expectedOut: []string{`params="[p3 p4]"`},
 		},
+		{
+			name:        "StartDAGWithParamsAfterDash",
+			args:        []string{"start", th.DAGFile("params.yaml").Path, "--", "p5", "p6"},
+			expectedOut: []string{`params="[p5 p6]"`},
+		},
 	}
 
 	for _, tc := range tests {

@@ -21,48 +21,88 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var (
-	errConfigFileRequired = errors.New("config file was not specified")
-	errReadFile           = errors.New("failed to read file")
-)
-
-// Load loads config from file.
-func Load(ctx context.Context, base, dag, params string) (*DAG, error) {
-	return loadDAG(ctx, dag, buildOpts{
-		base:         base,
-		parameters:   params,
-		metadataOnly: false,
-		noEval:       false,
-	})
+// LoadOptions contains options for loading a DAG.
+type LoadOptions struct {
+	baseConfig   string   // Path to the base DAG configuration file.
+	params       string   // Parameters to override default parameters in the DAG.
+	paramsList   []string // List of parameters to override default parameters in the DAG.
+	noEval       bool     // Flag to disable evaluation of dynamic fields.
+	onlyMetadata bool     // Flag to load only metadata without full DAG details.
 }
 
-// LoadWithoutEval loads config from file without evaluating env variables.
-func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
-	return loadDAG(ctx, dag, buildOpts{
-		metadataOnly: false,
-		noEval:       true,
-	})
+// LoadOption is a function type for setting LoadOptions.
+type LoadOption func(*LoadOptions)
+
+// WithBaseConfig sets the base DAG configuration file.
+func WithBaseConfig(baseDAG string) LoadOption {
+	return func(o *LoadOptions) {
+		o.baseConfig = baseDAG
+	}
 }
 
-// LoadMetadata loads config from file and returns only the headline data.
-func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {
-	return loadDAG(ctx, dag, buildOpts{
-		metadataOnly: true,
-		noEval:       true,
-	})
+// WithParams sets the parameters for the DAG.
+func WithParams(params any) LoadOption {
+	return func(o *LoadOptions) {
+		switch params := params.(type) {
+		case string:
+			o.params = params
+		case []string:
+			o.paramsList = params
+		default:
+			panic(fmt.Sprintf("invalid type %T for params", params))
+		}
+	}
 }
 
-// LoadYAML loads config from YAML data.
-// It does not evaluate the environment variables.
-// This is used to validate the YAML data.
-func LoadYAML(ctx context.Context, data []byte) (*DAG, error) {
+// WithoutEval disables the evaluation of dynamic fields.
+func WithoutEval() LoadOption {
+	return func(o *LoadOptions) {
+		o.noEval = true
+	}
+}
+
+// OnlyMetadata sets the flag to load only metadata.
+func OnlyMetadata() LoadOption {
+	return func(o *LoadOptions) {
+		o.onlyMetadata = true
+	}
+}
+
+// Load loads the DAG from the given file with the specified options.
+func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
+	var options LoadOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	buildContext := BuildContext{
+		ctx: ctx,
+		opts: buildOpts{
+			base:           options.baseConfig,
+			parameters:     options.params,
+			parametersList: options.paramsList,
+			onlyMetadata:   options.onlyMetadata,
+			noEval:         options.noEval,
+		},
+	}
+	return loadDAG(buildContext, dag)
+}
+
+// LoadYAML loads the DAG from the given YAML data with the specified options.
+func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error) {
+	var options LoadOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 	return loadYAML(ctx, data, buildOpts{
-		metadataOnly: false,
-		noEval:       true,
+		base:           options.baseConfig,
+		parameters:     options.params,
+		parametersList: options.paramsList,
+		onlyMetadata:   options.onlyMetadata,
+		noEval:         options.noEval,
 	})
 }
 
-// LoadYAML loads config from YAML data.
+// loadYAML loads the DAG configuration from YAML data.
 func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
@@ -74,12 +114,12 @@ func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	return build(ctx, def, opts, nil)
+	return build(BuildContext{ctx: ctx, opts: opts}, def)
 }
 
 // loadBaseConfig loads the global configuration from the given file.
 // The global configuration can be overridden by the DAG configuration.
-func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, error) {
+func loadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// The base config is optional.
 	if !fileutil.FileExists(file) {
 		return nil, nil
@@ -97,20 +137,20 @@ func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, err
 		return nil, err
 	}
 
-	// TODO: Consider removing the line below.
-	opts.metadataOnly = false
-
-	return build(ctx, def, opts, nil)
+	ctx = ctx.WithOpts(buildOpts{noEval: ctx.opts.noEval}).WithFile(file)
+	return build(ctx, def)
 }
 
 // loadDAG loads the DAG from the given file.
-func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
+func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 	filePath, err := resolveYamlFilePath(dag)
 	if err != nil {
 		return nil, err
 	}
 
-	dest, err := loadBaseConfigIfRequired(ctx, opts.base, opts)
+	ctx = ctx.WithFile(filePath)
+
+	dest, err := loadBaseConfigIfRequired(ctx, ctx.opts.base)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +165,7 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	target, err := build(ctx, spec, opts, dest.Env)
+	target, err := build(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +175,6 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Set the absolute path to the file.
-	dest.Location = filePath
 
 	// Set the name if not set.
 	if dest.Name == "" {
@@ -156,9 +193,11 @@ func defaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
+// resolveYamlFilePath resolves the YAML file path.
+// If the file name does not have an extension, it appends ".yaml".
 func resolveYamlFilePath(file string) (string, error) {
 	if file == "" {
-		return "", errConfigFileRequired
+		return "", errors.New("file path is required")
 	}
 
 	// The file name can be specified without the extension.
@@ -169,11 +208,10 @@ func resolveYamlFilePath(file string) (string, error) {
 	return filepath.Abs(file)
 }
 
-// loadBaseConfigIfRequired loads the base config if needed, based on the
-// given options.
-func loadBaseConfigIfRequired(ctx context.Context, baseConfig string, opts buildOpts) (*DAG, error) {
-	if !opts.metadataOnly && baseConfig != "" {
-		dag, err := loadBaseConfig(ctx, baseConfig, opts)
+// loadBaseConfigIfRequired loads the base config if needed, based on the given options.
+func loadBaseConfigIfRequired(ctx BuildContext, baseConfig string) (*DAG, error) {
+	if !ctx.opts.onlyMetadata && baseConfig != "" {
+		dag, err := loadBaseConfig(ctx, baseConfig)
 		if err != nil {
 			// Failed to load the base config.
 			return nil, err
@@ -215,7 +253,7 @@ func (*mergeTransformer) Transformer(
 func readFile(file string) (cfg map[string]any, err error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("%w %s: %v", errReadFile, file, err)
+		return nil, fmt.Errorf("failed to read file %q: %v", file, err)
 	}
 
 	return unmarshalData(data)
