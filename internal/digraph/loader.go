@@ -62,7 +62,7 @@ func OnlyMetadata() LoadOption {
 	}
 }
 
-// Load load the DAG from the given file.
+// Load loads the DAG from the given file.
 func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
 	for _, opt := range opts {
@@ -77,7 +77,7 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	})
 }
 
-// LoadYAML load the DAG from the given YAML data.
+// LoadYAML loads the DAG from the given YAML data.
 func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
 	for _, opt := range opts {
@@ -92,7 +92,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 	})
 }
 
-// LoadYAML loads config from YAML data.
+// loadYAML loads config from YAML data.
 func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
@@ -185,6 +185,8 @@ func defaultName(file string) string {
 
 var errConfigFileRequired = errors.New("config file was not specified")
 
+// resolveYamlFilePath resolves the YAML file path.
+// If the file name does not have an extension, it appends ".yaml".
 func resolveYamlFilePath(file string) (string, error) {
 	if file == "" {
 		return "", errConfigFileRequired
@@ -198,8 +200,7 @@ func resolveYamlFilePath(file string) (string, error) {
 	return filepath.Abs(file)
 }
 
-// loadBaseConfigIfRequired loads the base config if needed, based on the
-// given options.
+// loadBaseConfigIfRequired loads the base config if needed, based on the given options.
 func loadBaseConfigIfRequired(ctx context.Context, baseConfig string, opts buildOpts) (*DAG, error) {
 	if !opts.onlyMetadata && baseConfig != "" {
 		dag, err := loadBaseConfig(ctx, baseConfig, opts)
