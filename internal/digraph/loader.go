@@ -21,22 +21,26 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// LoadOptions contains options for loading a DAG.
 type LoadOptions struct {
-	baseDAG      string
-	params       string
-	paramsList   []string
-	noEval       bool
-	onlyMetadata bool
+	baseConfig   string   // Path to the base DAG configuration file.
+	params       string   // Parameters to override default parameters in the DAG.
+	paramsList   []string // List of parameters to override default parameters in the DAG.
+	noEval       bool     // Flag to disable evaluation of dynamic fields.
+	onlyMetadata bool     // Flag to load only metadata without full DAG details.
 }
 
+// LoadOption is a function type for setting LoadOptions.
 type LoadOption func(*LoadOptions)
 
+// WithBaseConfig sets the base DAG configuration file.
 func WithBaseConfig(baseDAG string) LoadOption {
 	return func(o *LoadOptions) {
-		o.baseDAG = baseDAG
+		o.baseConfig = baseDAG
 	}
 }
 
+// WithParams sets the parameters for the DAG.
 func WithParams(params any) LoadOption {
 	return func(o *LoadOptions) {
 		switch params := params.(type) {
@@ -50,26 +54,28 @@ func WithParams(params any) LoadOption {
 	}
 }
 
+// WithoutEval disables the evaluation of dynamic fields.
 func WithoutEval() LoadOption {
 	return func(o *LoadOptions) {
 		o.noEval = true
 	}
 }
 
+// OnlyMetadata sets the flag to load only metadata.
 func OnlyMetadata() LoadOption {
 	return func(o *LoadOptions) {
 		o.onlyMetadata = true
 	}
 }
 
-// Load loads the DAG from the given file.
+// Load loads the DAG from the given file with the specified options.
 func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 	return loadDAG(ctx, dag, buildOpts{
-		base:           options.baseDAG,
+		base:           options.baseConfig,
 		parameters:     options.params,
 		parametersList: options.paramsList,
 		onlyMetadata:   options.onlyMetadata,
@@ -77,14 +83,14 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	})
 }
 
-// LoadYAML loads the DAG from the given YAML data.
+// LoadYAML loads the DAG from the given YAML data with the specified options.
 func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error) {
 	var options LoadOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 	return loadYAML(ctx, data, buildOpts{
-		base:           options.baseDAG,
+		base:           options.baseConfig,
 		parameters:     options.params,
 		parametersList: options.paramsList,
 		onlyMetadata:   options.onlyMetadata,
@@ -92,7 +98,7 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 	})
 }
 
-// loadYAML loads config from YAML data.
+// loadYAML loads the DAG configuration from YAML data.
 func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
