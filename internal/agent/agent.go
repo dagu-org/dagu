@@ -360,7 +360,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 		}
 	}()
 
-	logger.Info(ctx, "Dry-run started", "reqId", a.requestID)
+	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
 	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)

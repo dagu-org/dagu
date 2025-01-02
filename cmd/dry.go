@@ -21,8 +21,8 @@ func dryCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",
-		Long:  `dagu dry [--params="param1 param2"] /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
+		Long:  `dagu dry /path/to/spec.yaml -- params1 params2`,
+		Args:  cobra.MinimumNArgs(1),
 		RunE:  wrapRunE(runDry),
 	}
 }
@@ -35,18 +35,27 @@ func runDry(cmd *cobra.Command, args []string) error {
 	setup := newSetup(cfg)
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
-	params, err := cmd.Flags().GetString("params")
-	if err != nil {
-		return fmt.Errorf("failed to get parameters: %w", err)
-	}
 
 	ctx := cmd.Context()
 
-	strParams := removeQuotes(params)
-	dag, err := digraph.Load(ctx, args[0],
-		digraph.WithBaseConfig(cfg.Paths.BaseConfig),
-		digraph.WithParams(strParams),
-	)
+	loadOpts := []digraph.LoadOption{
+		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+	}
+
+	var params string
+	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+		// Get parameters from command line arguments after "--"
+		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
+	} else {
+		// Get parameters from flags
+		params, err = cmd.Flags().GetString("params")
+		if err != nil {
+			return fmt.Errorf("failed to get parameters: %w", err)
+		}
+		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
+	}
+
+	dag, err := digraph.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}

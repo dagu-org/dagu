@@ -20,9 +20,9 @@ const startPrefix = "start_"
 
 func startCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [flags] /path/to/spec.yaml",
+		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
 		Short: "Runs the DAG",
-		Long:  `dagu start [--params="param1 param2"] /path/to/spec.yaml`,
+		Long:  `dagu start /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
 		RunE:  wrapRunE(runStart),
 	}
@@ -69,7 +69,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 		// Get parameters from flags
 		params, err = cmd.Flags().GetString("params")
 		if err != nil {
-			logger.Error(ctx, "Failed to get parameters", "err", err)
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))

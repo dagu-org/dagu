@@ -11,10 +11,10 @@ The following commands are available for interacting with Dagu:
   dagu start <file>
   
   # Runs the DAG with named parameters
-  dagu start <file> -- <key>=<value> ...
+  dagu start <file> [-- <key>=<value> ...]
   
   # Runs the DAG with positional parameters
-  dagu start <file> -- value1 value2 ...
+  dagu start <file> [-- value1 value2 ...]
   
   # Displays the current status of the DAG
   dagu status <file>
@@ -29,7 +29,7 @@ The following commands are available for interacting with Dagu:
   dagu restart <file>
   
   # Dry-runs the DAG
-  dagu dry [--params=<params>] <file>
+  dagu dry <file> [-- <key>=<value> ...]
   
   # Launches both the web UI server and scheduler process
   dagu start-all [--host=<host>] [--port=<port>] [--dags=<path to directory>]
