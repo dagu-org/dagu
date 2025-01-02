@@ -122,27 +122,27 @@ Files can be specified as:
 
 Parameters
 ~~~~~~~~~~
-Pass positional parameters to steps:
+Define default positional parameters that can be overridden:
 
 .. code-block:: yaml
 
-  params: param1 param2
+  params: param1 param2  # Default values for $1 and $2
   steps:
     - name: parameterized task
-      command: python main.py $1 $2
+      command: python main.py $1 $2      # Will use command-line args or defaults
 
 Named Parameters
 ~~~~~~~~~~~~~~
-Use named parameters for better clarity:
+Define default named parameters that can be overridden:
 
 .. code-block:: yaml
 
   params:
-    - FOO: 1
-    - BAR: "`echo 2`"
+    - FOO: 1           # Default value for ${FOO}
+    - BAR: "`echo 2`"  # Default value for ${BAR}, using command substitution
   steps:
     - name: named params task
-      command: python main.py ${FOO} ${BAR}
+      command: python main.py ${FOO} ${BAR}  # Will use command-line args or defaults
 
 Code Snippets
 ~~~~~~~~~~~~

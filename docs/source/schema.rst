@@ -62,6 +62,24 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 
     schedule: "5 4 * * *"  # runs daily at 04:05
 
+- **dotenv** (string or list of strings, optional):
+
+  Path to a `.env` file or a list of paths to load environment variables from.  
+  Dagu reads these files before running the DAG.
+
+  **Example**:
+
+  .. code-block:: yaml
+
+    dotenv: /path/to/.env
+
+  Files can be specified as:
+  
+  - Absolute paths
+  - Relative to the DAG file directory
+  - Relative to the base config directory
+  - Relative to the user's home directory
+
 - **skipIfSuccessful** (boolean, default: false):
 
   If true, Dagu checks whether this DAG has already succeeded since the last scheduled time. If it did, Dagu will skip the current scheduled run. Manual triggers always run regardless of this setting.

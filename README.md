@@ -180,7 +180,13 @@ You can execute the example by pressing the `Start` button. You can see "Hello D
 
 ```sh
 # Runs the DAG
-dagu start [--params=<params>] <file>
+dagu start <file>
+
+# Runs the DAG with named parameters
+dagu start <file> -- <key>=<value> ...
+
+# Runs the DAG with positional parameters
+dagu start <file> -- value1 value2 ...
 
 # Displays the current status of the DAG
 dagu status <file>
