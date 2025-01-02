@@ -53,7 +53,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	specFilePath := args[0]
 
 	// Load initial DAG configuration
-	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, specFilePath, "")
+	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseDAG(cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
@@ -89,7 +89,7 @@ func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, q
 	}
 
 	// Reload DAG with parameters
-	dag, err = digraph.Load(ctx, setup.cfg.Paths.BaseConfig, specFilePath, params)
+	dag, err = digraph.Load(ctx, specFilePath, digraph.WithBaseDAG(setup.cfg.Paths.BaseConfig), digraph.WithParams(params))
 	if err != nil {
 		return fmt.Errorf("failed to reload DAG with params: %w", err)
 	}

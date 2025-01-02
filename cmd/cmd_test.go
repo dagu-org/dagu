@@ -45,7 +45,7 @@ type testDAG struct {
 func (td *testDAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	dag, err := digraph.Load(td.Context, td.Config.Paths.BaseConfig, td.Path, "")
+	dag, err := digraph.Load(td.Context, td.Path, digraph.WithBaseDAG(td.Config.Paths.BaseConfig))
 	require.NoError(t, err)
 
 	cli := td.Client

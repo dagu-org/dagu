@@ -55,7 +55,7 @@ func TestRestartCommand(t *testing.T) {
 		dagFile.AssertCurrentStatus(t, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		dag, err := digraph.Load(th.Context, th.Config.Paths.BaseConfig, dagFile.Path, "")
+		dag, err := digraph.Load(th.Context, dagFile.Path, digraph.WithBaseDAG(th.Config.Paths.BaseConfig))
 		require.NoError(t, err)
 
 		setup := newSetup(th.Config)

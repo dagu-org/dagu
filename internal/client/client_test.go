@@ -256,7 +256,8 @@ steps:
 		require.NoError(t, err)
 
 		// Check if the new DAG is actually created.
-		dag, err := digraph.Load(ctx, "", filepath.Join(th.Config.Paths.DAGsDir, id+".yaml"), "")
+		filePath := filepath.Join(th.Config.Paths.DAGsDir, id+".yaml")
+		dag, err := digraph.Load(ctx, filePath)
 		require.NoError(t, err)
 		require.Equal(t, "test-dag", dag.Name)
 	})

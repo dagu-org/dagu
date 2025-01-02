@@ -48,7 +48,7 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dag, err := Load(context.Background(), "", tt.file, "")
+			dag, err := Load(context.Background(), tt.file)
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
@@ -82,7 +82,7 @@ func Test_loadBaseConfig(t *testing.T) {
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
 		filePath := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load(context.Background(), "", filePath, "")
+		dag, err := Load(context.Background(), filePath)
 
 		require.NoError(t, err)
 

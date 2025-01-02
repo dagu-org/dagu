@@ -18,7 +18,8 @@ var (
 
 func TestDAG_String(t *testing.T) {
 	t.Run("DefaltConfig", func(t *testing.T) {
-		dag, err := Load(context.Background(), "", filepath.Join(testdataDir, "default.yaml"), "")
+		filePath := filepath.Join(testdataDir, "default.yaml")
+		dag, err := Load(context.Background(), filePath)
 		require.NoError(t, err)
 
 		ret := dag.String()

@@ -21,20 +21,66 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type LoadOptions struct {
+	baseDAG      string
+	params       string
+	paramsList   []string
+	noEval       bool
+	onlyMetadata bool
+}
+
+type LoadOption func(*LoadOptions)
+
+func WithBaseDAG(baseDAG string) LoadOption {
+	return func(o *LoadOptions) {
+		o.baseDAG = baseDAG
+	}
+}
+
+func WithParams(params any) LoadOption {
+	return func(o *LoadOptions) {
+		switch params := params.(type) {
+		case string:
+			o.params = params
+		case []string:
+			o.paramsList = params
+		default:
+			panic(fmt.Sprintf("invalid type %T for params", params))
+		}
+	}
+}
+
+func WithoutEval() LoadOption {
+	return func(o *LoadOptions) {
+		o.noEval = true
+	}
+}
+
+func OnlyMetadata() LoadOption {
+	return func(o *LoadOptions) {
+		o.onlyMetadata = true
+	}
+}
+
 // Load loads the DAG from the given file.
-func Load(ctx context.Context, base, dag, params string) (*DAG, error) {
+func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
+	var options LoadOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 	return loadDAG(ctx, dag, buildOpts{
-		base:         base,
-		parameters:   params,
-		metadataOnly: false,
-		noEval:       false,
+		base:           options.baseDAG,
+		parameters:     options.params,
+		parametersList: options.paramsList,
+		onlyMetadata:   options.onlyMetadata,
+		noEval:         options.noEval,
 	})
 }
 
 // LoadWithoutEval loads config without evaluating dynamic fields.
 func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
 	return loadDAG(ctx, dag, buildOpts{
-		metadataOnly: false,
+		onlyMetadata: false,
 		noEval:       true,
 	})
 }
@@ -43,7 +89,7 @@ func LoadWithoutEval(ctx context.Context, dag string) (*DAG, error) {
 // E.g. name, description, schedule, etc.
 func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {
 	return loadDAG(ctx, dag, buildOpts{
-		metadataOnly: true,
+		onlyMetadata: true,
 		noEval:       true,
 	})
 }
@@ -53,7 +99,7 @@ func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {
 // This is used to validate the YAML data.
 func LoadYAML(ctx context.Context, data []byte) (*DAG, error) {
 	return loadYAML(ctx, data, buildOpts{
-		metadataOnly: false,
+		onlyMetadata: false,
 		noEval:       true,
 	})
 }
@@ -94,7 +140,7 @@ func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, err
 	}
 
 	// TODO: Consider removing the line below.
-	opts.metadataOnly = false
+	opts.onlyMetadata = false
 
 	return build(ctx, def, opts, nil)
 }
@@ -170,7 +216,7 @@ func resolveYamlFilePath(file string) (string, error) {
 // loadBaseConfigIfRequired loads the base config if needed, based on the
 // given options.
 func loadBaseConfigIfRequired(ctx context.Context, baseConfig string, opts buildOpts) (*DAG, error) {
-	if !opts.metadataOnly && baseConfig != "" {
+	if !opts.onlyMetadata && baseConfig != "" {
 		dag, err := loadBaseConfig(ctx, baseConfig, opts)
 		if err != nil {
 			// Failed to load the base config.

@@ -115,7 +115,7 @@ func (h Helper) LoadDAGFile(t *testing.T, filename string) DAG {
 	t.Helper()
 
 	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", filename)
-	dag, err := digraph.Load(h.Context, "", filePath, "")
+	dag, err := digraph.Load(h.Context, filePath)
 	require.NoError(t, err)
 
 	return DAG{

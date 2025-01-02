@@ -27,15 +27,14 @@ type BuildContext struct {
 type buildOpts struct {
 	// base specifies the base configuration file for the DAG.
 	base string
-	// metadataOnly specifies whether to build only the metadata.
-	metadataOnly bool
+	// onlyMetadata specifies whether to build only the metadata.
+	onlyMetadata bool
 	// parameters specifies the parameters to the DAG.
-	// parameters are used to override the default parameters for
-	// executing the DAG.
+	// parameters are used to override the default parameters in the DAG.
 	parameters string
-	// noEval specifies whether to evaluate environment variables.
-	// This is useful when loading details for a DAG, but not
-	// for execution.
+	// parametersList specifies the parameters to the DAG.
+	parametersList []string
+	// noEval specifies whether to evaluate dynamic fields.
 	noEval bool
 }
 
@@ -128,7 +127,7 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 
 	var errs errorList
 	for _, builder := range builderRegistry {
-		if !builder.metadata && opts.metadataOnly {
+		if !builder.metadata && opts.onlyMetadata {
 			continue
 		}
 		if err := builder.fn(buildCtx, spec, dag); err != nil {
@@ -136,7 +135,7 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 		}
 	}
 
-	if !opts.metadataOnly {
+	if !opts.onlyMetadata {
 		// TODO: Remove functions feature.
 		if err := assertFunctions(spec.Functions); err != nil {
 			errs.Add(err)

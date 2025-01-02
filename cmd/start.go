@@ -76,7 +76,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 }
 
 func executeDag(ctx context.Context, setup *setup, specPath, params string, quiet bool, requestID string) error {
-	dag, err := digraph.Load(ctx, setup.cfg.Paths.BaseConfig, specPath, params)
+	dag, err := digraph.Load(ctx, specPath, digraph.WithBaseDAG(setup.cfg.Paths.BaseConfig), digraph.WithParams(params))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)

@@ -42,7 +42,11 @@ func runDry(cmd *cobra.Command, args []string) error {
 
 	ctx := cmd.Context()
 
-	dag, err := digraph.Load(ctx, cfg.Paths.BaseConfig, args[0], removeQuotes(params))
+	strParams := removeQuotes(params)
+	dag, err := digraph.Load(ctx, args[0],
+		digraph.WithBaseDAG(cfg.Paths.BaseConfig),
+		digraph.WithParams(strParams),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
