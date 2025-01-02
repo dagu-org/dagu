@@ -119,6 +119,10 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 	}
 
 	for index, paramPair := range paramPairs {
+		if !ctx.opts.noEval {
+			paramPair.Value = os.ExpandEnv(paramPair.Value)
+		}
+
 		*params = append(*params, paramPair)
 
 		paramString := paramPair.String()
