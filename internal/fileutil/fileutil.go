@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 var (
@@ -124,11 +123,10 @@ func EnsureYAMLExtension(filename string) string {
 
 	ext := filepath.Ext(filename)
 	switch ext {
-	case "":
-		return filename + yamlExtension
-	case ymlExtension:
-		return strings.TrimSuffix(filename, ext) + yamlExtension
-	default:
+	case ymlExtension, yamlExtension:
 		return filename
+
+	default:
+		return filename + yamlExtension
 	}
 }
