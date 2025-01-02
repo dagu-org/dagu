@@ -77,18 +77,7 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	})
 }
 
-// LoadMetadata loads only basic information from the DAG.
-// E.g. name, description, schedule, etc.
-func LoadMetadata(ctx context.Context, dag string) (*DAG, error) {
-	return loadDAG(ctx, dag, buildOpts{
-		onlyMetadata: true,
-		noEval:       true,
-	})
-}
-
-// LoadYAML loads config from YAML data.
-// It does not evaluate the environment variables.
-// This is used to validate the YAML data.
+// LoadYAML load the DAG from the given YAML data.
 func LoadYAML(ctx context.Context, data []byte) (*DAG, error) {
 	return loadYAML(ctx, data, buildOpts{
 		onlyMetadata: false,

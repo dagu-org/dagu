@@ -62,7 +62,8 @@ func Test_Load(t *testing.T) {
 
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Metadata", func(t *testing.T) {
-		dag, err := LoadMetadata(context.Background(), filepath.Join(testdataDir, "default.yaml"))
+		filePath := filepath.Join(testdataDir, "default.yaml")
+		dag, err := Load(context.Background(), filePath, OnlyMetadata(), WithoutEval())
 		require.NoError(t, err)
 
 		require.Equal(t, dag.Name, "default")

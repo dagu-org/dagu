@@ -58,10 +58,10 @@ func (d *dagStoreImpl) GetMetadata(ctx context.Context, name string) (*digraph.D
 		return nil, fmt.Errorf("failed to locate DAG %s: %w", name, err)
 	}
 	if d.fileCache == nil {
-		return digraph.LoadMetadata(ctx, filePath)
+		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 	}
 	return d.fileCache.LoadLatest(filePath, func() (*digraph.DAG, error) {
-		return digraph.LoadMetadata(ctx, filePath)
+		return digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 	})
 }
 
@@ -269,7 +269,7 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 				errs = append(errs, fmt.Sprintf("grep %s failed: %s", entry.Name(), err))
 				continue
 			}
-			dag, err := digraph.LoadMetadata(ctx, filePath)
+			dag, err := digraph.Load(ctx, filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 			if err != nil {
 				errs = append(errs, fmt.Sprintf("check %s failed: %s", entry.Name(), err))
 				continue
