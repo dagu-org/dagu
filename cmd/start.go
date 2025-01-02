@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
@@ -23,7 +24,7 @@ func startCmd() *cobra.Command {
 		Use:   "start [flags] /path/to/spec.yaml",
 		Short: "Runs the DAG",
 		Long:  `dagu start [--params="param1 param2"] /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MinimumNArgs(1),
 		RunE:  wrapRunE(runStart),
 	}
 
@@ -61,10 +62,18 @@ func runStart(cmd *cobra.Command, args []string) error {
 	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	// Get parameters
-	params, err := cmd.Flags().GetString("params")
-	if err != nil {
-		logger.Error(ctx, "Failed to get parameters", "err", err)
-		return fmt.Errorf("failed to get parameters: %w", err)
+	// Get parameters from the new syntax
+	var params string
+	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+		params = strings.Join(args[argsLenAtDash:], " ")
+		args = args[:1]
+	} else {
+		// Get parameters from the deprecated flag
+		params, err = cmd.Flags().GetString("params")
+		if err != nil {
+			logger.Error(ctx, "Failed to get parameters", "err", err)
+			return fmt.Errorf("failed to get parameters: %w", err)
+		}
 	}
 
 	// Initialize and run DAG
