@@ -139,10 +139,7 @@ func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, err
 		return nil, err
 	}
 
-	// TODO: Consider removing the line below.
-	opts.onlyMetadata = false
-
-	return build(ctx, def, opts, nil)
+	return build(ctx, def, buildOpts{noEval: opts.noEval}, nil)
 }
 
 // loadDAG loads the DAG from the given file.
