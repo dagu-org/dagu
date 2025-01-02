@@ -52,6 +52,7 @@ func NewDAGStore(dir string, opts ...DAGStoreOption) persistence.DAGStore {
 	}
 }
 
+// GetMetadata retrieves the metadata of a DAG by its name.
 func (d *dagStoreImpl) GetMetadata(ctx context.Context, name string) (*digraph.DAG, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
@@ -65,6 +66,7 @@ func (d *dagStoreImpl) GetMetadata(ctx context.Context, name string) (*digraph.D
 	})
 }
 
+// GetDetails retrieves the details of a DAG by its name.
 func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DAG, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
@@ -77,6 +79,7 @@ func (d *dagStoreImpl) GetDetails(ctx context.Context, name string) (*digraph.DA
 	return dat, nil
 }
 
+// GetSpec retrieves the specification of a DAG by its name.
 func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
@@ -92,6 +95,7 @@ func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 // TODO: use 0600 // nolint: gosec
 const defaultPerm os.FileMode = 0744
 
+// UpdateSpec updates the specification of a DAG by its name.
 func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte) error {
 	// Validate the spec before saving it.
 	_, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
@@ -113,6 +117,7 @@ func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte)
 
 var errDAGFileAlreadyExists = errors.New("the DAG file already exists")
 
+// Create creates a new DAG with the given name and specification.
 func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (string, error) {
 	if err := d.ensureDirExist(); err != nil {
 		return "", fmt.Errorf("failed to create DAGs directory %s: %w", d.baseDir, err)
@@ -127,6 +132,7 @@ func (d *dagStoreImpl) Create(_ context.Context, name string, spec []byte) (stri
 	return name, nil
 }
 
+// Delete deletes a DAG by its name.
 func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
 	filePath, err := d.locateDAG(name)
 	if err != nil {
@@ -144,6 +150,7 @@ func (d *dagStoreImpl) Delete(_ context.Context, name string) error {
 	return nil
 }
 
+// ensureDirExist ensures that the base directory exists.
 func (d *dagStoreImpl) ensureDirExist() error {
 	if !fileExists(d.baseDir) {
 		if err := os.MkdirAll(d.baseDir, 0755); err != nil {
@@ -153,6 +160,7 @@ func (d *dagStoreImpl) ensureDirExist() error {
 	return nil
 }
 
+// ListPagination lists DAGs with pagination support.
 func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DAGListPaginationArgs) (*persistence.DagListPaginationResult, error) {
 	var (
 		dagList []*digraph.DAG
@@ -216,6 +224,7 @@ func (d *dagStoreImpl) ListPagination(ctx context.Context, params persistence.DA
 	}, nil
 }
 
+// List lists all DAGs.
 func (d *dagStoreImpl) List(ctx context.Context) (ret []*digraph.DAG, errs []string, err error) {
 	if err = d.ensureDirExist(); err != nil {
 		errs = append(errs, err.Error())
@@ -241,6 +250,7 @@ func (d *dagStoreImpl) List(ctx context.Context) (ret []*digraph.DAG, errs []str
 	return ret, errs, nil
 }
 
+// Grep searches for a pattern in all DAGs.
 func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 	ret []*persistence.GrepResult, errs []string, err error,
 ) {
@@ -284,6 +294,7 @@ func (d *dagStoreImpl) Grep(ctx context.Context, pattern string) (
 	return ret, errs, nil
 }
 
+// Rename renames a DAG from oldID to newID.
 func (d *dagStoreImpl) Rename(_ context.Context, oldID, newID string) error {
 	oldFilePath, err := d.locateDAG(oldID)
 	if err != nil {
@@ -296,6 +307,7 @@ func (d *dagStoreImpl) Rename(_ context.Context, oldID, newID string) error {
 	return os.Rename(oldFilePath, newFilePath)
 }
 
+// generateFilePath generates the file path for a DAG by its name.
 func (d *dagStoreImpl) generateFilePath(name string) string {
 	if strings.Contains(name, string(filepath.Separator)) {
 		filePath, err := filepath.Abs(name)
@@ -307,6 +319,7 @@ func (d *dagStoreImpl) generateFilePath(name string) string {
 	return filepath.Clean(filePath)
 }
 
+// locateDAG locates the DAG file by its name or path.
 func (d *dagStoreImpl) locateDAG(nameOrPath string) (string, error) {
 	if strings.Contains(nameOrPath, string(filepath.Separator)) {
 		foundPath, err := findDAGFile(nameOrPath)
@@ -345,6 +358,7 @@ func findDAGFile(name string) (string, error) {
 	return "", fmt.Errorf("file %s not found: %w", name, os.ErrNotExist)
 }
 
+// TagList lists all unique tags from the DAGs.
 func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) {
 	var (
 		errList []string
@@ -381,10 +395,12 @@ func (d *dagStoreImpl) TagList(ctx context.Context) ([]string, []string, error) 
 	return tagList, errList, nil
 }
 
+// containsSearchText checks if the text contains the search string (case-insensitive).
 func containsSearchText(text string, search string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(search))
 }
 
+// containsTag checks if the tags contain the search tag (case-insensitive).
 func containsTag(tags []string, searchTag string) bool {
 	for _, tag := range tags {
 		if strings.EqualFold(tag, searchTag) {
@@ -395,6 +411,7 @@ func containsTag(tags []string, searchTag string) bool {
 	return false
 }
 
+// fileExists checks if a file exists.
 func fileExists(file string) bool {
 	_, err := os.Stat(file)
 	return !os.IsNotExist(err)
