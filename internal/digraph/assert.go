@@ -14,19 +14,19 @@ func assertFunctions(fns []*funcDef) error {
 	nameMap := make(map[string]bool)
 	for _, funcDef := range fns {
 		if _, exists := nameMap[funcDef.Name]; exists {
-			return errDuplicateFunction
+			return WrapError("function", funcDef.Name, errDuplicateFunction)
 		}
 		nameMap[funcDef.Name] = true
 
 		definedParamNames := strings.Split(funcDef.Params, " ")
 		passedParamNames := extractParamNames(funcDef.Command)
 		if len(definedParamNames) != len(passedParamNames) {
-			return errFuncParamsMismatch
+			return WrapError("function", funcDef.Name, errFuncParamsMismatch)
 		}
 
 		for i := 0; i < len(definedParamNames); i++ {
 			if definedParamNames[i] != passedParamNames[i] {
-				return errFuncParamsMismatch
+				return WrapError("function", funcDef.Name, errFuncParamsMismatch)
 			}
 		}
 	}
@@ -38,7 +38,7 @@ func assertFunctions(fns []*funcDef) error {
 func assertStepDef(def stepDef, funcs []*funcDef) error {
 	// Step name is required.
 	if def.Name == "" {
-		return errStepNameRequired
+		return WrapError("name", def.Name, errStepNameRequired)
 	}
 
 	// TODO: Validate executor config for each executor type.
@@ -60,18 +60,18 @@ func assertStepDef(def stepDef, funcs []*funcDef) error {
 			}
 		}
 		if calledFuncDef.Name == "" {
-			return errCallFunctionNotFound
+			return WrapError("function", calledFunc, errCallFunctionNotFound)
 		}
 
 		definedParamNames := strings.Split(calledFuncDef.Params, " ")
 		if len(def.Call.Args) != len(definedParamNames) {
-			return errNumberOfParamsMismatch
+			return WrapError("function", calledFunc, errNumberOfParamsMismatch)
 		}
 
 		for _, paramName := range definedParamNames {
 			_, exists := def.Call.Args[paramName]
 			if !exists {
-				return errRequiredParameterNotFound
+				return WrapError("function", calledFunc, errRequiredParameterNotFound)
 			}
 		}
 	}

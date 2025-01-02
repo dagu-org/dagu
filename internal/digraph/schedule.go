@@ -21,7 +21,7 @@ func buildScheduler(values []string) ([]Schedule, error) {
 	for _, v := range values {
 		parsed, err := cronParser.Parse(v)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errInvalidSchedule, err)
+			return nil, WrapError("schedule", v, err)
 		}
 		ret = append(ret, Schedule{Expression: v, Parsed: parsed})
 	}
@@ -54,7 +54,7 @@ func parseScheduleMap(
 		// Key must be a string.
 		key, ok := k.(string)
 		if !ok {
-			return errScheduleKeyMustBeString
+			return WrapError("schedule", k, errScheduleKeyMustBeString)
 		}
 		var values []string
 
@@ -69,7 +69,7 @@ func parseScheduleMap(
 			for _, s := range v {
 				s, ok := s.(string)
 				if !ok {
-					return errScheduleMustBeStringOrArray
+					return WrapError("schedule", s, errScheduleMustBeStringOrArray)
 				}
 				values = append(values, s)
 			}
@@ -92,7 +92,7 @@ func parseScheduleMap(
 
 		for _, v := range values {
 			if _, err := cronParser.Parse(v); err != nil {
-				return fmt.Errorf("%w: %s", errInvalidSchedule, err)
+				return WrapError("schedule", v, fmt.Errorf("%w: %s", errInvalidSchedule, err))
 			}
 			*targets = append(*targets, v)
 		}

@@ -189,13 +189,11 @@ func defaultName(file string) string {
 	return strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
 }
 
-var errConfigFileRequired = errors.New("config file was not specified")
-
 // resolveYamlFilePath resolves the YAML file path.
 // If the file name does not have an extension, it appends ".yaml".
 func resolveYamlFilePath(file string) (string, error) {
 	if file == "" {
-		return "", errConfigFileRequired
+		return "", errors.New("file path is required")
 	}
 
 	// The file name can be specified without the extension.
