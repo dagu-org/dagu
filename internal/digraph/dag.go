@@ -5,15 +5,12 @@ package digraph
 
 import (
 	// nolint // gosec
-
 	"crypto/md5"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/robfig/cron/v3"
 )
 
@@ -232,31 +229,4 @@ func (d *DAG) setupHandlers(workDir string) {
 			handler.setup(workDir)
 		}
 	}
-}
-
-func resolveFilePath(dagLocation, baseLocation string, file string) (string, error) {
-	if filepath.IsAbs(file) {
-		if fileutil.FileExists(file) {
-			return file, nil
-		}
-		return "", os.ErrNotExist
-	}
-
-	dagDir := filepath.Dir(dagLocation)
-	baseConfigDir := filepath.Dir(baseLocation)
-	candidates := []string{
-		filepath.Join(dagDir, file),
-		filepath.Join(baseConfigDir, file),
-	}
-	if homeDir, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates, filepath.Join(homeDir, file))
-	}
-
-	for _, candidate := range candidates {
-		if fileutil.FileExists(candidate) {
-			return candidate, nil
-		}
-	}
-
-	return file, os.ErrNotExist
 }

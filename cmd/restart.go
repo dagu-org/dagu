@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
 )
 
@@ -83,13 +84,23 @@ func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, q
 	waitForRestart(ctx, dag.RestartWait)
 
 	// Get previous parameters
-	params, err := getPreviousExecutionParams(ctx, cli, dag)
+	status, err := getPreviousExecutionStatus(ctx, cli, dag)
 	if err != nil {
 		return fmt.Errorf("failed to get previous execution parameters: %w", err)
 	}
 
+	loadOpts := []digraph.LoadOption{
+		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+	}
+	if status.Params != "" {
+		// backward compatibility
+		loadOpts = append(loadOpts, digraph.WithParams(status.Params))
+	} else {
+		loadOpts = append(loadOpts, digraph.WithParams(status.ParamsList))
+	}
+
 	// Reload DAG with parameters
-	dag, err = digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig), digraph.WithParams(params))
+	dag, err = digraph.Load(ctx, specFilePath, loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to reload DAG with params: %w", err)
 	}
@@ -185,10 +196,10 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionParams(ctx context.Context, cli client.Client, dag *digraph.DAG) (string, error) {
+func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (model.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
-		return "", fmt.Errorf("failed to get latest status: %w", err)
+		return model.Status{}, fmt.Errorf("failed to get latest status: %w", err)
 	}
-	return status.Params, nil
+	return status, nil
 }

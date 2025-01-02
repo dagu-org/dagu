@@ -71,10 +71,21 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
 	}
 
-	dag, err := digraph.Load(ctx, absolutePath, digraph.WithBaseConfig(cfg.Paths.BaseConfig),
-		digraph.WithParams(status.Status.Params))
+	loadOpts := []digraph.LoadOption{
+		digraph.WithBaseConfig(cfg.Paths.BaseConfig),
+	}
+
+	if status.Status.Params != "" {
+		// backward compatibility
+		loadOpts = append(loadOpts, digraph.WithParams(status.Status.Params))
+	} else {
+		loadOpts = append(loadOpts, digraph.WithParams(status.Status.ParamsList))
+	}
+
+	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
+		// nolint : staticcheck
 		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
 			specFilePath, status.Status.Params, err)
 	}

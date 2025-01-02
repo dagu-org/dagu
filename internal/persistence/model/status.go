@@ -33,7 +33,8 @@ func (f *StatusFactory) CreateDefault() Status {
 		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
 		OnFailure:  nodeOrNil(f.dag.HandlerOn.Failure),
 		OnCancel:   nodeOrNil(f.dag.HandlerOn.Cancel),
-		Params:     Params(f.dag.Params),
+		Params:     strings.Join(f.dag.Params, " "),
+		ParamsList: f.dag.Params,
 		StartedAt:  stringutil.FormatTime(time.Time{}),
 		FinishedAt: stringutil.FormatTime(time.Time{}),
 	}
@@ -144,7 +145,8 @@ type Status struct {
 	StartedAt  string           `json:"StartedAt"`
 	FinishedAt string           `json:"FinishedAt"`
 	Log        string           `json:"Log"`
-	Params     string           `json:"Params"`
+	Params     string           `json:"Params,omitempty"`
+	ParamsList []string         `json:"ParamsList,omitempty"`
 }
 
 func (st *Status) CorrectRunningStatus() {
@@ -163,10 +165,6 @@ func FormatTime(val time.Time) string {
 
 func Time(t time.Time) *time.Time {
 	return &t
-}
-
-func Params(params []string) string {
-	return strings.Join(params, " ")
 }
 
 type PID int
