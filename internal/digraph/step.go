@@ -66,18 +66,25 @@ func (s *Step) setup(workDir string) {
 	}
 }
 
-// String implements the Stringer interface.
-// It returns the string representation of the step.
+// String returns a formatted string representation of the step
 func (s *Step) String() string {
-	values := []string{
-		fmt.Sprintf("Name: %s", s.Name),
-		fmt.Sprintf("Dir: %s", s.Dir),
-		fmt.Sprintf("Command: %s", s.Command),
-		fmt.Sprintf("Args: %v", s.Args),
-		fmt.Sprintf("Depends: [%s]", strings.Join(s.Depends, ", ")),
+	fields := []struct {
+		name  string
+		value string
+	}{
+		{"Name", s.Name},
+		{"Dir", s.Dir},
+		{"Command", s.Command},
+		{"Args", fmt.Sprintf("%v", s.Args)},
+		{"Depends", fmt.Sprintf("[%s]", strings.Join(s.Depends, ", "))},
 	}
 
-	return strings.Join(values, "\t")
+	var parts []string
+	for _, field := range fields {
+		parts = append(parts, fmt.Sprintf("%s: %s", field.name, field.value))
+	}
+
+	return strings.Join(parts, "\t")
 }
 
 // SubWorkflow contains information about a sub DAG to be executed.
