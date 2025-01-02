@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/config"
@@ -58,11 +57,15 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), quiet)
 
+	var loadOpts []digraph.LoadOption
+	if setup.cfg.Paths.BaseConfig != "" {
+		loadOpts = append(loadOpts, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
+	}
+
 	var params string
 	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
-		params = strings.Join(args[argsLenAtDash:], " ")
-		args = args[:1]
+		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
 		params, err = cmd.Flags().GetString("params")
@@ -70,13 +73,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 			logger.Error(ctx, "Failed to get parameters", "err", err)
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
+		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(ctx, setup, args[0], removeQuotes(params), quiet, requestID)
+	return executeDag(ctx, setup, args[0], loadOpts, quiet, requestID)
 }
 
-func executeDag(ctx context.Context, setup *setup, specPath, params string, quiet bool, requestID string) error {
-	dag, err := digraph.Load(ctx, specPath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig), digraph.WithParams(params))
+func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
+	dag, err := digraph.Load(ctx, specPath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)

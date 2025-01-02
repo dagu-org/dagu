@@ -42,41 +42,21 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 			return err
 		}
 		// Override the default parameters with the command line parameters
-		pairsIndex := make(map[string]int)
-		for i, paramPair := range paramPairs {
-			if paramPair.Name != "" {
-				pairsIndex[paramPair.Name] = i
-			}
-		}
-		for i, paramPair := range overridePairs {
-			if paramPair.Name == "" {
-				// For positional parameters
-				if i < len(paramPairs) {
-					paramPairs[i] = paramPair
-				} else {
-					paramPairs = append(paramPairs, paramPair)
-				}
-				continue
-			}
+		overrideParams(&paramPairs, overridePairs)
+		overrideEnvirons(&envs, overrideEnvs)
+	}
 
-			if foundIndex, ok := pairsIndex[paramPair.Name]; ok {
-				paramPairs[foundIndex] = paramPair
-			} else {
-				paramPairs = append(paramPairs, paramPair)
-			}
+	if len(ctx.opts.parametersList) > 0 {
+		var (
+			overridePairs []paramPair
+			overrideEnvs  []string
+		)
+		if err := parseParams(ctx, ctx.opts.parametersList, &overridePairs, &overrideEnvs); err != nil {
+			return err
 		}
-
-		envsIndex := make(map[string]int)
-		for i, env := range envs {
-			envsIndex[env] = i
-		}
-		for _, env := range overrideEnvs {
-			if i, ok := envsIndex[env]; !ok {
-				envs = append(envs, env)
-			} else {
-				envs[i] = env
-			}
-		}
+		// Override the default parameters with the command line parameters
+		overrideParams(&paramPairs, overridePairs)
+		overrideEnvirons(&envs, overrideEnvs)
 	}
 
 	for _, paramPair := range paramPairs {
@@ -86,6 +66,47 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 	dag.Env = append(dag.Env, envs...)
 
 	return nil
+}
+
+func overrideParams(paramPairs *[]paramPair, override []paramPair) {
+	// Override the default parameters with the command line parameters
+	pairsIndex := make(map[string]int)
+	for i, paramPair := range *paramPairs {
+		if paramPair.Name != "" {
+			pairsIndex[paramPair.Name] = i
+		}
+	}
+	for i, paramPair := range override {
+		if paramPair.Name == "" {
+			// For positional parameters
+			if i < len(*paramPairs) {
+				(*paramPairs)[i] = paramPair
+			} else {
+				*paramPairs = append(*paramPairs, paramPair)
+			}
+			continue
+		}
+
+		if foundIndex, ok := pairsIndex[paramPair.Name]; ok {
+			(*paramPairs)[foundIndex] = paramPair
+		} else {
+			*paramPairs = append(*paramPairs, paramPair)
+		}
+	}
+}
+
+func overrideEnvirons(envs *[]string, override []string) {
+	envsIndex := make(map[string]int)
+	for i, env := range *envs {
+		envsIndex[env] = i
+	}
+	for _, env := range override {
+		if i, ok := envsIndex[env]; !ok {
+			*envs = append(*envs, env)
+		} else {
+			(*envs)[i] = env
+		}
+	}
 }
 
 // parseParams parses and processes the parameters for the DAG.
@@ -98,10 +119,6 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 	}
 
 	for index, paramPair := range paramPairs {
-		if !ctx.opts.noEval {
-			paramPair.Value = os.ExpandEnv(paramPair.Value)
-		}
-
 		*params = append(*params, paramPair)
 
 		paramString := paramPair.String()
@@ -135,10 +152,27 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case []any:
 		return parseMapParams(ctx, v)
 
+	case []string:
+		return parseListParams(ctx, v)
+
 	default:
 		return nil, wrapError("params", v, fmt.Errorf("%w: %T", errInvalidParamValue, v))
 
 	}
+}
+
+func parseListParams(ctx BuildContext, input []string) ([]paramPair, error) {
+	var params []paramPair
+
+	for _, v := range input {
+		parsedParams, err := parseStringParams(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, parsedParams...)
+	}
+
+	return params, nil
 }
 
 func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
@@ -146,6 +180,13 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 
 	for _, m := range input {
 		switch m := m.(type) {
+		case string:
+			parsedParams, err := parseStringParams(ctx, m)
+			if err != nil {
+				return nil, err
+			}
+			params = append(params, parsedParams...)
+
 		case map[any]any:
 			for name, value := range m {
 				var nameStr string
