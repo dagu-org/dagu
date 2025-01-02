@@ -39,7 +39,6 @@ func initStartFlags(cmd *cobra.Command) {
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
@@ -47,13 +46,11 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	setup := newSetup(cfg)
 
-	// Get quiet flag
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	// Get request ID if specified
 	requestID, err := cmd.Flags().GetString("requestID")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
@@ -61,14 +58,13 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), quiet)
 
-	// Get parameters
-	// Get parameters from the new syntax
 	var params string
 	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+		// Get parameters from command line arguments after "--"
 		params = strings.Join(args[argsLenAtDash:], " ")
 		args = args[:1]
 	} else {
-		// Get parameters from the deprecated flag
+		// Get parameters from flags
 		params, err = cmd.Flags().GetString("params")
 		if err != nil {
 			logger.Error(ctx, "Failed to get parameters", "err", err)
@@ -76,19 +72,16 @@ func runStart(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Initialize and run DAG
 	return executeDag(ctx, setup, args[0], removeQuotes(params), quiet, requestID)
 }
 
 func executeDag(ctx context.Context, setup *setup, specPath, params string, quiet bool, requestID string) error {
-	// Load DAG
 	dag, err := digraph.Load(ctx, setup.cfg.Paths.BaseConfig, specPath, params)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
 	}
 
-	// Generate request ID
 	if requestID == "" {
 		var err error
 		requestID, err = generateRequestID()
@@ -98,7 +91,6 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 		}
 	}
 
-	// Setup logging
 	logFile, err := setup.openLogFile(startPrefix, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
@@ -122,7 +114,6 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	// Create and run agent
 	agt := agent.New(
 		requestID,
 		dag,
