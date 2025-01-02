@@ -74,7 +74,7 @@ func Test_LoadMetadata(t *testing.T) {
 
 func Test_loadBaseConfig(t *testing.T) {
 	t.Run("LoadBaseConfigFile", func(t *testing.T) {
-		dag, err := loadBaseConfig(context.Background(), filepath.Join(testdataDir, "base.yaml"), buildOpts{})
+		dag, err := loadBaseConfig(BuildContext{}, filepath.Join(testdataDir, "base.yaml"))
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})

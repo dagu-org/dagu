@@ -102,12 +102,6 @@ func (a *Agent) Run(ctx context.Context) error {
 	dbClient := newDBClient(a.historyStore, a.dagStore)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile)
 
-	// Load environment variables for the DAG execution
-	if err := a.dag.LoadEnvs(ctx); err != nil {
-		logger.Error(ctx, "Failed to load envs", "err", err)
-		return err
-	}
-
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
 		logger.Info(ctx, "Preconditions are not met", "err", err)

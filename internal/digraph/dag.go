@@ -5,18 +5,15 @@ package digraph
 
 import (
 	// nolint // gosec
-	"context"
+
 	"crypto/md5"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
 
@@ -31,8 +28,6 @@ const (
 type DAG struct {
 	// Location is the absolute path to the DAG file.
 	Location string `json:"Location"`
-	// Base is the base DAG file for the current DAG. This is optional.
-	Base string `json:"-"`
 	// Group is the group name of the DAG. This is optional.
 	Group string `json:"Group"`
 	// Name is the name of the DAG. The default is the filename without the extension.
@@ -158,51 +153,6 @@ func (d *DAG) HasTag(tag string) bool {
 		}
 	}
 	return false
-}
-
-// LoadEnvs loads the environment variables for the DAG.
-func (d *DAG) LoadEnvs(ctx context.Context) error {
-	resolver := fileutil.NewFileResolver([]string{d.Location, d.Base})
-	for _, filePath := range d.Dotenv {
-		resolvedPath, err := resolver.ResolveFilePath(filePath)
-		if err != nil {
-			continue
-		}
-		logger.Infof(ctx, "Loading dotenv file: %s", resolvedPath)
-		if err := godotenv.Load(resolvedPath); err != nil {
-			return fmt.Errorf("failed to load dotenv file %s: %w", filePath, err)
-		}
-	}
-
-	for _, env := range d.Env {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid environment variable: %s", env)
-		}
-		if err := os.Setenv(parts[0], parts[1]); err != nil {
-			return fmt.Errorf("failed to set environment variable %s: %w", parts[0], err)
-		}
-	}
-
-	for index, param := range d.Params {
-		if strings.Contains(param, "=") {
-			parts := strings.SplitN(param, "=", 2)
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid parameter: %s", param)
-			}
-			if err := os.Setenv(parts[0], parts[1]); err != nil {
-				return fmt.Errorf("failed to set parameter %s: %w", parts[0], err)
-			}
-			continue
-		}
-
-		// Parameters without values are set as positional parameters
-		if err := os.Setenv(strconv.Itoa(index+1), param); err != nil {
-			return fmt.Errorf("failed to set parameter %s: %w", param, err)
-		}
-	}
-
-	return nil
 }
 
 // SockAddr returns the unix socket address for the DAG.

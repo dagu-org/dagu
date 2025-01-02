@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/joho/godotenv"
 	"golang.org/x/sys/unix"
 )
 
@@ -17,9 +19,21 @@ type BuilderFn func(ctx BuildContext, spec *definition, dag *DAG) error
 
 // BuildContext is the context for building a DAG.
 type BuildContext struct {
-	ctx            context.Context
-	opts           buildOpts
-	additionalEnvs []string
+	ctx  context.Context
+	file string
+	opts buildOpts
+}
+
+func (c BuildContext) WithOpts(opts buildOpts) BuildContext {
+	copy := c
+	copy.opts = opts
+	return copy
+}
+
+func (c BuildContext) WithFile(file string) BuildContext {
+	copy := c
+	copy.file = file
+	return copy
 }
 
 // buildOpts is used to control the behavior of the builder.
@@ -80,14 +94,9 @@ type stepBuilderEntry struct {
 type StepBuilderFn func(ctx BuildContext, def stepDef, step *Step) error
 
 // build builds a DAG from the specification.
-func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs []string) (*DAG, error) {
-	buildCtx := BuildContext{
-		ctx:            ctx,
-		opts:           opts,
-		additionalEnvs: additionalEnvs,
-	}
-
+func build(ctx BuildContext, spec *definition) (*DAG, error) {
 	dag := &DAG{
+		Location:      ctx.file,
 		Name:          spec.Name,
 		Group:         spec.Group,
 		Description:   spec.Description,
@@ -100,15 +109,15 @@ func build(ctx context.Context, spec *definition, opts buildOpts, additionalEnvs
 
 	var errs errorList
 	for _, builder := range builderRegistry {
-		if !builder.metadata && opts.onlyMetadata {
+		if !builder.metadata && ctx.opts.onlyMetadata {
 			continue
 		}
-		if err := builder.fn(buildCtx, spec, dag); err != nil {
+		if err := builder.fn(ctx, spec, dag); err != nil {
 			errs.Add(wrapError(builder.name, nil, err))
 		}
 	}
 
-	if !opts.onlyMetadata {
+	if !ctx.opts.onlyMetadata {
 		// TODO: Remove functions feature.
 		if err := assertFunctions(spec.Functions); err != nil {
 			errs.Add(err)
@@ -224,13 +233,14 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 	return err
 }
 
-func buildDotenv(_ BuildContext, spec *definition, dag *DAG) error {
+func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 	switch v := spec.Dotenv.(type) {
 	case nil:
 		return nil
+
 	case string:
 		dag.Dotenv = append(dag.Dotenv, v)
-		return nil
+
 	case []any:
 		for _, e := range v {
 			switch e := e.(type) {
@@ -240,10 +250,31 @@ func buildDotenv(_ BuildContext, spec *definition, dag *DAG) error {
 				return wrapError("dotenv", e, errDotenvMustBeStringOrArray)
 			}
 		}
-		return nil
 	default:
 		return wrapError("dotenv", v, errDotenvMustBeStringOrArray)
 	}
+
+	if ctx.opts.noEval {
+		return nil
+	}
+
+	var relativeTos []string
+	if ctx.file != "" {
+		relativeTos = append(relativeTos, ctx.file)
+	}
+
+	resolver := fileutil.NewFileResolver(relativeTos)
+	for _, filePath := range dag.Dotenv {
+		resolvedPath, err := resolver.ResolveFilePath(filePath)
+		if err != nil {
+			continue
+		}
+		if err := godotenv.Load(resolvedPath); err != nil {
+			return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
+		}
+	}
+
+	return nil
 }
 
 func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
@@ -261,23 +292,13 @@ func buildMailOn(_ BuildContext, spec *definition, dag *DAG) error {
 // Case 1: env is an array of maps with string keys and string values.
 // Case 2: env is a map with string keys and string values.
 func buildEnvs(ctx BuildContext, spec *definition, dag *DAG) error {
-	env, err := loadVariables(ctx, spec.Env)
+	vars, err := loadVariables(ctx, spec.Env)
 	if err != nil {
 		return err
 	}
-	dag.Env = buildConfigEnv(env)
 
-	// Add the environment variables that are defined in the base
-	// configuration. If the environment variable is already defined in
-	// the DAG, it is not added.
-	for _, e := range ctx.additionalEnvs {
-		parts := strings.SplitN(e, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("Invalid environment variable: %s", e)
-		}
-		if _, ok := env[parts[0]]; !ok {
-			dag.Env = append(dag.Env, e)
-		}
+	for k, v := range vars {
+		dag.Env = append(dag.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
 	return nil
@@ -644,16 +665,6 @@ func parseKey(value any) (string, error) {
 	}
 
 	return val, nil
-}
-
-// buildConfigEnv builds the environment variables from the map.
-func buildConfigEnv(vars map[string]string) []string {
-	var ret []string
-	for k, v := range vars {
-		ret = append(ret, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	return ret
 }
 
 // buildConditions builds a list of conditions from the definition.

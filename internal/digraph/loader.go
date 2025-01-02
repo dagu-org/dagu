@@ -74,13 +74,17 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	return loadDAG(ctx, dag, buildOpts{
-		base:           options.baseConfig,
-		parameters:     options.params,
-		parametersList: options.paramsList,
-		onlyMetadata:   options.onlyMetadata,
-		noEval:         options.noEval,
-	})
+	buildContext := BuildContext{
+		ctx: ctx,
+		opts: buildOpts{
+			base:           options.baseConfig,
+			parameters:     options.params,
+			parametersList: options.paramsList,
+			onlyMetadata:   options.onlyMetadata,
+			noEval:         options.noEval,
+		},
+	}
+	return loadDAG(buildContext, dag)
 }
 
 // LoadYAML loads the DAG from the given YAML data with the specified options.
@@ -110,12 +114,12 @@ func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	return build(ctx, def, opts, nil)
+	return build(BuildContext{ctx: ctx, opts: opts}, def)
 }
 
 // loadBaseConfig loads the global configuration from the given file.
 // The global configuration can be overridden by the DAG configuration.
-func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, error) {
+func loadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// The base config is optional.
 	if !fileutil.FileExists(file) {
 		return nil, nil
@@ -133,17 +137,20 @@ func loadBaseConfig(ctx context.Context, file string, opts buildOpts) (*DAG, err
 		return nil, err
 	}
 
-	return build(ctx, def, buildOpts{noEval: opts.noEval}, nil)
+	ctx = ctx.WithOpts(buildOpts{noEval: ctx.opts.noEval}).WithFile(file)
+	return build(ctx, def)
 }
 
 // loadDAG loads the DAG from the given file.
-func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
+func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 	filePath, err := resolveYamlFilePath(dag)
 	if err != nil {
 		return nil, err
 	}
 
-	dest, err := loadBaseConfigIfRequired(ctx, opts.base, opts)
+	ctx = ctx.WithFile(filePath)
+
+	dest, err := loadBaseConfigIfRequired(ctx, ctx.opts.base)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +165,7 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 		return nil, err
 	}
 
-	target, err := build(ctx, spec, opts, dest.Env)
+	target, err := build(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -167,12 +174,6 @@ func loadDAG(ctx context.Context, dag string, opts buildOpts) (*DAG, error) {
 	err = merge(dest, target)
 	if err != nil {
 		return nil, err
-	}
-
-	// Set the absolute path to the file.
-	dest.Location = filePath
-	if opts.base != "" {
-		dest.Base = filepath.Clean(opts.base)
 	}
 
 	// Set the name if not set.
@@ -208,9 +209,9 @@ func resolveYamlFilePath(file string) (string, error) {
 }
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
-func loadBaseConfigIfRequired(ctx context.Context, baseConfig string, opts buildOpts) (*DAG, error) {
-	if !opts.onlyMetadata && baseConfig != "" {
-		dag, err := loadBaseConfig(ctx, baseConfig, opts)
+func loadBaseConfigIfRequired(ctx BuildContext, baseConfig string) (*DAG, error) {
+	if !ctx.opts.onlyMetadata && baseConfig != "" {
+		dag, err := loadBaseConfig(ctx, baseConfig)
 		if err != nil {
 			// Failed to load the base config.
 			return nil, err
