@@ -200,8 +200,9 @@ func (e *http) Run(_ context.Context) error {
 
 func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: false,
-		Result:      cfg,
+		WeaklyTypedInput: true,
+		ErrorUnused:      false,
+		Result:           cfg,
 	})
 	return md.Decode(dat)
 }

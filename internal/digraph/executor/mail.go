@@ -101,8 +101,9 @@ func (e *mail) Run(ctx context.Context) error {
 
 func decodeMailConfig(dat map[string]any, cfg *mailConfig) error {
 	md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ErrorUnused: false,
-		Result:      cfg,
+		WeaklyTypedInput: true,
+		ErrorUnused:      false,
+		Result:           cfg,
 	})
 	return md.Decode(dat)
 }

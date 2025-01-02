@@ -269,7 +269,8 @@ func newDocker(
 
 	if cfg, ok := execCfg.Config["container"]; ok {
 		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-			Result: containerConfig,
+			Result:           containerConfig,
+			WeaklyTypedInput: true,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create decoder: %w", err)
