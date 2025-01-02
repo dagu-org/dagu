@@ -123,7 +123,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		cli,
 		dagStore,
 		setup.historyStore(),
-		&agent.Options{RetryTarget: &originalStatus.Status},
+		agent.Options{RetryTarget: &originalStatus.Status},
 	)
 
 	listenSignals(ctx, agt)

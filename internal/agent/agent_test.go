@@ -145,7 +145,7 @@ func TestAgent_DryRun(t *testing.T) {
 		th := test.Setup(t)
 
 		dag := th.LoadDAGFile(t, "dry.yaml")
-		dagAgent := dag.Agent(test.WithAgentOptions(&agent.Options{Dry: true}))
+		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
 		dagAgent.RunSuccess(t)
 
@@ -175,7 +175,7 @@ func TestAgent_Retry(t *testing.T) {
 		}
 
 		// Retry the DAG and check if it is successful
-		dagAgent = dag.Agent(test.WithAgentOptions(&agent.Options{
+		dagAgent = dag.Agent(test.WithAgentOptions(agent.Options{
 			RetryTarget: &status,
 		}))
 		dagAgent.RunSuccess(t)

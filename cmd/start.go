@@ -122,7 +122,7 @@ func executeDag(ctx context.Context, setup *setup, specPath, params string, quie
 		cli,
 		dagStore,
 		setup.historyStore(),
-		&agent.Options{},
+		agent.Options{},
 	)
 
 	listenSignals(ctx, agt)

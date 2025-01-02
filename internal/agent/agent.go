@@ -77,7 +77,7 @@ func New(
 	cli client.Client,
 	dagStore persistence.DAGStore,
 	historyStore persistence.HistoryStore,
-	opts *Options,
+	opts Options,
 ) *Agent {
 	return &Agent{
 		requestID:    requestID,

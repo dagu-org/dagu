@@ -129,7 +129,7 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		cli,
 		dagStore,
 		setup.historyStore(),
-		&agent.Options{Dry: false})
+		agent.Options{Dry: false})
 
 	listenSignals(ctx, agt)
 	if err := agt.Run(ctx); err != nil {

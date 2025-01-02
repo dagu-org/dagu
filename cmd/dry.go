@@ -78,7 +78,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		cli,
 		dagStore,
 		setup.historyStore(),
-		&agent.Options{Dry: true},
+		agent.Options{Dry: true},
 	)
 
 	listenSignals(ctx, agt)
