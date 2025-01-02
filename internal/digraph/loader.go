@@ -78,10 +78,17 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 }
 
 // LoadYAML load the DAG from the given YAML data.
-func LoadYAML(ctx context.Context, data []byte) (*DAG, error) {
+func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error) {
+	var options LoadOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 	return loadYAML(ctx, data, buildOpts{
-		onlyMetadata: false,
-		noEval:       true,
+		base:           options.baseDAG,
+		parameters:     options.params,
+		parametersList: options.paramsList,
+		onlyMetadata:   options.onlyMetadata,
+		noEval:         options.noEval,
 	})
 }
 

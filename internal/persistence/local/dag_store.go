@@ -93,8 +93,8 @@ func (d *dagStoreImpl) GetSpec(_ context.Context, name string) (string, error) {
 const defaultPerm os.FileMode = 0744
 
 func (d *dagStoreImpl) UpdateSpec(ctx context.Context, name string, spec []byte) error {
-	// Load the DAG to validate the spec.
-	_, err := digraph.LoadYAML(ctx, spec)
+	// Validate the spec before saving it.
+	_, err := digraph.LoadYAML(ctx, spec, digraph.WithoutEval())
 	if err != nil {
 		return err
 	}
