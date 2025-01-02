@@ -14,6 +14,13 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+// Constants for configuration defaults
+const (
+	defaultHistoryRetentionDays = 30
+	defaultMaxCleanUpTime       = 60 * time.Second
+	maxSocketNameLength         = 50 // Maximum length for socket name (108 - 16 - 34 - 8 = 50)
+)
+
 // DAG contains all information about a workflow.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
@@ -117,28 +124,21 @@ const (
 	HandlerOnExit    HandlerType = "onExit"
 )
 
-func (e HandlerType) String() string {
-	return string(e)
+func (h HandlerType) String() string {
+	return string(h)
 }
 
 // ParseHandlerType converts a string to a HandlerType.
 func ParseHandlerType(s string) HandlerType {
-	return nameToHandlerType[s]
+	return handlerMapping[s]
 }
 
-var (
-	nameToHandlerType = map[string]HandlerType{
-		"onSuccess": HandlerOnSuccess,
-		"onFailure": HandlerOnFailure,
-		"onCancel":  HandlerOnCancel,
-		"onExit":    HandlerOnExit,
-	}
-)
-
-var (
-	defaultHistoryRetentionDays = 30
-	defaultMaxCleanUpTime       = time.Second * 60
-)
+var handlerMapping = map[string]HandlerType{
+	"onSuccess": HandlerOnSuccess,
+	"onFailure": HandlerOnFailure,
+	"onCancel":  HandlerOnCancel,
+	"onExit":    HandlerOnExit,
+}
 
 // setup sets the default values for the DAG.
 func (d *DAG) setup() {
@@ -152,24 +152,31 @@ func (d *DAG) setup() {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime
 	}
 
-	// Set the default working directory for the steps if not set.
-	dir := filepath.Dir(d.Location)
+	workDir := filepath.Dir(d.Location)
+	d.setupSteps(workDir)
+	d.setupHandlers(workDir)
+}
+
+// setupSteps initializes all workflow steps
+func (d *DAG) setupSteps(workDir string) {
 	for i := range d.Steps {
-		d.Steps[i].setup(dir)
+		d.Steps[i].setup(workDir)
+	}
+}
+
+// setupHandlers initializes all event handlers
+func (d *DAG) setupHandlers(workDir string) {
+	handlers := []*Step{
+		d.HandlerOn.Exit,
+		d.HandlerOn.Success,
+		d.HandlerOn.Failure,
+		d.HandlerOn.Cancel,
 	}
 
-	// Set the default working directory for the handler steps if not set.
-	if d.HandlerOn.Exit != nil {
-		d.HandlerOn.Exit.setup(dir)
-	}
-	if d.HandlerOn.Success != nil {
-		d.HandlerOn.Success.setup(dir)
-	}
-	if d.HandlerOn.Failure != nil {
-		d.HandlerOn.Failure.setup(dir)
-	}
-	if d.HandlerOn.Cancel != nil {
-		d.HandlerOn.Cancel.setup(dir)
+	for _, handler := range handlers {
+		if handler != nil {
+			handler.setup(workDir)
+		}
 	}
 }
 
@@ -186,33 +193,38 @@ func (d *DAG) HasTag(tag string) bool {
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr() string {
-	s := strings.ReplaceAll(d.Location, " ", "_")
-	name := strings.Replace(filepath.Base(s), filepath.Ext(filepath.Base(s)), "", 1)
-	// nolint // gosec
-	h := md5.New()
-	_, _ = h.Write([]byte(s))
-	bs := h.Sum(nil)
-	// Socket name length must be shorter than 108 characters,
-	// so we truncate the name.
-	// 108 - 16 (length of the hash) - 34 (length remaining non-name) - 8 padding = 50
-	lengthLimit := 50
-	if len(name) > lengthLimit {
-		name = name[:lengthLimit-1]
+	// Normalize the location path
+	normalizedPath := strings.ReplaceAll(d.Location, " ", "_")
+	name := strings.TrimSuffix(filepath.Base(normalizedPath), filepath.Ext(filepath.Base(normalizedPath)))
+
+	// Generate hash for uniqueness
+	hash := md5.New() // nolint // gosec
+	hash.Write([]byte(normalizedPath))
+	hashSum := hash.Sum(nil)
+
+	// Truncate name if necessary
+	if len(name) > maxSocketNameLength {
+		name = name[:maxSocketNameLength-1]
 	}
-	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, bs))
+
+	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, hashSum))
 }
 
 // String implements the Stringer interface.
-// It returns the string representation of the DAG.
+// String returns a formatted string representation of the DAG
 func (d *DAG) String() string {
-	ret := "{\n"
-	ret = fmt.Sprintf("%s\tName: %s\n", ret, d.Name)
-	ret = fmt.Sprintf("%s\tDescription: %s\n", ret, strings.TrimSpace(d.Description))
-	ret = fmt.Sprintf("%s\tEnv: %v\n", ret, strings.Join(d.Env, ", "))
-	ret = fmt.Sprintf("%s\tLogDir: %v\n", ret, d.LogDir)
-	for i, s := range d.Steps {
-		ret = fmt.Sprintf("%s\tStep%d: %s\n", ret, i, s.String())
+	var sb strings.Builder
+
+	sb.WriteString("{\n")
+	fmt.Fprintf(&sb, "\tName: %s\n", d.Name)
+	fmt.Fprintf(&sb, "\tDescription: %s\n", strings.TrimSpace(d.Description))
+	fmt.Fprintf(&sb, "\tParams: %v\n", strings.Join(d.Params, ", "))
+	fmt.Fprintf(&sb, "\tLogDir: %v\n", d.LogDir)
+
+	for i, step := range d.Steps {
+		fmt.Fprintf(&sb, "\tStep%d: %s\n", i, step.String())
 	}
-	ret = fmt.Sprintf("%s}\n", ret)
-	return ret
+
+	sb.WriteString("}\n")
+	return sb.String()
 }
