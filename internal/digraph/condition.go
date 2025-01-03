@@ -2,10 +2,14 @@ package digraph
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os/exec"
+
+	"github.com/dagu-org/dagu/internal/cmdutil"
 )
 
-var ErrConditionNotMet = fmt.Errorf("condition not met")
+var ErrConditionNotMet = fmt.Errorf("condition was not met")
 
 // Condition contains a condition and the expected value.
 // Conditions are evaluated and compared to the expected value.
@@ -24,19 +28,55 @@ func (c Condition) eval(ctx context.Context) (bool, error) {
 	case c.Condition != "":
 		return c.evalCondition(ctx)
 
+	case c.Command != "":
+		return c.evalCommand(ctx)
+
 	default:
 		return false, fmt.Errorf("invalid condition: Condition=%s", c.Condition)
 	}
 }
 
-// func (c Condition) evalCommand(ctx context.Context) (bool, error) {
-// 	command, err := GetContext(ctx).EvalString(c.Command)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	// Run the command and get the exit code
-// 	exitCode, err := cmdutil.WithVariables()
-// }
+func (c Condition) evalCommand(ctx context.Context) (bool, error) {
+	var commandToRun string
+	if IsStepContext(ctx) {
+		command, err := GetStepContext(ctx).EvalString(c.Command)
+		if err != nil {
+			return false, err
+		}
+		commandToRun = command
+	} else if IsContext(ctx) {
+		command, err := GetContext(ctx).EvalString(c.Command)
+		if err != nil {
+			return false, err
+		}
+		commandToRun = command
+	} else {
+		command, err := cmdutil.EvalString(c.Command)
+		if err != nil {
+			return false, err
+		}
+		commandToRun = command
+	}
+
+	shell := cmdutil.GetShellCommand("")
+	if shell == "" {
+		// Run the command directly
+		cmd := exec.CommandContext(ctx, commandToRun)
+		_, err := cmd.Output()
+		if err != nil {
+			return false, fmt.Errorf("%w: %s", ErrConditionNotMet, err)
+		}
+		return true, nil
+	}
+
+	// Run the command through a shell
+	cmd := exec.CommandContext(ctx, shell, "-c", commandToRun)
+	_, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("%w: %s", ErrConditionNotMet, err)
+	}
+	return true, nil
+}
 
 func (c Condition) evalCondition(ctx context.Context) (bool, error) {
 	if IsStepContext(ctx) {
@@ -64,6 +104,9 @@ func (c Condition) String() string {
 func evalCondition(ctx context.Context, c Condition) error {
 	matched, err := c.eval(ctx)
 	if err != nil {
+		if errors.Is(err, ErrConditionNotMet) {
+			return err
+		}
 		return fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
 	}
 

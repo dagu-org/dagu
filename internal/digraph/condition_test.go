@@ -49,6 +49,31 @@ func TestCondition_Eval(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "CommandResultMet",
+			condition: []Condition{
+				{
+					Command: "true",
+				},
+			},
+		},
+		{
+			name: "CommandResultNotMet",
+			condition: []Condition{
+				{
+					Command: "false",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "CommandResultTest",
+			condition: []Condition{
+				{
+					Command: "test 1 -eq 1",
+				},
+			},
+		},
 	}
 
 	// Set environment variable for testing
