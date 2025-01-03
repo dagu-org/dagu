@@ -349,11 +349,19 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 }
 
 func buildPrecondition(ctx BuildContext, spec *definition, dag *DAG) error {
+	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx, spec.Preconditions)
 	if err != nil {
 		return err
 	}
+	condition, err := parsePrecondition(ctx, spec.Precondition)
+	if err != nil {
+		return err
+	}
+
 	dag.Preconditions = conditions
+	dag.Preconditions = append(dag.Preconditions, condition...)
+
 	return nil
 }
 
@@ -361,6 +369,10 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 	switch v := precondition.(type) {
 	case nil:
 		return nil, nil
+
+	case string:
+		return []Condition{{Command: v}}, nil
+
 	case map[any]any:
 		var ret Condition
 		for k, vv := range v {
@@ -368,22 +380,38 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 			if !ok {
 				return nil, wrapError("preconditions", k, errPreconditionKeyMustBeString)
 			}
-			switch key {
+
+			switch strings.ToLower(key) {
 			case "condition":
 				ret.Condition, ok = vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
 				}
+
 			case "expected":
 				ret.Expected, ok = vv.(string)
 				if !ok {
 					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
 				}
+
+			case "command":
+				ret.Command, ok = vv.(string)
+				if !ok {
+					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
+				}
+
 			default:
 				return nil, wrapError("preconditions", k, fmt.Errorf("%w: %s", errPreconditionHasInvalidKey, key))
+
 			}
 		}
+
+		if err := ret.Validate(); err != nil {
+			return nil, wrapError("preconditions", v, err)
+		}
+
 		return []Condition{ret}, nil
+
 	case []any:
 		var ret []Condition
 		for _, vv := range v {
@@ -394,8 +422,10 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 			ret = append(ret, parsed...)
 		}
 		return ret, nil
+
 	default:
 		return nil, wrapError("preconditions", v, errPreconditionMustBeArrayOrString)
+
 	}
 }
 
@@ -544,11 +574,17 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 }
 
 func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
+	// Parse both `preconditions` and `precondition` fields.
 	conditions, err := parsePrecondition(ctx, def.Preconditions)
 	if err != nil {
 		return err
 	}
+	condition, err := parsePrecondition(ctx, def.Precondition)
+	if err != nil {
+		return err
+	}
 	step.Preconditions = conditions
+	step.Preconditions = append(step.Preconditions, condition...)
 	return nil
 }
 

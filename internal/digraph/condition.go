@@ -21,6 +21,22 @@ type Condition struct {
 	Expected  string `json:"Expected,omitempty"`  // Expected value
 }
 
+func (c Condition) Validate() error {
+	switch {
+	case c.Condition != "":
+		if c.Expected == "" {
+			return fmt.Errorf("expected value is required for condition: Condition=%s", c.Condition)
+		}
+
+	case c.Command != "":
+		// Command is required
+	default:
+		return fmt.Errorf("invalid condition: Condition=%s", c.Condition)
+	}
+
+	return nil
+}
+
 // eval evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
 func (c Condition) eval(ctx context.Context) (bool, error) {
