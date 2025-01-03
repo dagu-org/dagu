@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+var ErrConditionNotMet = fmt.Errorf("condition not met")
+
 // Condition contains a condition and the expected value.
 // Conditions are evaluated and compared to the expected value.
 // The condition can be a command substitution or an environment variable.
@@ -29,7 +31,7 @@ func (c Condition) eval(ctx context.Context) (bool, error) {
 
 // func (c Condition) evalCommand(ctx context.Context) (bool, error) {
 // 	command, err := GetContext(ctx).EvalString(c.Command)
-// 	if err !=nil {
+// 	if err != nil {
 // 		return false, err
 // 	}
 // 	// Run the command and get the exit code
@@ -66,7 +68,7 @@ func evalCondition(ctx context.Context, c Condition) error {
 	}
 
 	if !matched {
-		return fmt.Errorf("error condition was not met: Condition=%s Expected=%s", c.Condition, c.Expected)
+		return fmt.Errorf("%w: Condition=%s Expected=%s", ErrConditionNotMet, c.Condition, c.Expected)
 	}
 
 	// Condition was met

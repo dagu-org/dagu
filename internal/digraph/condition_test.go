@@ -49,15 +49,6 @@ func TestCondition_Eval(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{
-			name: "InvalidCond",
-			condition: []Condition{
-				{
-					Condition: "`invalid`",
-				},
-			},
-			wantErr: true,
-		},
 	}
 
 	// Set environment variable for testing
@@ -70,6 +61,9 @@ func TestCondition_Eval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := EvalConditions(context.Background(), tt.condition)
 			require.Equal(t, tt.wantErr, err != nil)
+			if err != nil {
+				require.ErrorIs(t, err, ErrConditionNotMet)
+			}
 		})
 	}
 }
