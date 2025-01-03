@@ -201,9 +201,41 @@ Send output to files:
 Conditional Execution
 ------------------
 
-Preconditions
+Precondition
 ~~~~~~~~~~~~
 Run steps only when conditions are met:
+
+.. code-block:: yaml
+
+  steps:
+    - name: monthly task
+      command: monthly.sh
+      preconditions: "test -f file.txt" # Run only if the file exists
+
+Use multiple conditions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: monthly task
+      command: monthly.sh
+      preconditions: # Run only if all commands exit with 0
+        - "test -f file.txt"
+        - "test -d dir"
+
+Use environment variables in conditions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: monthly task
+      command: monthly.sh
+      preconditions:
+        - condition: "${TODAY}" # Run only if TODAY is set as "01"
+          expected: "01"
+
+
+Use command substitution in conditions:
 
 .. code-block:: yaml
 
@@ -431,7 +463,7 @@ Complete list of DAG-level configuration options:
 - ``delaySec``: Delay between steps
 - ``maxActiveRuns``: Maximum parallel steps
 - ``params``: Default parameters
-- ``preconditions``: DAG-level conditions
+- ``precondition``: DAG-level conditions
 - ``mailOn``: Email notification settings
 - ``MaxCleanUpTimeSec``: Cleanup timeout
 - ``handlerOn``: Lifecycle event handlers
@@ -456,7 +488,7 @@ Example DAG configuration:
     delaySec: 1                          
     maxActiveRuns: 1                     
     params: param1 param2                
-    preconditions:                       
+    precondition:                       
       - condition: "`echo $2`"           
         expected: "param2"               
     mailOn:

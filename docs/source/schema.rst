@@ -152,15 +152,33 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       - FOO: 1
       - BAR: "`echo 2`"
 
-``preconditions``
+``precondition``
 ~~~~~~~~~~~~~~~
-  A list of conditions that must be satisfied before the DAG can run. Each condition can use shell expansions or command substitutions to validate external states.
+  The condition(s) that must be satisfied before the DAG can run. Each condition can use shell expansions or command substitutions to validate external states.
 
-  **Example**:
+  **Example**: Condition based on command exit code:
 
   .. code-block:: yaml
 
-    preconditions:
+    precondition:
+      - "test -f /path/to/file"
+  
+    # or more simply
+    precondition: "test -f /path/to/file"
+
+  **Example**: Condition based on environment variables:
+
+  .. code-block:: yaml
+
+    precondition:
+      - condition: "$ENV_VAR"
+        expected: "value"
+
+  **Example**: Condition based on command output (stdout):
+
+  .. code-block:: yaml
+
+    precondition:
       - condition: "`echo $2`" 
         expected: "param2"
 
@@ -285,21 +303,31 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
       repeat: true
       intervalSec: 60  # run every minute
 
-``preconditions``
+``precondition``
 ~~~~~~~~~~~~~~
-  Conditions that must be met for this step to run. Each condition block has:
-
-  - **condition** (string): A command or expression to evaluate.
-  - **expected** (string): The expected output. If the output matches, the step runs; otherwise, it is skipped.
+  Condition(s) that must be met for this step to run. It works same as the DAG-level ``precondition`` field. See :ref:`DAG-Level Fields <DAG-Level-Fields>` for examples.
 
   .. code-block:: yaml
   
     steps:
+      # Example 1: based on exit code
+      - name: daily task
+        command: daily.sh
+        precondition: "test -f /path/to/file"
+
+      # Example 2: based on command output (stdout)
       - name: monthly task
         command: monthly.sh
-        preconditions:
+        precondition:
           - condition: "`date '+%d'`"
             expected: "01"
+      
+      # Example 3: based on environment variables
+      - name: weekly task
+        command: weekly.sh
+        precondition:
+          - condition: "$WEEKDAY"
+            expected: "Friday"
 
 ``depends``
 ~~~~~~~~~
