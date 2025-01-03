@@ -105,7 +105,7 @@ func SplitCommandWithEval(cmd string) (string, []string, error) {
 		}
 		for i, arg := range command {
 			command[i] = arg
-			// escape the command
+			// Escape the command
 			command[i] = escapeReplacer.Replace(command[i])
 			// Substitute command in the command.
 			command[i], err = SubstituteCommands(command[i])
@@ -143,12 +143,6 @@ var (
 		`\t`, `\\\\t`,
 		`\r`, `\\\\r`,
 		`\n`, `\\\\n`,
-	)
-
-	unescapeReplacer = strings.NewReplacer(
-		`\\\\t`, `\t`,
-		`\\\\r`, `\r`,
-		`\\\\n`, `\n`,
 	)
 )
 

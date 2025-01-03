@@ -196,7 +196,13 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	n.cancelFunc = fn
 
 	if n.data.Step.CmdWithArgs != "" {
-		cmd, args, err := cmdutil.SplitCommandWithEval(n.data.Step.CmdWithArgs)
+		// Expand envs
+		stepContext := digraph.GetStepContext(ctx)
+		cmdWithArgs, err := stepContext.EvalString(n.data.Step.CmdWithArgs)
+		if err != nil {
+			return nil, err
+		}
+		cmd, args, err := cmdutil.SplitCommandWithEval(cmdWithArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to split command: %w", err)
 		}
