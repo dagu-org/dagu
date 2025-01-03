@@ -6,13 +6,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 type commandExecutor struct {
@@ -27,7 +27,10 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 
 	stepContext := digraph.GetStepContext(ctx)
 
-	cmd := createCommand(ctx, step)
+	cmd, err := createCommand(ctx, step)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create command: %w", err)
+	}
 	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
 	cmd.Dir = step.Dir
 
@@ -39,30 +42,35 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 	return &commandExecutor{cmd: cmd}, nil
 }
 
-func createCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
-	shellCommand := cmdutil.GetShellCommand(step.Shell)
-
-	if shellCommand == "" {
-		return createDirectCommand(ctx, step)
+func createCommand(ctx context.Context, step digraph.Step) (*exec.Cmd, error) {
+	stepContext := digraph.GetStepContext(ctx)
+	var args []string
+	for _, arg := range step.Args {
+		ret, err := stepContext.EvalString(arg)
+		if err != nil {
+			logger.Error(ctx, "Failed to evaluate string", "arg", arg, "err", err)
+			return nil, err
+		}
+		args = append(args, ret)
 	}
-	return createShellCommand(ctx, shellCommand, step)
+
+	shellCommand := cmdutil.GetShellCommand(step.Shell)
+	if shellCommand == "" {
+		return createDirectCommand(ctx, step, args), nil
+	}
+	return createShellCommand(ctx, shellCommand, step, args), nil
 }
 
 // createDirectCommand creates a command that runs directly without a shell
-func createDirectCommand(ctx context.Context, step digraph.Step) *exec.Cmd {
+func createDirectCommand(ctx context.Context, step digraph.Step, args []string) *exec.Cmd {
 	// nolint: gosec
-	return exec.CommandContext(ctx, step.Command, step.Args...)
+	return exec.CommandContext(ctx, step.Command, args...)
 }
 
 // createShellCommand creates a command that runs through a shell
-func createShellCommand(ctx context.Context, shell string, step digraph.Step) *exec.Cmd {
-	command := buildCommandString(step.Command, step.Args)
+func createShellCommand(ctx context.Context, shell string, step digraph.Step, args []string) *exec.Cmd {
+	command := cmdutil.BuildCommandEscapedString(step.Command, args)
 	return exec.CommandContext(ctx, shell, "-c", command)
-}
-
-// buildCommandString combines the command and arguments into a single string
-func buildCommandString(command string, args []string) string {
-	return fmt.Sprintf("%s %s", command, strings.Join(args, " "))
 }
 
 func (e *commandExecutor) Run(_ context.Context) error {

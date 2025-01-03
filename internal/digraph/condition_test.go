@@ -50,13 +50,29 @@ func TestCondition_Eval(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "InvalidCond",
+			name: "CommandResultMet",
 			condition: []Condition{
 				{
-					Condition: "`invalid`",
+					Command: "true",
+				},
+			},
+		},
+		{
+			name: "CommandResultNotMet",
+			condition: []Condition{
+				{
+					Command: "false",
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "CommandResultTest",
+			condition: []Condition{
+				{
+					Command: "test 1 -eq 1",
+				},
+			},
 		},
 	}
 
@@ -70,6 +86,9 @@ func TestCondition_Eval(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := EvalConditions(context.Background(), tt.condition)
 			require.Equal(t, tt.wantErr, err != nil)
+			if err != nil {
+				require.ErrorIs(t, err, ErrConditionNotMet)
+			}
 		})
 	}
 }

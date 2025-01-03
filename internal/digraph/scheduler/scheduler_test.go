@@ -124,7 +124,10 @@ func TestScheduler(t *testing.T) {
 			newStep("2",
 				withDepends("1"),
 				withCommand("false"),
-				withPrecondition("`echo 1`", "0"),
+				withPrecondition(digraph.Condition{
+					Condition: "`echo 1`",
+					Expected:  "0",
+				}),
 				withContinueOnSkipped(),
 			),
 			successStep("3", "2"),
@@ -238,7 +241,12 @@ func TestScheduler(t *testing.T) {
 		// 1 -> 2 (precondition match) -> 3
 		graph := sc.newGraph(t,
 			successStep("1"),
-			newStep("2", withCommand("echo 2"), withPrecondition("`echo 1`", "1")),
+			newStep("2", withCommand("echo 2"),
+				withPrecondition(digraph.Condition{
+					Condition: "`echo 1`",
+					Expected:  "1",
+				}),
+			),
 			successStep("3", "2"),
 		)
 
@@ -255,7 +263,54 @@ func TestScheduler(t *testing.T) {
 		// 1 -> 2 (precondition not match) -> 3
 		graph := sc.newGraph(t,
 			successStep("1"),
-			newStep("2", withCommand("echo 2"), withPrecondition("`echo 1`", "0")),
+			newStep("2", withCommand("echo 2"),
+				withPrecondition(digraph.Condition{
+					Condition: "`echo 1`",
+					Expected:  "0",
+				})),
+			successStep("3", "2"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertDoneCount(t, 1) // only 1 should
+
+		// 1 should be executed and 2, 3 should be skipped
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSkipped)
+		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSkipped)
+	})
+	t.Run("PreconditionWithCommandMet", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 -> 2 (precondition not match) -> 3
+		graph := sc.newGraph(t,
+			successStep("1"),
+			newStep("2", withCommand("echo 2"),
+				withPrecondition(digraph.Condition{
+					Command: "true",
+				})),
+			successStep("3", "2"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertDoneCount(t, 3)
+
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
+	})
+	t.Run("PreconditionWithCommandNotMet", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 -> 2 (precondition not match) -> 3
+		graph := sc.newGraph(t,
+			successStep("1"),
+			newStep("2", withCommand("echo 2"),
+				withPrecondition(digraph.Condition{
+					Command: "false",
+				})),
 			successStep("3", "2"),
 		)
 
@@ -604,14 +659,9 @@ func withRepeatPolicy(repeat bool, interval time.Duration) stepOption {
 	}
 }
 
-func withPrecondition(condition, expected string) stepOption {
+func withPrecondition(condition digraph.Condition) stepOption {
 	return func(step *digraph.Step) {
-		step.Preconditions = []digraph.Condition{
-			{
-				Condition: condition,
-				Expected:  expected,
-			},
-		}
+		step.Preconditions = []digraph.Condition{condition}
 	}
 }
 

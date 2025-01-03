@@ -43,8 +43,10 @@ type definition struct {
 	RestartWaitSec int
 	// HistRetentionDays is the retention days of the history.
 	HistRetentionDays *int
+	// Precondition is the condition to run the DAG.
+	Precondition any
 	// Preconditions is the condition to run the DAG.
-	Preconditions []*conditionDef
+	Preconditions any
 	// MaxActiveRuns is the maximum number of concurrent steps.
 	MaxActiveRuns int
 	// Params is the default parameters for the steps.
@@ -55,12 +57,6 @@ type definition struct {
 	MaxCleanUpTimeSec *int
 	// Tags is the tags for the DAG.
 	Tags any
-}
-
-// conditionDef defines a condition and its expected value.
-type conditionDef struct {
-	Condition string // Condition to evaluate
-	Expected  string // Expected value
 }
 
 // handlerOnDef defines the steps to be executed on different events.
@@ -103,8 +99,10 @@ type stepDef struct {
 	RepeatPolicy *repeatPolicyDef
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool
+	// Precondition is the condition to run the step.
+	Precondition any
 	// Preconditions is the condition to run the step.
-	Preconditions []*conditionDef
+	Preconditions any
 	// SignalOnStop is the signal when the step is requested to stop.
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.

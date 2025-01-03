@@ -401,3 +401,62 @@ func TestReplaceVars(t *testing.T) {
 		})
 	}
 }
+
+// TestBuildCommandString demonstrates table-driven tests for BuildCommandString.
+func TestBuildEscapedCommandString(t *testing.T) {
+	type testCase struct {
+		name string
+		cmd  string
+		args []string
+		want string
+	}
+
+	tests := []testCase{
+		{
+			name: "piping",
+			cmd:  "echo",
+			args: []string{"hello", "|", "wc", "-c"},
+			want: "echo hello | wc -c",
+		},
+		{
+			name: "redirection",
+			cmd:  "echo",
+			args: []string{"'test content'", ">", "testfile.txt", "&&", "cat", "testfile.txt"},
+			want: `echo 'test content' > testfile.txt && cat testfile.txt`,
+		},
+		{
+			name: `key="value" argument`,
+			cmd:  "echo",
+			args: []string{`key="value"`},
+			want: `echo key="value"`,
+		},
+		{
+			name: "JSON argument",
+			cmd:  "echo",
+			args: []string{`{"foo":"bar","hello":"world"}`},
+			want: `echo {"foo":"bar","hello":"world"}`,
+		},
+		{
+			name: "key=value argument",
+			cmd:  "echo",
+			args: []string{`key="some value"`},
+			want: `echo key="some value"`,
+		},
+		{
+			name: "double quotes",
+			cmd:  "echo",
+			args: []string{`a "b" c`},
+			want: `echo "a \"b\" c"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build the final command line that will be passed to `sh -c`.
+			cmdStr := BuildCommandEscapedString(tc.cmd, tc.args)
+
+			// Check if the built command string is as expected.
+			require.Equal(t, tc.want, cmdStr, "unexpected command string")
+		})
+	}
+}
