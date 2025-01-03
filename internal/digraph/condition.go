@@ -21,10 +21,20 @@ func (c Condition) eval(ctx context.Context) (bool, error) {
 	switch {
 	case c.Condition != "":
 		return c.evalCondition(ctx)
+
 	default:
 		return false, fmt.Errorf("invalid condition: Condition=%s", c.Condition)
 	}
 }
+
+// func (c Condition) evalCommand(ctx context.Context) (bool, error) {
+// 	command, err := GetContext(ctx).EvalString(c.Command)
+// 	if err !=nil {
+// 		return false, err
+// 	}
+// 	// Run the command and get the exit code
+// 	exitCode, err := cmdutil.WithVariables()
+// }
 
 func (c Condition) evalCondition(ctx context.Context) (bool, error) {
 	if IsStepContext(ctx) {
@@ -39,6 +49,7 @@ func (c Condition) evalCondition(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
 	return c.Expected == evaluatedVal, nil
 }
 
@@ -53,6 +64,7 @@ func evalCondition(ctx context.Context, c Condition) error {
 	if err != nil {
 		return fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
 	}
+
 	if !matched {
 		return fmt.Errorf("error condition was not met: Condition=%s Expected=%s", c.Condition, c.Expected)
 	}

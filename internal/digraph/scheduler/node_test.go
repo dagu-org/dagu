@@ -67,6 +67,8 @@ func withNodeOutput(output string) nodeOption {
 }
 
 func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
+	t.Helper()
+
 	th := test.Setup(t)
 
 	data := scheduler.NodeData{Step: digraph.Step{}}
@@ -81,6 +83,8 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 }
 
 func (n nodeHelper) Execute(t *testing.T) {
+	t.Helper()
+
 	err := n.Node.Setup(n.Context, n.Config.Paths.LogDir, n.reqID)
 	require.NoError(t, err, "failed to setup node")
 
@@ -92,22 +96,28 @@ func (n nodeHelper) Execute(t *testing.T) {
 }
 
 func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
+	t.Helper()
+
 	err := n.Node.Execute(n.execContext())
 	require.Error(t, err, "expected error")
 	require.Contains(t, err.Error(), expectedErr, "unexpected error")
 }
 
 func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
+	t.Helper()
+
 	dat, err := os.ReadFile(n.Node.LogFilename())
 	require.NoErrorf(t, err, "failed to read log file %q", n.Node.LogFilename())
 	require.Contains(t, string(dat), expected, "log file does not contain expected string")
 }
 
 func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
+	t.Helper()
+
 	require.NotNil(t, n.Node.Data().Step.OutputVariables, "output variables not set")
 	data, ok := n.Node.Data().Step.OutputVariables.Load(key)
 	require.True(t, ok, "output variable not found")
-	require.Equal(t, fmt.Sprintf("%s=%s", key, value), data, "output variable value mismatch")
+	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }
 
 func (n nodeHelper) execContext() context.Context {
@@ -225,6 +235,18 @@ func TestNode(t *testing.T) {
 			{
 				CmdWithArgs: `echo "{\"key\":\"value\"}"`,
 				Want:        `{"key":"value"}`,
+			},
+			{
+				CmdWithArgs: `echo 'hello world'`,
+				Want:        `hello world`,
+			},
+			{
+				CmdWithArgs: `echo hello "world"`,
+				Want:        `hello world`,
+			},
+			{
+				CmdWithArgs: `echo 'hello "world"'`,
+				Want:        `hello "world"`,
 			},
 		}
 

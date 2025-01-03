@@ -112,8 +112,6 @@ func SplitCommandWithEval(cmd string) (string, []string, error) {
 			if err != nil {
 				return "", nil, fmt.Errorf("failed to substitute command: %w", err)
 			}
-			// unescape the command
-			// command[i] = unescapeReplacer.Replace(command[i])
 		}
 	}
 
@@ -145,6 +143,12 @@ var (
 		`\t`, `\\\\t`,
 		`\r`, `\\\\r`,
 		`\n`, `\\\\n`,
+	)
+
+	unescapeReplacer = strings.NewReplacer(
+		`\\\\t`, `\t`,
+		`\\\\r`, `\r`,
+		`\\\\n`, `\n`,
 	)
 )
 
@@ -238,6 +242,54 @@ func WithVariables(vars map[string]string) EvalOption {
 	return func(opts *EvalOptions) {
 		opts.Variables = append(opts.Variables, vars)
 	}
+}
+
+// RunExitCode runs the command and returns the exit code.
+// func RunExitCode(cmd string) (int, error) {
+// 	command, args, err := SplitCommandWithEval(cmd)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	shellCommand := GetShellCommand("")
+// }
+
+var regEscapedKeyValue = regexp.MustCompile(`^[^\s=]+="[^"]+"$`)
+
+// BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.
+// It assumes that the command and arguments are already escaped.
+func BuildCommandEscapedString(command string, args []string) string {
+	quotedArgs := make([]string, 0, len(args))
+	for _, arg := range args {
+		// If already quoted, skip
+		if strings.HasPrefix(arg, `"`) && strings.HasSuffix(arg, `"`) {
+			quotedArgs = append(quotedArgs, arg)
+			continue
+		}
+		if strings.HasPrefix(arg, `'`) && strings.HasSuffix(arg, `'`) {
+			quotedArgs = append(quotedArgs, arg)
+			continue
+		}
+		// If the argument contains spaces, quote it.
+		if strings.ContainsAny(arg, " ") {
+			// If it includes '=' and is already quoted, skip
+			if regEscapedKeyValue.MatchString(arg) {
+				quotedArgs = append(quotedArgs, arg)
+				continue
+			}
+			// if it contains double quotes, escape them
+			arg = strings.ReplaceAll(arg, `"`, `\"`)
+			quotedArgs = append(quotedArgs, fmt.Sprintf(`"%s"`, arg))
+		} else {
+			quotedArgs = append(quotedArgs, arg)
+		}
+	}
+
+	// If we have no arguments, just return the command without trailing space.
+	if len(quotedArgs) == 0 {
+		return command
+	}
+
+	return fmt.Sprintf("%s %s", command, strings.Join(quotedArgs, " "))
 }
 
 // EvalString substitutes environment variables and commands in the input string
