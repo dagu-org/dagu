@@ -288,8 +288,7 @@ func TestScheduler(t *testing.T) {
 			successStep("1"),
 			newStep("2", withCommand("echo 2"),
 				withPrecondition(digraph.Condition{
-					Condition: "`echo 1`",
-					Expected:  "0",
+					Command: "true",
 				})),
 			successStep("3", "2"),
 		)

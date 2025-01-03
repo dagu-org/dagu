@@ -17,26 +17,47 @@ type Condition struct {
 
 // eval evaluates the condition and returns the actual value.
 // It returns an error if the evaluation failed or the condition is invalid.
-func (c Condition) eval(ctx context.Context) (string, error) {
+func (c Condition) eval(ctx context.Context) (bool, error) {
+	switch {
+	case c.Condition != "":
+		return c.evalCondition(ctx)
+	default:
+		return false, fmt.Errorf("invalid condition: Condition=%s", c.Condition)
+	}
+}
+
+func (c Condition) evalCondition(ctx context.Context) (bool, error) {
 	if IsStepContext(ctx) {
-		return GetStepContext(ctx).EvalString(c.Condition)
+		evaluatedVal, err := GetStepContext(ctx).EvalString(c.Condition)
+		if err != nil {
+			return false, err
+		}
+		return c.Expected == evaluatedVal, nil
 	}
 
-	return GetContext(ctx).EvalString(c.Condition)
+	evaluatedVal, err := GetContext(ctx).EvalString(c.Condition)
+	if err != nil {
+		return false, err
+	}
+	return c.Expected == evaluatedVal, nil
+}
+
+func (c Condition) String() string {
+	return fmt.Sprintf("Condition=%s Expected=%s", c.Condition, c.Expected)
 }
 
 // evalCondition evaluates a single condition and checks the result.
 // It returns an error if the condition was not met.
 func evalCondition(ctx context.Context, c Condition) error {
-	actual, err := c.eval(ctx)
+	matched, err := c.eval(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
 	}
-
-	if c.Expected != actual {
-		return fmt.Errorf("error condition was not met: Condition=%s Expected=%s Actual=%s", c.Condition, c.Expected, actual)
+	if !matched {
+		return fmt.Errorf("error condition was not met: Condition=%s Expected=%s", c.Condition, c.Expected)
 	}
 
+	// Condition was met
 	return nil
 }
 
