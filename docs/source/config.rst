@@ -53,7 +53,7 @@ UI Customization
 
 Configuration File
 ----------------
-Create ``admin.yaml`` in ``$HOME/.config/dagu/`` to override default settings. Below is a complete example with all available options:
+Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. Below is a complete example with all available options:
 
 .. code-block:: yaml
 
@@ -101,7 +101,7 @@ There are multiple ways to configure the server's host and port:
       
       DAGU_HOST=0.0.0.0 DAGU_PORT=8000 dagu server
  
-3. Configuration file (admin.yaml):
+3. Configuration file (config.yaml):
   .. code-block:: yaml
       
       host: "0.0.0.0"

@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package fileutil
 
 import (
@@ -8,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 var (
@@ -124,11 +120,10 @@ func EnsureYAMLExtension(filename string) string {
 
 	ext := filepath.Ext(filename)
 	switch ext {
-	case "":
-		return filename + yamlExtension
-	case ymlExtension:
-		return strings.TrimSuffix(filename, ext) + yamlExtension
-	default:
+	case ymlExtension, yamlExtension:
 		return filename
+
+	default:
+		return filename + yamlExtension
 	}
 }

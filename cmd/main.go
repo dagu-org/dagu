@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package main
 
 import (
@@ -38,7 +35,7 @@ func init() {
 	rootCmd.PersistentFlags().
 		StringVar(
 			&cfgFile, "config", "",
-			"config file (default is $HOME/.config/dagu/admin.yaml)",
+			"config file (default is $HOME/.config/dagu/config.yaml)",
 		)
 
 	cobra.OnInitialize(func() {

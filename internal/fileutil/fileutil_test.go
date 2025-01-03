@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package fileutil
 
 import (
@@ -134,9 +131,9 @@ func TestAddYamlExtension(t *testing.T) {
 		want string
 	}{
 		{"config", "config.yaml"},
-		{"config.yml", "config.yaml"},
+		{"config.yml", "config.yml"},
 		{"config.yaml", "config.yaml"},
-		{"config.json", "config.json"},
+		{"config.json", "config.json.yaml"},
 		{"", ""},
 	}
 

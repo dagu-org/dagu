@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package config
 
 import (
@@ -162,7 +159,7 @@ func TestConfigLoader_Load(t *testing.T) {
 	}
 
 	// Create test config file
-	configFile := filepath.Join(configDir, "admin.yaml")
+	configFile := filepath.Join(configDir, "config.yaml")
 	testConfig := []byte(`
 host: "127.0.0.1"
 port: 8080

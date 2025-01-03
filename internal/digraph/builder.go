@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package digraph
 
 import (
@@ -9,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/joho/godotenv"
 	"golang.org/x/sys/unix"
@@ -254,26 +252,28 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 		return wrapError("dotenv", v, errDotenvMustBeStringOrArray)
 	}
 
-	if ctx.opts.noEval {
-		return nil
-	}
-
-	var relativeTos []string
-	if ctx.file != "" {
-		relativeTos = append(relativeTos, ctx.file)
-	}
-
-	resolver := fileutil.NewFileResolver(relativeTos)
-	for _, filePath := range dag.Dotenv {
-		resolvedPath, err := resolver.ResolveFilePath(filePath)
-		if err != nil {
-			continue
+	if !ctx.opts.noEval {
+		var relativeTos []string
+		if ctx.file != "" {
+			relativeTos = append(relativeTos, ctx.file)
 		}
-		if err := godotenv.Load(resolvedPath); err != nil {
-			return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
+
+		resolver := fileutil.NewFileResolver(relativeTos)
+		for _, filePath := range dag.Dotenv {
+			filePath, err := cmdutil.EvalString(filePath)
+			if err != nil {
+				return wrapError("dotenv", filePath, fmt.Errorf("failed to evaluate dotenv file path %s: %w", filePath, err))
+			}
+			resolvedPath, err := resolver.ResolveFilePath(filePath)
+			if err != nil {
+				continue
+			}
+			if err := godotenv.Load(resolvedPath); err != nil {
+				return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
+			}
+			// Break after the first successful load.
+			break
 		}
-		// Break after the first successful load.
-		break
 	}
 
 	return nil

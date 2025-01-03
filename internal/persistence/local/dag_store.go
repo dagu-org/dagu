@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package local
 
 import (
@@ -344,16 +341,18 @@ func (d *dagStoreImpl) locateDAG(nameOrPath string) (string, error) {
 // findDAGFile finds the sub workflow file with the given name.
 func findDAGFile(name string) (string, error) {
 	ext := path.Ext(name)
-	if ext == "" {
+	switch ext {
+	case ".yaml", ".yml":
+		if fileutil.FileExists(name) {
+			return filepath.Abs(name)
+		}
+	default:
 		// try all supported extensions
 		for _, ext := range fileutil.ValidYAMLExtensions {
 			if fileutil.FileExists(name + ext) {
 				return filepath.Abs(name + ext)
 			}
 		}
-	} else if fileutil.FileExists(name) {
-		// the name has an extension
-		return filepath.Abs(name)
 	}
 	return "", fmt.Errorf("file %s not found: %w", name, os.ErrNotExist)
 }

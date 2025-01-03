@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 // This file is safe to edit. Once it exists it will not be overwritten
 
 package restapi

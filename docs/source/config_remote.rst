@@ -12,7 +12,7 @@ Dagu UI can be configured to connect to remote nodes, allowing management of DAG
 
 How to configure
 ----------------
-Create ``admin.yaml`` in ``$HOME/.config/dagu/`` to configure remote nodes. Example configuration:
+Create ``config.yaml`` in ``$HOME/.config/dagu/`` to configure remote nodes. Example configuration:
 
 .. code-block:: yaml
 

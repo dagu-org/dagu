@@ -228,7 +228,7 @@ See [Remote Node Configuration](https://dagu.readthedocs.io/en/latest/config_rem
 
 ### Configuration
 
-Create `admin.yaml` in `$HOME/.config/dagu/`:
+Create `config.yaml` in `$HOME/.config/dagu/`:
 
 ```yaml
 remoteNodes:

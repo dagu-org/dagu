@@ -1,6 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package config
 
 import (
@@ -38,6 +35,14 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+	}
+
+	// Backward compatibility for 'admin.yaml' renamed to 'config.yaml'
+	viper.SetConfigName("admin")
+	if err := viper.MergeInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("failed to read admin config: %w", err)
 		}
 	}
 
@@ -96,7 +101,7 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 func (l *ConfigLoader) configureViper(resolver PathResolver) {
 	viper.AddConfigPath(resolver.ConfigDir)
 	viper.SetConfigType("yaml")
-	viper.SetConfigName("admin")
+	viper.SetConfigName("config")
 	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()

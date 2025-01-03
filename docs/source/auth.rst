@@ -18,7 +18,7 @@ To enable basic authentication for Dagu, follow these steps:
   
    Replace ``<your-username>`` and ``<your-password>`` with your desired username and password.
 
-#. Alternatively, create an ``admin.yaml`` file in ``$HOME/.config/dagu/`` to override the default configuration values.
+#. Alternatively, create an ``config.yaml`` file in ``$HOME/.config/dagu/`` to override the default configuration values.
 
    .. code-block:: yaml
   

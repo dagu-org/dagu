@@ -67,15 +67,6 @@ linters-settings:
         disabled: false
       - name: "enforce-slice-style"
         disabled: false
-  goheader:
-    values:
-      const:
-        AUTHOR: Yota Hamada
-      regexp:
-        YEAR: 20\d\d
-    template: |-
-      Copyright (C) {{YEAR}} {{ AUTHOR }}
-      SPDX-License-Identifier: GPL-3.0-or-later
 
 run:
   allow-parallel-runners: true

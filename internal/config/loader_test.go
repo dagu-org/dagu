@@ -1,8 +1,3 @@
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2024 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package config
 
 import (
@@ -72,7 +67,7 @@ func TestConfigLoader_SetupViper(t *testing.T) {
 	}
 
 	// Create test config file after viper setup
-	configFile := filepath.Join(tmpDir, ".config", "dagu", "admin.yaml")
+	configFile := filepath.Join(tmpDir, ".config", "dagu", "config.yaml")
 	testConfig := []byte(`
 host: "test-host"
 port: 9999
@@ -271,7 +266,7 @@ func TestConfigLoader_ConfigFileOverride(t *testing.T) {
 	tmpDir := setupTestEnv(t)
 
 	// Create config file with custom values
-	configFile := filepath.Join(tmpDir, ".config", "dagu", "admin.yaml")
+	configFile := filepath.Join(tmpDir, ".config", "dagu", "config.yaml")
 	testConfig := []byte(`
 host: "custom-host"
 port: 7777
