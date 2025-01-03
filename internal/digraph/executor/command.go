@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -72,11 +71,6 @@ func createDirectCommand(ctx context.Context, step digraph.Step, args []string) 
 func createShellCommand(ctx context.Context, shell string, step digraph.Step, args []string) *exec.Cmd {
 	command := cmdutil.BuildCommandEscapedString(step.Command, args)
 	return exec.CommandContext(ctx, shell, "-c", command)
-}
-
-// buildCommandString combines the command and arguments into a single string
-func buildCommandString(command string, args []string) string {
-	return fmt.Sprintf("%s %s", command, strings.Join(args, " "))
 }
 
 func (e *commandExecutor) Run(_ context.Context) error {

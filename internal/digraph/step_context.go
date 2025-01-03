@@ -61,7 +61,7 @@ func (c StepContext) MailerConfig() (mailer.Config, error) {
 	})
 }
 
-func (c StepContext) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
+func (c StepContext) EvalString(s string) (string, error) {
 	return cmdutil.EvalString(s,
 		cmdutil.WithVariables(c.envs),
 		cmdutil.WithVariables(c.outputVariables.Variables()),
