@@ -59,6 +59,10 @@ var (
 	errExecutorHasInvalidKey              = errors.New("executor has invalid key")
 	errExecutorConfigMustBeStringOrMap    = errors.New("executor config must be string or map")
 	errDotenvMustBeStringOrArray          = errors.New("dotenv must be a string or an array of strings")
+	errPreconditionMustBeArrayOrString    = errors.New("precondition must be a string or an array of strings")
+	errPreconditionKeyMustBeString        = errors.New("precondition key must be a string")
+	errPreconditionValueMustBeString      = errors.New("precondition value must be a string")
+	errPreconditionHasInvalidKey          = errors.New("precondition has invalid key")
 )
 
 // errorList is just a list of errors.

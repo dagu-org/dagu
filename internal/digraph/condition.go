@@ -10,8 +10,9 @@ import (
 // The condition can be a command substitution or an environment variable.
 // The expected value must be a string without any substitutions.
 type Condition struct {
-	Condition string // Condition to evaluate
-	Expected  string // Expected value
+	Command   string `json:"Command,omitempty"`   // Command to evaluate
+	Condition string `json:"Condition,omitempty"` // Condition to evaluate
+	Expected  string `json:"Expected,omitempty"`  // Expected value
 }
 
 // eval evaluates the condition and returns the actual value.

@@ -44,7 +44,7 @@ type definition struct {
 	// HistRetentionDays is the retention days of the history.
 	HistRetentionDays *int
 	// Preconditions is the condition to run the DAG.
-	Preconditions []*conditionDef
+	Preconditions any
 	// MaxActiveRuns is the maximum number of concurrent steps.
 	MaxActiveRuns int
 	// Params is the default parameters for the steps.
@@ -104,7 +104,7 @@ type stepDef struct {
 	// MailOnError is the flag to send mail on error.
 	MailOnError bool
 	// Preconditions is the condition to run the step.
-	Preconditions []*conditionDef
+	Preconditions any
 	// SignalOnStop is the signal when the step is requested to stop.
 	// When it is empty, the same signal as the parent process is sent.
 	// It can be KILL when the process does not stop over the timeout.

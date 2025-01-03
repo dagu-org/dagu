@@ -64,7 +64,7 @@ var builderRegistry = []builderEntry{
 	{name: "infoMailConfig", fn: buildInfoMailConfig},
 	{name: "maxHistoryRetentionDays", fn: maxHistoryRetentionDays},
 	{name: "maxCleanUpTime", fn: maxCleanUpTime},
-	{name: "preconditions", fn: buildPreconditions},
+	{name: "preconditions", fn: buildPrecondition},
 }
 
 type builderEntry struct {
@@ -81,6 +81,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "retryPolicy", fn: buildRetryPolicy},
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
 	{name: "signalOnStop", fn: buildSignalOnStop},
+	{name: "precondition", fn: buildStepPrecondition},
 }
 
 type stepBuilderEntry struct {
@@ -347,9 +348,55 @@ func buildHandlers(ctx BuildContext, spec *definition, dag *DAG) (err error) {
 	return nil
 }
 
-func buildPreconditions(_ BuildContext, spec *definition, dag *DAG) error {
-	dag.Preconditions = buildConditions(spec.Preconditions)
+func buildPrecondition(ctx BuildContext, spec *definition, dag *DAG) error {
+	conditions, err := parsePrecondition(ctx, spec.Preconditions)
+	if err != nil {
+		return err
+	}
+	dag.Preconditions = conditions
 	return nil
+}
+
+func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) {
+	switch v := precondition.(type) {
+	case nil:
+		return nil, nil
+	case map[any]any:
+		var ret Condition
+		for k, vv := range v {
+			key, ok := k.(string)
+			if !ok {
+				return nil, wrapError("preconditions", k, errPreconditionKeyMustBeString)
+			}
+			switch key {
+			case "condition":
+				ret.Condition, ok = vv.(string)
+				if !ok {
+					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
+				}
+			case "expected":
+				ret.Expected, ok = vv.(string)
+				if !ok {
+					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
+				}
+			default:
+				return nil, wrapError("preconditions", k, fmt.Errorf("%w: %s", errPreconditionHasInvalidKey, key))
+			}
+		}
+		return []Condition{ret}, nil
+	case []any:
+		var ret []Condition
+		for _, vv := range v {
+			parsed, err := parsePrecondition(ctx, vv)
+			if err != nil {
+				return nil, err
+			}
+			ret = append(ret, parsed...)
+		}
+		return ret, nil
+	default:
+		return nil, wrapError("preconditions", v, errPreconditionMustBeArrayOrString)
+	}
 }
 
 func maxCleanUpTime(_ BuildContext, spec *definition, dag *DAG) error {
@@ -439,7 +486,6 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 		Dir:            def.Dir,
 		Depends:        def.Depends,
 		MailOnError:    def.MailOnError,
-		Preconditions:  buildConditions(def.Preconditions),
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
 
@@ -494,6 +540,15 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
 	}
+	return nil
+}
+
+func buildStepPrecondition(ctx BuildContext, def stepDef, step *Step) error {
+	conditions, err := parsePrecondition(ctx, def.Preconditions)
+	if err != nil {
+		return err
+	}
+	step.Preconditions = conditions
 	return nil
 }
 
@@ -667,19 +722,6 @@ func parseKey(value any) (string, error) {
 	}
 
 	return val, nil
-}
-
-// buildConditions builds a list of conditions from the definition.
-func buildConditions(cond []*conditionDef) []Condition {
-	var ret []Condition
-	for _, v := range cond {
-		ret = append(ret, Condition{
-			Condition: v.Condition,
-			Expected:  v.Expected,
-		})
-	}
-
-	return ret
 }
 
 // extractParamNames extracts a slice of parameter names by removing the '$'
