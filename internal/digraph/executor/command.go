@@ -16,11 +16,67 @@ import (
 )
 
 var _ Executor = (*commandExecutor)(nil)
+var _ ExitCoder = (*commandExecutor)(nil)
 
 type commandExecutor struct {
 	cmd      *exec.Cmd
 	lock     sync.Mutex
 	exitCode int
+}
+
+// ExitCode implements ExitCoder.
+func (e *commandExecutor) ExitCode() int {
+	return e.exitCode
+}
+
+func (e *commandExecutor) Run(_ context.Context) error {
+	e.lock.Lock()
+	err := e.cmd.Start()
+	e.lock.Unlock()
+	if err != nil {
+		e.exitCode = exitCodeFromError(err)
+		return err
+	}
+	if err := e.cmd.Wait(); err != nil {
+		e.exitCode = exitCodeFromError(err)
+		return err
+	}
+	return nil
+}
+
+func (e *commandExecutor) SetStdout(out io.Writer) {
+	e.cmd.Stdout = out
+}
+
+func (e *commandExecutor) SetStderr(out io.Writer) {
+	e.cmd.Stderr = out
+}
+
+func (e *commandExecutor) Kill(sig os.Signal) error {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if e.cmd == nil || e.cmd.Process == nil {
+		return nil
+	}
+	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
+}
+
+func init() {
+	Register("", newCommand)
+	Register("command", newCommand)
+}
+
+func exitCodeFromError(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exitCode int
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		exitCode = exitErr.ExitCode()
+	} else {
+		exitCode = 1
+	}
+	return exitCode
 }
 
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
@@ -74,43 +130,4 @@ func createDirectCommand(ctx context.Context, step digraph.Step, args []string) 
 func createShellCommand(ctx context.Context, shell string, step digraph.Step, args []string) *exec.Cmd {
 	command := cmdutil.BuildCommandEscapedString(step.Command, args)
 	return exec.CommandContext(ctx, shell, "-c", command)
-}
-
-func (e *commandExecutor) Run(_ context.Context) error {
-	e.lock.Lock()
-	err := e.cmd.Start()
-	e.lock.Unlock()
-	if err != nil {
-		var exitCode int
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-			e.exitCode = exitCode
-		} else {
-			e.exitCode = 1
-		}
-		return err
-	}
-	return e.cmd.Wait()
-}
-
-func (e *commandExecutor) SetStdout(out io.Writer) {
-	e.cmd.Stdout = out
-}
-
-func (e *commandExecutor) SetStderr(out io.Writer) {
-	e.cmd.Stderr = out
-}
-
-func (e *commandExecutor) Kill(sig os.Signal) error {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	if e.cmd == nil || e.cmd.Process == nil {
-		return nil
-	}
-	return syscall.Kill(-e.cmd.Process.Pid, sig.(syscall.Signal))
-}
-
-func init() {
-	Register("", newCommand)
-	Register("command", newCommand)
 }

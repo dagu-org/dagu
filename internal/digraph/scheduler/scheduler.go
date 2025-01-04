@@ -442,11 +442,29 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			continue
 
 		case NodeStatusError:
-			if !n.data.Step.ContinueOn.Failure {
-				ready = false
-				node.SetStatus(NodeStatusCancel)
-				node.setError(errUpstreamFailed)
+			// Check continueOn conditions
+			if n.data.Step.ContinueOn.Failure {
+				continue
 			}
+
+			// If the exit code is in the list, continue
+			if len(n.data.Step.ContinueOn.ExitCode) > 0 {
+				var found bool
+				exitCode := n.GetExitCode()
+				for _, code := range n.data.Step.ContinueOn.ExitCode {
+					if code == exitCode {
+						found = true
+						break
+					}
+				}
+				if found {
+					continue
+				}
+			}
+
+			ready = false
+			node.SetStatus(NodeStatusCancel)
+			node.setError(errUpstreamFailed)
 
 		case NodeStatusSkipped:
 			if !n.data.Step.ContinueOn.Skipped {

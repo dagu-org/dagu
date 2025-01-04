@@ -59,6 +59,7 @@ type NodeState struct {
 	RetriedAt  time.Time
 	DoneCount  int
 	Error      error
+	ExitCode   int
 }
 
 // NodeStatus represents the status of a node.
@@ -156,7 +157,18 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	n.setError(cmd.Run(ctx))
+	var exitCode int
+	if err := cmd.Run(ctx); err != nil {
+		n.setError(err)
+
+		// Set the exit code if the command implements ExitCoder
+		if cmd, ok := cmd.(executor.ExitCoder); ok {
+			exitCode = cmd.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+	n.SetExitCode(exitCode)
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
 		if err := n.outputWriter.Close(); err != nil {
@@ -272,6 +284,18 @@ func (n *Node) GetDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data.State.DoneCount
+}
+
+func (n *Node) GetExitCode() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.data.State.ExitCode
+}
+
+func (n *Node) SetExitCode(exitCode int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.State.ExitCode = exitCode
 }
 
 func (n *Node) ClearState() {

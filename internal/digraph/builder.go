@@ -537,6 +537,10 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	if def.ContinueOn != nil {
 		step.ContinueOn.Skipped = def.ContinueOn.Skipped
 		step.ContinueOn.Failure = def.ContinueOn.Failure
+		step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
+		if len(def.ContinueOn.ExitCode) == 0 {
+			step.ContinueOn.ExitCode = []int{0}
+		}
 	}
 	return nil
 }
