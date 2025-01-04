@@ -43,6 +43,8 @@ steps:
 ```
 */
 
+var _ Executor = (*docker)(nil)
+
 type docker struct {
 	image         string
 	containerName string

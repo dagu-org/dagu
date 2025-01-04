@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var _ Executor = (*subWorkflow)(nil)
+
 type subWorkflow struct {
 	subDAG    string
 	cmd       *exec.Cmd

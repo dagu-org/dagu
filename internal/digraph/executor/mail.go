@@ -11,6 +11,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+var _ Executor = (*mail)(nil)
+
 type mail struct {
 	stdout io.Writer
 	stderr io.Writer

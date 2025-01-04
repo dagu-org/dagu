@@ -15,9 +15,12 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
+var _ Executor = (*commandExecutor)(nil)
+
 type commandExecutor struct {
-	cmd  *exec.Cmd
-	lock sync.Mutex
+	cmd      *exec.Cmd
+	lock     sync.Mutex
+	exitCode int
 }
 
 func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
@@ -78,6 +81,13 @@ func (e *commandExecutor) Run(_ context.Context) error {
 	err := e.cmd.Start()
 	e.lock.Unlock()
 	if err != nil {
+		var exitCode int
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+			e.exitCode = exitCode
+		} else {
+			e.exitCode = 1
+		}
 		return err
 	}
 	return e.cmd.Wait()
