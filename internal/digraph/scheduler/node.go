@@ -176,22 +176,27 @@ func (n *Node) Execute(ctx context.Context) error {
 			logger.Error(ctx, "failed to close pipe writer", "err", err)
 		}
 		var buf bytes.Buffer
-		// TODO: Error handling
+		// TODO: handle the case where the error or output is too large
 		_, _ = io.Copy(&buf, n.outputReader)
-		ret := strings.TrimSpace(buf.String())
-		_ = os.Setenv(n.data.Step.Output, ret)
-
-		if n.data.Step.OutputVariables == nil {
-			n.data.Step.OutputVariables = &digraph.SyncMap{}
-		}
-
-		n.data.Step.OutputVariables.Store(
-			n.data.Step.Output,
-			fmt.Sprintf("%s=%s", n.data.Step.Output, ret),
-		)
+		value := strings.TrimSpace(buf.String())
+		n.setVariable(n.data.Step.Output, value)
 	}
 
 	return n.data.State.Error
+}
+
+func (n *Node) setVariable(key, value string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	_ = os.Setenv(key, value)
+
+	if n.data.Step.OutputVariables == nil {
+		n.data.Step.OutputVariables = &digraph.SyncMap{}
+	}
+	n.data.Step.OutputVariables.Store(key,
+		fmt.Sprintf("%s=%s", key, value),
+	)
 }
 
 func (n *Node) Finish() {
