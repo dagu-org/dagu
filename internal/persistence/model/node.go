@@ -33,6 +33,7 @@ func FromNode(node scheduler.NodeData) *Node {
 		FinishedAt: stringutil.FormatTime(node.State.FinishedAt),
 		Status:     node.State.Status,
 		StatusText: node.State.Status.String(),
+		RetriedAt:  stringutil.FormatTime(node.State.RetriedAt),
 		RetryCount: node.State.RetryCount,
 		DoneCount:  node.State.DoneCount,
 		Error:      errText(node.State.Error),
@@ -45,20 +46,23 @@ type Node struct {
 	StartedAt  string               `json:"StartedAt"`
 	FinishedAt string               `json:"FinishedAt"`
 	Status     scheduler.NodeStatus `json:"Status"`
-	RetryCount int                  `json:"RetryCount"`
-	DoneCount  int                  `json:"DoneCount"`
-	Error      string               `json:"Error"`
+	RetriedAt  string               `json:"RetriedAt,omitempty"`
+	RetryCount int                  `json:"RetryCount,omitempty"`
+	DoneCount  int                  `json:"DoneCount,omitempty"`
+	Error      string               `json:"Error,omitempty"`
 	StatusText string               `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *scheduler.Node {
 	startedAt, _ := stringutil.ParseTime(n.StartedAt)
 	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
+	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
 		Log:        n.Log,
 		StartedAt:  startedAt,
 		FinishedAt: finishedAt,
+		RetriedAt:  retriedAt,
 		RetryCount: n.RetryCount,
 		DoneCount:  n.DoneCount,
 		Error:      errFromText(n.Error),

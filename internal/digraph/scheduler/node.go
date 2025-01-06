@@ -168,6 +168,7 @@ func (n *Node) Execute(ctx context.Context) error {
 			exitCode = 1
 		}
 	}
+
 	n.SetExitCode(exitCode)
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
