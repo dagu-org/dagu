@@ -534,12 +534,45 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 }
 
 func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
-	if def.ContinueOn != nil {
-		step.ContinueOn.Skipped = def.ContinueOn.Skipped
-		step.ContinueOn.Failure = def.ContinueOn.Failure
-		step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
+	if def.ContinueOn == nil {
+		return nil
 	}
+	step.ContinueOn.Skipped = def.ContinueOn.Skipped
+	step.ContinueOn.Failure = def.ContinueOn.Failure
+	step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
+
+	stderr, err := parseContinueOnStrings("continueOn.stdout", def.ContinueOn.Stderr)
+	if err != nil {
+		return err
+	}
+	step.ContinueOn.Stderr = stderr
+
 	return nil
+}
+
+func parseContinueOnStrings(field string, v any) ([]string, error) {
+	switch v := v.(type) {
+	case nil:
+		return nil, nil
+
+	case string:
+		return []string{v}, nil
+
+	case []any:
+		var ret []string
+		for _, vv := range v {
+			s, ok := vv.(string)
+			if !ok {
+				return nil, wrapError(field, vv, errContinueOnStderrMustBeStringOrArray)
+			}
+			ret = append(ret, s)
+		}
+		return ret, nil
+
+	default:
+		return nil, wrapError(field, v, errContinueOnStderrMustBeStringOrArray)
+
+	}
 }
 
 // buildRetryPolicy builds the retry policy for a step.

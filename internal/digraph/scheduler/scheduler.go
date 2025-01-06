@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 
@@ -461,6 +462,16 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 				}
 				if found {
 					continue
+				}
+			}
+
+			if len(continueOn.Stderr) > 0 {
+				// If the output is in the list, continue
+				output := dep.data.Step.Output
+				for _, o := range continueOn.Stderr {
+					if strings.Contains(output, o) {
+						continue
+					}
 				}
 			}
 

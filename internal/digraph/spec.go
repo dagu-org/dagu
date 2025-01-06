@@ -133,6 +133,7 @@ type continueOnDef struct {
 	Failure  bool  // Continue on failure
 	Skipped  bool  // Continue on skipped
 	ExitCode []int // Continue on specific exit codes
+	Stderr   any   // Continue on specific stderr
 }
 
 // repeatPolicyDef defines the repeat policy for a step.
