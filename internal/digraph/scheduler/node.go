@@ -208,6 +208,10 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 
 	n.cancelFunc = fn
 
+	// Reset the state
+	n.data.State.Error = nil
+	n.data.State.ExitCode = 0
+
 	if n.data.Step.CmdWithArgs != "" {
 		// Expand envs
 		stepContext := digraph.GetStepContext(ctx)
