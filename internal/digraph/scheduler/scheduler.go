@@ -436,22 +436,24 @@ func (sc *Scheduler) isCanceled() bool {
 func isReady(g *ExecutionGraph, node *Node) bool {
 	ready := true
 	for _, dep := range g.to[node.id] {
-		n := g.node(dep)
-		switch n.State().Status {
+		dep := g.node(dep)
+
+		switch dep.State().Status {
 		case NodeStatusSuccess:
 			continue
 
 		case NodeStatusError:
 			// Check continueOn conditions
-			if n.data.Step.ContinueOn.Failure {
+			continueOn := dep.data.Step.ContinueOn
+			if continueOn.Failure {
 				continue
 			}
 
 			// If the exit code is in the list, continue
-			if len(n.data.Step.ContinueOn.ExitCode) > 0 {
+			if len(continueOn.ExitCode) > 0 {
 				var found bool
-				exitCode := n.GetExitCode()
-				for _, code := range n.data.Step.ContinueOn.ExitCode {
+				exitCode := dep.GetExitCode()
+				for _, code := range continueOn.ExitCode {
 					if code == exitCode {
 						found = true
 						break
@@ -467,7 +469,7 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			node.setError(errUpstreamFailed)
 
 		case NodeStatusSkipped:
-			if !n.data.Step.ContinueOn.Skipped {
+			if !dep.data.Step.ContinueOn.Skipped {
 				ready = false
 				node.SetStatus(NodeStatusSkipped)
 				node.setError(errUpstreamSkipped)

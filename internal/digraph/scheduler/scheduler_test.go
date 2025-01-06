@@ -102,7 +102,9 @@ func TestScheduler(t *testing.T) {
 			newStep("2",
 				withDepends("1"),
 				withCommand("false"),
-				withContinueOnFailure(),
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
 			),
 			successStep("3", "2"),
 		)
@@ -128,7 +130,9 @@ func TestScheduler(t *testing.T) {
 					Condition: "`echo 1`",
 					Expected:  "0",
 				}),
-				withContinueOnSkipped(),
+				withContinueOn(digraph.ContinueOn{
+					Skipped: true,
+				}),
 			),
 			successStep("3", "2"),
 		)
@@ -148,7 +152,9 @@ func TestScheduler(t *testing.T) {
 		graph := sc.newGraph(t,
 			newStep("1",
 				withCommand("false"),
-				withContinueOnExitCode(1),
+				withContinueOn(digraph.ContinueOn{
+					ExitCode: []int{1},
+				}),
 			),
 			successStep("2", "1"),
 		)
@@ -652,21 +658,9 @@ func withDepends(depends ...string) stepOption {
 	}
 }
 
-func withContinueOnFailure() stepOption {
+func withContinueOn(c digraph.ContinueOn) stepOption {
 	return func(step *digraph.Step) {
-		step.ContinueOn.Failure = true
-	}
-}
-
-func withContinueOnSkipped() stepOption {
-	return func(step *digraph.Step) {
-		step.ContinueOn.Skipped = true
-	}
-}
-
-func withContinueOnExitCode(exitCode int) stepOption {
-	return func(step *digraph.Step) {
-		step.ContinueOn.ExitCode = append(step.ContinueOn.ExitCode, exitCode)
+		step.ContinueOn = c
 	}
 }
 
