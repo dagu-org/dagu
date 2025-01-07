@@ -13,19 +13,39 @@ import (
 const (
 	legacyTimeFormat = "2006-01-02 15:04:05"
 	timeEmpty        = "-"
-	regexpPrefix     = "regexp:"
+	rePrefix         = "re:"
 )
+
+// MatchOption represents an option for pattern matching
+type MatchOption func(*matchOptions)
+
+type matchOptions struct {
+	exactMatch bool
+}
+
+// WithExactMatch configures the matcher to use exact string matching for literal patterns
+func WithExactMatch() MatchOption {
+	return func(o *matchOptions) {
+		o.exactMatch = true
+	}
+}
 
 // MatchPattern matches content against patterns using either literal or regex matching.
 // For files or large content, use MatchPatternScanner instead.
-func MatchPattern(ctx context.Context, content string, patterns []string) bool {
+func MatchPattern(ctx context.Context, content string, patterns []string, opts ...MatchOption) bool {
 	scanner := bufio.NewScanner(strings.NewReader(content))
-	return MatchPatternScanner(ctx, scanner, patterns)
+	return MatchPatternScanner(ctx, scanner, patterns, opts...)
 }
 
-func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns []string) bool {
+func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns []string, opts ...MatchOption) bool {
 	if len(patterns) == 0 {
 		return false
+	}
+
+	// Apply options
+	options := &matchOptions{}
+	for _, opt := range opts {
+		opt(options)
 	}
 
 	var regexps []*regexp.Regexp
@@ -33,14 +53,22 @@ func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns [
 
 	// Compile regex patterns first
 	for _, pattern := range patterns {
-		if strings.HasPrefix(pattern, regexpPrefix) {
-			re, err := regexp.Compile(strings.TrimPrefix(pattern, regexpPrefix))
+		switch {
+		case strings.HasPrefix(pattern, rePrefix):
+			re, err := regexp.Compile(strings.TrimPrefix(pattern, rePrefix))
 			if err != nil {
 				logger.Error(ctx, "invalid regexp pattern", "pattern", pattern, "err", err)
 				continue
 			}
 			regexps = append(regexps, re)
-		} else {
+		case strings.HasPrefix(pattern, rePrefix):
+			re, err := regexp.Compile(strings.TrimPrefix(pattern, rePrefix))
+			if err != nil {
+				logger.Error(ctx, "invalid regexp pattern", "pattern", pattern, "err", err)
+				continue
+			}
+			regexps = append(regexps, re)
+		default:
 			literalPatterns = append(literalPatterns, pattern)
 		}
 	}
@@ -64,13 +92,13 @@ func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns [
 
 	// Process first line (already read by scanner.Scan() above)
 	line := scanner.Text()
-	if matchLine(line, literalPatterns, regexps) {
+	if matchLine(line, literalPatterns, regexps, options) {
 		return true
 	}
 
 	// Process remaining lines
 	for scanner.Scan() {
-		if matchLine(scanner.Text(), literalPatterns, regexps) {
+		if matchLine(scanner.Text(), literalPatterns, regexps, options) {
 			return true
 		}
 	}
@@ -83,11 +111,17 @@ func MatchPatternScanner(ctx context.Context, scanner *bufio.Scanner, patterns [
 }
 
 // matchLine checks if a single line matches any of the patterns
-func matchLine(line string, literalPatterns []string, regexps []*regexp.Regexp) bool {
+func matchLine(line string, literalPatterns []string, regexps []*regexp.Regexp, opts *matchOptions) bool {
 	// Check literal patterns
 	for _, p := range literalPatterns {
-		if strings.Contains(line, p) {
-			return true
+		if opts.exactMatch {
+			if line == p {
+				return true
+			}
+		} else {
+			if strings.Contains(line, p) {
+				return true
+			}
 		}
 	}
 

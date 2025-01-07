@@ -112,31 +112,31 @@ func TestMatchPattern(t *testing.T) {
 		{
 			name:     "simple regex match",
 			val:      "test123",
-			patterns: []string{"regexp:test\\d+"},
+			patterns: []string{"re:test\\d+"},
 			want:     true,
 		},
 		{
 			name:     "no regex match",
 			val:      "test",
-			patterns: []string{"regexp:\\d+"},
+			patterns: []string{"re:\\d+"},
 			want:     false,
 		},
 		{
 			name:     "invalid regex pattern",
 			val:      "test",
-			patterns: []string{"regexp:["},
+			patterns: []string{"re:["},
 			want:     false,
 		},
 		{
 			name:     "mixed patterns with literal match",
 			val:      "test123",
-			patterns: []string{"regexp:\\d+", "test123", "foo"},
+			patterns: []string{"re:\\d+", "test123", "foo"},
 			want:     true,
 		},
 		{
 			name:     "mixed patterns with regex match",
 			val:      "test123",
-			patterns: []string{"foo", "bar", "regexp:test\\d+"},
+			patterns: []string{"foo", "bar", "re:test\\d+"},
 			want:     true,
 		},
 		{
@@ -148,19 +148,19 @@ func TestMatchPattern(t *testing.T) {
 		{
 			name:     "case sensitive regex match",
 			val:      "Test123",
-			patterns: []string{"regexp:test\\d+"},
+			patterns: []string{"re:test\\d+"},
 			want:     false,
 		},
 		{
 			name:     "case insensitive regex match",
 			val:      "Test123",
-			patterns: []string{"regexp:(?i)test\\d+"},
+			patterns: []string{"re:(?i)test\\d+"},
 			want:     true,
 		},
 		{
 			name:     "empty value",
 			val:      "",
-			patterns: []string{"regexp:.*", ""},
+			patterns: []string{"re:.*", ""},
 			want:     true,
 		},
 		{
@@ -172,7 +172,7 @@ func TestMatchPattern(t *testing.T) {
 		{
 			name:     "special characters in regex match",
 			val:      "test.123",
-			patterns: []string{"regexp:test\\.\\d+"},
+			patterns: []string{"re:test\\.\\d+"},
 			want:     true,
 		},
 	}

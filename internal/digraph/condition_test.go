@@ -74,6 +74,15 @@ func TestCondition_Eval(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "RegexMatch",
+			condition: []Condition{
+				{
+					Condition: "test",
+					Expected:  "re:^test$",
+				},
+			},
+		},
 	}
 
 	// Set environment variable for testing

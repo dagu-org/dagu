@@ -221,7 +221,7 @@ func TestScheduler(t *testing.T) {
 				withCommand("echo test_output; false"), // stdout: test_output
 				withContinueOn(digraph.ContinueOn{
 					Output: []string{
-						"regexp:^test_[a-z]+$",
+						"re:^test_[a-z]+$",
 					},
 				}),
 			),

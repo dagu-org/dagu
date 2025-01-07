@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 var ErrConditionNotMet = fmt.Errorf("condition was not met")
@@ -95,20 +96,25 @@ func (c Condition) evalCommand(ctx context.Context) (bool, error) {
 }
 
 func (c Condition) evalCondition(ctx context.Context) (bool, error) {
-	if IsStepContext(ctx) {
-		evaluatedVal, err := GetStepContext(ctx).EvalString(c.Condition)
-		if err != nil {
-			return false, err
-		}
-		return c.Expected == evaluatedVal, nil
-	}
+	var (
+		evaluatedVal string
+		err          error
+	)
 
-	evaluatedVal, err := GetContext(ctx).EvalString(c.Condition)
+	if IsStepContext(ctx) {
+		evaluatedVal, err = GetStepContext(ctx).EvalString(c.Condition)
+	} else {
+		evaluatedVal, err = GetContext(ctx).EvalString(c.Condition)
+	}
 	if err != nil {
 		return false, err
 	}
 
-	return c.Expected == evaluatedVal, nil
+	if stringutil.MatchPattern(ctx, evaluatedVal, []string{c.Expected}, stringutil.WithExactMatch()) {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("%w: Condition=%s Expected=%s", ErrConditionNotMet, c.Condition, c.Expected)
 }
 
 func (c Condition) String() string {
