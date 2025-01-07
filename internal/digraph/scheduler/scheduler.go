@@ -195,9 +195,14 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						default:
 							// finish the node
 							node.SetStatus(NodeStatusError)
-							node.MarkError(execErr)
-							sc.setLastError(execErr)
-
+							if node.shouldMarkSuccess(ctx) {
+								// mark as success if the node should be marked as success
+								// i.e. continueOn.markSuccess is set to true
+								node.SetStatus(NodeStatusSuccess)
+							} else {
+								node.MarkError(execErr)
+								sc.setLastError(execErr)
+							}
 						}
 					}
 

@@ -286,6 +286,7 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
   - **failure**: If true, continue the DAG even if this step fails.  
   - **skipped**: If true, continue the DAG even if preconditions cause this step to skip.
   - **output**: Specify text or list of text to continue on. If the output (stdout or stderr) contains this text, the step is considered successful. Regular expressions are supported with the ``re:`` prefix (e.g., ``re:[0-9]{3}``) in the format of Golang's ``regexp`` package.
+  - **markSuccess**: If true, mark the step as successful even if it fails.
 
 ``retryPolicy``
 ~~~~~~~~~~~~~

@@ -130,10 +130,11 @@ type callFuncDef struct {
 
 // continueOnDef defines the conditions to continue on failure or skipped.
 type continueOnDef struct {
-	Failure  bool  // Continue on failure
-	Skipped  bool  // Continue on skipped
-	ExitCode []int // Continue on specific exit codes
-	Output   any   // Continue on specific output (string or []string)
+	Failure     bool  // Continue on failure
+	Skipped     bool  // Continue on skipped
+	ExitCode    []int // Continue on specific exit codes
+	Output      any   // Continue on specific output (string or []string)
+	MarkSuccess bool  // Mark the step as success when the condition is met
 }
 
 // repeatPolicyDef defines the repeat policy for a step.

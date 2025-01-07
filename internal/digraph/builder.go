@@ -540,6 +540,7 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	step.ContinueOn.Skipped = def.ContinueOn.Skipped
 	step.ContinueOn.Failure = def.ContinueOn.Failure
 	step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
+	step.ContinueOn.MarkSuccess = def.ContinueOn.MarkSuccess
 
 	output, err := parseContinueOnStrings("continueOn.stdout", def.ContinueOn.Output)
 	if err != nil {

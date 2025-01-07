@@ -325,6 +325,17 @@ Multiple output conditions:
           - "complete"
           - "re:SUCCE.*"
 
+Mark as Success even if the step fails but continue to the next step:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output: "complete"
+        markSuccess: true # default is false
+
 Scheduling
 ---------
 
@@ -555,6 +566,7 @@ Example DAG configuration:
     precondition:                       
       - condition: "`echo $2`"           
         expected: "param2"               
+      - command: "test -f file.txt"
     mailOn:
       failure: true                      
       success: true                      
@@ -610,6 +622,8 @@ Example step configuration:
         continueOn:
           failure: true                  
           skipped: true                  
+          exitCode: [1, 2]
+          markSuccess: true
         retryPolicy:                     
           limit: 2                       
           intervalSec: 5                 

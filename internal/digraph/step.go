@@ -128,8 +128,9 @@ type RepeatPolicy struct {
 // A step can be skipped when the preconditions are not met.
 // Then if the ContinueOn.Skip is set, the step will continue to the next step.
 type ContinueOn struct {
-	Failure  bool     `json:"Failure,omitempty"`  // Failure is the flag to continue to the next step on failure.
-	Skipped  bool     `json:"Skipped,omitempty"`  // Skipped is the flag to continue to the next step on skipped.
-	ExitCode []int    `json:"ExitCode,omitempty"` // ExitCode is the list of exit codes to continue to the next step.
-	Output   []string `json:"Output,omitempty"`   // Output is the list of output (stdout/stderr) to continue to the next step.
+	Failure     bool     `json:"Failure,omitempty"`     // Failure is the flag to continue to the next step on failure.
+	Skipped     bool     `json:"Skipped,omitempty"`     // Skipped is the flag to continue to the next step on skipped.
+	ExitCode    []int    `json:"ExitCode,omitempty"`    // ExitCode is the list of exit codes to continue to the next step.
+	Output      []string `json:"Output,omitempty"`      // Output is the list of output (stdout/stderr) to continue to the next step.
+	MarkSuccess bool     `json:"MarkSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
 }

@@ -138,6 +138,15 @@ func (n *Node) LogFilename() string {
 	return ""
 }
 
+func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
+	if !n.shouldContinue(ctx) {
+		return false
+	}
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.data.Step.ContinueOn.MarkSuccess
+}
+
 func (n *Node) shouldContinue(ctx context.Context) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()

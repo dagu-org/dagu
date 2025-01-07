@@ -235,6 +235,28 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
+	t.Run("ContinueOnMarkSuccess", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					ExitCode:    []int{1},
+					MarkSuccess: true,
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		// 1, 2 should be executed even though 1 failed
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
 	t.Run("CancelSchedule", func(t *testing.T) {
 		sc := setup(t)
 
