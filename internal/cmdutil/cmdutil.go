@@ -192,16 +192,15 @@ func SubstituteCommands(input string) (string, error) {
 		// Execute the command and replace the command with the output.
 		command := matches[i]
 
-		parser := shellwords.NewParser()
-		parser.ParseBacktick = true
-		parser.ParseEnv = false
-
-		res, err := parser.Parse(escapeReplacer.Replace(command))
+		sh := GetShellCommand("")
+		cmd := exec.Command(sh, "-c", command[1:len(command)-1])
+		cmd.Env = os.Environ()
+		out, err := cmd.Output()
 		if err != nil {
-			return "", fmt.Errorf("failed to substitute command: %w", err)
+			return "", fmt.Errorf("failed to execute command: %w", err)
 		}
 
-		ret = strings.ReplaceAll(ret, command, strings.Join(res, " "))
+		ret = strings.ReplaceAll(ret, command, strings.TrimSpace(string(out)))
 	}
 
 	return ret, nil
@@ -227,7 +226,16 @@ func GetShellCommand(configuredShell string) string {
 }
 
 type EvalOptions struct {
-	Variables []map[string]string
+	ExpandEnv  bool
+	Substitute bool
+	Variables  []map[string]string
+}
+
+func newEvalOptions() *EvalOptions {
+	return &EvalOptions{
+		ExpandEnv:  true,
+		Substitute: true,
+	}
 }
 
 type EvalOption func(*EvalOptions)
@@ -235,6 +243,25 @@ type EvalOption func(*EvalOptions)
 func WithVariables(vars map[string]string) EvalOption {
 	return func(opts *EvalOptions) {
 		opts.Variables = append(opts.Variables, vars)
+	}
+}
+
+func WithoutExpandEnv() EvalOption {
+	return func(opts *EvalOptions) {
+		opts.ExpandEnv = false
+	}
+}
+
+func WithoutSubstitute() EvalOption {
+	return func(opts *EvalOptions) {
+		opts.Substitute = false
+	}
+}
+
+func OnlyReplaceVars() EvalOption {
+	return func(opts *EvalOptions) {
+		opts.ExpandEnv = false
+		opts.Substitute = false
 	}
 }
 
@@ -279,7 +306,7 @@ func BuildCommandEscapedString(command string, args []string) string {
 
 // EvalString substitutes environment variables and commands in the input string
 func EvalString(input string, opts ...EvalOption) (string, error) {
-	options := &EvalOptions{}
+	options := newEvalOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -287,17 +314,22 @@ func EvalString(input string, opts ...EvalOption) (string, error) {
 	for _, vars := range options.Variables {
 		value = replaceVars(value, vars)
 	}
-	value = os.ExpandEnv(value)
-	value, err := SubstituteCommands(value)
-	if err != nil {
-		return "", fmt.Errorf("failed to substitute string in %q: %w", input, err)
+	if options.Substitute {
+		var err error
+		value, err = SubstituteCommands(value)
+		if err != nil {
+			return "", fmt.Errorf("failed to substitute string in %q: %w", input, err)
+		}
+	}
+	if options.ExpandEnv {
+		value = os.ExpandEnv(value)
 	}
 	return value, nil
 }
 
 // EvalIntString substitutes environment variables and commands in the input string
 func EvalIntString(input string, opts ...EvalOption) (int, error) {
-	options := &EvalOptions{}
+	options := newEvalOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -305,7 +337,9 @@ func EvalIntString(input string, opts ...EvalOption) (int, error) {
 	for _, vars := range options.Variables {
 		value = replaceVars(value, vars)
 	}
-	value = os.ExpandEnv(value)
+	if options.ExpandEnv {
+		value = os.ExpandEnv(value)
+	}
 	value, err := SubstituteCommands(value)
 	if err != nil {
 		return 0, err
@@ -321,7 +355,7 @@ func EvalIntString(input string, opts ...EvalOption) (int, error) {
 // variables and substituting command outputs. It takes a struct value and returns a new
 // modified struct value.
 func EvalStringFields[T any](obj T, opts ...EvalOption) (T, error) {
-	options := &EvalOptions{}
+	options := newEvalOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -356,12 +390,20 @@ func processStructFields(v reflect.Value, opts *EvalOptions) error {
 			for _, vars := range opts.Variables {
 				value = replaceVars(value, vars)
 			}
-			value = os.ExpandEnv(value)
-			processed, err := SubstituteCommands(value)
-			if err != nil {
-				return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
+
+			if opts.Substitute {
+				var err error
+				value, err = SubstituteCommands(value)
+				if err != nil {
+					return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
+				}
 			}
-			field.SetString(processed)
+
+			if opts.ExpandEnv {
+				value = os.ExpandEnv(value)
+			}
+
+			field.SetString(value)
 
 		case reflect.Struct:
 			if err := processStructFields(field, opts); err != nil {

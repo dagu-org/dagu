@@ -61,11 +61,10 @@ func (c StepContext) MailerConfig() (mailer.Config, error) {
 	})
 }
 
-func (c StepContext) EvalString(s string) (string, error) {
-	return cmdutil.EvalString(s,
-		cmdutil.WithVariables(c.envs),
-		cmdutil.WithVariables(c.outputVariables.Variables()),
-	)
+func (c StepContext) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
+	opts = append(opts, cmdutil.WithVariables(c.envs))
+	opts = append(opts, cmdutil.WithVariables(c.outputVariables.Variables()))
+	return cmdutil.EvalString(s, opts...)
 }
 
 func (c StepContext) EvalBool(value any) (bool, error) {
