@@ -451,11 +451,6 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			if dep.shouldContinue(ctx) {
 				continue
 			}
-			continueOn := dep.data.Step.ContinueOn
-			if continueOn.Failure {
-				continue
-			}
-
 			ready = false
 			node.SetStatus(NodeStatusCancel)
 			node.setError(errUpstreamFailed)

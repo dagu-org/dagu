@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -269,7 +270,7 @@ func (n *Node) clearVariable(key string) {
 	n.data.Step.OutputVariables.Delete(key)
 }
 
-func (n *Node) getVariable(key string) (string, bool) {
+func (n *Node) getVariable(key string) (stringutil.PairString, bool) {
 	if n.data.Step.OutputVariables == nil {
 		return "", false
 	}
@@ -277,7 +278,7 @@ func (n *Node) getVariable(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return v.(string), true
+	return stringutil.PairString(v.(string)), true
 }
 
 func (n *Node) getBoolVariable(key string) (bool, bool) {
@@ -285,30 +286,21 @@ func (n *Node) getBoolVariable(key string) (bool, bool) {
 	if !ok {
 		return false, false
 	}
-	var b bool
-	_, err := fmt.Sscanf(v, "%t", &b)
-	if err != nil {
-		return false, false
-	}
-	return b, true
+	return v.Bool(), true
 }
 
 func (n *Node) setBoolVariable(key string, value bool) {
 	if n.data.Step.OutputVariables == nil {
 		n.data.Step.OutputVariables = &digraph.SyncMap{}
 	}
-	n.data.Step.OutputVariables.Store(key,
-		fmt.Sprintf("%s=%t", key, value),
-	)
+	n.data.Step.OutputVariables.Store(key, stringutil.NewPairString(key, strconv.FormatBool(value)))
 }
 
 func (n *Node) setVariable(key, value string) {
 	if n.data.Step.OutputVariables == nil {
 		n.data.Step.OutputVariables = &digraph.SyncMap{}
 	}
-	n.data.Step.OutputVariables.Store(key,
-		fmt.Sprintf("%s=%s", key, value),
-	)
+	n.data.Step.OutputVariables.Store(key, stringutil.NewPairString(key, value))
 }
 
 func (n *Node) Finish() {

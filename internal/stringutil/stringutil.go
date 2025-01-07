@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,40 @@ const (
 	timeEmpty        = "-"
 	rePrefix         = "re:"
 )
+
+type PairString string
+
+func NewPairString(key, value string) PairString {
+	return PairString(key + "=" + value)
+}
+
+func (kv PairString) Key() string {
+	parts := strings.SplitN(string(kv), "=", 2)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+func (kv PairString) Value() string {
+	parts := strings.SplitN(string(kv), "=", 2)
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
+}
+
+func (kv PairString) Bool() bool {
+	v, err := strconv.ParseBool(kv.Value())
+	if err != nil {
+		return false
+	}
+	return v
+}
+
+func (kv PairString) String() string {
+	return string(kv)
+}
 
 // MatchOption represents an option for pattern matching
 type MatchOption func(*matchOptions)
