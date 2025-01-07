@@ -67,6 +67,22 @@ func TestCondition_Eval(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "ComplexCommand",
+			condition: []Condition{
+				{
+					Command: "test 1 -eq 1",
+				},
+			},
+		},
+		{
+			name: "EvenMoreComplexCommand",
+			condition: []Condition{
+				{
+					Command: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'",
+				},
+			},
+		},
+		{
 			name: "CommandResultTest",
 			condition: []Condition{
 				{

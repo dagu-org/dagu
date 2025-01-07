@@ -56,19 +56,19 @@ func (c Condition) eval(ctx context.Context) (bool, error) {
 func (c Condition) evalCommand(ctx context.Context) (bool, error) {
 	var commandToRun string
 	if IsStepContext(ctx) {
-		command, err := GetStepContext(ctx).EvalString(c.Command)
+		command, err := GetStepContext(ctx).EvalString(c.Command, cmdutil.OnlyReplaceVars())
 		if err != nil {
 			return false, err
 		}
 		commandToRun = command
 	} else if IsContext(ctx) {
-		command, err := GetContext(ctx).EvalString(c.Command)
+		command, err := GetContext(ctx).EvalString(c.Command, cmdutil.OnlyReplaceVars())
 		if err != nil {
 			return false, err
 		}
 		commandToRun = command
 	} else {
-		command, err := cmdutil.EvalString(c.Command)
+		command, err := cmdutil.EvalString(c.Command, cmdutil.OnlyReplaceVars())
 		if err != nil {
 			return false, err
 		}

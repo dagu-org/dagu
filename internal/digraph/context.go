@@ -45,8 +45,9 @@ func (c Context) WithEnv(key, value string) Context {
 	return c
 }
 
-func (c Context) EvalString(s string) (string, error) {
-	return cmdutil.EvalString(s, cmdutil.WithVariables(c.envs))
+func (c Context) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
+	opts = append(opts, cmdutil.WithVariables(c.envs))
+	return cmdutil.EvalString(s, opts...)
 }
 
 func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {
