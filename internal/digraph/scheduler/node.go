@@ -270,7 +270,7 @@ func (n *Node) clearVariable(key string) {
 	n.data.Step.OutputVariables.Delete(key)
 }
 
-func (n *Node) getVariable(key string) (stringutil.PairString, bool) {
+func (n *Node) getVariable(key string) (stringutil.KeyValue, bool) {
 	if n.data.Step.OutputVariables == nil {
 		return "", false
 	}
@@ -278,7 +278,7 @@ func (n *Node) getVariable(key string) (stringutil.PairString, bool) {
 	if !ok {
 		return "", false
 	}
-	return stringutil.PairString(v.(string)), true
+	return stringutil.KeyValue(v.(string)), true
 }
 
 func (n *Node) getBoolVariable(key string) (bool, bool) {
@@ -293,14 +293,14 @@ func (n *Node) setBoolVariable(key string, value bool) {
 	if n.data.Step.OutputVariables == nil {
 		n.data.Step.OutputVariables = &digraph.SyncMap{}
 	}
-	n.data.Step.OutputVariables.Store(key, stringutil.NewPairString(key, strconv.FormatBool(value)).String())
+	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
 func (n *Node) setVariable(key, value string) {
 	if n.data.Step.OutputVariables == nil {
 		n.data.Step.OutputVariables = &digraph.SyncMap{}
 	}
-	n.data.Step.OutputVariables.Store(key, stringutil.NewPairString(key, value).String())
+	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
 
 func (n *Node) Finish() {
