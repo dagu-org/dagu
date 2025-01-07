@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -189,7 +190,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 	}
 
 	if len(continueOn.Output) > 0 {
-		ok, err := n.LogContainsPattern(continueOn.Output)
+		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
 		if err != nil {
 			logger.Error(ctx, "failed to check log for pattern", "err", err)
 			return false
@@ -650,10 +651,11 @@ func (n *Node) setupLog() error {
 	return nil
 }
 
-// LogContainsPattern checks if the given pattern exists in the node's log file.
-// Returns false if no log file exists or pattern is not found.
-// Returns error if there are issues reading the file.
-func (n *Node) LogContainsPattern(patterns []string) (bool, error) {
+// LogContainsPattern checks if any of the given patterns exist in the node's log file.
+// If a pattern starts with "regexp:", it will be treated as a regular expression.
+// Returns false if no log file exists or no pattern is found.
+// Returns error if there are issues reading the file or invalid regex pattern.
+func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool, error) {
 	if len(patterns) == 0 {
 		return false, nil
 	}
@@ -662,6 +664,24 @@ func (n *Node) LogContainsPattern(patterns []string) (bool, error) {
 	logFilename := n.LogFilename()
 	if logFilename == "" {
 		return false, nil
+	}
+
+	// Prepare regex patterns
+	var regexps []*regexp.Regexp
+	var literalPatterns []string
+
+	for _, pattern := range patterns {
+		const regexpPrefix = "regexp:"
+		if strings.HasPrefix(pattern, regexpPrefix) {
+			re, err := regexp.Compile(strings.TrimPrefix(pattern, regexpPrefix))
+			if err != nil {
+				logger.Error(ctx, "invalid regexp pattern", "pattern", pattern, "err", err)
+				continue
+			}
+			regexps = append(regexps, re)
+		} else {
+			literalPatterns = append(literalPatterns, pattern)
+		}
 	}
 
 	// Open the log file
@@ -689,9 +709,16 @@ func (n *Node) LogContainsPattern(patterns []string) (bool, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Check for pattern before handling any errors
-		for _, pattern := range patterns {
+		// Check literal patterns
+		for _, pattern := range literalPatterns {
 			if strings.Contains(line, pattern) {
+				return true, nil
+			}
+		}
+
+		// Check regex patterns
+		for _, re := range regexps {
+			if re.MatchString(line) {
 				return true, nil
 			}
 		}
