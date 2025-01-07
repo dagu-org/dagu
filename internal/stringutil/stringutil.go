@@ -3,6 +3,7 @@ package stringutil
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,6 +50,19 @@ func (kv PairString) Bool() bool {
 
 func (kv PairString) String() string {
 	return string(kv)
+}
+
+func (kv PairString) MarshalJSON() ([]byte, error) {
+	return json.Marshal(kv.String())
+}
+
+func (kv *PairString) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	*kv = PairString(s)
+	return nil
 }
 
 // MatchOption represents an option for pattern matching
