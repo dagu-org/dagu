@@ -259,7 +259,18 @@ Use regex in conditions:
 
 Continue on Failure
 ~~~~~~~~~~~~~~~~~
-Control flow when conditions aren't met:
+
+Continue to the next step even if the current step fails: 
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        failure: true
+
+Continue to the next step even if the current step skipped by preconditions:
 
 .. code-block:: yaml
 
@@ -271,6 +282,48 @@ Control flow when conditions aren't met:
           expected: "01"
       continueOn:
         skipped: true
+
+Based on exit code:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        exitCode: [1, 2] # Continue if exit code is 1 or 2
+  
+Based on output:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output: "error" # Continue if output (stdout or stderr) contains "error"  
+
+Use regular expressions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output: "re:SUCCE.*" # Continue if output (stdout or stderr) matches "SUCCE.*"
+
+Multiple output conditions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output:
+          - "complete"
+          - "re:SUCCE.*"
 
 Scheduling
 ---------
