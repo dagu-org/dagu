@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -666,24 +665,6 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 		return false, nil
 	}
 
-	// Prepare regex patterns
-	var regexps []*regexp.Regexp
-	var literalPatterns []string
-
-	for _, pattern := range patterns {
-		const regexpPrefix = "regexp:"
-		if strings.HasPrefix(pattern, regexpPrefix) {
-			re, err := regexp.Compile(strings.TrimPrefix(pattern, regexpPrefix))
-			if err != nil {
-				logger.Error(ctx, "invalid regexp pattern", "pattern", pattern, "err", err)
-				continue
-			}
-			regexps = append(regexps, re)
-		} else {
-			literalPatterns = append(literalPatterns, pattern)
-		}
-	}
-
 	// Open the log file
 	file, err := os.Open(logFilename)
 	if err != nil {
@@ -705,23 +686,8 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 
-	// Read the file line by line
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Check literal patterns
-		for _, pattern := range literalPatterns {
-			if strings.Contains(line, pattern) {
-				return true, nil
-			}
-		}
-
-		// Check regex patterns
-		for _, re := range regexps {
-			if re.MatchString(line) {
-				return true, nil
-			}
-		}
+	if stringutil.MatchPatternScanner(ctx, scanner, patterns) {
+		return true, nil
 	}
 
 	if err := scanner.Err(); err != nil {
