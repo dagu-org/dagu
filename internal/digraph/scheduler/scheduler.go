@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 
@@ -112,7 +111,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	NodesIteration:
 		for _, node := range graph.Nodes() {
-			if node.State().Status != NodeStatusNone || !isReady(graph, node) {
+			if node.State().Status != NodeStatusNone || !isReady(ctx, graph, node) {
 				continue NodesIteration
 			}
 			if sc.isCanceled() {
@@ -434,7 +433,7 @@ func (sc *Scheduler) isCanceled() bool {
 	return sc.canceled == 1
 }
 
-func isReady(g *ExecutionGraph, node *Node) bool {
+func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 	ready := true
 	for _, dep := range g.to[node.id] {
 		dep := g.node(dep)
@@ -444,35 +443,12 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			continue
 
 		case NodeStatusError:
-			// Check continueOn conditions
+			if dep.shouldContinue(ctx) {
+				continue
+			}
 			continueOn := dep.data.Step.ContinueOn
 			if continueOn.Failure {
 				continue
-			}
-
-			// If the exit code is in the list, continue
-			if len(continueOn.ExitCode) > 0 {
-				var found bool
-				exitCode := dep.GetExitCode()
-				for _, code := range continueOn.ExitCode {
-					if code == exitCode {
-						found = true
-						break
-					}
-				}
-				if found {
-					continue
-				}
-			}
-
-			if len(continueOn.Output) > 0 {
-				// If the output is in the list, continue
-				output := dep.data.Step.Output
-				for _, o := range continueOn.Output {
-					if strings.Contains(output, o) {
-						continue
-					}
-				}
 			}
 
 			ready = false
@@ -480,11 +456,12 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 			node.setError(errUpstreamFailed)
 
 		case NodeStatusSkipped:
-			if !dep.data.Step.ContinueOn.Skipped {
-				ready = false
-				node.SetStatus(NodeStatusSkipped)
-				node.setError(errUpstreamSkipped)
+			if dep.shouldContinue(ctx) {
+				continue
 			}
+			ready = false
+			node.SetStatus(NodeStatusSkipped)
+			node.setError(errUpstreamSkipped)
 
 		case NodeStatusCancel:
 			ready = false

@@ -166,6 +166,52 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
+	t.Run("ContinueOnOutputStdout", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo test_output; false"), // stdout: test_output
+				withContinueOn(digraph.ContinueOn{
+					Output: []string{
+						"test_output",
+					},
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// 1, 2 should be executed even though 1 failed
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
+	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo test_output; false 1>&2"), // stderr: test_output
+				withContinueOn(digraph.ContinueOn{
+					Output: []string{
+						"test_output",
+					},
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// 1, 2 should be
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
 	t.Run("CancelSchedule", func(t *testing.T) {
 		sc := setup(t)
 
