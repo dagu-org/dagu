@@ -3,6 +3,8 @@
 
 package digraph
 
+const SystemVariablePrefix = "DAGU_"
+
 // Special environment variables.
 const (
 	EnvKeyLogPath          = "DAG_EXECUTION_LOG_PATH"

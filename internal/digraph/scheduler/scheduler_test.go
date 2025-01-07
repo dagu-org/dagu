@@ -102,7 +102,9 @@ func TestScheduler(t *testing.T) {
 			newStep("2",
 				withDepends("1"),
 				withCommand("false"),
-				withContinueOnFailure(),
+				withContinueOn(digraph.ContinueOn{
+					Failure: true,
+				}),
 			),
 			successStep("3", "2"),
 		)
@@ -128,7 +130,9 @@ func TestScheduler(t *testing.T) {
 					Condition: "`echo 1`",
 					Expected:  "0",
 				}),
-				withContinueOnSkipped(),
+				withContinueOn(digraph.ContinueOn{
+					Skipped: true,
+				}),
 			),
 			successStep("3", "2"),
 		)
@@ -140,6 +144,118 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSkipped)
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
+	})
+	t.Run("ContinueOnExitCode", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					ExitCode: []int{1},
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// 1, 2 should be executed even though 1 failed
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
+	t.Run("ContinueOnOutputStdout", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo test_output; false"), // stdout: test_output
+				withContinueOn(digraph.ContinueOn{
+					Output: []string{
+						"test_output",
+					},
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// 1, 2 should be executed even though 1 failed
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
+	t.Run("ContinueOnOutputStderr", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo test_output; false 1>&2"), // stderr: test_output
+				withContinueOn(digraph.ContinueOn{
+					Output: []string{
+						"test_output",
+					},
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// 1, 2 should be
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
+	t.Run("ContinueOnOutputRegexp", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("echo test_output; false"), // stdout: test_output
+				withContinueOn(digraph.ContinueOn{
+					Output: []string{
+						"re:^test_[a-z]+$",
+					},
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusError)
+
+		// 1, 2 should be executed even though 1 failed
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
+	})
+	t.Run("ContinueOnMarkSuccess", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1 (exit code 1) -> 2
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("false"),
+				withContinueOn(digraph.ContinueOn{
+					ExitCode:    []int{1},
+					MarkSuccess: true,
+				}),
+			),
+			successStep("2", "1"),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		// 1, 2 should be executed even though 1 failed
+		result.AssertDoneCount(t, 2)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "2", scheduler.NodeStatusSuccess)
 	})
 	t.Run("CancelSchedule", func(t *testing.T) {
 		sc := setup(t)
@@ -633,15 +749,9 @@ func withDepends(depends ...string) stepOption {
 	}
 }
 
-func withContinueOnFailure() stepOption {
+func withContinueOn(c digraph.ContinueOn) stepOption {
 	return func(step *digraph.Step) {
-		step.ContinueOn.Failure = true
-	}
-}
-
-func withContinueOnSkipped() stepOption {
-	return func(step *digraph.Step) {
-		step.ContinueOn.Skipped = true
+		step.ContinueOn = c
 	}
 }
 

@@ -13,6 +13,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+var _ Executor = (*jq)(nil)
+
 type jq struct {
 	stdout io.Writer
 	stderr io.Writer

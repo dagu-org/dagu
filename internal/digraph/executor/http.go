@@ -15,6 +15,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
+var _ Executor = (*http)(nil)
+
 type http struct {
 	stdout    io.Writer
 	req       *resty.Request

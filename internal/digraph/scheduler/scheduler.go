@@ -111,7 +111,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	NodesIteration:
 		for _, node := range graph.Nodes() {
-			if node.State().Status != NodeStatusNone || !isReady(graph, node) {
+			if node.State().Status != NodeStatusNone || !isReady(ctx, graph, node) {
 				continue NodesIteration
 			}
 			if sc.isCanceled() {
@@ -195,9 +195,14 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						default:
 							// finish the node
 							node.SetStatus(NodeStatusError)
-							node.MarkError(execErr)
-							sc.setLastError(execErr)
-
+							if node.shouldMarkSuccess(ctx) {
+								// mark as success if the node should be marked as success
+								// i.e. continueOn.markSuccess is set to true
+								node.SetStatus(NodeStatusSuccess)
+							} else {
+								node.MarkError(execErr)
+								sc.setLastError(execErr)
+							}
 						}
 					}
 
@@ -433,27 +438,30 @@ func (sc *Scheduler) isCanceled() bool {
 	return sc.canceled == 1
 }
 
-func isReady(g *ExecutionGraph, node *Node) bool {
+func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 	ready := true
 	for _, dep := range g.to[node.id] {
-		n := g.node(dep)
-		switch n.State().Status {
+		dep := g.node(dep)
+
+		switch dep.State().Status {
 		case NodeStatusSuccess:
 			continue
 
 		case NodeStatusError:
-			if !n.data.Step.ContinueOn.Failure {
-				ready = false
-				node.SetStatus(NodeStatusCancel)
-				node.setError(errUpstreamFailed)
+			if dep.shouldContinue(ctx) {
+				continue
 			}
+			ready = false
+			node.SetStatus(NodeStatusCancel)
+			node.setError(errUpstreamFailed)
 
 		case NodeStatusSkipped:
-			if !n.data.Step.ContinueOn.Skipped {
-				ready = false
-				node.SetStatus(NodeStatusSkipped)
-				node.setError(errUpstreamSkipped)
+			if dep.shouldContinue(ctx) {
+				continue
 			}
+			ready = false
+			node.SetStatus(NodeStatusSkipped)
+			node.setError(errUpstreamSkipped)
 
 		case NodeStatusCancel:
 			ready = false

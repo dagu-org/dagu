@@ -246,9 +246,31 @@ Use command substitution in conditions:
         - condition: "`date '+%d'`"
           expected: "01"
 
+Use regex in conditions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: monthly task
+      command: monthly.sh
+      preconditions:
+        - condition: "`date '+%d'`"
+          expected: "re:0[1-9]" # Run only if the day is between 01 and 09
+
 Continue on Failure
 ~~~~~~~~~~~~~~~~~
-Control flow when conditions aren't met:
+
+Continue to the next step even if the current step fails: 
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        failure: true
+
+Continue to the next step even if the current step skipped by preconditions:
 
 .. code-block:: yaml
 
@@ -260,6 +282,59 @@ Control flow when conditions aren't met:
           expected: "01"
       continueOn:
         skipped: true
+
+Based on exit code:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        exitCode: [1, 2] # Continue if exit code is 1 or 2
+  
+Based on output:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output: "error" # Continue if output (stdout or stderr) contains "error"  
+
+Use regular expressions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output: "re:SUCCE.*" # Continue if output (stdout or stderr) matches "SUCCE.*"
+
+Multiple output conditions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output:
+          - "complete"
+          - "re:SUCCE.*"
+
+Mark as Success even if the step fails but continue to the next step:
+
+.. code-block:: yaml
+
+  steps:
+    - name: optional task
+      command: task.sh
+      continueOn:
+        output: "complete"
+        markSuccess: true # default is false
 
 Scheduling
 ---------
@@ -491,6 +566,7 @@ Example DAG configuration:
     precondition:                       
       - condition: "`echo $2`"           
         expected: "param2"               
+      - command: "test -f file.txt"
     mailOn:
       failure: true                      
       success: true                      
@@ -546,6 +622,8 @@ Example step configuration:
         continueOn:
           failure: true                  
           skipped: true                  
+          exitCode: [1, 2]
+          markSuccess: true
         retryPolicy:                     
           limit: 2                       
           intervalSec: 5                 

@@ -238,15 +238,6 @@ func WithVariables(vars map[string]string) EvalOption {
 	}
 }
 
-// RunExitCode runs the command and returns the exit code.
-// func RunExitCode(cmd string) (int, error) {
-// 	command, args, err := SplitCommandWithEval(cmd)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	shellCommand := GetShellCommand("")
-// }
-
 var regEscapedKeyValue = regexp.MustCompile(`^[^\s=]+="[^"]+"$`)
 
 // BuildCommandEscapedString constructs a single shell-ready string from a command and its arguments.

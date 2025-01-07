@@ -17,6 +17,10 @@ type Executor interface {
 	Run(ctx context.Context) error
 }
 
+type ExitCoder interface {
+	ExitCode() int
+}
+
 type Creator func(ctx context.Context, step digraph.Step) (Executor, error)
 
 var (

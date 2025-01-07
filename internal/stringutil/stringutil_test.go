@@ -1,32 +1,12 @@
 package stringutil_test
 
 import (
-	"os"
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/stretchr/testify/require"
 )
-
-func Test_MustGetUserHomeDir(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		err := os.Setenv("HOME", "/test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		hd := fileutil.MustGetUserHomeDir()
-		require.Equal(t, "/test", hd)
-	})
-}
-
-func Test_MustGetwd(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		wd, _ := os.Getwd()
-		require.Equal(t, fileutil.MustGetwd(), wd)
-	})
-}
 
 func Test_FormatTime(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {

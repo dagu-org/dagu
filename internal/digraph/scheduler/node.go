@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +60,7 @@ type NodeState struct {
 	RetriedAt  time.Time
 	DoneCount  int
 	Error      error
+	ExitCode   int
 }
 
 // NodeStatus represents the status of a node.
@@ -137,6 +139,81 @@ func (n *Node) LogFilename() string {
 	return ""
 }
 
+func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
+	if !n.shouldContinue(ctx) {
+		return false
+	}
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.data.Step.ContinueOn.MarkSuccess
+}
+
+func (n *Node) shouldContinue(ctx context.Context) bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	continueOn := n.data.Step.ContinueOn
+
+	switch n.data.State.Status {
+	case NodeStatusSuccess:
+		return true
+	case NodeStatusError:
+		if continueOn.Failure {
+			return true
+		}
+	case NodeStatusCancel:
+		return false
+	case NodeStatusSkipped:
+		if continueOn.Skipped {
+			return true
+		}
+	case NodeStatusNone:
+		fallthrough
+	case NodeStatusRunning:
+		// Unexpected state
+		logger.Error(ctx, "unexpected node status", "status", n.data.State.Status)
+		return false
+	}
+
+	cacheKey := digraph.SystemVariablePrefix + "CONTINUE_ON." + n.data.Step.Name
+
+	if v, ok := n.getBoolVariable(cacheKey); ok {
+		return v
+	}
+
+	// If the exit code is in the list, continue
+	if len(continueOn.ExitCode) > 0 {
+		var found bool
+		exitCode := n.data.State.ExitCode
+		for _, code := range continueOn.ExitCode {
+			if code == exitCode {
+				found = true
+				break
+			}
+		}
+		if found {
+			// cache the result
+			n.setBoolVariable(cacheKey, true)
+			return true
+		}
+	}
+
+	if len(continueOn.Output) > 0 {
+		ok, err := n.LogContainsPattern(ctx, continueOn.Output)
+		if err != nil {
+			logger.Error(ctx, "failed to check log for pattern", "err", err)
+			return false
+		}
+		if ok {
+			n.setBoolVariable(cacheKey, true)
+			return true
+		}
+	}
+
+	n.setBoolVariable(cacheKey, false)
+	return false
+}
+
 func (n *Node) setError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -156,29 +233,74 @@ func (n *Node) Execute(ctx context.Context) error {
 		return err
 	}
 
-	n.setError(cmd.Run(ctx))
+	var exitCode int
+	if err := cmd.Run(ctx); err != nil {
+		n.setError(err)
+
+		// Set the exit code if the command implements ExitCoder
+		if cmd, ok := cmd.(executor.ExitCoder); ok {
+			exitCode = cmd.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+
+	n.SetExitCode(exitCode)
 
 	if n.outputReader != nil && n.data.Step.Output != "" {
 		if err := n.outputWriter.Close(); err != nil {
 			logger.Error(ctx, "failed to close pipe writer", "err", err)
 		}
 		var buf bytes.Buffer
-		// TODO: Error handling
+		// TODO: handle the case where the error or output is too large
 		_, _ = io.Copy(&buf, n.outputReader)
-		ret := strings.TrimSpace(buf.String())
-		_ = os.Setenv(n.data.Step.Output, ret)
-
-		if n.data.Step.OutputVariables == nil {
-			n.data.Step.OutputVariables = &digraph.SyncMap{}
-		}
-
-		n.data.Step.OutputVariables.Store(
-			n.data.Step.Output,
-			fmt.Sprintf("%s=%s", n.data.Step.Output, ret),
-		)
+		value := strings.TrimSpace(buf.String())
+		n.setVariable(n.data.Step.Output, value)
 	}
 
 	return n.data.State.Error
+}
+
+func (n *Node) clearVariable(key string) {
+	_ = os.Unsetenv(key)
+
+	if n.data.Step.OutputVariables == nil {
+		return
+	}
+	n.data.Step.OutputVariables.Delete(key)
+}
+
+func (n *Node) getVariable(key string) (stringutil.KeyValue, bool) {
+	if n.data.Step.OutputVariables == nil {
+		return "", false
+	}
+	v, ok := n.data.Step.OutputVariables.Load(key)
+	if !ok {
+		return "", false
+	}
+	return stringutil.KeyValue(v.(string)), true
+}
+
+func (n *Node) getBoolVariable(key string) (bool, bool) {
+	v, ok := n.getVariable(key)
+	if !ok {
+		return false, false
+	}
+	return v.Bool(), true
+}
+
+func (n *Node) setBoolVariable(key string, value bool) {
+	if n.data.Step.OutputVariables == nil {
+		n.data.Step.OutputVariables = &digraph.SyncMap{}
+	}
+	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
+}
+
+func (n *Node) setVariable(key, value string) {
+	if n.data.Step.OutputVariables == nil {
+		n.data.Step.OutputVariables = &digraph.SyncMap{}
+	}
+	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
 
 func (n *Node) Finish() {
@@ -194,6 +316,13 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	ctx, fn := context.WithCancel(ctx)
 
 	n.cancelFunc = fn
+
+	// Clear the cache
+	n.clearVariable(digraph.SystemVariablePrefix + "CONTINUE_ON." + n.data.Step.Name)
+
+	// Reset the state
+	n.data.State.Error = nil
+	n.data.State.ExitCode = 0
 
 	if n.data.Step.CmdWithArgs != "" {
 		// Expand envs
@@ -272,6 +401,18 @@ func (n *Node) GetDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.data.State.DoneCount
+}
+
+func (n *Node) GetExitCode() int {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.data.State.ExitCode
+}
+
+func (n *Node) SetExitCode(exitCode int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.data.State.ExitCode = exitCode
 }
 
 func (n *Node) ClearState() {
@@ -423,6 +564,7 @@ func (n *Node) Teardown() error {
 	if lastErr != nil {
 		n.data.State.Error = lastErr
 	}
+
 	return lastErr
 }
 
@@ -507,6 +649,53 @@ func (n *Node) setupLog() error {
 	}
 	n.logWriter = bufio.NewWriter(n.logFile)
 	return nil
+}
+
+// LogContainsPattern checks if any of the given patterns exist in the node's log file.
+// If a pattern starts with "regexp:", it will be treated as a regular expression.
+// Returns false if no log file exists or no pattern is found.
+// Returns error if there are issues reading the file or invalid regex pattern.
+func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool, error) {
+	if len(patterns) == 0 {
+		return false, nil
+	}
+
+	// Get the log filename and check if it exists
+	logFilename := n.LogFilename()
+	if logFilename == "" {
+		return false, nil
+	}
+
+	// Open the log file
+	file, err := os.Open(logFilename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer file.Close()
+
+	// Create a buffered reader with optimal buffer size
+	reader := bufio.NewReaderSize(file, 64*1024)
+
+	// Use scanner for more efficient line reading
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024) // Set max line size to 1MB
+
+	// Use the logLock to prevent concurrent file operations
+	n.logLock.Lock()
+	defer n.logLock.Unlock()
+
+	if stringutil.MatchPatternScanner(ctx, scanner, patterns) {
+		return true, nil
+	}
+
+	if err := scanner.Err(); err != nil {
+		return false, fmt.Errorf("failed to read log file: %w", err)
+	}
+
+	return false, nil
 }
 
 var (

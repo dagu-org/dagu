@@ -86,8 +86,8 @@ func (s *Step) String() string {
 
 // SubWorkflow contains information about a sub DAG to be executed.
 type SubWorkflow struct {
-	Name   string
-	Params string
+	Name   string `json:"Name,omitempty"`
+	Params string `json:"Params,omitempty"`
 }
 
 // ExecutorTypeSubWorkflow is defined here in order to parse
@@ -98,8 +98,8 @@ const ExecutorTypeSubWorkflow = "subworkflow"
 type ExecutorConfig struct {
 	// Type represents one of the registered executors.
 	// See `executor.Register` in `internal/executor/executor.go`.
-	Type   string
-	Config map[string]any // Config contains executor-specific configuration.
+	Type   string         `json:"Type,omitempty"`
+	Config map[string]any `json:"Config,omitempty"` // Config contains executor-specific configuration.
 }
 
 // RetryPolicy contains the retry policy for a step.
@@ -117,9 +117,9 @@ type RetryPolicy struct {
 // RepeatPolicy contains the repeat policy for a step.
 type RepeatPolicy struct {
 	// Repeat determines if the step should be repeated.
-	Repeat bool
+	Repeat bool `json:"Repeat,omitempty"`
 	// Interval is the time to wait between repeats.
-	Interval time.Duration
+	Interval time.Duration `json:"Interval,omitempty"`
 }
 
 // ContinueOn contains the conditions to continue on failure or skipped.
@@ -128,6 +128,9 @@ type RepeatPolicy struct {
 // A step can be skipped when the preconditions are not met.
 // Then if the ContinueOn.Skip is set, the step will continue to the next step.
 type ContinueOn struct {
-	Failure bool // Failure is the flag to continue to the next step on failure.
-	Skipped bool // Skipped is the flag to continue to the next step on skipped.
+	Failure     bool     `json:"Failure,omitempty"`     // Failure is the flag to continue to the next step on failure.
+	Skipped     bool     `json:"Skipped,omitempty"`     // Skipped is the flag to continue to the next step on skipped.
+	ExitCode    []int    `json:"ExitCode,omitempty"`    // ExitCode is the list of exit codes to continue to the next step.
+	Output      []string `json:"Output,omitempty"`      // Output is the list of output (stdout/stderr) to continue to the next step.
+	MarkSuccess bool     `json:"MarkSuccess,omitempty"` // MarkSuccess is the flag to mark the step as success when the condition is met.
 }

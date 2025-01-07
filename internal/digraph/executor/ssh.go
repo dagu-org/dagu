@@ -15,6 +15,8 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 )
 
+var _ Executor = (*sshExec)(nil)
+
 type sshExec struct {
 	step      digraph.Step
 	config    *sshExecConfig
