@@ -674,16 +674,20 @@ func (n *Node) LogContainsPattern(patterns []string) (bool, error) {
 	}
 	defer file.Close()
 
-	// Create a buffered reader with 32KB buffer size for efficient reading
-	reader := bufio.NewReaderSize(file, 32*1024)
+	// Create a buffered reader with optimal buffer size
+	reader := bufio.NewReaderSize(file, 64*1024)
+
+	// Use scanner for more efficient line reading
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024) // Set max line size to 1MB
 
 	// Use the logLock to prevent concurrent file operations
 	n.logLock.Lock()
 	defer n.logLock.Unlock()
 
 	// Read the file line by line
-	for {
-		line, err := reader.ReadString('\n')
+	for scanner.Scan() {
+		line := scanner.Text()
 
 		// Check for pattern before handling any errors
 		for _, pattern := range patterns {
@@ -691,14 +695,13 @@ func (n *Node) LogContainsPattern(patterns []string) (bool, error) {
 				return true, nil
 			}
 		}
-
-		if err != nil {
-			if err == io.EOF {
-				return false, nil
-			}
-			return false, fmt.Errorf("error reading log file: %w", err)
-		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		return false, fmt.Errorf("failed to read log file: %w", err)
+	}
+
+	return false, nil
 }
 
 var (
