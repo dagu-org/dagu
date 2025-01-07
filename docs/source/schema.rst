@@ -182,6 +182,13 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
       - condition: "`echo $2`" 
         expected: "param2"
 
+  **Example**: Use regular expressions:
+  .. code-block:: yaml
+
+    precondition:
+      - condition: "`date '+%d'`"
+        expected: "re:0[1-9]" # Run only if the day is between 01 and 09
+
 ``mailOn``
 ~~~~~~~~~
   Email notifications at DAG-level events, such as ``failure`` or ``success``. Also supports ``cancel`` and ``exit``.

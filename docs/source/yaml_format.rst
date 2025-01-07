@@ -246,6 +246,17 @@ Use command substitution in conditions:
         - condition: "`date '+%d'`"
           expected: "01"
 
+Use regex in conditions:
+
+.. code-block:: yaml
+
+  steps:
+    - name: monthly task
+      command: monthly.sh
+      preconditions:
+        - condition: "`date '+%d'`"
+          expected: "re:0[1-9]" # Run only if the day is between 01 and 09
+
 Continue on Failure
 ~~~~~~~~~~~~~~~~~
 Control flow when conditions aren't met:
