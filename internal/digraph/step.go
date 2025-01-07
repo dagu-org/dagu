@@ -131,5 +131,5 @@ type ContinueOn struct {
 	Failure  bool     `json:"Failure,omitempty"`  // Failure is the flag to continue to the next step on failure.
 	Skipped  bool     `json:"Skipped,omitempty"`  // Skipped is the flag to continue to the next step on skipped.
 	ExitCode []int    `json:"ExitCode,omitempty"` // ExitCode is the list of exit codes to continue to the next step.
-	Stderr   []string `json:"Stderr,omitempty"`   // Stderr is the list of stderr patterns to continue to the next step.
+	Output   []string `json:"Output,omitempty"`   // Output is the list of output (stdout/stderr) to continue to the next step.
 }

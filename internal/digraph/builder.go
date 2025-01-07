@@ -541,11 +541,11 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	step.ContinueOn.Failure = def.ContinueOn.Failure
 	step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
 
-	stderr, err := parseContinueOnStrings("continueOn.stdout", def.ContinueOn.Stderr)
+	output, err := parseContinueOnStrings("continueOn.stdout", def.ContinueOn.Output)
 	if err != nil {
 		return err
 	}
-	step.ContinueOn.Stderr = stderr
+	step.ContinueOn.Output = output
 
 	return nil
 }
@@ -563,14 +563,14 @@ func parseContinueOnStrings(field string, v any) ([]string, error) {
 		for _, vv := range v {
 			s, ok := vv.(string)
 			if !ok {
-				return nil, wrapError(field, vv, errContinueOnStderrMustBeStringOrArray)
+				return nil, wrapError(field, vv, errContinueOnOutputMustBeStringOrArray)
 			}
 			ret = append(ret, s)
 		}
 		return ret, nil
 
 	default:
-		return nil, wrapError(field, v, errContinueOnStderrMustBeStringOrArray)
+		return nil, wrapError(field, v, errContinueOnOutputMustBeStringOrArray)
 
 	}
 }

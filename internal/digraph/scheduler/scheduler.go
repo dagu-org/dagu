@@ -465,10 +465,10 @@ func isReady(g *ExecutionGraph, node *Node) bool {
 				}
 			}
 
-			if len(continueOn.Stderr) > 0 {
+			if len(continueOn.Output) > 0 {
 				// If the output is in the list, continue
 				output := dep.data.Step.Output
-				for _, o := range continueOn.Stderr {
+				for _, o := range continueOn.Output {
 					if strings.Contains(output, o) {
 						continue
 					}
