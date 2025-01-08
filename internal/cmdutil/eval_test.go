@@ -320,7 +320,18 @@ func TestExpandReferences(t *testing.T) {
 			},
 			want: "Multi: 1, 2 , and 3",
 		},
+		{
+			name:    "lookup from environment",
+			input:   "${TEST_JSON_VAR.bar}",
+			dataMap: map[string]string{},
+			want:    "World",
+		},
 	}
+
+	os.Setenv("TEST_JSON_VAR", `{"bar": "World"}`)
+	t.Cleanup(func() {
+		_ = os.Unsetenv("TEST_JSON_VAR")
+	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

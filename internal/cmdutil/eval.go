@@ -240,8 +240,13 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 		// Lookup the JSON content for this "name"
 		jsonStr, ok := dataMap[name]
 		if !ok {
-			// Not found => leave as-is or handle otherwise
-			return match
+			// Find the variable from the environment
+			val, ok := os.LookupEnv(name)
+			if !ok {
+				// Not found => leave as-is or handle otherwise
+				return match
+			}
+			jsonStr = val
 		}
 
 		// Try to parse it as JSON and evaluate path
