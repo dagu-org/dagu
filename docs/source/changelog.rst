@@ -117,6 +117,17 @@ Unreleased
         "RESULT2": "Another output"
       }
     }
+- **Support string in depends field**: Added support for specifying a string in the ``depends`` field.
+
+  .. code-block:: yaml
+
+    steps:
+    - name: some_step1
+      command: some_command
+    - name: some_step2
+      command: some_other_command
+      depends: some_step1
+
 - **Support for environment variables in the most of the fields**: You can now use environment variables in most of the fields in the DAG configuration file.
 - **Bugfix**: Fixed the issue where the DAG can't be edited when the DAG name contains ``.``.
 - **UI**: Updated the visualization of the DAG in the Web UI for better readability.
