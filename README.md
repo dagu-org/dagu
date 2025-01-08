@@ -428,6 +428,12 @@ Feel free to contribute in any way you want! Share ideas, questions, submit issu
 
 We welcome any and all contributions!
 
+## **Contributors**
+
+<a href="https://github.com/dagu-org/dagu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
+</a>
+
 ## **License**
 
 This project is licensed under the GNU GPLv3.
