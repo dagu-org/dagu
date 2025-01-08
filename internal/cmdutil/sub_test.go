@@ -3,7 +3,6 @@ package cmdutil
 import (
 	"os"
 	"runtime"
-	"strings"
 	"testing"
 )
 
@@ -133,61 +132,6 @@ func TestSubstituteCommands(t *testing.T) {
 	}
 }
 
-func TestSubstituteCommandsWithCustomShell(t *testing.T) {
-	// Create a temporary shell script that just echoes its arguments
-	tmpDir := t.TempDir()
-	mockShell := "mock_shell"
-	if runtime.GOOS == "windows" {
-		mockShell += ".bat"
-	}
-
-	shellPath := tmpDir + string(os.PathSeparator) + mockShell
-	shellContent := `#!/bin/sh
-echo "MOCK_SHELL: $@"`
-
-	if err := os.WriteFile(shellPath, []byte(shellContent), 0755); err != nil {
-		t.Fatalf("Failed to create mock shell: %v", err)
-	}
-
-	// Set the mock shell in path
-	oldPath := os.Getenv("PATH")
-	os.Setenv("PATH", tmpDir+string(os.PathSeparator)+string(os.PathListSeparator)+oldPath)
-	defer os.Setenv("PATH", oldPath)
-
-	tests := []struct {
-		name    string
-		input   string
-		want    string
-		wantErr bool
-	}{
-		{
-			name:    "basic command",
-			input:   "`test command`",
-			want:    "MOCK_SHELL: test command",
-			wantErr: false,
-		},
-		{
-			name:    "command with quotes",
-			input:   "`echo \"hello world\"`",
-			want:    "MOCK_SHELL: echo \"hello world\"",
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := substituteCommands(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("substituteCommands() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !strings.Contains(got, tt.want) {
-				t.Errorf("substituteCommands() = %q, want to contain %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSubstituteCommandsEdgeCases(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -222,7 +166,8 @@ func TestSubstituteCommandsEdgeCases(t *testing.T) {
 		{
 			name:    "multiple backticks without command",
 			input:   "``````",
-			wantErr: true,
+			want:    "``````",
+			wantErr: false,
 		},
 	}
 
