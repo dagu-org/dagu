@@ -670,17 +670,22 @@ func TestScheduler(t *testing.T) {
 			newStep("1", withCommand("echo hello"), withOutput("OUT")),
 			newStep("2", withCommand("echo world"), withOutput("OUT2"), withDepends("1")),
 			newStep("3", withCommand("echo $OUT $OUT2"), withDepends("2"), withOutput("RESULT")),
+			newStep("4", withCommand("sleep 1")),
+			// 5 should not have reference to OUT or OUT2
+			newStep("5", withCommand("echo $OUT $OUT2"), withDepends("4"), withOutput("RESULT2")),
 		)
 
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 
-		result.AssertDoneCount(t, 3)
+		result.AssertDoneCount(t, 5)
 
 		node := result.Node(t, "3")
-
-		// check if RESULT variable is set to "hello"
 		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
+
+		node2 := result.Node(t, "5")
+		output2, _ := node2.Data().Step.OutputVariables.Load("RESULT2")
+		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
 	t.Run("SpecialVars_DAG_EXECUTION_LOG_PATH", func(t *testing.T) {
 		sc := setup(t)
