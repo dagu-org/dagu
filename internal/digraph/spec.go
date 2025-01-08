@@ -26,7 +26,7 @@ type definition struct {
 	// Deprecated: Don't use this field
 	Functions []*funcDef // deprecated
 	// Steps is the list of steps to run.
-	Steps []stepDef
+	Steps any // []stepDef or map[string]stepDef
 	// SMTP is the SMTP configuration.
 	SMTP smtpConfigDef
 	// MailOn is the mail configuration.
