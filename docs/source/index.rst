@@ -45,6 +45,9 @@ Quick Start
 :ref:`schema-reference`
    Schema reference.
 
+:ref:`changelog`
+   History of changes.
+
 .. toctree::
    :caption: Installation
    :hidden:
@@ -95,3 +98,9 @@ Quick Start
 
    faq
    contrib
+
+.. toctree::
+   :caption: Changelog
+   :hidden:
+
+   changelog

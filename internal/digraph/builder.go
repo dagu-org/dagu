@@ -3,6 +3,7 @@ package digraph
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,6 +76,7 @@ type builderEntry struct {
 
 var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "command", fn: buildCommand},
+	{name: "depends", fn: buildDepends},
 	{name: "executor", fn: buildExecutor},
 	{name: "subworkflow", fn: buildSubWorkflow},
 	{name: "continueOn", fn: buildContinueOn},
@@ -514,7 +516,6 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 		Stderr:         def.Stderr,
 		Output:         def.Output,
 		Dir:            def.Dir,
-		Depends:        def.Depends,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
 	}
@@ -539,41 +540,21 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	}
 	step.ContinueOn.Skipped = def.ContinueOn.Skipped
 	step.ContinueOn.Failure = def.ContinueOn.Failure
-	step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
 	step.ContinueOn.MarkSuccess = def.ContinueOn.MarkSuccess
 
-	output, err := parseContinueOnStrings("continueOn.stdout", def.ContinueOn.Output)
+	exitCodes, err := parseIntOrArray(def.ContinueOn.ExitCode)
 	if err != nil {
-		return err
+		return wrapError("continueOn.exitCode", def.ContinueOn.ExitCode, errContinueOnExitCodeMustBeIntOrArray)
+	}
+	step.ContinueOn.ExitCode = exitCodes
+
+	output, err := parseStringOrArray(def.ContinueOn.Output)
+	if err != nil {
+		return wrapError("continueOn.stdout", def.ContinueOn.Output, errContinueOnOutputMustBeStringOrArray)
 	}
 	step.ContinueOn.Output = output
 
 	return nil
-}
-
-func parseContinueOnStrings(field string, v any) ([]string, error) {
-	switch v := v.(type) {
-	case nil:
-		return nil, nil
-
-	case string:
-		return []string{v}, nil
-
-	case []any:
-		var ret []string
-		for _, vv := range v {
-			s, ok := vv.(string)
-			if !ok {
-				return nil, wrapError(field, vv, errContinueOnOutputMustBeStringOrArray)
-			}
-			ret = append(ret, s)
-		}
-		return ret, nil
-
-	default:
-		return nil, wrapError(field, v, errContinueOnOutputMustBeStringOrArray)
-
-	}
 }
 
 // buildRetryPolicy builds the retry policy for a step.
@@ -662,6 +643,16 @@ const (
 	executorKeyType   = "type"
 	executorKeyConfig = "config"
 )
+
+func buildDepends(_ BuildContext, def stepDef, step *Step) error {
+	deps, err := parseStringOrArray(def.Depends)
+	if err != nil {
+		return wrapError("depends", def.Depends, errDependsMustBeStringOrArray)
+	}
+	step.Depends = deps
+
+	return nil
+}
 
 // buildExecutor parses the executor field in the step definition.
 // Case 1: executor is nil
@@ -811,10 +802,60 @@ func extractParamNames(command string) []string {
 	return params
 }
 
-type scheduleKey string
+func parseIntOrArray(v any) ([]int, error) {
+	switch v := v.(type) {
+	case nil:
+		return nil, nil
 
-const (
-	scheduleKeyStart   scheduleKey = "start"
-	scheduleKeyStop    scheduleKey = "stop"
-	scheduleKeyRestart scheduleKey = "restart"
-)
+	case int:
+		return []int{v}, nil
+
+	case []any:
+		var ret []int
+		for _, vv := range v {
+			i, ok := vv.(int)
+			if !ok {
+				return nil, fmt.Errorf("int or array expected, got %T", vv)
+			}
+			ret = append(ret, i)
+		}
+		return ret, nil
+
+	case string:
+		// try to parse the string as an integer
+		exitCode, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("int or array expected, got %T", v)
+		}
+		return []int{exitCode}, nil
+
+	default:
+		return nil, fmt.Errorf("int or array expected, got %T", v)
+
+	}
+}
+
+func parseStringOrArray(v any) ([]string, error) {
+	switch v := v.(type) {
+	case nil:
+		return nil, nil
+
+	case string:
+		return []string{v}, nil
+
+	case []any:
+		var ret []string
+		for _, vv := range v {
+			s, ok := vv.(string)
+			if !ok {
+				return nil, fmt.Errorf("string or array expected, got %T", vv)
+			}
+			ret = append(ret, s)
+		}
+		return ret, nil
+
+	default:
+		return nil, fmt.Errorf("string or array expected, got %T", v)
+
+	}
+}

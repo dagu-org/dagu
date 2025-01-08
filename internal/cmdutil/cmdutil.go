@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
-	"github.com/mattn/go-shellwords"
 )
 
 var ErrCommandIsEmpty = fmt.Errorf("command is empty")
@@ -94,10 +92,6 @@ func SplitCommandWithEval(cmd string) (string, []string, error) {
 	if err != nil {
 		return "", nil, err
 	}
-
-	parser := shellwords.NewParser()
-	parser.ParseBacktick = true
-	parser.ParseEnv = false
 
 	for _, command := range pipeline {
 		if len(command) < 2 {

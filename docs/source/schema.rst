@@ -342,7 +342,7 @@ Each element in the top-level ``steps`` list has its own fields for customizatio
 
 ``depends``
 ~~~~~~~~~
-  Names of other steps that must complete before this step can run.
+  Names of other steps that must complete before this step can run. It can be a single step name or a list of step names.
 
 ``run``
 ~~~~~~

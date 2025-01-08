@@ -327,7 +327,7 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	if n.data.Step.CmdWithArgs != "" {
 		// Expand envs
 		stepContext := digraph.GetStepContext(ctx)
-		cmdWithArgs, err := stepContext.EvalString(n.data.Step.CmdWithArgs)
+		cmdWithArgs, err := stepContext.EvalString(n.data.Step.CmdWithArgs, cmdutil.WithoutExpandEnv())
 		if err != nil {
 			return nil, err
 		}

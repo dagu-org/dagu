@@ -97,3 +97,11 @@ func parseScheduleMap(
 
 	return nil
 }
+
+type scheduleKey string
+
+const (
+	scheduleKeyStart   scheduleKey = "start"
+	scheduleKeyStop    scheduleKey = "stop"
+	scheduleKeyRestart scheduleKey = "restart"
+)

@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/imdario/mergo"
-	"github.com/mitchellh/mapstructure"
 
 	"gopkg.in/yaml.v2"
 )

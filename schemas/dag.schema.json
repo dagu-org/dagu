@@ -1,233 +1,481 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "description": "Schema for Dagu YAML format",
+  "description": "Schema for Dagu DAG YAML format. Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for workflow orchestration.",
   "properties": {
     "name": {
       "type": "string",
-      "description": "Name of the DAG"
+      "description": "Name of the DAG. If omitted, defaults to the YAML filename without extension. This serves as a unique identifier for the workflow."
     },
     "description": {
-       "type": "string",
-       "description": "Description of the DAG"
-    },
-    "schedule": {
       "type": "string",
-      "pattern": "(\\*|[0-5]?[0-9]|\\*\/[0-9]+)\\s+(\\*|1?[0-9]|2[0-3]|\\*\/[0-9]+)\\s+(\\*|[1-2]?[0-9]|3[0-1]|\\*\/[0-9]+)\\s+(\\*|[0-9]|1[0-2]|\\*\/[0-9]+|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\*\/[0-9]+|\\*|[0-7]|sun|mon|tue|wed|thu|fri|sat)\\s*(\\*\/[0-9]+|\\*|[0-9]+)?",
-      "description": "Cron schedule expression for the DAG"
+      "description": "A brief description explaining what this DAG does. This helps document the workflow's purpose."
     },
     "group": {
       "type": "string",
-      "description": "Group name to organize DAGs"
+      "description": "An organizational label used to group related DAGs together. Useful for categorizing workflows in the UI, e.g., 'DailyJobs', 'Analytics'."
+    },
+    "dotenv": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Path to a .env file to load environment variables from"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of paths to .env files to load environment variables from. Files can be specified as absolute paths, or relative to: DAG file directory, base config directory, or user's home directory."
+        }
+      ],
+      "description": "Specifies candidate .env files to load environment variables from. By default, no env files are loaded unless explicitly specified."
+    },
+    "schedule": {
+      "type": "string",
+      "pattern": "(\\*|[0-5]?[0-9]|\\*/[0-9]+)\\s+(\\*|1?[0-9]|2[0-3]|\\*/[0-9]+)\\s+(\\*|[1-2]?[0-9]|3[0-1]|\\*/[0-9]+)\\s+(\\*|[0-9]|1[0-2]|\\*/[0-9]+|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\*/[0-9]+|\\*|[0-7]|sun|mon|tue|wed|thu|fri|sat)\\s*(\\*/[0-9]+|\\*|[0-9]+)?",
+      "description": "Cron expression that determines how often the DAG runs (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
+    },
+    "skipIfSuccessful": {
+      "type": "boolean",
+      "description": "When true, Dagu checks if this DAG has already succeeded since the last scheduled time. If it has, Dagu will skip the current scheduled run. This is useful for resource-intensive tasks or data processing jobs that shouldn't run twice. Note: Manual triggers always run regardless of this setting."
     },
     "tags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of free tags to categorize DAGs"
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Comma-separated list of tags for categorization"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of tags for categorization"
+        }
+      ],
+      "description": "Tags for categorizing and searching DAGs. Useful for filtering and organizing workflows."
     },
     "env": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of environment variables accessible to the DAG"
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true
+        }
+      ],
+      "description": "Environment variables available to all steps in the DAG. Can use shell expansions, references to other environment variables, or command substitutions. Note: These won't be stored in execution history data for security."
     },
     "logDir": {
       "type": "string",
-      "description": "Directory for log files"
+      "description": "Base directory for storing logs. Defaults to ${HOME}/.local/share/logs if not specified."
     },
-    "restartWaitSec": {
-      "type": "integer",
-      "description": "Seconds to wait before restarting DAG process"
-    },
-    "histRetentionDays": {
-      "type": "integer",
-      "description": "Days to retain execution history"
-    },
-    "delaySec": {
-      "type": "integer",
-      "description": "Seconds delay between steps"
-    },
-    "maxActiveRuns": {
-      "type": "integer",
-      "description": "Max parallel running steps"
-    },
-    "params": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of default parameters accessible as $1, $2, etc"
-    },
-    "preconditions": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "condition": {
-            "type": "string"
-          },
-          "expected": {
-            "type": "string"
-          }
+    "handlerOn": {
+      "type": "object",
+      "properties": {
+        "failure": {
+          "$ref": "#/definitions/step"
+        },
+        "success": {
+          "$ref": "#/definitions/step"
+        },
+        "cancel": {
+          "$ref": "#/definitions/step"
+        },
+        "exit": {
+          "$ref": "#/definitions/step"
         }
       },
-      "description": "List of conditions to check before running DAG/step"
+      "description": "Lifecycle event hooks that define commands to execute when the DAG succeeds, fails, is cancelled, or exits. Useful for cleanup, notifications, or triggering dependent workflows."
+    },
+    "smtp": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "SMTP server hostname"
+        },
+        "port": {
+          "type": "string",
+          "description": "SMTP server port"
+        },
+        "username": {
+          "type": "string",
+          "description": "SMTP authentication username"
+        },
+        "password": {
+          "type": "string",
+          "description": "SMTP authentication password"
+        }
+      },
+      "description": "SMTP server configuration for sending email notifications."
     },
     "mailOn": {
       "type": "object",
       "properties": {
         "failure": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Send email notification when DAG fails"
         },
         "success": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Send email notification when DAG succeeds"
         }
       },
-      "description": "Whether to send email on failure/success"
+      "description": "Configuration for sending email notifications on DAG success or failure."
+    },
+    "errorMail": {
+      "$ref": "#/definitions/mailConfig",
+      "description": "Email configuration specifically for error notifications."
+    },
+    "infoMail": {
+      "$ref": "#/definitions/mailConfig",
+      "description": "Email configuration for informational notifications."
+    },
+    "timeoutSec": {
+      "type": "integer",
+      "description": "Maximum number of seconds allowed for the entire DAG to finish. If exceeded, the DAG is considered timed out."
+    },
+    "delaySec": {
+      "type": "integer",
+      "description": "Delay in seconds before starting the first node. Useful for staggering workloads."
+    },
+    "restartWaitSec": {
+      "type": "integer",
+      "description": "Number of seconds to wait before restarting a failed or stopped DAG. Typically used with a process supervisor."
+    },
+    "histRetentionDays": {
+      "type": "integer",
+      "description": "Number of days to retain execution history. After this period, older run logs/history can be purged."
+    },
+    "maxActiveRuns": {
+      "type": "integer",
+      "description": "Maximum number of concurrent steps that can be active at once. Especially relevant for DAGs with frequent schedules."
     },
     "maxCleanUpTimeSec": {
       "type": "integer",
-      "description": "Max time to wait before killing steps after TERM signal"
+      "description": "Maximum time in seconds to spend cleaning up (stopping steps, finalizing logs) before forcing shutdown. If exceeded, processes will be killed."
     },
-    "handlerOn": {
-      "type": "object",
-      "properties": {
-        "success": {
-          "type": "object",
-          "properties": {
-            "command": {
-              "type": "string"
-            }
-          }
+    "precondition": {
+      "oneOf": [
+        {
+          "type": "string"
         },
-        "failure": {
-          "type": "object",
-          "properties": {
-            "command": {
-              "type": "string"
-            }
-          }
-        },
-        "cancel": {
-          "type": "object",
-          "properties": {
-            "command": {
-              "type": "string"
-            }
-          }
-        },
-        "exit": {
-          "type": "object",
-          "properties": {
-            "command": {
-              "type": "string"
-            }
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
           }
         }
-      },
-      "description": "Commands to execute on DAG/step events"
+      ],
+      "description": "Conditions that must be satisfied before the DAG can run. Can use shell expansions or command substitutions to validate external states."
+    },
+    "preconditions": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          }
+        }
+      ],
+      "description": "Alternative name for precondition. Works exactly the same way."
+    },
+    "params": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Space-separated positional parameters accessible as $1, $2, etc."
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Named parameters as key-value pairs, accessible as ${KEY}"
+        }
+      ],
+      "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
     },
     "steps": {
       "type": "array",
-      "required": ["name"],
       "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "depends": {
-            "type": "array",
-            "items": {
+        "$ref": "#/definitions/step"
+      },
+      "description": "List of steps that define the workflow. Steps can depend on each other, forming a directed acyclic graph."
+    }
+  },
+  "definitions": {
+    "step": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for the step within this DAG. Required field."
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of what this step does. Helps document the step's purpose."
+        },
+        "dir": {
+          "type": "string",
+          "description": "Working directory in which this step's command or script will be executed."
+        },
+        "executor": {
+          "oneOf": [
+            {
               "type": "string"
             },
-            "description": "List of step names this step depends on"
-          },
-          "description": {
-            "type": "string"
-          },
-          "dir": {
-            "type": "string"
-          },
-          "command": {
-            "type": "string"
-          },
-          "stdout": {
-            "type": "string"
-          },
-          "output": {
-            "type": "string"
-          },
-          "script": {
-            "type": "string"
-          },
-          "signalOnStop": {
-            "type": "string"
-          },
-          "mailOn": {
-            "type": "object",
-            "properties": {
-              "failure": {
-                "type": "boolean"
-              },
-              "success": {
-                "type": "boolean"
-              }
-            }
-          },
-          "continueOn": {
-            "type": "object",
-            "properties": {
-              "failure": {
-                "type": "boolean"
-              },
-              "skipped": {
-                "type": "boolean"
-              }
-            }
-          },
-          "retryPolicy": {
-            "type": "object",
-            "properties": {
-              "limit": {
-                "type": "integer"
-              },
-              "intervalSec": {
-                "type": "integer"
-              }
-            }
-          },
-          "repeatPolicy": {
-            "type": "object",
-            "properties": {
-              "repeat": {
-                "type": "boolean"
-              },
-              "intervalSec": {
-                "type": "integer"
-              }
-            }
-          },
-          "preconditions": {
-            "type": "array",
-            "items": {
+            {
               "type": "object",
               "properties": {
-                "condition": {
-                  "type": "string"
+                "type": {
+                  "type": "string",
+                  "enum": ["docker", "http", "mail", "ssh", "jq"],
+                  "description": "Type of executor to use for this step"
                 },
-                "expected": {
-                  "type": "string"
+                "config": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Executor-specific configuration options"
                 }
+              },
+              "required": ["type"]
+            }
+          ],
+          "description": "Specialized executor configuration for running the step (e.g., docker for containerized execution, http for API calls, mail for sending emails)."
+        },
+        "command": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
               }
             }
-          }
+          ],
+          "description": "Command to execute. Can be a shell command, script interpreter, or executable. If omitted when script is provided, uses system default shell."
+        },
+        "shell": {
+          "type": "string",
+          "description": "Specific shell to use for executing the command. Defaults to $SHELL or sh if not specified."
+        },
+        "script": {
+          "type": "string",
+          "description": "Multi-line script content that will be executed. Gets piped into the command if specified, otherwise uses default shell."
+        },
+        "stdout": {
+          "type": "string",
+          "description": "File path where the step's standard output (stdout) will be written."
+        },
+        "stderr": {
+          "type": "string",
+          "description": "File path where the step's standard error (stderr) will be written."
+        },
+        "output": {
+          "type": "string",
+          "description": "Variable name to capture the command's stdout. This output can be referenced in subsequent steps."
+        },
+        "depends": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Name of a step that must complete successfully before this step can start."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of step names that must complete successfully before this step can start."
+            }
+          ]
+        },
+        "continueOn": {
+          "type": "object",
+          "properties": {
+            "failure": {
+              "type": "boolean",
+              "description": "Continue DAG execution even if this step fails"
+            },
+            "skipped": {
+              "type": "boolean",
+              "description": "Continue DAG execution even if this step is skipped due to preconditions"
+            },
+            "exitCode": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "description": "Exit code that should be treated as successful"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "description": "List of exit codes that should be treated as successful"
+                }
+              ]
+            },
+            "output": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Output text or pattern that indicates success. Supports regex with 're:' prefix."
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "Output text or patterns that indicate success. Supports regex with 're:' prefix."
+                  }
+                }
+              ]
+            },
+            "markSuccess": {
+              "type": "boolean",
+              "description": "Mark the step as successful even if it technically failed but met continue conditions"
+            }
+          },
+          "description": "Conditions under which the DAG should continue executing even if this step fails or is skipped."
+        },
+        "retryPolicy": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "oneOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "Maximum number of retry attempts"
+            },
+            "intervalSec": {
+              "oneOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "Seconds to wait between retry attempts"
+            }
+          },
+          "description": "Configuration for automatically retrying failed steps."
+        },
+        "repeatPolicy": {
+          "type": "object",
+          "properties": {
+            "repeat": {
+              "type": "boolean",
+              "description": "Whether to repeat this step"
+            },
+            "intervalSec": {
+              "type": "integer",
+              "description": "Interval in seconds between repetitions"
+            }
+          },
+          "description": "Configuration for repeatedly executing this step at fixed intervals."
+        },
+        "mailOnError": {
+          "type": "boolean",
+          "description": "Send an email notification if this specific step fails."
+        },
+        "precondition": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/condition"
+              }
+            }
+          ],
+          "description": "Conditions that must be met before this step can run. Supports command exit codes, environment variables, and regex matching."
+        },
+        "preconditions": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/condition"
+              }
+            }
+          ],
+          "description": "Alternative name for precondition. Works exactly the same way."
+        },
+        "signalOnStop": {
+          "type": "string",
+          "description": "Signal to send when stopping this step (e.g., SIGINT). If empty, uses same signal as parent process."
+        },
+        "run": {
+          "type": "string",
+          "description": "Name of a sub-workflow (another DAG) to run as this step."
+        },
+        "params": {
+          "type": "string",
+          "description": "Parameters to pass to the sub-workflow when using 'run'."
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Command or expression to evaluate. Can include shell commands, environment variables, or command substitutions with backticks."
+        },
+        "expected": {
+          "type": "string",
+          "description": "Expected value or pattern to match against the condition result. Supports regex patterns with 're:' prefix (e.g., 're:0[1-9]' for matching numbers 01-09)."
         }
       },
-      "description": "List of steps to execute in the DAG"
+      "description": "Defines a condition that must be met before execution. Used in preconditions at both DAG and step levels."
+    },
+    "mailConfig": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "Email address to use as the sender address for notifications."
+        },
+        "to": {
+          "type": "string",
+          "description": "Email address(es) to receive notifications. Multiple addresses should be comma-separated."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Text to prepend to the email subject line. Useful for filtering or categorizing notification emails."
+        },
+        "attachLogs": {
+          "type": "boolean",
+          "description": "When true, relevant log files will be attached to the notification email."
+        }
+      },
+      "description": "Configuration for email notifications, used by errorMail and infoMail settings."
     }
   }
 }

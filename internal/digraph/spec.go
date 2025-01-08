@@ -90,7 +90,7 @@ type stepDef struct {
 	// Output is the variable name to store the output.
 	Output string
 	// Depends is the list of steps to depend on.
-	Depends []string
+	Depends any // string or []string
 	// ContinueOn is the condition to continue on.
 	ContinueOn *continueOnDef
 	// RetryPolicy is the retry policy.
@@ -130,11 +130,11 @@ type callFuncDef struct {
 
 // continueOnDef defines the conditions to continue on failure or skipped.
 type continueOnDef struct {
-	Failure     bool  // Continue on failure
-	Skipped     bool  // Continue on skipped
-	ExitCode    []int // Continue on specific exit codes
-	Output      any   // Continue on specific output (string or []string)
-	MarkSuccess bool  // Mark the step as success when the condition is met
+	Failure     bool // Continue on failure
+	Skipped     bool // Continue on skipped
+	ExitCode    any  // Continue on specific exit codes
+	Output      any  // Continue on specific output (string or []string)
+	MarkSuccess bool // Mark the step as success when the condition is met
 }
 
 // repeatPolicyDef defines the repeat policy for a step.
