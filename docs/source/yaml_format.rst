@@ -227,7 +227,7 @@ Send output to files:
       command: "echo error message >&2"
       stderr: "/tmp/error.txt"
 
-You can use JSON references in fields to dynamically expand values from nested structures. JSON references are denoted using the ``${NAME.path.to.value}`` syntax, where ``NAME`` refers to a variable name and ``path.to.value`` specifies the path in the JSON to resolve.
+You can use JSON references in fields to dynamically expand values from variables. JSON references are denoted using the ``${NAME.path.to.value}`` syntax, where ``NAME`` refers to a variable name and ``path.to.value`` specifies the path in the JSON to resolve. If the data is not JSON format, the value will not be expanded.
 
 Examples:
 
