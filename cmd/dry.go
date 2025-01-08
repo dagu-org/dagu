@@ -33,7 +33,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
 
-	ctx := cmd.Context()
+	ctx := setup.loggerContext(cmd.Context(), false)
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
@@ -62,7 +62,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(dryPrefix, dag, requestID)
+	logFile, err := setup.openLogFile(ctx, dryPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
