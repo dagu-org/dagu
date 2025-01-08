@@ -276,8 +276,6 @@ remoteNodes:
 
 ### Minimal examples
 
-```yaml
-
 A DAG with two steps:
 
 ```yaml
@@ -319,6 +317,48 @@ steps:
     command: echo "Bye"
     depends: step1
 ```
+
+### JSON processing
+
+You can reference the nested JSON data using the syntax `${INPUT.key}`:
+
+```yaml
+params:
+  - INPUT: '{ "name": "John", "age": 30 }'
+steps:
+  - name: John's age
+    command: echo ${INPUT.name} is ${INPUT.age} years old
+```
+
+It will write `John is 30 years old` to the log (stdout).
+
+### Calling a sub-DAG
+
+You can call a sub-DAG from a parent DAG:
+
+```yaml
+steps:
+  - name: parent
+    run: sub-dag
+    output: OUT
+  - name: use output
+    command: echo ${OUT.outputs.result}
+    depends: parent
+```
+
+The sub-DAG `sub-dag.yaml`:
+
+```yaml
+steps:
+  - name: sub-dag
+    command: echo "Hello from sub-dag"
+    output: result
+```
+
+THe parent DAG will call the sub-DAG and write the output to the log (stdout).
+The output will be `Hello from sub-dag`.
+
+More examples can be found in the [documentation](https://dagu.readthedocs.io/en/latest/yaml_format.html).
 
 ### Complex examples
 
