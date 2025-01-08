@@ -64,6 +64,7 @@ var (
 	errPreconditionValueMustBeString       = errors.New("precondition value must be a string")
 	errPreconditionHasInvalidKey           = errors.New("precondition has invalid key")
 	errContinueOnOutputMustBeStringOrArray = errors.New("continueOn.Output must be a string or an array of strings")
+	errContinueOnExitCodeMustBeIntOrArray  = errors.New("continueOn.ExitCode must be an int or an array of ints")
 )
 
 // errorList is just a list of errors.

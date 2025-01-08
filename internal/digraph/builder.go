@@ -3,6 +3,7 @@ package digraph
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -539,8 +540,13 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	}
 	step.ContinueOn.Skipped = def.ContinueOn.Skipped
 	step.ContinueOn.Failure = def.ContinueOn.Failure
-	step.ContinueOn.ExitCode = def.ContinueOn.ExitCode
 	step.ContinueOn.MarkSuccess = def.ContinueOn.MarkSuccess
+
+	exitCodes, err := parseContinueOnInt("continueOn.exitCode", def.ContinueOn.ExitCode)
+	if err != nil {
+		return err
+	}
+	step.ContinueOn.ExitCode = exitCodes
 
 	output, err := parseContinueOnStrings("continueOn.stdout", def.ContinueOn.Output)
 	if err != nil {
@@ -549,6 +555,36 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 	step.ContinueOn.Output = output
 
 	return nil
+}
+
+func parseContinueOnInt(field string, v any) ([]int, error) {
+	switch v := v.(type) {
+	case int:
+		return []int{v}, nil
+
+	case []any:
+		var ret []int
+		for _, vv := range v {
+			i, ok := vv.(int)
+			if !ok {
+				return nil, wrapError(field, vv, errContinueOnExitCodeMustBeIntOrArray)
+			}
+			ret = append(ret, i)
+		}
+		return ret, nil
+
+	case string:
+		// try to parse the string as an integer
+		exitCode, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, wrapError(field, v, errContinueOnExitCodeMustBeIntOrArray)
+		}
+		return []int{exitCode}, nil
+
+	default:
+		return nil, wrapError(field, v, errContinueOnExitCodeMustBeIntOrArray)
+
+	}
 }
 
 func parseContinueOnStrings(field string, v any) ([]string, error) {

@@ -309,11 +309,18 @@
               "description": "Continue DAG execution even if this step is skipped due to preconditions"
             },
             "exitCode": {
-              "type": "array",
-              "items": {
-                "type": "integer"
-              },
-              "description": "List of exit codes that should be treated as successful"
+              "oneOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "description": "List of exit codes that should be treated as successful"
+                }
+              ]
             },
             "output": {
               "oneOf": [
