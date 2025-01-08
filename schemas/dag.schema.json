@@ -291,11 +291,19 @@
           "description": "Variable name to capture the command's stdout. This output can be referenced in subsequent steps."
         },
         "depends": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of step names that must complete successfully before this step can start."
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Name of a step that must complete successfully before this step can start."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of step names that must complete successfully before this step can start."
+            }
+          ]
         },
         "continueOn": {
           "type": "object",
@@ -311,7 +319,8 @@
             "exitCode": {
               "oneOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "Exit code that should be treated as successful"
                 },
                 {
                   "type": "array",
@@ -325,16 +334,17 @@
             "output": {
               "oneOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Output text or pattern that indicates success. Supports regex with 're:' prefix."
                 },
                 {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Output text or patterns that indicate success. Supports regex with 're:' prefix."
                   }
                 }
-              ],
-              "description": "Output text or patterns that indicate success. Supports regex with 're:' prefix."
+              ]
             },
             "markSuccess": {
               "type": "boolean",

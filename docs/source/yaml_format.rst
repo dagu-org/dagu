@@ -27,8 +27,7 @@ Hello World
       command: echo Hello $NAME
     - name: Done
       command: echo Done!
-      depends:
-        - Hello world
+      depends: Hello world
 
 Using pipes (``|``) in commands:
 
@@ -57,6 +56,21 @@ Running a script:
       script: |
         echo hello world
         echo goodbye world
+
+Multiple dependencies:
+
+.. code-block:: yaml
+
+  steps:
+    - name: step 1
+      command: echo hello
+    - name: step 2
+      command: echo world
+    - name: step 3
+      command: echo hello world
+      depends:
+        - step 1
+        - step 2
 
 Schema Definition
 ~~~~~~~~~~~~~~~~

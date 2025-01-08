@@ -90,7 +90,7 @@ type stepDef struct {
 	// Output is the variable name to store the output.
 	Output string
 	// Depends is the list of steps to depend on.
-	Depends []string
+	Depends any // string or []string
 	// ContinueOn is the condition to continue on.
 	ContinueOn *continueOnDef
 	// RetryPolicy is the retry policy.
