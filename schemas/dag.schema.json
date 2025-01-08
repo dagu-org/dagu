@@ -208,11 +208,22 @@
       "description": "Default parameters that can be overridden when triggering the DAG. Can be positional (accessed as $1, $2) or named (accessed as ${KEY})."
     },
     "steps": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/step"
-      },
-      "description": "List of steps that define the workflow. Steps can depend on each other, forming a directed acyclic graph."
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/step"
+          },
+          "description": "List of steps that define the workflow. Steps can depend on each other, forming a directed acyclic graph."
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/step"
+          },
+          "description": "Map of step names to step definitions. Steps can depend on each other, forming a directed acyclic graph."
+        }
+      ]
     }
   },
   "definitions": {

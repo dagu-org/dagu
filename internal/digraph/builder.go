@@ -9,6 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/joho/godotenv"
 	"golang.org/x/sys/unix"
 )
@@ -453,16 +454,53 @@ func skipIfSuccessful(_ BuildContext, spec *definition, dag *DAG) error {
 
 // buildSteps builds the steps for the DAG.
 func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
-	var steps []Step
-	for _, stepDef := range spec.Steps {
-		step, err := buildStep(ctx, stepDef, spec.Functions)
-		if err != nil {
-			return err
+	switch v := spec.Steps.(type) {
+	case nil:
+		return nil
+
+	case []any:
+		var stepDefs []stepDef
+		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			ErrorUnused: true,
+			Result:      &stepDefs,
+		})
+		if err := md.Decode(v); err != nil {
+			return wrapError("steps", v, err)
 		}
-		steps = append(steps, *step)
+		for _, stepDef := range stepDefs {
+			step, err := buildStep(ctx, stepDef, spec.Functions)
+			if err != nil {
+				return err
+			}
+			dag.Steps = append(dag.Steps, *step)
+		}
+
+		return nil
+
+	case map[any]any:
+		stepDefs := make(map[string]stepDef)
+		md, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			ErrorUnused: true,
+			Result:      &stepDefs,
+		})
+		if err := md.Decode(v); err != nil {
+			return wrapError("steps", v, err)
+		}
+		for name, stepDef := range stepDefs {
+			stepDef.Name = name
+			step, err := buildStep(ctx, stepDef, spec.Functions)
+			if err != nil {
+				return err
+			}
+			dag.Steps = append(dag.Steps, *step)
+		}
+
+		return nil
+
+	default:
+		return wrapError("steps", v, errStepsMustBeArrayOrMap)
+
 	}
-	dag.Steps = steps
-	return nil
 }
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.

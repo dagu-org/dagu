@@ -66,6 +66,7 @@ var (
 	errContinueOnOutputMustBeStringOrArray = errors.New("continueOn.Output must be a string or an array of strings")
 	errContinueOnExitCodeMustBeIntOrArray  = errors.New("continueOn.ExitCode must be an int or an array of ints")
 	errDependsMustBeStringOrArray          = errors.New("depends must be a string or an array of strings")
+	errStepsMustBeArrayOrMap               = errors.New("steps must be an array or a map")
 )
 
 // errorList is just a list of errors.

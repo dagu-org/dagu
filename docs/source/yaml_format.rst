@@ -72,6 +72,21 @@ Multiple dependencies:
         - step 1
         - step 2
 
+Define steps as map:
+
+.. code-block:: yaml
+
+  steps:
+    step1:
+      command: echo hello
+    step2:
+      command: echo world
+    step3:
+      command: echo hello world
+      depends:
+        - step1
+        - step2
+
 Schema Definition
 ~~~~~~~~~~~~~~~~
 We provide a JSON schema to validate DAG files and enable IDE auto-completion:
