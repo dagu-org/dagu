@@ -105,7 +105,7 @@ func createCommand(ctx context.Context, step digraph.Step) (*exec.Cmd, error) {
 	stepContext := digraph.GetStepContext(ctx)
 	var args []string
 	for _, arg := range step.Args {
-		ret, err := stepContext.EvalString(arg)
+		ret, err := stepContext.EvalString(arg, cmdutil.OnlyReplaceVars())
 		if err != nil {
 			logger.Error(ctx, "Failed to evaluate string", "arg", arg, "err", err)
 			return nil, err

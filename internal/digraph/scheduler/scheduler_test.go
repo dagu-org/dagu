@@ -93,6 +93,18 @@ func TestScheduler(t *testing.T) {
 		result.AssertNodeStatus(t, "3", scheduler.NodeStatusSuccess)
 		result.AssertNodeStatus(t, "4", scheduler.NodeStatusSuccess)
 	})
+	t.Run("ComplexCommand", func(t *testing.T) {
+		sc := setup(t, withMaxActiveRuns(1))
+
+		graph := sc.newGraph(t,
+			newStep("1",
+				withCommand("df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'"),
+			))
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertDoneCount(t, 1)
+	})
 	t.Run("ContinueOnFailure", func(t *testing.T) {
 		sc := setup(t)
 
