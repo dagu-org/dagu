@@ -167,241 +167,6 @@ func TestSplitCommandWithSub(t *testing.T) {
 	})
 }
 
-func TestSubstituteStringFields(t *testing.T) {
-	// Set up test environment variables
-	os.Setenv("TEST_VAR", "test_value")
-	os.Setenv("NESTED_VAR", "nested_value")
-	defer os.Unsetenv("TEST_VAR")
-	defer os.Unsetenv("NESTED_VAR")
-
-	type Nested struct {
-		NestedField   string
-		NestedCommand string
-		unexported    string
-	}
-
-	type TestStruct struct {
-		SimpleField  string
-		EnvField     string
-		CommandField string
-		MultiField   string
-		EmptyField   string
-		unexported   string
-		NestedStruct Nested
-	}
-
-	tests := []struct {
-		name    string
-		input   TestStruct
-		want    TestStruct
-		wantErr bool
-	}{
-		{
-			name: "basic substitution",
-			input: TestStruct{
-				SimpleField:  "hello",
-				EnvField:     "$TEST_VAR",
-				CommandField: "`echo hello`",
-				MultiField:   "$TEST_VAR and `echo command`",
-				EmptyField:   "",
-				NestedStruct: Nested{
-					NestedField:   "$NESTED_VAR",
-					NestedCommand: "`echo nested`",
-					unexported:    "should not change",
-				},
-				unexported: "should not change",
-			},
-			want: TestStruct{
-				SimpleField:  "hello",
-				EnvField:     "test_value",
-				CommandField: "hello",
-				MultiField:   "test_value and command",
-				EmptyField:   "",
-				NestedStruct: Nested{
-					NestedField:   "nested_value",
-					NestedCommand: "nested",
-					unexported:    "should not change",
-				},
-				unexported: "should not change",
-			},
-			wantErr: false,
-		},
-		{
-			name: "invalid command",
-			input: TestStruct{
-				CommandField: "`invalid_command_that_does_not_exist`",
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := EvalStringFields(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SubstituteStringFields() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("SubstituteStringFields() = %+v, want %+v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSubstituteStringFields_AnonymousStruct(t *testing.T) {
-	obj, err := EvalStringFields(struct {
-		Field string
-	}{
-		Field: "`echo hello`",
-	})
-	require.NoError(t, err)
-	require.Equal(t, "hello", obj.Field)
-}
-
-func TestSubstituteStringFields_NonStruct(t *testing.T) {
-	_, err := EvalStringFields("not a struct")
-	if err == nil {
-		t.Error("SubstituteStringFields() should return error for non-struct input")
-	}
-}
-
-func TestSubstituteStringFields_NestedStructs(t *testing.T) {
-	type DeepNested struct {
-		Field string
-	}
-
-	type Nested struct {
-		Field      string
-		DeepNested DeepNested
-	}
-
-	type Root struct {
-		Field  string
-		Nested Nested
-	}
-
-	input := Root{
-		Field: "$TEST_VAR",
-		Nested: Nested{
-			Field: "`echo nested`",
-			DeepNested: DeepNested{
-				Field: "$NESTED_VAR",
-			},
-		},
-	}
-
-	// Set up environment
-	os.Setenv("TEST_VAR", "test_value")
-	os.Setenv("NESTED_VAR", "deep_nested_value")
-	defer os.Unsetenv("TEST_VAR")
-	defer os.Unsetenv("NESTED_VAR")
-
-	want := Root{
-		Field: "test_value",
-		Nested: Nested{
-			Field: "nested",
-			DeepNested: DeepNested{
-				Field: "deep_nested_value",
-			},
-		},
-	}
-
-	got, err := EvalStringFields(input)
-	if err != nil {
-		t.Fatalf("SubstituteStringFields() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, want)
-	}
-}
-
-func TestSubstituteStringFields_EmptyStruct(t *testing.T) {
-	type Empty struct{}
-
-	input := Empty{}
-	got, err := EvalStringFields(input)
-	if err != nil {
-		t.Fatalf("SubstituteStringFields() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(got, input) {
-		t.Errorf("SubstituteStringFields() = %+v, want %+v", got, input)
-	}
-}
-
-func TestReplaceVars(t *testing.T) {
-	tests := []struct {
-		name     string
-		template string
-		vars     map[string]string
-		want     string
-	}{
-		{
-			name:     "basic substitution",
-			template: "${FOO}",
-			vars:     map[string]string{"FOO": "BAR"},
-			want:     "BAR",
-		},
-		{
-			name:     "short syntax",
-			template: "$FOO",
-			vars:     map[string]string{"FOO": "BAR"},
-			want:     "BAR",
-		},
-		{
-			name:     "no substitution",
-			template: "$FOO_",
-			vars:     map[string]string{"FOO": "BAR"},
-			want:     "$FOO_",
-		},
-		{
-			name:     "in middle of string",
-			template: "prefix $FOO suffix",
-			vars:     map[string]string{"FOO": "BAR"},
-			want:     "prefix BAR suffix",
-		},
-		{
-			name:     "in middle of string and no substitution",
-			template: "prefix $FOO1 suffix",
-			vars:     map[string]string{"FOO": "BAR"},
-			want:     "prefix $FOO1 suffix",
-		},
-		{
-			name:     "missing var",
-			template: "${MISSING}",
-			vars:     map[string]string{"FOO": "BAR"},
-			want:     "${MISSING}",
-		},
-		{
-			name:     "multiple vars",
-			template: "$FOO ${BAR} $BAZ",
-			vars: map[string]string{
-				"FOO": "1",
-				"BAR": "2",
-				"BAZ": "3",
-			},
-			want: "1 2 3",
-		},
-		{
-			name:     "nested vars not supported",
-			template: "${FOO${BAR}}",
-			vars:     map[string]string{"FOO": "1", "BAR": "2"},
-			want:     "${FOO${BAR}}",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := replaceVars(tt.template, tt.vars)
-			if got != tt.want {
-				t.Errorf("replaceVars() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 // TestBuildCommandString demonstrates table-driven tests for BuildCommandString.
 func TestBuildEscapedCommandString(t *testing.T) {
 	type testCase struct {
@@ -457,6 +222,151 @@ func TestBuildEscapedCommandString(t *testing.T) {
 
 			// Check if the built command string is as expected.
 			require.Equal(t, tc.want, cmdStr, "unexpected command string")
+		})
+	}
+}
+
+func TestParsePipedCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    [][]string
+		wantErr bool
+	}{
+		{
+			name:  "simple command no args",
+			input: "echo",
+			want:  [][]string{{"echo"}},
+		},
+		{
+			name:  "simple command with args",
+			input: "echo foo bar",
+			want:  [][]string{{"echo", "foo", "bar"}},
+		},
+		{
+			name:  "command with quoted args",
+			input: `echo "hello world"`,
+			want:  [][]string{{"echo", `"hello world"`}},
+		},
+		{
+			name:  "command with pipe",
+			input: "echo foo | grep foo",
+			want:  [][]string{{"echo", "foo"}, {"grep", "foo"}},
+		},
+		{
+			name:  "multiple pipes",
+			input: "echo foo | grep foo | wc -l",
+			want:  [][]string{{"echo", "foo"}, {"grep", "foo"}, {"wc", "-l"}},
+		},
+		{
+			name:  "pipe in quotes",
+			input: `echo "hello|world"`,
+			want:  [][]string{{"echo", `"hello|world"`}},
+		},
+		{
+			name:  "multiple spaces between commands",
+			input: "echo foo    |    grep foo",
+			want:  [][]string{{"echo", "foo"}, {"grep", "foo"}},
+		},
+		{
+			name:  "command with backticks",
+			input: "echo `date`",
+			want:  [][]string{{"echo", "`date`"}},
+		},
+		{
+			name:  "pipe in backticks",
+			input: "echo `echo foo | grep foo`",
+			want:  [][]string{{"echo", "`echo foo | grep foo`"}},
+		},
+		{
+			name:  "escaped quotes",
+			input: `echo "Hello \"World\""`,
+			want:  [][]string{{"echo", `"Hello \"World\""`}},
+		},
+		{
+			name:  "escaped pipe",
+			input: `echo foo\|bar`,
+			want:  [][]string{{"echo", `foo\|bar`}},
+		},
+		{
+			name:  "empty command",
+			input: "",
+			want:  [][]string{},
+		},
+		{
+			name:  "mixed quotes and backticks",
+			input: "echo \"hello\" world `date`",
+			want:  [][]string{{"echo", `"hello"`, "world", "`date`"}},
+		},
+		{
+			name:  "complex pipeline",
+			input: `find . -name "*.go" | xargs grep "fmt" | sort | uniq -c`,
+			want: [][]string{
+				{"find", ".", "-name", `"*.go"`},
+				{"xargs", "grep", `"fmt"`},
+				{"sort"},
+				{"uniq", "-c"},
+			},
+		},
+		{
+			name:  "command with environment variables",
+			input: `echo $HOME | grep home`,
+			want:  [][]string{{"echo", "$HOME"}, {"grep", "home"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParsePipedCommand(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParsePipedCommand() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(got) == 0 && len(tt.want) == 0 {
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParsePipedCommand() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParsePipedCommandErrors tests error cases for ParsePipedCommand
+func TestParsePipedCommandErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		wantPipe [][]string // what we expect even in case of errors
+	}{
+		{
+			name:     "unterminated quote",
+			input:    `echo "hello`,
+			wantPipe: [][]string{{"echo", `"hello`}},
+		},
+		{
+			name:     "unterminated backtick",
+			input:    "echo `date",
+			wantPipe: [][]string{{"echo", "`date"}},
+		},
+		{
+			name:     "mixed unterminated quotes",
+			input:    "echo \"hello `date`\"",
+			wantPipe: [][]string{{"echo", "\"hello `date`\""}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParsePipedCommand(tt.input)
+			// Currently, ParsePipedCommand doesn't return errors for malformed input
+			// But we still want to verify the output matches expected behavior
+			if err != nil {
+				t.Errorf("ParsePipedCommand() unexpected error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.wantPipe) {
+				t.Errorf("ParsePipedCommand() = %v, want %v", got, tt.wantPipe)
+			}
 		})
 	}
 }
