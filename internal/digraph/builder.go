@@ -559,6 +559,9 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 
 func parseContinueOnInt(field string, v any) ([]int, error) {
 	switch v := v.(type) {
+	case nil:
+		return nil, nil
+
 	case int:
 		return []int{v}, nil
 
