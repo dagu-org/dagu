@@ -102,7 +102,7 @@ func SplitCommandWithSub(cmd string) (string, []string, error) {
 			// Escape the command
 			command[i] = escapeReplacer.Replace(command[i])
 			// Substitute command in the command.
-			command[i], err = SubstituteCommands(command[i])
+			command[i], err = substituteCommands(command[i])
 			if err != nil {
 				return "", nil, fmt.Errorf("failed to substitute command: %w", err)
 			}
@@ -173,9 +173,9 @@ func SplitCommand(cmd string) (string, []string, error) {
 // Example: "`date`"
 var tickerMatcher = regexp.MustCompile("`[^`]+`")
 
-// SubstituteCommands substitutes command in the value string.
+// substituteCommands substitutes command in the value string.
 // This logic needs to be refactored to handle more complex cases.
-func SubstituteCommands(input string) (string, error) {
+func substituteCommands(input string) (string, error) {
 	matches := tickerMatcher.FindAllString(strings.TrimSpace(input), -1)
 	if matches == nil {
 		return input, nil
@@ -310,7 +310,7 @@ func EvalString(input string, opts ...EvalOption) (string, error) {
 	}
 	if options.Substitute {
 		var err error
-		value, err = SubstituteCommands(value)
+		value, err = substituteCommands(value)
 		if err != nil {
 			return "", fmt.Errorf("failed to substitute string in %q: %w", input, err)
 		}
@@ -334,7 +334,7 @@ func EvalIntString(input string, opts ...EvalOption) (int, error) {
 	if options.ExpandEnv {
 		value = os.ExpandEnv(value)
 	}
-	value, err := SubstituteCommands(value)
+	value, err := substituteCommands(value)
 	if err != nil {
 		return 0, err
 	}
@@ -387,7 +387,7 @@ func processStructFields(v reflect.Value, opts *EvalOptions) error {
 
 			if opts.Substitute {
 				var err error
-				value, err = SubstituteCommands(value)
+				value, err = substituteCommands(value)
 				if err != nil {
 					return fmt.Errorf("field %q: %w", t.Field(i).Name, err)
 				}
