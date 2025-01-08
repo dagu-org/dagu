@@ -179,9 +179,7 @@ func (s *setup) openLogFile(
 	dag *digraph.DAG,
 	requestID string,
 ) (*os.File, error) {
-	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(
-		s.cfg.Paths.LogDir,
-	))
+	logDir, err := cmdutil.EvalString(s.cfg.Paths.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}
