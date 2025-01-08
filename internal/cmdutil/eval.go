@@ -94,6 +94,7 @@ func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, 
 	}
 	value := input
 	for _, vars := range options.Variables {
+		value = ExpandReferences(ctx, value, vars)
 		value = replaceVars(value, vars)
 	}
 	if options.Substitute {
@@ -117,6 +118,7 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 	}
 	value := input
 	for _, vars := range options.Variables {
+		value = ExpandReferences(ctx, value, vars)
 		value = replaceVars(value, vars)
 	}
 	if options.ExpandEnv {
@@ -136,7 +138,7 @@ func EvalIntString(ctx context.Context, input string, opts ...EvalOption) (int, 
 // EvalStringFields processes all string fields in a struct by expanding environment
 // variables and substituting command outputs. It takes a struct value and returns a new
 // modified struct value.
-func EvalStringFields[T any](obj T, opts ...EvalOption) (T, error) {
+func EvalStringFields[T any](ctx context.Context, obj T, opts ...EvalOption) (T, error) {
 	options := newEvalOptions()
 	for _, opt := range opts {
 		opt(options)
@@ -150,14 +152,14 @@ func EvalStringFields[T any](obj T, opts ...EvalOption) (T, error) {
 	modified := reflect.New(v.Type()).Elem()
 	modified.Set(v)
 
-	if err := processStructFields(modified, options); err != nil {
+	if err := processStructFields(ctx, modified, options); err != nil {
 		return obj, fmt.Errorf("failed to process fields: %w", err)
 	}
 
 	return modified.Interface().(T), nil
 }
 
-func processStructFields(v reflect.Value, opts *EvalOptions) error {
+func processStructFields(ctx context.Context, v reflect.Value, opts *EvalOptions) error {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
@@ -188,7 +190,7 @@ func processStructFields(v reflect.Value, opts *EvalOptions) error {
 			field.SetString(value)
 
 		case reflect.Struct:
-			if err := processStructFields(field, opts); err != nil {
+			if err := processStructFields(ctx, field, opts); err != nil {
 				return err
 			}
 		}

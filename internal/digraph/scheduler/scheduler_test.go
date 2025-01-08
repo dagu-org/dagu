@@ -687,6 +687,25 @@ func TestScheduler(t *testing.T) {
 		output2, _ := node2.Data().Step.OutputVariables.Load("RESULT2")
 		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
+	t.Run("OutputJSONReference", func(t *testing.T) {
+		sc := setup(t)
+
+		jsonData := `{"key": "value"}`
+		graph := sc.newGraph(t,
+			newStep("1", withCommand(fmt.Sprintf("echo '%s'", jsonData)), withOutput("OUT")),
+			newStep("2", withCommand("echo ${OUT.key}"), withDepends("1"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertDoneCount(t, 2)
+
+		// check if RESULT variable is set to "value"
+		node := result.Node(t, "2")
+
+		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
+	})
 	t.Run("SpecialVars_DAG_EXECUTION_LOG_PATH", func(t *testing.T) {
 		sc := setup(t)
 

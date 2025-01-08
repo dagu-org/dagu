@@ -107,6 +107,6 @@ func IsStepContext(ctx context.Context) bool {
 type stepCtxKey struct{}
 
 func EvalStringFields[T any](stepContext StepContext, obj T) (T, error) {
-	return cmdutil.EvalStringFields(obj,
+	return cmdutil.EvalStringFields(stepContext.ctx, obj,
 		cmdutil.WithVariables(stepContext.outputVariables.Variables()))
 }
