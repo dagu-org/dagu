@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"os"
 	"reflect"
 	"testing"
@@ -238,6 +239,90 @@ func TestReplaceVars(t *testing.T) {
 			got := replaceVars(tt.template, tt.vars)
 			if got != tt.want {
 				t.Errorf("replaceVars() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestExpandReferences checks multiple scenarios using table-driven tests.
+func TestExpandReferences(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		dataMap map[string]string
+		want    string
+	}{
+		{
+			name:  "Basic replacement with curly braces",
+			input: "Hello: ${FOO.bar}",
+			dataMap: map[string]string{
+				"FOO": `{"bar": "World"}`,
+			},
+			want: "Hello: World",
+		},
+		{
+			name:  "Basic replacement with single dollar sign",
+			input: "Output => $FOO.value",
+			dataMap: map[string]string{
+				"FOO": `{"value": "SingleDollarWorks"}`,
+			},
+			want: "Output => SingleDollarWorks",
+		},
+		{
+			name:  "Missing key in dataMap",
+			input: "Hello: ${BAR.xyz}",
+			dataMap: map[string]string{
+				// no "BAR" key
+				"FOO": `{"bar":"zzz"}`,
+			},
+			// Because "BAR" does not exist in dataMap, no replacement
+			want: "Hello: ${BAR.xyz}",
+		},
+		{
+			name:  "Invalid JSON in dataMap",
+			input: "Test => ${FOO.bar}",
+			dataMap: map[string]string{
+				"FOO": `{"bar":`, // invalid JSON
+			},
+			want: "Test => ${FOO.bar}",
+		},
+		{
+			name:  "Nested sub-path extraction",
+			input: "Deep => ${FOO.level1.level2}",
+			dataMap: map[string]string{
+				"FOO": `{"level1": {"level2":"DeepValue"}}`,
+			},
+			want: "Deep => DeepValue",
+		},
+		{
+			name:  "Non-existent sub-path in valid JSON",
+			input: "Data => ${FOO.bar.baz}",
+			dataMap: map[string]string{
+				"FOO": `{"bar":"NotAnObject"}`,
+			},
+			// "bar" is a string, so .bar.baz can't exist => original string remains
+			want: "Data => ${FOO.bar.baz}",
+		},
+		{
+			name:  "Multiple placeholders, including single-dollar form",
+			input: "Multi: ${FOO.one}, $FOO.two , and ${FOO.three}",
+			dataMap: map[string]string{
+				"FOO": `{
+									"one": "1",
+									"two": "2",
+									"three": "3"
+							}`,
+			},
+			want: "Multi: 1, 2 , and 3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			got := ExpandReferences(ctx, tt.input, tt.dataMap)
+			if got != tt.want {
+				t.Errorf("ExpandReferences() = %q, want %q", got, tt.want)
 			}
 		})
 	}
