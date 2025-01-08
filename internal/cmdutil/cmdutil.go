@@ -87,7 +87,7 @@ func ParsePipedCommand(cmdString string) ([][]string, error) {
 	return pipeline, nil
 }
 
-func SplitCommandWithEval(cmd string) (string, []string, error) {
+func SplitCommandWithSub(cmd string) (string, []string, error) {
 	pipeline, err := ParsePipedCommand(cmd)
 	if err != nil {
 		return "", nil, err

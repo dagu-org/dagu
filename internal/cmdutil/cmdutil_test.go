@@ -142,16 +142,16 @@ func TestSplitCommand(t *testing.T) {
 	}
 }
 
-func TestSplitCommandWithParse(t *testing.T) {
+func TestSplitCommandWithSub(t *testing.T) {
 	t.Run("CommandSubstitution", func(t *testing.T) {
-		cmd, args, err := SplitCommandWithEval("echo `echo hello`")
+		cmd, args, err := SplitCommandWithSub("echo `echo hello`")
 		require.NoError(t, err)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
 		require.Equal(t, "hello", args[0])
 	})
 	t.Run("QuotedCommandSubstitution", func(t *testing.T) {
-		cmd, args, err := SplitCommandWithEval("echo `echo \"hello world\"`")
+		cmd, args, err := SplitCommandWithSub("echo `echo \"hello world\"`")
 		require.NoError(t, err)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)
@@ -159,7 +159,7 @@ func TestSplitCommandWithParse(t *testing.T) {
 	})
 	t.Run("EnvVar", func(t *testing.T) {
 		os.Setenv("TEST_ARG", "hello")
-		cmd, args, err := SplitCommandWithEval("echo $TEST_ARG")
+		cmd, args, err := SplitCommandWithSub("echo $TEST_ARG")
 		require.NoError(t, err)
 		require.Equal(t, "echo", cmd)
 		require.Len(t, args, 1)

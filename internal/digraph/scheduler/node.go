@@ -331,7 +331,7 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 		if err != nil {
 			return nil, err
 		}
-		cmd, args, err := cmdutil.SplitCommandWithEval(cmdWithArgs)
+		cmd, args, err := cmdutil.SplitCommandWithSub(cmdWithArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to split command: %w", err)
 		}
