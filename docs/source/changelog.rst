@@ -7,6 +7,30 @@ Unreleased
 ----------
 
 - **Docker Image**: Docker image now based on ``ubuntu:24.04`` and includes common tools and utilities (e.g., ``sudo``, ``git``, ``curl``, ``jq``, ``python3``, etc)
+- **JSON Reference Expansion**: Added support for expanding JSON references in fields using the ``${NAME.path.to.value}`` syntax. Users can now dynamically resolve values from JSON variables. Example:
+  
+  .. code-block:: yaml
+  
+    steps:
+      - name: sub workflow
+        run: sub_workflow
+        output: SUB_RESULT
+      - name: use output
+        command: echo "The result is ${SUB_RESULT.outputs.finalValue}"
+        depends:
+          - sub workflow
+
+  If ``SUB_RESULT`` contains:
+  
+  .. code-block:: json
+  
+    {
+      "outputs": {
+        "finalValue": "success"
+      }
+    }
+
+  Then the expanded value of ``${SUB_RESULT.outputs.finalValue}`` will be ``success``.
 - **Regex support for precondition**: Added support for specifying regular expressions in the ``expected`` value with the ``re:`` prefix.
 
   .. code-block:: yaml

@@ -331,7 +331,7 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 		if err != nil {
 			return nil, err
 		}
-		cmd, args, err := cmdutil.SplitCommandWithEval(cmdWithArgs)
+		cmd, args, err := cmdutil.SplitCommandWithSub(cmdWithArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to split command: %w", err)
 		}
@@ -525,7 +525,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	if err := n.setupStderr(); err != nil {
 		return fmt.Errorf("failed to setup stderr: %w", err)
 	}
-	if err := n.setupRetryPolicy(); err != nil {
+	if err := n.setupRetryPolicy(ctx); err != nil {
 		return fmt.Errorf("failed to setup retry policy: %w", err)
 	}
 	if err := n.setupScript(); err != nil {
@@ -728,7 +728,7 @@ type retryPolicy struct {
 	Interval time.Duration
 }
 
-func (n *Node) setupRetryPolicy() error {
+func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	var retryPolicy retryPolicy
 
 	if n.data.Step.RetryPolicy.Limit > 0 {
@@ -740,14 +740,14 @@ func (n *Node) setupRetryPolicy() error {
 	// Evaluate the the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if n.data.Step.RetryPolicy.LimitStr != "" {
-		v, err := cmdutil.EvalIntString(n.data.Step.RetryPolicy.LimitStr)
+		v, err := cmdutil.EvalIntString(ctx, n.data.Step.RetryPolicy.LimitStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry limit %q: %w", n.data.Step.RetryPolicy.LimitStr, err)
 		}
 		retryPolicy.Limit = v
 	}
 	if n.data.Step.RetryPolicy.IntervalSecStr != "" {
-		v, err := cmdutil.EvalIntString(n.data.Step.RetryPolicy.IntervalSecStr)
+		v, err := cmdutil.EvalIntString(ctx, n.data.Step.RetryPolicy.IntervalSecStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry interval %q: %w", n.data.Step.RetryPolicy.IntervalSecStr, err)
 		}

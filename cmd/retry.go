@@ -102,7 +102,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		return fmt.Errorf("failed to generate new request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(retryPrefix, dag, newRequestID)
+	logFile, err := setup.openLogFile(ctx, retryPrefix, dag, newRequestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}

@@ -90,7 +90,7 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		}
 	}
 
-	logFile, err := setup.openLogFile(startPrefix, dag, requestID)
+	logFile, err := setup.openLogFile(ctx, startPrefix, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)

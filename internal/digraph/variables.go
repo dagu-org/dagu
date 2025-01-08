@@ -44,7 +44,7 @@ func loadVariables(ctx BuildContext, strVariables any) (
 			// This also executes command substitution.
 			var err error
 
-			value, err = cmdutil.SubstituteCommands(os.ExpandEnv(value))
+			value, err = cmdutil.EvalString(ctx.ctx, value)
 			if err != nil {
 				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val))
 			}

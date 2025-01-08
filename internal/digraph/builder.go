@@ -264,7 +264,7 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 
 		resolver := fileutil.NewFileResolver(relativeTos)
 		for _, filePath := range dag.Dotenv {
-			filePath, err := cmdutil.EvalString(filePath)
+			filePath, err := cmdutil.EvalString(ctx.ctx, filePath)
 			if err != nil {
 				return wrapError("dotenv", filePath, fmt.Errorf("failed to evaluate dotenv file path %s: %w", filePath, err))
 			}

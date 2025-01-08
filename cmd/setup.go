@@ -175,13 +175,12 @@ func (s *setup) historyStoreWithCache(cache *filecache.Cache[*model.Status]) per
 }
 
 func (s *setup) openLogFile(
+	ctx context.Context,
 	prefix string,
 	dag *digraph.DAG,
 	requestID string,
 ) (*os.File, error) {
-	logDir, err := cmdutil.SubstituteCommands(os.ExpandEnv(
-		s.cfg.Paths.LogDir,
-	))
+	logDir, err := cmdutil.EvalString(ctx, s.cfg.Paths.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}

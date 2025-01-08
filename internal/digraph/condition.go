@@ -68,7 +68,7 @@ func (c Condition) evalCommand(ctx context.Context) (bool, error) {
 		}
 		commandToRun = command
 	} else {
-		command, err := cmdutil.EvalString(c.Command, cmdutil.OnlyReplaceVars())
+		command, err := cmdutil.EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
 		if err != nil {
 			return false, err
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -22,7 +23,8 @@ func TestOpenLogFile(t *testing.T) {
 			},
 		})
 
-		file, err := setup.openLogFile("test_", &digraph.DAG{
+		ctx := setup.loggerContext(context.Background(), false)
+		file, err := setup.openLogFile(ctx, "test_", &digraph.DAG{
 			Name:   "test_dag",
 			LogDir: "",
 		}, "12345678")
