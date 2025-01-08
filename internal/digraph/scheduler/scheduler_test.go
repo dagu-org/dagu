@@ -659,6 +659,29 @@ func TestScheduler(t *testing.T) {
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
+	t.Run("OutputInheritance", func(t *testing.T) {
+		sc := setup(t)
+
+		// 1: echo hello > OUT
+		// 2: echo world > OUT2 (depends on 1)
+		// 3: echo $OUT $OUT2 > RESULT (depends on 2)
+		// RESULT should be "hello world"
+		graph := sc.newGraph(t,
+			newStep("1", withCommand("echo hello"), withOutput("OUT")),
+			newStep("2", withCommand("echo world"), withOutput("OUT2"), withDepends("1")),
+			newStep("3", withCommand("echo $OUT $OUT2"), withDepends("2"), withOutput("RESULT")),
+		)
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertDoneCount(t, 3)
+
+		node := result.Node(t, "3")
+
+		// check if RESULT variable is set to "hello"
+		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
+	})
 	t.Run("SpecialVars_DAG_EXECUTION_LOG_PATH", func(t *testing.T) {
 		sc := setup(t)
 
