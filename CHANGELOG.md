@@ -28,7 +28,7 @@
     - PARAM2: value2
   ```
 
-- **CLI**: Modified `dagu start` to support both named and positional parameters after the `--` separato
+- **CLI**: Modified `dagu start` to support both named and positional parameters after the `--` separator.
   ```bash
   dagu start my_dag -- param1 param2 --param3 value3
 
