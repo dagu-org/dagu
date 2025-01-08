@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/dagu-org/dagu/internal/digraph"

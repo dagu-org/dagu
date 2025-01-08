@@ -12,7 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/go-resty/resty/v2"
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 )
 
 var _ Executor = (*http)(nil)
