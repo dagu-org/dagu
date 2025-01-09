@@ -3,8 +3,8 @@
 Changelog
 =========
 
-Unreleased
-----------
+v1.16.0 (2025-01-09)
+---------------------
 
 - **Docker Image**: Docker image now based on ``ubuntu:24.04`` and includes common tools and utilities (e.g., ``sudo``, ``git``, ``curl``, ``jq``, ``python3``, etc)
 - **Support Dotenv file**: Added support for loading environment variables from a dotenv file. You can specify the path to the dotenv file using the ``dotenv`` attribute in the DAG configuration file.
