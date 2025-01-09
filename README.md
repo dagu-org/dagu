@@ -131,8 +131,7 @@ brew upgrade dagu-org/brew/dagu
 docker run \
 --rm \
 -p 8080:8080 \
--v $HOME/.config/dagu/dags:/home/dagu/.config/dagu/dags \
--v $HOME/.local/share/dagu:/home/dagu/.local/share/dagu \
+-v ~/.config/dagu:/config \
 -e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
 ghcr.io/dagu-org/dagu:latest dagu start-all
 ```

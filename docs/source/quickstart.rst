@@ -7,7 +7,7 @@ Quick Start Guide
 1. Launch the Web UI
 ---------------------
 
-Start the server with ``dagu server`` and browse to http://127.0.0.1:8080 to explore the Web UI.
+Start the server with ``dagu start-all`` and browse to http://127.0.0.1:8080 to explore the Web UI.
 
 Note: The server will be started on port ``8080`` by default. You can change the port by passing ``--port`` option. See :ref:`Host and Port Configuration` for more details.
 
