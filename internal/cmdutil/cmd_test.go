@@ -102,6 +102,12 @@ func TestSplitCommand(t *testing.T) {
 			wantCmd:  "echo",
 			wantArgs: []string{`"\"hello world\""`},
 		},
+		{
+			name:     "command with JSON",
+			input:    `echo "{\n\t\"key\": \"value\"\n}"`,
+			wantCmd:  "echo",
+			wantArgs: []string{`"{\n\t\"key\": \"value\"\n}"`},
+		},
 	}
 
 	for _, tt := range tests {

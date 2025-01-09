@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var _ Executor = (*commandExecutor)(nil)
@@ -102,22 +101,12 @@ func newCommand(ctx context.Context, step digraph.Step) (Executor, error) {
 }
 
 func createCommand(ctx context.Context, step digraph.Step) (*exec.Cmd, error) {
-	stepContext := digraph.GetStepContext(ctx)
-	var args []string
-	for _, arg := range step.Args {
-		ret, err := stepContext.EvalString(arg, cmdutil.OnlyReplaceVars())
-		if err != nil {
-			logger.Error(ctx, "Failed to evaluate string", "arg", arg, "err", err)
-			return nil, err
-		}
-		args = append(args, ret)
-	}
-
 	shellCommand := cmdutil.GetShellCommand(step.Shell)
-	if shellCommand == "" {
-		return createDirectCommand(ctx, step, args), nil
+	shellCmdArgs := step.ShellCmdArgs
+	if shellCommand == "" || shellCmdArgs == "" {
+		return createDirectCommand(ctx, step, step.Args), nil
 	}
-	return createShellCommand(ctx, shellCommand, step, args), nil
+	return createShellCommand(ctx, shellCommand, shellCmdArgs), nil
 }
 
 // createDirectCommand creates a command that runs directly without a shell
@@ -127,7 +116,6 @@ func createDirectCommand(ctx context.Context, step digraph.Step, args []string) 
 }
 
 // createShellCommand creates a command that runs through a shell
-func createShellCommand(ctx context.Context, shell string, step digraph.Step, args []string) *exec.Cmd {
-	command := cmdutil.BuildCommandEscapedString(step.Command, args)
-	return exec.CommandContext(ctx, shell, "-c", command)
+func createShellCommand(ctx context.Context, shell, shellCmd string) *exec.Cmd {
+	return exec.CommandContext(ctx, shell, "-c", shellCmd)
 }

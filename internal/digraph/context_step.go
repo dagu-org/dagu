@@ -11,7 +11,6 @@ import (
 
 type StepContext struct {
 	Context
-
 	outputVariables *SyncMap
 	step            Step
 	envs            map[string]string

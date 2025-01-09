@@ -205,58 +205,50 @@ func TestNode(t *testing.T) {
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
 	})
-	t.Run("OutputSpecialChar", func(t *testing.T) {
-		t.Parallel()
-
-		testCases := []struct {
-			CmdWithArgs string
-			Want        string
-		}{
-			{
-				CmdWithArgs: `echo "hello\tworld"`,
-				Want:        `hello\tworld`,
-			},
-			{
-				CmdWithArgs: `echo hello"\t"world`,
-				Want:        `hello\tworld`,
-			},
-			{
-				CmdWithArgs: `echo hello\tworld`,
-				Want:        `hello\tworld`,
-			},
-			{
-				CmdWithArgs: `echo hello\nworld`,
-				Want:        `hello\nworld`,
-			},
-			{
-				CmdWithArgs: `echo {\"key\":\"value\"}`,
-				Want:        `{"key":"value"}`,
-			},
-			{
-				CmdWithArgs: `echo "{\"key\":\"value\"}"`,
-				Want:        `{"key":"value"}`,
-			},
-			{
-				CmdWithArgs: `echo 'hello world'`,
-				Want:        `hello world`,
-			},
-			{
-				CmdWithArgs: `echo hello "world"`,
-				Want:        `hello world`,
-			},
-			{
-				CmdWithArgs: `echo 'hello "world"'`,
-				Want:        `hello "world"`,
-			},
-		}
-
-		for i, tc := range testCases {
-			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
-				node := setupNode(t, withNodeCmdArgs(tc.CmdWithArgs), withNodeOutput("OUTPUT_SPECIALCHAR_TEST"))
-				node.Execute(t)
-				node.AssertOutput(t, "OUTPUT_SPECIALCHAR_TEST", tc.Want)
-			})
-		}
+	t.Run("OutputTabWithDoubleQuotes", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo "hello\tworld"`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", "hello\tworld")
+	})
+	t.Run("OutputTabWithMixedQuotes", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo hello"\t"world`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", "hello\tworld") // This behavior is aligned with bash
+	})
+	t.Run("OutputTabWithoutQuotes", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo hello\tworld`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hellotworld`) // This behavior is aligned with bash
+	})
+	t.Run("OutputNewlineCharacter", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo hello\nworld`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hellonworld`) // This behavior is aligned with bash
+	})
+	t.Run("OutputEscapedJSONWithoutQuotes", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
+	})
+	t.Run("OutputEscapedJSONWithQuotes", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
+	})
+	t.Run("OutputSingleQuotedString", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo 'hello world'`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hello world`)
+	})
+	t.Run("OutputMixedQuotesWithSpace", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo hello "world"`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hello world`)
+	})
+	t.Run("OutputNestedQuotes", func(t *testing.T) {
+		node := setupNode(t, withNodeCmdArgs(`echo 'hello "world"'`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hello "world"`)
 	})
 	t.Run("Script", func(t *testing.T) {
 		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
