@@ -168,7 +168,7 @@ func TestAgent_Retry(t *testing.T) {
 		// Modify the DAG to make it successful
 		status := dagAgent.Status()
 		for i := range status.Nodes {
-			status.Nodes[i].Step.CmdWithArgs = "true"
+			status.Nodes[i].Step.CmdArgsSys = "true"
 		}
 
 		// Retry the DAG and check if it is successful

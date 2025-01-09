@@ -324,8 +324,21 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	n.data.State.Error = nil
 	n.data.State.ExitCode = 0
 
-	if n.data.Step.CmdWithArgs != "" {
-		// Expand envs
+	stepContext := digraph.GetStepContext(ctx)
+	switch {
+	case n.data.Step.CmdArgsSys != "":
+		cmd, args := cmdutil.SplitCommandArgs(n.data.Step.CmdArgsSys)
+		for i, arg := range args {
+			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			if err != nil {
+				return nil, fmt.Errorf("failed to eval command with args: %w", err)
+			}
+			args[i] = value
+		}
+		n.data.Step.Command = cmd
+		n.data.Step.Args = args
+
+	case n.data.Step.CmdWithArgs != "":
 		stepContext := digraph.GetStepContext(ctx)
 		cmdWithArgs, err := stepContext.EvalString(n.data.Step.CmdWithArgs, cmdutil.WithoutExpandEnv())
 		if err != nil {
@@ -333,15 +346,18 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 		}
 		cmd, args, err := cmdutil.SplitCommandWithSub(cmdWithArgs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to split command: %w", err)
+			return nil, fmt.Errorf("failed to split command with args: %w", err)
 		}
 		n.data.Step.Command = cmd
 		n.data.Step.Args = args
-	}
 
-	if n.data.Step.Command == "" {
+	case n.data.Step.Command == "":
 		// If the command is empty, use the default shell as the command
 		n.data.Step.Command = cmdutil.GetShellCommand(n.data.Step.Shell)
+
+	default:
+		// Do nothing here
+
 	}
 
 	if n.scriptFile != nil {

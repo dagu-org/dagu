@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -288,7 +289,9 @@ func TestBuildStep(t *testing.T) {
 	t.Run("ValidCommandInArray", func(t *testing.T) {
 		th := loadTestYAML(t, "valid_command_in_array.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, `echo "1"`, th.Steps[0].CmdWithArgs)
+		assert.Equal(t,
+			cmdutil.JoinCommandArgs("echo", []string{"1"}),
+			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
 		assert.Equal(t, "step 1", th.Steps[0].Name)
@@ -296,7 +299,9 @@ func TestBuildStep(t *testing.T) {
 	t.Run("ValidCommandInList", func(t *testing.T) {
 		th := loadTestYAML(t, "valid_command_in_list.yaml")
 		assert.Len(t, th.Steps, 1)
-		assert.Equal(t, `echo "1"`, th.Steps[0].CmdWithArgs)
+		assert.Equal(t,
+			cmdutil.JoinCommandArgs("echo", []string{"1"}),
+			th.Steps[0].CmdArgsSys)
 		assert.Equal(t, "echo", th.Steps[0].Command)
 		assert.Equal(t, []string{"1"}, th.Steps[0].Args)
 		assert.Equal(t, "step 1", th.Steps[0].Name)

@@ -65,7 +65,7 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 				// This is useful when the value is an integer for example.
 				val = fmt.Sprintf("%v", v)
 			}
-			if step.Command == "" {
+			if command == "" {
 				command = val
 				continue
 			}
