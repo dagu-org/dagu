@@ -20,18 +20,16 @@ Execute an Image
 
 The `docker` executor allows us to run Docker containers instead of bare commands. This can be useful for running commands in isolated environments or for reproducibility purposes.
 
-In the example below, it pulls and runs `Deno's docker image <https://hub.docker.com/r/denoland/deno>`_ and prints 'Hello World'.
-
 .. code-block:: yaml
 
-   steps:
-     - name: deno_hello_world
-       executor:
-         type: docker
-         config:
-           image: "denoland/deno:latest"
-           autoRemove: true
-       command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+    steps:
+      - name: hello
+        executor:
+          type: docker
+          config:
+            image: alpine
+            autoRemove: true
+        command: echo "hello"
 
 Example Log output:
 
@@ -41,15 +39,15 @@ By default, Dagu will try to pull the Docker image. For images built locally thi
 
 .. code-block:: yaml
 
-   steps:
-     - name: deno_hello_world
-       executor:
-         type: docker
-         config:
-           image: "denoland/deno:latest"
-           pull: false
-           autoRemove: true
-       command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+    steps:
+      - name: hello
+        executor:
+          type: docker
+          config:
+            image: alpine
+            pull: false
+            autoRemove: true
+        command: echo "hello"
 
 
 You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
@@ -59,18 +57,19 @@ For example:
 .. code-block:: yaml
 
     steps:
-      - name: deno_hello_world
+      - name: hello
         executor:
           type: docker
           config:
-            image: "denoland/deno:latest"
+            image: alpine
+            pull: false
             container:
               volumes:
                 /app:/app:
               env:
                 - FOO=BAR
             autoRemove: true
-        command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+        command: echo "${FOO}"
 
 See the Docker's API documentation for all available options.
 
@@ -142,13 +141,13 @@ Or
     env:
       - DOCKER_HOST : "tcp://host.docker.internal:2376"
     steps:
-      - name: deno_hello_world
+      - name: hello
         executor:
           type: docker
           config:
-            image: "denoland/deno:1.10.3"
+            image: alpine
             autoRemove: true
-        command: run https://examples.deno.land/hello-world.ts
+        command: echo "hello"
 
 For more details, see `this page <https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2>`_.
 
