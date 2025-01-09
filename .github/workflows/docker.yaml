@@ -9,7 +9,6 @@ on:
 jobs:
   # Build and push Docker image
   docker:
-    needs: goreleaser
     runs-on: ubuntu-latest
     permissions:
       contents: read
