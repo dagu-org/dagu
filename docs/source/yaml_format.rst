@@ -542,25 +542,6 @@ Execute steps periodically:
         repeat: true
         intervalSec: 60
 
-User Defined Functions
-~~~~~~~~~~~~~~~~~~~
-Create reusable task templates:
-
-.. code-block:: yaml
-
-  functions:
-    - name: my_function
-      params: param1 param2
-      command: python main.py $param1 $param2
-
-  steps:
-    - name: use function
-      call:
-        function: my_function
-        args:
-          param1: 1
-          param2: 2
-
 Field Reference
 -------------
 

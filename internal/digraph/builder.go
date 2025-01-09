@@ -76,9 +76,9 @@ type builderEntry struct {
 }
 
 var stepBuilderRegistry = []stepBuilderEntry{
+	{name: "executor", fn: buildExecutor},
 	{name: "command", fn: buildCommand},
 	{name: "depends", fn: buildDepends},
-	{name: "executor", fn: buildExecutor},
 	{name: "subworkflow", fn: buildSubWorkflow},
 	{name: "continueOn", fn: buildContinueOn},
 	{name: "retryPolicy", fn: buildRetryPolicy},

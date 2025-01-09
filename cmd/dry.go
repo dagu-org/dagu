@@ -97,5 +97,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 	}
 
+	agt.PrintSummary(ctx)
+
 	return nil
 }

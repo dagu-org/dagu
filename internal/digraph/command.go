@@ -55,6 +55,9 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 
 	case []any:
 		// Case 3: command is an array
+
+		var command string
+		var args []string
 		for _, v := range val {
 			val, ok := v.(string)
 			if !ok {
@@ -62,11 +65,11 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 				// This is useful when the value is an integer for example.
 				val = fmt.Sprintf("%v", v)
 			}
-			if step.Command == "" {
-				step.Command = val
+			if command == "" {
+				command = val
 				continue
 			}
-			step.Args = append(step.Args, val)
+			args = append(args, val)
 		}
 
 		// Setup CmdWithArgs (this will be actually used in the command execution)
@@ -77,7 +80,11 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 			}
 			sb.WriteString(fmt.Sprintf("%q", arg))
 		}
+
+		step.Command = command
+		step.Args = args
 		step.CmdWithArgs = fmt.Sprintf("%s %s", step.Command, sb.String())
+		step.CmdArgsSys = cmdutil.JoinCommandArgs(step.Command, step.Args)
 
 	default:
 		// Unknown type for command field.

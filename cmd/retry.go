@@ -144,7 +144,10 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 			agt.PrintSummary(ctx)
 			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
 		}
+	}
 
+	if !quiet {
+		agt.PrintSummary(ctx)
 	}
 
 	return nil

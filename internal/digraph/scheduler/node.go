@@ -43,6 +43,7 @@ type Node struct {
 	scriptFile   *os.File
 	done         bool
 	retryPolicy  retryPolicy
+	cmdEvaluated bool
 }
 
 type NodeData struct {
@@ -228,7 +229,7 @@ func (n *Node) State() NodeState {
 
 // Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
-	cmd, err := n.SetupExec(ctx)
+	cmd, err := n.setupExec(ctx)
 	if err != nil {
 		return err
 	}
@@ -309,7 +310,7 @@ func (n *Node) Finish() {
 	n.data.State.FinishedAt = time.Now()
 }
 
-func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
+func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -324,24 +325,9 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	n.data.State.Error = nil
 	n.data.State.ExitCode = 0
 
-	if n.data.Step.CmdWithArgs != "" {
-		// Expand envs
-		stepContext := digraph.GetStepContext(ctx)
-		cmdWithArgs, err := stepContext.EvalString(n.data.Step.CmdWithArgs, cmdutil.WithoutExpandEnv())
-		if err != nil {
-			return nil, err
-		}
-		cmd, args, err := cmdutil.SplitCommandWithSub(cmdWithArgs)
-		if err != nil {
-			return nil, fmt.Errorf("failed to split command: %w", err)
-		}
-		n.data.Step.Command = cmd
-		n.data.Step.Args = args
-	}
-
-	if n.data.Step.Command == "" {
-		// If the command is empty, use the default shell as the command
-		n.data.Step.Command = cmdutil.GetShellCommand(n.data.Step.Shell)
+	// Evaluate the command and args if not already evaluated
+	if err := n.evaluateCommandArgs(ctx); err != nil {
+		return nil, err
 	}
 
 	if n.scriptFile != nil {
@@ -383,6 +369,101 @@ func (n *Node) SetupExec(ctx context.Context) (executor.Executor, error) {
 	}
 
 	return cmd, nil
+}
+
+func (n *Node) evaluateCommandArgs(ctx context.Context) error {
+	if n.cmdEvaluated {
+		return nil
+	}
+
+	stepContext := digraph.GetStepContext(ctx)
+	switch {
+	case n.data.Step.CmdArgsSys != "":
+		// In case of the command and args are defined as a list. In this case,
+		// CmdArgsSys is a string with the command and args separated by special markers.
+		cmd, args := cmdutil.SplitCommandArgs(n.data.Step.CmdArgsSys)
+		for i, arg := range args {
+			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			if err != nil {
+				return fmt.Errorf("failed to eval command with args: %w", err)
+			}
+			args[i] = value
+		}
+		n.data.Step.Command = cmd
+		n.data.Step.Args = args
+
+		if n.data.Step.ExecutorConfig.IsCommand() {
+			n.data.Step.ShellCmdArgs = cmdutil.BuildCommandEscapedString(cmd, args)
+		}
+
+	case n.data.Step.CmdWithArgs != "":
+		// In case of the command and args are defined as a string.
+		stepContext := digraph.GetStepContext(ctx)
+		cmdWithArgs, err := stepContext.EvalString(n.data.Step.CmdWithArgs, cmdutil.WithoutExpandEnv())
+		if err != nil {
+			return err
+		}
+
+		// Use user defined command as the shell command args that should be already a valid command.
+		if n.data.Step.ExecutorConfig.IsCommand() {
+			n.data.Step.ShellCmdArgs = cmdWithArgs
+		}
+
+		// Split the command and args in case shell is not available in the system.
+		// In this case, the command and args need to be split to run the command directly.
+		cmd, args, err := cmdutil.SplitCommand(cmdWithArgs)
+		if err != nil {
+			return fmt.Errorf("failed to split command with args: %w", err)
+		}
+
+		n.data.Step.Command = cmd
+		n.data.Step.Args = args
+
+	case n.data.Step.Command == "":
+		// If the command is empty, use the default shell as the command
+		n.data.Step.Command = cmdutil.GetShellCommand(n.data.Step.Shell)
+
+	case n.data.Step.Command != "" && len(n.data.Step.Args) == 0:
+		// Shouldn't reach here except for testing.
+
+		cmd, args, err := cmdutil.SplitCommand(n.data.Step.Command)
+		if err != nil {
+			return fmt.Errorf("failed to split command: %w", err)
+		}
+		for i, arg := range args {
+			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			if err != nil {
+				return fmt.Errorf("failed to eval command args: %w", err)
+			}
+			args[i] = value
+		}
+
+		n.data.Step.CmdWithArgs = n.data.Step.Command
+		n.data.Step.Command = cmd
+		n.data.Step.Args = args
+
+	default:
+		// Shouldn't reach here except for testing.
+
+		if n.data.Step.Command != "" {
+			value, err := stepContext.EvalString(n.data.Step.Command, cmdutil.WithoutExpandEnv())
+			if err != nil {
+				return fmt.Errorf("failed to eval command: %w", err)
+			}
+			n.data.Step.Command = value
+		}
+
+		for i, arg := range n.data.Step.Args {
+			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			if err != nil {
+				return fmt.Errorf("failed to eval command args: %w", err)
+			}
+			n.data.Step.Args[i] = value
+		}
+	}
+
+	n.cmdEvaluated = true
+	return nil
 }
 
 func (n *Node) GetRetryCount() int {

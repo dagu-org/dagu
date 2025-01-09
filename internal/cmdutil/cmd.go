@@ -8,6 +8,25 @@ import (
 	"unicode"
 )
 
+// ArgsDelimiter is the delimiter used to separate command arguments
+const ArgsDelimiter = "∯ᓰ♨"
+
+// JoinCommandArgs joins a command and its arguments into a single string
+// separated by ArgsDelimiter
+func JoinCommandArgs(cmd string, args []string) string {
+	return fmt.Sprintf("%s %s", cmd, strings.Join(args, ArgsDelimiter))
+}
+
+// SplitCommandArgs splits a command and its arguments into a command and a slice of arguments
+func SplitCommandArgs(cmdWithArgs string) (string, []string) {
+	parts := strings.SplitN(cmdWithArgs, " ", 2)
+	if len(parts) == 1 {
+		return parts[0], nil
+	}
+	command, args := parts[0], parts[1]
+	return command, strings.Split(args, ArgsDelimiter)
+}
+
 // GetShellCommand returns the shell to use for command execution
 func GetShellCommand(configuredShell string) string {
 	if configuredShell != "" {

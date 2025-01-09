@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/persistence/model"
@@ -115,11 +116,13 @@ func (db *JSONDB) Update(ctx context.Context, key, requestID string, status mode
 	return writer.write(status)
 }
 
-func (db *JSONDB) Open(_ context.Context, key string, timestamp time.Time, requestID string) error {
+func (db *JSONDB) Open(ctx context.Context, key string, timestamp time.Time, requestID string) error {
 	filePath, err := db.generateFilePath(key, newUTC(timestamp), requestID)
 	if err != nil {
 		return err
 	}
+
+	logger.Infof(ctx, "Initializing status file: %s", filePath)
 
 	writer := newWriter(filePath)
 	if err := writer.open(); err != nil {

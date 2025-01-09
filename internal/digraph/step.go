@@ -23,10 +23,14 @@ type Step struct {
 	Dir string `json:"Dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.
 	ExecutorConfig ExecutorConfig `json:"ExecutorConfig,omitempty"`
-	// CmdWithArgs is the command with arguments.
+	// CmdWithArgs is the command with arguments (only display purpose).
 	CmdWithArgs string `json:"CmdWithArgs,omitempty"`
+	// CmdArgsSys is the command with arguments for the system.
+	CmdArgsSys string `json:"CmdArgsSys,omitempty"`
 	// Command specifies only the command without arguments.
 	Command string `json:"Command,omitempty"`
+	// ShellCmdArgs is the shell command with arguments.
+	ShellCmdArgs string `json:"ShellCmdArgs,omitempty"`
 	// Script is the script to be executed.
 	Script string `json:"Script,omitempty"`
 	// Args contains the arguments for the command.
@@ -100,6 +104,11 @@ type ExecutorConfig struct {
 	// See `executor.Register` in `internal/executor/executor.go`.
 	Type   string         `json:"Type,omitempty"`
 	Config map[string]any `json:"Config,omitempty"` // Config contains executor-specific configuration.
+}
+
+// IsCommand returns true if the executor is a command
+func (e ExecutorConfig) IsCommand() bool {
+	return e.Type == "" || e.Type == "command"
 }
 
 // RetryPolicy contains the retry policy for a step.
