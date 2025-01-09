@@ -84,6 +84,7 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 		step.Command = command
 		step.Args = args
 		step.CmdWithArgs = fmt.Sprintf("%s %s", step.Command, sb.String())
+		step.CmdArgsSys = cmdutil.JoinCommandArgs(step.Command, step.Args)
 
 	default:
 		// Unknown type for command field.

@@ -11,6 +11,8 @@ import (
 // ArgsDelimiter is the delimiter used to separate command arguments
 const ArgsDelimiter = "∯ᓰ♨"
 
+// JoinCommandArgs joins a command and its arguments into a single string
+// separated by ArgsDelimiter
 func JoinCommandArgs(cmd string, args []string) string {
 	return fmt.Sprintf("%s %s", cmd, strings.Join(args, ArgsDelimiter))
 }

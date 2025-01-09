@@ -23,8 +23,10 @@ type Step struct {
 	Dir string `json:"Dir,omitempty"`
 	// ExecutorConfig contains the configuration for the executor.
 	ExecutorConfig ExecutorConfig `json:"ExecutorConfig,omitempty"`
-	// CmdWithArgs is the command with arguments.
+	// CmdWithArgs is the command with arguments (only display purpose).
 	CmdWithArgs string `json:"CmdWithArgs,omitempty"`
+	// CmdArgsSys is the command with arguments for the system.
+	CmdArgsSys string `json:"CmdArgsSys,omitempty"`
 	// Command specifies only the command without arguments.
 	Command string `json:"Command,omitempty"`
 	// Script is the script to be executed.
