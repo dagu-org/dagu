@@ -36,9 +36,9 @@ Via Docker
    docker run \
    --rm \
    -p 8080:8080 \
-   -v $HOME/.config/dagu:/home/dagu/.config/dagu \
-   -v $HOME/.config/dagu/.local/share:/home/dagu/.local/share \
-   ghcr.io/dagu-org/dagu:latest
+   -v ~/.config/dagu:/config \
+   -e DAGU_TZ=`ls -l /etc/localtime | awk -F'/zoneinfo/' '{print $2}'` \
+   ghcr.io/dagu-org/dagu:latest dagu start-all
 
 Via GitHub Release Page
 -----------------------
