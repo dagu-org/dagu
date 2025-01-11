@@ -59,6 +59,19 @@ A powerful, self-contained Cron alternative with a clean Web UI and a [declarati
 - Email notification
 - Scheduling with Cron expressions
 
+
+## **Why we built Dagu**
+
+In many organizations, legacy systems still rely on hundreds of cron jobs running across multiple servers. These jobs are often written in various languages like Perl or Shell scripts, with implicit interdependencies. When one job fails, troubleshooting requires manually logging into servers via SSH and checking individual logs. To perform recovery, one must understand these implicit dependencies, which often rely on tribal knowledge. Dagu was developed to eliminate this complexity by providing a clear and understandable tool for workflow definition and dependency management.
+
+## **A Lightweight and Self-Contained Solution**
+
+While Cron is lightweight and suitable for simple scheduling, it doesn't scale well for complex workflows or provide features like retries, dependencies, or observability out of the box. On the other hand, tools like Airflow or other workflow engines can be overly complex for smaller projects or legacy environments, with steep learning curves and burdensome to maintain. Dagu strikes a balance: it's easy to use, self-contained, and require no coding, making it ideal for smaller projects.
+
+## **Built By and For In-House Developers**
+
+Dagu's design philosophy stems from the real-world experience in managing complex jobs across diverse environments, from small startups to enterprise companies. By focusing on simplicity, transparency, and minimal setup overhead, Dagu aims to make life easier for in-house developers who need a robust workflow engine without the heavy lift of a more complex tool.
+
 ## **Community**
 
 - Issues: [GitHub Issues](https://github.com/dagu-org/dagu/issues)
@@ -317,19 +330,51 @@ steps:
     depends: step1
 ```
 
-### JSON processing
+### Conditional DAG
 
-You can reference the nested JSON data using the syntax `${INPUT.key}`:
+You can add conditional logic to a DAG:
 
 ```yaml
-params:
-  - INPUT: '{ "name": "John", "age": 30 }'
 steps:
-  - name: John's age
-    command: echo ${INPUT.name} is ${INPUT.age} years old
+  - name: monthly task
+    command: monthly.sh
+    preconditions:
+      - condition: "`date '+%d'`"
+        expected: "re:0[1-9]" # Run only if the day is between 01 and 09
 ```
 
-It will write `John is 30 years old` to the log (stdout).
+### Scheduling
+
+You can specify the schedule with cron expression:
+
+```yaml
+schedule: "5 4 * * *" # Run at 04:05.
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+Or you can set multiple schedules.
+
+```yaml
+schedule:
+  - "30 7 * * *" # Run at 7:30
+  - "0 20 * * *" # Also run at 20:00
+steps:
+  - name: scheduled job
+    command: job.sh
+```
+
+If you want to start and stop a long-running process on a fixed schedule, you can define ``start`` and ``stop`` times:
+
+```yaml
+schedule:
+  start: "0 8 * * *" # starts at 8:00
+  stop: "0 13 * * *" # stops at 13:00
+steps:
+  - name: scheduled job
+    command: job.sh
+```
 
 ### Calling a sub-DAG
 
@@ -357,9 +402,22 @@ steps:
 THe parent DAG will call the sub-DAG and write the output to the log (stdout).
 The output will be `Hello from sub-dag`.
 
-More examples can be found in the [documentation](https://dagu.readthedocs.io/en/latest/yaml_format.html).
+#### Running a docker image
 
-### Complex examples
+You can run a docker image as a step:
+
+```yaml
+steps:
+  - name: hello
+    executor:
+      type: docker
+      config:
+        image: alpine
+        autoRemove: true
+    command: echo "hello"
+```
+
+### A bigger example
 
 A typical data pipeline for DevOps/Data Engineering scenarios:
 
@@ -437,6 +495,8 @@ steps:
       - send_report
 ```
 
+More examples can be found in the [documentation](https://dagu.readthedocs.io/en/latest/yaml_format.html).
+
 ## **Running as a daemon**
 
 The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
@@ -455,16 +515,6 @@ fi
 
 exit
 ```
-
-## **Motivation**
-
-Legacy systems often have complex and implicit dependencies between jobs. When there are hundreds of cron jobs on a server, it can be difficult to keep track of these dependencies and to determine which job to rerun if one fails. It can also be a hassle to SSH into a server to view logs and manually rerun shell scripts one by one. Dagu aims to solve these problems by allowing you to explicitly visualize and manage pipeline dependencies as a DAG, and by providing a web UI for checking dependencies, execution status, and logs and for rerunning or stopping jobs with a simple mouse click.
-
-Dagu addresses these pain points by providing a user-friendly solution for explicitly defining and visualizing workflows. With its intuitive web UI, Dagu simplifies the management of workflows, enabling users to easily check dependencies, monitor execution status, view logs, and control job execution with just a few clicks.
-
-## **Why Not Use an Existing DAG Scheduler Like Airflow?**
-
-There are many existing tools such as Airflow, but many of these require you to write code in a programming language like Python to define your DAG. For systems that have been in operation for a long time, there may already be complex jobs with hundreds of thousands of lines of code written in languages like Perl or Shell Script. Adding another layer of complexity on top of these codes can reduce maintainability. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
 ## **How It Works**
 
