@@ -818,7 +818,7 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	if n.data.Step.RetryPolicy.Interval > 0 {
 		retryPolicy.Interval = n.data.Step.RetryPolicy.Interval
 	}
-	// Evaluate the the configuration if it's configured as a string
+	// Evaluate the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if n.data.Step.RetryPolicy.LimitStr != "" {
 		v, err := cmdutil.EvalIntString(ctx, n.data.Step.RetryPolicy.LimitStr)
