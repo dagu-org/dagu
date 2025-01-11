@@ -402,7 +402,7 @@ steps:
 THe parent DAG will call the sub-DAG and write the output to the log (stdout).
 The output will be `Hello from sub-dag`.
 
-#### Running a docker image
+### Running a docker image
 
 You can run a docker image as a step:
 
