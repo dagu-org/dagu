@@ -23,6 +23,9 @@ A powerful, self-contained Cron alternative with a clean Web UI and a `declarati
 Quick Start
 ------------
 
+:doc:`motivation`
+   The motivation behind Dagu.
+
 :doc:`installation`
    How to install Dagu.
 
@@ -47,6 +50,12 @@ Quick Start
 
 :ref:`changelog`
    History of changes.
+
+.. toctree::
+   :caption: Motivation
+   :hidden:
+
+   motivation
 
 .. toctree::
    :caption: Installation
