@@ -49,6 +49,7 @@ Code Structure
 - ``docs``: Contains the documentation for the project.
 - ``examples``: Contains the example DAGs.
 - ``internal``: Contains the internal code for the project.
+
   - ``agent``: Contains the code for running the DAGs.
   - ``config``: Contains the code for loading the configuration.
   - ``dag``: Contains the code for parsing the DAG definition.
