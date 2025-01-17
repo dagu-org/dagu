@@ -28,6 +28,51 @@
 
 Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands in a declarative YAML Format. Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
 
+<h2><b>Table of Contents</b></h2>
+
+- [Why Dagu?](#why-dagu)
+- [Core Features](#core-features)
+- [Common Use Cases](#common-use-cases)
+- [Community](#community)
+- [Installation](#installation)
+  - [Via Bash script](#via-bash-script)
+  - [Via GitHub Releases Page](#via-github-releases-page)
+  - [Via Homebrew (macOS)](#via-homebrew-macos)
+  - [Via Docker](#via-docker)
+- [Quick Start Guide](#quick-start-guide)
+  - [1. Launch the Web UI](#1-launch-the-web-ui)
+  - [2. Create a New DAG](#2-create-a-new-dag)
+  - [3. Edit the DAG](#3-edit-the-dag)
+  - [4. Execute the DAG](#4-execute-the-dag)
+- [Usage / Command Line Interface](#usage--command-line-interface)
+- [Example DAG](#example-dag)
+  - [Minimal examples](#minimal-examples)
+  - [Named Parameters](#named-parameters)
+  - [Positional Parameters](#positional-parameters)
+  - [Conditional DAG](#conditional-dag)
+  - [Script Execution](#script-execution)
+  - [Variable Passing](#variable-passing)
+  - [Scheduling](#scheduling)
+  - [Calling a sub-DAG](#calling-a-sub-dag)
+  - [Running a docker image](#running-a-docker-image)
+  - [Environment Variables](#environment-variables)
+  - [Notifications on Failure or Success](#notifications-on-failure-or-success)
+  - [HTTP Request and Notifications](#http-request-and-notifications)
+  - [Execute commands over SSH](#execute-commands-over-ssh)
+  - [Advanced Preconditions](#advanced-preconditions)
+  - [Handling Various Execution Results](#handling-various-execution-results)
+  - [JSON Processing Examples](#json-processing-examples)
+- [Web UI](#web-ui)
+  - [DAG Details](#dag-details)
+  - [DAGs](#dags)
+  - [Search](#search)
+  - [Execution History](#execution-history)
+  - [Log Viewer](#log-viewer)
+- [Running as a daemon](#running-as-a-daemon)
+- [Contributing](#contributing)
+- [Contributors](#contributors)
+- [License](#license)
+
 ## Why Dagu?
 
 Dagu is a modern workflow engine that combines simplicity with power, designed for developers who need reliable automation without the overhead. Here's what makes Dagu stand out:
@@ -42,7 +87,7 @@ Dagu is a modern workflow engine that combines simplicity with power, designed f
 
 - **Cloud Native Ready**: While running perfectly on local environments, Dagu is built to seamlessly integrate with modern cloud infrastructure when you need to scale.
 
-## **Core Features**
+## Core Features
 
 - **Workflow Management**
   - Declarative YAML definitions
@@ -74,13 +119,13 @@ Dagu is a modern workflow engine that combines simplicity with power, designed f
 - ETL Pipelines
 - Agentic Workflows
 
-## **Community**
+## Community
 
 - Issues: [GitHub Issues](https://github.com/dagu-org/dagu/issues)
 - Discussion: [GitHub Discussions](https://github.com/dagu-org/dagu/discussions)
 - Chat: [Discord](https://discord.gg/gpahPUjGRk)
 
-## **Installation**
+## Installation
 
 Dagu can be installed in multiple ways, such as using Homebrew or downloading a single binary from GitHub releases.
 
@@ -121,7 +166,7 @@ Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and s
 
 See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
 
-## **Quick Start Guide**
+## Quick Start Guide
 
 ### 1. Launch the Web UI
 
@@ -155,7 +200,7 @@ steps:
 
 You can execute the example by pressing the `Start` button. You can see "Hello Dagu" in the log page in the Web UI.
 
-## **Usage / Command Line Interface**
+## Usage / Command Line Interface
 
 ```sh
 # Runs the DAG
@@ -195,7 +240,7 @@ dagu scheduler [--dags=<path to directory>]
 dagu version
 ```
 
-## **Example DAG**
+## Example DAG
 
 ### Minimal examples
 
@@ -747,7 +792,7 @@ steps:
 
 More examples can be found in the [documentation](https://dagu.readthedocs.io/en/latest/yaml_format.html).
 
-## **Web UI**
+## Web UI
 
 ### DAG Details
 
@@ -781,7 +826,7 @@ Examine detailed step-level logs and outputs.
 
 ![DAG Log](assets/images/ui-logoutput.webp?raw=true)
 
-## **Running as a daemon**
+## Running as a daemon
 
 The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
 
@@ -804,12 +849,12 @@ exit
 
 We welcome new contributors! Check out our [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for guidelines on how to get started.
 
-## **Contributors**
+## Contributors
 
 <a href="https://github.com/dagu-org/dagu/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dagu-org/dagu" />
 </a>
 
-## **License**
+## License
 
 Dagu is released under the [GNU GPLv3](./LICENSE.md).
