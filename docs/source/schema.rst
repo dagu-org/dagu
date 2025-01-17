@@ -229,6 +229,20 @@ These fields apply to the entire DAG. They appear at the root of the YAML file.
 ~~~~~~~~
   A list of steps (tasks) to execute. Steps define your workflow logic and can depend on each other. See :ref:`Step Fields <step-fields>` below for details.
 
+``smtp``
+~~~~~~~~
+  SMTP server configuration for sending email notifications. This is necessary if you use the ``mail`` executor or ``mailOn`` field.
+
+  **Example**:
+
+  .. code-block:: yaml
+
+    smtp:
+      host: $SMTP_HOST
+      port: "587"
+      username: $SMTP_USER
+      password: $SMTP_PASS
+
 ------------
 
 .. _step-fields:
