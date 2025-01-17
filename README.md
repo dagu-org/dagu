@@ -42,24 +42,37 @@ Dagu is a modern workflow engine that combines simplicity with power, designed f
 
 - **Cloud Native Ready**: While running perfectly on local environments, Dagu is built to seamlessly integrate with modern cloud infrastructure when you need to scale.
 
-## **Features**
+## **Core Features**
 
-- Environment variables
-- Flexible parameter passing
-- Conditional logic with regex and shell commands
-- Automatic retries
-- Parallel steps
-- Repeat steps at regular intervals
-- Running sub workflows
-- Execution timeouts
-- Automatic logging
-- Lifecycle hooks (on failure, on exit, etc.)
-- Email notifications
-- Running Docker containers in steps
-- JSON handling support
-- Controlling remote Dagu nodes from a single UI
-- SSH remote commands in steps
-- Flexible scheduling with cron expressions
+- **Workflow Management**
+  - Declarative YAML definitions
+  - Dependency management
+  - Parallel execution
+  - Sub-workflows
+  - Conditional execution with regex
+  - Timeouts and automatic retries
+- **Execution & Integration**
+  - Native Docker support
+  - SSH command execution
+  - HTTP requests
+  - JSON processing
+  - Email notifications
+- **Operations**
+  - Web UI for monitoring
+  - Real-time logs
+  - Execution history
+  - Flexible scheduling
+  - Environment variables
+  - Automatic logging
+
+## Common Use Cases
+
+- Data Processing
+- Scheduled Tasks
+- Media Processing
+- CI/CD Automation
+- ETL Pipelines
+- Agentic Workflows
 
 ## **Community**
 
@@ -186,11 +199,12 @@ dagu version
 
 ### Minimal examples
 
-A DAG with two steps:
+A simple example with a named parameter:
 
 ```yaml
 params:
   - NAME: "Dagu"
+
 steps:
   - name: Hello world
     command: echo Hello $NAME
@@ -217,20 +231,63 @@ steps:
     shell: bash # The default shell is `$SHELL` or `sh`.
 ```
 
-You can also define each steps as map instead of list:
+### Named Parameters
+
+You can define named parameters in the DAG file and override them when running the DAG.
 
 ```yaml
+# Default named parameters
+params:
+  NAME: "Dagu"
+  AGE: 30
+
 steps:
-  step1:
-    command: echo "Hello"
-  step2:
-    command: echo "Bye"
-    depends: step1
+  - name: Hello world
+    command: echo Hello $NAME
+  - name: Done
+    command: echo Done!
+    depends: Hello world
+```
+
+Run the DAG with custom parameters:
+
+```sh
+dagu start my_dag -- NAME=John AGE=40
+```
+
+### Positional Parameters
+
+You can define positional parameters in the DAG file and override them when running the DAG.
+
+```yaml
+# Default positional parameters
+params: input.csv output.csv 60  # Default values for $1, $2, and $3
+
+steps:
+  # Using positional parameters
+  - name: data processing
+    command: python
+    script: |
+      import sys
+      import pandas as pd
+      
+      input_file = "$1"    # First parameter
+      output_file = "$2"   # Second parameter
+      timeout = "$3"       # Third parameter
+      
+      print(f"Processing {input_file} -> {output_file} with timeout {timeout}s")
+      # Add your processing logic here
+```
+
+Run the DAG with custom parameters:
+
+```sh
+dagu start my_dag -- input.csv output.csv 120
 ```
 
 ### Conditional DAG
 
-You can add conditional logic to a DAG:
+You can define conditions to run a step based on the output of a command.
 
 ```yaml
 steps:
@@ -241,12 +298,78 @@ steps:
         expected: "re:0[1-9]" # Run only if the day is between 01 and 09
 ```
 
+### Script Execution
+
+You can run a script using the `script` field.
+
+```yaml
+steps:
+  # Python script example
+  - name: data analysis
+    command: python
+    script: |
+      import json
+      import sys
+      
+      data = {'count': 100, 'status': 'ok'}
+      print(json.dumps(data))
+      sys.stderr.write('Processing complete\n')
+    output: RESULT
+    stdout: /tmp/analysis.log
+    stderr: /tmp/analysis.error
+
+  # Shell script with multiple commands
+  - name: cleanup
+    command: bash
+    script: |
+      #!/bin/bash
+      echo "Starting cleanup..."
+      
+      # Remove old files
+      find /tmp -name "*.tmp" -mtime +7 -exec rm {} \;
+      
+      # Archive logs
+      cd /var/log
+      tar -czf archive.tar.gz *.log
+      
+      echo "Cleanup complete"
+    depends: data analysis
+```
+
+### Variable Passing
+
+You can pass the output of one step to another step using the `output` field.
+
+```yaml
+steps:
+  # Basic output capture
+  - name: generate id
+    command: echo "ABC123"
+    output: REQUEST_ID
+
+  - name: use id
+    command: echo "Processing request ${REQUEST_ID}"
+    depends: generate id
+
+# Capture JSON output
+steps:
+  - name: get config
+    command: |
+      echo '{"port": 8080, "host": "localhost"}'
+    output: CONFIG
+
+  - name: start server
+    command: echo "Starting server at ${CONFIG.host}:${CONFIG.port}"
+    depends: get config
+```
+
 ### Scheduling
 
-You can specify the schedule with cron expression:
+You can specify flexible schedules using the cron format.
 
 ```yaml
 schedule: "5 4 * * *" # Run at 04:05.
+
 steps:
   - name: scheduled job
     command: job.sh
@@ -258,6 +381,7 @@ Or you can set multiple schedules.
 schedule:
   - "30 7 * * *" # Run at 7:30
   - "0 20 * * *" # Also run at 20:00
+
 steps:
   - name: scheduled job
     command: job.sh
@@ -276,7 +400,7 @@ steps:
 
 ### Calling a sub-DAG
 
-You can call a sub-DAG from a parent DAG:
+You can call another DAG from a parent DAG.
 
 ```yaml
 steps:
@@ -313,6 +437,312 @@ steps:
         image: alpine
         autoRemove: true
     command: echo "hello"
+```
+
+### Environment Variables
+
+You can define environment variables and use them in the DAG.
+
+```yaml
+env:
+  - DATA_DIR: ${HOME}/data
+  - PROCESS_DATE: "`date '+%Y-%m-%d'`"
+
+steps:
+  - name: process logs
+    command: python process.py
+    dir: ${DATA_DIR}
+    preconditions:
+      - "test -f ${DATA_DIR}/logs_${PROCESS_DATE}.txt" # Check if the file exists
+```
+
+### Notifications on Failure or Success
+
+You can send notifications on failure in various ways.
+
+```yaml
+env:
+  - SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/XXXXX/YYYYY/ZZZZZ"
+
+dotenv:
+  - .env
+
+smtp:
+  host: $SMTP_HOST
+  port: "587"
+  username: $SMTP_USERNAME
+  password: $SMTP_PASSWORD
+
+handlerOn:
+  failure:
+    command: |
+      curl -X POST -H 'Content-type: application/json' \
+      --data '{"text":"DAG Failed ($DAG_NAME")}' \
+      ${SLACK_WEBHOOK_URL}
+
+steps:
+  - name: critical process
+    command: important_job.sh
+    retryPolicy:
+      limit: 3
+      intervalSec: 60
+    mailOn:
+      failure: true # Send an email on failure
+```
+
+If you want to set it globally, you can create `~/.config/dagu/base.yaml` and define the common configurations across all DAGs.
+
+```yaml
+smtp:
+  host: $SMTP_HOST
+  port: "587"
+  username: $SMTP_USERNAME
+  password: $SMTP_PASSWORD
+
+mailOn:
+  failure: true                      
+  success: true                      
+```
+
+You can also use mail executor to send notifications.
+
+```yaml
+params:
+  - RECIPIENT_NAME: XXX
+  - RECIPIENT_EMAIL: example@company.com
+  - MESSAGE: "Hello [RECIPIENT_NAME]"
+
+steps:
+  - name: step1
+    executor:
+      type: mail
+      config:
+        to: $RECIPIENT_EMAIL
+        from: dagu@dagu.com
+        subject: "Hello [RECIPIENT_NAME]"
+        message: $MESSAGE
+          
+```
+
+### HTTP Request and Notifications
+
+You can make HTTP requests and send notifications.
+
+```yaml
+dotenv:
+  - .env
+
+smtp:
+  host: $SMTP_HOST
+  port: "587"
+  username: $SMTP_USERNAME
+  password: $SMTP_PASSWORD
+
+steps:
+  - name: fetch data
+    executor:
+      type: http
+      config:
+        timeout: 10
+    command: GET https://api.example.com/data
+    output: API_RESPONSE
+
+  - name: send notification
+    executor:
+      type: mail
+      config:
+        to: team@company.com
+        from: team@company.com
+        subject: "Data Processing Complete"
+        message: |
+          Process completed successfully.
+          Response: ${API_RESPONSE}
+
+    depends: fetch data
+```
+
+### Execute commands over SSH
+
+You can execute commands over SSH.
+
+```yaml
+steps:
+  - name: backup
+    executor:
+      type: ssh
+      config:
+        user: admin
+        ip: 192.168.1.100
+        key: ~/.ssh/id_rsa
+    command: tar -czf /backup/data.tar.gz /data
+```
+
+### Advanced Preconditions
+
+You can define complex conditions to run a step based on the output of a command.
+
+```yaml
+steps:
+  # Check multiple conditions
+  - name: daily task
+    command: process_data.sh
+    preconditions:
+      # Run only on weekdays
+      - condition: "`date '+%u'`"
+        expected: "re:[1-5]"
+      # Run only if disk space > 20%
+      - condition: "`df -h / | awk 'NR==2 {print $5}' | sed 's/%//'`"
+        expected: "re:^[0-7][0-9]$|^[1-9]$"  # 0-79% used (meaning at least 20% free)
+      # Check if input file exists
+      - condition: "test -f input.csv"
+
+  # Complex file check
+  - name: process files
+    command: batch_process.sh
+    preconditions:
+      - condition: "`find data/ -name '*.csv' | wc -l`"
+        expected: "re:[1-9][0-9]*"  # At least one CSV file exists
+```
+
+### Handling Various Execution Results
+
+You can use `continueOn` to control when to fail or continue based on the exit code, output, or other conditions.
+
+```yaml
+steps:
+  # Basic error handling
+  - name: process data
+    command: python process.py
+    continueOn:
+      failure: true  # Continue on any failure
+      skipped: true  # Continue if preconditions aren't met
+
+  # Handle specific exit codes
+  - name: data validation
+    command: validate.sh
+    continueOn:
+      exitCode: [1, 2, 3]  # 1:No data, 2:Partial data, 3:Invalid format
+      markSuccess: true    # Mark as success even with these codes
+
+  # Output pattern matching
+  - name: api request
+    command: curl -s https://api.example.com/data
+    continueOn:
+      output:
+        - "no records found"      # Exact match
+        - "re:^Error: [45][0-9]"  # Regex match for HTTP errors
+        - "rate limit exceeded"    # Another exact match
+
+  # Complex pattern
+  - name: database backup
+    command: pg_dump database > backup.sql
+    continueOn:
+      exitCode: [0, 1]     # Accept specific exit codes
+      output:              # Accept specific outputs
+        - "re:0 rows affected"
+        - "already exists"
+      failure: false       # Don't continue on other failures
+      markSuccess: true    # Mark as success if conditions match
+
+  # Multiple conditions combined
+  - name: data sync
+    command: sync_data.sh
+    continueOn:
+      exitCode: [1]        # Exit code 1 is acceptable
+      output:              # These outputs are acceptable
+        - "no changes detected"
+        - "re:synchronized [0-9]+ files"
+      skipped: true       # OK if skipped due to preconditions
+      markSuccess: true   # Mark as success in these cases
+
+  # Error output handling
+  - name: log processing
+    command: process_logs.sh
+    stderr: /tmp/process.err
+    continueOn:
+      output: 
+        - "re:WARNING:.*"   # Continue on warnings
+        - "no logs found"   # Continue if no logs
+      exitCode: [0, 1, 2]   # Multiple acceptable exit codes
+      failure: true         # Continue on other failures too
+
+  # Application-specific status
+  - name: app health check
+    command: check_status.sh
+    continueOn:
+      output:
+        - "re:STATUS:(DEGRADED|MAINTENANCE)"  # Accept specific statuses
+        - "re:PERF:[0-9]{2,3}ms"             # Accept performance in range
+      markSuccess: true                       # Mark these as success
+```
+
+### JSON Processing Examples
+
+You can use `jq` executor to process JSON data.
+
+```yaml
+# Simple data extraction
+steps:
+  - name: extract value
+    executor: jq
+    command: .user.name    # Get user name from JSON
+    script: |
+      {
+        "user": {
+          "name": "John",
+          "age": 30
+        }
+      }
+
+# Output: "John"
+
+# Transform array data
+steps:
+  - name: get users
+    executor: jq
+    command: '.users[] | {name: .name}'    # Extract name from each user
+    script: |
+      {
+        "users": [
+          {"name": "Alice", "age": 25},
+          {"name": "Bob", "age": 30}
+        ]
+      }
+
+# Output:
+# {"name": "Alice"}
+# {"name": "Bob"}
+
+# Calculate and format
+steps:
+  - name: sum ages
+    executor: jq
+    command: '{total_age: ([.users[].age] | add)}'    # Sum all ages
+    script: |
+      {
+        "users": [
+          {"name": "Alice", "age": 25},
+          {"name": "Bob", "age": 30}
+        ]
+      }
+
+# Output: {"total_age": 55}
+
+# Filter and count
+steps:
+  - name: count active
+    executor: jq
+    command: '[.users[] | select(.active == true)] | length'
+    script: |
+      {
+        "users": [
+          {"name": "Alice", "active": true},
+          {"name": "Bob", "active": false},
+          {"name": "Charlie", "active": true}
+        ]
+      }
+
+# Output: 2
 ```
 
 More examples can be found in the [documentation](https://dagu.readthedocs.io/en/latest/yaml_format.html).
