@@ -580,6 +580,7 @@ Complete list of DAG-level configuration options:
 - ``MaxCleanUpTimeSec``: Cleanup timeout
 - ``handlerOn``: Lifecycle event handlers
 - ``steps``: List of steps to execute
+- ``smtp``: SMTP settings
 
 Example DAG configuration:
 
@@ -617,6 +618,11 @@ Example DAG configuration:
         command: echo "canceled"         
       exit:
         command: echo "finished"         
+    smtp:
+      host: "smtp.foo.bar"
+      port: "587"
+      username: "<username>"
+      password: "<password>"
 
 Step Fields
 ~~~~~~~~~

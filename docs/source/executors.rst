@@ -187,29 +187,20 @@ Example:
       username: "<username>"
       password: "<password>"
     
-    params: RECIPIENT=XXX
+    params:
+      - RECIPIENT_NAME: XXX
+      - RECIPIENT_EMAIL: example@company.com
+      - MESSAGE: "Hello [RECIPIENT_NAME]"
 
     steps:
       - name: step1
         executor:
           type: mail
           config:
-            to: <to address>
-            from: <from address>
-            subject: "Exciting New Features Now Available"
-            message: |
-              Hello [RECIPIENT],
-
-              We hope you're enjoying your experience with MyApp!
-              We're thrilled to announce that [] v2.0 is now available,
-              and we've added some fantastic new features based on your
-              valuable feedback.
-
-              Thank you for choosing MyApp and for your continued support.
-              We look forward to hearing from you and providing you with
-              an even better MyApp experience.
-
-              Best regards,
+            to: $RECIPIENT_EMAIL
+            from: dagu@dagu.com
+            subject: "Hello [RECIPIENT_NAME]"
+            message: $MESSAGE
 
 .. _command-execution-over-ssh:
 
