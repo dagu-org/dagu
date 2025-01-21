@@ -39,6 +39,14 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [Via GitHub Releases Page](#via-github-releases-page)
   - [Via Homebrew (macOS)](#via-homebrew-macos)
   - [Via Docker](#via-docker)
+  - [Quick Start](#quick-start)
+- [Building from Source](#building-from-source)
+  - [Prerequisites](#prerequisites)
+  - [Steps to Build Locally](#steps-to-build-locally)
+    - [1. Clone the repository](#1-clone-the-repository)
+    - [2. Build the UI](#2-build-the-ui)
+    - [3. Build the Binary](#3-build-the-binary)
+  - [Run Locally from Source](#run-locally-from-source)
 - [Quick Start Guide](#quick-start-guide)
   - [1. Launch the Web UI](#1-launch-the-web-ui)
   - [2. Create a New DAG](#2-create-a-new-dag)
@@ -46,7 +54,7 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [4. Execute the DAG](#4-execute-the-dag)
 - [Usage / Command Line Interface](#usage--command-line-interface)
 - [Example DAG](#example-dag)
-  - [Minimal examples](#minimal-examples)
+  - [Minimal Examples](#minimal-examples)
   - [Named Parameters](#named-parameters)
   - [Positional Parameters](#positional-parameters)
   - [Conditional DAG](#conditional-dag)
@@ -166,6 +174,68 @@ Note: The environment variable `DAGU_TZ` is the timezone for the scheduler and s
 
 See [Environment variables](https://dagu.readthedocs.io/en/latest/config.html#environment-variables) to configure those default directories.
 
+### Quick Start
+
+See the [Quick Start Guide](#quick-start-guide) to create and execute your first DAG!
+
+## Building from Source
+
+Dagu can be built and run locally if you prefer working from source. This is especially helpful for testing new features or contributing back to the project.
+
+### Prerequisites
+
+Make sure you have the following installed on your system:
+
+- [Go 1.23 or later](https://go.dev/doc/install)
+- [Node.js (Latest LTS or Current)](https://nodejs.org/en/download/)
+- [Yarn](https://yarnpkg.com/)
+
+### Steps to Build Locally
+
+#### 1. Clone the repository
+
+- Clone the repository to your local machine using Git.
+  ```sh
+  git clone https://github.com/dagu-org/dagu.git
+  cd dagu
+  ```
+
+#### 2. Build the UI
+- Navigate to the `ui` directory.
+  ```sh
+  cd ui
+  ```
+- Install / Update Dependencies
+  ```sh
+  yarn
+  ```
+- Go back to the root directory.
+  ```sh
+  cd ..
+  ```
+- Build the UI
+  ```sh
+  make build-ui
+  ```
+
+#### 3. Build the Binary
+- Build the binary
+  ```sh
+  make build-bin
+  ```
+  This produces the binary in the `.local/bin` directory.
+
+### Run Locally from Source
+
+For a quick test of both server, scheduler, and UI:
+```sh
+# Runs "dagu start-all" with the `go run` command
+make run
+```
+Once the server is running, visit `http://127.0.0.1:8080` to see the Web UI.
+
+Continue with the rest of the [Quick Start Guide](#quick-start-guide) to create and execute your first DAG!
+
 ## Quick Start Guide
 
 ### 1. Launch the Web UI
@@ -242,7 +312,7 @@ dagu version
 
 ## Example DAG
 
-### Minimal examples
+### Minimal Examples
 
 A simple example with a named parameter:
 
