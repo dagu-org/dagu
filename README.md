@@ -180,7 +180,7 @@ See the [Quick Start Guide](#quick-start-guide) to create and execute your first
 
 ## Building from Source
 
-Dagu can be built and run locally if you prefer working from source. This is especially helpful for testing new features or contributing back to the project.
+Dagu can be built and run locally from source.
 
 ### Prerequisites
 
@@ -223,7 +223,7 @@ Make sure you have the following installed on your system:
   ```sh
   make build-bin
   ```
-  This produces the binary in the `.local/bin` directory.
+  This produces the `dagu` binary in the `.local/bin` directory.
 
 ### Run Locally from Source
 
@@ -234,7 +234,7 @@ make run
 ```
 Once the server is running, visit `http://127.0.0.1:8080` to see the Web UI.
 
-Continue with the rest of the [Quick Start Guide](#quick-start-guide) to create and execute your first DAG!
+Continue with the [Quick Start Guide](#quick-start-guide) to create and execute your first DAG!
 
 ## Quick Start Guide
 
