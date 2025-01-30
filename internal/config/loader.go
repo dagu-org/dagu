@@ -149,6 +149,7 @@ func (l *ConfigLoader) bindEnvironmentVariables() {
 	l.bindEnv("ui.logEncodingCharset", "UI_LOG_ENCODING_CHARSET")
 	l.bindEnv("ui.navbarColor", "UI_NAVBAR_COLOR")
 	l.bindEnv("ui.navbarTitle", "UI_NAVBAR_TITLE")
+	l.bindEnv("ui.headless", "UI_HEADLESS")
 
 	// UI configurations (legacy)
 	l.bindEnv("ui.maxDashboardPageLimit", "MAX_DASHBOARD_PAGE_LIMIT")

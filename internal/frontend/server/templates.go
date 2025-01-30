@@ -20,6 +20,13 @@ var (
 )
 
 func (srv *Server) useTemplate(ctx context.Context, layout string, name string) func(http.ResponseWriter, any) {
+	// Skip template rendering if headless
+	if srv.headless {
+		return func(w http.ResponseWriter, _ any) {
+			http.Error(w, "Web UI is disabled in headless mode", http.StatusForbidden)
+		}
+	}
+
 	files := append(baseTemplates(), filepath.Join(templatePath, layout))
 	tmpl, err := template.New(name).Funcs(
 		defaultFunctions(srv.funcsConfig)).ParseFS(srv.assets, files...,
