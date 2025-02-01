@@ -1,133 +1,152 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-package cmd
+package main
 
 import (
-	"log"
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/daguflow/dagu/internal/agent"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
+const startPrefix = "start_"
+
 func startCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [flags] /path/to/spec.yaml",
+		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
 		Short: "Runs the DAG",
-		Long:  `dagu start [--params="param1 param2"] /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-
-			quiet, err := cmd.Flags().GetBool("quiet")
-			if err != nil {
-				log.Fatalf("Flag retrieval failed (quiet): %v", err)
-			}
-
-			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-				Quiet:  quiet,
-			})
-
-			params, err := cmd.Flags().GetString("params")
-			if err != nil {
-				initLogger.Error("Parameter retrieval failed", "error", err)
-				os.Exit(1)
-			}
-
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], removeQuotes(params))
-			if err != nil {
-				initLogger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
-			}
-
-			requestID, err := generateRequestID()
-			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
-				os.Exit(1)
-			}
-
-			logFile, err := openLogFile("start_", cfg.LogDir, workflow, requestID)
-			if err != nil {
-				initLogger.Error(
-					"Log file creation failed",
-					"error",
-					err,
-					"workflow",
-					workflow.Name,
-				)
-				os.Exit(1)
-			}
-			defer logFile.Close()
-
-			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:   cfg.Debug,
-				Format:  cfg.LogFormat,
-				LogFile: logFile,
-				Quiet:   quiet,
-			})
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, agentLogger)
-
-			agentLogger.Info("Workflow execution initiated",
-				"workflow", workflow.Name,
-				"requestID", requestID,
-				"logFile", logFile.Name())
-
-			agt := agent.New(
-				requestID,
-				workflow,
-				agentLogger,
-				filepath.Dir(logFile.Name()),
-				logFile.Name(),
-				cli,
-				dataStore,
-				&agent.Options{})
-
-			ctx := cmd.Context()
-
-			listenSignals(ctx, agt)
-
-			if err := agt.Run(ctx); err != nil {
-				agentLogger.Error("Workflow execution failed",
-					"error", err,
-					"workflow", workflow.Name,
-					"requestID", requestID)
-				os.Exit(1)
-			}
-		},
+		Long:  `dagu start /path/to/spec.yaml -- params1 params2`,
+		Args:  cobra.MinimumNArgs(1),
+		RunE:  wrapRunE(runStart),
 	}
 
-	cmd.Flags().StringP("params", "p", "", "parameters")
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	initStartFlags(cmd)
 	return cmd
+}
+
+func initStartFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("params", "p", "", "parameters")
+	cmd.Flags().StringP("requestID", "r", "", "specify request ID")
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+}
+
+func runStart(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	setup := newSetup(cfg)
+
+	quiet, err := cmd.Flags().GetBool("quiet")
+	if err != nil {
+		return fmt.Errorf("failed to get quiet flag: %w", err)
+	}
+
+	requestID, err := cmd.Flags().GetString("requestID")
+	if err != nil {
+		return fmt.Errorf("failed to get request ID: %w", err)
+	}
+
+	ctx := setup.loggerContext(cmd.Context(), quiet)
+
+	loadOpts := []digraph.LoadOption{
+		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+	}
+
+	var params string
+	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+		// Get parameters from command line arguments after "--"
+		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
+	} else {
+		// Get parameters from flags
+		params, err = cmd.Flags().GetString("params")
+		if err != nil {
+			return fmt.Errorf("failed to get parameters: %w", err)
+		}
+		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
+	}
+
+	return executeDag(ctx, setup, args[0], loadOpts, quiet, requestID)
+}
+
+func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
+	dag, err := digraph.Load(ctx, specPath, loadOpts...)
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
+		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
+	}
+
+	if requestID == "" {
+		var err error
+		requestID, err = generateRequestID()
+		if err != nil {
+			logger.Error(ctx, "Failed to generate request ID", "err", err)
+			return fmt.Errorf("failed to generate request ID: %w", err)
+		}
+	}
+
+	logFile, err := setup.openLogFile(ctx, startPrefix, dag, requestID)
+	if err != nil {
+		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
+	}
+	defer logFile.Close()
+
+	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
+
+	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
+
+	agt := agent.New(
+		requestID,
+		dag,
+		filepath.Dir(logFile.Name()),
+		logFile.Name(),
+		cli,
+		dagStore,
+		setup.historyStore(),
+		agent.Options{},
+	)
+
+	listenSignals(ctx, agt)
+
+	if err := agt.Run(ctx); err != nil {
+		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
+
+		if quiet {
+			os.Exit(1)
+		} else {
+			agt.PrintSummary(ctx)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
+		}
+	}
+
+	if !quiet {
+		agt.PrintSummary(ctx)
+	}
+
+	return nil
 }
 
 // removeQuotes removes the surrounding quotes from the string.
 func removeQuotes(s string) string {
-	if len(s) > 1 && s[0] == '"' && s[len(s)-1] == '"' {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
 		return s[1 : len(s)-1]
 	}
 	return s

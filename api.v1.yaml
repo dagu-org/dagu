@@ -1,0 +1,787 @@
+---
+swagger: "2.0"
+info:
+  version: 0.0.1
+  title: Dagu
+  contact:
+    name: Dagu
+  description: |
+    Dagu is a simple DAG (Directed Acyclic Graph) runner.
+    It is a simple tool to run a series of tasks in a specific order
+consumes:
+  - application/json
+produces:
+  - application/json
+basePath: "/api/v1"
+schemes:
+  - http
+host: "localhost:8080"
+tags:
+  - name: dags
+    description: Operations about DAGs
+
+paths:
+  /dags:
+    get:
+      description: Returns a list of DAGs.
+      produces:
+        - application/json
+      operationId: listDags
+      parameters:
+        - name: page
+          in: query
+          required: false
+          type: integer
+        - name: limit
+          in: query
+          required: false
+          type: integer
+        - name: searchName
+          in: query
+          required: false
+          type: string
+        - name: searchTag
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/listDagsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+    post:
+      description: Creates a new DAG.
+      produces:
+        - application/json
+      operationId: createDag
+      parameters:
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              action:
+                type: string
+              value:
+                type: string
+            required:
+              - action
+              - value
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/createDagResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+
+  /dags/{dagId}:
+    get:
+      description: Returns details of a DAG.
+      parameters:
+        - name: dagId
+          in: path
+          required: true
+          type: string
+        - name: tab
+          in: query
+          required: false
+          type: string
+        - name: file
+          in: query
+          required: false
+          type: string
+        - name: step
+          in: query
+          required: false
+          type: string
+      produces:
+        - application/json
+      operationId: getDagDetails
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/getDagDetailsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+    post:
+      description: Performs an action on a DAG.
+      parameters:
+        - name: dagId
+          in: path
+          required: true
+          type: string
+        - in: body
+          name: body
+          schema:
+            type: object
+            properties:
+              action:
+                type: string
+                enum:
+                  - start
+                  - suspend
+                  - stop
+                  - retry
+                  - mark-success
+                  - mark-failed
+                  - save
+                  - rename
+              value:
+                type: string
+              requestId:
+                type: string
+              step:
+                type: string
+              params:
+                type: string
+            required:
+              - action
+      produces:
+        - application/json
+      operationId: postDagAction
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/postDagActionResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+
+    delete:
+      description: Deletes a DAG.
+      parameters:
+        - name: dagId
+          in: path
+          required: true
+          type: string
+      produces:
+        - application/json
+      operationId: deleteDag
+      responses:
+        "200":
+          description: A successful response.
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+
+  /search:
+    get:
+      description: Searches for DAGs.
+      produces:
+        - application/json
+      operationId: searchDags
+      parameters:
+        - name: q
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/searchDagsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+  /tags:
+    get:
+      description: Returns a list of tags.
+      produces:
+        - application/json
+      operationId: listTags
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/listTagResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/ApiError"
+      tags:
+        - dags
+
+definitions:
+  ApiError:
+    type: object
+    properties:
+      message:
+        type: string
+      detailedMessage:
+        type: string
+    required:
+      - message
+      - detailedMessage
+
+  listDagsResponse:
+    type: object
+    properties:
+      DAGs:
+        type: array
+        items:
+          $ref: "#/definitions/dagListItem"
+      Errors:
+        type: array
+        items:
+          type: string
+      HasError:
+        type: boolean
+      PageCount:
+        type: integer
+    required:
+      - DAGs
+      - Errors
+      - HasError
+      - PageCount
+
+  createDagResponse:
+    type: object
+    properties:
+      DagID:
+        type: string
+    required:
+      - DagID
+
+  dagListItem:
+    type: object
+    properties:
+      File:
+        type: string
+      Dir:
+        type: string
+      DAG:
+        $ref: "#/definitions/dag"
+      Status:
+        $ref: "#/definitions/dagStatus"
+      Suspended:
+        type: boolean
+      Error:
+        type: string
+      ErrorT:
+        type: string
+    required:
+      - File
+      - Dir
+      - DAG
+      - Status
+      - Suspended
+      - Error
+      - ErrorT
+
+  dag:
+    type: object
+    properties:
+      Group:
+        type: string
+      Name:
+        type: string
+      Schedule:
+        type: array
+        items:
+          $ref: "#/definitions/schedule"
+      Description:
+        type: string
+      Params:
+        type: array
+        items:
+          type: string
+      DefaultParams:
+        type: string
+      Tags:
+        type: array
+        items:
+          type: string
+    required:
+      - Group
+      - Name
+      - Schedule
+      - Description
+      - Params
+      - DefaultParams
+      - Tags
+
+  schedule:
+    type: object
+    properties:
+      Expression:
+        type: string
+    required:
+      - Expression
+
+  dagStatus:
+    type: object
+    properties:
+      RequestId:
+        type: string
+      Name:
+        type: string
+      Status:
+        type: integer
+      StatusText:
+        type: string
+      Pid:
+        type: integer
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Log:
+        type: string
+      Params:
+        type: string
+    required:
+      - RequestId
+      - Name
+      - Status
+      - StatusText
+      - Pid
+      - StartedAt
+      - FinishedAt
+      - Log
+      - Params
+
+  getDagDetailsResponse:
+    type: object
+    properties:
+      Title:
+        type: string
+      DAG:
+        $ref: "#/definitions/dagStatusWithDetails"
+      Tab:
+        type: string
+      Graph:
+        type: string
+      Definition:
+        type: string
+      LogData:
+        $ref: "#/definitions/dagLogResponse"
+      LogUrl:
+        type: string
+      StepLog:
+        $ref: "#/definitions/dagStepLogResponse"
+      ScLog:
+        $ref: "#/definitions/dagSchedulerLogResponse"
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Title
+      - DAG
+      - Tab
+      - Graph
+      - Definition
+      - LogData
+      - LogUrl
+      - StepLog
+      - ScLog
+      - Errors
+
+  postDagActionResponse:
+    type: object
+    properties:
+      NewDagID:
+        type: string
+
+  dagStepLogResponse:
+    type: object
+    properties:
+      Step:
+        $ref: "#/definitions/statusNode"
+      LogFile:
+        type: string
+      Content:
+        type: string
+    required:
+      - Step
+      - LogFile
+      - Content
+
+  dagSchedulerLogResponse:
+    type: object
+    properties:
+      LogFile:
+        type: string
+      Content:
+        type: string
+    required:
+      - LogFile
+      - Content
+
+  dagLogResponse:
+    type: object
+    properties:
+      GridData:
+        type: array
+        items:
+          $ref: "#/definitions/dagLogGridItem"
+      Logs:
+        type: array
+        items:
+          $ref: "#/definitions/dagStatusFile"
+    required:
+      - GridData
+      - Logs
+
+  dagLogGridItem:
+    type: object
+    properties:
+      Name:
+        type: string
+      Vals:
+        type: array
+        items:
+          type: integer
+    required:
+      - Name
+      - Vals
+
+  dagStatusFile:
+    type: object
+    properties:
+      File:
+        type: string
+      Status:
+        $ref: "#/definitions/dagStatusDetail"
+    required:
+      - File
+
+  dagStatusWithDetails:
+    type: object
+    properties:
+      File:
+        type: string
+      Dir:
+        type: string
+      DAG:
+        $ref: "#/definitions/dagDetail"
+      Status:
+        $ref: "#/definitions/dagStatusDetail"
+      Suspended:
+        type: boolean
+      Error:
+        type: string
+      ErrorT:
+        type: string
+    required:
+      - File
+      - Dir
+      - DAG
+      - Status
+      - Suspended
+      - Error
+      - ErrorT
+
+  dagDetail:
+    type: object
+    properties:
+      Location:
+        type: string
+      Group:
+        type: string
+      Name:
+        type: string
+      Schedule:
+        type: array
+        items:
+          $ref: "#/definitions/schedule"
+      Description:
+        type: string
+      Env:
+        type: array
+        items:
+          type: string
+      LogDir:
+        type: string
+      HandlerOn:
+        $ref: "#/definitions/handlerOn"
+      Steps:
+        type: array
+        items:
+          $ref: "#/definitions/stepObject"
+      Delay:
+        type: integer
+      HistRetentionDays:
+        type: integer
+      Preconditions:
+        type: array
+        items:
+          $ref: "#/definitions/condition"
+      MaxActiveRuns:
+        type: integer
+      Params:
+        type: array
+        items:
+          type: string
+      DefaultParams:
+        type: string
+      Tags:
+        type: array
+        items:
+          type: string
+    required:
+      - Location
+      - Group
+      - Name
+      - Schedule
+      - Description
+      - Env
+      - LogDir
+      - HandlerOn
+      - Steps
+      - Delay
+      - HistRetentionDays
+      - Preconditions
+      - MaxActiveRuns
+      - Params
+      - DefaultParams
+      - Tags
+
+  handlerOn:
+    type: object
+    properties:
+      Failure:
+        $ref: "#/definitions/stepObject"
+      Success:
+        $ref: "#/definitions/stepObject"
+      Cancel:
+        $ref: "#/definitions/stepObject"
+      Exit:
+        $ref: "#/definitions/stepObject"
+
+  dagStatusDetail:
+    type: object
+    properties:
+      RequestId:
+        type: string
+      Name:
+        type: string
+      Status:
+        type: integer
+      StatusText:
+        type: string
+      Pid:
+        type: integer
+      Nodes:
+        type: array
+        items:
+          $ref: "#/definitions/statusNode"
+      OnExit:
+        $ref: "#/definitions/statusNode"
+      OnSuccess:
+        $ref: "#/definitions/statusNode"
+      OnFailure:
+        $ref: "#/definitions/statusNode"
+      OnCancel:
+        $ref: "#/definitions/statusNode"
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Log:
+        type: string
+      Params:
+        type: string
+    required:
+      - RequestId
+      - Name
+      - Status
+      - StatusText
+      - Pid
+      - Nodes
+      - OnExit
+      - OnSuccess
+      - OnFailure
+      - OnCancel
+      - StartedAt
+      - FinishedAt
+      - Log
+      - Params
+
+  statusNode:
+    type: object
+    properties:
+      Step:
+        $ref: "#/definitions/stepObject"
+      Log:
+        type: string
+      StartedAt:
+        type: string
+      FinishedAt:
+        type: string
+      Status:
+        type: integer
+      RetryCount:
+        type: integer
+      DoneCount:
+        type: integer
+      Error:
+        type: string
+      StatusText:
+        type: string
+    required:
+      - Step
+      - Log
+      - StartedAt
+      - FinishedAt
+      - Status
+      - RetryCount
+      - DoneCount
+      - Error
+      - StatusText
+
+  stepObject:
+    type: object
+    properties:
+      Name:
+        type: string
+      Description:
+        type: string
+      Variables:
+        type: array
+        items:
+          type: string
+      Dir:
+        type: string
+      CmdWithArgs:
+        type: string
+      Command:
+        type: string
+      Script:
+        type: string
+      Stdout:
+        type: string
+      Stderr:
+        type: string
+      Output:
+        type: string
+      Args:
+        type: array
+        items:
+          type: string
+      Run:
+        type: string
+      Params:
+        type: string
+      Depends:
+        type: array
+        items:
+          type: string
+      RepeatPolicy:
+        $ref: "#/definitions/repeatPolicy"
+      MailOnError:
+        type: boolean
+      Preconditions:
+        type: array
+        items:
+          $ref: "#/definitions/condition"
+    required:
+      - Name
+      - Description
+      - Variables
+      - Dir
+      - CmdWithArgs
+      - Command
+      - Script
+      - Stdout
+      - Stderr
+      - Output
+      - Args
+      - Depends
+      - RepeatPolicy
+      - MailOnError
+      - Preconditions
+
+  searchDagsResponse:
+    type: object
+    properties:
+      Results:
+        type: array
+        items:
+          $ref: "#/definitions/searchDagsResultItem"
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Results
+      - Errors
+
+  searchDagsResultItem:
+    type: object
+    properties:
+      Name:
+        type: string
+      DAG:
+        $ref: "#/definitions/dag"
+      Matches:
+        type: array
+        items:
+          $ref: "#/definitions/searchDagsMatchItem"
+
+  searchDagsMatchItem:
+    type: object
+    properties:
+      Line:
+        type: string
+      LineNumber:
+        type: integer
+      StartLine:
+        type: integer
+
+  condition:
+    type: object
+    properties:
+      Condition:
+        type: string
+      Expected:
+        type: string
+
+  repeatPolicy:
+    type: object
+    properties:
+      Repeat:
+        type: boolean
+      Interval:
+        type: integer
+
+  listTagResponse:
+    type: object
+    properties:
+      Tags:
+        type: array
+        items:
+          type: string
+      Errors:
+        type: array
+        items:
+          type: string
+    required:
+      - Tags
+      - Errors

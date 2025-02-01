@@ -1,12 +1,12 @@
 .. _Executors:
 
 Executors
-==========================
+==========
 
 .. contents::
     :local:
 
-Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/daguflow/dagu/tree/main/internal/dag/executor>`_ are very welcome.
+Executors are specialized modules for handling different types of tasks, including :code:`docker`, :code:`http`, :code:`mail`, :code:`ssh`, and :code:`jq` (JSON) executors. Contributions of new `executors <https://github.com/dagu-org/dagu/tree/main/internal/dag/executor>`_ are very welcome.
 
 .. _docker executor:
 
@@ -20,36 +20,34 @@ Execute an Image
 
 The `docker` executor allows us to run Docker containers instead of bare commands. This can be useful for running commands in isolated environments or for reproducibility purposes.
 
-In the example below, it pulls and runs `Deno's docker image <https://hub.docker.com/r/denoland/deno>`_ and prints 'Hello World'.
-
 .. code-block:: yaml
 
-   steps:
-     - name: deno_hello_world
-       executor:
-         type: docker
-         config:
-           image: "denoland/deno:latest"
-           autoRemove: true
-       command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+    steps:
+      - name: hello
+        executor:
+          type: docker
+          config:
+            image: alpine
+            autoRemove: true
+        command: echo "hello"
 
 Example Log output:
 
-.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/docker.png
+.. image:: https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/docker.png
 
 By default, Dagu will try to pull the Docker image. For images built locally this will fail. If you want to skip image pull, pass :code:`pull: false` in executor config.
 
 .. code-block:: yaml
 
-   steps:
-     - name: deno_hello_world
-       executor:
-         type: docker
-         config:
-           image: "denoland/deno:latest"
-           pull: false
-           autoRemove: true
-       command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+    steps:
+      - name: hello
+        executor:
+          type: docker
+          config:
+            image: alpine
+            pull: false
+            autoRemove: true
+        command: echo "hello"
 
 
 You can config the Docker container (e.g., `volumes`, `env`, etc) by passing more detailed options.
@@ -59,29 +57,76 @@ For example:
 .. code-block:: yaml
 
     steps:
-      - name: deno_hello_world
+      - name: hello
         executor:
           type: docker
           config:
-            image: "denoland/deno:latest"
+            image: alpine
+            pull: false
             container:
               volumes:
                 /app:/app:
               env:
                 - FOO=BAR
             autoRemove: true
-        command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+        command: echo "${FOO}"
 
 See the Docker's API documentation for all available options.
 
 - For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
 - For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.
 
+Execute Commands in Existing Containers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Docker executor also supports executing commands in already-running containers using Docker's exec functionality, similar to `docker exec`. This is useful when you need to run commands in containers that are already running as part of your infrastructure.
+
+.. code-block:: yaml
+
+   steps:
+     - name: exec-in-existing
+       executor:
+         type: docker
+         config:
+           containerName: "my-running-container"  # Name of existing container
+           autoRemove: true
+           exec:
+             user: root          # Optional: user to run as
+             workingDir: /app   # Optional: working directory
+             env:               # Optional: environment variables
+               - MY_VAR=value
+       command: echo "Hello from existing container"
+
+Available exec configuration options:
+
+- `containerName`: Name or ID of the existing container (required)
+- `exec`:
+    - `user`: Username or UID to execute command as (optional)
+    - `workingDir`: Working directory for command execution (optional)
+    - `env`: List of environment variables (optional)
+
+For comparison, here's how you would create and run in a new container:
+
+.. code-block:: yaml
+
+   steps:
+     - name: create-new
+       executor:
+         type: docker
+         config:
+           image: alpine:latest
+           autoRemove: true
+       command: echo "Hello from new container"
+
 
 Use Host's Docker Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you are running `dagu` using a container, you need the setup below.
+If you are running `dagu` using a container, there are two options to use the host's Docker environment.
+
+1. Mount the Docker socket to the container and pass through the host's docker group id. See the example in :ref:`Using Docker Compose <Using Docker Compose>`
+
+Or
 
 1. Run a `socat` container with the command below.
 
@@ -96,13 +141,13 @@ If you are running `dagu` using a container, you need the setup below.
     env:
       - DOCKER_HOST : "tcp://host.docker.internal:2376"
     steps:
-      - name: deno_hello_world
+      - name: hello
         executor:
           type: docker
           config:
-            image: "denoland/deno:1.10.3"
+            image: alpine
             autoRemove: true
-        command: run https://examples.deno.land/hello-world.ts
+        command: echo "hello"
 
 For more details, see `this page <https://forums.docker.com/t/remote-api-with-docker-for-mac-beta/15639/2>`_.
 
@@ -142,29 +187,20 @@ Example:
       username: "<username>"
       password: "<password>"
     
-    params: RECIPIENT=XXX
+    params:
+      - RECIPIENT_NAME: XXX
+      - RECIPIENT_EMAIL: example@company.com
+      - MESSAGE: "Hello [RECIPIENT_NAME]"
 
     steps:
       - name: step1
         executor:
           type: mail
           config:
-            to: <to address>
-            from: <from address>
-            subject: "Exciting New Features Now Available"
-            message: |
-              Hello [RECIPIENT],
-
-              We hope you're enjoying your experience with MyApp!
-              We're thrilled to announce that [] v2.0 is now available,
-              and we've added some fantastic new features based on your
-              valuable feedback.
-
-              Thank you for choosing MyApp and for your continued support.
-              We look forward to hearing from you and providing you with
-              an even better MyApp experience.
-
-              Best regards,
+            to: $RECIPIENT_EMAIL
+            from: dagu@dagu.com
+            subject: "Hello [RECIPIENT_NAME]"
+            message: $MESSAGE
 
 .. _command-execution-over-ssh:
 

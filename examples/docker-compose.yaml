@@ -1,36 +1,36 @@
-version: "3.9"
 services:
-    # init container updates permission
-    init:
-        image: "ghcr.io/daguflow/dagu:latest"
-        user: root
-        volumes:
-            - dagu_config:/home/dagu/.config/dagu
-            - dagu_data:/home/dagu/.local/share
-        command: chown -R dagu /home/dagu/.config/dagu/ /home/dagu/.local/share
-    # ui server process
-    server:
-        image: "ghcr.io/daguflow/dagu:latest"
-        environment:
-            - DAGU_PORT=8080
-        restart: unless-stopped
-        ports:
-            - "8080:8080"
-        volumes:
-            - dagu_config:/home/dagu/.config/dagu
-            - dagu_data:/home/dagu/.local/share
-        depends_on:
-            - init
-    # scheduler process
-    scheduler:
-        image: "ghcr.io/daguflow/dagu:latest"
-        restart: unless-stopped
-        volumes:
-            - dagu_config:/home/dagu/.config/dagu
-            - dagu_data:/home/dagu/.local/share
-        command: dagu scheduler
-        depends_on:
-            - init
+  dagu:
+    image: "ghcr.io/dagu-org/dagu:latest"
+    container_name: dagu
+    hostname: dagu
+    ports:
+      - "8080:8080"
+    environment:
+      - DAGU_PORT=8080 # optional. default is 8080
+      - DAGU_TZ=Asia/Tokyo # optional. default is local timezone
+      - DAGU_BASE_PATH=/dagu # optional. default is /
+      - PUID=1000 # optional. default is 1000
+      - PGID=1000 # optional. default is 1000
+      - DOCKER_GID=999 # optional. default is -1 and it will be ignored
+    volumes:
+      - dagu_config:/config
 volumes:
-    dagu_config: {}
-    dagu_data: {}
+  dagu_config: {}
+#
+# For Docker in Docker (DinD) support, use the following configuration:
+# services:
+#   dagu:
+#     image: "ghcr.io/dagu-org/dagu:latest"
+#     container_name: dagu
+#     hostname: dagu
+#     ports:
+#       - "8080:8080"
+#     environment:
+#       - DAGU_PORT=8080 # optional. default is 8080
+#       - DAGU_TZ=Asia/Tokyo # optional. default is local timezone
+#       - DAGU_BASE_PATH=/dagu # optional. default is /
+#     volumes:
+#       - dagu_config:/config
+#       - /var/run/docker.sock:/var/run/docker.sock
+#     user: "0:0"
+#     entrypoint: [] # Override any default entrypoint

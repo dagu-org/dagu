@@ -1,22 +1,8 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package sock
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -26,7 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 var ErrServerRequestedShutdown = errors.New(
@@ -40,7 +26,6 @@ type Server struct {
 	listener    net.Listener
 	quit        atomic.Bool
 	mu          sync.Mutex
-	logger      logger.Logger
 }
 
 // HTTPHandlerFunc is a function that handles HTTP requests.
@@ -50,17 +35,15 @@ type HTTPHandlerFunc func(w http.ResponseWriter, r *http.Request)
 func NewServer(
 	addr string,
 	handlerFunc HTTPHandlerFunc,
-	lg logger.Logger,
 ) (*Server, error) {
 	return &Server{
 		addr:        addr,
 		handlerFunc: handlerFunc,
-		logger:      lg,
 	}, nil
 }
 
 // Serve starts listening and serving requests.
-func (srv *Server) Serve(listen chan error) error {
+func (srv *Server) Serve(ctx context.Context, listen chan error) error {
 	_ = os.Remove(srv.addr)
 	var err error
 	srv.listener, err = net.Listen("unix", srv.addr)
@@ -73,10 +56,10 @@ func (srv *Server) Serve(listen chan error) error {
 	if listen != nil {
 		listen <- err
 	}
-	srv.logger.Debug("Unix socket is listening", "addr", srv.addr)
+	logger.Debug(ctx, "Unix socket is listening", "addr", srv.addr)
 
 	defer func() {
-		_ = srv.Shutdown()
+		_ = srv.Shutdown(ctx)
 		_ = os.Remove(srv.addr)
 	}()
 	for {
@@ -88,7 +71,7 @@ func (srv *Server) Serve(listen chan error) error {
 			go func() {
 				request, err := http.ReadRequest(bufio.NewReader(conn))
 				if err != nil {
-					srv.logger.Error("read request", "error", err)
+					logger.Error(ctx, "read request", "err", err)
 				} else {
 					srv.handlerFunc(newHTTPResponseWriter(&conn), request)
 				}
@@ -99,7 +82,7 @@ func (srv *Server) Serve(listen chan error) error {
 }
 
 // Shutdown stops the frontend.
-func (srv *Server) Shutdown() error {
+func (srv *Server) Shutdown(ctx context.Context) error {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	if !srv.quit.Load() {
@@ -107,7 +90,7 @@ func (srv *Server) Shutdown() error {
 		if srv.listener != nil {
 			err := srv.listener.Close()
 			if err != nil && !errors.Is(err, os.ErrClosed) {
-				srv.logger.Error("close listener", "error", err)
+				logger.Error(ctx, "close listener", "err", err)
 			}
 			return err
 		}

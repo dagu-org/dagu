@@ -24,7 +24,7 @@ import (
 	flags "github.com/jessevdk/go-flags"
 	"golang.org/x/net/netutil"
 
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 )
 
 const (
@@ -80,7 +80,7 @@ type Server struct {
 	ListenLimit  int           `long:"listen-limit" description:"limit the number of outstanding requests"`
 	KeepAlive    time.Duration `long:"keep-alive" description:"sets the TCP keep-alive timeouts on accepted connections. It prunes dead TCP connections ( e.g. closing laptop mid-download)" default:"3m"`
 	ReadTimeout  time.Duration `long:"read-timeout" description:"maximum duration before timing out read of the request" default:"30s"`
-	WriteTimeout time.Duration `long:"write-timeout" description:"maximum duration before timing out write of the response" default:"30s"`
+	WriteTimeout time.Duration `long:"write-timeout" description:"maximum duration before timing out write of the response" default:"60s"`
 	httpServerL  net.Listener
 
 	TLSHost           string         `long:"tls-host" description:"the IP to listen on for tls, when not specified it's the same as --host" env:"TLS_HOST"`
@@ -215,13 +215,13 @@ func (s *Server) Serve() (err error) {
 
 		servers = append(servers, httpServer)
 		wg.Add(1)
-		s.Logf("Serving frontend at http://%s", s.httpServerL.Addr())
+		s.Logf("Serving dagu at http://%s", s.httpServerL.Addr())
 		go func(l net.Listener) {
 			defer wg.Done()
 			if err := httpServer.Serve(l); err != nil && err != http.ErrServerClosed {
 				s.Fatalf("%v", err)
 			}
-			s.Logf("Stopped serving frontend at http://%s", l.Addr())
+			s.Logf("Stopped serving dagu at http://%s", l.Addr())
 		}(s.httpServerL)
 	}
 
@@ -308,13 +308,13 @@ func (s *Server) Serve() (err error) {
 
 		servers = append(servers, httpsServer)
 		wg.Add(1)
-		s.Logf("Serving frontend at https://%s", s.httpsServerL.Addr())
+		s.Logf("Serving dagu at https://%s", s.httpsServerL.Addr())
 		go func(l net.Listener) {
 			defer wg.Done()
 			if err := httpsServer.Serve(l); err != nil && err != http.ErrServerClosed {
 				s.Fatalf("%v", err)
 			}
-			s.Logf("Stopped serving frontend at https://%s", l.Addr())
+			s.Logf("Stopped serving dagu at https://%s", l.Addr())
 		}(tls.NewListener(s.httpsServerL, httpsServer.TLSConfig))
 	}
 

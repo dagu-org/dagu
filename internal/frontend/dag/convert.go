@@ -1,47 +1,32 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package dag
 
 import (
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/frontend/gen/models"
-	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/frontend/gen/models"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/swag"
 )
 
-func convertToDAG(workflow *dag.DAG) *models.Dag {
+func convertToDAG(dag *digraph.DAG) *models.Dag {
 	var schedules []*models.Schedule
-	for _, s := range workflow.Schedule {
+	for _, s := range dag.Schedule {
 		schedules = append(schedules, &models.Schedule{
 			Expression: swag.String(s.Expression),
 		})
 	}
 
 	return &models.Dag{
-		Name:          swag.String(workflow.Name),
-		Group:         swag.String(workflow.Group),
-		Description:   swag.String(workflow.Description),
-		Params:        workflow.Params,
-		DefaultParams: swag.String(workflow.DefaultParams),
-		Tags:          workflow.Tags,
+		Name:          swag.String(dag.Name),
+		Group:         swag.String(dag.Group),
+		Description:   swag.String(dag.Description),
+		Params:        dag.Params,
+		DefaultParams: swag.String(dag.DefaultParams),
+		Tags:          dag.Tags,
 		Schedule:      schedules,
 	}
 }
 
-func convertToStatusDetail(s *model.Status) *models.DagStatusDetail {
+func convertToStatusDetail(s model.Status) *models.DagStatusDetail {
 	status := &models.DagStatusDetail{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),
@@ -85,7 +70,7 @@ func convertToNode(node *model.Node) *models.StatusNode {
 	}
 }
 
-func convertToStepObject(step dag.Step) *models.StepObject {
+func convertToStepObject(step digraph.Step) *models.StepObject {
 	var conditions []*models.Condition
 	for _, cond := range step.Preconditions {
 		conditions = append(conditions, &models.Condition{
@@ -112,7 +97,8 @@ func convertToStepObject(step dag.Step) *models.StepObject {
 		Preconditions: conditions,
 		RepeatPolicy:  repeatPolicy,
 		Script:        swag.String(step.Script),
-		Variables:     step.Variables,
+		// Deprecated: Removed field but keeping for backward compatibility.
+		Variables: []string{},
 	}
 	if step.SubWorkflow != nil {
 		so.Run = step.SubWorkflow.Name

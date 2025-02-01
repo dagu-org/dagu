@@ -1,21 +1,7 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package filecache
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -54,11 +40,13 @@ func (c *Cache[T]) Stop() {
 	close(c.stopCh)
 }
 
-func (c *Cache[T]) StartEviction() {
+func (c *Cache[T]) StartEviction(ctx context.Context) {
 	go func() {
 		timer := time.NewTimer(time.Minute)
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-timer.C:
 				timer.Reset(time.Minute)
 				c.evict()
@@ -103,9 +91,9 @@ func (c *Cache[T]) Invalidate(fileName string) {
 }
 
 func (c *Cache[T]) LoadLatest(
-	fileName string, loader func() (T, error),
+	filePath string, loader func() (T, error),
 ) (T, error) {
-	stale, lastModified, err := c.IsStale(fileName, c.Entry(fileName))
+	stale, lastModified, err := c.IsStale(filePath, c.Entry(filePath))
 	if err != nil {
 		var zero T
 		return zero, err
@@ -116,10 +104,10 @@ func (c *Cache[T]) LoadLatest(
 			var zero T
 			return zero, err
 		}
-		c.Store(fileName, data, lastModified)
+		c.Store(filePath, data, lastModified)
 		return data, nil
 	}
-	item, _ := c.entries.Load(fileName)
+	item, _ := c.entries.Load(filePath)
 	entry := item.(Entry[T])
 	return entry.Data, nil
 }

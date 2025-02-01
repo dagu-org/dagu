@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/main.go",
+            "program": "${workspaceFolder}/cmd/",
             "args": [
                 "server",
                 "--port=8080",
@@ -18,11 +18,21 @@
             ]
         },
         {
+            "name": "Scheduler",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/",
+            "args": [
+                "scheduler",
+            ]
+        },
+        {
             "name": "Hello World",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/main.go",
+            "program": "${workspaceFolder}/cmd/",
             "args": [
                 "start",
                 "${workspaceFolder}/examples/hello_world.yaml"

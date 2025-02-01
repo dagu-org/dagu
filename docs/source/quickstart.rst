@@ -7,7 +7,7 @@ Quick Start Guide
 1. Launch the Web UI
 ---------------------
 
-Start the server with ``dagu server`` and browse to http://127.0.0.1:8080 to explore the Web UI.
+Start the server with ``dagu start-all`` and browse to http://127.0.0.1:8080 to explore the Web UI.
 
 Note: The server will be started on port ``8080`` by default. You can change the port by passing ``--port`` option. See :ref:`Host and Port Configuration` for more details.
 
@@ -23,24 +23,16 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
 
 .. code-block:: yaml
 
-    schedule: "0 0 * * *"
-    tags: Daily
+    schedule: "* * * * *" # Run the DAG every minute
+    params:
+      - NAME: "Dagu"
     steps:
-      - name: "S1"
-        command: "sleep 2"
-      - name: "S2"
-        command: "sleep 2"
+      - name: Hello world
+        command: echo Hello $NAME
+      - name: Done
+        command: echo Done!
         depends:
-          - "S1"
-      - name: "S3"
-        command: "sleep 2"
-        depends:
-          - "S1"
-      - name: "S4"
-        command: "sleep 2"
-        depends:
-          - "S2"
-          - "S3"
+          - Hello world
 
 4. Execute the DAG
 -------------------

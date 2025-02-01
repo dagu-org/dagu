@@ -5,6 +5,9 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "golang.go"
     },
+    "[markdown]": {
+        "editor.formatOnSave": false
+    },
     "editor.rulers": [
         80
     ],
@@ -18,4 +21,17 @@
     "files.associations": {
         "*.gohtml": "html"
     },
+    "prettier.tabWidth": 2,
+    "editor.tabSize": 2,
+    "cSpell.words": [
+        "dagu",
+        "yota",
+        "hamada",
+        "debugf",
+        "infof",
+        "warnf",
+        "errorf",
+        "fatalf",
+        "mapstructure",
+    ],
 }

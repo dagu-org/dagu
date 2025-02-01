@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
-import { Link, useParams, Routes, Route, useLocation } from 'react-router-dom';
+import { Link, useParams, useLocation } from 'react-router-dom';
 import { GetDAGResponse } from '../../../models/api';
-import DAGSpecErrors from '../../../components/molecules/DAGSpecErrors';
 import DAGStatus from '../../../components/organizations/DAGStatus';
 import { DAGContext } from '../../../contexts/DAGContext';
 import DAGSpec from '../../../components/organizations/DAGSpec';
@@ -13,7 +12,11 @@ import DAGActions from '../../../components/molecules/DAGActions';
 import DAGEditButtons from '../../../components/molecules/DAGEditButtons';
 import LoadingIndicator from '../../../components/atoms/LoadingIndicator';
 import { AppBarContext } from '../../../contexts/AppBarContext';
-import useSWR, { useSWRConfig } from 'swr';
+import useSWR from 'swr';
+import StatusChip from '../../../components/atoms/StatusChip';
+import { CalendarToday, TimerSharp } from '@mui/icons-material';
+import moment from 'moment-timezone';
+import { SchedulerStatus } from '../../../models';
 
 type Params = {
   name: string;
@@ -32,7 +35,7 @@ function DAGDetails() {
   const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
     `/dags/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
       window.location.search
-    ).toString()}`,
+    ).toString()}&remoteNode=${appBarContext.selectedRemoteNode || 'local'}`,
     null,
     {
       refreshInterval: 2000,
@@ -63,6 +66,21 @@ function DAGDetails() {
     name: params.name,
   };
 
+  const formatDuration = (startDate: string, endDate: string) => {
+    if (!startDate || !endDate) return '--';
+    const duration = moment.duration(moment(endDate).diff(moment(startDate)));
+    const hours = Math.floor(duration.asHours());
+    const minutes = duration.minutes();
+    const seconds = duration.seconds();
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
   return (
     <DAGContext.Provider value={ctx}>
       <Stack
@@ -90,6 +108,52 @@ function DAGDetails() {
           />
         </Box>
 
+        {data.DAG?.Status?.Status != SchedulerStatus.None ? (
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{ mx: 4, alignItems: 'center' }}
+          >
+            {data.DAG?.Status?.Status ? (
+              <StatusChip status={data.DAG.Status.Status}>
+                {data.DAG.Status.StatusText || ''}
+              </StatusChip>
+            ) : null}
+
+            <Stack
+              direction="row"
+              color={'text.secondary'}
+              sx={{ alignItems: 'center', ml: 1 }}
+            >
+              <CalendarToday sx={{ mr: 0.5 }} />
+              {data?.DAG?.Status?.FinishedAt
+                ? moment(data.DAG.Status.FinishedAt).format(
+                    'MMM D, YYYY HH:mm:ss Z'
+                  )
+                : '--'}
+            </Stack>
+
+            <Stack
+              direction="row"
+              color={'text.secondary'}
+              sx={{ alignItems: 'center', ml: 1 }}
+            >
+              <TimerSharp sx={{ mr: 0.5 }} />
+              {data?.DAG?.Status?.FinishedAt
+                ? formatDuration(
+                    data?.DAG?.Status?.StartedAt,
+                    data?.DAG?.Status?.FinishedAt
+                  )
+                : data?.DAG?.Status?.StartedAt
+                ? formatDuration(
+                    data?.DAG?.Status?.StartedAt,
+                    moment().toISOString()
+                  )
+                : '--'}
+            </Stack>
+          </Stack>
+        ) : null}
+
         <Stack
           sx={{
             mx: 4,
@@ -111,10 +175,6 @@ function DAGDetails() {
             <DAGEditButtons name={params.name} />
           ) : null}
         </Stack>
-
-        <Box sx={{ mt: 2, mx: 4 }}>
-          <DAGSpecErrors errors={data.Errors} />
-        </Box>
 
         <Box sx={{ mx: 4, flex: 1 }}>
           {tab == 'status' ? (

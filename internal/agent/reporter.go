@@ -1,182 +1,150 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package agent
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 // Sender is a mailer interface.
 type Sender interface {
-	Send(
-		from string, to []string, subject, body string, attachments []string,
-	) error
+	Send(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
 }
 
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
-type reporter struct {
-	sender Sender
-	logger logger.Logger
-}
+type reporter struct{ sender Sender }
 
-func newReporter(sender Sender, lg logger.Logger) *reporter {
-	return &reporter{
-		sender: sender,
-		logger: lg,
-	}
+func newReporter(sender Sender) *reporter {
+	return &reporter{sender: sender}
 }
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	workflow *dag.DAG, status *model.Status, node *scheduler.Node,
+	ctx context.Context, dag *digraph.DAG, status model.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		r.logger.Info("Step execution finished",
-			"step", node.Data().Name,
-			"status", nodeStatus,
-		)
+		logger.Info(ctx, "Step execution finished", "step", node.Data().Step.Name, "status", nodeStatus)
 	}
 	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
-		return r.sender.Send(
-			workflow.ErrorMail.From,
-			[]string{workflow.ErrorMail.To},
-			fmt.Sprintf(
-				"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
-			),
-			renderHTML(status.Nodes),
-			addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
-		)
+		fromAddress := dag.ErrorMail.From
+		toAddresses := []string{dag.ErrorMail.To}
+		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
+		html := renderHTML(status.Nodes)
+		attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
+		return r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
 	}
 	return nil
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) report(status *model.Status, err error) {
+func (r *reporter) getSummary(_ context.Context, status model.Status, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
-	_, _ = buf.Write([]byte(renderSummary(status, err)))
+	_, _ = buf.Write([]byte(renderDAGSummary(status, err)))
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Details ->\n"))
-	_, _ = buf.Write([]byte(renderTable(status.Nodes)))
-	r.logger.Write(buf.String())
+	_, _ = buf.Write([]byte(renderStepSummary(status.Nodes)))
+	return buf.String()
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(
-	workflow *dag.DAG, status *model.Status, err error,
-) error {
+func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status model.Status, err error) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if workflow.MailOn != nil && workflow.MailOn.Failure {
-			return r.sender.Send(
-				workflow.ErrorMail.From,
-				[]string{workflow.ErrorMail.To},
-				fmt.Sprintf(
-					"%s %s (%s)", workflow.ErrorMail.Prefix, workflow.Name, status.Status,
-				),
-				renderHTML(status.Nodes),
-				addAttachmentList(workflow.ErrorMail.AttachLogs, status.Nodes),
-			)
+		if dag.MailOn != nil && dag.MailOn.Failure {
+			fromAddress := dag.ErrorMail.From
+			toAddresses := []string{dag.ErrorMail.To}
+			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
+			html := renderHTML(status.Nodes)
+			attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
+			return r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if workflow.MailOn != nil && workflow.MailOn.Success {
-			_ = r.sender.Send(
-				workflow.InfoMail.From,
-				[]string{workflow.InfoMail.To},
-				fmt.Sprintf(
-					"%s %s (%s)", workflow.InfoMail.Prefix, workflow.Name, status.Status,
-				),
-				renderHTML(status.Nodes),
-				addAttachmentList(workflow.InfoMail.AttachLogs, status.Nodes),
-			)
+		if dag.MailOn != nil && dag.MailOn.Success {
+			fromAddress := dag.InfoMail.From
+			toAddresses := []string{dag.InfoMail.To}
+			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, status.Status)
+			html := renderHTML(status.Nodes)
+			attachments := addAttachments(dag.InfoMail.AttachLogs, status.Nodes)
+			_ = r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	}
 	return nil
 }
 
-func renderSummary(status *model.Status, err error) string {
-	t := table.NewWriter()
-	var errText string
-	if err != nil {
-		errText = err.Error()
-	}
-	t.AppendHeader(
-		table.Row{
-			"RequestID",
-			"Name",
-			"Started At",
-			"Finished At",
-			"Status",
-			"Params",
-			"Error",
-		},
-	)
-	t.AppendRow(table.Row{
+var dagHeader = table.Row{
+	"RequestID",
+	"Name",
+	"Started At",
+	"Finished At",
+	"Status",
+	"Params",
+	"Error",
+}
+
+func renderDAGSummary(status model.Status, err error) string {
+	dataRow := table.Row{
 		status.RequestID,
 		status.Name,
 		status.StartedAt,
 		status.FinishedAt,
 		status.Status,
 		status.Params,
-		errText,
-	})
-	return t.Render()
+	}
+	if err != nil {
+		dataRow = append(dataRow, err.Error())
+	} else {
+		dataRow = append(dataRow, "")
+	}
+
+	reportTable := table.NewWriter()
+	reportTable.AppendHeader(dagHeader)
+	reportTable.AppendRow(dataRow)
+	return reportTable.Render()
 }
 
-func renderTable(nodes []*model.Node) string {
-	t := table.NewWriter()
-	t.AppendHeader(
-		table.Row{
-			"#",
-			"Step",
-			"Started At",
-			"Finished At",
-			"Status",
-			"Command",
-			"Error",
-		},
-	)
+var stepHeader = table.Row{
+	"#",
+	"Step",
+	"Started At",
+	"Finished At",
+	"Status",
+	"Command",
+	"Error",
+}
+
+func renderStepSummary(nodes []*model.Node) string {
+	stepTable := table.NewWriter()
+	stepTable.AppendHeader(stepHeader)
+
 	for i, n := range nodes {
-		var command = n.Command
-		if n.Args != nil {
-			command = strings.Join(
-				[]string{n.Command, strings.Join(n.Args, " ")}, " ",
-			)
-		}
-		t.AppendRow(table.Row{
-			fmt.Sprintf("%d", i+1),
-			n.Name,
+		number := fmt.Sprintf("%d", i+1)
+		dataRow := table.Row{
+			number,
+			n.Step.Name,
 			n.StartedAt,
 			n.FinishedAt,
 			n.StatusText,
-			command,
-			n.Error,
-		})
+		}
+		if n.Step.Args != nil {
+			dataRow = append(dataRow, strings.Join(n.Step.Args, " "))
+		} else {
+			dataRow = append(dataRow, "")
+		}
+		dataRow = append(dataRow, n.Error)
+		stepTable.AppendRow(dataRow)
 	}
-	return t.Render()
+
+	return stepTable.Render()
 }
 
 func renderHTML(nodes []*model.Node) string {
@@ -215,7 +183,7 @@ func renderHTML(nodes []*model.Node) string {
 	}
 	for _, n := range nodes {
 		_, _ = buffer.WriteString("<tr>")
-		addValFunc(n.Name)
+		addValFunc(n.Step.Name)
 		addValFunc(n.StartedAt)
 		addValFunc(n.FinishedAt)
 		addStatusFunc(n.Status)
@@ -226,7 +194,7 @@ func renderHTML(nodes []*model.Node) string {
 	return buffer.String()
 }
 
-func addAttachmentList(
+func addAttachments(
 	trigger bool, nodes []*model.Node,
 ) (attachments []string) {
 	if trigger {

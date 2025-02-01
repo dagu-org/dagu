@@ -1,115 +1,108 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package jsondb
 
 import (
+	"context"
 	"fmt"
-	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/persistence/model"
-
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestWriteStatusToFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+func TestWriter(t *testing.T) {
+	th := testSetup(t)
 
-	d := &dag.DAG{
-		Name:     "test_write_status",
-		Location: "test_write_status.yaml",
-	}
-	dw, file, err := db.newWriter(d.Location, time.Now(), "request-id-1")
-	require.NoError(t, err)
-	require.NoError(t, dw.open())
-	defer func() {
-		_ = dw.close()
-		_ = db.RemoveOld(d.Location, 0)
-	}()
+	t.Run("WriteStatusToNewFile", func(t *testing.T) {
+		dag := th.DAG("test_write_status")
+		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusRunning, testPID, time.Now(),
+		)
+		writer := dag.Writer(t, requestID, time.Now())
+		writer.Write(t, status)
 
-	status := model.NewStatus(d, nil, scheduler.StatusRunning, 10000, nil, nil)
-	status.RequestID = fmt.Sprintf("request-id-%d", time.Now().Unix())
-	require.NoError(t, dw.write(status))
-	require.Regexp(t, ".*test_write_status.*", file)
+		writer.AssertContent(t, "test_write_status", requestID, scheduler.StatusRunning)
+	})
 
-	dat, err := os.ReadFile(file)
-	require.NoError(t, err)
+	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
+		dag := th.DAG("test_append_to_existing")
+		requestID := "request-id-test-write-status-to-existing-file"
+		startedAt := time.Now()
 
-	r, err := model.StatusFromJSON(string(dat))
-	require.NoError(t, err)
+		writer := dag.Writer(t, requestID, startedAt)
 
-	require.Equal(t, d.Name, r.Name)
+		status := model.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusCancel, testPID, time.Now(),
+		)
 
-	err = dw.close()
-	require.NoError(t, err)
+		// Write initial status
+		writer.Write(t, status)
+		writer.Close(t)
+		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusCancel)
 
-	// TODO: fixme
-	oldS := d.Location
-	newS := "text_write_status_new.yaml"
+		// Append to existing file
+		writer = dag.Writer(t, requestID, startedAt)
+		status.Status = scheduler.StatusSuccess
+		writer.Write(t, status)
+		writer.Close(t)
 
-	oldDir := db.getDirectory(oldS, prefix(oldS))
-	newDir := db.getDirectory(newS, prefix(newS))
-	require.DirExists(t, oldDir)
-	require.NoDirExists(t, newDir)
-
-	err = db.Rename(oldS, newS)
-	require.NoError(t, err)
-	require.NoDirExists(t, oldDir)
-	require.DirExists(t, newDir)
-
-	ret := db.ReadStatusRecent(newS, 1)
-	require.Equal(t, 1, len(ret))
-	require.Equal(t, status.RequestID, ret[0].Status.RequestID)
+		// Verify appended data
+		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusSuccess)
+	})
 }
 
-func TestWriteStatusToExistingFile(t *testing.T) {
-	tmpDir, db := setupTest(t)
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+func TestWriterErrorHandling(t *testing.T) {
+	th := testSetup(t)
 
-	d := &dag.DAG{Name: "test_append_to_existing", Location: "test_append_to_existing.yaml"}
-	dw, file, err := db.newWriter(d.Location, time.Now(), "request-id-1")
+	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
+		writer := newWriter("/nonexistent/dir/file.dat")
+		err := writer.open()
+		assert.Error(t, err)
+	})
+
+	t.Run("WriteToClosedWriter", func(t *testing.T) {
+		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.open())
+		require.NoError(t, writer.close())
+
+		dag := th.DAG("test_write_to_closed_writer")
+		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+		status := model.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, testPID, time.Now())
+		assert.Error(t, writer.write(status))
+	})
+
+	t.Run("CloseMultipleTimes", func(t *testing.T) {
+		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.open())
+		require.NoError(t, writer.close())
+		assert.NoError(t, writer.close()) // Second close should not return an error
+	})
+}
+
+func TestWriterRename(t *testing.T) {
+	th := testSetup(t)
+
+	// Create a status file with old path
+	dag := th.DAG("test_rename_old")
+	writer := dag.Writer(t, "request-id-1", time.Now())
+	requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
+	status := model.NewStatusFactory(dag.DAG).Create(
+		requestID, scheduler.StatusRunning, testPID, time.Now(),
+	)
+	writer.Write(t, status)
+	writer.Close(t)
+	require.FileExists(t, writer.FilePath)
+
+	// Rename and verify the file
+	newDAG := th.DAG("test_rename_new")
+	err := th.DB.Rename(context.Background(), dag.Location, newDAG.Location)
 	require.NoError(t, err)
-	require.NoError(t, dw.open())
+	newWriter := newDAG.Writer(t, "request-id-2", time.Now())
 
-	status := model.NewStatus(d, nil, scheduler.StatusCancel, 10000, nil, nil)
-	status.RequestID = "request-id-test-write-status-to-existing-file"
-	require.NoError(t, dw.write(status))
-	_ = dw.close()
-
-	data, err := db.FindByRequestID(d.Location, status.RequestID)
-	require.NoError(t, err)
-	require.Equal(t, data.Status.Status, scheduler.StatusCancel)
-	require.Equal(t, file, data.File)
-
-	dw = &writer{target: file}
-	require.NoError(t, dw.open())
-	status.Status = scheduler.StatusSuccess
-	require.NoError(t, dw.write(status))
-	_ = dw.close()
-
-	data, err = db.FindByRequestID(d.Location, status.RequestID)
-	require.NoError(t, err)
-	require.Equal(t, data.Status.Status, scheduler.StatusSuccess)
-	require.Equal(t, file, data.File)
+	require.NoFileExists(t, writer.FilePath)
+	require.FileExists(t, newWriter.FilePath)
 }

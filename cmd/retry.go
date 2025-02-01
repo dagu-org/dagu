@@ -1,30 +1,21 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-package cmd
+package main
 
 import (
-	"log"
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/daguflow/dagu/internal/agent"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/agent"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/spf13/cobra"
+)
+
+const (
+	retryPrefix = "retry_"
 )
 
 func retryCmd() *cobra.Command {
@@ -33,106 +24,131 @@ func retryCmd() *cobra.Command {
 		Short: "Retry the DAG execution",
 		Long:  `dagu retry --req=<request-id> /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-			initLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-			})
-
-			requestID, err := cmd.Flags().GetString("req")
-			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
-				os.Exit(1)
-			}
-
-			// Read the specified DAG execution status from the history store.
-			dataStore := newDataStores(cfg)
-			historyStore := dataStore.HistoryStore()
-
-			specFilePath := args[0]
-			absoluteFilePath, err := filepath.Abs(specFilePath)
-			if err != nil {
-				initLogger.Error("Absolute path resolution failed",
-					"error", err,
-					"file", specFilePath)
-				os.Exit(1)
-			}
-
-			status, err := historyStore.FindByRequestID(absoluteFilePath, requestID)
-			if err != nil {
-				initLogger.Error("Historical execution retrieval failed",
-					"error", err,
-					"requestID", requestID,
-					"file", absoluteFilePath)
-				os.Exit(1)
-			}
-
-			// Start the DAG with the same parameters with the execution that
-			// is being retried.
-			workflow, err := dag.Load(cfg.BaseConfig, absoluteFilePath, status.Status.Params)
-			if err != nil {
-				initLogger.Error("Workflow specification load failed",
-					"error", err,
-					"file", specFilePath,
-					"params", status.Status.Params)
-				os.Exit(1)
-			}
-
-			newRequestID, err := generateRequestID()
-			if err != nil {
-				initLogger.Error("Request ID generation failed", "error", err)
-				os.Exit(1)
-			}
-
-			logFile, err := openLogFile("dry_", cfg.LogDir, workflow, newRequestID)
-			if err != nil {
-				initLogger.Error("Log file creation failed",
-					"error", err,
-					"workflow", workflow.Name)
-				os.Exit(1)
-			}
-			defer logFile.Close()
-
-			agentLogger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:   cfg.Debug,
-				Format:  cfg.LogFormat,
-				LogFile: logFile,
-			})
-
-			cli := newClient(cfg, dataStore, agentLogger)
-
-			agentLogger.Info("Workflow retry initiated",
-				"workflow", workflow.Name,
-				"originalRequestID", requestID,
-				"newRequestID", newRequestID,
-				"logFile", logFile.Name())
-
-			agt := agent.New(
-				newRequestID,
-				workflow,
-				agentLogger,
-				filepath.Dir(logFile.Name()),
-				logFile.Name(),
-				cli,
-				dataStore,
-				&agent.Options{RetryTarget: status.Status},
-			)
-
-			ctx := cmd.Context()
-			listenSignals(ctx, agt)
-
-			if err := agt.Run(ctx); err != nil {
-				agentLogger.Error("Failed to start workflow", "error", err)
-				os.Exit(1)
-			}
-		},
+		RunE:  wrapRunE(runRetry),
 	}
 
 	cmd.Flags().StringP("req", "r", "", "request-id")
 	_ = cmd.MarkFlagRequired("req")
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
+}
+
+func runRetry(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	setup := newSetup(cfg)
+
+	// Get quiet flag
+	quiet, err := cmd.Flags().GetBool("quiet")
+	if err != nil {
+		return fmt.Errorf("failed to get quiet flag: %w", err)
+	}
+
+	requestID, err := cmd.Flags().GetString("req")
+	if err != nil {
+		return fmt.Errorf("failed to get request ID: %w", err)
+	}
+
+	ctx := setup.loggerContext(cmd.Context(), quiet)
+
+	specFilePath := args[0]
+
+	absolutePath, err := filepath.Abs(specFilePath)
+	if err != nil {
+		logger.Error(ctx, "Failed to resolve absolute path", "path", specFilePath, "err", err)
+		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
+	}
+
+	status, err := setup.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	if err != nil {
+		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
+		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
+	}
+
+	loadOpts := []digraph.LoadOption{
+		digraph.WithBaseConfig(cfg.Paths.BaseConfig),
+	}
+
+	if status.Status.Params != "" {
+		// backward compatibility
+		loadOpts = append(loadOpts, digraph.WithParams(status.Status.Params))
+	} else {
+		loadOpts = append(loadOpts, digraph.WithParams(status.Status.ParamsList))
+	}
+
+	dag, err := digraph.Load(ctx, absolutePath, loadOpts...)
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG specification", "path", specFilePath, "err", err)
+		// nolint : staticcheck
+		return fmt.Errorf("failed to load DAG specification from %s with params %s: %w",
+			specFilePath, status.Status.Params, err)
+	}
+
+	// Execute DAG retry
+	if err := executeRetry(ctx, dag, setup, status, quiet); err != nil {
+		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
+		return fmt.Errorf("failed to execute retry: %w", err)
+	}
+
+	return nil
+}
+
+func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalStatus *model.StatusFile, quiet bool) error {
+	newRequestID, err := generateRequestID()
+	if err != nil {
+		return fmt.Errorf("failed to generate new request ID: %w", err)
+	}
+
+	logFile, err := setup.openLogFile(ctx, retryPrefix, dag, newRequestID)
+	if err != nil {
+		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
+	}
+	defer logFile.Close()
+
+	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "originalRequestID", originalStatus.Status.RequestID, "newRequestID", newRequestID, "logFile", logFile.Name())
+
+	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
+
+	dagStore, err := setup.dagStore()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
+		return fmt.Errorf("failed to initialize DAG store: %w", err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "Failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
+
+	agt := agent.New(
+		newRequestID,
+		dag,
+		filepath.Dir(logFile.Name()),
+		logFile.Name(),
+		cli,
+		dagStore,
+		setup.historyStore(),
+		agent.Options{RetryTarget: &originalStatus.Status},
+	)
+
+	listenSignals(ctx, agt)
+
+	if err := agt.Run(ctx); err != nil {
+		if quiet {
+			os.Exit(1)
+		} else {
+			agt.PrintSummary(ctx)
+			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
+		}
+	}
+
+	if !quiet {
+		agt.PrintSummary(ctx)
+	}
+
+	return nil
 }

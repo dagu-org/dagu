@@ -10,20 +10,56 @@ import { useLocation } from 'react-router-dom';
 import { ListWorkflowsResponse } from '../../models/api';
 import { AppBarContext } from '../../contexts/AppBarContext';
 import useSWR, { useSWRConfig } from 'swr';
+import DAGPagination from '../../components/molecules/DAGPagination';
+import { debounce } from 'lodash';
+import { useUserPreferences } from '../../contexts/UserPreference';
 
 function DAGs() {
   const useQuery = () => new URLSearchParams(useLocation().search);
   const query = useQuery();
   const group = query.get('group') || '';
   const appBarContext = React.useContext(AppBarContext);
+  const [searchText, setSearchText] = React.useState(query.get('search') || '');
+  const [searchTag, setSearchTag] = React.useState(query.get('tag') || '');
+  const [page, setPage] = React.useState(parseInt(query.get('page') || '1'));
+  const [apiSearchText, setAPISearchText] = React.useState(
+    query.get('search') || ''
+  );
+  const [apiSearchTag, setAPISearchTag] = React.useState(
+    query.get('tag') || ''
+  );
+
+  const { preferences, updatePreference } = useUserPreferences();
+  // Use preferences.pageLimit instead of local state
+  const handlePageLimitChange = (newLimit: number) => {
+    updatePreference('pageLimit', newLimit);
+  };
 
   const { cache, mutate } = useSWRConfig();
-  const { data } = useSWR<ListWorkflowsResponse>(`/dags`, null, {
+  const endPoint = `/dags?${new URLSearchParams({
+    page: page.toString(),
+    limit: preferences.pageLimit.toString(),
+    searchName: apiSearchText,
+    searchTag: apiSearchTag,
+    remoteNode: appBarContext.selectedRemoteNode || 'local',
+  }).toString()}`;
+  const { data } = useSWR<ListWorkflowsResponse>(endPoint, null, {
     refreshInterval: 10000,
+    revalidateIfStale: false,
   });
 
+  const addSearchParam = (key: string, value: string) => {
+    const locationQuery = new URLSearchParams(window.location.search);
+    locationQuery.set(key, value);
+    window.history.pushState(
+      {},
+      '',
+      `${window.location.pathname}?${locationQuery.toString()}`
+    );
+  };
+
   const refreshFn = React.useCallback(() => {
-    setTimeout(() => mutate(`/dags`), 500);
+    setTimeout(() => mutate(endPoint), 500);
   }, [mutate, cache]);
 
   React.useEffect(() => {
@@ -45,6 +81,41 @@ function DAGs() {
     }
     return ret;
   }, [data]);
+
+  const pageChange = (page: number) => {
+    addSearchParam('page', page.toString());
+    setPage(page);
+  };
+
+  const debouncedAPISearchText = React.useMemo(
+    () =>
+      debounce((searchText: string) => {
+        setAPISearchText(searchText);
+      }, 500),
+    []
+  );
+
+  const debouncedAPISearchTag = React.useMemo(
+    () =>
+      debounce((searchTag: string) => {
+        setAPISearchTag(searchTag);
+      }, 500),
+    []
+  );
+
+  const searchTextChange = (searchText: string) => {
+    addSearchParam('search', searchText);
+    setSearchText(searchText);
+    setPage(1);
+    debouncedAPISearchText(searchText);
+  };
+
+  const searchTagChange = (searchTag: string) => {
+    addSearchParam('tag', searchTag);
+    setSearchTag(searchTag);
+    setPage(1);
+    debouncedAPISearchTag(searchTag);
+  };
 
   return (
     <Box
@@ -80,7 +151,18 @@ function DAGs() {
                 DAGs={merged}
                 group={group}
                 refreshFn={refreshFn}
+                searchText={searchText}
+                handleSearchTextChange={searchTextChange}
+                searchTag={searchTag}
+                handleSearchTagChange={searchTagChange}
               ></DAGTable>
+              <DAGPagination
+                totalPages={data.PageCount}
+                page={page}
+                pageChange={pageChange}
+                onPageLimitChange={handlePageLimitChange}
+                pageLimit={preferences.pageLimit}
+              />
             </React.Fragment>
           )}
         </WithLoading>

@@ -6,13 +6,17 @@ import Title from '../../components/atoms/Title';
 import { GetSearchResponse } from '../../models/api';
 import SearchResult from '../../components/molecules/SearchResult';
 import LoadingIndicator from '../../components/atoms/LoadingIndicator';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchVal, setSearchVal] = React.useState(searchParams.get('q') || '');
+  const appBarContext = React.useContext(AppBarContext);
 
   const { data, error } = useSWR<GetSearchResponse>(
-    `/search?q=${searchParams.get('q') || ''}`
+    `/search?q=${searchParams.get('q') || ''}&remoteNode=${
+      appBarContext.selectedRemoteNode || 'local'
+    }`
   );
   const ref = useRef<HTMLInputElement>(null);
 
@@ -69,18 +73,31 @@ function Search() {
         </Stack>
 
         <Box mt={2}>
-          {!data && !error ? <LoadingIndicator /> : null}
-          {data && data.Results.length == 0 ? (
-            <Box>No results found</Box>
-          ) : null}
-          {data && data.Results.length > 0 ? (
-            <Box>
-              <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
-                {data.Results.length} results found
-              </Typography>
-              <SearchResult results={data?.Results} />
-            </Box>
-          ) : null}
+          {(() => {
+            if (!data && !error) {
+              return <LoadingIndicator />;
+            }
+
+            if (data && data.Results && data.Results.length > 0) {
+              return (
+                <Box>
+                  <Typography variant="h6" style={{ fontStyle: 'bolder' }}>
+                    {data.Results.length} results found
+                  </Typography>
+                  <SearchResult results={data?.Results} />
+                </Box>
+              );
+            }
+
+            if (
+              (data && !data.Results) ||
+              (data && data.Results && data.Results.length === 0)
+            ) {
+              return <Box>No results found</Box>;
+            }
+
+            return null;
+          })()}
         </Box>
       </Grid>
     </Grid>

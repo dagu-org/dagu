@@ -18,12 +18,14 @@ import {
   faXmark,
   faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
+import { AppBarContext } from '../../contexts/AppBarContext';
 
 type Props = {
   data: GetDAGResponse;
 };
 
 function DAGSpec({ data }: Props) {
+  const appBarContext = React.useContext(AppBarContext);
   const [editing, setEditing] = React.useState(false);
   const [currentValue, setCurrentValue] = React.useState(data.Definition);
   const handlers = getHandlers(data.DAG?.DAG);
@@ -71,6 +73,7 @@ function DAGSpec({ data }: Props) {
                     steps={data.DAG.DAG.Steps}
                     type="config"
                     flowchart={flowchart}
+                    showIcons={false}
                   />
                 </Box>
               </BorderedBox>
@@ -133,6 +136,8 @@ function DAGSpec({ data }: Props) {
                         onClick={async () => {
                           const url = `${getConfig().apiURL}/dags/${
                             props.name
+                          }?remoteNode=${
+                            appBarContext.selectedRemoteNode || 'local'
                           }`;
                           const resp = await fetch(url, {
                             method: 'POST',

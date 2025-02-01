@@ -1,30 +1,15 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package model
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
-func FromSteps(steps []dag.Step) []*Node {
+func FromSteps(steps []digraph.Step) []*Node {
 	var ret []*Node
 	for _, s := range steps {
 		ret = append(ret, NewNode(s))
@@ -43,44 +28,48 @@ func FromNodes(nodes []scheduler.NodeData) []*Node {
 func FromNode(node scheduler.NodeData) *Node {
 	return &Node{
 		Step:       node.Step,
-		Log:        node.Log,
-		StartedAt:  util.FormatTime(node.StartedAt),
-		FinishedAt: util.FormatTime(node.FinishedAt),
-		Status:     node.Status,
-		StatusText: node.Status.String(),
-		RetryCount: node.RetryCount,
-		DoneCount:  node.DoneCount,
-		Error:      errText(node.Error),
+		Log:        node.State.Log,
+		StartedAt:  stringutil.FormatTime(node.State.StartedAt),
+		FinishedAt: stringutil.FormatTime(node.State.FinishedAt),
+		Status:     node.State.Status,
+		StatusText: node.State.Status.String(),
+		RetriedAt:  stringutil.FormatTime(node.State.RetriedAt),
+		RetryCount: node.State.RetryCount,
+		DoneCount:  node.State.DoneCount,
+		Error:      errText(node.State.Error),
 	}
 }
 
 type Node struct {
-	dag.Step   `json:"Step"`
+	Step       digraph.Step         `json:"Step"`
 	Log        string               `json:"Log"`
 	StartedAt  string               `json:"StartedAt"`
 	FinishedAt string               `json:"FinishedAt"`
 	Status     scheduler.NodeStatus `json:"Status"`
-	RetryCount int                  `json:"RetryCount"`
-	DoneCount  int                  `json:"DoneCount"`
-	Error      string               `json:"Error"`
+	RetriedAt  string               `json:"RetriedAt,omitempty"`
+	RetryCount int                  `json:"RetryCount,omitempty"`
+	DoneCount  int                  `json:"DoneCount,omitempty"`
+	Error      string               `json:"Error,omitempty"`
 	StatusText string               `json:"StatusText"`
 }
 
 func (n *Node) ToNode() *scheduler.Node {
-	startedAt, _ := util.ParseTime(n.StartedAt)
-	finishedAt, _ := util.ParseTime(n.FinishedAt)
+	startedAt, _ := stringutil.ParseTime(n.StartedAt)
+	finishedAt, _ := stringutil.ParseTime(n.FinishedAt)
+	retriedAt, _ := stringutil.ParseTime(n.RetriedAt)
 	return scheduler.NewNode(n.Step, scheduler.NodeState{
 		Status:     n.Status,
 		Log:        n.Log,
 		StartedAt:  startedAt,
 		FinishedAt: finishedAt,
+		RetriedAt:  retriedAt,
 		RetryCount: n.RetryCount,
 		DoneCount:  n.DoneCount,
 		Error:      errFromText(n.Error),
 	})
 }
 
-func NewNode(step dag.Step) *Node {
+func NewNode(step digraph.Step) *Node {
 	return &Node{
 		Step:       step,
 		StartedAt:  "-",

@@ -1,6 +1,6 @@
-.. _Example DAGs:
+.. _Examples:
 
-Example DAGs
+Examples
 ============
 
 .. contents::
@@ -11,14 +11,15 @@ Hello World
 
 .. code-block:: yaml
 
-  name: hello world
+  params:
+    - NAME: "Dagu"
   steps:
-    - name: s1
-      command: echo hello world
-    - name: s2
-      command: echo done!
+    - name: Hello world
+      command: echo Hello $NAME
+    - name: Done
+      command: echo Done!
       depends:
-        - s1
+        - Hello world
 
 
 Conditional Steps
@@ -45,7 +46,7 @@ Conditional Steps
         - condition: "$1"
           expected: bar
 
-.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/conditional.png
+.. image:: https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/conditional.png
 
 
 File Output
@@ -178,7 +179,7 @@ Expected Output:
 Sending Email Notifications
 ---------------------------
 
-.. image:: https://raw.githubusercontent.com/daguflow/dagu/main/examples/images/email.png
+.. image:: https://raw.githubusercontent.com/dagu-org/dagu/main/examples/images/email.png
 
 .. code-block:: yaml
 

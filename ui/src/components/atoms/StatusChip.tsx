@@ -9,12 +9,12 @@ type Props = {
 };
 
 function StatusChip({ status, children }: Props) {
-  const style = React.useMemo(() => {
+  const style = () => {
     if (!status) {
       return {};
     }
     return statusColorMapping[status] || {};
-  }, [status]);
+  };
   return <Chip sx={style} size="small" label={children} />;
 }
 

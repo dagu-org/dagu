@@ -58,6 +58,7 @@ export type ListWorkflowsResponse = {
   DAGs?: WorkflowListItem[];
   Errors?: string[];
   HasError: boolean;
+  PageCount: number;
 };
 
 export type WorkflowListItem = {

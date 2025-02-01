@@ -1,92 +1,143 @@
 .. _Configuration Options:
 
 Configurations
-==============
+=============
 
 .. contents::
     :local:
 
-.. _Environment Variables:
+Introduction
+-----------
+Dagu offers multiple ways to configure its behavior, from environment variables to configuration files. This document covers all available configuration options for setting up Dagu in different environments.
+
+Configuration Methods
+-------------------
+There are three ways to configure Dagu:
+
+1. Command-line arguments
+2. Environment variables
+3. Configuration file
 
 Environment Variables
-----------------------
+-------------------
 
-The following environment variables can be used to configure the Dagu. Default values are provided in the parentheses:
+Server Configuration
+~~~~~~~~~~~~~~~~~~
+- ``DAGU_HOST`` (``127.0.0.1``): Server binding host
+- ``DAGU_PORT`` (``8080``): Server binding port
+- ``DAGU_BASE_PATH`` (``""``): Base path to serve the application (e.g., ``/dagu``)
+- ``DAGU_TZ`` (``""``): Server timezone (default: system timezone, e.g., ``Asia/Tokyo``)
+- ``DAGU_CERT_FILE``: SSL certificate file path
+- ``DAGU_KEY_FILE``: SSL key file path
+- ``DAGU_HEADLESS`` (``""``): Run the server in headless mode (1=enabled)
 
-- ``DAGU_HOST`` (``127.0.0.1``): The host to bind the server to.
-- ``DAGU_PORT`` (``8080``): The port to bind the server to.
-- ``DAGU_DAGS`` (``$HOME/.config/dagu/dags``): The directory containing the DAGs.
-- ``DAGU_IS_BASICAUTH`` (``0``): Set to 1 to enable basic authentication.
-- ``DAGU_BASICAUTH_USERNAME`` (``""``): The username to use for basic authentication.
-- ``DAGU_BASICAUTH_PASSWORD`` (``""``): The password to use for basic authentication.
-- ``DAGU_LOG_DIR`` (``$HOME/.local/share/logs``): The directory where logs will be stored.
-- ``DAGU_DATA_DIR`` (``$HOME/.local/share/history``): The directory where application data will be stored.
-- ``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): The directory containing DAG suspend flags.
-- ``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): The directory where admin logs will be stored.
-- ``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): The path to the base configuration file.
-- ``DAGU_NAVBAR_COLOR`` (``""``): The color to use for the navigation bar. E.g., ``red`` or ``#ff0000``.
-- ``DAGU_NAVBAR_TITLE`` (``Dagu``): The title to display in the navigation bar. E.g., ``Dagu - PROD`` or ``Dagu - DEV``
-- ``DAGU_WORK_DIR``: The working directory for DAGs. If not set, the default value is DAG location. Also you can set the working directory for each DAG steps in the DAG configuration file. For more information, see :ref:`specifying working dir`.
-- ``DAGU_CERT_FILE``: The path to the SSL certificate file.
-- ``DAGU_KEY_FILE`` : The path to the SSL key file.
+Directory Paths
+~~~~~~~~~~~~~
+- ``DAGU_DAGS_DIR`` (``$HOME/.config/dagu/dags``): DAG definitions directory
+- ``DAGU_LOG_DIR`` (``$HOME/.local/share/dagu/logs``): Log files directory
+- ``DAGU_DATA_DIR`` (``$HOME/.local/share/dagu/history``): Application data directory
+- ``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): DAG suspend flags directory
+- ``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): Admin logs directory
+- ``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): Base configuration file path
+- ``DAGU_WORK_DIR``: Default working directory for DAGs (default: DAG location)
 
-Config File
---------------
+Authentication
+~~~~~~~~~~~~
+- ``DAGU_IS_BASICAUTH`` (``0``): Enable basic authentication (1=enabled)
+- ``DAGU_BASICAUTH_USERNAME`` (``""``): Basic auth username
+- ``DAGU_BASICAUTH_PASSWORD`` (``""``): Basic auth password
 
-You can create ``admin.yaml`` file in ``$HOME/.config/dagu/`` to override the default configuration values. The following configuration options are available:
+UI Customization
+~~~~~~~~~~~~~~
+- ``DAGU_NAVBAR_COLOR`` (``""``): Navigation bar color (e.g., ``red`` or ``#ff0000``)
+- ``DAGU_NAVBAR_TITLE`` (``Dagu``): Navigation bar title (e.g., ``Dagu - PROD``)
+
+Configuration File
+----------------
+Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. Below is a complete example with all available options:
 
 .. code-block:: yaml
 
-    host: <hostname for web UI address>                          # default: 127.0.0.1
-    port: <port number for web UI address>                       # default: 8080
-
-    # to show latest status of dags from today or history
-    latestStatusToday: true
-
-    # path to the DAGs directory
-    dags: <the location of DAG configuration files>              # default: ${HOME}/.config/dagu/dags
+    # Server Configuration
+    host: "127.0.0.1" # Web UI hostname
+    port: 8080        # Web UI port
+    basePath: ""      # Base path to serve the application
+    tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
     
-    # Web UI Color & Title
-    navbarColor: <ui header color>                               # header color for web UI (e.g. "#ff0000")
-    navbarTitle: <ui title text>                                 # header title for web UI (e.g. "PROD")
+    # Directory Configuration
+    dagsDir: "${HOME}/.config/dagu/dags"          # DAG definitions location
+    workDir: "/path/to/work"                      # Default working directory
+    baseConfig: "${HOME}/.config/dagu/base.yaml"  # Base DAG config
     
-    # Basic Auth
-    isBasicAuth: <true|false>                                    # enables basic auth
-    basicAuthUsername: <username for basic auth of web UI>       # basic auth user
-    basicAuthPassword: <password for basic auth of web UI>       # basic auth password
-
-    # API Token
-    isAuthToken: <true|false>                                    # enables API token
-    authToken: <token for API access>                            # API token
-
-    # Base Config
-    baseConfig: <base DAG config path>                           # default: ${HOME}/.config/dagu/base.yaml
-
-    # Working Directory
-    workDir: <working directory for DAGs>                        # default: DAG location
-
+    # UI Configuration
+    navbarColor: "#ff0000"     # Header color
+    navbarTitle: "Dagu - PROD" # Header title
+    latestStatusToday: true    # Show today's latest status
+    headless: true             # Run in headless mode
+    
+    # Authentication
+    isBasicAuth: true           # Enable basic auth
+    basicAuthUsername: "admin"  # Basic auth username
+    basicAuthPassword: "secret" # Basic auth password
+    
+    # API Authentication
+    isAuthToken: true              # Enable API token
+    authToken: "your-secret-token" # API token value
+    
     # SSL Configuration
     tls:
-        certFile: <path to SSL certificate file>
-        keyFile: <path to SSL key file>
+        certFile: "/path/to/cert.pem"
+        keyFile: "/path/to/key.pem"
 
-.. _Host and Port Configuration:
+Server Configuration
+------------------
+There are multiple ways to configure the server's host and port:
 
-Server's Host and Port Configuration
--------------------------------------
+1. Command-line arguments (highest precedence):
+  .. code-block:: sh
+      
+      dagu server --host=0.0.0.0 --port=8000
+ 
+2. Environment variables:
+  .. code-block:: sh
+      
+      DAGU_HOST=0.0.0.0 DAGU_PORT=8000 dagu server
+ 
+3. Configuration file (config.yaml):
+  .. code-block:: yaml
+      
+      host: "0.0.0.0"
+      port: 8000
 
-To specify the host and port for running the Dagu server, there are a couple of ways to do it.
+Quick Reference
+-------------
+Most commonly used configurations:
 
-The first way is to specify the ``DAGU_HOST`` and ``DAGU_PORT`` environment variables. For example, you could run the following command:
+1. Basic server setup:
+ .. code-block:: yaml
+     
+   host: "127.0.0.1"
+   port: 8080
+   dags: "${HOME}/dags"
 
-.. code-block:: sh
+2. Production setup:
+ .. code-block:: yaml
+     
+   host: "0.0.0.0"
+   port: 443
+   isBasicAuth: true
+   basicAuthUsername: "admin"
+   basicAuthPassword: "strong-password"
+   tls:
+       certFile: "/path/to/cert.pem"
+       keyFile: "/path/to/key.pem"
+   navbarColor: "#ff0000"
+   navbarTitle: "Dagu - PROD"
 
-    DAGU_PORT=8000 dagu server
-
-The second way is to use the ``--host`` and ``--port`` options when running the ``dagu server`` command. For example:
-
-.. code-block:: sh
-
-    dagu server --port=8000
-
-See :ref:`Environment Variables` for more information.
+3. Development setup:
+ .. code-block:: yaml
+     
+   host: "127.0.0.1"
+   port: 8080
+   navbarColor: "#00ff00"
+   navbarTitle: "Dagu - DEV"

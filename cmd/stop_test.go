@@ -1,61 +1,38 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-package cmd
+package main
 
 import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 )
 
 func TestStopCommand(t *testing.T) {
 	t.Run("StopDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := testSetup(t)
 
-		dagFile := testDAGFile("long2.yaml")
+		dagFile := th.DAGFile("long2.yaml")
 
-		// Start the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, startCmd(), cmdTest{args: []string{"start", dagFile}})
+			// Start the DAG to stop.
+			args := []string{"start", dagFile.Path}
+			th.RunCommand(t, startCmd(), cmdTest{args: args})
 			close(done)
 		}()
 
 		time.Sleep(time.Millisecond * 100)
 
 		// Wait for the DAG running.
-		testLastStatusEventual(
-			t,
-			setup.DataStore().HistoryStore(),
-			dagFile,
-			scheduler.StatusRunning,
-		)
+		dagFile.AssertLastStatus(t, scheduler.StatusRunning)
 
 		// Stop the DAG.
-		testRunCommand(t, stopCmd(), cmdTest{
-			args:        []string{"stop", dagFile},
-			expectedOut: []string{"Stopping..."}})
+		th.RunCommand(t, stopCmd(), cmdTest{
+			args:        []string{"stop", dagFile.Path},
+			expectedOut: []string{"DAG stopped"}})
 
-		// Check the last execution is cancelled.
-		testLastStatusEventual(
-			t, setup.DataStore().HistoryStore(), dagFile, scheduler.StatusCancel,
-		)
+		// Check the DAG is stopped.
+		dagFile.AssertLastStatus(t, scheduler.StatusCancel)
 		<-done
 	})
 }

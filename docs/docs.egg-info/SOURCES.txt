@@ -1,8 +1,0 @@
-README.md
-pyproject.toml
-docs.egg-info/PKG-INFO
-docs.egg-info/SOURCES.txt
-docs.egg-info/dependency_links.txt
-docs.egg-info/requires.txt
-docs.egg-info/top_level.txt
-source/conf.py

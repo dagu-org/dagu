@@ -1,18 +1,3 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package model
 
 import (
@@ -20,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 
 	"github.com/stretchr/testify/require"
 )
@@ -38,52 +23,55 @@ func TestPID(t *testing.T) {
 }
 
 func TestStatusSerialization(t *testing.T) {
-	start, end := time.Now(), time.Now().Add(time.Second*1)
-	workflow := &dag.DAG{
-		HandlerOn: dag.HandlerOn{},
-		Steps: []dag.Step{
+	startedAt, finishedAt := time.Now(), time.Now().Add(time.Second*1)
+	dag := &digraph.DAG{
+		HandlerOn: digraph.HandlerOn{},
+		Steps: []digraph.Step{
 			{
-				Name: "1", Description: "", Variables: []string{},
+				Name: "1", Description: "",
 				Dir: "dir", Command: "echo 1", Args: []string{},
-				Depends: []string{}, ContinueOn: dag.ContinueOn{},
-				RetryPolicy: &dag.RetryPolicy{}, MailOnError: false,
-				RepeatPolicy: dag.RepeatPolicy{}, Preconditions: []dag.Condition{},
+				Depends: []string{}, ContinueOn: digraph.ContinueOn{},
+				RetryPolicy: digraph.RetryPolicy{}, MailOnError: false,
+				RepeatPolicy: digraph.RepeatPolicy{}, Preconditions: []digraph.Condition{},
 			},
 		},
-		MailOn:    &dag.MailOn{},
-		ErrorMail: &dag.MailConfig{},
-		InfoMail:  &dag.MailConfig{},
-		SMTP:      &dag.SMTPConfig{},
+		MailOn:    &digraph.MailOn{},
+		ErrorMail: &digraph.MailConfig{},
+		InfoMail:  &digraph.MailConfig{},
+		SMTP:      &digraph.SMTPConfig{},
 	}
-	status := NewStatus(workflow, nil, scheduler.StatusSuccess, 10000, &start, &end)
+	requestID := "request-id-testI"
+	statusToPersist := NewStatusFactory(dag).Create(
+		requestID, scheduler.StatusSuccess, 0, startedAt, WithFinishedAt(finishedAt),
+	)
 
-	rawJSON, err := status.ToJSON()
+	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
 
-	unmarshalled, err := StatusFromJSON(string(rawJSON))
+	statusObject, err := StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
-	require.Equal(t, status.Name, unmarshalled.Name)
-	require.Equal(t, 1, len(unmarshalled.Nodes))
-	require.Equal(t, workflow.Steps[0].Name, unmarshalled.Nodes[0].Name)
+	require.Equal(t, statusToPersist.Name, statusObject.Name)
+	require.Equal(t, 1, len(statusObject.Nodes))
+	require.Equal(t, dag.Steps[0].Name, statusObject.Nodes[0].Step.Name)
 }
 
 func TestCorrectRunningStatus(t *testing.T) {
-	workflow := &dag.DAG{Name: "test"}
-	status := NewStatus(workflow, nil, scheduler.StatusRunning,
-		10000, nil, nil)
+	dag := &digraph.DAG{Name: "test"}
+	requestID := "request-id-testII"
+	status := NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
 	status.CorrectRunningStatus()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }
 
 func TestJsonMarshal(t *testing.T) {
-	step := dag.Step{
-		OutputVariables: &dag.SyncMap{},
+	step := digraph.Step{
+		OutputVariables: &digraph.SyncMap{},
 	}
 	step.OutputVariables.Store("A", "B")
 	rawJSON, err := json.Marshal(step)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
-	t.Logf(string(rawJSON))
+	t.Log(string(rawJSON))
 }

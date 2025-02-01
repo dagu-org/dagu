@@ -1,12 +1,12 @@
 Contribution Guide
 ===================
 
-We welcome contributions of any size and skill level. If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository.
+We welcome any contributions to the `Dagu` project. If you have an idea for a new feature or have found a bug, please open an issue on the GitHub repository.
 
 Prerequisite
 -------------
 
-* `Go version 1.19 or later. <https://go.dev/doc/install>`_
+* `Go version 1.23 or later. <https://go.dev/doc/install>`_
 * Latest version of `Node.js <https://nodejs.org/en/download/>`_.
 * `yarn <https://yarnpkg.com/>`_ package manager.
 
@@ -41,23 +41,6 @@ Running Tests
 
       make test
 
-Code Structure
----------------
-
-- ``ui``: Frontend code for the Web UI.
-- ``cmd``: Contains the main application entry point.
-- ``docs``: Contains the documentation for the project.
-- ``examples``: Contains the example DAGs.
-- ``internal``: Contains the internal code for the project.
-  - ``agent``: Contains the code for running the DAGs.
-  - ``config``: Contains the code for loading the configuration.
-  - ``dag``: Contains the code for parsing the DAG definition.
-  - ``client``: Contains the code for managing the DAGs.
-  - ``persistence``: Contains the code for interacting with the database.
-  - ``sock``: Contains the code for interacting with the socket.
-  - ``frontend``: Contains the code for the frontend Web UI.
-  - ``scheduler``: Contains the code for scheduler.
-
 Setting up your local environment for front end development
 -------------------------------------------------------------
 
@@ -72,7 +55,7 @@ Setting up your local environment for front end development
 
    .. code-block:: sh
 
-      go run main.go server
+      go run ./cmd/ server
 
 #. Navigate to ``ui`` directory and run the following command to install the dependencies:
 
@@ -84,8 +67,3 @@ Setting up your local environment for front end development
 #. Open the browser and navigate to http://localhost:8081.
 
 #. Make changes to the source code and refresh the browser to see the changes.
-
-Branches
----------
-
-* ``main``: The main branch where the source code always reflects a production-ready state.

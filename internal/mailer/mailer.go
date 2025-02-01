@@ -1,30 +1,17 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package mailer
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"net/smtp"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dagu-org/dagu/internal/logger"
 )
 
 // Mailer is a mailer that sends emails.
@@ -35,15 +22,15 @@ type Mailer struct {
 	password string
 }
 
-// NewMailerArgs is a config for SMTP mailer.
-type NewMailerArgs struct {
+// Config is a config for SMTP mailer.
+type Config struct {
 	Host     string
 	Port     string
 	Username string
 	Password string
 }
 
-func New(cfg *NewMailerArgs) *Mailer {
+func New(cfg Config) *Mailer {
 	return &Mailer{
 		host:     cfg.Host,
 		port:     cfg.Port,
@@ -62,16 +49,13 @@ var (
 
 // SendMail sends an email.
 func (m *Mailer) Send(
+	ctx context.Context,
 	from string,
 	to []string,
 	subject, body string,
 	attachments []string,
 ) error {
-	log.Printf(
-		"Sending an email to %s, subject is \"%s\"",
-		strings.Join(to, ","),
-		subject,
-	)
+	logger.Info(ctx, "Sending an email", "to", to, "subject", subject)
 	if m.username == "" && m.password == "" {
 		return m.sendWithNoAuth(from, to, subject, body, attachments)
 	}

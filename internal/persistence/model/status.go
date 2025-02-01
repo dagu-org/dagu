@@ -1,31 +1,114 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package model
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/stringutil"
 )
+
+type StatusFactory struct {
+	dag *digraph.DAG
+}
+
+func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
+	return &StatusFactory{dag: dag}
+}
+
+func (f *StatusFactory) CreateDefault() Status {
+	return Status{
+		Name:       f.dag.Name,
+		Status:     scheduler.StatusNone,
+		StatusText: scheduler.StatusNone.String(),
+		PID:        PID(pidNotRunning),
+		Nodes:      FromSteps(f.dag.Steps),
+		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
+		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
+		OnFailure:  nodeOrNil(f.dag.HandlerOn.Failure),
+		OnCancel:   nodeOrNil(f.dag.HandlerOn.Cancel),
+		Params:     strings.Join(f.dag.Params, " "),
+		ParamsList: f.dag.Params,
+		StartedAt:  stringutil.FormatTime(time.Time{}),
+		FinishedAt: stringutil.FormatTime(time.Time{}),
+	}
+}
+
+type StatusOption func(*Status)
+
+func WithNodes(nodes []scheduler.NodeData) StatusOption {
+	return func(s *Status) {
+		s.Nodes = FromNodes(nodes)
+	}
+}
+
+func WithFinishedAt(t time.Time) StatusOption {
+	return func(s *Status) {
+		s.FinishedAt = FormatTime(t)
+	}
+}
+
+func WithOnExitNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnExit = FromNode(node.Data())
+		}
+	}
+}
+
+func WithOnSuccessNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnSuccess = FromNode(node.Data())
+		}
+	}
+}
+
+func WithOnFailureNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnFailure = FromNode(node.Data())
+		}
+	}
+}
+
+func WithOnCancelNode(node *scheduler.Node) StatusOption {
+	return func(s *Status) {
+		if node != nil {
+			s.OnCancel = FromNode(node.Data())
+		}
+	}
+}
+
+func WithLogFilePath(logFilePath string) StatusOption {
+	return func(s *Status) {
+		s.Log = logFilePath
+	}
+}
+
+func (f *StatusFactory) Create(
+	requestID string,
+	status scheduler.Status,
+	pid int,
+	startedAt time.Time,
+	opts ...StatusOption,
+) Status {
+	statusObj := f.CreateDefault()
+	statusObj.RequestID = requestID
+	statusObj.Status = status
+	statusObj.StatusText = status.String()
+	statusObj.PID = PID(pid)
+	statusObj.StartedAt = FormatTime(startedAt)
+
+	for _, opt := range opts {
+		opt(&statusObj)
+	}
+
+	return statusObj
+}
 
 func StatusFromJSON(s string) (*Status, error) {
 	status := new(Status)
@@ -36,16 +119,9 @@ func StatusFromJSON(s string) (*Status, error) {
 	return status, err
 }
 
-func FromNodesOrSteps(nodes []scheduler.NodeData, steps []dag.Step) []*Node {
-	if len(nodes) != 0 {
-		return FromNodes(nodes)
-	}
-	return FromSteps(steps)
-}
-
 type StatusFile struct {
 	File   string
-	Status *Status
+	Status Status
 }
 
 type StatusResponse struct {
@@ -66,42 +142,8 @@ type Status struct {
 	StartedAt  string           `json:"StartedAt"`
 	FinishedAt string           `json:"FinishedAt"`
 	Log        string           `json:"Log"`
-	Params     string           `json:"Params"`
-	mu         sync.RWMutex
-}
-
-func NewStatusDefault(workflow *dag.DAG) *Status {
-	return NewStatus(
-		workflow, nil, scheduler.StatusNone, int(pidNotRunning), nil, nil,
-	)
-}
-
-func NewStatus(
-	workflow *dag.DAG,
-	nodes []scheduler.NodeData,
-	status scheduler.Status,
-	pid int,
-	startTime, endTime *time.Time,
-) *Status {
-	statusObj := &Status{
-		Name:       workflow.Name,
-		Status:     status,
-		StatusText: status.String(),
-		PID:        PID(pid),
-		Nodes:      FromNodesOrSteps(nodes, workflow.Steps),
-		OnExit:     nodeOrNil(workflow.HandlerOn.Exit),
-		OnSuccess:  nodeOrNil(workflow.HandlerOn.Success),
-		OnFailure:  nodeOrNil(workflow.HandlerOn.Failure),
-		OnCancel:   nodeOrNil(workflow.HandlerOn.Cancel),
-		Params:     Params(workflow.Params),
-	}
-	if startTime != nil {
-		statusObj.StartedAt = util.FormatTime(*startTime)
-	}
-	if endTime != nil {
-		statusObj.FinishedAt = util.FormatTime(*endTime)
-	}
-	return statusObj
+	Params     string           `json:"Params,omitempty"`
+	ParamsList []string         `json:"ParamsList,omitempty"`
 }
 
 func (st *Status) CorrectRunningStatus() {
@@ -111,29 +153,15 @@ func (st *Status) CorrectRunningStatus() {
 	}
 }
 
-func (st *Status) ToJSON() ([]byte, error) {
-	st.mu.RLock()
-	defer st.mu.RUnlock()
-	js, err := json.Marshal(st)
-	if err != nil {
-		return []byte{}, err
-	}
-	return js, nil
-}
-
 func FormatTime(val time.Time) string {
 	if val.IsZero() {
 		return ""
 	}
-	return util.FormatTime(val)
+	return stringutil.FormatTime(val)
 }
 
 func Time(t time.Time) *time.Time {
 	return &t
-}
-
-func Params(params []string) string {
-	return strings.Join(params, " ")
 }
 
 type PID int
@@ -151,7 +179,7 @@ func (p PID) IsRunning() bool {
 	return p != pidNotRunning
 }
 
-func nodeOrNil(s *dag.Step) *Node {
+func nodeOrNil(s *digraph.Step) *Node {
 	if s == nil {
 		return nil
 	}

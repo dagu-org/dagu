@@ -1,0 +1,3 @@
+preconditions:
+  - condition: "test -f file.txt"
+    expected: "true"

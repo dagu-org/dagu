@@ -2,7 +2,7 @@ import { Box } from '@mui/material';
 import React from 'react';
 import { GridData, LogData } from '../../models/api';
 import { DAGContext } from '../../contexts/DAGContext';
-import { Handlers, StatusFile } from '../../models';
+import { Handlers, Node, StatusFile } from '../../models';
 import NodeStatusTable from '../molecules/NodeStatusTable';
 import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import SubTitle from '../atoms/SubTitle';
@@ -25,17 +25,23 @@ function DAGHistory({ logData, isLoading }: Props) {
 }
 
 type HistoryTableProps = {
-  GridData: GridData[];
-  Logs: StatusFile[];
+  GridData: GridData[] | null;
+  Logs: StatusFile[] | null;
 };
 
 function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
-  const [idx, setIdx] = React.useState(Logs.length - 1);
+  console.log(
+    { GridData, Logs },
+  )
+  const [idx, setIdx] = React.useState(Logs ?Logs.length - 1 : 0);
   const logs = React.useMemo(() => {
     return Logs;
   }, [Logs]);
 
-  const handlers = logs.length > idx ? Handlers(logs[idx].Status) : null;
+  let handlers: Node[] | null = null;
+  if (logs && logs.length > idx) {
+    handlers = Handlers(logs[idx].Status);
+  }
 
   return (
     <DAGContext.Consumer>
@@ -44,8 +50,8 @@ function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
           <Box>
             <SubTitle>Execution History</SubTitle>
             <HistoryTable
-              logs={logs}
-              gridData={GridData}
+              logs={logs|| []}
+              gridData={GridData|| []}
               onSelect={setIdx}
               idx={idx}
             />

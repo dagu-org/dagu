@@ -1,76 +1,54 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-package cmd
+package main
 
 import (
-	"log"
-	"os"
+	"fmt"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
 func stopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop /path/to/spec.yaml",
-		Short: "Stop the running workflow",
+		Short: "Stop the running DAG",
 		Long:  `dagu stop /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-
-			quiet, err := cmd.Flags().GetBool("quiet")
-			if err != nil {
-				log.Fatalf("Flag retrieval failed (quiet): %v", err)
-			}
-
-			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-				Quiet:  quiet,
-			})
-
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
-			if err != nil {
-				logger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
-			}
-
-			logger.Info("Workflow stop initiated", "workflow", workflow.Name)
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, logger)
-
-			if err := cli.Stop(workflow); err != nil {
-				logger.Error(
-					"Workflow stop operation failed",
-					"error",
-					err,
-					"workflow",
-					workflow.Name,
-				)
-				os.Exit(1)
-			}
-		},
+		RunE:  wrapRunE(runStop),
 	}
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
+}
+
+func runStop(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	setup := newSetup(cfg)
+
+	ctx := setup.loggerContext(cmd.Context(), false)
+
+	dag, err := digraph.Load(cmd.Context(), args[0], digraph.WithBaseConfig(cfg.Paths.BaseConfig))
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG", "err", err)
+		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+	}
+
+	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
+
+	if err := cli.Stop(cmd.Context(), dag); err != nil {
+		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
+		return fmt.Errorf("failed to stop DAG: %w", err)
+	}
+
+	logger.Info(ctx, "DAG stopped", "dag", dag.Name)
+	return nil
 }

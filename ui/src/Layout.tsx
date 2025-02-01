@@ -8,7 +8,7 @@ import Toolbar from '@mui/material/Toolbar';
 import List from '@mui/material/List';
 import Typography from '@mui/material/Typography';
 import { mainListItems } from './menu';
-import { Grid } from '@mui/material';
+import { Grid, MenuItem, Select } from '@mui/material';
 import { AppBarContext } from './contexts/AppBarContext';
 
 const drawerWidthClosed = 64;
@@ -137,7 +137,50 @@ function Content({ title, navbarColor, children }: DashboardContentProps) {
                   </NavBarTitleText>
                 )}
               </AppBarContext.Consumer>
-              <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <NavBarTitleText>{title || 'Dagu'}</NavBarTitleText>
+                <AppBarContext.Consumer>
+                  {(context) => {
+                    if (
+                      !context.remoteNodes ||
+                      context.remoteNodes.length === 0
+                    ) {
+                      return null;
+                    }
+                    return (
+                      <Select
+                        sx={{
+                          backgroundColor: 'white',
+                          color: 'black',
+                          borderRadius: '5px',
+                          border: '1px solid #ccc',
+                          marginLeft: '10px',
+                          height: '30px',
+                          width: '150px',
+                          marginBottom: '5px',
+                        }}
+                        value={context.selectedRemoteNode}
+                        onChange={(e) => {
+                          context.selectRemoteNode(e.target.value);
+                        }}
+                      >
+                        {context.remoteNodes.map((node) => (
+                          <MenuItem key={node} value={node}>
+                            {node}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    );
+                  }}
+                </AppBarContext.Consumer>
+              </Box>
             </Toolbar>
           </AppBar>
           <Grid

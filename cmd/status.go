@@ -1,27 +1,11 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-package cmd
+package main
 
 import (
-	"log"
-	"os"
+	"fmt"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -31,34 +15,42 @@ func statusCmd() *cobra.Command {
 		Short: "Display current status of the DAG",
 		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		Run: func(_ *cobra.Command, args []string) {
-			cfg, err := config.Load()
-			if err != nil {
-				log.Fatalf("Configuration load failed: %v", err)
-			}
-			logger := logger.NewLogger(logger.NewLoggerArgs{
-				Debug:  cfg.Debug,
-				Format: cfg.LogFormat,
-			})
-
-			// Load the DAG file and get the current running status.
-			workflow, err := dag.Load(cfg.BaseConfig, args[0], "")
-			if err != nil {
-				logger.Error("Workflow load failed", "error", err, "file", args[0])
-				os.Exit(1)
-			}
-
-			dataStore := newDataStores(cfg)
-			cli := newClient(cfg, dataStore, logger)
-
-			curStatus, err := cli.GetCurrentStatus(workflow)
-
-			if err != nil {
-				logger.Error("Current status retrieval failed", "error", err)
-				os.Exit(1)
-			}
-
-			logger.Info("Current status", "pid", curStatus.PID, "status", curStatus.Status)
-		},
+		RunE:  wrapRunE(runStatus),
 	}
+}
+
+func runStatus(cmd *cobra.Command, args []string) error {
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	setup := newSetup(cfg)
+
+	ctx := setup.loggerContext(cmd.Context(), false)
+
+	// Load the DAG
+	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(cfg.Paths.BaseConfig))
+	if err != nil {
+		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
+		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
+	}
+
+	cli, err := setup.client()
+	if err != nil {
+		logger.Error(ctx, "failed to initialize client", "err", err)
+		return fmt.Errorf("failed to initialize client: %w", err)
+	}
+
+	status, err := cli.GetCurrentStatus(ctx, dag)
+	if err != nil {
+		logger.Error(ctx, "Failed to retrieve current status", "dag", dag.Name, "err", err)
+		return fmt.Errorf("failed to retrieve current status: %w", err)
+	}
+
+	// Log the status information
+	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status)
+
+	return nil
 }

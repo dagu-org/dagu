@@ -1,0 +1,6 @@
+steps:
+  - name: "2"
+    command: "echo 2"
+    preconditions:
+      - condition: "test -f file.txt"
+        expected: "true"

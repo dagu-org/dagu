@@ -15,14 +15,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/daguflow/dagu.git"
+    "url": "git+https://github.com/dagu-org/dagu.git"
   },
   "author": "Yota Hamada",
   "license": "SEE LICENSE.md",
   "bugs": {
-    "url": "https://github.com/daguflow/dagu/issues"
+    "url": "https://github.com/dagu-org/dagu/issues"
   },
-  "homepage": "https://github.com/daguflow/dagu#readme",
+  "homepage": "https://github.com/dagu-org/dagu#readme",
   "devDependencies": {
     "-": "^0.0.1",
     "@babel/core": "^7.18.0",
@@ -58,28 +58,33 @@
     "@emotion/styled": "^11.8.1",
     "@fontsource/inter": "^5.0.8",
     "@fontsource/roboto": "^4.5.7",
-    "@fortawesome/fontawesome-svg-core": "^6.1.2",
-    "@fortawesome/free-solid-svg-icons": "^6.1.2",
-    "@fortawesome/react-fontawesome": "^0.2.0",
-    "@mui/icons-material": "^5.8.0",
-    "@mui/material": "^5.8.1",
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "@mui/icons-material": "^6.1.0",
+    "@mui/material": "^6.1.0",
     "@tanstack/react-table": "^8.5.11",
+    "@types/lodash": "^4.17.7",
     "cron-parser": "^4.5.0",
     "fontsource-roboto": "^4.0.0",
-    "mermaid": "^9.1.1",
+    "mermaid": "^11.4.1",
     "moment": "^2.29.3",
     "moment-duration-format": "^2.3.2",
+    "moment-timezone": "^0.5.46",
     "monaco-editor": "^0.41.0",
     "monaco-loader": "^1.0.0",
     "monaco-react": "^1.1.0",
     "monaco-yaml": "^4.0.4",
     "prism": "^4.1.2",
-    "react": "^18.1.0",
+    "react": "^18.3.0",
     "react-cookie": "^4.1.1",
     "react-dom": "^18.1.0",
     "react-monaco-editor": "^0.54.0",
     "react-router-dom": "^6.3.0",
-    "recharts": "^2.1.10",
-    "swr": "^1.3.0"
+    "recharts": "^2.13.0",
+    "swr": "^1.3.0",
+    "vis-data": "^7.1.9",
+    "vis-timeline": "^7.7.3"
   }
 }

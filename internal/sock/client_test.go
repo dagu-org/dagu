@@ -1,29 +1,14 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package sock_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/sock"
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,12 +38,11 @@ func TestDialTimeout(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("OK"))
 		},
-		test.NewLogger(),
 	)
 	require.NoError(t, err)
 
 	go func() {
-		_ = srv.Serve(nil)
+		_ = srv.Serve(context.Background(), nil)
 	}()
 
 	time.Sleep(time.Millisecond * 500)

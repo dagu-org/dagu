@@ -7,20 +7,25 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Dagu'
-copyright = '2023, Dagu Developers'
-author = 'Dagu Developers'
-# release = '1.10'
+copyright = '2024 Yota Hamada'
+author = 'Yota Hamada'
+
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
     'sphinx_rtd_theme',
+    'sphinx.ext.extlinks',
 ]
 
 templates_path = ['_templates']
 exclude_patterns = []
 
+extlinks = {
+    'issue': ('https://github.com/dagu-org/dagu/issues/%s', '#%s'),
+    'user': ('https://github.com/%s', '@%s'),
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

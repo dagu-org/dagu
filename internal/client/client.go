@@ -1,21 +1,7 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,35 +10,41 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/persistence"
-	"github.com/daguflow/dagu/internal/persistence/model"
-	"github.com/daguflow/dagu/internal/sock"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/sock"
 )
 
 // New creates a new Client instance.
 // The Client is used to interact with the DAG.
 func New(
-	dataStore persistence.DataStores,
+	dagStore persistence.DAGStore,
+	historyStore persistence.HistoryStore,
+	flagStore persistence.FlagStore,
 	executable string,
 	workDir string,
-	lg logger.Logger,
 ) Client {
 	return &client{
-		dataStore:  dataStore,
-		executable: executable,
-		workDir:    workDir,
-		logger:     lg,
+		dagStore:     dagStore,
+		historyStore: historyStore,
+		flagStore:    flagStore,
+		executable:   executable,
+		workDir:      workDir,
 	}
 }
 
+var _ Client = (*client)(nil)
+
 type client struct {
-	dataStore  persistence.DataStores
-	executable string
-	workDir    string
-	logger     logger.Logger
+	dagStore     persistence.DAGStore
+	historyStore persistence.HistoryStore
+	flagStore    persistence.FlagStore
+	executable   string
+	workDir      string
 }
 
 var (
@@ -62,58 +54,58 @@ var (
 `)
 )
 
-var (
-	errCreateDAGFile = errors.New("failed to create DAG file")
-	errGetStatus     = errors.New("failed to get status")
-	errDAGIsRunning  = errors.New("the DAG is running")
-)
-
-func (e *client) GetDAGSpec(id string) (string, error) {
-	dagStore := e.dataStore.DAGStore()
-	return dagStore.GetSpec(id)
+func (e *client) GetDAGSpec(ctx context.Context, id string) (string, error) {
+	return e.dagStore.GetSpec(ctx, id)
 }
 
-func (e *client) CreateDAG(name string) (string, error) {
-	dagStore := e.dataStore.DAGStore()
-	id, err := dagStore.Create(name, dagTemplate)
+func (e *client) CreateDAG(ctx context.Context, name string) (string, error) {
+	id, err := e.dagStore.Create(ctx, name, dagTemplate)
 	if err != nil {
-		return "", fmt.Errorf("%w: %s", errCreateDAGFile, err)
+		return "", fmt.Errorf("failed to create DAG: %w", err)
 	}
 	return id, nil
 }
 
-func (e *client) Grep(pattern string) (
+func (e *client) Grep(ctx context.Context, pattern string) (
 	[]*persistence.GrepResult, []string, error,
 ) {
-	dagStore := e.dataStore.DAGStore()
-	return dagStore.Grep(pattern)
+	return e.dagStore.Grep(ctx, pattern)
 }
 
-func (e *client) Rename(oldID, newID string) error {
-	dagStore := e.dataStore.DAGStore()
-	if err := dagStore.Rename(oldID, newID); err != nil {
+func (e *client) Rename(ctx context.Context, oldID, newID string) error {
+	oldDAG, err := e.dagStore.GetMetadata(ctx, oldID)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for %s: %w", oldID, err)
+	}
+	if err := e.dagStore.Rename(ctx, oldID, newID); err != nil {
 		return err
 	}
-	historyStore := e.dataStore.HistoryStore()
-	return historyStore.Rename(oldID, newID)
+	newDAG, err := e.dagStore.GetMetadata(ctx, newID)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for %s: %w", newID, err)
+	}
+	if err := e.historyStore.Rename(ctx, oldDAG.Location, newDAG.Location); err != nil {
+		return fmt.Errorf("failed to rename history for %s: %w", oldID, err)
+	}
+	return nil
 }
 
-func (e *client) Stop(workflow *dag.DAG) error {
+func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
 	// TODO: fix this not to connect to the DAG directly
-	client := sock.NewClient(workflow.SockAddr())
+	client := sock.NewClient(dag.SockAddr())
 	_, err := client.Request("POST", "/stop")
 	return err
 }
 
-func (e *client) StartAsync(workflow *dag.DAG, opts StartOptions) {
+func (e *client) StartAsync(ctx context.Context, dag *digraph.DAG, opts StartOptions) {
 	go func() {
-		if err := e.Start(workflow, opts); err != nil {
-			e.logger.Error("Workflow start operation failed", "error", err)
+		if err := e.Start(ctx, dag, opts); err != nil {
+			logger.Error(ctx, "DAG start operation failed", "err", err)
 		}
 	}()
 }
 
-func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
+func (e *client) Start(_ context.Context, dag *digraph.DAG, opts StartOptions) error {
 	args := []string{"start"}
 	if opts.Params != "" {
 		args = append(args, "-p")
@@ -122,7 +114,7 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, workflow.Location)
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -138,12 +130,12 @@ func (e *client) Start(workflow *dag.DAG, opts StartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
+func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOptions) error {
 	args := []string{"restart"}
 	if opts.Quiet {
 		args = append(args, "-q")
 	}
-	args = append(args, workflow.Location)
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -156,10 +148,10 @@ func (e *client) Restart(workflow *dag.DAG, opts RestartOptions) error {
 	return cmd.Wait()
 }
 
-func (e *client) Retry(workflow *dag.DAG, requestID string) error {
+func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
 	args = append(args, fmt.Sprintf("--req=%s", requestID))
-	args = append(args, workflow.Location)
+	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
@@ -172,67 +164,71 @@ func (e *client) Retry(workflow *dag.DAG, requestID string) error {
 	return cmd.Wait()
 }
 
-func (*client) GetCurrentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
+	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return nil, err
 		}
-		return model.NewStatusDefault(workflow), nil
+		// The DAG is not running so return the default status
+		status := model.NewStatusFactory(dag).CreateDefault()
+		return &status, nil
 	}
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetStatusByRequestID(workflow *dag.DAG, requestID string) (
+func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*model.Status, error,
 ) {
-	ret, err := e.dataStore.HistoryStore().FindByRequestID(
-		workflow.Location, requestID,
-	)
+	ret, err := e.historyStore.FindByRequestID(ctx, dag.Location, requestID)
 	if err != nil {
 		return nil, err
 	}
-	status, _ := e.GetCurrentStatus(workflow)
+	status, _ := e.GetCurrentStatus(ctx, dag)
 	if status != nil && status.RequestID != requestID {
 		// if the request id is not matched then correct the status
 		ret.Status.CorrectRunningStatus()
 	}
-	return ret.Status, err
+	return &ret.Status, err
 }
 
-func (*client) currentStatus(workflow *dag.DAG) (*model.Status, error) {
-	client := sock.NewClient(workflow.SockAddr())
+func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
+	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", errGetStatus, err)
+		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
 	return model.StatusFromJSON(ret)
 }
 
-func (e *client) GetLatestStatus(workflow *dag.DAG) (*model.Status, error) {
-	currStatus, _ := e.currentStatus(workflow)
+func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error) {
+	currStatus, _ := e.currentStatus(ctx, dag)
 	if currStatus != nil {
-		return currStatus, nil
+		return *currStatus, nil
 	}
-	status, err := e.dataStore.HistoryStore().ReadStatusToday(workflow.Location)
-	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
-		errors.Is(err, persistence.ErrNoStatusData) {
-		return model.NewStatusDefault(workflow), nil
-	}
+	status, err := e.historyStore.ReadStatusToday(ctx, dag.Location)
 	if err != nil {
-		return model.NewStatusDefault(workflow), err
+		status := model.NewStatusFactory(dag).CreateDefault()
+		if errors.Is(err, persistence.ErrNoStatusDataToday) ||
+			errors.Is(err, persistence.ErrNoStatusData) {
+			// No status for today
+			return status, nil
+		}
+		return status, err
 	}
 	status.CorrectRunningStatus()
-	return status, nil
+	return *status, nil
 }
 
-func (e *client) GetRecentHistory(workflow *dag.DAG, n int) []*model.StatusFile {
-	return e.dataStore.HistoryStore().ReadStatusRecent(workflow.Location, n)
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {
+	return e.historyStore.ReadStatusRecent(ctx, dag.Location, n)
 }
 
-func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
-	client := sock.NewClient(workflow.SockAddr())
+var errDAGIsRunning = errors.New("the DAG is running")
+
+func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error {
+	client := sock.NewClient(dag.SockAddr())
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
@@ -245,34 +241,29 @@ func (e *client) UpdateStatus(workflow *dag.DAG, status *model.Status) error {
 			return errDAGIsRunning
 		}
 	}
-	return e.dataStore.HistoryStore().Update(
-		workflow.Location, status.RequestID, status,
-	)
+	return e.historyStore.Update(ctx, dag.Location, status.RequestID, status)
 }
 
-func (e *client) UpdateDAG(id string, spec string) error {
-	dagStore := e.dataStore.DAGStore()
-	return dagStore.UpdateSpec(id, []byte(spec))
+func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
+	return e.dagStore.UpdateSpec(ctx, id, []byte(spec))
 }
 
-func (e *client) DeleteDAG(name, loc string) error {
-	err := e.dataStore.HistoryStore().RemoveAll(loc)
+func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
+	err := e.historyStore.RemoveAll(ctx, loc)
 	if err != nil {
 		return err
 	}
-	dagStore := e.dataStore.DAGStore()
-	return dagStore.Delete(name)
+	return e.dagStore.Delete(ctx, name)
 }
 
-func (e *client) GetAllStatus() (
-	statuses []*DAGStatus, errs []string, err error,
+func (e *client) GetAllStatus(ctx context.Context) (
+	statuses []DAGStatus, errs []string, err error,
 ) {
-	dagStore := e.dataStore.DAGStore()
-	dags, errs, err := dagStore.List()
+	dagList, errs, err := e.dagStore.List(ctx)
 
-	var ret []*DAGStatus
-	for _, d := range dags {
-		status, err := e.readStatus(d)
+	var ret []DAGStatus
+	for _, d := range dagList {
+		status, err := e.readStatus(ctx, d)
 		if err != nil {
 			errs = append(errs, err.Error())
 		}
@@ -282,55 +273,98 @@ func (e *client) GetAllStatus() (
 	return ret, errs, err
 }
 
-func (e *client) getDAG(name string) (*dag.DAG, error) {
-	dagStore := e.dataStore.DAGStore()
-	dagDetail, err := dagStore.GetDetails(name)
+func (e *client) getPageCount(total int, limit int) int {
+	return (total-1)/(limit) + 1
+}
+
+func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
+	var (
+		dagListPaginationResult *persistence.DagListPaginationResult
+		err                     error
+		dagStatusList           = make([]DAGStatus, 0)
+	)
+
+	page := 1
+	if params.Page != nil {
+		page = int(*params.Page)
+	}
+	limit := 100
+	if params.Limit != nil {
+		limit = int(*params.Limit)
+	}
+
+	if dagListPaginationResult, err = e.dagStore.ListPagination(ctx, persistence.DAGListPaginationArgs{
+		Page:  page,
+		Limit: limit,
+		Name:  fromPtr(params.SearchName),
+		Tag:   fromPtr(params.SearchTag),
+	}); err != nil {
+		return dagStatusList, &DagListPaginationSummaryResult{PageCount: 1}, err
+	}
+
+	for _, currentDag := range dagListPaginationResult.DagList {
+		var (
+			currentStatus DAGStatus
+			err           error
+		)
+		if currentStatus, err = e.readStatus(ctx, currentDag); err != nil {
+			dagListPaginationResult.ErrorList = append(dagListPaginationResult.ErrorList, err.Error())
+		}
+		dagStatusList = append(dagStatusList, currentStatus)
+	}
+
+	return dagStatusList, &DagListPaginationSummaryResult{
+		PageCount: e.getPageCount(dagListPaginationResult.Count, limit),
+		ErrorList: dagListPaginationResult.ErrorList,
+	}, nil
+}
+
+func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) {
+	dagDetail, err := e.dagStore.GetDetails(ctx, name)
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(id string) (*DAGStatus, error) {
-	dg, err := e.getDAG(id)
-	if dg == nil {
+func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
+	dag, err := e.getDAG(ctx, id)
+	if dag == nil {
 		// TODO: fix not to use location
-		dg = &dag.DAG{Name: id, Location: id}
+		dag = &digraph.DAG{Name: id, Location: id}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
-		_, err = scheduler.NewExecutionGraph(e.logger, dg.Steps...)
+		_, err = scheduler.NewExecutionGraph(dag.Steps...)
 	}
-	latestStatus, _ := e.GetLatestStatus(dg)
+	latestStatus, _ := e.GetLatestStatus(ctx, dag)
 	return newDAGStatus(
-		dg, latestStatus, e.IsSuspended(id), err,
+		dag, latestStatus, e.IsSuspended(ctx, id), err,
 	), err
 }
 
-func (e *client) ToggleSuspend(id string, suspend bool) error {
-	flagStore := e.dataStore.FlagStore()
-	return flagStore.ToggleSuspend(id, suspend)
+func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error {
+	return e.flagStore.ToggleSuspend(id, suspend)
 }
 
-func (e *client) readStatus(workflow *dag.DAG) (*DAGStatus, error) {
-	latestStatus, err := e.GetLatestStatus(workflow)
+func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {
+	latestStatus, err := e.GetLatestStatus(ctx, dag)
 	id := strings.TrimSuffix(
-		filepath.Base(workflow.Location),
-		filepath.Ext(workflow.Location),
+		filepath.Base(dag.Location),
+		filepath.Ext(dag.Location),
 	)
 
 	return newDAGStatus(
-		workflow, latestStatus, e.IsSuspended(id), err,
+		dag, latestStatus, e.IsSuspended(ctx, id), err,
 	), err
 }
 
-func (*client) emptyDAGIfNil(workflow *dag.DAG, dagLocation string) *dag.DAG {
-	if workflow != nil {
-		return workflow
+func (*client) emptyDAGIfNil(dag *digraph.DAG, dagLocation string) *digraph.DAG {
+	if dag != nil {
+		return dag
 	}
-	return &dag.DAG{Location: dagLocation}
+	return &digraph.DAG{Location: dagLocation}
 }
 
-func (e *client) IsSuspended(id string) bool {
-	flagStore := e.dataStore.FlagStore()
-	return flagStore.IsSuspended(id)
+func (e *client) IsSuspended(_ context.Context, id string) bool {
+	return e.flagStore.IsSuspended(id)
 }
 
 func escapeArg(input string) string {
@@ -347,4 +381,16 @@ func escapeArg(input string) string {
 	}
 
 	return escaped.String()
+}
+
+func (e *client) GetTagList(ctx context.Context) ([]string, []string, error) {
+	return e.dagStore.TagList(ctx)
+}
+
+func fromPtr[T any](p *T) T {
+	var zero T
+	if p == nil {
+		return zero
+	}
+	return *p
 }

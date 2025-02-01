@@ -1,23 +1,9 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package logger
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"sync"
@@ -25,65 +11,92 @@ import (
 	slogmulti "github.com/samber/slog-multi"
 )
 
-type (
-	Logger interface {
-		Debug(msg string, tags ...any)
-		Info(msg string, tags ...any)
-		Warn(msg string, tags ...any)
-		Error(msg string, tags ...any)
+type Logger interface {
+	Debug(msg string, tags ...any)
+	Info(msg string, tags ...any)
+	Warn(msg string, tags ...any)
+	Error(msg string, tags ...any)
+	Fatal(msg string, tags ...any)
 
-		Debugf(format string, v ...any)
-		Infof(format string, v ...any)
-		Warnf(format string, v ...any)
-		Errorf(format string, v ...any)
+	Debugf(format string, v ...any)
+	Infof(format string, v ...any)
+	Warnf(format string, v ...any)
+	Errorf(format string, v ...any)
+	Fatalf(format string, v ...any)
 
-		With(attrs ...any) Logger
-		WithGroup(name string) Logger
+	With(attrs ...any) Logger
+	WithGroup(name string) Logger
 
-		// Write writes a free-form message to the logger.
-		// It writes to the standard output and to the log file if present.
-		// If the log file is not present, it writes only to the standard output.
-		Write(string)
-	}
-)
+	// Write writes a message to the logger in free form.
+	Write(string)
+}
 
 var _ Logger = (*appLogger)(nil)
 
 type appLogger struct {
 	logger         *slog.Logger
 	guardedHandler *guardedHandler
-	prefix         string
 	quiet          bool
 }
 
-type NewLoggerArgs struct {
-	Debug   bool
-	Format  string
-	LogFile *os.File
-	Quiet   bool
+type Config struct {
+	debug  bool
+	format string
+	writer io.Writer
+	quiet  bool
 }
 
-var (
-	// Default is the default logger used by the application.
-	Default = NewLogger(NewLoggerArgs{
-		Format: "text",
-	})
-)
+type Option func(*Config)
 
-func NewLogger(args NewLoggerArgs) Logger {
+// WithDebug sets the level of the logger to debug.
+func WithDebug() Option {
+	return func(o *Config) {
+		o.debug = true
+	}
+}
+
+// WithFormat sets the format of the logger (text or json).
+func WithFormat(format string) Option {
+	return func(o *Config) {
+		o.format = format
+	}
+}
+
+// WithWriter sets the file to write logs to.
+func WithWriter(w io.Writer) Option {
+	return func(o *Config) {
+		o.writer = w
+	}
+}
+
+// WithQuiet suppresses output to stderr.
+func WithQuiet() Option {
+	return func(o *Config) {
+		o.quiet = true
+	}
+}
+
+var defaultLogger = NewLogger(WithFormat("text"))
+
+func NewLogger(opts ...Option) Logger {
+	cfg := &Config{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	var level slog.Level
-	if args.Debug {
+	if cfg.debug {
 		level = slog.LevelDebug
 	} else {
 		level = slog.LevelInfo
 	}
 
-	opts := &slog.HandlerOptions{
+	handlerOpts := &slog.HandlerOptions{
 		Level: level,
 	}
 
 	if level == slog.LevelDebug {
-		opts.AddSource = true
+		handlerOpts.AddSource = true
 	}
 
 	var (
@@ -91,23 +104,20 @@ func NewLogger(args NewLoggerArgs) Logger {
 		guardedHandler *guardedHandler
 	)
 
-	if !args.Quiet {
-		handlers = append(handlers, newHandler(os.Stderr, args.Format, opts))
+	if !cfg.quiet {
+		handlers = append(handlers, newHandler(os.Stderr, cfg.format, handlerOpts))
 	}
 
-	if args.LogFile != nil {
-		guardedHandler = newGuardedHandler(
-			newHandler(args.LogFile, args.Format, opts), args.LogFile,
-		)
+	if cfg.writer != nil {
+		handler := newHandler(cfg.writer, cfg.format, handlerOpts)
+		guardedHandler = newGuardedHandler(handler, cfg.writer)
 		handlers = append(handlers, guardedHandler)
 	}
 
 	return &appLogger{
-		logger: slog.New(
-			slogmulti.Fanout(handlers...),
-		),
+		logger:         slog.New(slogmulti.Fanout(handlers...)),
 		guardedHandler: guardedHandler,
-		quiet:          args.Quiet,
+		quiet:          cfg.quiet,
 	}
 }
 
@@ -120,14 +130,14 @@ var _ slog.Handler = (*guardedHandler)(nil)
 // 2. the file is opened with the O_SYNC flag to ensure that writes are atomic.
 type guardedHandler struct {
 	handler slog.Handler
-	file    *os.File
+	writer  io.Writer
 	mu      sync.Mutex
 }
 
-func newGuardedHandler(handler slog.Handler, file *os.File) *guardedHandler {
+func newGuardedHandler(handler slog.Handler, writer io.Writer) *guardedHandler {
 	return &guardedHandler{
 		handler: handler,
-		file:    file,
+		writer:  writer,
 	}
 }
 
@@ -149,7 +159,7 @@ func (s *guardedHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	defer s.mu.Unlock()
 	return &guardedHandler{
 		handler: s.handler.WithAttrs(attrs),
-		file:    s.file,
+		writer:  s.writer,
 		mu:      sync.Mutex{},
 	}
 }
@@ -160,56 +170,68 @@ func (s *guardedHandler) WithGroup(name string) slog.Handler {
 	defer s.mu.Unlock()
 	return &guardedHandler{
 		handler: s.handler.WithGroup(name),
-		file:    s.file,
+		writer:  s.writer,
 		mu:      sync.Mutex{},
 	}
 }
 
-func newHandler(f *os.File, format string, opts *slog.HandlerOptions) slog.Handler {
+func newHandler(w io.Writer, format string, opts *slog.HandlerOptions) slog.Handler {
 	if format == "text" {
-		return slog.NewTextHandler(f, opts)
+		return slog.NewTextHandler(w, opts)
 	}
-	return slog.NewJSONHandler(f, opts)
+	return slog.NewJSONHandler(w, opts)
 }
 
 // Debugf implements logger.Logger.
 func (a *appLogger) Debugf(format string, v ...any) {
-	a.logger.Debug(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Debug(fmt.Sprintf(format, v...))
 }
 
 // Errorf implements logger.Logger.
 func (a *appLogger) Errorf(format string, v ...any) {
-	a.logger.Error(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Error(fmt.Sprintf(format, v...))
+}
+
+// Fatalf implements logger.Logger.
+func (a *appLogger) Fatalf(format string, v ...any) {
+	a.logger.Error(fmt.Sprintf(format, v...))
+	os.Exit(1)
 }
 
 // Infof implements logger.Logger.
 func (a *appLogger) Infof(format string, v ...any) {
-	a.logger.Info(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Info(fmt.Sprintf(format, v...))
 }
 
 // Warnf implements logger.Logger.
 func (a *appLogger) Warnf(format string, v ...any) {
-	a.logger.Warn(fmt.Sprintf(a.prefix+format, v...))
+	a.logger.Warn(fmt.Sprintf(format, v...))
 }
 
 // Debug implements logger.Logger.
 func (a *appLogger) Debug(msg string, tags ...any) {
-	a.logger.Debug(a.prefix+msg, tags...)
+	a.logger.Debug(msg, tags...)
 }
 
 // Error implements logger.Logger.
 func (a *appLogger) Error(msg string, tags ...any) {
-	a.logger.Error(a.prefix+msg, tags...)
+	a.logger.Error(msg, tags...)
+}
+
+// Fatal implements logger.Logger.
+func (a *appLogger) Fatal(msg string, tags ...any) {
+	a.logger.Error(msg, tags...)
+	os.Exit(1)
 }
 
 // Info implements logger.Logger.
 func (a *appLogger) Info(msg string, tags ...any) {
-	a.logger.Info(a.prefix+msg, tags...)
+	a.logger.Info(msg, tags...)
 }
 
 // Warn implements logger.Logger.
 func (a *appLogger) Warn(msg string, tags ...any) {
-	a.logger.Warn(a.prefix+msg, tags...)
+	a.logger.Warn(msg, tags...)
 }
 
 // With implements logger.Logger.
@@ -228,17 +250,15 @@ func (a *appLogger) WithGroup(name string) Logger {
 	}
 }
 
-// Write implements logger.Logger.
 func (a *appLogger) Write(msg string) {
 	// write to the standard output
 	if !a.quiet {
 		_, _ = fmt.Fprintf(os.Stdout, "%s\n", msg)
 	}
-	// If a guarded handler is present, write to the file
-	if a.guardedHandler == nil {
-		return
+	if a.guardedHandler != nil {
+		// If a guarded handler is present, write to the file
+		a.guardedHandler.mu.Lock()
+		defer a.guardedHandler.mu.Unlock()
+		_, _ = a.guardedHandler.writer.Write([]byte(msg + "\n"))
 	}
-	a.guardedHandler.mu.Lock()
-	defer a.guardedHandler.mu.Unlock()
-	_, _ = a.guardedHandler.file.WriteString(msg)
 }

@@ -1,0 +1,4 @@
+maxCleanUpTimeSec: 10
+steps:
+  - name: "1"
+    command: "true"

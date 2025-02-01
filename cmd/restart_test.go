@@ -1,28 +1,12 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-package cmd
+package main
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/dag/scheduler"
-	"github.com/daguflow/dagu/internal/logger"
-	"github.com/daguflow/dagu/internal/test"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,56 +16,50 @@ const (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		setup := test.SetupTest(t)
-		defer setup.Cleanup()
+		th := testSetup(t)
+		dagFile := th.DAGFile("restart.yaml")
 
-		dagFile := testDAGFile("restart.yaml")
-
-		// Start the DAG.
 		go func() {
-			testRunCommand(
-				t,
-				startCmd(),
-				cmdTest{args: []string{"start", `--params="foo"`, dagFile}},
-			)
+			// Start a DAG to restart.
+			args := []string{"start", `--params="foo"`, dagFile.Path}
+			th.RunCommand(t, startCmd(), cmdTest{args: args})
 		}()
 
 		time.Sleep(waitForStatusUpdate)
-		cli := setup.Client()
 
 		// Wait for the DAG running.
-		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
+		dagFile.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		// Restart the DAG.
 		done := make(chan struct{})
 		go func() {
-			testRunCommand(t, restartCmd(), cmdTest{args: []string{"restart", dagFile}})
+			args := []string{"restart", dagFile.Path}
+			th.RunCommand(t, restartCmd(), cmdTest{args: args})
 			close(done)
 		}()
 
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG running again.
-		testStatusEventual(t, cli, dagFile, scheduler.StatusRunning)
+		dagFile.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		// Stop the restarted DAG.
-		testRunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile}})
+		th.RunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dagFile.Path}})
 
 		time.Sleep(waitForStatusUpdate)
 
 		// Wait for the DAG is stopped.
-		testStatusEventual(t, cli, dagFile, scheduler.StatusNone)
+		dagFile.AssertCurrentStatus(t, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		workflow, err := dag.Load(setup.Config.BaseConfig, dagFile, "")
+		dag, err := digraph.Load(th.Context, dagFile.Path, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))
 		require.NoError(t, err)
 
-		dataStore := newDataStores(setup.Config)
-		recentHistory := newClient(
-			setup.Config,
-			dataStore,
-			logger.Default,
-		).GetRecentHistory(workflow, 2)
+		setup := newSetup(th.Config)
+		client, err := setup.client()
+		require.NoError(t, err)
+
+		recentHistory := client.GetRecentHistory(context.Background(), dag, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

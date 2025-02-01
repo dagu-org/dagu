@@ -9,11 +9,20 @@ import (
 	"errors"
 	"net/url"
 	golangswaggerpaths "path"
+
+	"github.com/go-openapi/swag"
 )
 
 // ListDagsURL generates an URL for the list dags operation
 type ListDagsURL struct {
+	Limit      *int64
+	Page       *int64
+	SearchName *string
+	SearchTag  *string
+
 	_basePath string
+	// avoid unkeyed usage
+	_ struct{}
 }
 
 // WithBasePath sets the base path for this url builder, only required when it's different from the
@@ -42,6 +51,42 @@ func (o *ListDagsURL) Build() (*url.URL, error) {
 		_basePath = "/api/v1"
 	}
 	_result.Path = golangswaggerpaths.Join(_basePath, _path)
+
+	qs := make(url.Values)
+
+	var limitQ string
+	if o.Limit != nil {
+		limitQ = swag.FormatInt64(*o.Limit)
+	}
+	if limitQ != "" {
+		qs.Set("limit", limitQ)
+	}
+
+	var pageQ string
+	if o.Page != nil {
+		pageQ = swag.FormatInt64(*o.Page)
+	}
+	if pageQ != "" {
+		qs.Set("page", pageQ)
+	}
+
+	var searchNameQ string
+	if o.SearchName != nil {
+		searchNameQ = *o.SearchName
+	}
+	if searchNameQ != "" {
+		qs.Set("searchName", searchNameQ)
+	}
+
+	var searchTagQ string
+	if o.SearchTag != nil {
+		searchTagQ = *o.SearchTag
+	}
+	if searchTagQ != "" {
+		qs.Set("searchTag", searchTagQ)
+	}
+
+	_result.RawQuery = qs.Encode()
 
 	return &_result, nil
 }

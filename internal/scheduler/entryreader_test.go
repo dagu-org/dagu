@@ -1,35 +1,22 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package scheduler
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/logger"
-	dsclient "github.com/daguflow/dagu/internal/persistence/client"
-	"github.com/daguflow/dagu/internal/test"
-	"github.com/daguflow/dagu/internal/util"
+	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb"
+	"github.com/dagu-org/dagu/internal/persistence/local"
+	"github.com/dagu-org/dagu/internal/persistence/local/storage"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/daguflow/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/config"
 )
 
 func TestReadEntries(t *testing.T) {
@@ -40,29 +27,28 @@ func TestReadEntries(t *testing.T) {
 		}()
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-		entryReader := newEntryReader(newEntryReaderArgs{
-			DagsDir:    filepath.Join(testdataDir, "invalid_directory"),
-			JobCreator: &mockJobFactory{},
-			Logger:     test.NewLogger(),
-			Client:     cli,
-		})
+		entryReader := newEntryReader(
+			filepath.Join(testdataDir, "invalid_directory"),
+			&mockJobFactory{},
+			cli,
+		)
 
-		entries, err := entryReader.Read(now)
+		entries, err := entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.Len(t, entries, 0)
 
-		entryReader = newEntryReader(newEntryReaderArgs{
-			DagsDir:    testdataDir,
-			JobCreator: &mockJobFactory{},
-			Logger:     test.NewLogger(),
-			Client:     cli,
-		})
+		entryReader = newEntryReader(
+			testdataDir,
+			&mockJobFactory{},
+			cli,
+		)
 
 		done := make(chan any)
 		defer close(done)
-		entryReader.Start(done)
+		err = entryReader.Start(context.Background(), done)
+		require.NoError(t, err)
 
-		entries, err = entryReader.Read(now)
+		entries, err = entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(entries), 1)
 
@@ -73,47 +59,46 @@ func TestReadEntries(t *testing.T) {
 		var j job
 		for _, e := range entries {
 			jj := e.Job
-			if jj.GetDAG().Name == "scheduled_job" {
+			if jj.GetDAG(context.Background()).Name == "scheduled_job" {
 				j = jj
 				break
 			}
 		}
 
-		err = cli.ToggleSuspend(j.GetDAG().Name, true)
+		err = cli.ToggleSuspend(context.Background(), j.GetDAG(context.Background()).Name, true)
 		require.NoError(t, err)
 
 		// check if the job is suspended
-		lives, err := entryReader.Read(now)
+		lives, err := entryReader.Read(context.Background(), now)
 		require.NoError(t, err)
 		require.Equal(t, len(entries)-1, len(lives))
 	})
 }
 
-var testdataDir = filepath.Join(util.MustGetwd(), "testdata")
+var testdataDir = filepath.Join(fileutil.MustGetwd(), "testdata")
 
 func setupTest(t *testing.T) (string, client.Client) {
 	t.Helper()
 
-	tmpDir := util.MustTempDir("dagu_test")
+	tmpDir := fileutil.MustTempDir("test")
 
 	err := os.Setenv("HOME", tmpDir)
 	require.NoError(t, err)
 
 	cfg := &config.Config{
-		DataDir:         filepath.Join(tmpDir, ".dagu", "data"),
-		DAGs:            testdataDir,
-		SuspendFlagsDir: tmpDir,
-		WorkDir:         tmpDir,
+		Paths: config.PathsConfig{
+			DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
+			DAGsDir:         testdataDir,
+			SuspendFlagsDir: tmpDir,
+		},
+		WorkDir: tmpDir,
 	}
 
-	dataStore := dsclient.NewDataStores(
-		cfg.DAGs,
-		cfg.DataDir,
-		cfg.SuspendFlagsDir,
-		dsclient.DataStoreOptions{
-			LatestStatusToday: cfg.LatestStatusToday,
-		},
+	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
+	historyStore := jsondb.New(cfg.Paths.DataDir)
+	flagStore := local.NewFlagStore(
+		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
 	)
 
-	return tmpDir, client.New(dataStore, "", cfg.WorkDir, logger.Default)
+	return tmpDir, client.New(dagStore, historyStore, flagStore, "", cfg.WorkDir)
 }

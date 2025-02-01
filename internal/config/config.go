@@ -1,243 +1,255 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package config
 
 import (
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
+	"path"
 	"sync"
-
-	"github.com/adrg/xdg"
-	"github.com/spf13/viper"
+	"time"
 )
 
-// Config represents the configuration for the server.
+// Config represents the server configuration with both new and legacy fields
 type Config struct {
-	Host               string   // Server host
-	Port               int      // Server port
-	DAGs               string   // Location of DAG files
-	Executable         string   // Executable path
-	WorkDir            string   // Default working directory
-	IsBasicAuth        bool     // Enable basic auth
-	BasicAuthUsername  string   // Basic auth username
-	BasicAuthPassword  string   // Basic auth password
-	LogEncodingCharset string   // Log encoding charset
-	LogDir             string   // Log directory
-	DataDir            string   // Data directory
-	SuspendFlagsDir    string   // Suspend flags directory
-	AdminLogsDir       string   // Directory for admin logs
-	BaseConfig         string   // Common config file for all DAGs.
-	NavbarColor        string   // Navbar color for the web UI
-	NavbarTitle        string   // Navbar title for the web UI
-	Env                sync.Map // Store environment variables
-	TLS                *TLS     // TLS configuration
-	IsAuthToken        bool     // Enable auth token for API
-	AuthToken          string   // Auth token for API
-	LatestStatusToday  bool     // Show latest status today or the latest status
-	APIBaseURL         string   // Base URL for API
-	Debug              bool     // Enable debug mode (verbose logging)
-	LogFormat          string   // Log format
+	// Server settings
+	Host        string `mapstructure:"host"`
+	Port        int    `mapstructure:"port"`
+	Debug       bool   `mapstructure:"debug"`
+	BasePath    string `mapstructure:"basePath"`
+	APIBasePath string `mapstructure:"apiBasePath"`
+	APIBaseURL  string `mapstructure:"apiBaseURL"` // For backward compatibility
+	WorkDir     string `mapstructure:"workDir"`
+	Headless    bool   `mapstructure:"headless"`
+
+	// Authentication
+	Auth Auth `mapstructure:"auth"`
+
+	// File system paths
+	Paths PathsConfig `mapstructure:"paths"`
+
+	// Legacy fields for backward compatibility - Start
+	// Note: These fields are used for backward compatibility and should not be used in new code
+	// Deprecated: Use Auth.Basic.Enabled instead
+	DAGs string `mapstructure:"dags"`
+	// Deprecated: Use Paths.Executable instead
+	Executable string `mapstructure:"executable"`
+	// Deprecated: Use Paths.LogDir instead
+	LogDir string `mapstructure:"logDir"`
+	// Deprecated: Use Paths.DataDir instead
+	DataDir string `mapstructure:"dataDir"`
+	// Deprecated: Use Paths.SuspendFlagsDir instead
+	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
+	// Deprecated: Use Paths.AdminLogsDir instead
+	AdminLogsDir string `mapstructure:"adminLogsDir"`
+	// Deprecated: Use Paths.BaseConfig instead
+	BaseConfig string `mapstructure:"baseConfig"`
+	// Deprecated: Use Auth.Token.Enabled instead
+	IsBasicAuth bool `mapstructure:"isBasicAuth"`
+	// Deprecated: Use Auth.Basic.Username instead
+	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
+	// Deprecated: Use Auth.Basic.Password instead
+	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
+	// Deprecated: Use Auth.Token.Enabled instead
+	IsAuthToken bool `mapstructure:"isAuthToken"`
+	// Deprecated: Use Auth.Token.Value instead
+	AuthToken string `mapstructure:"authToken"`
+	// Deprecated: Use UI.LogEncodingCharset instead
+	LogEncodingCharset string `mapstructure:"logEncodingCharset"`
+	// Deprecated: Use UI.NavbarColor instead
+	NavbarColor string `mapstructure:"navbarColor"`
+	// Deprecated: Use UI.NavbarTitle instead
+	NavbarTitle string `mapstructure:"navbarTitle"`
+	// Deprecated: Use UI.MaxDashboardPageLimit instead
+	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
+	// Legacy fields for backward compatibility - End
+
+	// Other settings
+	LogFormat         string         `mapstructure:"logFormat"`
+	LatestStatusToday bool           `mapstructure:"latestStatusToday"`
+	TZ                string         `mapstructure:"tz"`
+	Location          *time.Location `mapstructure:"-"`
+	Env               sync.Map       `mapstructure:"-"`
+
+	UI UI `mapstructure:"ui"`
+
+	// Remote nodes configuration
+	RemoteNodes []RemoteNode `mapstructure:"remoteNodes"`
+
+	// TLS configuration
+	TLS *TLSConfig `mapstructure:"tls"`
 }
 
-type TLS struct {
-	CertFile string
-	KeyFile  string
+// Auth represents the authentication configuration
+type Auth struct {
+	Basic AuthBasic `mapstructure:"basic"`
+	Token AuthToken `mapstructure:"token"`
 }
 
-var configLock sync.Mutex
+// AuthBasic represents the basic authentication configuration
+type AuthBasic struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+}
 
-func Load() (*Config, error) {
-	configLock.Lock()
-	defer configLock.Unlock()
+// AuthToken represents the authentication token configuration
+type AuthToken struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Value   string `mapstructure:"value"`
+}
 
-	// Set default values for config keys.
-	if err := setupViper(); err != nil {
-		return nil, err
+// Paths represents the file system paths configuration
+type PathsConfig struct {
+	DAGsDir         string `mapstructure:"dagsDir"`
+	Executable      string `mapstructure:"executable"`
+	LogDir          string `mapstructure:"logDir"`
+	DataDir         string `mapstructure:"dataDir"`
+	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
+	AdminLogsDir    string `mapstructure:"adminLogsDir"`
+	BaseConfig      string `mapstructure:"baseConfig"`
+}
+
+type UI struct {
+	LogEncodingCharset    string `mapstructure:"logEncodingCharset"`
+	NavbarColor           string `mapstructure:"navbarColor"`
+	NavbarTitle           string `mapstructure:"navbarTitle"`
+	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
+}
+
+// RemoteNode represents a remote node configuration
+type RemoteNode struct {
+	Name              string `mapstructure:"name"`
+	APIBaseURL        string `mapstructure:"apiBaseURL"`
+	IsBasicAuth       bool   `mapstructure:"isBasicAuth"`
+	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
+	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
+	IsAuthToken       bool   `mapstructure:"isAuthToken"`
+	AuthToken         string `mapstructure:"authToken"`
+	SkipTLSVerify     bool   `mapstructure:"skipTLSVerify"`
+}
+
+// TLSConfig represents TLS configuration
+type TLSConfig struct {
+	CertFile string `mapstructure:"certFile"`
+	KeyFile  string `mapstructure:"keyFile"`
+}
+
+// MigrateLegacyConfig migrates legacy configuration
+func (c *Config) MigrateLegacyConfig() {
+	// Migrate server settings
+	c.migrateServerSettings()
+
+	// Migrate authentication settings
+	c.migrateAuthSettings()
+
+	// Migrate paths
+	c.migratePaths()
+
+	// Migrate UI settings
+	c.migrateUISettings()
+
+	// Clean base path
+	c.cleanBasePath()
+}
+
+func (c *Config) migrateServerSettings() {
+	if c.APIBaseURL != "" {
+		c.APIBasePath = c.APIBaseURL
+	}
+}
+
+func (c *Config) migrateAuthSettings() {
+	if c.IsBasicAuth {
+		c.Auth.Basic.Enabled = c.IsBasicAuth
+		c.Auth.Basic.Username = c.BasicAuthUsername
+		c.Auth.Basic.Password = c.BasicAuthPassword
 	}
 
-	// Populate viper with environment variables.
-	viper.AutomaticEnv()
+	if c.IsAuthToken {
+		c.Auth.Token.Enabled = c.IsAuthToken
+		c.Auth.Token.Value = c.AuthToken
+	}
+}
 
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("failed to read cfg file: %w", err)
+func (c *Config) migratePaths() {
+	if c.DAGs != "" {
+		c.Paths.DAGsDir = c.DAGs
+	}
+	if c.Executable != "" {
+		c.Paths.Executable = c.Executable
+	}
+	if c.LogDir != "" {
+		c.Paths.LogDir = c.LogDir
+	}
+	if c.DataDir != "" {
+		c.Paths.DataDir = c.DataDir
+	}
+	if c.SuspendFlagsDir != "" {
+		c.Paths.SuspendFlagsDir = c.SuspendFlagsDir
+	}
+	if c.AdminLogsDir != "" {
+		c.Paths.AdminLogsDir = c.AdminLogsDir
+	}
+	if c.BaseConfig != "" {
+		c.Paths.BaseConfig = c.BaseConfig
+	}
+}
+
+func (c *Config) migrateUISettings() {
+	if c.LogEncodingCharset != "" {
+		c.UI.LogEncodingCharset = c.LogEncodingCharset
+	}
+	if c.NavbarColor != "" {
+		c.UI.NavbarColor = c.NavbarColor
+	}
+	if c.NavbarTitle != "" {
+		c.UI.NavbarTitle = c.NavbarTitle
+	}
+	if c.MaxDashboardPageLimit > 0 {
+		c.UI.MaxDashboardPageLimit = c.MaxDashboardPageLimit
+	}
+}
+
+func (c *Config) cleanBasePath() {
+	if c.BasePath != "" {
+		c.BasePath = path.Clean(c.BasePath)
+		if !path.IsAbs(c.BasePath) {
+			c.BasePath = path.Join("/", c.BasePath)
+		}
+		if c.BasePath == "/" {
+			c.BasePath = ""
 		}
 	}
+}
 
-	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal cfg file: %w", err)
+// Load creates a new configuration with backward compatibility
+func Load() (*Config, error) {
+	loader := NewConfigLoader()
+	cfg, err := loader.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Load legacy environment variables if they exist.
-	loadLegacyEnvs(&cfg)
+	// Load legacy environment variables
+	if err := loader.LoadLegacyEnv(cfg); err != nil {
+		return nil, fmt.Errorf("failed to load legacy env: %w", err)
+	}
 
-	// Set environment variables specified in the config file.
-	cfg.Env.Range(func(k, v any) bool {
-		if err := os.Setenv(k.(string), v.(string)); err != nil {
-			log.Printf("failed to set env variable %s: %v", k, err)
+	// Migrate legacy configuration
+	cfg.MigrateLegacyConfig()
+
+	// Set environment variables
+	cfg.setEnvVariables()
+
+	return cfg, nil
+}
+
+func (c *Config) setEnvVariables() {
+	c.Env.Range(func(k, v any) bool {
+		key := k.(string)
+		value := v.(string)
+		if err := os.Setenv(key, value); err != nil {
+			fmt.Printf("failed to set env variable %s: %v\n", key, err)
 		}
 		return true
 	})
-
-	return &cfg, nil
-}
-
-const (
-	// Application name.
-	appName = "dagu"
-)
-
-var (
-	envPrefix = strings.ToUpper(appName)
-)
-
-func setupViper() error {
-	homeDir := getHomeDir()
-
-	var xdgCfg XDGConfig
-	xdgCfg.DataHome = xdg.DataHome
-	xdgCfg.ConfigHome = filepath.Join(homeDir, ".config")
-	if v := os.Getenv("XDG_CONFIG_HOME"); v != "" {
-		xdgCfg.ConfigHome = v
-	}
-
-	r := newResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgCfg)
-
-	viper.AddConfigPath(r.configDir)
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("admin")
-
-	viper.SetEnvPrefix(envPrefix)
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-
-	// Bind environment variables with config keys.
-	bindEnvs()
-
-	// Set default values for config keys.
-	viper.SetDefault("dags", r.dagsDir)
-	viper.SetDefault("suspendFlagsDir", r.suspendFlagsDir)
-	viper.SetDefault("dataDir", r.dataDir)
-	viper.SetDefault("logDir", r.logsDir)
-	viper.SetDefault("adminLogsDir", r.adminLogsDir)
-	viper.SetDefault("baseConfig", r.baseConfigFile)
-
-	// Logging configurations
-	viper.SetDefault("logLevel", "info")
-	viper.SetDefault("logFormat", "text")
-
-	// Other defaults
-	viper.SetDefault("host", "127.0.0.1")
-	viper.SetDefault("port", "8080")
-	viper.SetDefault("navbarTitle", "Dagu")
-	viper.SetDefault("apiBaseURL", "/api/v1")
-
-	// Set executable path
-	// This is used for invoking the workflow process on the server.
-	return setExecutableDefault()
-}
-
-func getHomeDir() string {
-	dir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("could not determine home directory: %v", err)
-		return ""
-	}
-	return dir
-}
-
-func setExecutableDefault() error {
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-	viper.SetDefault("executable", executable)
-	return nil
-}
-
-func bindEnvs() {
-	// Server configurations
-	_ = viper.BindEnv("logEncodingCharset", "DAGU_LOG_ENCODING_CHARSET")
-	_ = viper.BindEnv("navbarColor", "DAGU_NAVBAR_COLOR")
-	_ = viper.BindEnv("navbarTitle", "DAGU_NAVBAR_TITLE")
-	_ = viper.BindEnv("apiBaseURL", "DAGU_API_BASE_URL")
-
-	// Basic authentication
-	_ = viper.BindEnv("isBasicAuth", "DAGU_IS_BASICAUTH")
-	_ = viper.BindEnv("basicAuthUsername", "DAGU_BASICAUTH_USERNAME")
-	_ = viper.BindEnv("basicAuthPassword", "DAGU_BASICAUTH_PASSWORD")
-
-	// TLS configurations
-	_ = viper.BindEnv("tls.certFile", "DAGU_CERT_FILE")
-	_ = viper.BindEnv("tls.keyFile", "DAGU_KEY_FILE")
-
-	// Auth Token
-	_ = viper.BindEnv("isAuthToken", "DAGU_IS_AUTHTOKEN")
-	_ = viper.BindEnv("authToken", "DAGU_AUTHTOKEN")
-
-	// Executables
-	_ = viper.BindEnv("executable", "DAGU_EXECUTABLE")
-
-	// Directories and files
-	_ = viper.BindEnv("dags", "DAGU_DAGS_DIR")
-	_ = viper.BindEnv("workDir", "DAGU_WORK_DIR")
-	_ = viper.BindEnv("baseConfig", "DAGU_BASE_CONFIG")
-	_ = viper.BindEnv("logDir", "DAGU_LOG_DIR")
-	_ = viper.BindEnv("dataDir", "DAGU_DATA_DIR")
-	_ = viper.BindEnv("suspendFlagsDir", "DAGU_SUSPEND_FLAGS_DIR")
-	_ = viper.BindEnv("adminLogsDir", "DAGU_ADMIN_LOG_DIR")
-
-	// Miscellaneous
-	_ = viper.BindEnv("latestStatusToday", "DAGU_LATEST_STATUS")
-}
-
-func loadLegacyEnvs(cfg *Config) {
-	// Load old environment variables if they exist.
-	if v := os.Getenv("DAGU__ADMIN_NAVBAR_COLOR"); v != "" {
-		log.Println("DAGU__ADMIN_NAVBAR_COLOR is deprecated. Use DAGU_NAVBAR_COLOR instead.")
-		cfg.NavbarColor = v
-	}
-	if v := os.Getenv("DAGU__ADMIN_NAVBAR_TITLE"); v != "" {
-		log.Println("DAGU__ADMIN_NAVBAR_TITLE is deprecated. Use DAGU_NAVBAR_TITLE instead.")
-		cfg.NavbarTitle = v
-	}
-	if v := os.Getenv("DAGU__ADMIN_PORT"); v != "" {
-		if i, err := strconv.Atoi(v); err == nil {
-			log.Println("DAGU__ADMIN_PORT is deprecated. Use DAGU_PORT instead.")
-			cfg.Port = i
-		}
-	}
-	if v := os.Getenv("DAGU__ADMIN_HOST"); v != "" {
-		log.Println("DAGU__ADMIN_HOST is deprecated. Use DAGU_HOST instead.")
-		cfg.Host = v
-	}
-	if v := os.Getenv("DAGU__DATA"); v != "" {
-		log.Println("DAGU__DATA is deprecated. Use DAGU_DATA_DIR instead.")
-		cfg.DataDir = v
-	}
-	if v := os.Getenv("DAGU__SUSPEND_FLAGS_DIR"); v != "" {
-		log.Println("DAGU__SUSPEND_FLAGS_DIR is deprecated. Use DAGU_SUSPEND_FLAGS_DIR instead.")
-		cfg.SuspendFlagsDir = v
-	}
-	if v := os.Getenv("DAGU__ADMIN_LOGS_DIR"); v != "" {
-		log.Println("DAGU__ADMIN_LOGS_DIR is deprecated. Use DAGU_ADMIN_LOG_DIR instead.")
-		cfg.AdminLogsDir = v
-	}
 }

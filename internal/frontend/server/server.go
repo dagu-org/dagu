@@ -1,18 +1,3 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package server
 
 import (
@@ -24,14 +9,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-openapi/loads"
-	flags "github.com/jessevdk/go-flags"
+	"github.com/jessevdk/go-flags"
 
-	"github.com/daguflow/dagu/internal/frontend/gen/restapi/operations"
-	pkgmiddleware "github.com/daguflow/dagu/internal/frontend/middleware"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
+	pkgmiddleware "github.com/dagu-org/dagu/internal/frontend/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -42,11 +27,11 @@ type Server struct {
 	port        int
 	basicAuth   *BasicAuth
 	authToken   *AuthToken
-	tls         *config.TLS
-	logger      logger.Logger
+	tls         *config.TLSConfig
 	server      *restapi.Server
 	handlers    []Handler
 	assets      fs.FS
+	headless    bool
 }
 
 type NewServerArgs struct {
@@ -54,15 +39,18 @@ type NewServerArgs struct {
 	Port      int
 	BasicAuth *BasicAuth
 	AuthToken *AuthToken
-	TLS       *config.TLS
-	Logger    logger.Logger
+	TLS       *config.TLSConfig
 	Handlers  []Handler
 	AssetsFS  fs.FS
 
-	// Configuration for the frontend
-	NavbarColor string
-	NavbarTitle string
-	APIBaseURL  string
+	Headless              bool
+	NavbarColor           string
+	NavbarTitle           string
+	BasePath              string
+	APIBaseURL            string
+	TimeZone              string
+	MaxDashboardPageLimit int
+	RemoteNodes           []string
 }
 
 type BasicAuth struct {
@@ -85,32 +73,41 @@ func New(params NewServerArgs) *Server {
 		basicAuth: params.BasicAuth,
 		authToken: params.AuthToken,
 		tls:       params.TLS,
-		logger:    params.Logger,
 		handlers:  params.Handlers,
 		assets:    params.AssetsFS,
+		headless:  params.Headless, // Assign headless mode flag
 		funcsConfig: funcsConfig{
-			NavbarColor: params.NavbarColor,
-			NavbarTitle: params.NavbarTitle,
-			APIBaseURL:  params.APIBaseURL,
+			NavbarColor:           params.NavbarColor,
+			NavbarTitle:           params.NavbarTitle,
+			BasePath:              params.BasePath,
+			APIBaseURL:            params.APIBaseURL,
+			TZ:                    params.TimeZone,
+			MaxDashboardPageLimit: params.MaxDashboardPageLimit,
+			RemoteNodes:           params.RemoteNodes,
 		},
 	}
 }
 
-func (svr *Server) Shutdown() {
+func (svr *Server) Shutdown(ctx context.Context) {
 	if svr.server == nil {
 		return
 	}
 	err := svr.server.Shutdown()
 	if err != nil {
-		svr.logger.Warn("Server shutdown", "error", err)
+		logger.Warn(ctx, "Server shutdown", "error", err)
 	}
 }
 
 func (svr *Server) Serve(ctx context.Context) (err error) {
+	loggerInstance := logger.FromContext(ctx)
+
+	// Setup middleware & routes
 	middlewareOptions := &pkgmiddleware.Options{
-		Handler: svr.defaultRoutes(chi.NewRouter()),
-		Logger:  svr.logger,
+		Handler:  svr.defaultRoutes(ctx, chi.NewRouter()), // API remains active
+		BasePath: svr.funcsConfig.BasePath,
+		Logger:   loggerInstance,
 	}
+
 	if svr.authToken != nil {
 		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
 			Token: svr.authToken.Token,
@@ -124,43 +121,37 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	}
 	pkgmiddleware.Setup(middlewareOptions)
 
+	// Load API spec (Always required)
 	swaggerSpec, err := loads.Analyzed(restapi.SwaggerJSON, "")
 	if err != nil {
-		svr.logger.Error("Failed to load API spec", "error", err)
+		logger.Error(ctx, "Failed to load API spec", "err", err)
 		return err
 	}
 	api := operations.NewDaguAPI(swaggerSpec)
-	api.Logger = svr.logger.Infof
+	api.Logger = loggerInstance.Infof
 	for _, h := range svr.handlers {
-		h.Configure(api)
+		h.Configure(api) // Always configure API handlers
 	}
 
+	// Start API server
 	svr.server = restapi.NewServer(api)
-	defer svr.Shutdown()
+	defer svr.Shutdown(ctx)
 
 	svr.server.Host = svr.host
 	svr.server.Port = svr.port
 	svr.server.ConfigureAPI()
 
-	// Server run context
+	// Listen for system signals (CTRL+C, termination)
 	serverCtx, serverStopCtx := context.WithCancel(ctx)
-
-	// Listen for syscall signals for process to interrupt/quit
 	sig := make(chan os.Signal, 1)
-	signal.Notify(
-		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
-	)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sig
-
-		// Trigger graceful shutdown
-		err := svr.server.Shutdown()
-		if err != nil {
-			svr.logger.Error("Server shutdown", "error", err)
-		}
+		_ = svr.server.Shutdown()
 		serverStopCtx()
 	}()
 
+	// Run with or without TLS
 	if svr.tls != nil {
 		svr.server.TLSCertificate = flags.Filename(svr.tls.CertFile)
 		svr.server.TLSCertificateKey = flags.Filename(svr.tls.KeyFile)
@@ -172,13 +163,10 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	// Run the server
 	err = svr.server.Serve()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		svr.logger.Error("Server error", "error", err)
+		logger.Error(ctx, "Server error", "err", err)
 	}
 
-	// Wait for server context to be stopped
 	<-serverCtx.Done()
-
-	svr.logger.Info("Server stopped")
-
+	logger.Info(ctx, "Server stopped")
 	return nil
 }

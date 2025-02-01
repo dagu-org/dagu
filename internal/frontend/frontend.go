@@ -1,60 +1,54 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package frontend
 
 import (
-	"github.com/daguflow/dagu/internal/client"
-	"github.com/daguflow/dagu/internal/config"
-	"github.com/daguflow/dagu/internal/frontend/dag"
-	"github.com/daguflow/dagu/internal/frontend/server"
-	"github.com/daguflow/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/client"
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/dagu-org/dagu/internal/frontend/dag"
+	"github.com/dagu-org/dagu/internal/frontend/server"
 )
 
-func New(cfg *config.Config, lg logger.Logger, cli client.Client) *server.Server {
+func New(cfg *config.Config, cli client.Client) *server.Server {
 	var hs []server.Handler
 
 	hs = append(hs, dag.NewHandler(
 		&dag.NewHandlerArgs{
 			Client:             cli,
-			LogEncodingCharset: cfg.LogEncodingCharset,
+			LogEncodingCharset: cfg.UI.LogEncodingCharset,
+			RemoteNodes:        cfg.RemoteNodes,
+			ApiBasePath:        cfg.APIBaseURL,
 		},
 	))
 
-	serverParams := server.NewServerArgs{
-		Host:        cfg.Host,
-		Port:        cfg.Port,
-		TLS:         cfg.TLS,
-		Logger:      lg,
-		Handlers:    hs,
-		AssetsFS:    assetsFS,
-		NavbarColor: cfg.NavbarColor,
-		NavbarTitle: cfg.NavbarTitle,
-		APIBaseURL:  cfg.APIBaseURL,
+	var remoteNodes []string
+	for _, n := range cfg.RemoteNodes {
+		remoteNodes = append(remoteNodes, n.Name)
 	}
 
-	if cfg.IsAuthToken {
+	serverParams := server.NewServerArgs{
+		Host:                  cfg.Host,
+		Port:                  cfg.Port,
+		TLS:                   cfg.TLS,
+		Handlers:              hs,
+		AssetsFS:              assetsFS,
+		NavbarColor:           cfg.UI.NavbarColor,
+		NavbarTitle:           cfg.UI.NavbarTitle,
+		MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
+		APIBaseURL:            cfg.APIBaseURL,
+		TimeZone:              cfg.TZ,
+		RemoteNodes:           remoteNodes,
+		Headless:              cfg.Headless,
+	}
+
+	if cfg.Auth.Token.Enabled {
 		serverParams.AuthToken = &server.AuthToken{
-			Token: cfg.AuthToken,
+			Token: cfg.Auth.Token.Value,
 		}
 	}
 
-	if cfg.IsBasicAuth {
+	if cfg.Auth.Basic.Enabled {
 		serverParams.BasicAuth = &server.BasicAuth{
-			Username: cfg.BasicAuthUsername,
-			Password: cfg.BasicAuthPassword,
+			Username: cfg.Auth.Basic.Username,
+			Password: cfg.Auth.Basic.Password,
 		}
 	}
 

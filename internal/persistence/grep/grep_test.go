@@ -1,18 +1,3 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package grep
 
 import (
@@ -31,7 +16,7 @@ func TestGrep(t *testing.T) {
 		Name    string
 		File    string
 		Pattern string
-		Opts    *Options
+		Opts    Options
 		Want    []*Match
 		IsErr   bool
 	}{
@@ -50,7 +35,7 @@ func TestGrep(t *testing.T) {
 			Name:    "regexp",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "^b.",
-			Opts: &Options{
+			Opts: Options{
 				IsRegexp: true,
 			},
 			Want: []*Match{
@@ -64,7 +49,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "b",
-			Opts: &Options{
+			Opts: Options{
 				Before: 1,
 			},
 			Want: []*Match{
@@ -78,7 +63,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before+after",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "cc",
-			Opts: &Options{
+			Opts: Options{
 				Before: 2,
 				After:  2,
 			},
@@ -93,7 +78,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before+after,firstline",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "aa",
-			Opts: &Options{
+			Opts: Options{
 				Before: 1,
 				After:  1,
 			},
@@ -108,7 +93,7 @@ func TestGrep(t *testing.T) {
 			Name:    "before+after,lastline",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "ee",
-			Opts: &Options{
+			Opts: Options{
 				Before: 1,
 				After:  1,
 			},
@@ -141,7 +126,7 @@ func TestGrep(t *testing.T) {
 			Name:    "invalid regexp",
 			File:    filepath.Join(dir, "test.txt"),
 			Pattern: "(aa",
-			Opts: &Options{
+			Opts: Options{
 				IsRegexp: true,
 			},
 			IsErr: true,

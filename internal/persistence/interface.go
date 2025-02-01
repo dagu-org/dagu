@@ -1,27 +1,13 @@
-// Copyright (C) 2024 The Daguflow/Dagu Authors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 package persistence
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/daguflow/dagu/internal/dag"
-	"github.com/daguflow/dagu/internal/persistence/grep"
-	"github.com/daguflow/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/persistence/grep"
+	"github.com/dagu-org/dagu/internal/persistence/model"
 )
 
 var (
@@ -30,42 +16,49 @@ var (
 	ErrNoStatusData      = fmt.Errorf("no status data")
 )
 
-type DataStores interface {
-	HistoryStore() HistoryStore
-	DAGStore() DAGStore
-	FlagStore() FlagStore
-}
-
 type HistoryStore interface {
-	Open(dagFile string, t time.Time, requestID string) error
-	Write(status *model.Status) error
-	Close() error
-	Update(dagFile, requestID string, st *model.Status) error
-	ReadStatusRecent(dagFile string, n int) []*model.StatusFile
-	ReadStatusToday(dagFile string) (*model.Status, error)
-	FindByRequestID(dagFile string, requestID string) (*model.StatusFile, error)
-	RemoveAll(dagFile string) error
-	RemoveOld(dagFile string, retentionDays int) error
-	Rename(oldName, newName string) error
+	Open(ctx context.Context, key string, timestamp time.Time, requestID string) error
+	Write(ctx context.Context, status model.Status) error
+	Close(ctx context.Context) error
+	Update(ctx context.Context, key, requestID string, status model.Status) error
+	ReadStatusRecent(ctx context.Context, key string, itemLimit int) []model.StatusFile
+	ReadStatusToday(ctx context.Context, key string) (*model.Status, error)
+	FindByRequestID(ctx context.Context, key string, requestID string) (*model.StatusFile, error)
+	RemoveAll(ctx context.Context, key string) error
+	RemoveOld(ctx context.Context, key string, retentionDays int) error
+	Rename(ctx context.Context, oldKey, newKey string) error
 }
 
 type DAGStore interface {
-	Create(name string, spec []byte) (string, error)
-	Delete(name string) error
-	List() (ret []*dag.DAG, errs []string, err error)
-	GetMetadata(name string) (*dag.DAG, error)
-	GetDetails(name string) (*dag.DAG, error)
-	Grep(pattern string) (ret []*GrepResult, errs []string, err error)
-	Load(name string) (*dag.DAG, error)
-	Rename(oldID, newID string) error
-	GetSpec(name string) (string, error)
-	UpdateSpec(name string, spec []byte) error
-	Find(name string) (*dag.DAG, error)
+	Create(ctx context.Context, name string, spec []byte) (string, error)
+	Delete(ctx context.Context, name string) error
+	List(ctx context.Context) (ret []*digraph.DAG, errs []string, err error)
+	ListPagination(ctx context.Context, params DAGListPaginationArgs) (*DagListPaginationResult, error)
+	GetMetadata(ctx context.Context, name string) (*digraph.DAG, error)
+	GetDetails(ctx context.Context, name string) (*digraph.DAG, error)
+	Grep(ctx context.Context, pattern string) (ret []*GrepResult, errs []string, err error)
+	Rename(ctx context.Context, oldID, newID string) error
+	GetSpec(ctx context.Context, name string) (string, error)
+	UpdateSpec(ctx context.Context, name string, spec []byte) error
+	TagList(ctx context.Context) ([]string, []string, error)
+}
+
+type DAGListPaginationArgs struct {
+	Page  int
+	Limit int
+	Name  string
+	Tag   string
+}
+
+type DagListPaginationResult struct {
+	DagList   []*digraph.DAG
+	Count     int
+	ErrorList []string
 }
 
 type GrepResult struct {
 	Name    string
-	DAG     *dag.DAG
+	DAG     *digraph.DAG
 	Matches []*grep.Match
 }
 
