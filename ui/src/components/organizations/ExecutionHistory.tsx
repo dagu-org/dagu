@@ -30,10 +30,7 @@ type HistoryTableProps = {
 };
 
 function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
-  console.log(
-    { GridData, Logs },
-  )
-  const [idx, setIdx] = React.useState(Logs ?Logs.length - 1 : 0);
+  const [idx, setIdx] = React.useState(Logs ? Logs.length - 1 : 0);
   const logs = React.useMemo(() => {
     return Logs;
   }, [Logs]);
@@ -50,8 +47,8 @@ function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
           <Box>
             <SubTitle>Execution History</SubTitle>
             <HistoryTable
-              logs={logs|| []}
-              gridData={GridData|| []}
+              logs={logs || []}
+              gridData={GridData || []}
               onSelect={setIdx}
               idx={idx}
             />

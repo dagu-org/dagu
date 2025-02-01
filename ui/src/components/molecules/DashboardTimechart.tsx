@@ -85,10 +85,6 @@ function DashboardTimechart({ data: input }: Props) {
       timelineInstance.current.setItems(dataset);
     }
 
-    console.log(
-      {input, items}
-    )
-
     return () => {
       if (timelineInstance.current) {
         timelineInstance.current.destroy();
@@ -99,10 +95,7 @@ function DashboardTimechart({ data: input }: Props) {
 
   return (
     <TimelineWrapper>
-      <div
-        ref={timelineRef}
-        style={{ width: '100%', height: '100%' }}
-      />
+      <div ref={timelineRef} style={{ width: '100%', height: '100%' }} />
       <style>
         {`
         .vis-item .vis-item-overflow {
