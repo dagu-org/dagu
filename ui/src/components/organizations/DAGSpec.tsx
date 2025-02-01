@@ -197,7 +197,7 @@ function DAGSpec({ data }: Props) {
                     <DAGEditor
                       value={data.Definition}
                       onChange={(newValue) => {
-                        setCurrentValue(newValue);
+                        setCurrentValue(newValue || '');
                       }}
                     ></DAGEditor>
                   </Box>

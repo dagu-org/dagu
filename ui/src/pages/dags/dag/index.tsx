@@ -28,10 +28,7 @@ function DAGDetails() {
   const appBarContext = React.useContext(AppBarContext);
   const { pathname } = useLocation();
 
-  const baseUrl = useMemo(
-    () => `/dags/${encodeURI(params.name!)}`,
-    [params.name]
-  );
+  const baseUrl = `/dags/${encodeURI(params.name!)}`;
   const { data, isValidating, mutate } = useSWR<GetDAGResponse>(
     `/dags/${params.name}?tab=${params.tab ?? ''}&${new URLSearchParams(
       window.location.search

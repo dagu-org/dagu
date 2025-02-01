@@ -34,16 +34,11 @@ function DAGStatus({ DAG, name, refresh }: Props) {
     onSuccess: refresh,
     requestId: DAG.Status?.RequestId,
   });
-  const dismissModal = React.useCallback(() => {
-    setModal(false);
-  }, [setModal]);
-  const onUpdateStatus = React.useCallback(
-    async (step: Step, action: string) => {
-      doPost(action, step.Name);
-      dismissModal();
-    },
-    [refresh, dismissModal]
-  );
+  const dismissModal = () => setModal(false);
+  const onUpdateStatus = async (step: Step, action: string) => {
+    doPost(action, step.Name);
+    dismissModal();
+  };
   const onSelectStepOnGraph = React.useCallback(
     async (id: string) => {
       const status = DAG.Status?.Status;
@@ -63,13 +58,10 @@ function DAGStatus({ DAG, name, refresh }: Props) {
   );
   const [cookie, setCookie] = useCookies(['flowchart']);
   const [flowchart, setFlowchart] = React.useState(cookie['flowchart']);
-  const onChangeFlowchart = React.useCallback(
-    (value: FlowchartType) => {
-      setCookie('flowchart', value, { path: '/' });
-      setFlowchart(value);
-    },
-    [setCookie, flowchart, setFlowchart]
-  );
+  const onChangeFlowchart = (value: FlowchartType) => {
+    setCookie('flowchart', value, { path: '/' });
+    setFlowchart(value);
+  };
 
   if (!DAG.Status) {
     return null;

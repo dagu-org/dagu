@@ -9,9 +9,7 @@ type Props = {
 };
 
 function NodeStatusChip({ status, children }: Props) {
-  const style = React.useMemo(() => {
-    return nodeStatusColorMapping[status] || {};
-  }, [status]);
+  const style = nodeStatusColorMapping[status] || {};
   return <Chip sx={style} label={children} />;
 }
 

@@ -78,15 +78,11 @@ function DAGActions({
     [refresh]
   );
 
-  const buttonState = React.useMemo(
-    () => ({
-      start: status?.Status != SchedulerStatus.Running,
-      stop: status?.Status == SchedulerStatus.Running,
-      retry:
-        status?.Status != SchedulerStatus.Running && status?.RequestId != '',
-    }),
-    [status]
-  );
+  const buttonState = {
+    start: status?.Status != SchedulerStatus.Running,
+    stop: status?.Status == SchedulerStatus.Running,
+    retry: status?.Status != SchedulerStatus.Running && status?.RequestId != '',
+  };
   return (
     <Stack direction="row" spacing={2}>
       <ActionButton
