@@ -2,6 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "description": "Schema for Dagu DAG YAML format. Dagu uses YAML files to define Directed Acyclic Graphs (DAGs) for workflow orchestration.",
+  "additionalProperties": false,
   "properties": {
     "name": {
       "type": "string",
@@ -230,6 +231,7 @@
     "step": {
       "type": "object",
       "required": ["name"],
+      "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
