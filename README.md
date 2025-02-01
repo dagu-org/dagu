@@ -130,7 +130,6 @@ Dagu is a modern workflow engine that combines simplicity with power, designed f
 ## Community
 
 - Issues: [GitHub Issues](https://github.com/dagu-org/dagu/issues)
-- Discussion: [GitHub Discussions](https://github.com/dagu-org/dagu/discussions)
 - Chat: [Discord](https://discord.gg/gpahPUjGRk)
 
 ## Installation
