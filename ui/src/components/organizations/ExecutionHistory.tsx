@@ -8,6 +8,7 @@ import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import SubTitle from '../atoms/SubTitle';
 import LoadingIndicator from '../atoms/LoadingIndicator';
 import HistoryTable from '../molecules/HistoryTable';
+import { DAGStatusContext } from '../../contexts/DAGStatusContext';
 
 type Props = {
   logData: LogData;
@@ -31,11 +32,18 @@ type HistoryTableProps = {
 
 function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
   const [idx, setIdx] = React.useState(Logs ? Logs.length - 1 : 0);
+  const dagStatusContext = React.useContext(DAGStatusContext);
 
   let handlers: Node[] | null = null;
   if (Logs && Logs.length > idx) {
     handlers = Handlers(Logs[idx].Status);
   }
+
+  React.useEffect(() => {
+    if (Logs && Logs[idx]) {
+      dagStatusContext.setData(Logs[idx].Status);
+    }
+  }, [idx]);
 
   return (
     <DAGContext.Consumer>
