@@ -217,7 +217,7 @@ const calculateGraphBreadth = (steps: Step[] | Node[]) => {
 
   // Count nodes at each level
   const levelCounts = new Map<number, number>();
-  nodeLevels.forEach((level, _) => {
+  nodeLevels.forEach((level) => {
     levelCounts.set(level, (levelCounts.get(level) || 0) + 1);
   });
 

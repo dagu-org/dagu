@@ -1,9 +1,14 @@
 import React from 'react';
 import { Status } from '../models';
 
-export const DAGStatusContext = React.createContext({
+type DAGStatusContextType = {
+  data: Status | undefined;
+  setData(val: Status): void;
+};
+
+export const DAGStatusContext = React.createContext<DAGStatusContextType>({
   data: undefined as Status | undefined,
-  setData: (_: Status) => {
+  setData: () => {
     return;
   },
 });
