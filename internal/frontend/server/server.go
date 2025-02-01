@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-openapi/loads"
-	flags "github.com/jessevdk/go-flags"
+	"github.com/jessevdk/go-flags"
 
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 	pkgmiddleware "github.com/dagu-org/dagu/internal/frontend/middleware"
@@ -31,6 +31,7 @@ type Server struct {
 	server      *restapi.Server
 	handlers    []Handler
 	assets      fs.FS
+	headless    bool
 }
 
 type NewServerArgs struct {
@@ -42,7 +43,7 @@ type NewServerArgs struct {
 	Handlers  []Handler
 	AssetsFS  fs.FS
 
-	// Configuration for the frontend
+	Headless              bool
 	NavbarColor           string
 	NavbarTitle           string
 	BasePath              string
@@ -74,6 +75,7 @@ func New(params NewServerArgs) *Server {
 		tls:       params.TLS,
 		handlers:  params.Handlers,
 		assets:    params.AssetsFS,
+		headless:  params.Headless, // Assign headless mode flag
 		funcsConfig: funcsConfig{
 			NavbarColor:           params.NavbarColor,
 			NavbarTitle:           params.NavbarTitle,
@@ -98,11 +100,14 @@ func (svr *Server) Shutdown(ctx context.Context) {
 
 func (svr *Server) Serve(ctx context.Context) (err error) {
 	loggerInstance := logger.FromContext(ctx)
+
+	// Setup middleware & routes
 	middlewareOptions := &pkgmiddleware.Options{
-		Handler:  svr.defaultRoutes(ctx, chi.NewRouter()),
+		Handler:  svr.defaultRoutes(ctx, chi.NewRouter()), // API remains active
 		BasePath: svr.funcsConfig.BasePath,
 		Logger:   loggerInstance,
 	}
+
 	if svr.authToken != nil {
 		middlewareOptions.AuthToken = &pkgmiddleware.AuthToken{
 			Token: svr.authToken.Token,
@@ -116,6 +121,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	}
 	pkgmiddleware.Setup(middlewareOptions)
 
+	// Load API spec (Always required)
 	swaggerSpec, err := loads.Analyzed(restapi.SwaggerJSON, "")
 	if err != nil {
 		logger.Error(ctx, "Failed to load API spec", "err", err)
@@ -124,9 +130,10 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	api := operations.NewDaguAPI(swaggerSpec)
 	api.Logger = loggerInstance.Infof
 	for _, h := range svr.handlers {
-		h.Configure(api)
+		h.Configure(api) // Always configure API handlers
 	}
 
+	// Start API server
 	svr.server = restapi.NewServer(api)
 	defer svr.Shutdown(ctx)
 
@@ -134,25 +141,17 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	svr.server.Port = svr.port
 	svr.server.ConfigureAPI()
 
-	// Server run context
+	// Listen for system signals (CTRL+C, termination)
 	serverCtx, serverStopCtx := context.WithCancel(ctx)
-
-	// Listen for syscall signals for process to interrupt/quit
 	sig := make(chan os.Signal, 1)
-	signal.Notify(
-		sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT,
-	)
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sig
-
-		// Trigger graceful shutdown
-		err := svr.server.Shutdown()
-		if err != nil {
-			logger.Error(ctx, "Server shutdown", "err", err)
-		}
+		_ = svr.server.Shutdown()
 		serverStopCtx()
 	}()
 
+	// Run with or without TLS
 	if svr.tls != nil {
 		svr.server.TLSCertificate = flags.Filename(svr.tls.CertFile)
 		svr.server.TLSCertificateKey = flags.Filename(svr.tls.KeyFile)
@@ -167,10 +166,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 		logger.Error(ctx, "Server error", "err", err)
 	}
 
-	// Wait for server context to be stopped
 	<-serverCtx.Done()
-
 	logger.Info(ctx, "Server stopped")
-
 	return nil
 }

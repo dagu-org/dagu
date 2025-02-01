@@ -36,6 +36,7 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		APIBaseURL:            cfg.APIBaseURL,
 		TimeZone:              cfg.TZ,
 		RemoteNodes:           remoteNodes,
+		Headless:              cfg.UI.Headless,
 	}
 
 	if cfg.Auth.Token.Enabled {
