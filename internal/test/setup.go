@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"syscall"
@@ -87,8 +88,19 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		opt(&helper)
 	}
 
+	// setup the default shell for reproducible result
+	setShell(t, "sh")
+
 	t.Cleanup(helper.Cleanup)
 	return helper
+}
+
+func setShell(t *testing.T, shell string) {
+	t.Helper()
+
+	shPath, err := exec.LookPath(shell)
+	require.NoError(t, err, "failed to find shell")
+	os.Setenv("SHELL", shPath)
 }
 
 // Helper provides test utilities and configuration
