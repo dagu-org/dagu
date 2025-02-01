@@ -29,6 +29,7 @@ Server Configuration
 - ``DAGU_TZ`` (``""``): Server timezone (default: system timezone, e.g., ``Asia/Tokyo``)
 - ``DAGU_CERT_FILE``: SSL certificate file path
 - ``DAGU_KEY_FILE``: SSL key file path
+- ``DAGU_HEADLESS`` (``""``): Run the server in headless mode (1=enabled)
 
 Directory Paths
 ~~~~~~~~~~~~~
@@ -72,6 +73,7 @@ Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. 
     navbarColor: "#ff0000"     # Header color
     navbarTitle: "Dagu - PROD" # Header title
     latestStatusToday: true    # Show today's latest status
+    headless: true             # Run in headless mode
     
     # Authentication
     isBasicAuth: true           # Enable basic auth
