@@ -18,6 +18,7 @@ type Config struct {
 	APIBasePath string `mapstructure:"apiBasePath"`
 	APIBaseURL  string `mapstructure:"apiBaseURL"` // For backward compatibility
 	WorkDir     string `mapstructure:"workDir"`
+	Headless    bool   `mapstructure:"headless"`
 
 	// Authentication
 	Auth Auth `mapstructure:"auth"`
@@ -58,8 +59,7 @@ type Config struct {
 	// Deprecated: Use UI.NavbarTitle instead
 	NavbarTitle string `mapstructure:"navbarTitle"`
 	// Deprecated: Use UI.MaxDashboardPageLimit instead
-	MaxDashboardPageLimit int  `mapstructure:"maxDashboardPageLimit"`
-	Headless              bool `mapstructure:"headless"`
+	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
 	// Legacy fields for backward compatibility - End
 
 	// Other settings
@@ -113,7 +113,6 @@ type UI struct {
 	NavbarColor           string `mapstructure:"navbarColor"`
 	NavbarTitle           string `mapstructure:"navbarTitle"`
 	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
-	Headless              bool   `mapstructure:"headless"`
 }
 
 // RemoteNode represents a remote node configuration
@@ -207,9 +206,6 @@ func (c *Config) migrateUISettings() {
 	}
 	if c.MaxDashboardPageLimit > 0 {
 		c.UI.MaxDashboardPageLimit = c.MaxDashboardPageLimit
-	}
-	if c.Headless {
-		c.UI.Headless = c.Headless
 	}
 }
 
