@@ -40,17 +40,12 @@ function NodeStatusTable({ nodes, status, name, refresh, file = '' }: Props) {
       setModal(true);
     }
   };
-  const dismissModal = React.useCallback(() => {
-    setModal(false);
-  }, [setModal]);
-  const onUpdateStatus = React.useCallback(
-    async (step: Step, action: string) => {
-      doPost(action, step.Name);
-      dismissModal();
-      refresh();
-    },
-    [refresh, dismissModal]
-  );
+  const dismissModal = () => setModal(false);
+  const onUpdateStatus = async (step: Step, action: string) => {
+    doPost(action, step.Name);
+    dismissModal();
+    refresh();
+  };
   const styles = stepTabColStyles;
   let i = 0;
   if (!nodes || !nodes.length) {

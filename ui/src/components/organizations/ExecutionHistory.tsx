@@ -8,6 +8,7 @@ import DAGStatusOverview from '../molecules/DAGStatusOverview';
 import SubTitle from '../atoms/SubTitle';
 import LoadingIndicator from '../atoms/LoadingIndicator';
 import HistoryTable from '../molecules/HistoryTable';
+import { DAGStatusContext } from '../../contexts/DAGStatusContext';
 
 type Props = {
   logData: LogData;
@@ -30,18 +31,19 @@ type HistoryTableProps = {
 };
 
 function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
-  console.log(
-    { GridData, Logs },
-  )
-  const [idx, setIdx] = React.useState(Logs ?Logs.length - 1 : 0);
-  const logs = React.useMemo(() => {
-    return Logs;
-  }, [Logs]);
+  const [idx, setIdx] = React.useState(Logs ? Logs.length - 1 : 0);
+  const dagStatusContext = React.useContext(DAGStatusContext);
 
   let handlers: Node[] | null = null;
-  if (logs && logs.length > idx) {
-    handlers = Handlers(logs[idx].Status);
+  if (Logs && Logs.length > idx) {
+    handlers = Handlers(Logs[idx].Status);
   }
+
+  React.useEffect(() => {
+    if (Logs && Logs[idx]) {
+      dagStatusContext.setData(Logs[idx].Status);
+    }
+  }, [idx]);
 
   return (
     <DAGContext.Consumer>
@@ -50,21 +52,21 @@ function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
           <Box>
             <SubTitle>Execution History</SubTitle>
             <HistoryTable
-              logs={logs|| []}
-              gridData={GridData|| []}
+              logs={Logs || []}
+              gridData={GridData || []}
               onSelect={setIdx}
               idx={idx}
             />
           </Box>
 
-          {logs && logs[idx] ? (
+          {Logs && Logs[idx] ? (
             <React.Fragment>
               <Box sx={{ mt: 3 }}>
                 <SubTitle>Status</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <DAGStatusOverview
-                    status={logs[idx].Status}
-                    file={logs[idx].File}
+                    status={Logs[idx].Status}
+                    file={Logs[idx].File}
                     {...props}
                   />
                 </Box>
@@ -73,9 +75,9 @@ function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
                 <SubTitle>Steps</SubTitle>
                 <Box sx={{ mt: 2 }}>
                   <NodeStatusTable
-                    nodes={logs[idx].Status.Nodes}
-                    status={logs[idx].Status}
-                    file={logs[idx].File}
+                    nodes={Logs[idx].Status.Nodes}
+                    status={Logs[idx].Status}
+                    file={Logs[idx].File}
                     {...props}
                   />
                 </Box>
@@ -86,9 +88,9 @@ function DAGHistoryTable({ GridData, Logs }: HistoryTableProps) {
                   <SubTitle>Lifecycle Hooks</SubTitle>
                   <Box sx={{ mt: 2 }}>
                     <NodeStatusTable
-                      nodes={Handlers(logs[idx].Status)}
-                      file={logs[idx].File}
-                      status={logs[idx].Status}
+                      nodes={Handlers(Logs[idx].Status)}
+                      file={Logs[idx].File}
+                      status={Logs[idx].Status}
                       {...props}
                     />
                   </Box>

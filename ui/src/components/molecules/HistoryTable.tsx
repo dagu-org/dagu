@@ -26,7 +26,7 @@ function HistoryTable({ logs, gridData, onSelect, idx }: Props) {
         <TableHead>
           <TableRow>
             <TableCell></TableCell>
-            {logs.map((log, i) => {
+            {logs.map((_, i) => {
               let date;
               const startedAt = logs[i].Status.StartedAt;
               if (startedAt && startedAt != '-') {
@@ -39,7 +39,7 @@ function HistoryTable({ logs, gridData, onSelect, idx }: Props) {
                 moment(logs[i - 1].Status.StartedAt).format('M/D') != date;
               return (
                 <TableCell
-                  key={log.Status.StartedAt}
+                  key={`date-${i}`}
                   style={colStyle}
                   onClick={() => {
                     onSelect(i);

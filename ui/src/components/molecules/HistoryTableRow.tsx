@@ -11,13 +11,10 @@ type Props = {
 };
 
 function HistoryTableRow({ data, onSelect, idx }: Props) {
-  const vals = React.useMemo(() => {
-    return data.Vals.reverse();
-  }, [data]);
   return (
     <StyledTableRow>
       <TableCell>{data.Name}</TableCell>
-      {vals.map((status, i) => {
+      {[...data.Vals].reverse().map((status, i) => {
         const style: CSSProperties = { ...circleStyle };
         const tdStyle: CSSProperties = { maxWidth: '22px' };
         if (i == idx) {

@@ -20,7 +20,7 @@ type LabelProps = {
 type Props = {
   status?: Status | WorkflowStatus;
   name: string;
-  dag: DAG | Workflow;
+  dag: DAG | Workflow | undefined;
   label?: boolean;
   redirectTo?: string;
   refresh?: () => void;
@@ -78,15 +78,11 @@ function DAGActions({
     [refresh]
   );
 
-  const buttonState = React.useMemo(
-    () => ({
-      start: status?.Status != SchedulerStatus.Running,
-      stop: status?.Status == SchedulerStatus.Running,
-      retry:
-        status?.Status != SchedulerStatus.Running && status?.RequestId != '',
-    }),
-    [status]
-  );
+  const buttonState = {
+    start: status?.Status != SchedulerStatus.Running,
+    stop: status?.Status == SchedulerStatus.Running,
+    retry: status?.Status != SchedulerStatus.Running && status?.RequestId != '',
+  };
   return (
     <Stack direction="row" spacing={2}>
       <ActionButton
@@ -166,17 +162,19 @@ function DAGActions({
           <Box>{status?.RequestId}</Box>
         </Stack>
       </ConfirmModal>
-      <StartDAGModal
-        dag={dag}
-        visible={isStartModal}
-        onSubmit={(params) => {
-          setIsStartModal(false);
-          onSubmit({ name: name, action: 'start', params: params });
-        }}
-        dismissModal={() => {
-          setIsStartModal(false);
-        }}
-      />
+      {dag && (
+        <StartDAGModal
+          dag={dag}
+          visible={isStartModal}
+          onSubmit={(params) => {
+            setIsStartModal(false);
+            onSubmit({ name: name, action: 'start', params: params });
+          }}
+          dismissModal={() => {
+            setIsStartModal(false);
+          }}
+        />
+      )}
     </Stack>
   );
 }
