@@ -1,37 +1,45 @@
 import React, { useEffect, useRef } from 'react';
-import MonacoEditor from 'react-monaco-editor';
+import MonacoEditor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
-import { setDiagnosticsOptions } from 'monaco-yaml';
+import { configureMonacoYaml } from 'monaco-yaml';
+
+// Configure schema at module level (before editor initialization)
+configureMonacoYaml(monaco, {
+  enableSchemaRequest: true,
+  hover: true,
+  completion: true,
+  validate: true,
+  format: true,
+  schemas: [
+    {
+      uri: 'https://raw.githubusercontent.com/daguflow/dagu/main/schemas/dag.schema.json',
+      fileMatch: ['*'], // Match all YAML files
+    },
+  ],
+});
+
+loader.config({ monaco });
 
 type Props = {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value?: string) => void;
 };
 
 function DAGEditor({ value, onChange }: Props) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
   useEffect(() => {
-    setDiagnosticsOptions({
-      enableSchemaRequest: true,
-      schemas: [
-        {
-          uri: 'https://raw.githubusercontent.com/daguflow/dagu/main/schemas/dag.schema.json',
-          fileMatch: ['*'],
-        },
-      ],
-    });
-
-    // cleanup
     return () => {
-      if (editorRef.current) {
-        editorRef.current.dispose();
-      }
+      editorRef.current?.dispose();
     };
   }, []);
 
   const editorDidMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
+
+    setTimeout(() => {
+      editor.getAction('editor.action.formatDocument')?.run();
+    }, 100);
   };
 
   return (
@@ -40,12 +48,17 @@ function DAGEditor({ value, onChange }: Props) {
       language="yaml"
       value={value}
       onChange={onChange}
-      editorDidMount={editorDidMount}
+      onMount={editorDidMount}
       options={{
         automaticLayout: true,
+        minimap: { enabled: false },
         scrollBeyondLastLine: false,
         quickSuggestions: { other: true, comments: false, strings: true },
         formatOnType: true,
+        formatOnPaste: true,
+        renderValidationDecorations: 'on',
+        lineNumbers: 'on',
+        glyphMargin: true,
       }}
     />
   );
