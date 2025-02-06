@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
-	dagscheduler "github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -47,7 +47,7 @@ func (job *dagJob) Start(ctx context.Context) error {
 	}
 
 	// Guard against already running jobs.
-	if latestStatus.Status == dagscheduler.StatusRunning {
+	if latestStatus.Status == scheduler.StatusRunning {
 		return ErrJobRunning
 	}
 
@@ -63,7 +63,7 @@ func (job *dagJob) Start(ctx context.Context) error {
 // ready checks whether the job can be safely started based on the latest status.
 func (job *dagJob) ready(ctx context.Context, latestStatus model.Status) error {
 	// Prevent starting if it's already running.
-	if latestStatus.Status == dagscheduler.StatusRunning {
+	if latestStatus.Status == scheduler.StatusRunning {
 		return ErrJobRunning
 	}
 
@@ -88,7 +88,7 @@ func (job *dagJob) ready(ctx context.Context, latestStatus model.Status) error {
 // If so, the current run is skipped.
 func (job *dagJob) skipIfSuccessful(ctx context.Context, latestStatus model.Status, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
-	if !job.DAG.SkipIfSuccessful || latestStatus.Status != dagscheduler.StatusSuccess {
+	if !job.DAG.SkipIfSuccessful || latestStatus.Status != scheduler.StatusSuccess {
 		return nil
 	}
 
@@ -115,7 +115,7 @@ func (job *dagJob) Stop(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if latestStatus.Status != dagscheduler.StatusRunning {
+	if latestStatus.Status != scheduler.StatusRunning {
 		return ErrJobIsNotRunning
 	}
 	return job.Client.Stop(ctx, job.DAG)

@@ -13,9 +13,18 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 )
+
+// Job is the interface for the actual DAG.
+type Job interface {
+	// Start starts the DAG.
+	Start(ctx context.Context) error
+	// Stop stops the DAG.
+	Stop(ctx context.Context) error
+	// Restart restarts the DAG.
+	Restart(ctx context.Context) error
+}
 
 type Scheduler struct {
 	manager  JobManager
@@ -39,14 +48,6 @@ func New(cfg *config.Config, manager JobManager) *Scheduler {
 	}
 }
 
-type Job interface {
-	GetDAG(ctx context.Context) *digraph.DAG
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
-	Restart(ctx context.Context) error
-	String() string
-}
-
 // ScheduleType is the type of schedule (start, stop, restart).
 type ScheduleType int
 
@@ -68,17 +69,20 @@ func (s ScheduleType) String() string {
 		return "Restart"
 
 	default:
+		// Should never happen.
 		return "Unknown"
 
 	}
 }
 
-func (s *ScheduledJob) Invoke(ctx context.Context) error {
+// invoke invokes the job based on the schedule type.
+func (s *ScheduledJob) invoke(ctx context.Context) error {
 	if s.Job == nil {
+		logger.Error(ctx, "job is nil", "job", s.Job)
 		return nil
 	}
 
-	logger.Info(ctx, "DAG operation started", "operation", s.Type.String(), "DAG", s.Job.String(), "next", s.Next.Format(time.RFC3339))
+	logger.Info(ctx, "starting operation", "type", s.Type.String(), "job", s.Job)
 
 	switch s.Type {
 	case ScheduleTypeStart:
@@ -91,7 +95,7 @@ func (s *ScheduledJob) Invoke(ctx context.Context) error {
 		return s.Job.Restart(ctx)
 
 	default:
-		return fmt.Errorf("unknown entry type: %v", s.Type)
+		return fmt.Errorf("unknown schedule type: %v", s.Type)
 
 	}
 }
@@ -154,32 +158,35 @@ func (s *Scheduler) start(ctx context.Context) {
 }
 
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
-	entries, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
+	jobs, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		logger.Error(ctx, "Scheduler failed to read DAG entries", "err", err)
+		logger.Error(ctx, "failed to get next jobs", "err", err)
 		return
 	}
-	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].Next.Before(entries[j].Next)
+
+	// Sort the jobs by the next scheduled time.
+	sort.SliceStable(jobs, func(i, j int) bool {
+		return jobs[i].Next.Before(jobs[j].Next)
 	})
-	for _, e := range entries {
-		t := e.Next
-		if t.After(now) {
+
+	for _, job := range jobs {
+		if job.Next.After(now) {
 			break
 		}
-		go func(e *ScheduledJob) {
-			if err := e.Invoke(ctx); err != nil {
+
+		go func(job *ScheduledJob) {
+			if err := job.invoke(ctx); err != nil {
 				if errors.Is(err, ErrJobFinished) {
-					logger.Info(ctx, "DAG is already finished", "DAG", e.Job, "err", err)
+					logger.Info(ctx, "job is already finished", "job", job.Job, "err", err)
 				} else if errors.Is(err, ErrJobRunning) {
-					logger.Info(ctx, "DAG is already running", "DAG", e.Job, "err", err)
+					logger.Info(ctx, "job is already running", "job", job.Job, "err", err)
 				} else if errors.Is(err, ErrJobSkipped) {
-					logger.Info(ctx, "DAG is skipped", "DAG", e.Job, "err", err)
+					logger.Info(ctx, "job is skipped", "job", job.Job, "err", err)
 				} else {
-					logger.Error(ctx, "DAG execution failed", "DAG", e.Job, "operation", e.Type.String(), "err", err)
+					logger.Error(ctx, "job failed", "job", job.Job, "err", err)
 				}
 			}
-		}(e)
+		}(job)
 	}
 }
 
@@ -191,32 +198,37 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.Load() {
 		return
 	}
+
 	if s.stopChan != nil {
 		close(s.stopChan)
 	}
+
 	s.running.Store(false)
 	logger.Info(ctx, "Scheduler stopped")
 }
 
 var (
-	fixedTime time.Time
-	timeLock  sync.RWMutex
+	// fixedTime is the fixed time used for testing.
+	fixedTime     time.Time
+	fixedTimeLock sync.RWMutex
 )
 
-// setFixedTime sets the fixed time.
-// This is used for testing.
+// setFixedTime sets the fixed time for testing.
 func setFixedTime(t time.Time) {
-	timeLock.Lock()
-	defer timeLock.Unlock()
+	fixedTimeLock.Lock()
+	defer fixedTimeLock.Unlock()
+
 	fixedTime = t
 }
 
 // now returns the current time.
 func now() time.Time {
-	timeLock.RLock()
-	defer timeLock.RUnlock()
+	fixedTimeLock.RLock()
+	defer fixedTimeLock.RUnlock()
+
 	if fixedTime.IsZero() {
 		return time.Now()
 	}
+
 	return fixedTime
 }

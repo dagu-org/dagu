@@ -143,7 +143,7 @@ func (s *setup) scheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	manager := scheduler.NewDAGManager(s.cfg.Paths.DAGsDir, cli, s.cfg.Paths.Executable, s.cfg.WorkDir)
+	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, cli, s.cfg.Paths.Executable, s.cfg.WorkDir)
 	return scheduler.New(s.cfg, manager), nil
 }
 

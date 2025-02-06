@@ -27,13 +27,15 @@ type JobManager interface {
 	Next(ctx context.Context, now time.Time) ([]*ScheduledJob, error)
 }
 
+// ScheduledJob stores the next time a job should be run and the job itself.
 type ScheduledJob struct {
 	Next time.Time // Next is the time when the job should be run.
 	Job  Job
-	Type ScheduleType
+	Type ScheduleType // start, stop, restart
 }
 
-func NewSchedule(next time.Time, job Job, typ ScheduleType) *ScheduledJob {
+// NewScheduledJob creates a new ScheduledJob.
+func NewScheduledJob(next time.Time, job Job, typ ScheduleType) *ScheduledJob {
 	return &ScheduledJob{next, job, typ}
 }
 
@@ -49,8 +51,8 @@ type dagJobManager struct {
 	workDir    string
 }
 
-// NewDAGManager creates a new DAG manager with the given configuration.
-func NewDAGManager(dir string, client client.Client, executable, workDir string) JobManager {
+// NewDAGJobManager creates a new DAG manager with the given configuration.
+func NewDAGJobManager(dir string, client client.Client, executable, workDir string) JobManager {
 	return &dagJobManager{
 		targetDir:  dir,
 		lock:       sync.Mutex{},
@@ -58,17 +60,6 @@ func NewDAGManager(dir string, client client.Client, executable, workDir string)
 		client:     client,
 		executable: executable,
 		workDir:    workDir,
-	}
-}
-
-func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
-	return &dagJob{
-		DAG:        dag,
-		Executable: m.executable,
-		WorkDir:    m.workDir,
-		Next:       next,
-		Schedule:   schedule,
-		Client:     m.client,
 	}
 }
 
@@ -106,13 +97,24 @@ func (m *dagJobManager) Next(ctx context.Context, now time.Time) ([]*ScheduledJo
 		for _, s := range schedules {
 			for _, schedule := range s.items {
 				next := schedule.Parsed.Next(now)
-				job := NewSchedule(next, m.createJob(dag, next, schedule.Parsed), s.typ)
+				job := NewScheduledJob(next, m.createJob(dag, next, schedule.Parsed), s.typ)
 				jobs = append(jobs, job)
 			}
 		}
 	}
 
 	return jobs, nil
+}
+
+func (m *dagJobManager) createJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
+	return &dagJob{
+		DAG:        dag,
+		Executable: m.executable,
+		WorkDir:    m.workDir,
+		Next:       next,
+		Schedule:   schedule,
+		Client:     m.client,
+	}
 }
 
 func (m *dagJobManager) initialize(ctx context.Context) error {
@@ -129,7 +131,7 @@ func (m *dagJobManager) initialize(ctx context.Context) error {
 		if fileutil.IsYAMLFile(fi.Name()) {
 			dag, err := digraph.Load(ctx, filepath.Join(m.targetDir, fi.Name()), digraph.OnlyMetadata(), digraph.WithoutEval())
 			if err != nil {
-				logger.Error(ctx, "DAG load failed", "err", err, "DAG", fi.Name())
+				logger.Error(ctx, "DAG load failed", "err", err, "name", fi.Name())
 				continue
 			}
 			m.registry[fi.Name()] = dag
@@ -137,7 +139,7 @@ func (m *dagJobManager) initialize(ctx context.Context) error {
 		}
 	}
 
-	logger.Info(ctx, "Scheduler initialized", "specs", strings.Join(dags, ","))
+	logger.Info(ctx, "Scheduler initialized", "dags", strings.Join(dags, ","))
 	return nil
 }
 
@@ -176,12 +178,12 @@ func (m *dagJobManager) watchDags(ctx context.Context, done chan any) {
 					logger.Error(ctx, "DAG load failed", "err", err, "file", event.Name)
 				} else {
 					m.registry[filepath.Base(event.Name)] = dag
-					logger.Info(ctx, "DAG added/updated", "DAG", filepath.Base(event.Name))
+					logger.Info(ctx, "DAG added/updated", "name", filepath.Base(event.Name))
 				}
 			}
 			if event.Op == fsnotify.Rename || event.Op == fsnotify.Remove {
 				delete(m.registry, filepath.Base(event.Name))
-				logger.Info(ctx, "DAG removed", "DAG", filepath.Base(event.Name))
+				logger.Info(ctx, "DAG removed", "name", filepath.Base(event.Name))
 			}
 			m.lock.Unlock()
 

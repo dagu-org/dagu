@@ -21,19 +21,13 @@ func TestScheduler(t *testing.T) {
 
 		entryReader := &mockJobManager{
 			Entries: []*ScheduledJob{
-				{
-					Job:  &mockJob{},
-					Next: now,
-				},
-				{
-					Job:  &mockJob{},
-					Next: now.Add(time.Minute),
-				},
+				{Job: &mockJob{}, Next: now},
+				{Job: &mockJob{}, Next: now.Add(time.Minute)},
 			},
 		}
 
-		_, _, cfg := setupTest(t)
-		scheduler := New(cfg, entryReader)
+		th := setupTest(t)
+		scheduler := New(th.config, entryReader)
 
 		go func() {
 			_ = scheduler.Start(context.Background())
@@ -51,16 +45,12 @@ func TestScheduler(t *testing.T) {
 
 		entryReader := &mockJobManager{
 			Entries: []*ScheduledJob{
-				{
-					Type: ScheduleTypeRestart,
-					Job:  &mockJob{},
-					Next: now,
-				},
+				{Type: ScheduleTypeRestart, Job: &mockJob{}, Next: now},
 			},
 		}
 
-		_, _, cfg := setupTest(t)
-		scheduler := New(cfg, entryReader)
+		th := setupTest(t)
+		scheduler := New(th.config, entryReader)
 
 		go func() {
 			_ = scheduler.Start(context.Background())
@@ -74,22 +64,23 @@ func TestScheduler(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 		setFixedTime(now)
 
-		_, _, cfg := setupTest(t)
-		schedulerInstance := New(cfg, &mockJobManager{})
+		th := setupTest(t)
+		schedulerInstance := New(th.config, &mockJobManager{})
 
 		next := schedulerInstance.nextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 	})
-	t.Run("FixedTime", func(t *testing.T) {
-		fixedTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+}
 
-		setFixedTime(fixedTime)
-		require.Equal(t, fixedTime, now())
+func TestFixedTime(t *testing.T) {
+	fixedTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 
-		// Reset
-		setFixedTime(time.Time{})
-		require.NotEqual(t, fixedTime, now())
-	})
+	setFixedTime(fixedTime)
+	require.Equal(t, fixedTime, now())
+
+	// Reset
+	setFixedTime(time.Time{})
+	require.NotEqual(t, fixedTime, now())
 }
 
 func TestJobReady(t *testing.T) {
@@ -210,11 +201,7 @@ func TestPrevExecTime(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			job := &dagJob{
-				Schedule: schedule,
-				Next:     tt.now,
-			}
-
+			job := &dagJob{Schedule: schedule, Next: tt.now}
 			got := job.prevExecTime(context.Background())
 			require.Equal(t, tt.want, got)
 		})

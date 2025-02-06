@@ -2,105 +2,78 @@ package scheduler
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/build"
-	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/local"
-	"github.com/dagu-org/dagu/internal/persistence/local/storage"
-
 	"github.com/stretchr/testify/require"
-
-	"github.com/dagu-org/dagu/internal/config"
 )
 
 func TestReadEntries(t *testing.T) {
-	t.Run("ReadEntries", func(t *testing.T) {
-		tmpDir, cli, _ := setupTest(t)
-		defer func() {
-			_ = os.RemoveAll(tmpDir)
-		}()
+	expectedNext := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
+	now := expectedNext.Add(-time.Second)
 
-		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-		entryReader := NewDAGManager(
-			filepath.Join(testdataDir, "invalid_directory"),
-			cli,
-			"",
-			"",
-		)
-
-		entries, err := entryReader.Next(context.Background(), now)
+	t.Run("InvalidDirectory", func(t *testing.T) {
+		manager := NewDAGJobManager("invalid_directory", nil, "", "")
+		jobs, err := manager.Next(context.Background(), expectedNext)
 		require.NoError(t, err)
-		require.Len(t, entries, 0)
-
-		entryReader = NewDAGManager(
-			testdataDir,
-			cli,
-			"",
-			"",
-		)
+		require.Len(t, jobs, 0)
+	})
+	t.Run("StartAndNext", func(t *testing.T) {
+		th := setupTest(t)
+		ctx := context.Background()
 
 		done := make(chan any)
 		defer close(done)
-		err = entryReader.Start(context.Background(), done)
+
+		err := th.manager.Start(ctx, done)
 		require.NoError(t, err)
 
-		entries, err = entryReader.Next(context.Background(), now)
+		jobs, err := th.manager.Next(ctx, now)
 		require.NoError(t, err)
-		require.GreaterOrEqual(t, len(entries), 1)
+		require.NotEmpty(t, jobs, "jobs should not be empty")
 
-		next := entries[0].Next
-		require.Equal(t, now.Add(time.Second), next)
+		job := jobs[0]
+		next := job.Next
+		require.Equal(t, expectedNext, next)
+	})
+	t.Run("SuspendedJob", func(t *testing.T) {
+		th := setupTest(t)
+		ctx := context.Background()
 
-		// suspend
-		var j Job
-		for _, e := range entries {
-			jj := e.Job
-			if jj.GetDAG(context.Background()).Name == "scheduled_job" {
-				j = jj
-				break
-			}
-		}
+		done := make(chan any)
+		defer close(done)
 
-		err = cli.ToggleSuspend(context.Background(), j.GetDAG(context.Background()).Name, true)
+		err := th.manager.Start(ctx, done)
 		require.NoError(t, err)
 
-		// check if the job is suspended
-		lives, err := entryReader.Next(context.Background(), now)
+		beforeSuspend, err := th.manager.Next(ctx, now)
 		require.NoError(t, err)
-		require.Equal(t, len(entries)-1, len(lives))
+
+		// find the job and suspend it
+		job := findJobByName(t, beforeSuspend, "scheduled_job").Job
+		dagJob, ok := job.(*dagJob)
+		require.True(t, ok)
+		dag := dagJob.DAG
+		err = th.client.ToggleSuspend(ctx, dag.Name, true)
+		require.NoError(t, err)
+
+		// check if the job is suspended and not returned
+		afterSuspend, err := th.manager.Next(ctx, now)
+		require.NoError(t, err)
+		require.Equal(t, len(afterSuspend), len(beforeSuspend)-1, "suspended job should not be returned")
 	})
 }
 
-var testdataDir = filepath.Join(fileutil.MustGetwd(), "testdata")
-
-func setupTest(t *testing.T) (string, client.Client, *config.Config) {
+func findJobByName(t *testing.T, jobs []*ScheduledJob, name string) *ScheduledJob {
 	t.Helper()
 
-	tmpDir := fileutil.MustTempDir("test")
-
-	err := os.Setenv("HOME", tmpDir)
-	require.NoError(t, err)
-
-	cfg := &config.Config{
-		Paths: config.PathsConfig{
-			DataDir:         filepath.Join(tmpDir, "."+build.Slug, "data"),
-			DAGsDir:         testdataDir,
-			SuspendFlagsDir: tmpDir,
-		},
-		WorkDir: tmpDir,
+	for _, job := range jobs {
+		dagJob, ok := job.Job.(*dagJob)
+		if ok && dagJob.DAG.Name == name {
+			return job
+		}
 	}
 
-	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
-	historyStore := jsondb.New(cfg.Paths.DataDir)
-	flagStore := local.NewFlagStore(
-		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
-	)
-
-	return tmpDir, client.New(dagStore, historyStore, flagStore, "", cfg.WorkDir), cfg
+	t.Fatalf("job %s not found", name)
+	return nil
 }
