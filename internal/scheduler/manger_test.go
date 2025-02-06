@@ -21,26 +21,28 @@ import (
 
 func TestReadEntries(t *testing.T) {
 	t.Run("ReadEntries", func(t *testing.T) {
-		tmpDir, cli := setupTest(t)
+		tmpDir, cli, _ := setupTest(t)
 		defer func() {
 			_ = os.RemoveAll(tmpDir)
 		}()
 
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
-		entryReader := newEntryReader(
+		entryReader := NewDAGManager(
 			filepath.Join(testdataDir, "invalid_directory"),
-			testGetJob,
 			cli,
+			"",
+			"",
 		)
 
-		entries, err := entryReader.Read(context.Background(), now)
+		entries, err := entryReader.Next(context.Background(), now)
 		require.NoError(t, err)
 		require.Len(t, entries, 0)
 
-		entryReader = newEntryReader(
+		entryReader = NewDAGManager(
 			testdataDir,
-			testGetJob,
 			cli,
+			"",
+			"",
 		)
 
 		done := make(chan any)
@@ -48,7 +50,7 @@ func TestReadEntries(t *testing.T) {
 		err = entryReader.Start(context.Background(), done)
 		require.NoError(t, err)
 
-		entries, err = entryReader.Read(context.Background(), now)
+		entries, err = entryReader.Next(context.Background(), now)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(entries), 1)
 
@@ -69,7 +71,7 @@ func TestReadEntries(t *testing.T) {
 		require.NoError(t, err)
 
 		// check if the job is suspended
-		lives, err := entryReader.Read(context.Background(), now)
+		lives, err := entryReader.Next(context.Background(), now)
 		require.NoError(t, err)
 		require.Equal(t, len(entries)-1, len(lives))
 	})
@@ -77,7 +79,7 @@ func TestReadEntries(t *testing.T) {
 
 var testdataDir = filepath.Join(fileutil.MustGetwd(), "testdata")
 
-func setupTest(t *testing.T) (string, client.Client) {
+func setupTest(t *testing.T) (string, client.Client, *config.Config) {
 	t.Helper()
 
 	tmpDir := fileutil.MustTempDir("test")
@@ -100,5 +102,5 @@ func setupTest(t *testing.T) (string, client.Client) {
 		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
 	)
 
-	return tmpDir, client.New(dagStore, historyStore, flagStore, "", cfg.WorkDir)
+	return tmpDir, client.New(dagStore, historyStore, flagStore, "", cfg.WorkDir), cfg
 }

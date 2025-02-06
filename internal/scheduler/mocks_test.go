@@ -6,26 +6,19 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/robfig/cron/v3"
 )
 
-type mockJobFactory struct{}
+var _ JobManager = (*mockJobManager)(nil)
 
-func (f *mockJobFactory) CreateJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) Job {
-	return newMockJob(dag)
+type mockJobManager struct {
+	Entries []*ScheduledJob
 }
 
-var _ entryReader = (*mockEntryReader)(nil)
-
-type mockEntryReader struct {
-	Entries []*entry
-}
-
-func (er *mockEntryReader) Read(_ context.Context, _ time.Time) ([]*entry, error) {
+func (er *mockJobManager) Next(_ context.Context, _ time.Time) ([]*ScheduledJob, error) {
 	return er.Entries, nil
 }
 
-func (er *mockEntryReader) Start(_ context.Context, _ chan any) error {
+func (er *mockJobManager) Start(_ context.Context, _ chan any) error {
 	return nil
 }
 
@@ -38,17 +31,6 @@ type mockJob struct {
 	StopCount    atomic.Int32
 	RestartCount atomic.Int32
 	Panic        error
-}
-
-func testGetJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) Job {
-	return newMockJob(dag)
-}
-
-func newMockJob(dag *digraph.DAG) *mockJob {
-	return &mockJob{
-		DAG:  dag,
-		Name: dag.Name,
-	}
 }
 
 func (j *mockJob) GetDAG(_ context.Context) *digraph.DAG {

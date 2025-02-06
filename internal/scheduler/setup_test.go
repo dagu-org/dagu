@@ -17,8 +17,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+
 	testHomeDir = tempDir
 	code := m.Run()
+
 	_ = os.RemoveAll(tempDir)
 	os.Exit(code)
 }

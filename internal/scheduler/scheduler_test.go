@@ -19,8 +19,8 @@ func TestScheduler(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		setFixedTime(now)
 
-		entryReader := &mockEntryReader{
-			Entries: []*entry{
+		entryReader := &mockJobManager{
+			Entries: []*ScheduledJob{
 				{
 					Job:  &mockJob{},
 					Next: now,
@@ -32,14 +32,15 @@ func TestScheduler(t *testing.T) {
 			},
 		}
 
-		schedulerInstance := newScheduler(entryReader, testHomeDir, time.Local)
+		_, _, cfg := setupTest(t)
+		scheduler := New(cfg, entryReader)
 
 		go func() {
-			_ = schedulerInstance.Start(context.Background())
+			_ = scheduler.Start(context.Background())
 		}()
 
 		time.Sleep(time.Second + time.Millisecond*100)
-		schedulerInstance.Stop(context.Background())
+		scheduler.Stop(context.Background())
 
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RunCount.Load())
 		require.Equal(t, int32(0), entryReader.Entries[1].Job.(*mockJob).RunCount.Load())
@@ -48,22 +49,23 @@ func TestScheduler(t *testing.T) {
 		now := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 		setFixedTime(now)
 
-		entryReader := &mockEntryReader{
-			Entries: []*entry{
+		entryReader := &mockJobManager{
+			Entries: []*ScheduledJob{
 				{
-					EntryType: entryTypeRestart,
-					Job:       &mockJob{},
-					Next:      now,
+					Type: ScheduleTypeRestart,
+					Job:  &mockJob{},
+					Next: now,
 				},
 			},
 		}
 
-		schedulerInstance := newScheduler(entryReader, testHomeDir, time.Local)
+		_, _, cfg := setupTest(t)
+		scheduler := New(cfg, entryReader)
 
 		go func() {
-			_ = schedulerInstance.Start(context.Background())
+			_ = scheduler.Start(context.Background())
 		}()
-		defer schedulerInstance.Stop(context.Background())
+		defer scheduler.Stop(context.Background())
 
 		time.Sleep(time.Second + time.Millisecond*100)
 		require.Equal(t, int32(1), entryReader.Entries[0].Job.(*mockJob).RestartCount.Load())
@@ -71,7 +73,10 @@ func TestScheduler(t *testing.T) {
 	t.Run("NextTick", func(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 50, 0, time.UTC)
 		setFixedTime(now)
-		schedulerInstance := newScheduler(&mockEntryReader{}, testHomeDir, time.Local)
+
+		_, _, cfg := setupTest(t)
+		schedulerInstance := New(cfg, &mockJobManager{})
+
 		next := schedulerInstance.nextTick(now)
 		require.Equal(t, time.Date(2020, 1, 1, 1, 1, 0, 0, time.UTC), next)
 	})
@@ -106,7 +111,7 @@ func TestJobReady(t *testing.T) {
 			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC), // 1 min after prev schedule
 			lastStatus:     scheduler.StatusSuccess,
 			skipSuccessful: true,
-			wantErr:        errJobSuccess,
+			wantErr:        ErrJobSuccess,
 		},
 		{
 			name:           "skip_if_successful_false_with_recent_success",
@@ -124,7 +129,7 @@ func TestJobReady(t *testing.T) {
 			lastRunTime:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 			lastStatus:     scheduler.StatusRunning,
 			skipSuccessful: true,
-			wantErr:        errJobRunning,
+			wantErr:        ErrJobRunning,
 		},
 		{
 			name:           "last_run_after_next_schedule",
@@ -133,7 +138,7 @@ func TestJobReady(t *testing.T) {
 			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
 			lastStatus:     scheduler.StatusSuccess,
 			skipSuccessful: true,
-			wantErr:        errJobFinished,
+			wantErr:        ErrJobFinished,
 		},
 		{
 			name:           "failed_previous_run",
@@ -153,7 +158,7 @@ func TestJobReady(t *testing.T) {
 
 			setFixedTime(tt.now)
 
-			job := &jobImpl{
+			job := &dagJob{
 				DAG: &digraph.DAG{
 					SkipIfSuccessful: tt.skipSuccessful,
 				},
@@ -205,7 +210,7 @@ func TestPrevExecTime(t *testing.T) {
 			schedule, err := cronParser.Parse(tt.schedule)
 			require.NoError(t, err)
 
-			job := &jobImpl{
+			job := &dagJob{
 				Schedule: schedule,
 				Next:     tt.now,
 			}

@@ -16,21 +16,16 @@ import (
 
 // Error variables for job states.
 var (
-	errJobRunning      = errors.New("job already running")
-	errJobIsNotRunning = errors.New("job is not running")
-	errJobFinished     = errors.New("job already finished")
-	errJobSkipped      = errors.New("job skipped")
-	errJobSuccess      = errors.New("job already successful")
+	ErrJobRunning      = errors.New("job already running")
+	ErrJobIsNotRunning = errors.New("job is not running")
+	ErrJobFinished     = errors.New("job already finished")
+	ErrJobSkipped      = errors.New("job skipped")
+	ErrJobSuccess      = errors.New("job already successful")
 )
 
-// GetJobFn is a function that returns a new job.
-type GetJobFn func(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job
+var _ Job = (*dagJob)(nil)
 
-// Ensure jobImpl satisfies the job interface.
-var _ Job = (*jobImpl)(nil)
-
-// jobImpl wraps data needed for scheduling and running a DAG job.
-type jobImpl struct {
+type dagJob struct {
 	DAG        *digraph.DAG
 	Executable string
 	WorkDir    string
@@ -40,12 +35,12 @@ type jobImpl struct {
 }
 
 // GetDAG returns the DAG associated with this job.
-func (job *jobImpl) GetDAG(_ context.Context) *digraph.DAG {
+func (job *dagJob) GetDAG(_ context.Context) *digraph.DAG {
 	return job.DAG
 }
 
 // Start attempts to run the job if it is not already running and is ready.
-func (job *jobImpl) Start(ctx context.Context) error {
+func (job *dagJob) Start(ctx context.Context) error {
 	latestStatus, err := job.Client.GetLatestStatus(ctx, job.DAG)
 	if err != nil {
 		return err
@@ -53,7 +48,7 @@ func (job *jobImpl) Start(ctx context.Context) error {
 
 	// Guard against already running jobs.
 	if latestStatus.Status == dagscheduler.StatusRunning {
-		return errJobRunning
+		return ErrJobRunning
 	}
 
 	// Check if the job is ready to start.
@@ -66,10 +61,10 @@ func (job *jobImpl) Start(ctx context.Context) error {
 }
 
 // ready checks whether the job can be safely started based on the latest status.
-func (job *jobImpl) ready(ctx context.Context, latestStatus model.Status) error {
+func (job *dagJob) ready(ctx context.Context, latestStatus model.Status) error {
 	// Prevent starting if it's already running.
 	if latestStatus.Status == dagscheduler.StatusRunning {
-		return errJobRunning
+		return ErrJobRunning
 	}
 
 	latestStartedAt, err := stringutil.ParseTime(latestStatus.StartedAt)
@@ -82,7 +77,7 @@ func (job *jobImpl) ready(ctx context.Context, latestStatus model.Status) error 
 	// Skip if the last successful run time is on or after the next scheduled time.
 	latestStartedAt = latestStartedAt.Truncate(time.Minute)
 	if latestStartedAt.After(job.Next) || job.Next.Equal(latestStartedAt) {
-		return errJobFinished
+		return ErrJobFinished
 	}
 
 	// Check if we should skip this run due to a prior successful run.
@@ -91,7 +86,7 @@ func (job *jobImpl) ready(ctx context.Context, latestStatus model.Status) error 
 
 // skipIfSuccessful checks if the DAG has already run successfully in the window since the last scheduled time.
 // If so, the current run is skipped.
-func (job *jobImpl) skipIfSuccessful(ctx context.Context, latestStatus model.Status, latestStartedAt time.Time) error {
+func (job *dagJob) skipIfSuccessful(ctx context.Context, latestStatus model.Status, latestStartedAt time.Time) error {
 	// If skip is not configured, or the DAG is not currently successful, do nothing.
 	if !job.DAG.SkipIfSuccessful || latestStatus.Status != dagscheduler.StatusSuccess {
 		return nil
@@ -101,37 +96,37 @@ func (job *jobImpl) skipIfSuccessful(ctx context.Context, latestStatus model.Sta
 	if (latestStartedAt.After(prevExecTime) || latestStartedAt.Equal(prevExecTime)) &&
 		latestStartedAt.Before(job.Next) {
 		logger.Infof(ctx, "skipping the job because it has already run successfully at %s", latestStartedAt)
-		return errJobSuccess
+		return ErrJobSuccess
 	}
 	return nil
 }
 
 // prevExecTime calculates the previous schedule time from 'Next' by subtracting
 // the schedule duration between runs.
-func (job *jobImpl) prevExecTime(_ context.Context) time.Time {
+func (job *dagJob) prevExecTime(_ context.Context) time.Time {
 	nextNextRunTime := job.Schedule.Next(job.Next.Add(time.Second))
 	duration := nextNextRunTime.Sub(job.Next)
 	return job.Next.Add(-duration)
 }
 
 // Stop halts a running job if it's currently running.
-func (job *jobImpl) Stop(ctx context.Context) error {
+func (job *dagJob) Stop(ctx context.Context) error {
 	latestStatus, err := job.Client.GetLatestStatus(ctx, job.DAG)
 	if err != nil {
 		return err
 	}
 	if latestStatus.Status != dagscheduler.StatusRunning {
-		return errJobIsNotRunning
+		return ErrJobIsNotRunning
 	}
 	return job.Client.Stop(ctx, job.DAG)
 }
 
 // Restart restarts the job unconditionally (quiet mode).
-func (job *jobImpl) Restart(ctx context.Context) error {
+func (job *dagJob) Restart(ctx context.Context) error {
 	return job.Client.Restart(ctx, job.DAG, client.RestartOptions{Quiet: true})
 }
 
 // String returns a string representation of the job, which is the DAG's name.
-func (job *jobImpl) String() string {
+func (job *dagJob) String() string {
 	return job.DAG.Name
 }
