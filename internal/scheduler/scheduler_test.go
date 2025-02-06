@@ -5,6 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,4 +85,133 @@ func TestScheduler(t *testing.T) {
 		setFixedTime(time.Time{})
 		require.NotEqual(t, fixedTime, now())
 	})
+}
+
+func TestJobReady(t *testing.T) {
+	cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+	tests := []struct {
+		name           string
+		schedule       string
+		now            time.Time
+		lastRunTime    time.Time
+		lastStatus     scheduler.Status
+		skipSuccessful bool
+		wantErr        error
+	}{
+		{
+			name:           "skip_if_successful_true_with_recent_success",
+			schedule:       "0 * * * *", // Every hour
+			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC), // 1 min after prev schedule
+			lastStatus:     scheduler.StatusSuccess,
+			skipSuccessful: true,
+			wantErr:        errJobSuccess,
+		},
+		{
+			name:           "skip_if_successful_false_with_recent_success",
+			schedule:       "0 * * * *",
+			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
+			lastStatus:     scheduler.StatusSuccess,
+			skipSuccessful: false,
+			wantErr:        nil,
+		},
+		{
+			name:           "already_running",
+			schedule:       "0 * * * *",
+			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+			lastRunTime:    time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+			lastStatus:     scheduler.StatusRunning,
+			skipSuccessful: true,
+			wantErr:        errJobRunning,
+		},
+		{
+			name:           "last_run_after_next_schedule",
+			schedule:       "0 * * * *",
+			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+			lastRunTime:    time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
+			lastStatus:     scheduler.StatusSuccess,
+			skipSuccessful: true,
+			wantErr:        errJobFinished,
+		},
+		{
+			name:           "failed_previous_run",
+			schedule:       "0 * * * *",
+			now:            time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+			lastRunTime:    time.Date(2020, 1, 1, 0, 1, 0, 0, time.UTC),
+			lastStatus:     scheduler.StatusError,
+			skipSuccessful: true,
+			wantErr:        nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schedule, err := cronParser.Parse(tt.schedule)
+			require.NoError(t, err)
+
+			setFixedTime(tt.now)
+
+			job := &jobImpl{
+				DAG: &digraph.DAG{
+					SkipIfSuccessful: tt.skipSuccessful,
+				},
+				Schedule: schedule,
+				Next:     tt.now,
+			}
+
+			lastRunStatus := model.Status{
+				Status:    tt.lastStatus,
+				StartedAt: stringutil.FormatTime(tt.lastRunTime),
+			}
+
+			err = job.ready(context.Background(), lastRunStatus)
+			require.Equal(t, tt.wantErr, err)
+		})
+	}
+}
+
+func TestPrevExecTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		schedule string
+		now      time.Time
+		want     time.Time
+	}{
+		{
+			name:     "hourly_schedule",
+			schedule: "0 * * * *",
+			now:      time.Date(2020, 1, 1, 2, 0, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "every_five_minutes",
+			schedule: "*/5 * * * *",
+			now:      time.Date(2020, 1, 1, 1, 5, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC),
+		},
+		{
+			name:     "daily_schedule",
+			schedule: "0 0 * * *",
+			now:      time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC),
+			want:     time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cronParser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+			schedule, err := cronParser.Parse(tt.schedule)
+			require.NoError(t, err)
+
+			job := &jobImpl{
+				Schedule: schedule,
+				Next:     tt.now,
+			}
+
+			got := job.prevExecTime(context.Background())
+			require.Equal(t, tt.want, got)
+		})
+	}
 }
