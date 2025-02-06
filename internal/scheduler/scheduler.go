@@ -12,109 +12,102 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-type Scheduler struct {
-	entryReader entryReader
-	logDir      string
-	stop        chan struct{}
-	running     atomic.Bool
-	location    *time.Location
-}
-
-// TODO: refactor to remove ctx from the constructor
-func New(cfg *config.Config, cli client.Client) *Scheduler {
-	jobCreator := &jobCreatorImpl{
-		WorkDir:    cfg.WorkDir,
-		Client:     cli,
-		Executable: cfg.Paths.Executable,
-	}
-	entryReader := newEntryReader(cfg.Paths.DAGsDir, jobCreator, cli)
-	return newScheduler(entryReader, cfg.Paths.LogDir, cfg.Location)
-}
-
-type entryReader interface {
-	Start(ctx context.Context, done chan any) error
-	Read(ctx context.Context, now time.Time) ([]*entry, error)
-}
-
-type entry struct {
-	Next      time.Time
-	Job       job
-	EntryType entryType
-}
-
-type job interface {
-	GetDAG(ctx context.Context) *digraph.DAG
+// Job is the interface for the actual DAG.
+type Job interface {
+	// Start starts the DAG.
 	Start(ctx context.Context) error
+	// Stop stops the DAG.
 	Stop(ctx context.Context) error
+	// Restart restarts the DAG.
 	Restart(ctx context.Context) error
-	String() string
 }
 
-type entryType int
+type Scheduler struct {
+	manager  JobManager
+	logDir   string
+	stopChan chan struct{}
+	running  atomic.Bool
+	location *time.Location
+}
+
+func New(cfg *config.Config, manager JobManager) *Scheduler {
+	timeLoc := cfg.Location
+	if timeLoc == nil {
+		timeLoc = time.Local
+	}
+
+	return &Scheduler{
+		logDir:   cfg.Paths.LogDir,
+		stopChan: make(chan struct{}),
+		location: timeLoc,
+		manager:  manager,
+	}
+}
+
+// ScheduleType is the type of schedule (start, stop, restart).
+type ScheduleType int
 
 const (
-	entryTypeStart entryType = iota
-	entryTypeStop
-	entryTypeRestart
+	ScheduleTypeStart ScheduleType = iota
+	ScheduleTypeStop
+	ScheduleTypeRestart
 )
 
-func (e entryType) String() string {
-	switch e {
-	case entryTypeStart:
+func (s ScheduleType) String() string {
+	switch s {
+	case ScheduleTypeStart:
 		return "Start"
-	case entryTypeStop:
+
+	case ScheduleTypeStop:
 		return "Stop"
-	case entryTypeRestart:
+
+	case ScheduleTypeRestart:
 		return "Restart"
+
 	default:
+		// Should never happen.
 		return "Unknown"
+
 	}
 }
 
-func (e *entry) Invoke(ctx context.Context) error {
-	if e.Job == nil {
+// invoke invokes the job based on the schedule type.
+func (s *ScheduledJob) invoke(ctx context.Context) error {
+	if s.Job == nil {
+		logger.Error(ctx, "job is nil", "job", s.Job)
 		return nil
 	}
 
-	logger.Info(ctx, "DAG operation started", "operation", e.EntryType.String(), "DAG", e.Job.String(), "next", e.Next.Format(time.RFC3339))
+	logger.Info(ctx, "starting operation", "type", s.Type.String(), "job", s.Job)
 
-	switch e.EntryType {
-	case entryTypeStart:
-		return e.Job.Start(ctx)
-	case entryTypeStop:
-		return e.Job.Stop(ctx)
-	case entryTypeRestart:
-		return e.Job.Restart(ctx)
+	switch s.Type {
+	case ScheduleTypeStart:
+		return s.Job.Start(ctx)
+
+	case ScheduleTypeStop:
+		return s.Job.Stop(ctx)
+
+	case ScheduleTypeRestart:
+		return s.Job.Restart(ctx)
+
 	default:
-		return fmt.Errorf("unknown entry type: %v", e.EntryType)
-	}
-}
+		return fmt.Errorf("unknown schedule type: %v", s.Type)
 
-func newScheduler(entryReader entryReader, logDir string, location *time.Location) *Scheduler {
-	if location == nil {
-		location = time.Local
-	}
-	return &Scheduler{
-		entryReader: entryReader,
-		logDir:      logDir,
-		stop:        make(chan struct{}),
-		location:    location,
 	}
 }
 
 func (s *Scheduler) Start(ctx context.Context) error {
 	sig := make(chan os.Signal, 1)
+
 	done := make(chan any)
 	defer close(done)
 
-	if err := s.entryReader.Start(ctx, done); err != nil {
-		return fmt.Errorf("failed to start entry reader: %w", err)
+	if err := s.manager.Start(ctx, done); err != nil {
+		return fmt.Errorf("failed to start manager: %w", err)
 	}
 
 	signal.Notify(
@@ -125,10 +118,13 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		select {
 		case <-done:
 			return
+
 		case <-sig:
 			s.Stop(ctx)
+
 		case <-ctx.Done():
 			s.Stop(ctx)
+
 		}
 	}()
 
@@ -138,11 +134,11 @@ func (s *Scheduler) Start(ctx context.Context) error {
 }
 
 func (s *Scheduler) start(ctx context.Context) {
-	// TODO: refactor this to use a ticker
 	t := now().Truncate(time.Minute)
 	timer := time.NewTimer(0)
 
 	s.running.Store(true)
+
 	for {
 		select {
 		case <-timer.C:
@@ -150,42 +146,47 @@ func (s *Scheduler) start(ctx context.Context) {
 			t = s.nextTick(t)
 			_ = timer.Stop()
 			timer.Reset(t.Sub(now()))
-		case <-s.stop:
+
+		case <-s.stopChan:
 			if !timer.Stop() {
 				<-timer.C
 			}
 			return
+
 		}
 	}
 }
 
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
-	entries, err := s.entryReader.Read(ctx, now.Add(-time.Second).In(s.location))
+	jobs, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
-		logger.Error(ctx, "Scheduler failed to read DAG entries", "err", err)
+		logger.Error(ctx, "failed to get next jobs", "err", err)
 		return
 	}
-	sort.SliceStable(entries, func(i, j int) bool {
-		return entries[i].Next.Before(entries[j].Next)
+
+	// Sort the jobs by the next scheduled time.
+	sort.SliceStable(jobs, func(i, j int) bool {
+		return jobs[i].Next.Before(jobs[j].Next)
 	})
-	for _, e := range entries {
-		t := e.Next
-		if t.After(now) {
+
+	for _, job := range jobs {
+		if job.Next.After(now) {
 			break
 		}
-		go func(e *entry) {
-			if err := e.Invoke(ctx); err != nil {
-				if errors.Is(err, errJobFinished) {
-					logger.Info(ctx, "DAG is already finished", "DAG", e.Job, "err", err)
-				} else if errors.Is(err, errJobRunning) {
-					logger.Info(ctx, "DAG is already running", "DAG", e.Job, "err", err)
-				} else if errors.Is(err, errJobSkipped) {
-					logger.Info(ctx, "DAG is skipped", "DAG", e.Job, "err", err)
+
+		go func(job *ScheduledJob) {
+			if err := job.invoke(ctx); err != nil {
+				if errors.Is(err, ErrJobFinished) {
+					logger.Info(ctx, "job is already finished", "job", job.Job, "err", err)
+				} else if errors.Is(err, ErrJobRunning) {
+					logger.Info(ctx, "job is already running", "job", job.Job, "err", err)
+				} else if errors.Is(err, ErrJobSkipped) {
+					logger.Info(ctx, "job is skipped", "job", job.Job, "err", err)
 				} else {
-					logger.Error(ctx, "DAG execution failed", "DAG", e.Job, "operation", e.EntryType.String(), "err", err)
+					logger.Error(ctx, "job failed", "job", job.Job, "err", err)
 				}
 			}
-		}(e)
+		}(job)
 	}
 }
 
@@ -197,32 +198,37 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	if !s.running.Load() {
 		return
 	}
-	if s.stop != nil {
-		close(s.stop)
+
+	if s.stopChan != nil {
+		close(s.stopChan)
 	}
+
 	s.running.Store(false)
 	logger.Info(ctx, "Scheduler stopped")
 }
 
 var (
-	fixedTime time.Time
-	timeLock  sync.RWMutex
+	// fixedTime is the fixed time used for testing.
+	fixedTime     time.Time
+	fixedTimeLock sync.RWMutex
 )
 
-// setFixedTime sets the fixed time.
-// This is used for testing.
+// setFixedTime sets the fixed time for testing.
 func setFixedTime(t time.Time) {
-	timeLock.Lock()
-	defer timeLock.Unlock()
+	fixedTimeLock.Lock()
+	defer fixedTimeLock.Unlock()
+
 	fixedTime = t
 }
 
 // now returns the current time.
 func now() time.Time {
-	timeLock.RLock()
-	defer timeLock.RUnlock()
+	fixedTimeLock.RLock()
+	defer fixedTimeLock.RUnlock()
+
 	if fixedTime.IsZero() {
 		return time.Now()
 	}
+
 	return fixedTime
 }
