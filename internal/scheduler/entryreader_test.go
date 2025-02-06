@@ -29,7 +29,7 @@ func TestReadEntries(t *testing.T) {
 		now := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC).Add(-time.Second)
 		entryReader := newEntryReader(
 			filepath.Join(testdataDir, "invalid_directory"),
-			&mockJobFactory{},
+			testGetJob,
 			cli,
 		)
 
@@ -39,7 +39,7 @@ func TestReadEntries(t *testing.T) {
 
 		entryReader = newEntryReader(
 			testdataDir,
-			&mockJobFactory{},
+			testGetJob,
 			cli,
 		)
 
@@ -56,7 +56,7 @@ func TestReadEntries(t *testing.T) {
 		require.Equal(t, now.Add(time.Second), next)
 
 		// suspend
-		var j job
+		var j Job
 		for _, e := range entries {
 			jj := e.Job
 			if jj.GetDAG(context.Background()).Name == "scheduled_job" {

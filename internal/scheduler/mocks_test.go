@@ -9,11 +9,9 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-var _ jobCreator = (*mockJobFactory)(nil)
-
 type mockJobFactory struct{}
 
-func (f *mockJobFactory) CreateJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) job {
+func (f *mockJobFactory) CreateJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) Job {
 	return newMockJob(dag)
 }
 
@@ -31,7 +29,7 @@ func (er *mockEntryReader) Start(_ context.Context, _ chan any) error {
 	return nil
 }
 
-var _ job = (*mockJob)(nil)
+var _ Job = (*mockJob)(nil)
 
 type mockJob struct {
 	DAG          *digraph.DAG
@@ -40,6 +38,10 @@ type mockJob struct {
 	StopCount    atomic.Int32
 	RestartCount atomic.Int32
 	Panic        error
+}
+
+func testGetJob(dag *digraph.DAG, _ time.Time, _ cron.Schedule) Job {
+	return newMockJob(dag)
 }
 
 func newMockJob(dag *digraph.DAG) *mockJob {

@@ -16,6 +16,7 @@ import (
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/robfig/cron/v3"
 )
 
 type Scheduler struct {
@@ -30,27 +31,33 @@ type Scheduler struct {
 }
 
 func New(cfg *config.Config, cli client.Client) *Scheduler {
-	jobCreator := &jobCreatorImpl{
-		WorkDir:    cfg.WorkDir,
-		Client:     cli,
-		Executable: cfg.Paths.Executable,
-	}
-
 	timeLoc := cfg.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}
 
-	entryReader := newEntryReader(cfg.Paths.DAGsDir, jobCreator, cli)
+	scheduler := &Scheduler{
+		logDir:     cfg.Paths.LogDir,
+		stop:       make(chan struct{}),
+		location:   timeLoc,
+		workDir:    cfg.WorkDir,
+		client:     cli,
+		executable: cfg.Paths.Executable,
+	}
 
-	return &Scheduler{
-		entryReader: entryReader,
-		logDir:      cfg.Paths.LogDir,
-		stop:        make(chan struct{}),
-		location:    timeLoc,
-		workDir:     cfg.WorkDir,
-		client:      cli,
-		executable:  cfg.Paths.Executable,
+	entryReader := newEntryReader(cfg.Paths.DAGsDir, scheduler.getJob, cli)
+	scheduler.entryReader = entryReader
+	return scheduler
+}
+
+func (s *Scheduler) getJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job {
+	return &jobImpl{
+		DAG:        dag,
+		Executable: s.executable,
+		WorkDir:    s.workDir,
+		Next:       next,
+		Schedule:   schedule,
+		Client:     s.client,
 	}
 }
 
@@ -61,11 +68,11 @@ type entryReader interface {
 
 type entry struct {
 	Next      time.Time
-	Job       job
+	Job       Job
 	EntryType entryType
 }
 
-type job interface {
+type Job interface {
 	GetDAG(ctx context.Context) *digraph.DAG
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error

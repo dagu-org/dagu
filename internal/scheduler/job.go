@@ -23,29 +23,11 @@ var (
 	errJobSuccess      = errors.New("job already successful")
 )
 
-var _ jobCreator = (*jobCreatorImpl)(nil)
-
-// jobCreatorImpl provides a factory for creating jobs.
-type jobCreatorImpl struct {
-	Executable string
-	WorkDir    string
-	Client     client.Client
-}
-
-// CreateJob returns a new job, implementing the job interface.
-func (creator jobCreatorImpl) CreateJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) job {
-	return &jobImpl{
-		DAG:        dag,
-		Executable: creator.Executable,
-		WorkDir:    creator.WorkDir,
-		Next:       next,
-		Schedule:   schedule,
-		Client:     creator.Client,
-	}
-}
+// GetJobFn is a function that returns a new job.
+type GetJobFn func(dag *digraph.DAG, next time.Time, schedule cron.Schedule) Job
 
 // Ensure jobImpl satisfies the job interface.
-var _ job = (*jobImpl)(nil)
+var _ Job = (*jobImpl)(nil)
 
 // jobImpl wraps data needed for scheduling and running a DAG job.
 type jobImpl struct {

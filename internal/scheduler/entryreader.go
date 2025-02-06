@@ -13,7 +13,6 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/scheduler/filenotify"
-	"github.com/robfig/cron/v3"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/fsnotify/fsnotify"
@@ -22,24 +21,20 @@ import (
 var _ entryReader = (*entryReaderImpl)(nil)
 
 type entryReaderImpl struct {
-	dagsDir    string
-	dagsLock   sync.Mutex
-	dags       map[string]*digraph.DAG
-	jobCreator jobCreator
-	client     client.Client
+	dagsDir  string
+	dagsLock sync.Mutex
+	dags     map[string]*digraph.DAG
+	getJobFn GetJobFn
+	client   client.Client
 }
 
-type jobCreator interface {
-	CreateJob(dag *digraph.DAG, next time.Time, schedule cron.Schedule) job
-}
-
-func newEntryReader(dagsDir string, jobCreator jobCreator, client client.Client) *entryReaderImpl {
+func newEntryReader(dagsDir string, getJobFn GetJobFn, client client.Client) *entryReaderImpl {
 	return &entryReaderImpl{
-		dagsDir:    dagsDir,
-		dagsLock:   sync.Mutex{},
-		dags:       map[string]*digraph.DAG{},
-		jobCreator: jobCreator,
-		client:     client,
+		dagsDir:  dagsDir,
+		dagsLock: sync.Mutex{},
+		dags:     map[string]*digraph.DAG{},
+		getJobFn: getJobFn,
+		client:   client,
 	}
 }
 
@@ -61,7 +56,7 @@ func (er *entryReaderImpl) Read(ctx context.Context, now time.Time) ([]*entry, e
 			next := schedule.Parsed.Next(now)
 			entries = append(entries, &entry{
 				Next:      schedule.Parsed.Next(now),
-				Job:       er.jobCreator.CreateJob(dag, next, schedule.Parsed),
+				Job:       er.getJobFn(dag, next, schedule.Parsed),
 				EntryType: entryType,
 			})
 		}
