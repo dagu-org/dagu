@@ -24,17 +24,34 @@ type Scheduler struct {
 	stop        chan struct{}
 	running     atomic.Bool
 	location    *time.Location
+	workDir     string
+	client      client.Client
+	executable  string
 }
 
-// TODO: refactor to remove ctx from the constructor
 func New(cfg *config.Config, cli client.Client) *Scheduler {
 	jobCreator := &jobCreatorImpl{
 		WorkDir:    cfg.WorkDir,
 		Client:     cli,
 		Executable: cfg.Paths.Executable,
 	}
+
+	timeLoc := cfg.Location
+	if timeLoc == nil {
+		timeLoc = time.Local
+	}
+
 	entryReader := newEntryReader(cfg.Paths.DAGsDir, jobCreator, cli)
-	return newScheduler(entryReader, cfg.Paths.LogDir, cfg.Location)
+
+	return &Scheduler{
+		entryReader: entryReader,
+		logDir:      cfg.Paths.LogDir,
+		stop:        make(chan struct{}),
+		location:    timeLoc,
+		workDir:     cfg.WorkDir,
+		client:      cli,
+		executable:  cfg.Paths.Executable,
+	}
 }
 
 type entryReader interface {
