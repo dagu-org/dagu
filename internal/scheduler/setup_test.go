@@ -12,6 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -50,7 +51,7 @@ func setupTest(t *testing.T) testHelper {
 	err := os.Setenv("HOME", tempDir)
 	require.NoError(t, err)
 
-	testdataDir := filepath.Join(fileutil.MustGetwd(), "testdata")
+	testdataDir := test.TestdataPath(t, filepath.Join("scheduler"))
 
 	cfg := &config.Config{
 		Paths: config.PathsConfig{
