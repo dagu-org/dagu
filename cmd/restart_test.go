@@ -1,9 +1,10 @@
 package main
 
 import (
-	"context"
 	"testing"
+	"time"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/stretchr/testify/require"
 )
@@ -25,14 +26,17 @@ func TestRestartCommand(t *testing.T) {
 
 		// Restart the DAG.
 		done := make(chan struct{})
+
 		go func() {
+			defer close(done)
 			args := []string{"restart", dag.Location}
 			th.RunCommand(t, restartCmd(), cmdTest{args: args})
-			close(done)
 		}()
 
 		// Wait for the DAG running again.
 		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
+
+		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
 
 		// Stop the restarted DAG.
 		th.RunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dag.Location}})
@@ -41,11 +45,17 @@ func TestRestartCommand(t *testing.T) {
 		dag.AssertCurrentStatus(t, scheduler.StatusNone)
 
 		// Check parameter was the same as the first execution
-		env := newENV(th.Config)
-		client, err := env.client()
+		loaded, err := digraph.Load(th.Context, dag.Location, digraph.WithBaseConfig(th.Config.Paths.BaseConfig))
 		require.NoError(t, err)
 
-		recentHistory := client.GetRecentHistory(context.Background(), dag.DAG, 2)
+		// Check parameter was the same as the first execution
+		setup := newENV(th.Config)
+		client, err := setup.client()
+		require.NoError(t, err)
+
+		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.
+
+		recentHistory := client.GetRecentHistory(th.Context, loaded, 2)
 
 		require.Len(t, recentHistory, 2)
 		require.Equal(t, recentHistory[0].Status.Params, recentHistory[1].Status.Params)

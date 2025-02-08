@@ -157,13 +157,18 @@ type DAG struct {
 func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var latestStatusValue scheduler.Status
+	var status scheduler.Status
+	var lock sync.Mutex
+
 	assert.Eventually(t, func() bool {
-		latestStatus, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+		lock.Lock()
+		defer lock.Unlock()
+
+		latest, err := d.Client.GetLatestStatus(d.Context, d.DAG)
 		require.NoError(t, err)
-		latestStatusValue = latestStatus.Status
-		return latestStatus.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, latestStatusValue)
+		status = latest.Status
+		return latest.Status == expected
+	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
@@ -178,13 +183,18 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var lastCurrentStatus scheduler.Status
-	assert.Eventuallyf(t, func() bool {
-		currentStatus, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
+	var status scheduler.Status
+	var lock sync.Mutex
+
+	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
+		curr, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
 		require.NoError(t, err)
-		lastCurrentStatus = currentStatus.Status
-		return currentStatus.Status == expected
-	}, time.Second*2, time.Millisecond*50, "expected current status to be %q, got %q", expected, lastCurrentStatus)
+		status = curr.Status
+		return curr.Status == expected
+	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)
 }
 
 type AgentOption func(*Agent)
