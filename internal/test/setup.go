@@ -36,18 +36,16 @@ func init() {
 }
 
 // TestHelperOption defines functional options for Helper
-type TestHelperOption func(*Helper)
+type TestHelperOption func(*TestOptions)
+
+type TestOptions struct {
+	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
+}
 
 // WithCaptureLoggingOutput creates a logging capture option
 func WithCaptureLoggingOutput() TestHelperOption {
-	return func(h *Helper) {
-		h.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
-		loggerInstance := logger.NewLogger(
-			logger.WithDebug(),
-			logger.WithFormat("text"),
-			logger.WithWriter(h.LoggingOutput),
-		)
-		h.Context = logger.WithFixedLogger(h.Context, loggerInstance)
+	return func(opts *TestOptions) {
+		opts.CaptureLoggingOutput = true
 	}
 }
 
@@ -55,6 +53,11 @@ func WithCaptureLoggingOutput() TestHelperOption {
 func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
+
+	var options TestOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
@@ -84,8 +87,14 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		tmpDir: tmpDir,
 	}
 
-	for _, opt := range opts {
-		opt(&helper)
+	if options.CaptureLoggingOutput {
+		helper.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
+		loggerInstance := logger.NewLogger(
+			logger.WithDebug(),
+			logger.WithFormat("text"),
+			logger.WithWriter(helper.LoggingOutput),
+		)
+		helper.Context = logger.WithFixedLogger(helper.Context, loggerInstance)
 	}
 
 	// setup the default shell for reproducible result
