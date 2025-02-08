@@ -292,6 +292,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 func (sc *Scheduler) setLastError(err error) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
+
 	sc.lastError = err
 }
 
