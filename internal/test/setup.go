@@ -122,19 +122,6 @@ func (h Helper) Cleanup() {
 	_ = os.RemoveAll(h.tmpDir)
 }
 
-func (h Helper) LoadDAGFile(t *testing.T, filename string) DAG {
-	t.Helper()
-
-	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", filename)
-	dag, err := digraph.Load(h.Context, filePath)
-	require.NoError(t, err)
-
-	return DAG{
-		Helper: &h,
-		DAG:    dag,
-	}
-}
-
 // DAG loads a test DAG from the testdata directory
 func (h Helper) DAG(t *testing.T, name string) DAG {
 	t.Helper()

@@ -24,7 +24,7 @@ func TestClient_GetStatus(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("Valid", func(t *testing.T) {
-		dag := th.LoadDAGFile(t, "valid.yaml")
+		dag := th.DAG(t, filepath.Join("client", "valid.yaml"))
 		ctx := th.Context
 
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
@@ -67,7 +67,7 @@ func TestClient_GetStatus(t *testing.T) {
 		require.Error(t, dagStatus.Error)
 	})
 	t.Run("UpdateStatus", func(t *testing.T) {
-		dag := th.LoadDAGFile(t, "update_status.yaml")
+		dag := th.DAG(t, filepath.Join("client", "update_status.yaml"))
 
 		requestID := "test-update-status"
 		now := time.Now()
@@ -104,7 +104,7 @@ func TestClient_GetStatus(t *testing.T) {
 	})
 	t.Run("InvalidUpdateStatusWithInvalidReqID", func(t *testing.T) {
 		wrongReqID := "invalid-request-id"
-		dag := th.LoadDAGFile(t, "invalid_reqid.yaml")
+		dag := th.DAG(t, filepath.Join("client", "invalid_reqid.yaml"))
 		ctx := th.Context
 		cli := th.Client
 
@@ -122,7 +122,7 @@ func TestClient_RunDAG(t *testing.T) {
 	th := test.Setup(t)
 
 	t.Run("RunDAG", func(t *testing.T) {
-		dag := th.LoadDAGFile(t, "run_dag.yaml")
+		dag := th.DAG(t, filepath.Join("client", "run_dag.yaml"))
 		dagStatus, err := th.Client.GetStatus(th.Context, dag.Location)
 		require.NoError(t, err)
 
@@ -134,7 +134,7 @@ func TestClient_RunDAG(t *testing.T) {
 		require.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 	})
 	t.Run("Stop", func(t *testing.T) {
-		dag := th.LoadDAGFile(t, "stop.yaml")
+		dag := th.DAG(t, filepath.Join("client", "stop.yaml"))
 		ctx := th.Context
 
 		th.Client.StartAsync(ctx, dag.DAG, client.StartOptions{})
@@ -147,7 +147,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dag.AssertLatestStatus(t, scheduler.StatusCancel)
 	})
 	t.Run("Restart", func(t *testing.T) {
-		dag := th.LoadDAGFile(t, "restart.yaml")
+		dag := th.DAG(t, filepath.Join("client", "restart.yaml"))
 		ctx := th.Context
 
 		err := th.Client.Restart(ctx, dag.DAG, client.RestartOptions{})
@@ -156,7 +156,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 	})
 	t.Run("Retry", func(t *testing.T) {
-		dag := th.LoadDAGFile(t, "retry.yaml")
+		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
 		ctx := th.Context
 		cli := th.Client
 
@@ -285,7 +285,7 @@ func TestClient_ReadHistory(t *testing.T) {
 	t.Run("TestClient_Empty", func(t *testing.T) {
 		ctx := th.Context
 		cli := th.Client
-		dag := th.LoadDAGFile(t, "empty_status.yaml")
+		dag := th.DAG(t, filepath.Join("client", "empty_status.yaml"))
 
 		_, err := cli.GetStatus(ctx, dag.Location)
 		require.NoError(t, err)
