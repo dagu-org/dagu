@@ -39,7 +39,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
 	// Get quiet flag
 	quiet, err := cmd.Flags().GetBool("quiet")
@@ -52,7 +52,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), quiet)
+	ctx := env.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
 
@@ -62,7 +62,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
 	}
 
-	status, err := setup.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	status, err := env.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
@@ -88,7 +88,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, dag, setup, status, quiet); err != nil {
+	if err := executeRetry(ctx, dag, env, status, quiet); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -96,7 +96,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalStatus *model.StatusFile, quiet bool) error {
+func executeRetry(ctx context.Context, dag *digraph.DAG, setup *env, originalStatus *model.StatusFile, quiet bool) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)

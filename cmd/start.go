@@ -40,7 +40,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -52,10 +52,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), quiet)
+	ctx := env.loggerContext(cmd.Context(), quiet)
 
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(env.cfg.Paths.BaseConfig),
 	}
 
 	var params string
@@ -71,10 +71,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(ctx, setup, args[0], loadOpts, quiet, requestID)
+	return executeDag(ctx, env, args[0], loadOpts, quiet, requestID)
 }
 
-func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
+func executeDag(ctx context.Context, setup *env, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
 	dag, err := digraph.Load(ctx, specPath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)

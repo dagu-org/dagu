@@ -42,13 +42,13 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
-	ctx := setup.loggerContext(cmd.Context(), false)
+	ctx := env.loggerContext(cmd.Context(), false)
 
 	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
 
-	server, err := setup.server(ctx)
+	server, err := env.server(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}

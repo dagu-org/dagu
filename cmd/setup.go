@@ -39,15 +39,19 @@ func wrapRunE(f func(cmd *cobra.Command, args []string) error) func(cmd *cobra.C
 	}
 }
 
-type setup struct {
+type env struct {
 	cfg *config.Config
 }
 
-func newSetup(cfg *config.Config) *setup {
-	return &setup{cfg: cfg}
+func newENV(cfg *config.Config) *env {
+	return &env{cfg: cfg}
 }
 
-func (s *setup) loggerContext(ctx context.Context, quiet bool) context.Context {
+func newENVWithConfig(cfg *config.Config) *env {
+	return &env{cfg: cfg}
+}
+
+func (s *env) loggerContext(ctx context.Context, quiet bool) context.Context {
 	var opts []logger.Option
 	if s.cfg.Debug {
 		opts = append(opts, logger.WithDebug())
@@ -61,7 +65,7 @@ func (s *setup) loggerContext(ctx context.Context, quiet bool) context.Context {
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
-func (s *setup) loggerContextWithFile(ctx context.Context, quiet bool, f *os.File) context.Context {
+func (s *env) loggerContextWithFile(ctx context.Context, quiet bool, f *os.File) context.Context {
 	var opts []logger.Option
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
@@ -91,7 +95,7 @@ func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
 	}
 }
 
-func (s *setup) client(opts ...clientOption) (client.Client, error) {
+func (s *env) client(opts ...clientOption) (client.Client, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -121,7 +125,7 @@ func (s *setup) client(opts ...clientOption) (client.Client, error) {
 	), nil
 }
 
-func (s *setup) server(ctx context.Context) (*server.Server, error) {
+func (s *env) server(ctx context.Context) (*server.Server, error) {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
 	dagStore := s.dagStoreWithCache(dagCache)
@@ -137,7 +141,7 @@ func (s *setup) server(ctx context.Context) (*server.Server, error) {
 	return frontend.New(s.cfg, cli), nil
 }
 
-func (s *setup) scheduler() (*scheduler.Scheduler, error) {
+func (s *env) scheduler() (*scheduler.Scheduler, error) {
 	cli, err := s.client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
@@ -147,7 +151,7 @@ func (s *setup) scheduler() (*scheduler.Scheduler, error) {
 	return scheduler.New(s.cfg, manager), nil
 }
 
-func (s *setup) dagStore() (persistence.DAGStore, error) {
+func (s *env) dagStore() (persistence.DAGStore, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -159,24 +163,24 @@ func (s *setup) dagStore() (persistence.DAGStore, error) {
 	return local.NewDAGStore(s.cfg.Paths.DAGsDir), nil
 }
 
-func (s *setup) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
+func (s *env) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
 	return local.NewDAGStore(s.cfg.Paths.DAGsDir, local.WithFileCache(cache))
 }
 
-func (s *setup) historyStore() persistence.HistoryStore {
+func (s *env) historyStore() persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
 		s.cfg.LatestStatusToday,
 	))
 }
 
-func (s *setup) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
+func (s *env) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir,
 		jsondb.WithLatestStatusToday(s.cfg.LatestStatusToday),
 		jsondb.WithFileCache(cache),
 	)
 }
 
-func (s *setup) openLogFile(
+func (s *env) openLogFile(
 	ctx context.Context,
 	prefix string,
 	dag *digraph.DAG,

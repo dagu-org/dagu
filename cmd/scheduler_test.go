@@ -8,6 +8,7 @@ import (
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartScheduler", func(t *testing.T) {
 		th := testSetup(t)
+
 		go func() {
 			th.RunCommand(t, schedulerCmd(), cmdTest{
 				args:        []string{"scheduler"},

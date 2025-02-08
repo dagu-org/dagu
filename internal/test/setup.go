@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"testing"
@@ -104,14 +105,6 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	return helper
 }
 
-func setShell(t *testing.T, shell string) {
-	t.Helper()
-
-	shPath, err := exec.LookPath(shell)
-	require.NoError(t, err, "failed to find shell")
-	os.Setenv("SHELL", shPath)
-}
-
 // Helper provides test utilities and configuration
 type Helper struct {
 	Context       context.Context
@@ -135,6 +128,20 @@ func (h Helper) LoadDAGFile(t *testing.T, filename string) DAG {
 	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", filename)
 	dag, err := digraph.Load(h.Context, filePath)
 	require.NoError(t, err)
+
+	return DAG{
+		Helper: &h,
+		DAG:    dag,
+	}
+}
+
+// DAG loads a test DAG from the testdata directory
+func (h Helper) DAG(t *testing.T, name string) DAG {
+	t.Helper()
+
+	filePath := getTestdataPath(t, name)
+	dag, err := digraph.Load(h.Context, filePath)
+	require.NoError(t, err, "failed to load test DAG %q", name)
 
 	return DAG{
 		Helper: &h,
@@ -216,14 +223,6 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	return helper
 }
 
-func genRequestID() string {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		panic(err)
-	}
-	return id.String()
-}
-
 type Agent struct {
 	*Helper
 	*digraph.DAG
@@ -300,4 +299,40 @@ func createDefaultContext() context.Context {
 		logger.WithDebug(),
 		logger.WithFormat("text"),
 	))
+}
+
+func setShell(t *testing.T, shell string) {
+	t.Helper()
+
+	shPath, err := exec.LookPath(shell)
+	require.NoError(t, err, "failed to find shell")
+	os.Setenv("SHELL", shPath)
+}
+
+func genRequestID() string {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
+	return id.String()
+}
+
+// getTestdataPath returns the path to a testdata file.
+func getTestdataPath(t *testing.T, filename string) string {
+	t.Helper()
+
+	rootDir := getProjectRoot(t)
+	return filepath.Join(rootDir, "internal", "testdata", filename)
+}
+
+// getProjectRoot returns the root directory of the project.
+// This allows to read testdata files from the testdata directory.
+func getProjectRoot(t *testing.T) string {
+	t.Helper()
+
+	_, filename, _, ok := runtime.Caller(1)
+	require.True(t, ok, "failed to get caller information")
+	rootDir := filepath.Join(filepath.Dir(filename), "..", "..")
+
+	return filepath.Clean(rootDir)
 }

@@ -39,14 +39,14 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), quiet)
+	ctx := env.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
 
@@ -58,7 +58,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle the restart process
-	if err := handleRestartProcess(ctx, setup, dag, quiet, specFilePath); err != nil {
+	if err := handleRestartProcess(ctx, env, dag, quiet, specFilePath); err != nil {
 		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
@@ -66,7 +66,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, quiet bool, specFilePath string) error {
+func handleRestartProcess(ctx context.Context, setup *env, dag *digraph.DAG, quiet bool, specFilePath string) error {
 	cli, err := setup.client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -105,7 +105,7 @@ func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, q
 	return executeDAG(ctx, cli, setup, dag, quiet)
 }
 
-func executeDAG(ctx context.Context, cli client.Client, setup *setup,
+func executeDAG(ctx context.Context, cli client.Client, setup *env,
 	dag *digraph.DAG, quiet bool) error {
 
 	requestID, err := generateRequestID()

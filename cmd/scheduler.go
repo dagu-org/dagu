@@ -33,9 +33,9 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
-	ctx := setup.loggerContext(cmd.Context(), false)
+	ctx := env.loggerContext(cmd.Context(), false)
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
@@ -44,7 +44,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 
 	logger.Info(ctx, "Scheduler initialization", "specsDirectory", cfg.Paths.DAGsDir, "logFormat", cfg.LogFormat)
 
-	scheduler, err := setup.scheduler()
+	scheduler, err := env.scheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}

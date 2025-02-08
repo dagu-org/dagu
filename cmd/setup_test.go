@@ -17,14 +17,14 @@ func TestOpenLogFile(t *testing.T) {
 	t.Run("successful log file creation", func(t *testing.T) {
 		tempDir := t.TempDir() // Using t.TempDir() for automatic cleanup
 
-		setup := newSetup(&config.Config{
+		env := newENV(&config.Config{
 			Paths: config.PathsConfig{
 				LogDir: tempDir,
 			},
 		})
 
-		ctx := setup.loggerContext(context.Background(), false)
-		file, err := setup.openLogFile(ctx, "test_", &digraph.DAG{
+		ctx := env.loggerContext(context.Background(), false)
+		file, err := env.openLogFile(ctx, "test_", &digraph.DAG{
 			Name:   "test_dag",
 			LogDir: "",
 		}, "12345678")

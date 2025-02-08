@@ -38,16 +38,16 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		cfg.Paths.DAGsDir = dagsDir
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), false)
+	ctx := env.loggerContext(cmd.Context(), false)
 
-	scheduler, err := setup.scheduler()
+	scheduler, err := env.scheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
@@ -64,7 +64,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		errChan <- nil
 	}()
 
-	server, err := setup.server(ctx)
+	server, err := env.server(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}

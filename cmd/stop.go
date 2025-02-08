@@ -26,9 +26,9 @@ func runStop(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	setup := newSetup(cfg)
+	env := newENV(cfg)
 
-	ctx := setup.loggerContext(cmd.Context(), false)
+	ctx := env.loggerContext(cmd.Context(), false)
 
 	dag, err := digraph.Load(cmd.Context(), args[0], digraph.WithBaseConfig(cfg.Paths.BaseConfig))
 	if err != nil {
@@ -38,7 +38,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
-	cli, err := setup.client()
+	cli, err := env.client()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
