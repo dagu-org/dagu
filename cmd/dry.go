@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/spf13/cobra"
 )
@@ -25,18 +24,17 @@ func dryCmd() *cobra.Command {
 }
 
 func runDry(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-	env := newENV(cfg)
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
 
-	ctx := env.loggerContext(cmd.Context(), false)
+	ctx := setup.loggerContext(cmd.Context(), false)
 
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(env.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
 	}
 
 	var params string
@@ -62,20 +60,20 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := env.openLogFile(ctx, dryPrefix, dag, requestID)
+	logFile, err := setup.openLogFile(ctx, dryPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx = env.loggerContextWithFile(ctx, false, logFile)
+	ctx = setup.loggerContextWithFile(ctx, false, logFile)
 
-	dagStore, err := env.dagStore()
+	dagStore, err := setup.dagStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := env.client()
+	cli, err := setup.client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -87,7 +85,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		env.historyStore(),
+		setup.historyStore(),
 		agent.Options{Dry: true},
 	)
 

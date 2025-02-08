@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -33,21 +32,19 @@ func bindStartAllFlags(cmd *cobra.Command, _ []string) error {
 }
 
 func runStartAll(cmd *cobra.Command, _ []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-
-	env := newENV(cfg)
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
-		cfg.Paths.DAGsDir = dagsDir
+		setup.cfg.Paths.DAGsDir = dagsDir
 	}
 
-	ctx := env.loggerContext(cmd.Context(), false)
+	ctx := setup.loggerContext(cmd.Context(), false)
 
-	scheduler, err := env.scheduler()
+	scheduler, err := setup.scheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
@@ -55,7 +52,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Info(ctx, "Scheduler initialization", "dags", cfg.Paths.DAGsDir)
+		logger.Info(ctx, "Scheduler initialization", "dags", setup.cfg.Paths.DAGsDir)
 
 		if err := scheduler.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
@@ -64,13 +61,13 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		errChan <- nil
 	}()
 
-	server, err := env.server(ctx)
+	server, err := setup.server(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
 	// Start server in main thread
-	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", setup.cfg.Host, "port", setup.cfg.Port)
 
 	serverErr := make(chan error, 1)
 	go func() {

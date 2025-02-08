@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
@@ -21,16 +20,14 @@ func stopCmd() *cobra.Command {
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
 
-	env := newENV(cfg)
+	ctx := setup.loggerContext(cmd.Context(), false)
 
-	ctx := env.loggerContext(cmd.Context(), false)
-
-	dag, err := digraph.Load(cmd.Context(), args[0], digraph.WithBaseConfig(cfg.Paths.BaseConfig))
+	dag, err := digraph.Load(cmd.Context(), args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -38,7 +35,7 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
-	cli, err := env.client()
+	cli, err := setup.client()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -35,30 +34,29 @@ func restartCmd() *cobra.Command {
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-	env := newENV(cfg)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	ctx := env.loggerContext(cmd.Context(), quiet)
+	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
 
 	// Load initial DAG configuration
-	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(cfg.Paths.BaseConfig))
+	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
 	}
 
 	// Handle the restart process
-	if err := handleRestartProcess(ctx, env, dag, quiet, specFilePath); err != nil {
+	if err := handleRestartProcess(ctx, setup, dag, quiet, specFilePath); err != nil {
 		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
@@ -66,7 +64,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func handleRestartProcess(ctx context.Context, setup *env, dag *digraph.DAG, quiet bool, specFilePath string) error {
+func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, quiet bool, specFilePath string) error {
 	cli, err := setup.client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -105,7 +103,7 @@ func handleRestartProcess(ctx context.Context, setup *env, dag *digraph.DAG, qui
 	return executeDAG(ctx, cli, setup, dag, quiet)
 }
 
-func executeDAG(ctx context.Context, cli client.Client, setup *env,
+func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 	dag *digraph.DAG, quiet bool) error {
 
 	requestID, err := generateRequestID()
