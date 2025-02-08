@@ -1,11 +1,12 @@
 // Copyright (C) 2025 Yota Hamada
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package digraph
+package digraph_test
 
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +17,7 @@ func TestReplace(t *testing.T) {
 			"AGE":  30,
 		}
 
-		result, err := renderTemplate("Hello {{.NAME}}, you are {{.AGE}} years old", data)
+		result, err := digraph.RenderTemplate("Hello {{.NAME}}, you are {{.AGE}} years old", data)
 		assert.NoError(t, err)
 		assert.Equal(t, "Hello John, you are 30 years old", result)
 	})
@@ -29,7 +30,7 @@ func TestReplace(t *testing.T) {
 			},
 		}
 
-		result, err := renderTemplate("File: {{.CONFIG.PATH}}/{{.CONFIG.FILE}}", data)
+		result, err := digraph.RenderTemplate("File: {{.CONFIG.PATH}}/{{.CONFIG.FILE}}", data)
 		assert.NoError(t, err)
 		assert.Equal(t, "File: /data/output.txt", result)
 	})
@@ -40,7 +41,7 @@ func TestReplace(t *testing.T) {
 		}
 
 		// Use index to access array elements
-		result, err := renderTemplate("First item: {{index .ITEMS 0}}", data)
+		result, err := digraph.RenderTemplate("First item: {{index .ITEMS 0}}", data)
 		assert.NoError(t, err)
 		assert.Equal(t, "First item: a", result)
 	})
@@ -50,7 +51,7 @@ func TestReplace(t *testing.T) {
 			"NAME": "John",
 		}
 
-		_, err := renderTemplate("Hello {{.NAME} missing closing bracket", data)
+		_, err := digraph.RenderTemplate("Hello {{.NAME} missing closing bracket", data)
 		assert.Error(t, err)
 	})
 
@@ -59,7 +60,7 @@ func TestReplace(t *testing.T) {
 			"NAME": "John",
 		}
 
-		result, err := renderTemplate("Hello {{.UNDEFINED}}", data)
+		result, err := digraph.RenderTemplate("Hello {{.UNDEFINED}}", data)
 		assert.NoError(t, err)
 		assert.Equal(t, "Hello ", result)
 	})
@@ -69,13 +70,13 @@ func TestReplace(t *testing.T) {
 			"NAME": "John",
 		}
 
-		result, err := renderTemplate("", data)
+		result, err := digraph.RenderTemplate("", data)
 		assert.NoError(t, err)
 		assert.Equal(t, "", result)
 	})
 
 	t.Run("nil data", func(t *testing.T) {
-		result, err := renderTemplate("Hello {{.NAME}}", nil)
+		result, err := digraph.RenderTemplate("Hello {{.NAME}}", nil)
 		assert.NoError(t, err)
 		// The "<no value>" will be replaced with an empty string
 		assert.Equal(t, "Hello ", result)

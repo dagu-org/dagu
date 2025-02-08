@@ -21,10 +21,10 @@ type BuilderFn func(ctx BuildContext, spec *definition, dag *DAG) error
 type BuildContext struct {
 	ctx  context.Context
 	file string
-	opts buildOpts
+	opts BuildOpts
 }
 
-func (c BuildContext) WithOpts(opts buildOpts) BuildContext {
+func (c BuildContext) WithOpts(opts BuildOpts) BuildContext {
 	copy := c
 	copy.opts = opts
 	return copy
@@ -36,19 +36,19 @@ func (c BuildContext) WithFile(file string) BuildContext {
 	return copy
 }
 
-// buildOpts is used to control the behavior of the builder.
-type buildOpts struct {
-	// base specifies the base configuration file for the DAG.
-	base string
-	// onlyMetadata specifies whether to build only the metadata.
-	onlyMetadata bool
-	// parameters specifies the parameters to the DAG.
-	// parameters are used to override the default parameters in the DAG.
-	parameters string
-	// parametersList specifies the parameters to the DAG.
-	parametersList []string
-	// noEval specifies whether to evaluate dynamic fields.
-	noEval bool
+// BuildOpts is used to control the behavior of the builder.
+type BuildOpts struct {
+	// Base specifies the Base configuration file for the DAG.
+	Base string
+	// OnlyMetadata specifies whether to build only the metadata.
+	OnlyMetadata bool
+	// Parameters specifies the Parameters to the DAG.
+	// Parameters are used to override the default Parameters in the DAG.
+	Parameters string
+	// ParametersList specifies the parameters to the DAG.
+	ParametersList []string
+	// NoEval specifies whether to evaluate dynamic fields.
+	NoEval bool
 }
 
 var builderRegistry = []builderEntry{
@@ -109,9 +109,9 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		MaxActiveRuns: spec.MaxActiveRuns,
 	}
 
-	var errs errorList
+	var errs ErrorList
 	for _, builder := range builderRegistry {
-		if !builder.metadata && ctx.opts.onlyMetadata {
+		if !builder.metadata && ctx.opts.OnlyMetadata {
 			continue
 		}
 		if err := builder.fn(ctx, spec, dag); err != nil {
@@ -119,7 +119,7 @@ func build(ctx BuildContext, spec *definition) (*DAG, error) {
 		}
 	}
 
-	if !ctx.opts.onlyMetadata {
+	if !ctx.opts.OnlyMetadata {
 		// TODO: Remove functions feature.
 		if err := assertFunctions(spec.Functions); err != nil {
 			errs.Add(err)
@@ -199,7 +199,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 		for _, s := range schedule {
 			s, ok := s.(string)
 			if !ok {
-				return wrapError("schedule", s, errScheduleMustBeStringOrArray)
+				return wrapError("schedule", s, ErrScheduleMustBeStringOrArray)
 			}
 			starts = append(starts, s)
 		}
@@ -217,7 +217,7 @@ func buildSchedule(_ BuildContext, spec *definition, dag *DAG) error {
 
 	default:
 		// If schedule is of an invalid type, return an error.
-		return wrapError("schedule", spec.Schedule, errInvalidScheduleType)
+		return wrapError("schedule", spec.Schedule, ErrInvalidScheduleType)
 
 	}
 
@@ -249,14 +249,14 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 			case string:
 				dag.Dotenv = append(dag.Dotenv, e)
 			default:
-				return wrapError("dotenv", e, errDotenvMustBeStringOrArray)
+				return wrapError("dotenv", e, ErrDotenvMustBeStringOrArray)
 			}
 		}
 	default:
-		return wrapError("dotenv", v, errDotenvMustBeStringOrArray)
+		return wrapError("dotenv", v, ErrDotenvMustBeStringOrArray)
 	}
 
-	if !ctx.opts.noEval {
+	if !ctx.opts.NoEval {
 		var relativeTos []string
 		if ctx.file != "" {
 			relativeTos = append(relativeTos, ctx.file)
@@ -381,30 +381,30 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 		for k, vv := range v {
 			key, ok := k.(string)
 			if !ok {
-				return nil, wrapError("preconditions", k, errPreconditionKeyMustBeString)
+				return nil, wrapError("preconditions", k, ErrPreconditionKeyMustBeString)
 			}
 
 			switch strings.ToLower(key) {
 			case "condition":
 				ret.Condition, ok = vv.(string)
 				if !ok {
-					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
+					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 
 			case "expected":
 				ret.Expected, ok = vv.(string)
 				if !ok {
-					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
+					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 
 			case "command":
 				ret.Command, ok = vv.(string)
 				if !ok {
-					return nil, wrapError("preconditions", vv, errPreconditionValueMustBeString)
+					return nil, wrapError("preconditions", vv, ErrPreconditionValueMustBeString)
 				}
 
 			default:
-				return nil, wrapError("preconditions", k, fmt.Errorf("%w: %s", errPreconditionHasInvalidKey, key))
+				return nil, wrapError("preconditions", k, fmt.Errorf("%w: %s", ErrPreconditionHasInvalidKey, key))
 
 			}
 		}
@@ -427,7 +427,7 @@ func parsePrecondition(ctx BuildContext, precondition any) ([]Condition, error) 
 		return ret, nil
 
 	default:
-		return nil, wrapError("preconditions", v, errPreconditionMustBeArrayOrString)
+		return nil, wrapError("preconditions", v, ErrPreconditionMustBeArrayOrString)
 
 	}
 }
@@ -498,7 +498,7 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 		return nil
 
 	default:
-		return wrapError("steps", v, errStepsMustBeArrayOrMap)
+		return wrapError("steps", v, ErrStepsMustBeArrayOrMap)
 
 	}
 }
@@ -582,13 +582,13 @@ func buildContinueOn(_ BuildContext, def stepDef, step *Step) error {
 
 	exitCodes, err := parseIntOrArray(def.ContinueOn.ExitCode)
 	if err != nil {
-		return wrapError("continueOn.exitCode", def.ContinueOn.ExitCode, errContinueOnExitCodeMustBeIntOrArray)
+		return wrapError("continueOn.exitCode", def.ContinueOn.ExitCode, ErrContinueOnExitCodeMustBeIntOrArray)
 	}
 	step.ContinueOn.ExitCode = exitCodes
 
 	output, err := parseStringOrArray(def.ContinueOn.Output)
 	if err != nil {
-		return wrapError("continueOn.stdout", def.ContinueOn.Output, errContinueOnOutputMustBeStringOrArray)
+		return wrapError("continueOn.stdout", def.ContinueOn.Output, ErrContinueOnOutputMustBeStringOrArray)
 	}
 	step.ContinueOn.Output = output
 
@@ -647,7 +647,7 @@ func buildSignalOnStop(_ BuildContext, def stepDef, step *Step) error {
 		sigDef := *def.SignalOnStop
 		sig := unix.SignalNum(sigDef)
 		if sig == 0 {
-			return fmt.Errorf("%w: %s", errInvalidSignal, sigDef)
+			return fmt.Errorf("%w: %s", ErrInvalidSignal, sigDef)
 		}
 		step.SignalOnStop = sigDef
 	}
@@ -685,7 +685,7 @@ const (
 func buildDepends(_ BuildContext, def stepDef, step *Step) error {
 	deps, err := parseStringOrArray(def.Depends)
 	if err != nil {
-		return wrapError("depends", def.Depends, errDependsMustBeStringOrArray)
+		return wrapError("depends", def.Depends, ErrDependsMustBeStringOrArray)
 	}
 	step.Depends = deps
 
@@ -717,7 +717,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 		for k, v := range val {
 			key, ok := k.(string)
 			if !ok {
-				return wrapError("executor.config", k, errExecutorConfigMustBeString)
+				return wrapError("executor.config", k, ErrExecutorConfigMustBeString)
 			}
 
 			switch key {
@@ -725,7 +725,7 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// Executor type is a string.
 				typ, ok := v.(string)
 				if !ok {
-					return wrapError("executor.type", v, errExecutorTypeMustBeString)
+					return wrapError("executor.type", v, ErrExecutorTypeMustBeString)
 				}
 				step.ExecutorConfig.Type = typ
 
@@ -735,26 +735,26 @@ func buildExecutor(_ BuildContext, def stepDef, step *Step) error {
 				// It is up to the executor to parse the values.
 				executorConfig, ok := v.(map[any]any)
 				if !ok {
-					return wrapError("executor.config", v, errExecutorConfigValueMustBeMap)
+					return wrapError("executor.config", v, ErrExecutorConfigValueMustBeMap)
 				}
 				for k, v := range executorConfig {
 					configKey, ok := k.(string)
 					if !ok {
-						return wrapError("executor.config", k, errExecutorConfigMustBeString)
+						return wrapError("executor.config", k, ErrExecutorConfigMustBeString)
 					}
 					step.ExecutorConfig.Config[configKey] = v
 				}
 
 			default:
 				// Unknown key in the executor config.
-				return wrapError("executor.config", key, fmt.Errorf("%w: %s", errExecutorHasInvalidKey, key))
+				return wrapError("executor.config", key, fmt.Errorf("%w: %s", ErrExecutorHasInvalidKey, key))
 
 			}
 		}
 
 	default:
 		// Unknown key for executor field.
-		return wrapError("executor", val, errExecutorConfigMustBeStringOrMap)
+		return wrapError("executor", val, ErrExecutorConfigMustBeStringOrMap)
 
 	}
 
@@ -799,7 +799,7 @@ func convertMap(m map[string]any) error {
 				key, err := parseKey(kk)
 				if err != nil {
 					return fmt.Errorf(
-						"%w: %s", errExecutorConfigMustBeString, err,
+						"%w: %s", ErrExecutorConfigMustBeString, err,
 					)
 				}
 				ret[key] = vv
@@ -818,7 +818,7 @@ func convertMap(m map[string]any) error {
 func parseKey(value any) (string, error) {
 	val, ok := value.(string)
 	if !ok {
-		return "", fmt.Errorf("%w: %T", errInvalidKeyType, value)
+		return "", fmt.Errorf("%w: %T", ErrInvalidKeyType, value)
 	}
 
 	return val, nil

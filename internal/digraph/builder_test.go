@@ -1,4 +1,4 @@
-package digraph
+package digraph_test
 
 import (
 	"context"
@@ -9,14 +9,15 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type testHelper struct {
 	t         *testing.T
-	buildOpts buildOpts
-	*DAG
+	buildOpts digraph.BuildOpts
+	*digraph.DAG
 }
 
 func (th *testHelper) AssertEnv(t *testing.T, key, val string) {
@@ -41,7 +42,7 @@ func (th *testHelper) AssertParam(t *testing.T, params ...string) {
 
 type testOption func(*testHelper)
 
-func withBuildOpts(opts buildOpts) testOption {
+func withBuildOpts(opts digraph.BuildOpts) testOption {
 	return func(th *testHelper) {
 		th.buildOpts = opts
 	}
@@ -57,7 +58,7 @@ func loadTestYAML(t *testing.T, inputFile string, opts ...testOption) *testHelpe
 		opt(th)
 	}
 
-	dag, err := loadYAML(ctx, readTestFile(t, inputFile), th.buildOpts)
+	dag, err := digraph.LoadYAMLWithOpts(ctx, readTestFile(t, inputFile), th.buildOpts)
 	require.NoError(t, err, "failed to load YAML %s", inputFile)
 
 	th.DAG = dag
@@ -74,9 +75,9 @@ func loadTestYAMLError(t *testing.T, inputFile string, expectedErr error, opts .
 		opt(th)
 	}
 
-	_, err := loadYAML(ctx, readTestFile(t, inputFile), th.buildOpts)
+	_, err := digraph.LoadYAMLWithOpts(ctx, readTestFile(t, inputFile), th.buildOpts)
 	assert.Error(t, err, "expected error %v, got nil", expectedErr)
-	if errs, ok := err.(*errorList); ok && len(*errs) > 0 {
+	if errs, ok := err.(*digraph.ErrorList); ok && len(*errs) > 0 {
 		// check if the error is in the list of errors
 		found := false
 		for _, e := range *errs {
@@ -96,23 +97,23 @@ func loadTestYAMLError(t *testing.T, inputFile string, expectedErr error, opts .
 func TestBuildDAGError(t *testing.T) {
 	t.Parallel()
 	t.Run("NoName", func(t *testing.T) {
-		loadTestYAMLError(t, "invalid_no_name.yaml", errStepNameRequired)
+		loadTestYAMLError(t, "invalid_no_name.yaml", digraph.ErrStepNameRequired)
 	})
 	t.Run("InvalidEnv", func(t *testing.T) {
-		loadTestYAMLError(t, "invalid_env.yaml", errInvalidEnvValue)
+		loadTestYAMLError(t, "invalid_env.yaml", digraph.ErrInvalidEnvValue)
 	})
 	t.Run("InvalidParams", func(t *testing.T) {
-		loadTestYAMLError(t, "invalid_params.yaml", errInvalidParamValue)
+		loadTestYAMLError(t, "invalid_params.yaml", digraph.ErrInvalidParamValue)
 	})
 	t.Run("InvalidSchedule", func(t *testing.T) {
-		loadTestYAMLError(t, "invalid_schedule.yaml", errInvalidSchedule)
+		loadTestYAMLError(t, "invalid_schedule.yaml", digraph.ErrInvalidSchedule)
 	})
 }
 
 func TestBuildStepError(t *testing.T) {
 	t.Parallel()
 	t.Run("NoCommand", func(t *testing.T) {
-		loadTestYAMLError(t, "invalid_no_command.yaml", errStepCommandIsRequired)
+		loadTestYAMLError(t, "invalid_no_command.yaml", digraph.ErrStepCommandIsRequired)
 	})
 }
 
@@ -199,9 +200,7 @@ func TestBuildDAG(t *testing.T) {
 	})
 	t.Run("ParamsAsMapOverride", func(t *testing.T) {
 		th := loadTestYAML(t, "params_as_map.yaml", withBuildOpts(
-			buildOpts{
-				parameters: "FOO=X BAZ=Y",
-			},
+			digraph.BuildOpts{Parameters: "FOO=X BAZ=Y"},
 		))
 		th.AssertParam(t,
 			"FOO=X",
@@ -268,7 +267,7 @@ func TestBuildDAG(t *testing.T) {
 	t.Run("Preconditions", func(t *testing.T) {
 		th := loadTestYAML(t, "preconditions.yaml")
 		assert.Len(t, th.Preconditions, 1)
-		assert.Equal(t, Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
+		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Preconditions[0])
 	})
 	t.Run("MaxActiveRuns", func(t *testing.T) {
 		th := loadTestYAML(t, "max_active_runs.yaml")
@@ -361,7 +360,7 @@ func TestBuildStep(t *testing.T) {
 		th := loadTestYAML(t, "step_preconditions.yaml")
 		assert.Len(t, th.Steps, 1)
 		assert.Len(t, th.Steps[0].Preconditions, 1)
-		assert.Equal(t, Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
+		assert.Equal(t, digraph.Condition{Condition: "test -f file.txt", Expected: "true"}, th.Steps[0].Preconditions[0])
 	})
 }
 
@@ -374,11 +373,11 @@ func TestOverrideBaseConfig(t *testing.T) {
 		// Overwrite the base config with the following values:
 		// MailOn: {Failure: false, Success: false}
 		filePath := filepath.Join(testdataDir, "overwrite.yaml")
-		dag, err := Load(context.Background(), filePath, WithBaseConfig(baseConfig))
+		dag, err := digraph.Load(context.Background(), filePath, digraph.WithBaseConfig(baseConfig))
 		require.NoError(t, err)
 
 		// The MailOn key should be overwritten.
-		require.Equal(t, &MailOn{Failure: false, Success: false}, dag.MailOn)
+		require.Equal(t, &digraph.MailOn{Failure: false, Success: false}, dag.MailOn)
 		require.Equal(t, dag.HistRetentionDays, 7)
 	})
 	t.Run("WithoutOverride", func(t *testing.T) {
@@ -386,11 +385,11 @@ func TestOverrideBaseConfig(t *testing.T) {
 
 		// no_overwrite.yaml does not have the MailOn key.
 		filePath := filepath.Join(testdataDir, "no_overwrite.yaml")
-		dag, err := Load(context.Background(), filePath, WithBaseConfig(baseConfig))
+		dag, err := digraph.Load(context.Background(), filePath, digraph.WithBaseConfig(baseConfig))
 		require.NoError(t, err)
 
 		// The MailOn key should be the same as the base config.
-		require.Equal(t, &MailOn{Failure: true, Success: false}, dag.MailOn)
+		require.Equal(t, &digraph.MailOn{Failure: true, Success: false}, dag.MailOn)
 		require.Equal(t, dag.HistRetentionDays, 30)
 	})
 }

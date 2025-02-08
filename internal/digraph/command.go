@@ -42,7 +42,7 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 	case string:
 		// Case 2: command is a string
 		if val == "" {
-			return wrapError("command", val, errStepCommandIsEmpty)
+			return wrapError("command", val, ErrStepCommandIsEmpty)
 		}
 		// We need to split the command into command and args.
 		step.CmdWithArgs = val
@@ -88,7 +88,7 @@ func buildCommand(_ BuildContext, def stepDef, step *Step) error {
 
 	default:
 		// Unknown type for command field.
-		return wrapError("command", val, errStepCommandMustBeArrayOrString)
+		return wrapError("command", val, ErrStepCommandMustBeArrayOrString)
 
 	}
 

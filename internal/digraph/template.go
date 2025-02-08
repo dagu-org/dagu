@@ -17,8 +17,8 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// renderTemplate replaces the template variables in the given template string
-func renderTemplate(tmpl string, data map[string]any) (string, error) {
+// RenderTemplate replaces the template variables in the given template string
+func RenderTemplate(tmpl string, data map[string]any) (string, error) {
 	// Create a new template instance
 	templateObject := template.New("").Funcs(templateFuncs)
 

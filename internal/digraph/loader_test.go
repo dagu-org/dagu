@@ -1,4 +1,4 @@
-package digraph
+package digraph_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +46,7 @@ func Test_Load(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dag, err := Load(context.Background(), tt.file)
+			dag, err := digraph.Load(context.Background(), tt.file)
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedError)
@@ -60,7 +61,7 @@ func Test_Load(t *testing.T) {
 func Test_LoadMetadata(t *testing.T) {
 	t.Run("Metadata", func(t *testing.T) {
 		filePath := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load(context.Background(), filePath, OnlyMetadata(), WithoutEval())
+		dag, err := digraph.Load(context.Background(), filePath, digraph.OnlyMetadata(), digraph.WithoutEval())
 		require.NoError(t, err)
 
 		require.Equal(t, dag.Name, "default")
@@ -71,7 +72,7 @@ func Test_LoadMetadata(t *testing.T) {
 
 func Test_loadBaseConfig(t *testing.T) {
 	t.Run("LoadBaseConfigFile", func(t *testing.T) {
-		dag, err := loadBaseConfig(BuildContext{}, filepath.Join(testdataDir, "base.yaml"))
+		dag, err := digraph.LoadBaseConfig(digraph.BuildContext{}, filepath.Join(testdataDir, "base.yaml"))
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})
@@ -80,7 +81,7 @@ func Test_loadBaseConfig(t *testing.T) {
 func Test_LoadDefaultConfig(t *testing.T) {
 	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
 		filePath := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load(context.Background(), filePath)
+		dag, err := digraph.Load(context.Background(), filePath)
 
 		require.NoError(t, err)
 
@@ -110,7 +111,7 @@ steps:
 
 func Test_LoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
-		ret, err := loadYAML(context.Background(), []byte(testDAG), buildOpts{})
+		ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{})
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -119,7 +120,7 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
-		_, err := loadYAML(context.Background(), []byte(`invalidyaml`), buildOpts{})
+		_, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(`invalidyaml`), digraph.BuildOpts{})
 		require.Error(t, err)
 	})
 }
