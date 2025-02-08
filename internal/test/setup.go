@@ -139,7 +139,7 @@ func (h Helper) LoadDAGFile(t *testing.T, filename string) DAG {
 func (h Helper) DAG(t *testing.T, name string) DAG {
 	t.Helper()
 
-	filePath := getTestdataPath(t, name)
+	filePath := TestdataPath(t, name)
 	dag, err := digraph.Load(h.Context, filePath)
 	require.NoError(t, err, "failed to load test DAG %q", name)
 
@@ -147,6 +147,15 @@ func (h Helper) DAG(t *testing.T, name string) DAG {
 		Helper: &h,
 		DAG:    dag,
 	}
+}
+
+func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
+	t.Helper()
+
+	filePath := TestdataPath(t, name)
+	_, err := digraph.Load(h.Context, filePath)
+	require.Error(t, err, "expected error loading test DAG %q", name)
+	require.Contains(t, err.Error(), expectedErr, "expected error %q, got %q", expectedErr, err.Error())
 }
 
 type DAG struct {
@@ -327,12 +336,23 @@ func genRequestID() string {
 	return id.String()
 }
 
-// getTestdataPath returns the path to a testdata file.
-func getTestdataPath(t *testing.T, filename string) string {
+// TestdataPath returns the path to a testdata file.
+func TestdataPath(t *testing.T, filename string) string {
 	t.Helper()
 
 	rootDir := getProjectRoot(t)
 	return filepath.Join(rootDir, "internal", "testdata", filename)
+}
+
+// ReadTestdata reads the content of a testdata file.
+func ReadTestdata(t *testing.T, filename string) []byte {
+	t.Helper()
+
+	path := TestdataPath(t, filename)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "failed to read testdata file %q", filename)
+
+	return data
 }
 
 // getProjectRoot returns the root directory of the project.

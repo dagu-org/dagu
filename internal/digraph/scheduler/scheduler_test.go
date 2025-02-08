@@ -21,6 +21,8 @@ import (
 func TestScheduler(t *testing.T) {
 	t.Parallel()
 
+	testScript := test.TestdataPath(t, filepath.Join("digraph", "scheduler", "testfile.sh"))
+
 	t.Run("SequentialStepsSuccess", func(t *testing.T) {
 		sc := setup(t, withMaxActiveRuns(1))
 

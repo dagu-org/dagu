@@ -230,9 +230,9 @@ var _ mergo.Transformers = (*mergeTransformer)(nil)
 func (*mergeTransformer) Transformer(
 	typ reflect.Type,
 ) func(dst, src reflect.Value) error {
-	// mergo does not overwrite a value with zero value for a pointer.
+	// mergo does not override a value with zero value for a pointer.
 	if typ == reflect.TypeOf(MailOn{}) {
-		// We need to explicitly overwrite the value for a pointer with a zero
+		// We need to explicitly override the value for a pointer with a zero
 		// value.
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {
