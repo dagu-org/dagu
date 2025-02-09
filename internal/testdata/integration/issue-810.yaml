@@ -17,5 +17,14 @@ steps:
       - step1
     output: OUT3 # "bar"
     preconditions:
-      - condition: "$1" # should be "foo"
+      - condition: "$1" # should be "bar"
+        expected: bar
+  - name: baz
+    command: echo baz
+    depends:
+      - foo
+      - bar
+    output: OUT4 # "baz"
+    preconditions:
+      - condition: "$1" # should be "bar"
         expected: bar

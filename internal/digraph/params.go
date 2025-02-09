@@ -156,6 +156,9 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case []string:
 		return parseListParams(ctx, v)
 
+	case map[any]any:
+		return parseMapParams(ctx, []any{v})
+
 	default:
 		return nil, wrapError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
 
@@ -198,7 +201,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 					valueStr = v
 
 				default:
-					return nil, wrapError("params", value, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
+					valueStr = fmt.Sprintf("%v", v)
 
 				}
 
