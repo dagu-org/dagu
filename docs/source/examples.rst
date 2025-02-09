@@ -230,6 +230,30 @@ Sending Email
           message: |
             Hello world
 
+Sending Email with Attachments
+------------------------------
+
+.. code-block:: yaml
+
+  smtp:
+    host: "smtp.foo.bar"
+    port: "587"
+    username: "<username>"
+    password: "<password>"
+
+  steps:
+    - name: step1
+      executor:
+        type: mail
+        config:
+          to: <to address>
+          from: <from address>
+          subject: "Sample Email"
+          message: |
+            Hello world
+          attachments:
+            - /tmp/email-attachment.txt
+
 
 Customizing Signal Handling on Stop
 -----------------------------------
