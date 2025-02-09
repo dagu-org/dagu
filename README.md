@@ -25,14 +25,14 @@
 </div>
 
 <h1><b>Dagu</b></h1>
+Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
 
-Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to define dependencies between commands in a declarative YAML Format. Additionally, Dagu natively supports running Docker containers, making HTTP requests, and executing commands over SSH. Dagu was designed to be easy to use, self-contained, and require no coding, making it ideal for small projects.
+Dagu’s design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
 
 <h2><b>Table of Contents</b></h2>
 
-- [Why Dagu?](#why-dagu)
-- [Core Features](#core-features)
-- [Common Use Cases](#common-use-cases)
+- [Key Attributes](#key-attributes)
+- [Use Cases](#use-cases)
 - [Community](#community)
 - [Installation](#installation)
   - [Via Bash script](#via-bash-script)
@@ -76,56 +76,30 @@ Dagu is a powerful Cron alternative that comes with a Web UI. It allows you to d
   - [Search](#search)
   - [Execution History](#execution-history)
   - [Log Viewer](#log-viewer)
-- [Running as a daemon](#running-as-a-daemon)
 - [Contributing](#contributing)
 - [Contributors](#contributors)
 - [License](#license)
 
-## Why Dagu?
+## Key Attributes
 
-Dagu is a modern workflow engine that combines simplicity with power, designed for developers who need reliable automation without the overhead. Here's what makes Dagu stand out:
+- **Small Footprint**
+Dagu is distributed as a single binary with minimal resource overhead. It does not require additional components such as external databases, message brokers, or other services.
 
-- **Language Agnostic**: Run any command or script regardless of programming language. Whether you're working with Python, Node.js, Bash, or any other language, Dagu seamlessly integrates with your existing tools and scripts.
+- **Language Agnostic**: Workflows in Dagu are defined by specifying tasks (called “steps”) and their dependencies in YAML. A step can execute any command whether Python, Bash, Node.js, or other executables. This flexibility allows easy integration with existing scripts or tools.
 
-- **Local-First Architecture**: Deploy and run workflows directly on your machine without external dependencies. This local-first approach ensures complete control over your automation while maintaining the flexibility to scale to distributed environments when needed.
+- **Local-First Architecture**: Dagu was designed to run on a single developer workstation or server. By default, all tasks, logs, and scheduling run locally, allowing run offline or in air-gapped environments. This architecture ensures that sensitive data or proprietary workflows remain secure.
 
-- **Zero Configuration**: Get started in minutes with minimal setup. Dagu uses simple YAML files to define workflows, eliminating the need for complex configurations or infrastructure setup.
+- **Declarative Configuration**: The workflow definition is contained in a YAML file. Dependencies, schedules, and execution details are declaratively expressed, making the workflow easy to comprehend and maintain.
 
-- **Built for Developers**: Designed with software engineers in mind, Dagu provides powerful features like dependency management, retry logic, and parallel execution while maintaining a clean, intuitive interface.
+- **No Complex Setup**: Unlike other orchestration platforms (e.g., `Airflow`) that often require substantial infrastructure, Dagu can be installed in minutes. Just `dagu start-all` command spins up both the scheduler and web UI, ready to run tasks immediately.
 
-- **Cloud Native Ready**: While running perfectly on local environments, Dagu is built to seamlessly integrate with modern cloud infrastructure when you need to scale.
+## Use Cases
 
-## Core Features
-
-- **Workflow Management**
-  - Declarative YAML definitions
-  - Dependency management
-  - Parallel execution
-  - Sub-workflows
-  - Conditional execution with regex
-  - Timeouts and automatic retries
-- **Execution & Integration**
-  - Native Docker support
-  - SSH command execution
-  - HTTP requests
-  - JSON processing
-  - Email notifications
-- **Operations**
-  - Web UI for monitoring
-  - Real-time logs
-  - Execution history
-  - Flexible scheduling
-  - Environment variables
-  - Automatic logging
-
-## Common Use Cases
-
-- Data Processing
-- Scheduled Tasks
-- Media Processing
-- CI/CD Automation
-- ETL Pipelines
-- Agentic Workflows
+- Data ingestion pipelines
+- Data processing on small-scale/embedded systems
+- Media file conversion tasks
+- Automated workflows for employee onboarding and offboarding
+- CI/CD automation
 
 ## Community
 
@@ -895,28 +869,9 @@ Examine detailed step-level logs and outputs.
 
 ![DAG Log](assets/images/ui-logoutput.webp?raw=true)
 
-## Running as a daemon
-
-The easiest way to make sure the process is always running on your system is to create the script below and execute it every minute using cron (you don't need `root` account in this way):
-
-```bash
-#!/bin/bash
-process="dagu start-all"
-command="/usr/bin/dagu start-all"
-
-if ps ax | grep -v grep | grep "$process" > /dev/null
-then
-    exit
-else
-    $command &
-fi
-
-exit
-```
-
 ## Contributing
 
-We welcome new contributors! Check out our [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for guidelines on how to get started.
+Contributions to Dagu are welcome. Refer to the [Contribution Guide](https://dagu.readthedocs.io/en/latest/contrib.html) for details on how to get started.
 
 ## Contributors
 
@@ -926,4 +881,4 @@ We welcome new contributors! Check out our [Contribution Guide](https://dagu.rea
 
 ## License
 
-Dagu is released under the [GNU GPLv3](./LICENSE.md).
+Dagu is distributed under the [GNU GPLv3](./LICENSE.md).
