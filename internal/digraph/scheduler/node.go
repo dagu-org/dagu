@@ -248,6 +248,9 @@ func (n *Node) Execute(ctx context.Context) error {
 
 	n.SetExitCode(exitCode)
 
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
 	if n.outputReader != nil && n.data.Step.Output != "" {
 		if err := n.outputWriter.Close(); err != nil {
 			logger.Error(ctx, "failed to close pipe writer", "err", err)
@@ -643,7 +646,7 @@ func (n *Node) Teardown() error {
 		_ = os.Remove(n.scriptFile.Name())
 	}
 	if lastErr != nil {
-		n.data.State.Error = lastErr
+		n.setError(lastErr)
 	}
 
 	return lastErr

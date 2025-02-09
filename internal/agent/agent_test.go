@@ -19,7 +19,7 @@ func TestAgent_Run(t *testing.T) {
 
 	t.Run("RunDAG", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.LoadDAGFile(t, "run.yaml")
+		dag := th.DAG(t, "agent/run.yaml")
 		dagAgent := dag.Agent()
 
 		dag.AssertLatestStatus(t, scheduler.StatusNone)
@@ -32,7 +32,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("DeleteOldHistory", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.LoadDAGFile(t, "delete_old_history.yaml")
+		dag := th.DAG(t, "agent/delete_old_history.yaml")
 		dagAgent := dag.Agent()
 
 		// Create a history file by running a DAG
@@ -51,7 +51,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("AlreadyRunning", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.LoadDAGFile(t, "is_running.yaml")
+		dag := th.DAG(t, "agent/is_running.yaml")
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -67,7 +67,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.LoadDAGFile(t, "multiple_steps.yaml")
+		dag := th.DAG(t, "agent/multiple_steps.yaml")
 
 		// Set a precondition that always fails
 		dag.Preconditions = []digraph.Condition{
@@ -85,7 +85,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithError", func(t *testing.T) {
 		th := test.Setup(t)
-		errDAG := th.LoadDAGFile(t, "error.yaml")
+		errDAG := th.DAG(t, "agent/error.yaml")
 		dagAgent := errDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -94,7 +94,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("FinishWithTimeout", func(t *testing.T) {
 		th := test.Setup(t)
-		timeoutDAG := th.LoadDAGFile(t, "timeout.yaml")
+		timeoutDAG := th.DAG(t, "agent/timeout.yaml")
 		dagAgent := timeoutDAG.Agent()
 		dagAgent.RunError(t)
 
@@ -103,7 +103,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("ReceiveSignal", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.LoadDAGFile(t, "sleep.yaml")
+		dag := th.DAG(t, "agent/sleep.yaml")
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -121,7 +121,7 @@ func TestAgent_Run(t *testing.T) {
 	})
 	t.Run("ExitHandler", func(t *testing.T) {
 		th := test.Setup(t)
-		dag := th.LoadDAGFile(t, "on_exit.yaml")
+		dag := th.DAG(t, "agent/on_exit.yaml")
 		dagAgent := dag.Agent()
 		dagAgent.RunSuccess(t)
 
@@ -141,7 +141,7 @@ func TestAgent_DryRun(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
 		th := test.Setup(t)
 
-		dag := th.LoadDAGFile(t, "dry.yaml")
+		dag := th.DAG(t, "agent/dry.yaml")
 		dagAgent := dag.Agent(test.WithAgentOptions(agent.Options{Dry: true}))
 
 		dagAgent.RunSuccess(t)
@@ -160,7 +160,7 @@ func TestAgent_Retry(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
 		th := test.Setup(t)
 		// retry.yaml has a DAG that fails
-		dag := th.LoadDAGFile(t, "retry.yaml")
+		dag := th.DAG(t, "agent/retry.yaml")
 		dagAgent := dag.Agent()
 
 		dagAgent.RunError(t)
@@ -192,7 +192,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.LoadDAGFile(t, "handle_http_valid.yaml")
+		dag := th.DAG(t, "agent/handle_http_valid.yaml")
 		dagAgent := dag.Agent()
 		ctx := th.Context
 		go func() {
@@ -222,7 +222,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.LoadDAGFile(t, "handle_http_invalid.yaml")
+		dag := th.DAG(t, "agent/handle_http_invalid.yaml")
 		dagAgent := dag.Agent()
 
 		go func() {
@@ -249,7 +249,7 @@ func TestAgent_HandleHTTP(t *testing.T) {
 		th := test.Setup(t)
 
 		// Start a long-running DAG
-		dag := th.LoadDAGFile(t, "handle_http_cancel.yaml")
+		dag := th.DAG(t, "agent/handle_http_cancel.yaml")
 		dagAgent := dag.Agent()
 
 		done := make(chan struct{})

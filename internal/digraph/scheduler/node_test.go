@@ -16,10 +16,186 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNode(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Execute", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCommand("true"))
+		node.Execute(t)
+	})
+	t.Run("Error", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCommand("false"))
+		node.ExecuteFail(t, "exit status 1")
+	})
+	t.Run("Signal", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCommand("sleep 3"))
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			node.Signal(node.Context, syscall.SIGTERM, false)
+		}()
+
+		node.SetStatus(scheduler.NodeStatusRunning)
+
+		node.ExecuteFail(t, "signal: terminated")
+		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
+	})
+	t.Run("SignalOnStop", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCommand("sleep 3"), withNodeSignalOnStop("SIGINT"))
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
+		}()
+
+		node.SetStatus(scheduler.NodeStatusRunning)
+
+		node.ExecuteFail(t, "signal: interrupt")
+		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
+	})
+	t.Run("LogOutput", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCommand("echo hello"))
+		node.Execute(t)
+		node.AssertLogContains(t, "hello")
+	})
+	t.Run("Stdout", func(t *testing.T) {
+		t.Parallel()
+
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
+		defer os.Remove(random)
+
+		node := setupNode(t, withNodeCommand("echo hello"), withNodeStdout(random))
+		node.Execute(t)
+
+		file := node.Data().Step.Stdout
+		dat, _ := os.ReadFile(file)
+		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
+	})
+	t.Run("Stderr", func(t *testing.T) {
+		t.Parallel()
+
+		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
+		defer os.Remove(random)
+
+		node := setupNode(t,
+			withNodeCommand("sh"),
+			withNodeStderr(random),
+			withNodeScript("echo hello >&2"),
+		)
+		node.Execute(t)
+
+		file := node.Data().Step.Stderr
+		dat, _ := os.ReadFile(file)
+		require.Equalf(t, "hello\n", string(dat), "unexpected stderr content: %s", string(dat))
+	})
+	t.Run("Output", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs("echo hello"), withNodeOutput("OUTPUT_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT_TEST", "hello")
+	})
+	t.Run("OutputJSON", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key": "value"}`)
+	})
+	t.Run("OutputJSONUnescaped", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
+	})
+	t.Run("OutputTabWithDoubleQuotes", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo "hello\tworld"`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", "hello\tworld")
+	})
+	t.Run("OutputTabWithMixedQuotes", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo hello"\t"world`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", "hello\tworld") // This behavior is aligned with bash
+	})
+	t.Run("OutputTabWithoutQuotes", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo hello\tworld`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hellotworld`) // This behavior is aligned with bash
+	})
+	t.Run("OutputNewlineCharacter", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo hello\nworld`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hellonworld`) // This behavior is aligned with bash
+	})
+	t.Run("OutputEscapedJSONWithoutQuotes", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
+	})
+	t.Run("OutputEscapedJSONWithQuotes", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
+	})
+	t.Run("OutputSingleQuotedString", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo 'hello world'`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hello world`)
+	})
+	t.Run("OutputMixedQuotesWithSpace", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo hello "world"`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hello world`)
+	})
+	t.Run("OutputNestedQuotes", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeCmdArgs(`echo 'hello "world"'`), withNodeOutput("OUTPUT"))
+		node.Execute(t)
+		node.AssertOutput(t, "OUTPUT", `hello "world"`)
+	})
+	t.Run("Script", func(t *testing.T) {
+		t.Parallel()
+
+		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
+		node.Execute(t)
+		node.AssertOutput(t, "SCRIPT_TEST", "hello")
+		// check script file is removed
+		scriptFilePath := node.ScriptFilename()
+		require.NotEmpty(t, scriptFilePath)
+		require.NoFileExists(t, scriptFilePath, "script file not removed")
+	})
+}
+
 type nodeHelper struct {
 	*scheduler.Node
 	test.Helper
-	reqID string
 }
 
 type nodeOption func(*scheduler.NodeData)
@@ -76,19 +252,20 @@ func setupNode(t *testing.T, opts ...nodeOption) nodeHelper {
 		opt(&data)
 	}
 
-	node := scheduler.NodeWithData(data)
-	reqID := uuid.Must(uuid.NewRandom()).String()
-
-	return nodeHelper{node, th, reqID}
+	return nodeHelper{
+		Helper: th,
+		Node:   scheduler.NodeWithData(data),
+	}
 }
 
 func (n nodeHelper) Execute(t *testing.T) {
 	t.Helper()
 
-	err := n.Node.Setup(n.Context, n.Config.Paths.LogDir, n.reqID)
+	reqID := reqID()
+	err := n.Node.Setup(n.Context, n.Config.Paths.LogDir, reqID)
 	require.NoError(t, err, "failed to setup node")
 
-	err = n.Node.Execute(n.execContext())
+	err = n.Node.Execute(n.execContext(reqID))
 	require.NoError(t, err, "failed to execute node")
 
 	err = n.Teardown()
@@ -98,7 +275,7 @@ func (n nodeHelper) Execute(t *testing.T) {
 func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 	t.Helper()
 
-	err := n.Node.Execute(n.execContext())
+	err := n.Node.Execute(n.execContext(reqID()))
 	require.Error(t, err, "expected error")
 	require.Contains(t, err.Error(), expectedErr, "unexpected error")
 }
@@ -120,143 +297,10 @@ func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }
 
-func (n nodeHelper) execContext() context.Context {
-	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, n.reqID, "logFile")
+func (n nodeHelper) execContext(reqID string) context.Context {
+	return digraph.NewContext(n.Context, &digraph.DAG{}, nil, reqID, "logFile")
 }
 
-func TestNode(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Execute", func(t *testing.T) {
-		node := setupNode(t, withNodeCommand("true"))
-		node.Execute(t)
-	})
-	t.Run("Error", func(t *testing.T) {
-		node := setupNode(t, withNodeCommand("false"))
-		node.ExecuteFail(t, "exit status 1")
-	})
-	t.Run("Signal", func(t *testing.T) {
-		node := setupNode(t, withNodeCommand("sleep 3"))
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			node.Signal(node.Context, syscall.SIGTERM, false)
-		}()
-
-		node.SetStatus(scheduler.NodeStatusRunning)
-
-		node.ExecuteFail(t, "signal: terminated")
-		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
-	})
-	t.Run("SignalOnStop", func(t *testing.T) {
-		node := setupNode(t, withNodeCommand("sleep 3"), withNodeSignalOnStop("SIGINT"))
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			node.Signal(node.Context, syscall.SIGTERM, true) // allow override signal
-		}()
-
-		node.SetStatus(scheduler.NodeStatusRunning)
-
-		node.ExecuteFail(t, "signal: interrupt")
-		require.Equal(t, scheduler.NodeStatusCancel.String(), node.State().Status.String())
-	})
-	t.Run("LogOutput", func(t *testing.T) {
-		node := setupNode(t, withNodeCommand("echo hello"))
-		node.Execute(t)
-		node.AssertLogContains(t, "hello")
-	})
-	t.Run("Stdout", func(t *testing.T) {
-		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
-		defer os.Remove(random)
-
-		node := setupNode(t, withNodeCommand("echo hello"), withNodeStdout(random))
-		node.Execute(t)
-
-		file := node.Data().Step.Stdout
-		dat, _ := os.ReadFile(file)
-		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
-	})
-	t.Run("Stderr", func(t *testing.T) {
-		random := path.Join(os.TempDir(), uuid.Must(uuid.NewRandom()).String())
-		defer os.Remove(random)
-
-		node := setupNode(t,
-			withNodeCommand("sh"),
-			withNodeStderr(random),
-			withNodeScript("echo hello >&2"),
-		)
-		node.Execute(t)
-
-		file := node.Data().Step.Stderr
-		dat, _ := os.ReadFile(file)
-		require.Equalf(t, "hello\n", string(dat), "unexpected stderr content: %s", string(dat))
-	})
-	t.Run("Output", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs("echo hello"), withNodeOutput("OUTPUT_TEST"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT_TEST", "hello")
-	})
-	t.Run("OutputJSON", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo '{"key": "value"}'`), withNodeOutput("OUTPUT_JSON_TEST"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key": "value"}`)
-	})
-	t.Run("OutputJSONUnescaped", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT_JSON_TEST"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT_JSON_TEST", `{"key":"value"}`)
-	})
-	t.Run("OutputTabWithDoubleQuotes", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo "hello\tworld"`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", "hello\tworld")
-	})
-	t.Run("OutputTabWithMixedQuotes", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo hello"\t"world`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", "hello\tworld") // This behavior is aligned with bash
-	})
-	t.Run("OutputTabWithoutQuotes", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo hello\tworld`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hellotworld`) // This behavior is aligned with bash
-	})
-	t.Run("OutputNewlineCharacter", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo hello\nworld`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hellonworld`) // This behavior is aligned with bash
-	})
-	t.Run("OutputEscapedJSONWithoutQuotes", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo {\"key\":\"value\"}`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
-	})
-	t.Run("OutputEscapedJSONWithQuotes", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo "{\"key\":\"value\"}"`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `{"key":"value"}`)
-	})
-	t.Run("OutputSingleQuotedString", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo 'hello world'`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hello world`)
-	})
-	t.Run("OutputMixedQuotesWithSpace", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo hello "world"`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hello world`)
-	})
-	t.Run("OutputNestedQuotes", func(t *testing.T) {
-		node := setupNode(t, withNodeCmdArgs(`echo 'hello "world"'`), withNodeOutput("OUTPUT"))
-		node.Execute(t)
-		node.AssertOutput(t, "OUTPUT", `hello "world"`)
-	})
-	t.Run("Script", func(t *testing.T) {
-		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
-		node.Execute(t)
-		node.AssertOutput(t, "SCRIPT_TEST", "hello")
-		// check script file is removed
-		scriptFilePath := node.ScriptFilename()
-		require.NotEmpty(t, scriptFilePath)
-		require.NoFileExists(t, scriptFilePath, "script file not removed")
-	})
+func reqID() string {
+	return uuid.Must(uuid.NewRandom()).String()
 }

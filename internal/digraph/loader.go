@@ -73,12 +73,12 @@ func Load(ctx context.Context, dag string, opts ...LoadOption) (*DAG, error) {
 	}
 	buildContext := BuildContext{
 		ctx: ctx,
-		opts: buildOpts{
-			base:           options.baseConfig,
-			parameters:     options.params,
-			parametersList: options.paramsList,
-			onlyMetadata:   options.onlyMetadata,
-			noEval:         options.noEval,
+		opts: BuildOpts{
+			Base:           options.baseConfig,
+			Parameters:     options.params,
+			ParametersList: options.paramsList,
+			OnlyMetadata:   options.onlyMetadata,
+			NoEval:         options.noEval,
 		},
 	}
 	return loadDAG(buildContext, dag)
@@ -90,17 +90,17 @@ func LoadYAML(ctx context.Context, data []byte, opts ...LoadOption) (*DAG, error
 	for _, opt := range opts {
 		opt(&options)
 	}
-	return loadYAML(ctx, data, buildOpts{
-		base:           options.baseConfig,
-		parameters:     options.params,
-		parametersList: options.paramsList,
-		onlyMetadata:   options.onlyMetadata,
-		noEval:         options.noEval,
+	return LoadYAMLWithOpts(ctx, data, BuildOpts{
+		Base:           options.baseConfig,
+		Parameters:     options.params,
+		ParametersList: options.paramsList,
+		OnlyMetadata:   options.onlyMetadata,
+		NoEval:         options.noEval,
 	})
 }
 
-// loadYAML loads the DAG configuration from YAML data.
-func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
+// LoadYAMLWithOpts loads the DAG configuration from YAML data.
+func LoadYAMLWithOpts(ctx context.Context, data []byte, opts BuildOpts) (*DAG, error) {
 	raw, err := unmarshalData(data)
 	if err != nil {
 		return nil, err
@@ -114,9 +114,9 @@ func loadYAML(ctx context.Context, data []byte, opts buildOpts) (*DAG, error) {
 	return build(BuildContext{ctx: ctx, opts: opts}, def)
 }
 
-// loadBaseConfig loads the global configuration from the given file.
+// LoadBaseConfig loads the global configuration from the given file.
 // The global configuration can be overridden by the DAG configuration.
-func loadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
+func LoadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 	// The base config is optional.
 	if !fileutil.FileExists(file) {
 		return nil, nil
@@ -134,7 +134,7 @@ func loadBaseConfig(ctx BuildContext, file string) (*DAG, error) {
 		return nil, err
 	}
 
-	ctx = ctx.WithOpts(buildOpts{noEval: ctx.opts.noEval}).WithFile(file)
+	ctx = ctx.WithOpts(BuildOpts{NoEval: ctx.opts.NoEval}).WithFile(file)
 	return build(ctx, def)
 }
 
@@ -147,7 +147,7 @@ func loadDAG(ctx BuildContext, dag string) (*DAG, error) {
 
 	ctx = ctx.WithFile(filePath)
 
-	dest, err := loadBaseConfigIfRequired(ctx, ctx.opts.base)
+	dest, err := loadBaseConfigIfRequired(ctx, ctx.opts.Base)
 	if err != nil {
 		return nil, err
 	}
@@ -207,8 +207,8 @@ func resolveYamlFilePath(file string) (string, error) {
 
 // loadBaseConfigIfRequired loads the base config if needed, based on the given options.
 func loadBaseConfigIfRequired(ctx BuildContext, baseConfig string) (*DAG, error) {
-	if !ctx.opts.onlyMetadata && baseConfig != "" {
-		dag, err := loadBaseConfig(ctx, baseConfig)
+	if !ctx.opts.OnlyMetadata && baseConfig != "" {
+		dag, err := LoadBaseConfig(ctx, baseConfig)
 		if err != nil {
 			// Failed to load the base config.
 			return nil, err
@@ -230,9 +230,9 @@ var _ mergo.Transformers = (*mergeTransformer)(nil)
 func (*mergeTransformer) Transformer(
 	typ reflect.Type,
 ) func(dst, src reflect.Value) error {
-	// mergo does not overwrite a value with zero value for a pointer.
+	// mergo does not override a value with zero value for a pointer.
 	if typ == reflect.TypeOf(MailOn{}) {
-		// We need to explicitly overwrite the value for a pointer with a zero
+		// We need to explicitly override the value for a pointer with a zero
 		// value.
 		return func(dst, src reflect.Value) error {
 			if dst.CanSet() {

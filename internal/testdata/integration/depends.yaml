@@ -1,0 +1,6 @@
+steps:
+  - name: "1"
+    command: "echo 1"
+  - name: "2"
+    depends: "1"
+    command: "echo 2"

@@ -239,7 +239,7 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 	}
 
 	// Copy headers from the original request if needed
-	// But we need to overwrite authorization headers
+	// But we need to override authorization headers
 	if node.IsBasicAuth {
 		req.SetBasicAuth(node.BasicAuthUsername, node.BasicAuthPassword)
 	} else if node.IsAuthToken {

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -38,15 +37,14 @@ func bindFlags(cmd *cobra.Command, _ []string) error {
 }
 
 func runServer(cmd *cobra.Command, _ []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-	setup := newSetup(cfg)
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
-	logger.Info(ctx, "Server initialization", "host", cfg.Host, "port", cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", setup.cfg.Host, "port", setup.cfg.Port)
 
 	server, err := setup.server(ctx)
 	if err != nil {

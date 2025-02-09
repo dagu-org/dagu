@@ -10,12 +10,12 @@ func TestDryCommand(t *testing.T) {
 		tests := []cmdTest{
 			{
 				name:        "DryRunDAG",
-				args:        []string{"dry", th.DAGFile("success.yaml").Path},
+				args:        []string{"dry", th.DAG(t, "cmd/dry.yaml").Location},
 				expectedOut: []string{"Dry-run finished"},
 			},
 			{
 				name:        "DryRunDAGWithParamsAfterDash",
-				args:        []string{"dry", th.DAGFile("params.yaml").Path, "--", "p5", "p6"},
+				args:        []string{"dry", th.DAG(t, "cmd/dry_with_params.yaml").Location, "--", "p5", "p6"},
 				expectedOut: []string{`[p5 p6]`},
 			},
 		}

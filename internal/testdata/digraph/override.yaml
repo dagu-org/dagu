@@ -1,5 +1,6 @@
 mailOn:
   failure: false
+  success: true
 
 histRetentionDays: 7
 

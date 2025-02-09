@@ -39,14 +39,14 @@ func loadVariables(ctx BuildContext, strVariables any) (
 	for _, pair := range pairs {
 		value := pair.val
 
-		if !ctx.opts.noEval {
+		if !ctx.opts.NoEval {
 			// Evaluate the value of the environment variable.
 			// This also executes command substitution.
 			var err error
 
 			value, err = cmdutil.EvalString(ctx.ctx, value)
 			if err != nil {
-				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", errInvalidEnvValue, pair.val))
+				return nil, wrapError("env", pair.val, fmt.Errorf("%w: %s", ErrInvalidEnvValue, pair.val))
 			}
 
 			if err := os.Setenv(pair.key, value); err != nil {
@@ -71,7 +71,7 @@ func parseKeyValue(m map[any]any, pairs *[]pair) error {
 	for k, v := range m {
 		key, ok := k.(string)
 		if !ok {
-			return wrapError("env", k, errInvalidKeyType)
+			return wrapError("env", k, ErrInvalidKeyType)
 		}
 
 		var val string

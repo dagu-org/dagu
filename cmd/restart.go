@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/client"
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -35,11 +34,10 @@ func restartCmd() *cobra.Command {
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-	setup := newSetup(cfg)
 
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -51,7 +49,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	specFilePath := args[0]
 
 	// Load initial DAG configuration
-	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(cfg.Paths.BaseConfig))
+	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)

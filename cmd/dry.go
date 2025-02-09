@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/dagu-org/dagu/internal/agent"
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/spf13/cobra"
 )
@@ -25,11 +24,10 @@ func dryCmd() *cobra.Command {
 }
 
 func runDry(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-	setup := newSetup(cfg)
 
 	cmd.Flags().StringP("params", "p", "", "parameters")
 

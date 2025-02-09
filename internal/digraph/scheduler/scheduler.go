@@ -121,17 +121,6 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				continue NodesIteration
 			}
 
-			// Check preconditions
-			if len(node.data.Step.Preconditions) > 0 {
-				logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.data.Step.Name)
-				if err := digraph.EvalConditions(ctx, node.data.Step.Preconditions); err != nil {
-					logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.data.Step.Name)
-					node.SetStatus(NodeStatusSkipped)
-					node.setError(err)
-					continue NodesIteration
-				}
-			}
-
 			wg.Add(1)
 
 			logger.Info(ctx, "Step execution started", "step", node.data.Step.Name)
@@ -153,6 +142,20 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				}()
 
 				ctx = sc.setupContext(ctx, graph, node)
+
+				// Check preconditions
+				if len(node.data.Step.Preconditions) > 0 {
+					logger.Infof(ctx, "Checking pre conditions for \"%s\"", node.data.Step.Name)
+					if err := digraph.EvalConditions(ctx, node.data.Step.Preconditions); err != nil {
+						logger.Infof(ctx, "Pre conditions failed for \"%s\"", node.data.Step.Name)
+						node.SetStatus(NodeStatusSkipped)
+						node.setError(err)
+						if done != nil {
+							done <- node
+						}
+						return
+					}
+				}
 
 				setupSucceed := true
 				if err := sc.setupNode(ctx, node); err != nil {
@@ -292,6 +295,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 func (sc *Scheduler) setLastError(err error) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
+
 	sc.lastError = err
 }
 

@@ -28,7 +28,7 @@ func parseFuncCall(step *Step, call *callFuncDef, funcs []*funcDef) error {
 			continue
 		}
 
-		return errArgsMustBeConvertibleToIntOrString
+		return ErrArgsMustBeConvertibleToIntOrString
 	}
 
 	calledFuncDef := &funcDef{}

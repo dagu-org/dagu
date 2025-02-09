@@ -17,10 +17,8 @@ func TestOpenLogFile(t *testing.T) {
 	t.Run("successful log file creation", func(t *testing.T) {
 		tempDir := t.TempDir() // Using t.TempDir() for automatic cleanup
 
-		setup := newSetup(&config.Config{
-			Paths: config.PathsConfig{
-				LogDir: tempDir,
-			},
+		setup := setupWithConfig(&config.Config{
+			Paths: config.PathsConfig{LogDir: tempDir},
 		})
 
 		ctx := setup.loggerContext(context.Background(), false)

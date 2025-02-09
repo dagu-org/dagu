@@ -12,6 +12,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
@@ -90,9 +91,14 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	return nil
 }
 
-func (e *client) Stop(_ context.Context, dag *digraph.DAG) error {
-	// TODO: fix this not to connect to the DAG directly
-	client := sock.NewClient(dag.SockAddr())
+func (e *client) Stop(ctx context.Context, dag *digraph.DAG) error {
+	logger.Info(ctx, "Stopping", "name", dag.Name)
+	addr := dag.SockAddr()
+	if !fileutil.FileExists(addr) {
+		logger.Info(ctx, "The DAG is not running", "name", dag.Name)
+		return nil
+	}
+	client := sock.NewClient(addr)
 	_, err := client.Request("POST", "/stop")
 	return err
 }

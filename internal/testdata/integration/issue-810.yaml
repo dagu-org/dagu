@@ -1,0 +1,30 @@
+params: bar
+steps:
+  - name: step1
+    command: echo start
+    output: OUT1 # "start"
+  - name: foo
+    command: echo foo
+    depends:
+      - step1
+    output: OUT2 # "foo"
+    preconditions:
+      - condition: $OUT1 # should be "start"
+        expected: start
+  - name: bar
+    command: echo bar
+    depends:
+      - step1
+    output: OUT3 # "bar"
+    preconditions:
+      - condition: "$1" # should be "bar"
+        expected: bar
+  - name: baz
+    command: echo baz
+    depends:
+      - foo
+      - bar
+    output: OUT4 # "baz"
+    preconditions:
+      - condition: "$1" # should be "bar"
+        expected: bar

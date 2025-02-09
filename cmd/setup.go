@@ -43,7 +43,16 @@ type setup struct {
 	cfg *config.Config
 }
 
-func newSetup(cfg *config.Config) *setup {
+func createSetup() (*setup, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	return &setup{cfg: cfg}, nil
+}
+
+func setupWithConfig(cfg *config.Config) *setup {
 	return &setup{cfg: cfg}
 }
 

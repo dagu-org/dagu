@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,20 +28,19 @@ func schedulerCmd() *cobra.Command {
 }
 
 func runScheduler(cmd *cobra.Command, _ []string) error {
-	cfg, err := config.Load()
+	setup, err := createSetup()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create setup: %w", err)
 	}
-	setup := newSetup(cfg)
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
 	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
-		cfg.Paths.DAGsDir = dagsDir
+		setup.cfg.Paths.DAGsDir = dagsDir
 	}
 
-	logger.Info(ctx, "Scheduler initialization", "specsDirectory", cfg.Paths.DAGsDir, "logFormat", cfg.LogFormat)
+	logger.Info(ctx, "Scheduler initialization", "specsDirectory", setup.cfg.Paths.DAGsDir, "logFormat", setup.cfg.LogFormat)
 
 	scheduler, err := setup.scheduler()
 	if err != nil {
@@ -51,7 +49,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 
 	if err := scheduler.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
-			cfg.Paths.DAGsDir, err)
+			setup.cfg.Paths.DAGsDir, err)
 	}
 
 	return nil

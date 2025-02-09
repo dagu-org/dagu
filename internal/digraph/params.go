@@ -29,13 +29,13 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 	}
 	dag.DefaultParams = strings.Join(paramsToJoin, " ")
 
-	if ctx.opts.parameters != "" {
+	if ctx.opts.Parameters != "" {
 		// Parse the parameters from the command line and override the default parameters
 		var (
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.parameters, &overridePairs, &overrideEnvs); err != nil {
+		if err := parseParams(ctx, ctx.opts.Parameters, &overridePairs, &overrideEnvs); err != nil {
 			return err
 		}
 		// Override the default parameters with the command line parameters
@@ -43,12 +43,12 @@ func buildParams(ctx BuildContext, spec *definition, dag *DAG) error {
 		overrideEnvirons(&envs, overrideEnvs)
 	}
 
-	if len(ctx.opts.parametersList) > 0 {
+	if len(ctx.opts.ParametersList) > 0 {
 		var (
 			overridePairs []paramPair
 			overrideEnvs  []string
 		)
-		if err := parseParams(ctx, ctx.opts.parametersList, &overridePairs, &overrideEnvs); err != nil {
+		if err := parseParams(ctx, ctx.opts.ParametersList, &overridePairs, &overrideEnvs); err != nil {
 			return err
 		}
 		// Override the default parameters with the command line parameters
@@ -112,11 +112,11 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 
 	paramPairs, err := parseParamValue(ctx, value)
 	if err != nil {
-		return wrapError("params", value, fmt.Errorf("%w: %s", errInvalidParamValue, err))
+		return wrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 	}
 
 	for index, paramPair := range paramPairs {
-		if !ctx.opts.noEval {
+		if !ctx.opts.NoEval {
 			paramPair.Value = os.ExpandEnv(paramPair.Value)
 		}
 
@@ -130,7 +130,7 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 			return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
 		}
 
-		if !ctx.opts.noEval && paramPair.Name != "" {
+		if !ctx.opts.NoEval && paramPair.Name != "" {
 			*envs = append(*envs, paramString)
 			if err := os.Setenv(paramPair.Name, paramPair.Value); err != nil {
 				return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
@@ -156,8 +156,11 @@ func parseParamValue(ctx BuildContext, input any) ([]paramPair, error) {
 	case []string:
 		return parseListParams(ctx, v)
 
+	case map[any]any:
+		return parseMapParams(ctx, []any{v})
+
 	default:
-		return nil, wrapError("params", v, fmt.Errorf("%w: %T", errInvalidParamValue, v))
+		return nil, wrapError("params", v, fmt.Errorf("%w: %T", ErrInvalidParamValue, v))
 
 	}
 }
@@ -198,7 +201,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 					valueStr = v
 
 				default:
-					return nil, wrapError("params", value, fmt.Errorf("%w: %T", errInvalidParamValue, v))
+					valueStr = fmt.Sprintf("%v", v)
 
 				}
 
@@ -207,14 +210,14 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 					nameStr = n
 
 				default:
-					return nil, wrapError("params", name, fmt.Errorf("%w: %T", errInvalidParamValue, n))
+					return nil, wrapError("params", name, fmt.Errorf("%w: %T", ErrInvalidParamValue, n))
 
 				}
 
-				if !ctx.opts.noEval {
+				if !ctx.opts.NoEval {
 					parsed, err := cmdutil.EvalString(ctx.ctx, valueStr)
 					if err != nil {
-						return nil, wrapError("params", valueStr, fmt.Errorf("%w: %s", errInvalidParamValue, err))
+						return nil, wrapError("params", valueStr, fmt.Errorf("%w: %s", ErrInvalidParamValue, err))
 					}
 					valueStr = parsed
 				}
@@ -224,7 +227,7 @@ func parseMapParams(ctx BuildContext, input []any) ([]paramPair, error) {
 			}
 
 		default:
-			return nil, wrapError("params", m, fmt.Errorf("%w: %T", errInvalidParamValue, m))
+			return nil, wrapError("params", m, fmt.Errorf("%w: %T", ErrInvalidParamValue, m))
 		}
 	}
 
@@ -251,7 +254,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				value = strings.ReplaceAll(value, `\"`, `"`)
 			}
 
-			if !ctx.opts.noEval {
+			if !ctx.opts.NoEval {
 				// Perform backtick command substitution
 				backtickRegex := regexp.MustCompile("`[^`]*`")
 
@@ -272,7 +275,7 @@ func parseStringParams(ctx BuildContext, input string) ([]paramPair, error) {
 				)
 
 				if cmdErr != nil {
-					return nil, wrapError("params", value, fmt.Errorf("%w: %s", errInvalidParamValue, cmdErr))
+					return nil, wrapError("params", value, fmt.Errorf("%w: %s", ErrInvalidParamValue, cmdErr))
 				}
 			}
 		}

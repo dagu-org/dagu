@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"testing"
@@ -36,18 +37,16 @@ func init() {
 }
 
 // TestHelperOption defines functional options for Helper
-type TestHelperOption func(*Helper)
+type TestHelperOption func(*TestOptions)
+
+type TestOptions struct {
+	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
+}
 
 // WithCaptureLoggingOutput creates a logging capture option
 func WithCaptureLoggingOutput() TestHelperOption {
-	return func(h *Helper) {
-		h.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
-		loggerInstance := logger.NewLogger(
-			logger.WithDebug(),
-			logger.WithFormat("text"),
-			logger.WithWriter(h.LoggingOutput),
-		)
-		h.Context = logger.WithFixedLogger(h.Context, loggerInstance)
+	return func(opts *TestOptions) {
+		opts.CaptureLoggingOutput = true
 	}
 }
 
@@ -55,6 +54,11 @@ func WithCaptureLoggingOutput() TestHelperOption {
 func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	setupLock.Lock()
 	defer setupLock.Unlock()
+
+	var options TestOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
@@ -84,8 +88,14 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		tmpDir: tmpDir,
 	}
 
-	for _, opt := range opts {
-		opt(&helper)
+	if options.CaptureLoggingOutput {
+		helper.LoggingOutput = &SyncBuffer{buf: new(bytes.Buffer)}
+		loggerInstance := logger.NewLogger(
+			logger.WithDebug(),
+			logger.WithFormat("text"),
+			logger.WithWriter(helper.LoggingOutput),
+		)
+		helper.Context = logger.WithFixedLogger(helper.Context, loggerInstance)
 	}
 
 	// setup the default shell for reproducible result
@@ -93,14 +103,6 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 
 	t.Cleanup(helper.Cleanup)
 	return helper
-}
-
-func setShell(t *testing.T, shell string) {
-	t.Helper()
-
-	shPath, err := exec.LookPath(shell)
-	require.NoError(t, err, "failed to find shell")
-	os.Setenv("SHELL", shPath)
 }
 
 // Helper provides test utilities and configuration
@@ -120,17 +122,27 @@ func (h Helper) Cleanup() {
 	_ = os.RemoveAll(h.tmpDir)
 }
 
-func (h Helper) LoadDAGFile(t *testing.T, filename string) DAG {
+// DAG loads a test DAG from the testdata directory
+func (h Helper) DAG(t *testing.T, name string) DAG {
 	t.Helper()
 
-	filePath := filepath.Join(fileutil.MustGetwd(), "testdata", filename)
+	filePath := TestdataPath(t, name)
 	dag, err := digraph.Load(h.Context, filePath)
-	require.NoError(t, err)
+	require.NoError(t, err, "failed to load test DAG %q", name)
 
 	return DAG{
 		Helper: &h,
 		DAG:    dag,
 	}
+}
+
+func (h Helper) DAGExpectError(t *testing.T, name string, expectedErr string) {
+	t.Helper()
+
+	filePath := TestdataPath(t, name)
+	_, err := digraph.Load(h.Context, filePath)
+	require.Error(t, err, "expected error loading test DAG %q", name)
+	require.Contains(t, err.Error(), expectedErr, "expected error %q, got %q", expectedErr, err.Error())
 }
 
 type DAG struct {
@@ -141,13 +153,18 @@ type DAG struct {
 func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var latestStatusValue scheduler.Status
+	var status scheduler.Status
+	var lock sync.Mutex
+
 	assert.Eventually(t, func() bool {
-		latestStatus, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+		lock.Lock()
+		defer lock.Unlock()
+
+		latest, err := d.Client.GetLatestStatus(d.Context, d.DAG)
 		require.NoError(t, err)
-		latestStatusValue = latestStatus.Status
-		return latestStatus.Status == expected
-	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, latestStatusValue)
+		status = latest.Status
+		return latest.Status == expected
+	}, time.Second*3, time.Millisecond*50, "expected latest status to be %q, got %q", expected, status)
 }
 
 func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
@@ -162,13 +179,49 @@ func (d *DAG) AssertHistoryCount(t *testing.T, expected int) {
 func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	t.Helper()
 
-	var lastCurrentStatus scheduler.Status
-	assert.Eventuallyf(t, func() bool {
-		currentStatus, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
+	var status scheduler.Status
+	var lock sync.Mutex
+
+	assert.Eventually(t, func() bool {
+		lock.Lock()
+		defer lock.Unlock()
+
+		curr, err := d.Client.GetCurrentStatus(d.Context, d.DAG)
 		require.NoError(t, err)
-		lastCurrentStatus = currentStatus.Status
-		return currentStatus.Status == expected
-	}, time.Second*2, time.Millisecond*50, "expected current status to be %q, got %q", expected, lastCurrentStatus)
+		status = curr.Status
+		return curr.Status == expected
+	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)
+}
+
+// AssertOutputs checks the given outputs against the actual outputs of the DAG
+// Note that this function does not respect dependencies between nodes
+// making the outputs with the same key indeterministic
+func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]string) {
+	t.Helper()
+
+	status, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+	require.NoError(t, err)
+
+	// collect the actual outputs from the status
+	var actualOutputs = make(map[string]string)
+	for _, node := range status.Nodes {
+		if node.Step.OutputVariables == nil {
+			continue
+		}
+		value, ok := node.Step.OutputVariables.Load(node.Step.Output)
+		if ok {
+			actualOutputs[node.Step.Output] = value.(string)
+		}
+	}
+
+	// compare the actual outputs with the expected outputs
+	for key, expected := range outputs {
+		if actual, ok := actualOutputs[key]; ok {
+			assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
+		} else {
+			t.Errorf("expected output %q not found", key)
+		}
+	}
 }
 
 type AgentOption func(*Agent)
@@ -205,14 +258,6 @@ func (d *DAG) Agent(opts ...AgentOption) *Agent {
 	)
 
 	return helper
-}
-
-func genRequestID() string {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		panic(err)
-	}
-	return id.String()
 }
 
 type Agent struct {
@@ -256,10 +301,10 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	t.Helper()
 
 	err := a.Agent.Run(a.Context)
-	assert.NoError(t, err)
+	assert.NoError(t, err, "failed to run agent")
 
 	status := a.Agent.Status().Status
-	require.Equal(t, scheduler.StatusSuccess.String(), status.String())
+	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
 }
 
 func (a *Agent) Abort() {
@@ -291,4 +336,51 @@ func createDefaultContext() context.Context {
 		logger.WithDebug(),
 		logger.WithFormat("text"),
 	))
+}
+
+func setShell(t *testing.T, shell string) {
+	t.Helper()
+
+	shPath, err := exec.LookPath(shell)
+	require.NoError(t, err, "failed to find shell")
+	os.Setenv("SHELL", shPath)
+}
+
+func genRequestID() string {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		panic(err)
+	}
+	return id.String()
+}
+
+// TestdataPath returns the path to a testdata file.
+func TestdataPath(t *testing.T, filename string) string {
+	t.Helper()
+
+	rootDir := getProjectRoot(t)
+	return filepath.Join(rootDir, "internal", "testdata", filename)
+}
+
+// ReadTestdata reads the content of a testdata file.
+func ReadTestdata(t *testing.T, filename string) []byte {
+	t.Helper()
+
+	path := TestdataPath(t, filename)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "failed to read testdata file %q", filename)
+
+	return data
+}
+
+// getProjectRoot returns the root directory of the project.
+// This allows to read testdata files from the testdata directory.
+func getProjectRoot(t *testing.T) string {
+	t.Helper()
+
+	_, filename, _, ok := runtime.Caller(1)
+	require.True(t, ok, "failed to get caller information")
+	rootDir := filepath.Join(filepath.Dir(filename), "..", "..")
+
+	return filepath.Clean(rootDir)
 }

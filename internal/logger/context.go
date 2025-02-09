@@ -22,7 +22,6 @@ func FromContext(ctx context.Context) Logger {
 	}
 	value := ctx.Value(contextKey{})
 	if value == nil {
-		defaultLogger.Warn("logger not found in the context")
 		return defaultLogger
 	}
 	return value.(Logger)

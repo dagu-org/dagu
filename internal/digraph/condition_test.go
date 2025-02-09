@@ -1,30 +1,31 @@
-package digraph
+package digraph_test
 
 import (
 	"context"
 	"os"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCondition_Eval(t *testing.T) {
 	tests := []struct {
 		name      string
-		condition []Condition
+		condition []digraph.Condition
 		wantErr   bool
 	}{
 		{
 			name:      "CommandSubstitution",
-			condition: []Condition{{Condition: "`echo 1`", Expected: "1"}},
+			condition: []digraph.Condition{{Condition: "`echo 1`", Expected: "1"}},
 		},
 		{
 			name:      "EnvVar",
-			condition: []Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
+			condition: []digraph.Condition{{Condition: "${TEST_CONDITION}", Expected: "100"}},
 		},
 		{
 			name: "MultipleCond",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -37,7 +38,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "MultipleCondOneMet",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Condition: "`echo 1`",
 					Expected:  "1",
@@ -51,7 +52,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "CommandResultMet",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Command: "true",
 				},
@@ -59,7 +60,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "CommandResultNotMet",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Command: "false",
 				},
@@ -68,7 +69,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "ComplexCommand",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Command: "test 1 -eq 1",
 				},
@@ -76,7 +77,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "EvenMoreComplexCommand",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Command: "df / | awk 'NR==2 {exit $4 > 5000 ? 0 : 1}'",
 				},
@@ -84,7 +85,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "CommandResultTest",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Command: "test 1 -eq 1",
 				},
@@ -92,7 +93,7 @@ func TestCondition_Eval(t *testing.T) {
 		},
 		{
 			name: "RegexMatch",
-			condition: []Condition{
+			condition: []digraph.Condition{
 				{
 					Condition: "test",
 					Expected:  "re:^test$",
@@ -109,10 +110,10 @@ func TestCondition_Eval(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := EvalConditions(context.Background(), tt.condition)
+			err := digraph.EvalConditions(context.Background(), tt.condition)
 			require.Equal(t, tt.wantErr, err != nil)
 			if err != nil {
-				require.ErrorIs(t, err, ErrConditionNotMet)
+				require.ErrorIs(t, err, digraph.ErrConditionNotMet)
 			}
 		})
 	}

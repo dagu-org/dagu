@@ -1,4 +1,4 @@
-package digraph
+package digraph_test
 
 import (
 	"context"
@@ -6,111 +6,128 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_Load(t *testing.T) {
-	tests := []struct {
-		name             string
-		file             string
-		expectedError    string
-		expectedLocation string
-	}{
-		{
-			name:             "WithExt",
-			file:             filepath.Join(testdataDir, "loader_test.yaml"),
-			expectedLocation: filepath.Join(testdataDir, "loader_test.yaml"),
-		},
-		{
-			name:             "WithoutExt",
-			file:             filepath.Join(testdataDir, "loader_test"),
-			expectedLocation: filepath.Join(testdataDir, "loader_test.yaml"),
-		},
-		{
-			name:          "InvalidPath",
-			file:          filepath.Join(testdataDir, "not_existing_file.yaml"),
-			expectedError: "no such file or directory",
-		},
-		{
-			name:          "InvalidDAG",
-			file:          filepath.Join(testdataDir, "err_decode.yaml"),
-			expectedError: "has invalid keys: invalidkey",
-		},
-		{
-			name:          "InvalidYAML",
-			file:          filepath.Join(testdataDir, "err_parse.yaml"),
-			expectedError: "cannot unmarshal",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dag, err := Load(context.Background(), tt.file)
-			if tt.expectedError != "" {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedLocation, dag.Location)
-			}
-		})
-	}
-}
+func TestLoad(t *testing.T) {
+	t.Parallel()
 
-func Test_LoadMetadata(t *testing.T) {
-	t.Run("Metadata", func(t *testing.T) {
-		filePath := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load(context.Background(), filePath, OnlyMetadata(), WithoutEval())
+	t.Run(("WithExt"), func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test"))
+		_, err := digraph.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+	})
+	t.Run(("WithoutExt"), func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test.yaml"))
+		_, err := digraph.Load(context.Background(), testDAG)
+		require.NoError(t, err)
+	})
+	t.Run("InvalidPath", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "not_existing_file.yaml"))
+		_, err := digraph.Load(context.Background(), testDAG)
+		require.Error(t, err)
+	})
+	t.Run("UnknownField", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "err_decode.yaml"))
+		_, err := digraph.Load(context.Background(), testDAG)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "has invalid keys: invalidKey")
+	})
+	t.Run("InvalidYAML", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "err_parse.yaml"))
+		_, err := digraph.Load(context.Background(), testDAG)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "cannot unmarshal")
+	})
+	t.Run("MetadataOnly", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "loader_test.yaml"))
+		dag, err := digraph.Load(context.Background(), testDAG, digraph.OnlyMetadata())
+		require.NoError(t, err)
+		require.Empty(t, dag.Steps)
+		// Check if the metadata is loaded correctly
+		require.Equal(t, "loader_test", dag.Name)
+		require.Len(t, dag.Steps, 0)
+	})
+	t.Run("DefaultConfig", func(t *testing.T) {
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "default.yaml"))
+		dag, err := digraph.Load(context.Background(), testDAG)
+
 		require.NoError(t, err)
 
-		require.Equal(t, dag.Name, "default")
-		// Check if steps are empty since we are loading metadata only
-		require.True(t, len(dag.Steps) == 0)
+		// DAG level
+		assert.Equal(t, "", dag.LogDir)
+		assert.Equal(t, testDAG, dag.Location)
+		assert.Equal(t, "default", dag.Name)
+		assert.Equal(t, time.Second*60, dag.MaxCleanUpTime)
+		assert.Equal(t, 30, dag.HistRetentionDays)
+
+		// Step level
+		require.Len(t, dag.Steps, 1)
+		assert.Equal(t, "1", dag.Steps[0].Name, "1")
+		assert.Equal(t, "true", dag.Steps[0].Command, "true")
+		assert.Equal(t, filepath.Dir(testDAG), dag.Steps[0].Dir)
+	})
+	t.Run("OverrideConfig", func(t *testing.T) {
+		t.Parallel()
+
+		// Base config has the following values:
+		// MailOn: {Failure: true, Success: false}
+		base := test.TestdataPath(t, filepath.Join("digraph", "base.yaml"))
+		// Overwrite the base config with the following values:
+		// MailOn: {Failure: false, Success: true}
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "override.yaml"))
+		dag, err := digraph.Load(context.Background(), testDAG, digraph.WithBaseConfig(base))
+		require.NoError(t, err)
+
+		// Check if the MailOn values are overwritten
+		assert.False(t, dag.MailOn.Failure)
+		assert.True(t, dag.MailOn.Success)
 	})
 }
 
-func Test_loadBaseConfig(t *testing.T) {
+func TestLoadBaseConfig(t *testing.T) {
+	t.Parallel()
+
 	t.Run("LoadBaseConfigFile", func(t *testing.T) {
-		dag, err := loadBaseConfig(BuildContext{}, filepath.Join(testdataDir, "base.yaml"))
+		t.Parallel()
+
+		testDAG := test.TestdataPath(t, filepath.Join("digraph", "base.yaml"))
+		dag, err := digraph.LoadBaseConfig(digraph.BuildContext{}, testDAG)
 		require.NotNil(t, dag)
 		require.NoError(t, err)
 	})
 }
 
-func Test_LoadDefaultConfig(t *testing.T) {
-	t.Run("DefaultConfigWithoutBaseConfig", func(t *testing.T) {
-		filePath := filepath.Join(testdataDir, "default.yaml")
-		dag, err := Load(context.Background(), filePath)
+func TestLoadYAML(t *testing.T) {
+	t.Parallel()
 
-		require.NoError(t, err)
-
-		// Check if the default values are set correctly
-		assert.Equal(t, "", dag.LogDir)
-		assert.Equal(t, filePath, dag.Location)
-		assert.Equal(t, "default", dag.Name)
-		assert.Equal(t, time.Second*60, dag.MaxCleanUpTime)
-		assert.Equal(t, 30, dag.HistRetentionDays)
-
-		// Check if the steps are loaded correctly
-		require.Len(t, dag.Steps, 1)
-		assert.Equal(t, "1", dag.Steps[0].Name, "1")
-		assert.Equal(t, "true", dag.Steps[0].Command, "true")
-		assert.Equal(t, filepath.Dir(filePath), dag.Steps[0].Dir)
-	})
-}
-
-const (
-	testDAG = `
+	const testDAG = `
 name: test DAG
 steps:
   - name: "1"
     command: "true"
 `
-)
-
-func Test_LoadYAML(t *testing.T) {
 	t.Run("ValidYAMLData", func(t *testing.T) {
-		ret, err := loadYAML(context.Background(), []byte(testDAG), buildOpts{})
+		t.Parallel()
+
+		ret, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(testDAG), digraph.BuildOpts{})
 		require.NoError(t, err)
 		require.Equal(t, ret.Name, "test DAG")
 
@@ -119,7 +136,9 @@ func Test_LoadYAML(t *testing.T) {
 		require.Equal(t, step.Command, "true")
 	})
 	t.Run("InvalidYAMLData", func(t *testing.T) {
-		_, err := loadYAML(context.Background(), []byte(`invalidyaml`), buildOpts{})
+		t.Parallel()
+
+		_, err := digraph.LoadYAMLWithOpts(context.Background(), []byte(`invalid`), digraph.BuildOpts{})
 		require.Error(t, err)
 	})
 }
