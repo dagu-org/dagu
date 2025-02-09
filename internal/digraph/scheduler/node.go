@@ -643,7 +643,7 @@ func (n *Node) Teardown() error {
 		_ = os.Remove(n.scriptFile.Name())
 	}
 	if lastErr != nil {
-		n.data.State.Error = lastErr
+		n.setError(lastErr)
 	}
 
 	return lastErr
