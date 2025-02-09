@@ -3,10 +3,5 @@ params:
 steps:
   - name: step 1
     script: |
-      value=""
-      for i in {1..3}; do
-        # $i is a bash variable
-        value="$value $i"
-      done
-      echo $value # 1 2 3
+      echo 1 2 3
     output: OUT1
