@@ -46,6 +46,35 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name: "Script",
+			dag:  "script.yaml",
+			expectedOutputs: map[string]string{
+				"OUT1": "1 2 3",
+			},
+		},
+		{
+			name: "RegexPrecondition",
+			dag:  "precondition-regex.yaml",
+			expectedOutputs: map[string]string{
+				"OUT1": "abc run def",
+				"OUT2": "match",
+			},
+		},
+		{
+			name: "Json",
+			dag:  "json.yaml",
+			expectedOutputs: map[string]string{
+				"OUT1": "Starting server at localhost:8080",
+			},
+		},
+		{
+			name: "EnvironmentVar",
+			dag:  "environment-var.yaml",
+			expectedOutputs: map[string]string{
+				"OUT1": "foo",
+			},
+		},
+		{
 			name: "issue-810",
 			dag:  "issue-810.yaml",
 			expectedOutputs: map[string]string{

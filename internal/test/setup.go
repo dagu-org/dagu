@@ -301,10 +301,10 @@ func (a *Agent) RunSuccess(t *testing.T) {
 	t.Helper()
 
 	err := a.Agent.Run(a.Context)
-	assert.NoError(t, err)
+	assert.NoError(t, err, "failed to run agent")
 
 	status := a.Agent.Status().Status
-	require.Equal(t, scheduler.StatusSuccess.String(), status.String())
+	require.Equal(t, scheduler.StatusSuccess.String(), status.String(), "expected status %q, got %q", scheduler.StatusSuccess, status)
 }
 
 func (a *Agent) Abort() {

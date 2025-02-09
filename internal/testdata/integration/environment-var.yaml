@@ -1,0 +1,18 @@
+env:
+  - DATA_DIR: /tmp/dagu_test_integration
+  - PROCESS_DATE: "`date '+%Y%m%d_%H%M%S'`"
+
+steps:
+  - name: output file
+    command: echo foo
+    stdout: "${DATA_DIR}_${PROCESS_DATE}"
+  - name: make tmp file
+    command: cat ${DATA_DIR}_${PROCESS_DATE}
+    output: OUT1
+    depends: output file
+    precondition:
+      - condition: "${DATA_DIR}_${PROCESS_DATE}"
+        expected: "re:[0-9]{8}_[0-9]{6}"
+  - name: cleanup
+    command: rm ${DATA_DIR}_${PROCESS_DATE}
+    depends: make tmp file
