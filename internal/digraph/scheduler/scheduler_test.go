@@ -12,7 +12,6 @@ import (
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -1107,7 +1106,3 @@ func (sr scheduleResult) Node(t *testing.T, stepName string) *scheduler.Node {
 	t.Fatalf("step %s not found", stepName)
 	return nil
 }
-
-// testScript is a shell script that fails if the file with the name of
-// the first argument does not exist
-var testScript = filepath.Join(fileutil.MustGetwd(), "testdata/testfile.sh")
