@@ -12,14 +12,24 @@ func TestIntegration(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
-		name string
-		dag  string
+		name            string
+		dag             string
+		expectedOutputs map[string]string
 	}
 
 	testCases := []testCase{
 		{
 			name: "Depends",
 			dag:  "depends.yaml",
+		},
+		{
+			name: "issue-810",
+			dag:  "issue-810.yaml",
+			expectedOutputs: map[string]string{
+				"OUT1": "start",
+				"OUT2": "foo",
+				"OUT3": "bar",
+			},
 		},
 	}
 
@@ -34,6 +44,7 @@ func TestIntegration(t *testing.T) {
 			agent.RunSuccess(t)
 
 			dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+			dag.AssertOutputs(t, tc.expectedOutputs)
 		})
 	}
 }

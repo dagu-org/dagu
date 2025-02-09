@@ -193,6 +193,37 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 	}, time.Second*3, time.Millisecond*50, "expected current status to be %q, got %q", expected, status)
 }
 
+// AssertOutputs checks the given outputs against the actual outputs of the DAG
+// Note that this function does not respect dependencies between nodes
+// making the outputs with the same key indeterministic
+func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]string) {
+	t.Helper()
+
+	status, err := d.Client.GetLatestStatus(d.Context, d.DAG)
+	require.NoError(t, err)
+
+	// collect the actual outputs from the status
+	var actualOutputs = make(map[string]string)
+	for _, node := range status.Nodes {
+		if node.Step.OutputVariables == nil {
+			continue
+		}
+		value, ok := node.Step.OutputVariables.Load(node.Step.Output)
+		if ok {
+			actualOutputs[node.Step.Output] = value.(string)
+		}
+	}
+
+	// compare the actual outputs with the expected outputs
+	for key, expected := range outputs {
+		if actual, ok := actualOutputs[key]; ok {
+			assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
+		} else {
+			t.Errorf("expected output %q not found", key)
+		}
+	}
+}
+
 type AgentOption func(*Agent)
 
 func WithAgentOptions(options agent.Options) AgentOption {
