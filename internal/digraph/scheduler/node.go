@@ -292,14 +292,18 @@ func (n *Node) getBoolVariable(key string) (bool, bool) {
 
 func (n *Node) setBoolVariable(key string, value bool) {
 	if n.data.Step.OutputVariables == nil {
+		n.mu.Lock()
 		n.data.Step.OutputVariables = &digraph.SyncMap{}
+		n.mu.Unlock()
 	}
 	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
 func (n *Node) setVariable(key, value string) {
 	if n.data.Step.OutputVariables == nil {
+		n.mu.Lock()
 		n.data.Step.OutputVariables = &digraph.SyncMap{}
+		n.mu.Unlock()
 	}
 	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
