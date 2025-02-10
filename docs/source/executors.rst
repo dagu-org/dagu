@@ -63,9 +63,9 @@ For example:
           config:
             image: alpine
             pull: false
-            container:
-              volumes:
-                /app:/app:
+            host:
+              binds:
+                - /app:/app
               env:
                 - FOO=BAR
             autoRemove: true

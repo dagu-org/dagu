@@ -444,7 +444,7 @@ The ``docker`` executor runs commands inside Docker containers. This can help yo
          config:
            image: "denoland/deno:latest"
            autoRemove: true
-       command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+       command: run https://docs.deno.com/examples/scripts/hello_world.ts
 
 By default, Dagu pulls the Docker image. If you're using a local image, set :code:`pull: false`.
 
@@ -458,13 +458,13 @@ You can also configure volumes, environment variables, etc.:
           type: docker
           config:
             image: "denoland/deno:latest"
-            container:
-              volumes:
-                /app:/app:
+            host:
+              binds:
+                - /app:/app
               env:
                 - FOO=BAR
             autoRemove: true
-        command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+        command: run https://docs.deno.com/examples/scripts/hello_world.ts
 
 
 **Execute Commands in Existing Containers**
@@ -517,9 +517,9 @@ Then set `DOCKER_HOST`:
       executor:
         type: docker
         config:
-          image: "denoland/deno:1.10.3"
+          image: "denoland/deno:latest"
           autoRemove: true
-      command: run https://examples.deno.land/hello-world.ts
+      command: run https://docs.deno.com/examples/scripts/hello_world.ts
 
 HTTP Executor
 ~~~~~~~~~~~~~

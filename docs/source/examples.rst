@@ -87,7 +87,7 @@ Running a Docker Container
         config:
           image: "denoland/deno:latest"
           autoRemove: true
-      command: run https://raw.githubusercontent.com/denoland/deno-docs/main/by-example/hello-world.ts
+      command: run https://docs.deno.com/examples/scripts/hello_world.ts
 
 See :ref:`docker executor` for more details.
 
