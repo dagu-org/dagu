@@ -26,7 +26,7 @@ type PostDAGActionOK struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.PostDagActionResponse `json:"body,omitempty"`
+	Payload *models.PostDAGActionResponse `json:"body,omitempty"`
 }
 
 // NewPostDAGActionOK creates PostDAGActionOK with default headers values
@@ -36,13 +36,13 @@ func NewPostDAGActionOK() *PostDAGActionOK {
 }
 
 // WithPayload adds the payload to the post d a g action o k response
-func (o *PostDAGActionOK) WithPayload(payload *models.PostDagActionResponse) *PostDAGActionOK {
+func (o *PostDAGActionOK) WithPayload(payload *models.PostDAGActionResponse) *PostDAGActionOK {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the post d a g action o k response
-func (o *PostDAGActionOK) SetPayload(payload *models.PostDagActionResponse) {
+func (o *PostDAGActionOK) SetPayload(payload *models.PostDAGActionResponse) {
 	o.Payload = payload
 }
 

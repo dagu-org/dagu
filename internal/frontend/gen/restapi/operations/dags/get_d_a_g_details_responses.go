@@ -26,7 +26,7 @@ type GetDAGDetailsOK struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.GetDagDetailsResponse `json:"body,omitempty"`
+	Payload *models.GetDAGDetailsResponse `json:"body,omitempty"`
 }
 
 // NewGetDAGDetailsOK creates GetDAGDetailsOK with default headers values
@@ -36,13 +36,13 @@ func NewGetDAGDetailsOK() *GetDAGDetailsOK {
 }
 
 // WithPayload adds the payload to the get d a g details o k response
-func (o *GetDAGDetailsOK) WithPayload(payload *models.GetDagDetailsResponse) *GetDAGDetailsOK {
+func (o *GetDAGDetailsOK) WithPayload(payload *models.GetDAGDetailsResponse) *GetDAGDetailsOK {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the get d a g details o k response
-func (o *GetDAGDetailsOK) SetPayload(payload *models.GetDagDetailsResponse) {
+func (o *GetDAGDetailsOK) SetPayload(payload *models.GetDAGDetailsResponse) {
 	o.Payload = payload
 }
 

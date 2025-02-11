@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// GetDagDetailsResponse Response object for getting details of a DAG.
+// GetDAGDetailsResponse Response object for getting details of a DAG.
 //
-// swagger:model GetDagDetailsResponse
-type GetDagDetailsResponse struct {
+// swagger:model GetDAGDetailsResponse
+type GetDAGDetailsResponse struct {
 
 	// d a g
 	// Required: true
@@ -60,8 +60,8 @@ type GetDagDetailsResponse struct {
 	Title *string `json:"Title"`
 }
 
-// Validate validates this get dag details response
-func (m *GetDagDetailsResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this get d a g details response
+func (m *GetDAGDetailsResponse) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDAG(formats); err != nil {
@@ -110,7 +110,7 @@ func (m *GetDagDetailsResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateDAG(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateDAG(formats strfmt.Registry) error {
 
 	if err := validate.Required("DAG", "body", m.DAG); err != nil {
 		return err
@@ -130,7 +130,7 @@ func (m *GetDagDetailsResponse) validateDAG(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateDefinition(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateDefinition(formats strfmt.Registry) error {
 
 	if err := validate.Required("Definition", "body", m.Definition); err != nil {
 		return err
@@ -139,7 +139,7 @@ func (m *GetDagDetailsResponse) validateDefinition(formats strfmt.Registry) erro
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateErrors(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateErrors(formats strfmt.Registry) error {
 
 	if err := validate.Required("Errors", "body", m.Errors); err != nil {
 		return err
@@ -148,7 +148,7 @@ func (m *GetDagDetailsResponse) validateErrors(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateGraph(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateGraph(formats strfmt.Registry) error {
 
 	if err := validate.Required("Graph", "body", m.Graph); err != nil {
 		return err
@@ -157,7 +157,7 @@ func (m *GetDagDetailsResponse) validateGraph(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateLogData(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateLogData(formats strfmt.Registry) error {
 
 	if err := validate.Required("LogData", "body", m.LogData); err != nil {
 		return err
@@ -177,7 +177,7 @@ func (m *GetDagDetailsResponse) validateLogData(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateLogURL(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateLogURL(formats strfmt.Registry) error {
 
 	if err := validate.Required("LogUrl", "body", m.LogURL); err != nil {
 		return err
@@ -186,7 +186,7 @@ func (m *GetDagDetailsResponse) validateLogURL(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateScLog(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateScLog(formats strfmt.Registry) error {
 
 	if err := validate.Required("ScLog", "body", m.ScLog); err != nil {
 		return err
@@ -206,7 +206,7 @@ func (m *GetDagDetailsResponse) validateScLog(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateStepLog(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateStepLog(formats strfmt.Registry) error {
 
 	if err := validate.Required("StepLog", "body", m.StepLog); err != nil {
 		return err
@@ -226,7 +226,7 @@ func (m *GetDagDetailsResponse) validateStepLog(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateTab(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateTab(formats strfmt.Registry) error {
 
 	if err := validate.Required("Tab", "body", m.Tab); err != nil {
 		return err
@@ -235,7 +235,7 @@ func (m *GetDagDetailsResponse) validateTab(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *GetDagDetailsResponse) validateTitle(formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) validateTitle(formats strfmt.Registry) error {
 
 	if err := validate.Required("Title", "body", m.Title); err != nil {
 		return err
@@ -244,8 +244,8 @@ func (m *GetDagDetailsResponse) validateTitle(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this get dag details response based on the context it is used
-func (m *GetDagDetailsResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this get d a g details response based on the context it is used
+func (m *GetDAGDetailsResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateDAG(ctx, formats); err != nil {
@@ -270,7 +270,7 @@ func (m *GetDagDetailsResponse) ContextValidate(ctx context.Context, formats str
 	return nil
 }
 
-func (m *GetDagDetailsResponse) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.DAG != nil {
 
@@ -287,7 +287,7 @@ func (m *GetDagDetailsResponse) contextValidateDAG(ctx context.Context, formats 
 	return nil
 }
 
-func (m *GetDagDetailsResponse) contextValidateLogData(ctx context.Context, formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) contextValidateLogData(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.LogData != nil {
 
@@ -304,7 +304,7 @@ func (m *GetDagDetailsResponse) contextValidateLogData(ctx context.Context, form
 	return nil
 }
 
-func (m *GetDagDetailsResponse) contextValidateScLog(ctx context.Context, formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) contextValidateScLog(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.ScLog != nil {
 
@@ -321,7 +321,7 @@ func (m *GetDagDetailsResponse) contextValidateScLog(ctx context.Context, format
 	return nil
 }
 
-func (m *GetDagDetailsResponse) contextValidateStepLog(ctx context.Context, formats strfmt.Registry) error {
+func (m *GetDAGDetailsResponse) contextValidateStepLog(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.StepLog != nil {
 
@@ -339,7 +339,7 @@ func (m *GetDagDetailsResponse) contextValidateStepLog(ctx context.Context, form
 }
 
 // MarshalBinary interface implementation
-func (m *GetDagDetailsResponse) MarshalBinary() ([]byte, error) {
+func (m *GetDAGDetailsResponse) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -347,8 +347,8 @@ func (m *GetDagDetailsResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *GetDagDetailsResponse) UnmarshalBinary(b []byte) error {
-	var res GetDagDetailsResponse
+func (m *GetDAGDetailsResponse) UnmarshalBinary(b []byte) error {
+	var res GetDAGDetailsResponse
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

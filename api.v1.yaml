@@ -83,7 +83,7 @@ paths:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/ListDagsResponse"
+            $ref: "#/definitions/ListDAGsResponse"
         default:
           description: "Generic error response."
           schema:
@@ -100,12 +100,12 @@ paths:
           name: "body"
           required: true
           schema:
-            $ref: "#/definitions/CreateDagRequest"
+            $ref: "#/definitions/CreateDAGRequest"
       responses:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/CreateDagResponse"
+            $ref: "#/definitions/CreateDAGResponse"
         default:
           description: "Generic error response."
           schema:
@@ -143,7 +143,7 @@ paths:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/GetDagDetailsResponse"
+            $ref: "#/definitions/GetDAGDetailsResponse"
         default:
           description: "Generic error response."
           schema:
@@ -165,12 +165,12 @@ paths:
           name: "body"
           required: true
           schema:
-            $ref: "#/definitions/PostDagActionRequest"
+            $ref: "#/definitions/PostDAGActionRequest"
       responses:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/PostDagActionResponse"
+            $ref: "#/definitions/PostDAGActionResponse"
         default:
           description: "Generic error response."
           schema:
@@ -283,7 +283,7 @@ definitions:
       - uptime
       - timestamp
 
-  CreateDagRequest:
+  CreateDAGRequest:
     type: object
     description: "Request body for creating a DAG."
     properties:
@@ -297,7 +297,7 @@ definitions:
       - action
       - value
 
-  PostDagActionRequest:
+  PostDAGActionRequest:
     type: object
     description: "Request body for posting an action to a DAG."
     properties:
@@ -328,7 +328,7 @@ definitions:
     required:
       - action
 
-  ListDagsResponse:
+  ListDAGsResponse:
     type: object
     description: "Response object for listing all DAGs."
     properties:
@@ -354,7 +354,7 @@ definitions:
       - HasError
       - PageCount
 
-  CreateDagResponse:
+  CreateDAGResponse:
     type: object
     properties:
       DagID:
@@ -362,7 +362,7 @@ definitions:
     required:
       - DagID
 
-  GetDagDetailsResponse:
+  GetDAGDetailsResponse:
     type: object
     description: "Response object for getting details of a DAG."
     properties:
@@ -405,7 +405,7 @@ definitions:
       - ScLog
       - Errors
 
-  PostDagActionResponse:
+  PostDAGActionResponse:
     type: object
     description: "Response object for posting an action to a DAG."
     properties:

@@ -38,7 +38,7 @@ type CreateDAGParams struct {
 	  Required: true
 	  In: body
 	*/
-	Body *models.CreateDagRequest
+	Body *models.CreateDAGRequest
 }
 
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
@@ -52,7 +52,7 @@ func (o *CreateDAGParams) BindRequest(r *http.Request, route *middleware.Matched
 
 	if runtime.HasBody(r) {
 		defer r.Body.Close()
-		var body models.CreateDagRequest
+		var body models.CreateDAGRequest
 		if err := route.Consumer.Consume(r.Body, &body); err != nil {
 			if err == io.EOF {
 				res = append(res, errors.Required("body", "body", ""))

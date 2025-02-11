@@ -82,7 +82,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/ListDagsResponse"
+              "$ref": "#/definitions/ListDAGsResponse"
             }
           },
           "default": {
@@ -106,7 +106,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/CreateDagRequest"
+              "$ref": "#/definitions/CreateDAGRequest"
             }
           }
         ],
@@ -114,7 +114,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/CreateDagResponse"
+              "$ref": "#/definitions/CreateDAGResponse"
             }
           },
           "default": {
@@ -165,7 +165,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/GetDagDetailsResponse"
+              "$ref": "#/definitions/GetDAGDetailsResponse"
             }
           },
           "default": {
@@ -196,7 +196,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/PostDagActionRequest"
+              "$ref": "#/definitions/PostDAGActionRequest"
             }
           }
         ],
@@ -204,7 +204,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/PostDagActionResponse"
+              "$ref": "#/definitions/PostDAGActionResponse"
             }
           },
           "default": {
@@ -333,7 +333,7 @@ func init() {
     }
   },
   "definitions": {
-    "CreateDagRequest": {
+    "CreateDAGRequest": {
       "description": "Request body for creating a DAG.",
       "type": "object",
       "required": [
@@ -351,7 +351,7 @@ func init() {
         }
       }
     },
-    "CreateDagResponse": {
+    "CreateDAGResponse": {
       "type": "object",
       "required": [
         "DagID"
@@ -785,7 +785,7 @@ func init() {
         }
       }
     },
-    "GetDagDetailsResponse": {
+    "GetDAGDetailsResponse": {
       "description": "Response object for getting details of a DAG.",
       "type": "object",
       "required": [
@@ -891,7 +891,7 @@ func init() {
         }
       }
     },
-    "ListDagsResponse": {
+    "ListDAGsResponse": {
       "description": "Response object for listing all DAGs.",
       "type": "object",
       "required": [
@@ -1001,7 +1001,7 @@ func init() {
         }
       }
     },
-    "PostDagActionRequest": {
+    "PostDAGActionRequest": {
       "description": "Request body for posting an action to a DAG.",
       "type": "object",
       "required": [
@@ -1040,7 +1040,7 @@ func init() {
         }
       }
     },
-    "PostDagActionResponse": {
+    "PostDAGActionResponse": {
       "description": "Response object for posting an action to a DAG.",
       "type": "object",
       "properties": {
@@ -1346,7 +1346,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/ListDagsResponse"
+              "$ref": "#/definitions/ListDAGsResponse"
             }
           },
           "default": {
@@ -1370,7 +1370,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/CreateDagRequest"
+              "$ref": "#/definitions/CreateDAGRequest"
             }
           }
         ],
@@ -1378,7 +1378,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/CreateDagResponse"
+              "$ref": "#/definitions/CreateDAGResponse"
             }
           },
           "default": {
@@ -1429,7 +1429,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/GetDagDetailsResponse"
+              "$ref": "#/definitions/GetDAGDetailsResponse"
             }
           },
           "default": {
@@ -1460,7 +1460,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/PostDagActionRequest"
+              "$ref": "#/definitions/PostDAGActionRequest"
             }
           }
         ],
@@ -1468,7 +1468,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/PostDagActionResponse"
+              "$ref": "#/definitions/PostDAGActionResponse"
             }
           },
           "default": {
@@ -1597,7 +1597,7 @@ func init() {
     }
   },
   "definitions": {
-    "CreateDagRequest": {
+    "CreateDAGRequest": {
       "description": "Request body for creating a DAG.",
       "type": "object",
       "required": [
@@ -1615,7 +1615,7 @@ func init() {
         }
       }
     },
-    "CreateDagResponse": {
+    "CreateDAGResponse": {
       "type": "object",
       "required": [
         "DagID"
@@ -2049,7 +2049,7 @@ func init() {
         }
       }
     },
-    "GetDagDetailsResponse": {
+    "GetDAGDetailsResponse": {
       "description": "Response object for getting details of a DAG.",
       "type": "object",
       "required": [
@@ -2155,7 +2155,7 @@ func init() {
         }
       }
     },
-    "ListDagsResponse": {
+    "ListDAGsResponse": {
       "description": "Response object for listing all DAGs.",
       "type": "object",
       "required": [
@@ -2265,7 +2265,7 @@ func init() {
         }
       }
     },
-    "PostDagActionRequest": {
+    "PostDAGActionRequest": {
       "description": "Request body for posting an action to a DAG.",
       "type": "object",
       "required": [
@@ -2304,7 +2304,7 @@ func init() {
         }
       }
     },
-    "PostDagActionResponse": {
+    "PostDAGActionResponse": {
       "description": "Response object for posting an action to a DAG.",
       "type": "object",
       "properties": {

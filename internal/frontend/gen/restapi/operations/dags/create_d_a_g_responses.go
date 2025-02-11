@@ -26,7 +26,7 @@ type CreateDAGOK struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.CreateDagResponse `json:"body,omitempty"`
+	Payload *models.CreateDAGResponse `json:"body,omitempty"`
 }
 
 // NewCreateDAGOK creates CreateDAGOK with default headers values
@@ -36,13 +36,13 @@ func NewCreateDAGOK() *CreateDAGOK {
 }
 
 // WithPayload adds the payload to the create d a g o k response
-func (o *CreateDAGOK) WithPayload(payload *models.CreateDagResponse) *CreateDAGOK {
+func (o *CreateDAGOK) WithPayload(payload *models.CreateDAGResponse) *CreateDAGOK {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the create d a g o k response
-func (o *CreateDAGOK) SetPayload(payload *models.CreateDagResponse) {
+func (o *CreateDAGOK) SetPayload(payload *models.CreateDAGResponse) {
 	o.Payload = payload
 }
 

@@ -26,7 +26,7 @@ type ListDAGsOK struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.ListDagsResponse `json:"body,omitempty"`
+	Payload *models.ListDAGsResponse `json:"body,omitempty"`
 }
 
 // NewListDAGsOK creates ListDAGsOK with default headers values
@@ -36,13 +36,13 @@ func NewListDAGsOK() *ListDAGsOK {
 }
 
 // WithPayload adds the payload to the list d a gs o k response
-func (o *ListDAGsOK) WithPayload(payload *models.ListDagsResponse) *ListDAGsOK {
+func (o *ListDAGsOK) WithPayload(payload *models.ListDAGsResponse) *ListDAGsOK {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the list d a gs o k response
-func (o *ListDAGsOK) SetPayload(payload *models.ListDagsResponse) {
+func (o *ListDAGsOK) SetPayload(payload *models.ListDAGsResponse) {
 	o.Payload = payload
 }
 

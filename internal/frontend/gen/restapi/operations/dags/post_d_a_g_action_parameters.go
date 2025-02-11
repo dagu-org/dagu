@@ -39,7 +39,7 @@ type PostDAGActionParams struct {
 	  Required: true
 	  In: body
 	*/
-	Body *models.PostDagActionRequest
+	Body *models.PostDAGActionRequest
 	/*The ID of the DAG.
 	  Required: true
 	  In: path
@@ -58,7 +58,7 @@ func (o *PostDAGActionParams) BindRequest(r *http.Request, route *middleware.Mat
 
 	if runtime.HasBody(r) {
 		defer r.Body.Close()
-		var body models.PostDagActionRequest
+		var body models.PostDAGActionRequest
 		if err := route.Consumer.Consume(r.Body, &body); err != nil {
 			if err == io.EOF {
 				res = append(res, errors.Required("body", "body", ""))

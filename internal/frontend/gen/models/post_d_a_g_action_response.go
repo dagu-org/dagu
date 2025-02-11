@@ -12,27 +12,27 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// PostDagActionResponse Response object for posting an action to a DAG.
+// PostDAGActionResponse Response object for posting an action to a DAG.
 //
-// swagger:model PostDagActionResponse
-type PostDagActionResponse struct {
+// swagger:model PostDAGActionResponse
+type PostDAGActionResponse struct {
 
 	// New DAG ID, if the action resulted in a new DAG.
 	NewDagID string `json:"NewDagID,omitempty"`
 }
 
-// Validate validates this post dag action response
-func (m *PostDagActionResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this post d a g action response
+func (m *PostDAGActionResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this post dag action response based on context it is used
-func (m *PostDagActionResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this post d a g action response based on context it is used
+func (m *PostDAGActionResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *PostDagActionResponse) MarshalBinary() ([]byte, error) {
+func (m *PostDAGActionResponse) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -40,8 +40,8 @@ func (m *PostDagActionResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *PostDagActionResponse) UnmarshalBinary(b []byte) error {
-	var res PostDagActionResponse
+func (m *PostDAGActionResponse) UnmarshalBinary(b []byte) error {
+	var res PostDAGActionResponse
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

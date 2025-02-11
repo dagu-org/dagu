@@ -14,18 +14,18 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// CreateDagResponse create dag response
+// CreateDAGResponse create d a g response
 //
-// swagger:model CreateDagResponse
-type CreateDagResponse struct {
+// swagger:model CreateDAGResponse
+type CreateDAGResponse struct {
 
 	// dag ID
 	// Required: true
 	DagID *string `json:"DagID"`
 }
 
-// Validate validates this create dag response
-func (m *CreateDagResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this create d a g response
+func (m *CreateDAGResponse) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDagID(formats); err != nil {
@@ -38,7 +38,7 @@ func (m *CreateDagResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *CreateDagResponse) validateDagID(formats strfmt.Registry) error {
+func (m *CreateDAGResponse) validateDagID(formats strfmt.Registry) error {
 
 	if err := validate.Required("DagID", "body", m.DagID); err != nil {
 		return err
@@ -47,13 +47,13 @@ func (m *CreateDagResponse) validateDagID(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this create dag response based on context it is used
-func (m *CreateDagResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this create d a g response based on context it is used
+func (m *CreateDAGResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *CreateDagResponse) MarshalBinary() ([]byte, error) {
+func (m *CreateDAGResponse) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -61,8 +61,8 @@ func (m *CreateDagResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *CreateDagResponse) UnmarshalBinary(b []byte) error {
-	var res CreateDagResponse
+func (m *CreateDAGResponse) UnmarshalBinary(b []byte) error {
+	var res CreateDAGResponse
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

@@ -15,10 +15,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// ListDagsResponse Response object for listing all DAGs.
+// ListDAGsResponse Response object for listing all DAGs.
 //
-// swagger:model ListDagsResponse
-type ListDagsResponse struct {
+// swagger:model ListDAGsResponse
+type ListDAGsResponse struct {
 
 	// List of DAGs with their status and metadata.
 	// Required: true
@@ -37,8 +37,8 @@ type ListDagsResponse struct {
 	PageCount *int64 `json:"PageCount"`
 }
 
-// Validate validates this list dags response
-func (m *ListDagsResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this list d a gs response
+func (m *ListDAGsResponse) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDAGs(formats); err != nil {
@@ -63,7 +63,7 @@ func (m *ListDagsResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *ListDagsResponse) validateDAGs(formats strfmt.Registry) error {
+func (m *ListDAGsResponse) validateDAGs(formats strfmt.Registry) error {
 
 	if err := validate.Required("DAGs", "body", m.DAGs); err != nil {
 		return err
@@ -90,7 +90,7 @@ func (m *ListDagsResponse) validateDAGs(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *ListDagsResponse) validateErrors(formats strfmt.Registry) error {
+func (m *ListDAGsResponse) validateErrors(formats strfmt.Registry) error {
 
 	if err := validate.Required("Errors", "body", m.Errors); err != nil {
 		return err
@@ -99,7 +99,7 @@ func (m *ListDagsResponse) validateErrors(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *ListDagsResponse) validateHasError(formats strfmt.Registry) error {
+func (m *ListDAGsResponse) validateHasError(formats strfmt.Registry) error {
 
 	if err := validate.Required("HasError", "body", m.HasError); err != nil {
 		return err
@@ -108,7 +108,7 @@ func (m *ListDagsResponse) validateHasError(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *ListDagsResponse) validatePageCount(formats strfmt.Registry) error {
+func (m *ListDAGsResponse) validatePageCount(formats strfmt.Registry) error {
 
 	if err := validate.Required("PageCount", "body", m.PageCount); err != nil {
 		return err
@@ -117,8 +117,8 @@ func (m *ListDagsResponse) validatePageCount(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this list dags response based on the context it is used
-func (m *ListDagsResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this list d a gs response based on the context it is used
+func (m *ListDAGsResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateDAGs(ctx, formats); err != nil {
@@ -131,7 +131,7 @@ func (m *ListDagsResponse) ContextValidate(ctx context.Context, formats strfmt.R
 	return nil
 }
 
-func (m *ListDagsResponse) contextValidateDAGs(ctx context.Context, formats strfmt.Registry) error {
+func (m *ListDAGsResponse) contextValidateDAGs(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.DAGs); i++ {
 
@@ -157,7 +157,7 @@ func (m *ListDagsResponse) contextValidateDAGs(ctx context.Context, formats strf
 }
 
 // MarshalBinary interface implementation
-func (m *ListDagsResponse) MarshalBinary() ([]byte, error) {
+func (m *ListDAGsResponse) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -165,8 +165,8 @@ func (m *ListDagsResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *ListDagsResponse) UnmarshalBinary(b []byte) error {
-	var res ListDagsResponse
+func (m *ListDAGsResponse) UnmarshalBinary(b []byte) error {
+	var res ListDAGsResponse
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

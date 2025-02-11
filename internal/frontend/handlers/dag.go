@@ -322,7 +322,7 @@ func (h *DAG) responderWithCodedError(err *codedError) middleware.Responder {
 }
 
 func (h *DAG) createDAG(ctx context.Context, params dags.CreateDAGParams) (
-	*models.CreateDagResponse, *codedError,
+	*models.CreateDAGResponse, *codedError,
 ) {
 	if params.Body.Action == nil || params.Body.Value == nil {
 		return nil, newBadRequestError(fmt.Errorf("missing required parameters: action and value"))
@@ -335,7 +335,7 @@ func (h *DAG) createDAG(ctx context.Context, params dags.CreateDAGParams) (
 		if err != nil {
 			return nil, newInternalError(err)
 		}
-		return &models.CreateDagResponse{DagID: swag.String(id)}, nil
+		return &models.CreateDAGResponse{DagID: swag.String(id)}, nil
 	default:
 		return nil, newBadRequestError(fmt.Errorf("invalid action: %s", *params.Body.Action))
 	}
@@ -352,7 +352,7 @@ func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDAGParams) *coded
 	return nil
 }
 
-func (h *DAG) getList(ctx context.Context, params dags.ListDAGsParams) (*models.ListDagsResponse, *codedError) {
+func (h *DAG) getList(ctx context.Context, params dags.ListDAGsParams) (*models.ListDAGsResponse, *codedError) {
 	dgs, result, err := h.client.GetAllStatusPagination(ctx, params)
 	if err != nil {
 		return nil, newInternalError(err)
@@ -369,7 +369,7 @@ func (h *DAG) getList(ctx context.Context, params dags.ListDAGsParams) (*models.
 		}
 	}
 
-	resp := &models.ListDagsResponse{
+	resp := &models.ListDAGsResponse{
 		Errors:    result.ErrorList,
 		PageCount: swag.Int64(int64(result.PageCount)),
 		HasError:  swag.Bool(hasErr),
@@ -411,7 +411,7 @@ func (h *DAG) getList(ctx context.Context, params dags.ListDAGsParams) (*models.
 
 func (h *DAG) getDetail(
 	ctx context.Context, params dags.GetDAGDetailsParams,
-) (*models.GetDagDetailsResponse, *codedError) {
+) (*models.GetDAGDetailsResponse, *codedError) {
 	dagID := params.DagID
 
 	tab := dagTabTypeStatus
@@ -490,7 +490,7 @@ func (h *DAG) getDetail(
 		statusWithDetails.Error = swag.String(dagStatus.Error.Error())
 	}
 
-	resp := &models.GetDagDetailsResponse{
+	resp := &models.GetDAGDetailsResponse{
 		Title:      swag.String(dagStatus.DAG.Name),
 		DAG:        statusWithDetails,
 		Tab:        swag.String(tab),
@@ -528,8 +528,8 @@ func (h *DAG) processSchedulerLogRequest(
 	ctx context.Context,
 	dag *digraph.DAG,
 	params dags.GetDAGDetailsParams,
-	resp *models.GetDagDetailsResponse,
-) (*models.GetDagDetailsResponse, *codedError) {
+	resp *models.GetDAGDetailsResponse,
+) (*models.GetDAGDetailsResponse, *codedError) {
 	var logFile string
 
 	if params.File != nil {
@@ -565,8 +565,8 @@ func (h *DAG) processStepLogRequest(
 	ctx context.Context,
 	dag *digraph.DAG,
 	params dags.GetDAGDetailsParams,
-	resp *models.GetDagDetailsResponse,
-) (*models.GetDagDetailsResponse, *codedError) {
+	resp *models.GetDAGDetailsResponse,
+) (*models.GetDAGDetailsResponse, *codedError) {
 	var status *model.Status
 
 	if params.Step == nil {
@@ -640,8 +640,8 @@ func (h *DAG) processStepLogRequest(
 func (h *DAG) processSpecRequest(
 	ctx context.Context,
 	dagID string,
-	resp *models.GetDagDetailsResponse,
-) (*models.GetDagDetailsResponse, *codedError) {
+	resp *models.GetDAGDetailsResponse,
+) (*models.GetDAGDetailsResponse, *codedError) {
 	dagContent, err := h.client.GetDAGSpec(ctx, dagID)
 	if err != nil {
 		return nil, newNotFoundError(err)
@@ -656,9 +656,9 @@ var (
 
 func (h *DAG) processLogRequest(
 	ctx context.Context,
-	resp *models.GetDagDetailsResponse,
+	resp *models.GetDAGDetailsResponse,
 	dag *digraph.DAG,
-) (*models.GetDagDetailsResponse, *codedError) {
+) (*models.GetDAGDetailsResponse, *codedError) {
 	logs := h.client.GetRecentHistory(ctx, dag, defaultHistoryLimit)
 
 	nodeNameToStatusList := map[string][]scheduler.NodeStatus{}
@@ -754,7 +754,7 @@ func addNodeStatus(
 func (h *DAG) postAction(
 	ctx context.Context,
 	params dags.PostDAGActionParams,
-) (*models.PostDagActionResponse, *codedError) {
+) (*models.PostDAGActionResponse, *codedError) {
 	if params.Body.Action == nil {
 		return nil, newBadRequestError(fmt.Errorf("missing required parameter: action"))
 	}
@@ -777,11 +777,11 @@ func (h *DAG) postAction(
 		h.client.StartAsync(ctx, dagStatus.DAG, client.StartOptions{
 			Params: params.Body.Params,
 		})
-		return &models.PostDagActionResponse{}, nil
+		return &models.PostDAGActionResponse{}, nil
 
 	case "suspend":
 		_ = h.client.ToggleSuspend(ctx, params.DagID, params.Body.Value == "true")
-		return &models.PostDagActionResponse{}, nil
+		return &models.PostDAGActionResponse{}, nil
 
 	case "stop":
 		if dagStatus.Status.Status != scheduler.StatusRunning {
@@ -794,7 +794,7 @@ func (h *DAG) postAction(
 				fmt.Errorf("error trying to stop the DAG: %w", err),
 			)
 		}
-		return &models.PostDagActionResponse{}, nil
+		return &models.PostDAGActionResponse{}, nil
 
 	case "retry":
 		if params.Body.RequestID == "" {
@@ -807,7 +807,7 @@ func (h *DAG) postAction(
 				fmt.Errorf("error trying to retry the DAG: %w", err),
 			)
 		}
-		return &models.PostDagActionResponse{}, nil
+		return &models.PostDAGActionResponse{}, nil
 
 	case "mark-success":
 		return h.processUpdateStatus(ctx, params, dagStatus, scheduler.NodeStatusSuccess)
@@ -819,7 +819,7 @@ func (h *DAG) postAction(
 		if err := h.client.UpdateDAG(ctx, params.DagID, params.Body.Value); err != nil {
 			return nil, newInternalError(err)
 		}
-		return &models.PostDagActionResponse{}, nil
+		return &models.PostDAGActionResponse{}, nil
 
 	case "rename":
 		newName := params.Body.Value
@@ -831,7 +831,7 @@ func (h *DAG) postAction(
 		if err := h.client.Rename(ctx, params.DagID, newName); err != nil {
 			return nil, newInternalError(err)
 		}
-		return &models.PostDagActionResponse{NewDagID: params.Body.Value}, nil
+		return &models.PostDAGActionResponse{NewDagID: params.Body.Value}, nil
 
 	default:
 		return nil, newBadRequestError(
@@ -844,7 +844,7 @@ func (h *DAG) processUpdateStatus(
 	ctx context.Context,
 	params dags.PostDAGActionParams,
 	dagStatus client.DAGStatus, to scheduler.NodeStatus,
-) (*models.PostDagActionResponse, *codedError) {
+) (*models.PostDAGActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
 		return nil, newBadRequestError(fmt.Errorf("request-id is required"))
 	}
@@ -887,7 +887,7 @@ func (h *DAG) processUpdateStatus(
 		return nil, newInternalError(err)
 	}
 
-	return &models.PostDagActionResponse{}, nil
+	return &models.PostDAGActionResponse{}, nil
 }
 
 func (h *DAG) searchDAGs(ctx context.Context, params dags.SearchDAGsParams) (

@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// CreateDagRequest Request body for creating a DAG.
+// CreateDAGRequest Request body for creating a DAG.
 //
-// swagger:model CreateDagRequest
-type CreateDagRequest struct {
+// swagger:model CreateDAGRequest
+type CreateDAGRequest struct {
 
 	// Action to perform upon creation (if any).
 	// Required: true
@@ -28,8 +28,8 @@ type CreateDagRequest struct {
 	Value *string `json:"value"`
 }
 
-// Validate validates this create dag request
-func (m *CreateDagRequest) Validate(formats strfmt.Registry) error {
+// Validate validates this create d a g request
+func (m *CreateDAGRequest) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateAction(formats); err != nil {
@@ -46,7 +46,7 @@ func (m *CreateDagRequest) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *CreateDagRequest) validateAction(formats strfmt.Registry) error {
+func (m *CreateDAGRequest) validateAction(formats strfmt.Registry) error {
 
 	if err := validate.Required("action", "body", m.Action); err != nil {
 		return err
@@ -55,7 +55,7 @@ func (m *CreateDagRequest) validateAction(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *CreateDagRequest) validateValue(formats strfmt.Registry) error {
+func (m *CreateDAGRequest) validateValue(formats strfmt.Registry) error {
 
 	if err := validate.Required("value", "body", m.Value); err != nil {
 		return err
@@ -64,13 +64,13 @@ func (m *CreateDagRequest) validateValue(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this create dag request based on context it is used
-func (m *CreateDagRequest) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this create d a g request based on context it is used
+func (m *CreateDAGRequest) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *CreateDagRequest) MarshalBinary() ([]byte, error) {
+func (m *CreateDAGRequest) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -78,8 +78,8 @@ func (m *CreateDagRequest) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *CreateDagRequest) UnmarshalBinary(b []byte) error {
-	var res CreateDagRequest
+func (m *CreateDAGRequest) UnmarshalBinary(b []byte) error {
+	var res CreateDAGRequest
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}
