@@ -1,0 +1,56 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., v1.0.0)"
+        required: true
+        type: string
+
+jobs:
+  # Build release binaries
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up NodeJS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up yarn
+        run: npm install --global yarn
+
+      - name: Yarn install
+        run: yarn install
+        working-directory: ui
+
+      - name: Build web UI
+        run: yarn build
+        working-directory: ui
+
+      - name: Copy web assets
+        run: |
+          cp ui/dist/* ./internal/frontend/assets/
+
+      - name: Install Snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{secrets.DAGU_GITHUB_TOKEN}}
