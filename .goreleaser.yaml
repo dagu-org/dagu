@@ -1,7 +1,10 @@
+# goreleaser.yaml
 version: 2
+
 before:
   hooks:
     - go mod tidy
+
 builds:
   - dir: ./cmd
     env:
@@ -9,22 +12,34 @@ builds:
     goos:
       - linux
       - darwin
+      - freebsd
+      - openbsd
+      - netbsd
+      # - windows
     goarch:
-      - amd64
-      - arm
-      - arm64
+      - "amd64"
+      - "386"
+      - "arm"
+      - "arm64"
+      - "ppc64le"
+      - "s390x"
     goarm:
+      - "6"
       - "7"
+
 checksum:
   name_template: "checksums.txt"
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
     exclude:
       - "^docs:"
       - "^test:"
+
 brews:
   - repository:
       owner: dagu-org
@@ -41,9 +56,11 @@ brews:
         log_path var/"log/dagu.log"
         working_dir var
       end
+
+  # Deprecated brew tap:
   - repository:
-      owner: dagu-org
-      name: homebrew-brew
+      owner: yohamta
+      name: homebrew-tap
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
     description: "Dagu is a compact, portable, and language-agnostic workflow engine."
@@ -56,6 +73,7 @@ brews:
         log_path var/"log/dagu.log"
         working_dir var
       end
+
 snapcrafts:
   - name: dagu
     title: Dagu
