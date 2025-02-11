@@ -28,7 +28,7 @@ LDFLAGS=-X 'main.version=$(BUILD_VERSION)-$(DATE)'
 APP_NAME=dagu
 
 # Docker image build configuration
-DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm64/v8 --builder container --build-arg LDFLAGS=$(LDFLAGS) --push --no-cache
+DOCKER_CMD := docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm64/v8 --builder container --build-arg LDFLAGS="$(LDFLAGS)" --push --no-cache
 
 # Arguments for the tests
 GOTESTSUM_ARGS=--format=standard-quiet
