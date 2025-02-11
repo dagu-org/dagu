@@ -15,19 +15,19 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// NewListDagsParams creates a new ListDagsParams object
+// NewListDAGsParams creates a new ListDAGsParams object
 //
 // There are no default values defined in the spec.
-func NewListDagsParams() ListDagsParams {
+func NewListDAGsParams() ListDAGsParams {
 
-	return ListDagsParams{}
+	return ListDAGsParams{}
 }
 
-// ListDagsParams contains all the bound params for the list dags operation
+// ListDAGsParams contains all the bound params for the list d a gs operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters listDags
-type ListDagsParams struct {
+// swagger:parameters listDAGs
+type ListDAGsParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
@@ -53,8 +53,8 @@ type ListDagsParams struct {
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewListDagsParams() beforehand.
-func (o *ListDagsParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewListDAGsParams() beforehand.
+func (o *ListDAGsParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
@@ -87,7 +87,7 @@ func (o *ListDagsParams) BindRequest(r *http.Request, route *middleware.MatchedR
 }
 
 // bindLimit binds and validates parameter Limit from query.
-func (o *ListDagsParams) bindLimit(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *ListDAGsParams) bindLimit(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
@@ -110,7 +110,7 @@ func (o *ListDagsParams) bindLimit(rawData []string, hasKey bool, formats strfmt
 }
 
 // bindPage binds and validates parameter Page from query.
-func (o *ListDagsParams) bindPage(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *ListDAGsParams) bindPage(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
@@ -133,7 +133,7 @@ func (o *ListDagsParams) bindPage(rawData []string, hasKey bool, formats strfmt.
 }
 
 // bindSearchName binds and validates parameter SearchName from query.
-func (o *ListDagsParams) bindSearchName(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *ListDAGsParams) bindSearchName(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
@@ -151,7 +151,7 @@ func (o *ListDagsParams) bindSearchName(rawData []string, hasKey bool, formats s
 }
 
 // bindSearchTag binds and validates parameter SearchTag from query.
-func (o *ListDagsParams) bindSearchTag(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *ListDAGsParams) bindSearchTag(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]

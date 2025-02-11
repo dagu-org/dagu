@@ -14,19 +14,19 @@ import (
 	"github.com/go-openapi/strfmt"
 )
 
-// NewGetDagDetailsParams creates a new GetDagDetailsParams object
+// NewGetDAGDetailsParams creates a new GetDAGDetailsParams object
 //
 // There are no default values defined in the spec.
-func NewGetDagDetailsParams() GetDagDetailsParams {
+func NewGetDAGDetailsParams() GetDAGDetailsParams {
 
-	return GetDagDetailsParams{}
+	return GetDAGDetailsParams{}
 }
 
-// GetDagDetailsParams contains all the bound params for the get dag details operation
+// GetDAGDetailsParams contains all the bound params for the get d a g details operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters getDagDetails
-type GetDagDetailsParams struct {
+// swagger:parameters getDAGDetails
+type GetDAGDetailsParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
@@ -53,8 +53,8 @@ type GetDagDetailsParams struct {
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewGetDagDetailsParams() beforehand.
-func (o *GetDagDetailsParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewGetDAGDetailsParams() beforehand.
+func (o *GetDAGDetailsParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
@@ -87,7 +87,7 @@ func (o *GetDagDetailsParams) BindRequest(r *http.Request, route *middleware.Mat
 }
 
 // bindDagID binds and validates parameter DagID from path.
-func (o *GetDagDetailsParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *GetDAGDetailsParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
@@ -101,7 +101,7 @@ func (o *GetDagDetailsParams) bindDagID(rawData []string, hasKey bool, formats s
 }
 
 // bindFile binds and validates parameter File from query.
-func (o *GetDagDetailsParams) bindFile(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *GetDAGDetailsParams) bindFile(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
@@ -119,7 +119,7 @@ func (o *GetDagDetailsParams) bindFile(rawData []string, hasKey bool, formats st
 }
 
 // bindStep binds and validates parameter Step from query.
-func (o *GetDagDetailsParams) bindStep(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *GetDAGDetailsParams) bindStep(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]
@@ -137,7 +137,7 @@ func (o *GetDagDetailsParams) bindStep(rawData []string, hasKey bool, formats st
 }
 
 // bindTab binds and validates parameter Tab from query.
-func (o *GetDagDetailsParams) bindTab(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *GetDAGDetailsParams) bindTab(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]

@@ -68,88 +68,88 @@ func NewDAG(
 }
 
 func (h *DAG) Configure(api *operations.DaguAPI) {
-	api.DagsListDagsHandler = dags.ListDagsHandlerFunc(
-		func(params dags.ListDagsParams) middleware.Responder {
+	api.DagsListDAGsHandler = dags.ListDAGsHandlerFunc(
+		func(params dags.ListDAGsParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
 				return resp
 			}
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.getList(ctx, params)
 			if err != nil {
-				return dags.NewListDagsDefault(err.HTTPCode).
+				return dags.NewListDAGsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
-			return dags.NewListDagsOK().WithPayload(resp)
+			return dags.NewListDAGsOK().WithPayload(resp)
 		})
 
-	api.DagsGetDagDetailsHandler = dags.GetDagDetailsHandlerFunc(
-		func(params dags.GetDagDetailsParams) middleware.Responder {
+	api.DagsGetDAGDetailsHandler = dags.GetDAGDetailsHandlerFunc(
+		func(params dags.GetDAGDetailsParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
 				return resp
 			}
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.getDetail(ctx, params)
 			if err != nil {
-				return dags.NewGetDagDetailsDefault(err.HTTPCode).
+				return dags.NewGetDAGDetailsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
-			return dags.NewGetDagDetailsOK().WithPayload(resp)
+			return dags.NewGetDAGDetailsOK().WithPayload(resp)
 		})
 
-	api.DagsPostDagActionHandler = dags.PostDagActionHandlerFunc(
-		func(params dags.PostDagActionParams) middleware.Responder {
+	api.DagsPostDAGActionHandler = dags.PostDAGActionHandlerFunc(
+		func(params dags.PostDAGActionParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(params.Body, params.HTTPRequest); resp != nil {
 				return resp
 			}
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.postAction(ctx, params)
 			if err != nil {
-				return dags.NewPostDagActionDefault(err.HTTPCode).
+				return dags.NewPostDAGActionDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
-			return dags.NewPostDagActionOK().WithPayload(resp)
+			return dags.NewPostDAGActionOK().WithPayload(resp)
 		})
 
-	api.DagsCreateDagHandler = dags.CreateDagHandlerFunc(
-		func(params dags.CreateDagParams) middleware.Responder {
+	api.DagsCreateDAGHandler = dags.CreateDAGHandlerFunc(
+		func(params dags.CreateDAGParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(params.Body, params.HTTPRequest); resp != nil {
 				return resp
 			}
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.createDAG(ctx, params)
 			if err != nil {
-				return dags.NewCreateDagDefault(err.HTTPCode).
+				return dags.NewCreateDAGDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
-			return dags.NewCreateDagOK().WithPayload(resp)
+			return dags.NewCreateDAGOK().WithPayload(resp)
 		})
 
-	api.DagsDeleteDagHandler = dags.DeleteDagHandlerFunc(
-		func(params dags.DeleteDagParams) middleware.Responder {
+	api.DagsDeleteDAGHandler = dags.DeleteDAGHandlerFunc(
+		func(params dags.DeleteDAGParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
 				return resp
 			}
 			ctx := params.HTTPRequest.Context()
 			err := h.deleteDAG(ctx, params)
 			if err != nil {
-				return dags.NewDeleteDagDefault(err.HTTPCode).
+				return dags.NewDeleteDAGDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
-			return dags.NewDeleteDagOK()
+			return dags.NewDeleteDAGOK()
 		})
 
-	api.DagsSearchDagsHandler = dags.SearchDagsHandlerFunc(
-		func(params dags.SearchDagsParams) middleware.Responder {
+	api.DagsSearchDAGsHandler = dags.SearchDAGsHandlerFunc(
+		func(params dags.SearchDAGsParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
 				return resp
 			}
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.searchDAGs(ctx, params)
 			if err != nil {
-				return dags.NewSearchDagsDefault(err.HTTPCode).
+				return dags.NewSearchDAGsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
-			return dags.NewSearchDagsOK().WithPayload(resp)
+			return dags.NewSearchDAGsOK().WithPayload(resp)
 		})
 
 	api.DagsListTagsHandler = dags.ListTagsHandlerFunc(
@@ -183,7 +183,7 @@ func (h *DAG) handleRemoteNodeProxy(body any, r *http.Request) middleware.Respon
 	node, ok := h.remoteNodes[remoteNodeName]
 	if !ok {
 		// remote node not found, return bad request
-		return dags.NewListDagsDefault(400)
+		return dags.NewListDAGsDefault(400)
 	}
 
 	// forward the request to the remote node
@@ -318,10 +318,10 @@ func (h *DAG) doRemoteProxy(body any, originalReq *http.Request, node config.Rem
 }
 
 func (h *DAG) responderWithCodedError(err *codedError) middleware.Responder {
-	return dags.NewListDagsDefault(err.HTTPCode).WithPayload(err.APIError)
+	return dags.NewListDAGsDefault(err.HTTPCode).WithPayload(err.APIError)
 }
 
-func (h *DAG) createDAG(ctx context.Context, params dags.CreateDagParams) (
+func (h *DAG) createDAG(ctx context.Context, params dags.CreateDAGParams) (
 	*models.CreateDagResponse, *codedError,
 ) {
 	if params.Body.Action == nil || params.Body.Value == nil {
@@ -340,7 +340,8 @@ func (h *DAG) createDAG(ctx context.Context, params dags.CreateDagParams) (
 		return nil, newBadRequestError(fmt.Errorf("invalid action: %s", *params.Body.Action))
 	}
 }
-func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDagParams) *codedError {
+
+func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDAGParams) *codedError {
 	dagStatus, err := h.client.GetStatus(ctx, params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
@@ -351,7 +352,7 @@ func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDagParams) *coded
 	return nil
 }
 
-func (h *DAG) getList(ctx context.Context, params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
+func (h *DAG) getList(ctx context.Context, params dags.ListDAGsParams) (*models.ListDagsResponse, *codedError) {
 	dgs, result, err := h.client.GetAllStatusPagination(ctx, params)
 	if err != nil {
 		return nil, newInternalError(err)
@@ -409,7 +410,7 @@ func (h *DAG) getList(ctx context.Context, params dags.ListDagsParams) (*models.
 }
 
 func (h *DAG) getDetail(
-	ctx context.Context, params dags.GetDagDetailsParams,
+	ctx context.Context, params dags.GetDAGDetailsParams,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	dagID := params.DagID
 
@@ -526,7 +527,7 @@ func (h *DAG) getDetail(
 func (h *DAG) processSchedulerLogRequest(
 	ctx context.Context,
 	dag *digraph.DAG,
-	params dags.GetDagDetailsParams,
+	params dags.GetDAGDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	var logFile string
@@ -563,7 +564,7 @@ func (h *DAG) processSchedulerLogRequest(
 func (h *DAG) processStepLogRequest(
 	ctx context.Context,
 	dag *digraph.DAG,
-	params dags.GetDagDetailsParams,
+	params dags.GetDAGDetailsParams,
 	resp *models.GetDagDetailsResponse,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	var status *model.Status
@@ -752,7 +753,7 @@ func addNodeStatus(
 
 func (h *DAG) postAction(
 	ctx context.Context,
-	params dags.PostDagActionParams,
+	params dags.PostDAGActionParams,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.Action == nil {
 		return nil, newBadRequestError(fmt.Errorf("missing required parameter: action"))
@@ -841,7 +842,7 @@ func (h *DAG) postAction(
 
 func (h *DAG) processUpdateStatus(
 	ctx context.Context,
-	params dags.PostDagActionParams,
+	params dags.PostDAGActionParams,
 	dagStatus client.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
@@ -889,7 +890,7 @@ func (h *DAG) processUpdateStatus(
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *DAG) searchDAGs(ctx context.Context, params dags.SearchDagsParams) (
+func (h *DAG) searchDAGs(ctx context.Context, params dags.SearchDAGsParams) (
 	*models.SearchDAGsResponse, *codedError,
 ) {
 	query := params.Q

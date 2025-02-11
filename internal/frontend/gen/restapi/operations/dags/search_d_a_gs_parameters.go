@@ -15,19 +15,19 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// NewSearchDagsParams creates a new SearchDagsParams object
+// NewSearchDAGsParams creates a new SearchDAGsParams object
 //
 // There are no default values defined in the spec.
-func NewSearchDagsParams() SearchDagsParams {
+func NewSearchDAGsParams() SearchDAGsParams {
 
-	return SearchDagsParams{}
+	return SearchDAGsParams{}
 }
 
-// SearchDagsParams contains all the bound params for the search dags operation
+// SearchDAGsParams contains all the bound params for the search d a gs operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters searchDags
-type SearchDagsParams struct {
+// swagger:parameters searchDAGs
+type SearchDAGsParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
@@ -42,8 +42,8 @@ type SearchDagsParams struct {
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewSearchDagsParams() beforehand.
-func (o *SearchDagsParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewSearchDAGsParams() beforehand.
+func (o *SearchDAGsParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
@@ -61,7 +61,7 @@ func (o *SearchDagsParams) BindRequest(r *http.Request, route *middleware.Matche
 }
 
 // bindQ binds and validates parameter Q from query.
-func (o *SearchDagsParams) bindQ(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *SearchDAGsParams) bindQ(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	if !hasKey {
 		return errors.Required("q", "query", rawData)
 	}

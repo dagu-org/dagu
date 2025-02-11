@@ -55,7 +55,7 @@ paths:
     get:
       summary: "List all DAGs"
       description: "Returns a list of DAGs with optional pagination and search filters."
-      operationId: "listDags"
+      operationId: "listDAGs"
       tags:
         - "dags"
       parameters:
@@ -92,7 +92,7 @@ paths:
     post:
       summary: "Create a new DAG"
       description: "Creates a new DAG."
-      operationId: "createDag"
+      operationId: "createDAG"
       tags:
         - "dags"
       parameters:
@@ -115,7 +115,7 @@ paths:
     get:
       summary: "Get DAG details"
       description: "Returns details of a DAG, including files, logs, etc."
-      operationId: "getDagDetails"
+      operationId: "getDAGDetails"
       tags:
         - "dags"
       parameters:
@@ -152,7 +152,7 @@ paths:
     post:
       summary: "Perform an action on a DAG"
       description: "Performs a specified action (e.g., start, stop) on the given DAG."
-      operationId: "postDagAction"
+      operationId: "postDAGAction"
       tags:
         - "dags"
       parameters:
@@ -179,7 +179,7 @@ paths:
     delete:
       summary: "Delete a DAG"
       description: "Deletes a DAG by its ID."
-      operationId: "deleteDag"
+      operationId: "deleteDAG"
       tags:
         - "dags"
       parameters:
@@ -200,7 +200,7 @@ paths:
     get:
       summary: "Search DAGs"
       description: "Searches for DAGs based on a query string."
-      operationId: "searchDags"
+      operationId: "searchDAGs"
       tags:
         - "dags"
       parameters:

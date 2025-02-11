@@ -283,7 +283,7 @@ func (e *client) getPageCount(total int, limit int) int {
 	return (total-1)/(limit) + 1
 }
 
-func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
+func (e *client) GetAllStatusPagination(ctx context.Context, params dags.ListDAGsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error) {
 	var (
 		dagListPaginationResult *persistence.DagListPaginationResult
 		err                     error

@@ -9,16 +9,11 @@ import (
 	"errors"
 	"net/url"
 	golangswaggerpaths "path"
-
-	"github.com/go-openapi/swag"
 )
 
-// ListDagsURL generates an URL for the list dags operation
-type ListDagsURL struct {
-	Limit      *int64
-	Page       *int64
-	SearchName *string
-	SearchTag  *string
+// SearchDAGsURL generates an URL for the search d a gs operation
+type SearchDAGsURL struct {
+	Q string
 
 	_basePath string
 	// avoid unkeyed usage
@@ -28,7 +23,7 @@ type ListDagsURL struct {
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *ListDagsURL) WithBasePath(bp string) *ListDagsURL {
+func (o *SearchDAGsURL) WithBasePath(bp string) *SearchDAGsURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -36,15 +31,15 @@ func (o *ListDagsURL) WithBasePath(bp string) *ListDagsURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *ListDagsURL) SetBasePath(bp string) {
+func (o *SearchDAGsURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *ListDagsURL) Build() (*url.URL, error) {
+func (o *SearchDAGsURL) Build() (*url.URL, error) {
 	var _result url.URL
 
-	var _path = "/dags"
+	var _path = "/search"
 
 	_basePath := o._basePath
 	if _basePath == "" {
@@ -54,36 +49,9 @@ func (o *ListDagsURL) Build() (*url.URL, error) {
 
 	qs := make(url.Values)
 
-	var limitQ string
-	if o.Limit != nil {
-		limitQ = swag.FormatInt64(*o.Limit)
-	}
-	if limitQ != "" {
-		qs.Set("limit", limitQ)
-	}
-
-	var pageQ string
-	if o.Page != nil {
-		pageQ = swag.FormatInt64(*o.Page)
-	}
-	if pageQ != "" {
-		qs.Set("page", pageQ)
-	}
-
-	var searchNameQ string
-	if o.SearchName != nil {
-		searchNameQ = *o.SearchName
-	}
-	if searchNameQ != "" {
-		qs.Set("searchName", searchNameQ)
-	}
-
-	var searchTagQ string
-	if o.SearchTag != nil {
-		searchTagQ = *o.SearchTag
-	}
-	if searchTagQ != "" {
-		qs.Set("searchTag", searchTagQ)
+	qQ := o.Q
+	if qQ != "" {
+		qs.Set("q", qQ)
 	}
 
 	_result.RawQuery = qs.Encode()
@@ -92,7 +60,7 @@ func (o *ListDagsURL) Build() (*url.URL, error) {
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *ListDagsURL) Must(u *url.URL, err error) *url.URL {
+func (o *SearchDAGsURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -103,17 +71,17 @@ func (o *ListDagsURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *ListDagsURL) String() string {
+func (o *SearchDAGsURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *ListDagsURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *SearchDAGsURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on ListDagsURL")
+		return nil, errors.New("scheme is required for a full url on SearchDAGsURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on ListDagsURL")
+		return nil, errors.New("host is required for a full url on SearchDAGsURL")
 	}
 
 	base, err := o.Build()
@@ -127,6 +95,6 @@ func (o *ListDagsURL) BuildFull(scheme, host string) (*url.URL, error) {
 }
 
 // StringFull returns the string representation of a complete url
-func (o *ListDagsURL) StringFull(scheme, host string) string {
+func (o *SearchDAGsURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

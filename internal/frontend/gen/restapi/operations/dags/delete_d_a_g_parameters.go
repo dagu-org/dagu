@@ -13,19 +13,19 @@ import (
 	"github.com/go-openapi/strfmt"
 )
 
-// NewDeleteDagParams creates a new DeleteDagParams object
+// NewDeleteDAGParams creates a new DeleteDAGParams object
 //
 // There are no default values defined in the spec.
-func NewDeleteDagParams() DeleteDagParams {
+func NewDeleteDAGParams() DeleteDAGParams {
 
-	return DeleteDagParams{}
+	return DeleteDAGParams{}
 }
 
-// DeleteDagParams contains all the bound params for the delete dag operation
+// DeleteDAGParams contains all the bound params for the delete d a g operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters deleteDag
-type DeleteDagParams struct {
+// swagger:parameters deleteDAG
+type DeleteDAGParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
@@ -40,8 +40,8 @@ type DeleteDagParams struct {
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewDeleteDagParams() beforehand.
-func (o *DeleteDagParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewDeleteDAGParams() beforehand.
+func (o *DeleteDAGParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
@@ -57,7 +57,7 @@ func (o *DeleteDagParams) BindRequest(r *http.Request, route *middleware.Matched
 }
 
 // bindDagID binds and validates parameter DagID from path.
-func (o *DeleteDagParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *DeleteDAGParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]

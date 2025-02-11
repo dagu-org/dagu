@@ -51,7 +51,7 @@ func init() {
           "dags"
         ],
         "summary": "List all DAGs",
-        "operationId": "listDags",
+        "operationId": "listDAGs",
         "parameters": [
           {
             "type": "integer",
@@ -99,7 +99,7 @@ func init() {
           "dags"
         ],
         "summary": "Create a new DAG",
-        "operationId": "createDag",
+        "operationId": "createDAG",
         "parameters": [
           {
             "name": "body",
@@ -133,7 +133,7 @@ func init() {
           "dags"
         ],
         "summary": "Get DAG details",
-        "operationId": "getDagDetails",
+        "operationId": "getDAGDetails",
         "parameters": [
           {
             "type": "string",
@@ -182,7 +182,7 @@ func init() {
           "dags"
         ],
         "summary": "Perform an action on a DAG",
-        "operationId": "postDagAction",
+        "operationId": "postDAGAction",
         "parameters": [
           {
             "type": "string",
@@ -221,7 +221,7 @@ func init() {
           "dags"
         ],
         "summary": "Delete a DAG",
-        "operationId": "deleteDag",
+        "operationId": "deleteDAG",
         "parameters": [
           {
             "type": "string",
@@ -281,7 +281,7 @@ func init() {
           "dags"
         ],
         "summary": "Search DAGs",
-        "operationId": "searchDags",
+        "operationId": "searchDAGs",
         "parameters": [
           {
             "type": "string",
@@ -1315,7 +1315,7 @@ func init() {
           "dags"
         ],
         "summary": "List all DAGs",
-        "operationId": "listDags",
+        "operationId": "listDAGs",
         "parameters": [
           {
             "type": "integer",
@@ -1363,7 +1363,7 @@ func init() {
           "dags"
         ],
         "summary": "Create a new DAG",
-        "operationId": "createDag",
+        "operationId": "createDAG",
         "parameters": [
           {
             "name": "body",
@@ -1397,7 +1397,7 @@ func init() {
           "dags"
         ],
         "summary": "Get DAG details",
-        "operationId": "getDagDetails",
+        "operationId": "getDAGDetails",
         "parameters": [
           {
             "type": "string",
@@ -1446,7 +1446,7 @@ func init() {
           "dags"
         ],
         "summary": "Perform an action on a DAG",
-        "operationId": "postDagAction",
+        "operationId": "postDAGAction",
         "parameters": [
           {
             "type": "string",
@@ -1485,7 +1485,7 @@ func init() {
           "dags"
         ],
         "summary": "Delete a DAG",
-        "operationId": "deleteDag",
+        "operationId": "deleteDAG",
         "parameters": [
           {
             "type": "string",
@@ -1545,7 +1545,7 @@ func init() {
           "dags"
         ],
         "summary": "Search DAGs",
-        "operationId": "searchDags",
+        "operationId": "searchDAGs",
         "parameters": [
           {
             "type": "string",

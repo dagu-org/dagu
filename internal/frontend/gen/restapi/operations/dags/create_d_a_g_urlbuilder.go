@@ -11,15 +11,15 @@ import (
 	golangswaggerpaths "path"
 )
 
-// CreateDagURL generates an URL for the create dag operation
-type CreateDagURL struct {
+// CreateDAGURL generates an URL for the create d a g operation
+type CreateDAGURL struct {
 	_basePath string
 }
 
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *CreateDagURL) WithBasePath(bp string) *CreateDagURL {
+func (o *CreateDAGURL) WithBasePath(bp string) *CreateDAGURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -27,12 +27,12 @@ func (o *CreateDagURL) WithBasePath(bp string) *CreateDagURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *CreateDagURL) SetBasePath(bp string) {
+func (o *CreateDAGURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *CreateDagURL) Build() (*url.URL, error) {
+func (o *CreateDAGURL) Build() (*url.URL, error) {
 	var _result url.URL
 
 	var _path = "/dags"
@@ -47,7 +47,7 @@ func (o *CreateDagURL) Build() (*url.URL, error) {
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *CreateDagURL) Must(u *url.URL, err error) *url.URL {
+func (o *CreateDAGURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -58,17 +58,17 @@ func (o *CreateDagURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *CreateDagURL) String() string {
+func (o *CreateDAGURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *CreateDagURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *CreateDAGURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on CreateDagURL")
+		return nil, errors.New("scheme is required for a full url on CreateDAGURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on CreateDagURL")
+		return nil, errors.New("host is required for a full url on CreateDAGURL")
 	}
 
 	base, err := o.Build()
@@ -82,6 +82,6 @@ func (o *CreateDagURL) BuildFull(scheme, host string) (*url.URL, error) {
 }
 
 // StringFull returns the string representation of a complete url
-func (o *CreateDagURL) StringFull(scheme, host string) string {
+func (o *CreateDAGURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

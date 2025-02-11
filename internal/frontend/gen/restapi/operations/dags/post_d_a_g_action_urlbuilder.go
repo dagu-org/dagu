@@ -9,11 +9,12 @@ import (
 	"errors"
 	"net/url"
 	golangswaggerpaths "path"
+	"strings"
 )
 
-// SearchDagsURL generates an URL for the search dags operation
-type SearchDagsURL struct {
-	Q string
+// PostDAGActionURL generates an URL for the post d a g action operation
+type PostDAGActionURL struct {
+	DagID string
 
 	_basePath string
 	// avoid unkeyed usage
@@ -23,7 +24,7 @@ type SearchDagsURL struct {
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *SearchDagsURL) WithBasePath(bp string) *SearchDagsURL {
+func (o *PostDAGActionURL) WithBasePath(bp string) *PostDAGActionURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -31,15 +32,22 @@ func (o *SearchDagsURL) WithBasePath(bp string) *SearchDagsURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *SearchDagsURL) SetBasePath(bp string) {
+func (o *PostDAGActionURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *SearchDagsURL) Build() (*url.URL, error) {
+func (o *PostDAGActionURL) Build() (*url.URL, error) {
 	var _result url.URL
 
-	var _path = "/search"
+	var _path = "/dags/{dagId}"
+
+	dagID := o.DagID
+	if dagID != "" {
+		_path = strings.Replace(_path, "{dagId}", dagID, -1)
+	} else {
+		return nil, errors.New("dagId is required on PostDAGActionURL")
+	}
 
 	_basePath := o._basePath
 	if _basePath == "" {
@@ -47,20 +55,11 @@ func (o *SearchDagsURL) Build() (*url.URL, error) {
 	}
 	_result.Path = golangswaggerpaths.Join(_basePath, _path)
 
-	qs := make(url.Values)
-
-	qQ := o.Q
-	if qQ != "" {
-		qs.Set("q", qQ)
-	}
-
-	_result.RawQuery = qs.Encode()
-
 	return &_result, nil
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *SearchDagsURL) Must(u *url.URL, err error) *url.URL {
+func (o *PostDAGActionURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -71,17 +70,17 @@ func (o *SearchDagsURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *SearchDagsURL) String() string {
+func (o *PostDAGActionURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *SearchDagsURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *PostDAGActionURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on SearchDagsURL")
+		return nil, errors.New("scheme is required for a full url on PostDAGActionURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on SearchDagsURL")
+		return nil, errors.New("host is required for a full url on PostDAGActionURL")
 	}
 
 	base, err := o.Build()
@@ -95,6 +94,6 @@ func (o *SearchDagsURL) BuildFull(scheme, host string) (*url.URL, error) {
 }
 
 // StringFull returns the string representation of a complete url
-func (o *SearchDagsURL) StringFull(scheme, host string) string {
+func (o *PostDAGActionURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

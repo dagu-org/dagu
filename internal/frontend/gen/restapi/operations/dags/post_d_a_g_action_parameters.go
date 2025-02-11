@@ -12,24 +12,25 @@ import (
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 )
 
-// NewCreateDagParams creates a new CreateDagParams object
+// NewPostDAGActionParams creates a new PostDAGActionParams object
 //
 // There are no default values defined in the spec.
-func NewCreateDagParams() CreateDagParams {
+func NewPostDAGActionParams() PostDAGActionParams {
 
-	return CreateDagParams{}
+	return PostDAGActionParams{}
 }
 
-// CreateDagParams contains all the bound params for the create dag operation
+// PostDAGActionParams contains all the bound params for the post d a g action operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters createDag
-type CreateDagParams struct {
+// swagger:parameters postDAGAction
+type PostDAGActionParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
@@ -38,21 +39,26 @@ type CreateDagParams struct {
 	  Required: true
 	  In: body
 	*/
-	Body *models.CreateDagRequest
+	Body *models.PostDagActionRequest
+	/*The ID of the DAG.
+	  Required: true
+	  In: path
+	*/
+	DagID string
 }
 
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewCreateDagParams() beforehand.
-func (o *CreateDagParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewPostDAGActionParams() beforehand.
+func (o *PostDAGActionParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
 
 	if runtime.HasBody(r) {
 		defer r.Body.Close()
-		var body models.CreateDagRequest
+		var body models.PostDagActionRequest
 		if err := route.Consumer.Consume(r.Body, &body); err != nil {
 			if err == io.EOF {
 				res = append(res, errors.Required("body", "body", ""))
@@ -77,8 +83,27 @@ func (o *CreateDagParams) BindRequest(r *http.Request, route *middleware.Matched
 	} else {
 		res = append(res, errors.Required("body", "body", ""))
 	}
+
+	rDagID, rhkDagID, _ := route.Params.GetOK("dagId")
+	if err := o.bindDagID(rDagID, rhkDagID, route.Formats); err != nil {
+		res = append(res, err)
+	}
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+// bindDagID binds and validates parameter DagID from path.
+func (o *PostDAGActionParams) bindDagID(rawData []string, hasKey bool, formats strfmt.Registry) error {
+	var raw string
+	if len(rawData) > 0 {
+		raw = rawData[len(rawData)-1]
+	}
+
+	// Required: true
+	// Parameter is provided by construction from the route
+	o.DagID = raw
+
 	return nil
 }

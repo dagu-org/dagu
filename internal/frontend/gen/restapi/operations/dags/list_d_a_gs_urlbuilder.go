@@ -9,16 +9,16 @@ import (
 	"errors"
 	"net/url"
 	golangswaggerpaths "path"
-	"strings"
+
+	"github.com/go-openapi/swag"
 )
 
-// GetDagDetailsURL generates an URL for the get dag details operation
-type GetDagDetailsURL struct {
-	DagID string
-
-	File *string
-	Step *string
-	Tab  *string
+// ListDAGsURL generates an URL for the list d a gs operation
+type ListDAGsURL struct {
+	Limit      *int64
+	Page       *int64
+	SearchName *string
+	SearchTag  *string
 
 	_basePath string
 	// avoid unkeyed usage
@@ -28,7 +28,7 @@ type GetDagDetailsURL struct {
 // WithBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *GetDagDetailsURL) WithBasePath(bp string) *GetDagDetailsURL {
+func (o *ListDAGsURL) WithBasePath(bp string) *ListDAGsURL {
 	o.SetBasePath(bp)
 	return o
 }
@@ -36,22 +36,15 @@ func (o *GetDagDetailsURL) WithBasePath(bp string) *GetDagDetailsURL {
 // SetBasePath sets the base path for this url builder, only required when it's different from the
 // base path specified in the swagger spec.
 // When the value of the base path is an empty string
-func (o *GetDagDetailsURL) SetBasePath(bp string) {
+func (o *ListDAGsURL) SetBasePath(bp string) {
 	o._basePath = bp
 }
 
 // Build a url path and query string
-func (o *GetDagDetailsURL) Build() (*url.URL, error) {
+func (o *ListDAGsURL) Build() (*url.URL, error) {
 	var _result url.URL
 
-	var _path = "/dags/{dagId}"
-
-	dagID := o.DagID
-	if dagID != "" {
-		_path = strings.Replace(_path, "{dagId}", dagID, -1)
-	} else {
-		return nil, errors.New("dagId is required on GetDagDetailsURL")
-	}
+	var _path = "/dags"
 
 	_basePath := o._basePath
 	if _basePath == "" {
@@ -61,28 +54,36 @@ func (o *GetDagDetailsURL) Build() (*url.URL, error) {
 
 	qs := make(url.Values)
 
-	var fileQ string
-	if o.File != nil {
-		fileQ = *o.File
+	var limitQ string
+	if o.Limit != nil {
+		limitQ = swag.FormatInt64(*o.Limit)
 	}
-	if fileQ != "" {
-		qs.Set("file", fileQ)
-	}
-
-	var stepQ string
-	if o.Step != nil {
-		stepQ = *o.Step
-	}
-	if stepQ != "" {
-		qs.Set("step", stepQ)
+	if limitQ != "" {
+		qs.Set("limit", limitQ)
 	}
 
-	var tabQ string
-	if o.Tab != nil {
-		tabQ = *o.Tab
+	var pageQ string
+	if o.Page != nil {
+		pageQ = swag.FormatInt64(*o.Page)
 	}
-	if tabQ != "" {
-		qs.Set("tab", tabQ)
+	if pageQ != "" {
+		qs.Set("page", pageQ)
+	}
+
+	var searchNameQ string
+	if o.SearchName != nil {
+		searchNameQ = *o.SearchName
+	}
+	if searchNameQ != "" {
+		qs.Set("searchName", searchNameQ)
+	}
+
+	var searchTagQ string
+	if o.SearchTag != nil {
+		searchTagQ = *o.SearchTag
+	}
+	if searchTagQ != "" {
+		qs.Set("searchTag", searchTagQ)
 	}
 
 	_result.RawQuery = qs.Encode()
@@ -91,7 +92,7 @@ func (o *GetDagDetailsURL) Build() (*url.URL, error) {
 }
 
 // Must is a helper function to panic when the url builder returns an error
-func (o *GetDagDetailsURL) Must(u *url.URL, err error) *url.URL {
+func (o *ListDAGsURL) Must(u *url.URL, err error) *url.URL {
 	if err != nil {
 		panic(err)
 	}
@@ -102,17 +103,17 @@ func (o *GetDagDetailsURL) Must(u *url.URL, err error) *url.URL {
 }
 
 // String returns the string representation of the path with query string
-func (o *GetDagDetailsURL) String() string {
+func (o *ListDAGsURL) String() string {
 	return o.Must(o.Build()).String()
 }
 
 // BuildFull builds a full url with scheme, host, path and query string
-func (o *GetDagDetailsURL) BuildFull(scheme, host string) (*url.URL, error) {
+func (o *ListDAGsURL) BuildFull(scheme, host string) (*url.URL, error) {
 	if scheme == "" {
-		return nil, errors.New("scheme is required for a full url on GetDagDetailsURL")
+		return nil, errors.New("scheme is required for a full url on ListDAGsURL")
 	}
 	if host == "" {
-		return nil, errors.New("host is required for a full url on GetDagDetailsURL")
+		return nil, errors.New("host is required for a full url on ListDAGsURL")
 	}
 
 	base, err := o.Build()
@@ -126,6 +127,6 @@ func (o *GetDagDetailsURL) BuildFull(scheme, host string) (*url.URL, error) {
 }
 
 // StringFull returns the string representation of a complete url
-func (o *GetDagDetailsURL) StringFull(scheme, host string) string {
+func (o *ListDAGsURL) StringFull(scheme, host string) string {
 	return o.Must(o.BuildFull(scheme, host)).String()
 }

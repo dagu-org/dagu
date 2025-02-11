@@ -11,42 +11,42 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 )
 
-// ListDagsHandlerFunc turns a function with the right signature into a list dags handler
-type ListDagsHandlerFunc func(ListDagsParams) middleware.Responder
+// ListDAGsHandlerFunc turns a function with the right signature into a list d a gs handler
+type ListDAGsHandlerFunc func(ListDAGsParams) middleware.Responder
 
 // Handle executing the request and returning a response
-func (fn ListDagsHandlerFunc) Handle(params ListDagsParams) middleware.Responder {
+func (fn ListDAGsHandlerFunc) Handle(params ListDAGsParams) middleware.Responder {
 	return fn(params)
 }
 
-// ListDagsHandler interface for that can handle valid list dags params
-type ListDagsHandler interface {
-	Handle(ListDagsParams) middleware.Responder
+// ListDAGsHandler interface for that can handle valid list d a gs params
+type ListDAGsHandler interface {
+	Handle(ListDAGsParams) middleware.Responder
 }
 
-// NewListDags creates a new http.Handler for the list dags operation
-func NewListDags(ctx *middleware.Context, handler ListDagsHandler) *ListDags {
-	return &ListDags{Context: ctx, Handler: handler}
+// NewListDAGs creates a new http.Handler for the list d a gs operation
+func NewListDAGs(ctx *middleware.Context, handler ListDAGsHandler) *ListDAGs {
+	return &ListDAGs{Context: ctx, Handler: handler}
 }
 
 /*
-	ListDags swagger:route GET /dags dags listDags
+	ListDAGs swagger:route GET /dags dags listDAGs
 
 # List all DAGs
 
 Returns a list of DAGs with optional pagination and search filters.
 */
-type ListDags struct {
+type ListDAGs struct {
 	Context *middleware.Context
-	Handler ListDagsHandler
+	Handler ListDAGsHandler
 }
 
-func (o *ListDags) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (o *ListDAGs) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	route, rCtx, _ := o.Context.RouteInfo(r)
 	if rCtx != nil {
 		*r = *rCtx
 	}
-	var Params = NewListDagsParams()
+	var Params = NewListDAGsParams()
 	if err := o.Context.BindValidRequest(r, route, &Params); err != nil { // bind params
 		o.Context.Respond(rw, r, route.Produces, route, err)
 		return
