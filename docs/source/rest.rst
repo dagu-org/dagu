@@ -1,129 +1,413 @@
 .. _REST API:
 
-REST API Docs
-=============
+REST API Documentation
+====================
 
-Dagu server provides simple APIs to query and control DAGs.
+Overview
+--------
 
-See the `OpenAPI Schema for Dagu <https://github.com/dagu-org/dagu/blob/main/api.v1.yaml>`_ for more details.
+Dagu server provides a comprehensive REST API for querying and controlling DAGs. The API enables programmatic control over workflow orchestration, including DAG management, execution control, monitoring, and system operations.
 
-**Endpoint** : `localhost:8080` (default)
+Base Configuration
+----------------
 
-**Required HTTP header** :
-   ``Accept: application/json``
+**Base URL**
+    ``http://localhost:8080/api/v1``
 
-API Endpoints
+**Content Types**
+    - Request: ``application/json``
+    - Response: ``application/json``
+
+**Required Headers**
+    - For all requests: ``Accept: application/json``
+    - For POST/PUT requests: ``Content-Type: application/json``
+
+Authentication
+    Currently, the API does not require authentication.
+
+System Operations
+---------------
+
+Health Check ``GET /health``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Checks the health status of the Dagu server and its dependencies.
+
+**URL**
+    ``/health``
+
+**Method**
+    ``GET``
+
+**Parameters**
+    None
+
+**Success Response (200)**
+
+.. code-block:: json
+
+    {
+        "status": "healthy",
+        "version": "1.0.0",
+        "uptime": 3600,
+        "timestamp": "2024-02-11T12:00:00Z"
+    }
+
+.. list-table:: Response Fields
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Field
+     - Description
+   * - status
+     - Server health status ("healthy" or "unhealthy")
+   * - version
+     - Current server version
+   * - uptime
+     - Server uptime in seconds
+   * - timestamp
+     - Current server time in ISO 8601 format
+
+**Error Response (503)**
+
+.. code-block:: json
+
+    {
+        "status": "unhealthy",
+        "version": "1.0.0",
+        "uptime": 3600,
+        "timestamp": "2024-02-11T12:00:00Z"
+    }
+
+DAG Operations
+------------
+
+List DAGs ``GET /dags``
+~~~~~~~~~~~~~~~~~~~~~
+
+Retrieves a paginated list of available DAGs with optional filtering capabilities.
+
+**URL**
+    ``/dags``
+
+**Method**
+    ``GET``
+
+.. list-table:: Query Parameters
+   :widths: 20 15 50 15
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+     - Required
+   * - page
+     - integer
+     - Page number for pagination
+     - No
+   * - limit
+     - integer
+     - Number of items per page
+     - No
+   * - searchName
+     - string
+     - Filter DAGs by matching name
+     - No
+   * - searchTag
+     - string
+     - Filter DAGs by matching tag
+     - No
+
+**Success Response (200)**
+
+.. code-block:: json
+
+    {
+        "DAGs": [
+            {
+                "File": "example.yaml",
+                "Dir": "/dags",
+                "DAG": {
+                    "Group": "default",
+                    "Name": "example_dag",
+                    "Schedule": [
+                        {
+                            "Expression": "0 * * * *"
+                        }
+                    ],
+                    "Description": "Example DAG",
+                    "Params": ["param1", "param2"],
+                    "DefaultParams": "{}",
+                    "Tags": ["example", "demo"]
+                },
+                "Status": {
+                    "RequestId": "req-123",
+                    "Name": "example_dag",
+                    "Status": 1,
+                    "StatusText": "running",
+                    "Pid": 1234,
+                    "StartedAt": "2024-02-11T10:00:00Z",
+                    "FinishedAt": "",
+                    "Log": "/logs/example_dag.log",
+                    "Params": "{}"
+                },
+                "Suspended": false,
+                "Error": "",
+            }
+        ],
+        "Errors": [],
+        "HasError": false,
+        "PageCount": 1
+    }
+
+**Response Fields Description**
+
+DAG Object:
+    - ``File``: Path to the DAG definition file
+    - ``Dir``: Directory containing the DAG file
+    - ``DAG``: DAG configuration and metadata
+    - ``Status``: Current execution status
+    - ``Suspended``: Whether the DAG is suspended
+    - ``Error``: Error message if any
+
+Create DAG ``POST /dags``
+~~~~~~~~~~~~~~~~~~~~~~
+
+Creates a new DAG definition.
+
+**URL**
+    ``/dags``
+
+**Method**
+    ``POST``
+
+**Request Body**
+
+.. code-block:: json
+
+    {
+        "action": "create",
+        "value": "dag_definition_yaml_content"
+    }
+
+.. list-table:: Request Fields
+   :widths: 20 15 50 15
+   :header-rows: 1
+
+   * - Field
+     - Type
+     - Description
+     - Required
+   * - action
+     - string
+     - Action to perform upon creation
+     - Yes
+   * - value
+     - string
+     - DAG definition in YAML format
+     - Yes
+
+**Success Response (200)**
+
+.. code-block:: json
+
+    {
+        "DagID": "new_dag_123"
+    }
+
+Get DAG Details ``GET /dags/{dagId}``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Retrieves detailed information about a specific DAG.
+
+**URL**
+    ``/dags/{dagId}``
+
+**Method**
+    ``GET``
+
+.. list-table:: URL Parameters
+   :widths: 20 15 50 15
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+     - Required
+   * - dagId
+     - string
+     - Unique identifier of the DAG
+     - Yes
+
+.. list-table:: Query Parameters
+   :widths: 20 15 50 15
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+     - Required
+   * - tab
+     - string
+     - Tab name for UI navigation
+     - No
+   * - file
+     - string
+     - Specific file related to the DAG
+     - No
+   * - step
+     - string
+     - Step name within the DAG
+     - No
+
+Perform DAG Action ``POST /dags/{dagId}``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Executes an action on a specific DAG.
+
+**URL**
+    ``/dags/{dagId}``
+
+**Method**
+    ``POST``
+
+.. list-table:: URL Parameters
+   :widths: 20 15 50 15
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+     - Required
+   * - dagId
+     - string
+     - Unique identifier of the DAG
+     - Yes
+
+**Request Body**
+
+.. code-block:: json
+
+    {
+        "action": "start",
+        "value": "optional_value",
+        "requestId": "req_123",
+        "step": "step_name",
+        "params": "{\"key\": \"value\"}"
+    }
+
+Available Actions:
+    - ``start``: Begin DAG execution
+    - ``suspend``: Pause DAG execution
+    - ``stop``: Stop DAG execution
+    - ``retry``: Retry failed execution
+
+Search Operations
+--------------
+
+Search DAGs ``GET /search``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Performs a full-text search across DAG definitions.
+
+**URL**
+    ``/search``
+
+**Method**
+    ``GET``
+
+.. list-table:: Query Parameters
+   :widths: 20 15 50 15
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+     - Required
+   * - q
+     - string
+     - Search query string
+     - Yes
+
+Error Handling
+------------
+
+All endpoints may return error responses in the following format:
+
+.. code-block:: json
+
+    {
+        "code": "error_code",
+        "message": "Human readable error message",
+        "details": {
+            "additional": "error details"
+        }
+    }
+
+.. list-table:: Error Codes
+   :widths: 25 75
+   :header-rows: 1
+
+   * - Code
+     - Description
+   * - validation_error
+     - Invalid request parameters or body
+   * - not_found
+     - Requested resource doesn't exist
+   * - internal_error
+     - Server-side error
+   * - unauthorized
+     - Authentication/authorization failed
+   * - bad_gateway
+     - Upstream service error
+
+Example Usage
+-----------
+
+Python Example
+~~~~~~~~~~~~
+
+.. code-block:: python
+
+    import requests
+    import json
+
+    BASE_URL = "http://localhost:8080/api/v1"
+
+    # List all DAGs
+    response = requests.get(f"{BASE_URL}/dags")
+    dags = response.json()
+
+    # Start a specific DAG
+    dag_id = "example_dag"
+    action = {
+        "action": "start",
+        "requestId": "req_123",
+        "params": "{}"
+    }
+    response = requests.post(f"{BASE_URL}/dags/{dag_id}", json=action)
+
+cURL Example
+~~~~~~~~~~
+
+.. code-block:: bash
+
+    # List DAGs
+    curl -X GET "http://localhost:8080/api/v1/dags" \
+         -H "Accept: application/json"
+
+    # Start a DAG
+    curl -X POST "http://localhost:8080/api/v1/dags/example_dag" \
+         -H "Content-Type: application/json" \
+         -H "Accept: application/json" \
+         -d '{"action": "start", "requestId": "req_123"}'
+
+Version History
 -------------
-This document provides information about the following endpoints:
 
-Show DAGs `GET /api/v1/dags/`
----------------------
-
-Return a list of available DAGs.
-
-URL
-  : ``/api/v1/dags/``
-
-Method
-  : ``GET``
-
-Header
-  : ``Accept: application/json``
-
-Query Parameters:
-
-- ``group=[string]`` where group is the subdirectory name that the DAG is in.
-
-Success Response
-~~~~~~~~~~~~~~~~~
-
-Code: ``200 OK``
-
-Response Body
-~~~~~~~~~~~~~
-
-
-Show DAG Detail `GET /api/v1/dags/:name`
---------------------------------------
-
-Return details about the specified DAG.
-
-URL
-  : ``/api/v1/dags/:name``
-
-URL Parameters
-  :name: [string] - Name of the DAG.
-
-Method
-  : ``GET``
-
-Header
-  : ``Accept: application/json``
-
-Success Response
-~~~~~~~~~~~~~~~~~
-
-Code: ``200 OK``
-
-Response Body
-~~~~~~~~~~~~~
-
-TBU
-
-
-Show DAG Spec `GET /api/v1/dags/:name/spec`
-----------------------------------------
-
-Return the specifications of the specified DAG.
-
-URL
-  : ``/api/v1/dags/:name/spec``
-
-URL Parameters
-  :name: [string] - Name of the DAG.
-
-Method
-  : ``GET``
-
-Header
-  : ``Accept: application/json``
-
-Success Response
-~~~~~~~~~~~~~~~~~
-
-Code: ``200 OK``
-
-Response Body
-~~~~~~~~~~~~~
-
-TBU
-
-
-Submit DAG Action `POST /api/v1/dags/:name`
-----------------------------------------
-
-Submit an action to a specified DAG.
-
-URL
-  : ``/api/v1/dags/:name``
-
-URL Parameters
-  :name: [string] - Name of the DAG.
-
-Form Parameters
-  :action: [string] - Specify 'start', 'stop', or 'retry'.
-  :request-id: [string] - Required if action is 'retry'.
-  :params: [string] - Parameters for the DAG execution.
-
-Method
-  : ``POST``
-
-Success Response
-~~~~~~~~~~~~~~~~~
-
-Code: ``200 OK``
-
-Response Body
-~~~~~~~~~~~~~
-
-TBU
+v0.0.1
+    - Initial API release
+    - Basic DAG operations
+    - Health check endpoint
+    - Search functionality
+    - Tag management
