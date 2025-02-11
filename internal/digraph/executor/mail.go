@@ -25,7 +25,7 @@ type mailConfig struct {
 	To          string   `mapstructure:"to"`
 	Subject     string   `mapstructure:"subject"`
 	Message     string   `mapstructure:"message"`
-	Attachments []string `json:"attachments,omitempty"`
+	Attachments []string `mapstructure:"attachments"`
 }
 
 func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
