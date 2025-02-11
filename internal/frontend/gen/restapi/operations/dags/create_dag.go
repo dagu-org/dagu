@@ -6,14 +6,9 @@ package dags
 // Editing this file might prove futile when you re-run the generate command
 
 import (
-	"context"
 	"net/http"
 
-	"github.com/go-openapi/errors"
 	"github.com/go-openapi/runtime/middleware"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/swag"
-	"github.com/go-openapi/validate"
 )
 
 // CreateDagHandlerFunc turns a function with the right signature into a create dag handler
@@ -37,6 +32,8 @@ func NewCreateDag(ctx *middleware.Context, handler CreateDagHandler) *CreateDag 
 /*
 	CreateDag swagger:route POST /dags dags createDag
 
+# Create a new DAG
+
 Creates a new DAG.
 */
 type CreateDag struct {
@@ -58,77 +55,4 @@ func (o *CreateDag) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	res := o.Handler.Handle(Params) // actually handle the request
 	o.Context.Respond(rw, r, route.Produces, route, res)
 
-}
-
-// CreateDagBody create dag body
-//
-// swagger:model CreateDagBody
-type CreateDagBody struct {
-
-	// action
-	// Required: true
-	Action *string `json:"action"`
-
-	// value
-	// Required: true
-	Value *string `json:"value"`
-}
-
-// Validate validates this create dag body
-func (o *CreateDagBody) Validate(formats strfmt.Registry) error {
-	var res []error
-
-	if err := o.validateAction(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := o.validateValue(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if len(res) > 0 {
-		return errors.CompositeValidationError(res...)
-	}
-	return nil
-}
-
-func (o *CreateDagBody) validateAction(formats strfmt.Registry) error {
-
-	if err := validate.Required("body"+"."+"action", "body", o.Action); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (o *CreateDagBody) validateValue(formats strfmt.Registry) error {
-
-	if err := validate.Required("body"+"."+"value", "body", o.Value); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// ContextValidate validates this create dag body based on context it is used
-func (o *CreateDagBody) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
-	return nil
-}
-
-// MarshalBinary interface implementation
-func (o *CreateDagBody) MarshalBinary() ([]byte, error) {
-	if o == nil {
-		return nil, nil
-	}
-	return swag.WriteJSON(o)
-}
-
-// UnmarshalBinary interface implementation
-func (o *CreateDagBody) UnmarshalBinary(b []byte) error {
-	var res CreateDagBody
-	if err := swag.ReadJSON(b, &res); err != nil {
-		return err
-	}
-	*o = res
-	return nil
 }

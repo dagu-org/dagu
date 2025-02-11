@@ -68,10 +68,8 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 	}
 }
 
-/*
-DaguAPI Dagu is a simple DAG (Directed Acyclic Graph) runner.
-It is a simple tool to run a series of tasks in a specific order
-*/
+/*DaguAPI Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+ */
 type DaguAPI struct {
 	spec            *loads.Document
 	context         *middleware.Context

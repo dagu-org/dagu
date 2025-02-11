@@ -27,7 +27,7 @@ type StatusNode struct {
 	// Required: true
 	Error *string `json:"Error"`
 
-	// finished at
+	// Timestamp when the step finished.
 	// Required: true
 	FinishedAt *string `json:"FinishedAt"`
 
@@ -39,7 +39,7 @@ type StatusNode struct {
 	// Required: true
 	RetryCount *int64 `json:"RetryCount"`
 
-	// started at
+	// Timestamp when the step started.
 	// Required: true
 	StartedAt *string `json:"StartedAt"`
 

@@ -19,11 +19,11 @@ import (
 // swagger:model ApiError
 type APIError struct {
 
-	// detailed message
+	// Detailed error description.
 	// Required: true
 	DetailedMessage *string `json:"detailedMessage"`
 
-	// message
+	// Short error message.
 	// Required: true
 	Message *string `json:"message"`
 }

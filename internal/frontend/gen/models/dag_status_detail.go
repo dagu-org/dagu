@@ -20,7 +20,7 @@ import (
 // swagger:model dagStatusDetail
 type DagStatusDetail struct {
 
-	// finished at
+	// Timestamp when the DAG finished.
 	// Required: true
 	FinishedAt *string `json:"FinishedAt"`
 
@@ -64,7 +64,7 @@ type DagStatusDetail struct {
 	// Required: true
 	RequestID *string `json:"RequestId"`
 
-	// started at
+	// Timestamp when the DAG started.
 	// Required: true
 	StartedAt *string `json:"StartedAt"`
 

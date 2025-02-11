@@ -17,7 +17,7 @@ import (
 // swagger:model postDagActionResponse
 type PostDagActionResponse struct {
 
-	// new dag ID
+	// New DAG ID, if the action triggered a DAG rename or duplication.
 	NewDagID string `json:"NewDagID,omitempty"`
 }
 

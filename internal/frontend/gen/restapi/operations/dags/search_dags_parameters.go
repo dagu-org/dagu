@@ -32,7 +32,7 @@ type SearchDagsParams struct {
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*
+	/*A search query string.
 	  Required: true
 	  In: query
 	*/

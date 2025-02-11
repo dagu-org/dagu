@@ -6,6 +6,7 @@ package dags
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/go-openapi/errors"
@@ -13,6 +14,8 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
+
+	"github.com/dagu-org/dagu/internal/frontend/gen/models"
 )
 
 // NewPostDagActionParams creates a new PostDagActionParams object
@@ -33,10 +36,11 @@ type PostDagActionParams struct {
 	HTTPRequest *http.Request `json:"-"`
 
 	/*
+	  Required: true
 	  In: body
 	*/
-	Body PostDagActionBody
-	/*
+	Body *models.PostDagActionRequest
+	/*The ID of the DAG.
 	  Required: true
 	  In: path
 	*/
@@ -54,9 +58,13 @@ func (o *PostDagActionParams) BindRequest(r *http.Request, route *middleware.Mat
 
 	if runtime.HasBody(r) {
 		defer r.Body.Close()
-		var body PostDagActionBody
+		var body models.PostDagActionRequest
 		if err := route.Consumer.Consume(r.Body, &body); err != nil {
-			res = append(res, errors.NewParseError("body", "body", "", err))
+			if err == io.EOF {
+				res = append(res, errors.Required("body", "body", ""))
+			} else {
+				res = append(res, errors.NewParseError("body", "body", "", err))
+			}
 		} else {
 			// validate body object
 			if err := body.Validate(route.Formats); err != nil {
@@ -69,9 +77,11 @@ func (o *PostDagActionParams) BindRequest(r *http.Request, route *middleware.Mat
 			}
 
 			if len(res) == 0 {
-				o.Body = body
+				o.Body = &body
 			}
 		}
+	} else {
+		res = append(res, errors.Required("body", "body", ""))
 	}
 
 	rDagID, rhkDagID, _ := route.Params.GetOK("dagId")

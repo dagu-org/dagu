@@ -32,7 +32,9 @@ func NewDeleteDag(ctx *middleware.Context, handler DeleteDagHandler) *DeleteDag 
 /*
 	DeleteDag swagger:route DELETE /dags/{dagId} dags deleteDag
 
-Deletes a DAG.
+# Delete a DAG
+
+Deletes a DAG by its ID.
 */
 type DeleteDag struct {
 	Context *middleware.Context

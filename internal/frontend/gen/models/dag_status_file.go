@@ -24,7 +24,8 @@ type DagStatusFile struct {
 	File *string `json:"File"`
 
 	// status
-	Status *DagStatusDetail `json:"Status,omitempty"`
+	// Required: true
+	Status *DagStatusDetail `json:"Status"`
 }
 
 // Validate validates this dag status file
@@ -55,8 +56,9 @@ func (m *DagStatusFile) validateFile(formats strfmt.Registry) error {
 }
 
 func (m *DagStatusFile) validateStatus(formats strfmt.Registry) error {
-	if swag.IsZero(m.Status) { // not required
-		return nil
+
+	if err := validate.Required("Status", "body", m.Status); err != nil {
+		return err
 	}
 
 	if m.Status != nil {
@@ -90,10 +92,6 @@ func (m *DagStatusFile) ContextValidate(ctx context.Context, formats strfmt.Regi
 func (m *DagStatusFile) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Status != nil {
-
-		if swag.IsZero(m.Status) { // not required
-			return nil
-		}
 
 		if err := m.Status.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {

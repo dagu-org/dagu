@@ -32,7 +32,9 @@ func NewGetDagDetails(ctx *middleware.Context, handler GetDagDetailsHandler) *Ge
 /*
 	GetDagDetails swagger:route GET /dags/{dagId} dags getDagDetails
 
-Returns details of a DAG.
+# Get DAG details
+
+Returns details of a DAG, including files, logs, etc.
 */
 type GetDagDetails struct {
 	Context *middleware.Context

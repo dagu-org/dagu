@@ -32,19 +32,19 @@ type ListDagsParams struct {
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*
+	/*Number of items to return per page.
 	  In: query
 	*/
 	Limit *int64
-	/*
+	/*Page number (for pagination).
 	  In: query
 	*/
 	Page *int64
-	/*
+	/*Filter DAGs by matching name.
 	  In: query
 	*/
 	SearchName *string
-	/*
+	/*Filter DAGs by matching tag.
 	  In: query
 	*/
 	SearchTag *string
