@@ -273,7 +273,6 @@ definitions:
         description: "Server uptime in seconds"
       timestamp:
         type: string
-        format: "date-time"
         description: "Current server time"
     required:
       - status

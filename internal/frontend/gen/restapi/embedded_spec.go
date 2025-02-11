@@ -856,8 +856,7 @@ func init() {
         },
         "timestamp": {
           "description": "Current server time",
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "uptime": {
           "description": "Server uptime in seconds",
@@ -2056,8 +2055,7 @@ func init() {
         },
         "timestamp": {
           "description": "Current server time",
-          "type": "string",
-          "format": "date-time"
+          "type": "string"
         },
         "uptime": {
           "description": "Server uptime in seconds",

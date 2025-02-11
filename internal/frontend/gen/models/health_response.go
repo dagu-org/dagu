@@ -27,8 +27,7 @@ type HealthResponse struct {
 
 	// Current server time
 	// Required: true
-	// Format: date-time
-	Timestamp *strfmt.DateTime `json:"timestamp"`
+	Timestamp *string `json:"timestamp"`
 
 	// Server uptime in seconds
 	// Required: true
@@ -111,10 +110,6 @@ func (m *HealthResponse) validateStatus(formats strfmt.Registry) error {
 func (m *HealthResponse) validateTimestamp(formats strfmt.Registry) error {
 
 	if err := validate.Required("timestamp", "body", m.Timestamp); err != nil {
-		return err
-	}
-
-	if err := validate.FormatOf("timestamp", "body", "date-time", m.Timestamp.String(), formats); err != nil {
 		return err
 	}
 

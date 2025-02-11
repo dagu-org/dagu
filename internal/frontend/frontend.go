@@ -13,6 +13,9 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.RemoteNodes, cfg.APIBaseURL)
 	apiHandlers = append(apiHandlers, dagAPIHandler)
 
+	systemAPIHandler := handlers.NewSystem()
+	apiHandlers = append(apiHandlers, systemAPIHandler)
+
 	var remoteNodes []string
 	for _, n := range cfg.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)

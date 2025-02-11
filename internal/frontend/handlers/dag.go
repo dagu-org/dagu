@@ -39,6 +39,8 @@ const (
 	dagTabTypeSchedulerLog = "scheduler-log"
 )
 
+var _ server.Handler = (*DAG)(nil)
+
 // DAG is a handler for the DAG API.
 type DAG struct {
 	client             client.Client
