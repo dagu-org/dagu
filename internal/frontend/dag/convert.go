@@ -7,7 +7,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-func convertToDAG(dag *digraph.DAG) *models.Dag {
+func convertToDAG(dag *digraph.DAG) *models.DAG {
 	var schedules []*models.Schedule
 	for _, s := range dag.Schedule {
 		schedules = append(schedules, &models.Schedule{
@@ -15,7 +15,7 @@ func convertToDAG(dag *digraph.DAG) *models.Dag {
 		})
 	}
 
-	return &models.Dag{
+	return &models.DAG{
 		Name:          swag.String(dag.Name),
 		Group:         swag.String(dag.Group),
 		Description:   swag.String(dag.Description),
@@ -26,8 +26,8 @@ func convertToDAG(dag *digraph.DAG) *models.Dag {
 	}
 }
 
-func convertToStatusDetail(s model.Status) *models.DagStatusDetail {
-	status := &models.DagStatusDetail{
+func convertToStatusDetails(s model.Status) *models.DAGStatusDetails {
+	status := &models.DAGStatusDetails{
 		Log:        swag.String(s.Log),
 		Name:       swag.String(s.Name),
 		Params:     swag.String(s.Params),
@@ -56,8 +56,8 @@ func convertToStatusDetail(s model.Status) *models.DagStatusDetail {
 	return status
 }
 
-func convertToNode(node *model.Node) *models.StatusNode {
-	return &models.StatusNode{
+func convertToNode(node *model.Node) *models.Node {
+	return &models.Node{
 		DoneCount:  swag.Int64(int64(node.DoneCount)),
 		Error:      swag.String(node.Error),
 		FinishedAt: swag.String(node.FinishedAt),

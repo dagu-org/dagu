@@ -15,10 +15,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagDetail dag detail
+// DAGDetails d a g details
 //
-// swagger:model dagDetail
-type DagDetail struct {
+// swagger:model DAGDetails
+type DAGDetails struct {
 
 	// default params
 	// Required: true
@@ -85,8 +85,8 @@ type DagDetail struct {
 	Tags []string `json:"Tags"`
 }
 
-// Validate validates this dag detail
-func (m *DagDetail) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g details
+func (m *DAGDetails) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDefaultParams(formats); err != nil {
@@ -159,7 +159,7 @@ func (m *DagDetail) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateDefaultParams(formats strfmt.Registry) error {
+func (m *DAGDetails) validateDefaultParams(formats strfmt.Registry) error {
 
 	if err := validate.Required("DefaultParams", "body", m.DefaultParams); err != nil {
 		return err
@@ -168,7 +168,7 @@ func (m *DagDetail) validateDefaultParams(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateDelay(formats strfmt.Registry) error {
+func (m *DAGDetails) validateDelay(formats strfmt.Registry) error {
 
 	if err := validate.Required("Delay", "body", m.Delay); err != nil {
 		return err
@@ -177,7 +177,7 @@ func (m *DagDetail) validateDelay(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateDescription(formats strfmt.Registry) error {
+func (m *DAGDetails) validateDescription(formats strfmt.Registry) error {
 
 	if err := validate.Required("Description", "body", m.Description); err != nil {
 		return err
@@ -186,7 +186,7 @@ func (m *DagDetail) validateDescription(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateEnv(formats strfmt.Registry) error {
+func (m *DAGDetails) validateEnv(formats strfmt.Registry) error {
 
 	if err := validate.Required("Env", "body", m.Env); err != nil {
 		return err
@@ -195,7 +195,7 @@ func (m *DagDetail) validateEnv(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateGroup(formats strfmt.Registry) error {
+func (m *DAGDetails) validateGroup(formats strfmt.Registry) error {
 
 	if err := validate.Required("Group", "body", m.Group); err != nil {
 		return err
@@ -204,7 +204,7 @@ func (m *DagDetail) validateGroup(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateHandlerOn(formats strfmt.Registry) error {
+func (m *DAGDetails) validateHandlerOn(formats strfmt.Registry) error {
 
 	if err := validate.Required("HandlerOn", "body", m.HandlerOn); err != nil {
 		return err
@@ -224,7 +224,7 @@ func (m *DagDetail) validateHandlerOn(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateHistRetentionDays(formats strfmt.Registry) error {
+func (m *DAGDetails) validateHistRetentionDays(formats strfmt.Registry) error {
 
 	if err := validate.Required("HistRetentionDays", "body", m.HistRetentionDays); err != nil {
 		return err
@@ -233,7 +233,7 @@ func (m *DagDetail) validateHistRetentionDays(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateLocation(formats strfmt.Registry) error {
+func (m *DAGDetails) validateLocation(formats strfmt.Registry) error {
 
 	if err := validate.Required("Location", "body", m.Location); err != nil {
 		return err
@@ -242,7 +242,7 @@ func (m *DagDetail) validateLocation(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateLogDir(formats strfmt.Registry) error {
+func (m *DAGDetails) validateLogDir(formats strfmt.Registry) error {
 
 	if err := validate.Required("LogDir", "body", m.LogDir); err != nil {
 		return err
@@ -251,7 +251,7 @@ func (m *DagDetail) validateLogDir(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateMaxActiveRuns(formats strfmt.Registry) error {
+func (m *DAGDetails) validateMaxActiveRuns(formats strfmt.Registry) error {
 
 	if err := validate.Required("MaxActiveRuns", "body", m.MaxActiveRuns); err != nil {
 		return err
@@ -260,7 +260,7 @@ func (m *DagDetail) validateMaxActiveRuns(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateName(formats strfmt.Registry) error {
+func (m *DAGDetails) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("Name", "body", m.Name); err != nil {
 		return err
@@ -269,7 +269,7 @@ func (m *DagDetail) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateParams(formats strfmt.Registry) error {
+func (m *DAGDetails) validateParams(formats strfmt.Registry) error {
 
 	if err := validate.Required("Params", "body", m.Params); err != nil {
 		return err
@@ -278,7 +278,7 @@ func (m *DagDetail) validateParams(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validatePreconditions(formats strfmt.Registry) error {
+func (m *DAGDetails) validatePreconditions(formats strfmt.Registry) error {
 
 	if err := validate.Required("Preconditions", "body", m.Preconditions); err != nil {
 		return err
@@ -305,7 +305,7 @@ func (m *DagDetail) validatePreconditions(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateSchedule(formats strfmt.Registry) error {
+func (m *DAGDetails) validateSchedule(formats strfmt.Registry) error {
 
 	if err := validate.Required("Schedule", "body", m.Schedule); err != nil {
 		return err
@@ -332,7 +332,7 @@ func (m *DagDetail) validateSchedule(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateSteps(formats strfmt.Registry) error {
+func (m *DAGDetails) validateSteps(formats strfmt.Registry) error {
 
 	if err := validate.Required("Steps", "body", m.Steps); err != nil {
 		return err
@@ -359,7 +359,7 @@ func (m *DagDetail) validateSteps(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagDetail) validateTags(formats strfmt.Registry) error {
+func (m *DAGDetails) validateTags(formats strfmt.Registry) error {
 
 	if err := validate.Required("Tags", "body", m.Tags); err != nil {
 		return err
@@ -368,8 +368,8 @@ func (m *DagDetail) validateTags(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this dag detail based on the context it is used
-func (m *DagDetail) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this d a g details based on the context it is used
+func (m *DAGDetails) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateHandlerOn(ctx, formats); err != nil {
@@ -394,7 +394,7 @@ func (m *DagDetail) ContextValidate(ctx context.Context, formats strfmt.Registry
 	return nil
 }
 
-func (m *DagDetail) contextValidateHandlerOn(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGDetails) contextValidateHandlerOn(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.HandlerOn != nil {
 
@@ -411,7 +411,7 @@ func (m *DagDetail) contextValidateHandlerOn(ctx context.Context, formats strfmt
 	return nil
 }
 
-func (m *DagDetail) contextValidatePreconditions(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGDetails) contextValidatePreconditions(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Preconditions); i++ {
 
@@ -436,7 +436,7 @@ func (m *DagDetail) contextValidatePreconditions(ctx context.Context, formats st
 	return nil
 }
 
-func (m *DagDetail) contextValidateSchedule(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGDetails) contextValidateSchedule(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Schedule); i++ {
 
@@ -461,7 +461,7 @@ func (m *DagDetail) contextValidateSchedule(ctx context.Context, formats strfmt.
 	return nil
 }
 
-func (m *DagDetail) contextValidateSteps(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGDetails) contextValidateSteps(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Steps); i++ {
 
@@ -487,7 +487,7 @@ func (m *DagDetail) contextValidateSteps(ctx context.Context, formats strfmt.Reg
 }
 
 // MarshalBinary interface implementation
-func (m *DagDetail) MarshalBinary() ([]byte, error) {
+func (m *DAGDetails) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -495,8 +495,8 @@ func (m *DagDetail) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagDetail) UnmarshalBinary(b []byte) error {
-	var res DagDetail
+func (m *DAGDetails) UnmarshalBinary(b []byte) error {
+	var res DAGDetails
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

@@ -17,7 +17,7 @@ import (
 
 // PostDagActionRequest Request body for posting an action to a DAG.
 //
-// swagger:model postDagActionRequest
+// swagger:model PostDagActionRequest
 type PostDagActionRequest struct {
 
 	// Action to be performed on the DAG.

@@ -15,7 +15,7 @@ import (
 
 // HandlerOn handler on
 //
-// swagger:model handlerOn
+// swagger:model HandlerOn
 type HandlerOn struct {
 
 	// cancel

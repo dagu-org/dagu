@@ -17,12 +17,12 @@ import (
 
 // ListDagsResponse list dags response
 //
-// swagger:model listDagsResponse
+// swagger:model ListDagsResponse
 type ListDagsResponse struct {
 
 	// d a gs
 	// Required: true
-	DAGs []*DagListItem `json:"DAGs"`
+	DAGs []*DAGStatusFile `json:"DAGs"`
 
 	// errors
 	// Required: true

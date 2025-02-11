@@ -56,7 +56,7 @@ paths:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/listDagsResponse"
+            $ref: "#/definitions/ListDagsResponse"
         default:
           description: "Generic error response."
           schema:
@@ -73,12 +73,12 @@ paths:
           name: "body"
           required: true
           schema:
-            $ref: "#/definitions/createDagRequest"
+            $ref: "#/definitions/CreateDagRequest"
       responses:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/createDagResponse"
+            $ref: "#/definitions/CreateDagResponse"
         default:
           description: "Generic error response."
           schema:
@@ -116,7 +116,7 @@ paths:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/getDagDetailsResponse"
+            $ref: "#/definitions/GetDagDetailsResponse"
         default:
           description: "Generic error response."
           schema:
@@ -138,12 +138,12 @@ paths:
           name: "body"
           required: true
           schema:
-            $ref: "#/definitions/postDagActionRequest"
+            $ref: "#/definitions/PostDagActionRequest"
       responses:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/postDagActionResponse"
+            $ref: "#/definitions/PostDagActionResponse"
         default:
           description: "Generic error response."
           schema:
@@ -186,7 +186,7 @@ paths:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/searchDagsResponse"
+            $ref: "#/definitions/SearchDAGsResponse"
         default:
           description: "Generic error response."
           schema:
@@ -203,7 +203,7 @@ paths:
         "200":
           description: "A successful response."
           schema:
-            $ref: "#/definitions/listTagResponse"
+            $ref: "#/definitions/ListTagResponse"
         default:
           description: "Generic error response."
           schema:
@@ -229,7 +229,7 @@ definitions:
   ################################################################
   # Requests
   ################################################################
-  createDagRequest:
+  CreateDagRequest:
     type: object
     description: "Request body for creating a DAG."
     properties:
@@ -243,7 +243,7 @@ definitions:
       - action
       - value
 
-  postDagActionRequest:
+  PostDagActionRequest:
     type: object
     description: "Request body for posting an action to a DAG."
     properties:
@@ -277,13 +277,13 @@ definitions:
   ################################################################
   # Responses
   ################################################################
-  listDagsResponse:
+  ListDagsResponse:
     type: object
     properties:
       DAGs:
         type: array
         items:
-          $ref: "#/definitions/dagListItem"
+          $ref: "#/definitions/DAGStatusFile"
       Errors:
         type: array
         items:
@@ -298,7 +298,7 @@ definitions:
       - HasError
       - PageCount
 
-  createDagResponse:
+  CreateDagResponse:
     type: object
     properties:
       DagID:
@@ -306,13 +306,13 @@ definitions:
     required:
       - DagID
 
-  getDagDetailsResponse:
+  GetDagDetailsResponse:
     type: object
     properties:
       Title:
         type: string
       DAG:
-        $ref: "#/definitions/dagStatusWithDetails"
+        $ref: "#/definitions/DAGStatusFileDetails"
       Tab:
         type: string
       Graph:
@@ -320,13 +320,13 @@ definitions:
       Definition:
         type: string
       LogData:
-        $ref: "#/definitions/dagLogResponse"
+        $ref: "#/definitions/DAGLogData"
       LogUrl:
         type: string
       StepLog:
-        $ref: "#/definitions/dagStepLogResponse"
+        $ref: "#/definitions/StepLog"
       ScLog:
-        $ref: "#/definitions/dagSchedulerLogResponse"
+        $ref: "#/definitions/SchedulerLog"
       Errors:
         type: array
         items:
@@ -343,7 +343,7 @@ definitions:
       - ScLog
       - Errors
 
-  postDagActionResponse:
+  PostDagActionResponse:
     type: object
     properties:
       NewDagID:
@@ -353,7 +353,7 @@ definitions:
   ################################################################
   # DAG List / Status / Detail
   ################################################################
-  dagListItem:
+  DAGStatusFile:
     type: object
     properties:
       File:
@@ -361,9 +361,9 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: "#/definitions/dag"
+        $ref: "#/definitions/DAG"
       Status:
-        $ref: "#/definitions/dagStatus"
+        $ref: "#/definitions/DAGStatus"
       Suspended:
         type: boolean
       Error:
@@ -379,7 +379,7 @@ definitions:
       - Error
       - ErrorT
 
-  dag:
+  DAG:
     type: object
     properties:
       Group:
@@ -389,7 +389,7 @@ definitions:
       Schedule:
         type: array
         items:
-          $ref: "#/definitions/schedule"
+          $ref: "#/definitions/Schedule"
       Description:
         type: string
       Params:
@@ -411,7 +411,7 @@ definitions:
       - DefaultParams
       - Tags
 
-  schedule:
+  Schedule:
     type: object
     properties:
       Expression:
@@ -419,7 +419,7 @@ definitions:
     required:
       - Expression
 
-  dagStatus:
+  DAGStatus:
     type: object
     properties:
       RequestId:
@@ -453,7 +453,7 @@ definitions:
       - Log
       - Params
 
-  dagStatusWithDetails:
+  DAGStatusFileDetails:
     type: object
     properties:
       File:
@@ -461,9 +461,9 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: "#/definitions/dagDetail"
+        $ref: "#/definitions/DAGDetails"
       Status:
-        $ref: "#/definitions/dagStatusDetail"
+        $ref: "#/definitions/DAGStatusDetails"
       Suspended:
         type: boolean
       Error:
@@ -479,7 +479,7 @@ definitions:
       - Error
       - ErrorT
 
-  dagDetail:
+  DAGDetails:
     type: object
     properties:
       Location:
@@ -491,7 +491,7 @@ definitions:
       Schedule:
         type: array
         items:
-          $ref: "#/definitions/schedule"
+          $ref: "#/definitions/Schedule"
       Description:
         type: string
       Env:
@@ -501,7 +501,7 @@ definitions:
       LogDir:
         type: string
       HandlerOn:
-        $ref: "#/definitions/handlerOn"
+        $ref: "#/definitions/HandlerOn"
       Steps:
         type: array
         items:
@@ -513,7 +513,7 @@ definitions:
       Preconditions:
         type: array
         items:
-          $ref: "#/definitions/condition"
+          $ref: "#/definitions/Condition"
       MaxActiveRuns:
         type: integer
       Params:
@@ -544,7 +544,7 @@ definitions:
       - DefaultParams
       - Tags
 
-  handlerOn:
+  HandlerOn:
     type: object
     properties:
       Failure:
@@ -556,7 +556,7 @@ definitions:
       Exit:
         $ref: "#/definitions/stepObject"
 
-  dagStatusDetail:
+  DAGStatusDetails:
     type: object
     properties:
       RequestId:
@@ -572,15 +572,15 @@ definitions:
       Nodes:
         type: array
         items:
-          $ref: "#/definitions/statusNode"
+          $ref: "#/definitions/Node"
       OnExit:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       OnSuccess:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       OnFailure:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       OnCancel:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       StartedAt:
         type: string
         description: "Timestamp when the DAG started."
@@ -607,7 +607,7 @@ definitions:
       - Log
       - Params
 
-  statusNode:
+  Node:
     type: object
     properties:
       Step:
@@ -679,13 +679,13 @@ definitions:
         items:
           type: string
       RepeatPolicy:
-        $ref: "#/definitions/repeatPolicy"
+        $ref: "#/definitions/RepeatPolicy"
       MailOnError:
         type: boolean
       Preconditions:
         type: array
         items:
-          $ref: "#/definitions/condition"
+          $ref: "#/definitions/Condition"
     required:
       - Name
       - Description
@@ -706,13 +706,13 @@ definitions:
   ################################################################
   # Search
   ################################################################
-  searchDagsResponse:
+  SearchDAGsResponse:
     type: object
     properties:
       Results:
         type: array
         items:
-          $ref: "#/definitions/searchDagsResultItem"
+          $ref: "#/definitions/SearchDAGsResultItem"
       Errors:
         type: array
         items:
@@ -721,19 +721,19 @@ definitions:
       - Results
       - Errors
 
-  searchDagsResultItem:
+  SearchDAGsResultItem:
     type: object
     properties:
       Name:
         type: string
       DAG:
-        $ref: "#/definitions/dag"
+        $ref: "#/definitions/DAG"
       Matches:
         type: array
         items:
-          $ref: "#/definitions/searchDagsMatchItem"
+          $ref: "#/definitions/SearchDAGsMatchItem"
 
-  searchDagsMatchItem:
+  SearchDAGsMatchItem:
     type: object
     properties:
       Line:
@@ -746,11 +746,11 @@ definitions:
   ################################################################
   # Logging
   ################################################################
-  dagStepLogResponse:
+  StepLog:
     type: object
     properties:
       Step:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       LogFile:
         type: string
       Content:
@@ -760,7 +760,7 @@ definitions:
       - LogFile
       - Content
 
-  dagSchedulerLogResponse:
+  SchedulerLog:
     type: object
     properties:
       LogFile:
@@ -771,22 +771,22 @@ definitions:
       - LogFile
       - Content
 
-  dagLogResponse:
+  DAGLogData:
     type: object
     properties:
       GridData:
         type: array
         items:
-          $ref: "#/definitions/dagLogGridItem"
+          $ref: "#/definitions/DAGLogGridItem"
       Logs:
         type: array
         items:
-          $ref: "#/definitions/dagStatusFile"
+          $ref: "#/definitions/DAGLogStatusFile"
     required:
       - GridData
       - Logs
 
-  dagLogGridItem:
+  DAGLogGridItem:
     type: object
     properties:
       Name:
@@ -799,13 +799,13 @@ definitions:
       - Name
       - Vals
 
-  dagStatusFile:
+  DAGLogStatusFile:
     type: object
     properties:
       File:
         type: string
       Status:
-        $ref: "#/definitions/dagStatusDetail"
+        $ref: "#/definitions/DAGStatusDetails"
     required:
       - File
       - Status
@@ -813,7 +813,7 @@ definitions:
   ################################################################
   # Other
   ################################################################
-  condition:
+  Condition:
     type: object
     properties:
       Condition:
@@ -821,7 +821,7 @@ definitions:
       Expected:
         type: string
 
-  repeatPolicy:
+  RepeatPolicy:
     type: object
     properties:
       Repeat:
@@ -829,7 +829,7 @@ definitions:
       Interval:
         type: integer
 
-  listTagResponse:
+  ListTagResponse:
     type: object
     properties:
       Tags:

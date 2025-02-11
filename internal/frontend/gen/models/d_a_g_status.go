@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagStatus dag status
+// DAGStatus d a g status
 //
-// swagger:model dagStatus
-type DagStatus struct {
+// swagger:model DAGStatus
+type DAGStatus struct {
 
 	// Timestamp when the DAG finished.
 	// Required: true
@@ -56,8 +56,8 @@ type DagStatus struct {
 	StatusText *string `json:"StatusText"`
 }
 
-// Validate validates this dag status
-func (m *DagStatus) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g status
+func (m *DAGStatus) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateFinishedAt(formats); err != nil {
@@ -102,7 +102,7 @@ func (m *DagStatus) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateFinishedAt(formats strfmt.Registry) error {
+func (m *DAGStatus) validateFinishedAt(formats strfmt.Registry) error {
 
 	if err := validate.Required("FinishedAt", "body", m.FinishedAt); err != nil {
 		return err
@@ -111,7 +111,7 @@ func (m *DagStatus) validateFinishedAt(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateLog(formats strfmt.Registry) error {
+func (m *DAGStatus) validateLog(formats strfmt.Registry) error {
 
 	if err := validate.Required("Log", "body", m.Log); err != nil {
 		return err
@@ -120,7 +120,7 @@ func (m *DagStatus) validateLog(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateName(formats strfmt.Registry) error {
+func (m *DAGStatus) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("Name", "body", m.Name); err != nil {
 		return err
@@ -129,7 +129,7 @@ func (m *DagStatus) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateParams(formats strfmt.Registry) error {
+func (m *DAGStatus) validateParams(formats strfmt.Registry) error {
 
 	if err := validate.Required("Params", "body", m.Params); err != nil {
 		return err
@@ -138,7 +138,7 @@ func (m *DagStatus) validateParams(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validatePid(formats strfmt.Registry) error {
+func (m *DAGStatus) validatePid(formats strfmt.Registry) error {
 
 	if err := validate.Required("Pid", "body", m.Pid); err != nil {
 		return err
@@ -147,7 +147,7 @@ func (m *DagStatus) validatePid(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateRequestID(formats strfmt.Registry) error {
+func (m *DAGStatus) validateRequestID(formats strfmt.Registry) error {
 
 	if err := validate.Required("RequestId", "body", m.RequestID); err != nil {
 		return err
@@ -156,7 +156,7 @@ func (m *DagStatus) validateRequestID(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateStartedAt(formats strfmt.Registry) error {
+func (m *DAGStatus) validateStartedAt(formats strfmt.Registry) error {
 
 	if err := validate.Required("StartedAt", "body", m.StartedAt); err != nil {
 		return err
@@ -165,7 +165,7 @@ func (m *DagStatus) validateStartedAt(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateStatus(formats strfmt.Registry) error {
+func (m *DAGStatus) validateStatus(formats strfmt.Registry) error {
 
 	if err := validate.Required("Status", "body", m.Status); err != nil {
 		return err
@@ -174,7 +174,7 @@ func (m *DagStatus) validateStatus(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatus) validateStatusText(formats strfmt.Registry) error {
+func (m *DAGStatus) validateStatusText(formats strfmt.Registry) error {
 
 	if err := validate.Required("StatusText", "body", m.StatusText); err != nil {
 		return err
@@ -183,13 +183,13 @@ func (m *DagStatus) validateStatusText(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this dag status based on context it is used
-func (m *DagStatus) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this d a g status based on context it is used
+func (m *DAGStatus) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *DagStatus) MarshalBinary() ([]byte, error) {
+func (m *DAGStatus) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -197,8 +197,8 @@ func (m *DagStatus) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagStatus) UnmarshalBinary(b []byte) error {
-	var res DagStatus
+func (m *DAGStatus) UnmarshalBinary(b []byte) error {
+	var res DAGStatus
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

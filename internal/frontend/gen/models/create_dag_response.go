@@ -16,7 +16,7 @@ import (
 
 // CreateDagResponse create dag response
 //
-// swagger:model createDagResponse
+// swagger:model CreateDagResponse
 type CreateDagResponse struct {
 
 	// dag ID

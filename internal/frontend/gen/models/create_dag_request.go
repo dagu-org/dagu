@@ -16,7 +16,7 @@ import (
 
 // CreateDagRequest Request body for creating a DAG.
 //
-// swagger:model createDagRequest
+// swagger:model CreateDagRequest
 type CreateDagRequest struct {
 
 	// Action to perform upon creation (if any).

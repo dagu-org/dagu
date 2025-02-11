@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagStatusFile dag status file
+// DAGLogStatusFile d a g log status file
 //
-// swagger:model dagStatusFile
-type DagStatusFile struct {
+// swagger:model DAGLogStatusFile
+type DAGLogStatusFile struct {
 
 	// file
 	// Required: true
@@ -25,11 +25,11 @@ type DagStatusFile struct {
 
 	// status
 	// Required: true
-	Status *DagStatusDetail `json:"Status"`
+	Status *DAGStatusDetails `json:"Status"`
 }
 
-// Validate validates this dag status file
-func (m *DagStatusFile) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g log status file
+func (m *DAGLogStatusFile) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateFile(formats); err != nil {
@@ -46,7 +46,7 @@ func (m *DagStatusFile) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusFile) validateFile(formats strfmt.Registry) error {
+func (m *DAGLogStatusFile) validateFile(formats strfmt.Registry) error {
 
 	if err := validate.Required("File", "body", m.File); err != nil {
 		return err
@@ -55,7 +55,7 @@ func (m *DagStatusFile) validateFile(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusFile) validateStatus(formats strfmt.Registry) error {
+func (m *DAGLogStatusFile) validateStatus(formats strfmt.Registry) error {
 
 	if err := validate.Required("Status", "body", m.Status); err != nil {
 		return err
@@ -75,8 +75,8 @@ func (m *DagStatusFile) validateStatus(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this dag status file based on the context it is used
-func (m *DagStatusFile) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this d a g log status file based on the context it is used
+func (m *DAGLogStatusFile) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateStatus(ctx, formats); err != nil {
@@ -89,7 +89,7 @@ func (m *DagStatusFile) ContextValidate(ctx context.Context, formats strfmt.Regi
 	return nil
 }
 
-func (m *DagStatusFile) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGLogStatusFile) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Status != nil {
 
@@ -107,7 +107,7 @@ func (m *DagStatusFile) contextValidateStatus(ctx context.Context, formats strfm
 }
 
 // MarshalBinary interface implementation
-func (m *DagStatusFile) MarshalBinary() ([]byte, error) {
+func (m *DAGLogStatusFile) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -115,8 +115,8 @@ func (m *DagStatusFile) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagStatusFile) UnmarshalBinary(b []byte) error {
-	var res DagStatusFile
+func (m *DAGLogStatusFile) UnmarshalBinary(b []byte) error {
+	var res DAGLogStatusFile
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

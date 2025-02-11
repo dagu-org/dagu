@@ -16,12 +16,12 @@ import (
 
 // GetDagDetailsResponse get dag details response
 //
-// swagger:model getDagDetailsResponse
+// swagger:model GetDagDetailsResponse
 type GetDagDetailsResponse struct {
 
 	// d a g
 	// Required: true
-	DAG *DagStatusWithDetails `json:"DAG"`
+	DAG *DAGStatusFileDetails `json:"DAG"`
 
 	// definition
 	// Required: true
@@ -37,7 +37,7 @@ type GetDagDetailsResponse struct {
 
 	// log data
 	// Required: true
-	LogData *DagLogResponse `json:"LogData"`
+	LogData *DAGLogData `json:"LogData"`
 
 	// log Url
 	// Required: true
@@ -45,11 +45,11 @@ type GetDagDetailsResponse struct {
 
 	// sc log
 	// Required: true
-	ScLog *DagSchedulerLogResponse `json:"ScLog"`
+	ScLog *SchedulerLog `json:"ScLog"`
 
 	// step log
 	// Required: true
-	StepLog *DagStepLogResponse `json:"StepLog"`
+	StepLog *StepLog `json:"StepLog"`
 
 	// tab
 	// Required: true

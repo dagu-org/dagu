@@ -41,10 +41,7 @@ const (
 )
 
 var (
-	errInvalidArgs        = errors.New("invalid argument")
-	ErrFailedToReadStatus = errors.New("failed to read status")
-	ErrStepNotFound       = errors.New("step was not found")
-	ErrReadingLastStatus  = errors.New("error reading the last status")
+	ErrReadingLastStatus = errors.New("error reading the last status")
 )
 
 // Handler is a handler for the DAG API.
@@ -337,7 +334,7 @@ func (h *Handler) createDAG(ctx context.Context, params dags.CreateDagParams) (
 	*models.CreateDagResponse, *codedError,
 ) {
 	if params.Body.Action == nil || params.Body.Value == nil {
-		return nil, newBadRequestError(errInvalidArgs)
+		return nil, newBadRequestError(fmt.Errorf("missing required parameters: action and value"))
 	}
 
 	switch *params.Body.Action {
@@ -349,7 +346,7 @@ func (h *Handler) createDAG(ctx context.Context, params dags.CreateDagParams) (
 		}
 		return &models.CreateDagResponse{DagID: swag.String(id)}, nil
 	default:
-		return nil, newBadRequestError(errInvalidArgs)
+		return nil, newBadRequestError(fmt.Errorf("invalid action: %s", *params.Body.Action))
 	}
 }
 func (h *Handler) deleteDAG(ctx context.Context, params dags.DeleteDagParams) *codedError {
@@ -389,7 +386,7 @@ func (h *Handler) getList(ctx context.Context, params dags.ListDagsParams) (*mod
 	for _, dagStatus := range dgs {
 		s := dagStatus.Status
 
-		status := &models.DagStatus{
+		status := &models.DAGStatus{
 			Log:        swag.String(s.Log),
 			Name:       swag.String(s.Name),
 			Params:     swag.String(s.Params),
@@ -401,7 +398,7 @@ func (h *Handler) getList(ctx context.Context, params dags.ListDagsParams) (*mod
 			StatusText: swag.String(s.StatusText),
 		}
 
-		item := &models.DagListItem{
+		item := &models.DAGStatusFile{
 			Dir:       swag.String(dagStatus.Dir),
 			ErrorT:    dagStatus.ErrorT,
 			File:      swag.String(dagStatus.File),
@@ -469,7 +466,7 @@ func (h *Handler) getDetail(
 	}
 
 	dag := dagStatus.DAG
-	dagDetail := &models.DagDetail{
+	dagDetail := &models.DAGDetails{
 		DefaultParams:     swag.String(dag.DefaultParams),
 		Delay:             swag.Int64(int64(dag.Delay)),
 		Description:       swag.String(dag.Description),
@@ -488,12 +485,12 @@ func (h *Handler) getDetail(
 		Tags:              dag.Tags,
 	}
 
-	statusWithDetails := &models.DagStatusWithDetails{
+	statusWithDetails := &models.DAGStatusFileDetails{
 		DAG:       dagDetail,
 		Dir:       swag.String(dagStatus.Dir),
 		ErrorT:    dagStatus.ErrorT,
 		File:      swag.String(dagStatus.File),
-		Status:    convertToStatusDetail(dagStatus.Status),
+		Status:    convertToStatusDetails(dagStatus.Status),
 		Suspended: swag.Bool(dagStatus.Suspended),
 	}
 
@@ -531,7 +528,7 @@ func (h *Handler) getDetail(
 		return h.processSchedulerLogRequest(ctx, dag, params, resp)
 
 	default:
-		return nil, newBadRequestError(errInvalidArgs)
+		return nil, newBadRequestError(fmt.Errorf("invalid tab type: %s", tab))
 	}
 }
 
@@ -564,7 +561,7 @@ func (h *Handler) processSchedulerLogRequest(
 		return nil, newInternalError(err)
 	}
 
-	resp.ScLog = &models.DagSchedulerLogResponse{
+	resp.ScLog = &models.SchedulerLog{
 		LogFile: swag.String(logFile),
 		Content: swag.String(string(content)),
 	}
@@ -581,7 +578,7 @@ func (h *Handler) processStepLogRequest(
 	var status *model.Status
 
 	if params.Step == nil {
-		return nil, newBadRequestError(errInvalidArgs)
+		return nil, newBadRequestError(fmt.Errorf("missing required parameter: step"))
 	}
 
 	if params.File != nil {
@@ -625,7 +622,7 @@ func (h *Handler) processStepLogRequest(
 	}
 
 	if node == nil {
-		return nil, newNotFoundError(ErrStepNotFound)
+		return nil, newNotFoundError(fmt.Errorf("step not found: %s", *params.Step))
 	}
 
 	var decoder *encoding.Decoder
@@ -638,7 +635,7 @@ func (h *Handler) processStepLogRequest(
 		return nil, newInternalError(err)
 	}
 
-	stepLog := &models.DagStepLogResponse{
+	stepLog := &models.StepLog{
 		LogFile: swag.String(node.Log),
 		Step:    convertToNode(node),
 		Content: swag.String(string(logContent)),
@@ -679,13 +676,13 @@ func (h *Handler) processLogRequest(
 		}
 	}
 
-	var grid []*models.DagLogGridItem
+	var grid []*models.DAGLogGridItem
 	for node, statusList := range nodeNameToStatusList {
 		var values []int64
 		for _, status := range statusList {
 			values = append(values, int64(status))
 		}
-		grid = append(grid, &models.DagLogGridItem{
+		grid = append(grid, &models.DAGLogGridItem{
 			Name: swag.String(node),
 			Vals: values,
 		})
@@ -725,23 +722,23 @@ func (h *Handler) processLogRequest(
 			for _, status := range statusList {
 				values = append(values, int64(status))
 			}
-			grid = append(grid, &models.DagLogGridItem{
+			grid = append(grid, &models.DAGLogGridItem{
 				Name: swag.String(handlerType.String()),
 				Vals: values,
 			})
 		}
 	}
 
-	var logFileStatusList []*models.DagStatusFile
+	var logStatusFiles []*models.DAGLogStatusFile
 	for _, log := range logs {
-		logFileStatusList = append(logFileStatusList, &models.DagStatusFile{
+		logStatusFiles = append(logStatusFiles, &models.DAGLogStatusFile{
 			File:   swag.String(log.File),
-			Status: convertToStatusDetail(log.Status),
+			Status: convertToStatusDetails(log.Status),
 		})
 	}
 
-	resp.LogData = &models.DagLogResponse{
-		Logs:     lo.Reverse(logFileStatusList),
+	resp.LogData = &models.DAGLogData{
+		Logs:     lo.Reverse(logStatusFiles),
 		GridData: grid,
 	}
 
@@ -767,7 +764,7 @@ func (h *Handler) postAction(
 	params dags.PostDagActionParams,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.Action == nil {
-		return nil, newBadRequestError(errInvalidArgs)
+		return nil, newBadRequestError(fmt.Errorf("missing required parameter: action"))
 	}
 
 	var dagStatus client.DAGStatus
@@ -783,7 +780,7 @@ func (h *Handler) postAction(
 	switch *params.Body.Action {
 	case "start":
 		if dagStatus.Status.Status == scheduler.StatusRunning {
-			return nil, newBadRequestError(errInvalidArgs)
+			return nil, newBadRequestError(fmt.Errorf("the DAG %q is already running", params.DagID))
 		}
 		h.client.StartAsync(ctx, dagStatus.DAG, client.StartOptions{
 			Params: params.Body.Params,
@@ -797,7 +794,7 @@ func (h *Handler) postAction(
 	case "stop":
 		if dagStatus.Status.Status != scheduler.StatusRunning {
 			return nil, newBadRequestError(
-				fmt.Errorf("the DAG is not running: %w", errInvalidArgs),
+				fmt.Errorf("the DAG %q is not running", params.DagID),
 			)
 		}
 		if err := h.client.Stop(ctx, dagStatus.DAG); err != nil {
@@ -810,7 +807,7 @@ func (h *Handler) postAction(
 	case "retry":
 		if params.Body.RequestID == "" {
 			return nil, newBadRequestError(
-				fmt.Errorf("request-id is required: %w", errInvalidArgs),
+				fmt.Errorf("request-id is required"),
 			)
 		}
 		if err := h.client.Retry(ctx, dagStatus.DAG, params.Body.RequestID); err != nil {
@@ -836,7 +833,7 @@ func (h *Handler) postAction(
 		newName := params.Body.Value
 		if newName == "" {
 			return nil, newBadRequestError(
-				fmt.Errorf("new name is required: %w", errInvalidArgs),
+				fmt.Errorf("the value (new name) is required"),
 			)
 		}
 		if err := h.client.Rename(ctx, params.DagID, newName); err != nil {
@@ -857,17 +854,17 @@ func (h *Handler) processUpdateStatus(
 	dagStatus client.DAGStatus, to scheduler.NodeStatus,
 ) (*models.PostDagActionResponse, *codedError) {
 	if params.Body.RequestID == "" {
-		return nil, newBadRequestError(fmt.Errorf("request-id is required: %w", errInvalidArgs))
+		return nil, newBadRequestError(fmt.Errorf("request-id is required"))
 	}
 
 	if params.Body.Step == "" {
-		return nil, newBadRequestError(fmt.Errorf("step name is required: %w", errInvalidArgs))
+		return nil, newBadRequestError(fmt.Errorf("step name is required"))
 	}
 
 	// Do not allow updating the status if the DAG is still running.
 	if dagStatus.Status.Status == scheduler.StatusRunning {
 		return nil, newBadRequestError(
-			fmt.Errorf("the DAG is still running: %w", errInvalidArgs),
+			fmt.Errorf("the DAG %q is still running", dagStatus.DAG.Name),
 		)
 	}
 
@@ -888,7 +885,7 @@ func (h *Handler) processUpdateStatus(
 		}
 	}
 	if !ok {
-		return nil, newBadRequestError(fmt.Errorf("step not found: %w", errInvalidArgs))
+		return nil, newBadRequestError(fmt.Errorf("step %q not found", params.Body.Step))
 	}
 
 	status.Nodes[idxToUpdate].Status = to
@@ -902,11 +899,11 @@ func (h *Handler) processUpdateStatus(
 }
 
 func (h *Handler) searchDAGs(ctx context.Context, params dags.SearchDagsParams) (
-	*models.SearchDagsResponse, *codedError,
+	*models.SearchDAGsResponse, *codedError,
 ) {
 	query := params.Q
 	if query == "" {
-		return nil, newBadRequestError(errInvalidArgs)
+		return nil, newBadRequestError(fmt.Errorf("missing required parameter: q"))
 	}
 
 	ret, errs, err := h.client.Grep(ctx, query)
@@ -914,25 +911,25 @@ func (h *Handler) searchDAGs(ctx context.Context, params dags.SearchDagsParams) 
 		return nil, newInternalError(err)
 	}
 
-	var results []*models.SearchDagsResultItem
+	var results []*models.SearchDAGsResultItem
 	for _, item := range ret {
-		var matches []*models.SearchDagsMatchItem
+		var matches []*models.SearchDAGsMatchItem
 		for _, match := range item.Matches {
-			matches = append(matches, &models.SearchDagsMatchItem{
+			matches = append(matches, &models.SearchDAGsMatchItem{
 				Line:       match.Line,
 				LineNumber: int64(match.LineNumber),
 				StartLine:  int64(match.StartLine),
 			})
 		}
 
-		results = append(results, &models.SearchDagsResultItem{
+		results = append(results, &models.SearchDAGsResultItem{
 			Name:    item.Name,
 			DAG:     convertToDAG(item.DAG),
 			Matches: matches,
 		})
 	}
 
-	return &models.SearchDagsResponse{
+	return &models.SearchDAGsResponse{
 		Results: results,
 		Errors:  errs,
 	}, nil

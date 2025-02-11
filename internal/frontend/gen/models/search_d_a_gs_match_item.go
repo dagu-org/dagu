@@ -12,10 +12,10 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// SearchDagsMatchItem search dags match item
+// SearchDAGsMatchItem search d a gs match item
 //
-// swagger:model searchDagsMatchItem
-type SearchDagsMatchItem struct {
+// swagger:model SearchDAGsMatchItem
+type SearchDAGsMatchItem struct {
 
 	// line
 	Line string `json:"Line,omitempty"`
@@ -27,18 +27,18 @@ type SearchDagsMatchItem struct {
 	StartLine int64 `json:"StartLine,omitempty"`
 }
 
-// Validate validates this search dags match item
-func (m *SearchDagsMatchItem) Validate(formats strfmt.Registry) error {
+// Validate validates this search d a gs match item
+func (m *SearchDAGsMatchItem) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this search dags match item based on context it is used
-func (m *SearchDagsMatchItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this search d a gs match item based on context it is used
+func (m *SearchDAGsMatchItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *SearchDagsMatchItem) MarshalBinary() ([]byte, error) {
+func (m *SearchDAGsMatchItem) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -46,8 +46,8 @@ func (m *SearchDagsMatchItem) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *SearchDagsMatchItem) UnmarshalBinary(b []byte) error {
-	var res SearchDagsMatchItem
+func (m *SearchDAGsMatchItem) UnmarshalBinary(b []byte) error {
+	var res SearchDAGsMatchItem
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

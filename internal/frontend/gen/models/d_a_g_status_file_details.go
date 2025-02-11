@@ -14,14 +14,14 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagStatusWithDetails dag status with details
+// DAGStatusFileDetails d a g status file details
 //
-// swagger:model dagStatusWithDetails
-type DagStatusWithDetails struct {
+// swagger:model DAGStatusFileDetails
+type DAGStatusFileDetails struct {
 
 	// d a g
 	// Required: true
-	DAG *DagDetail `json:"DAG"`
+	DAG *DAGDetails `json:"DAG"`
 
 	// dir
 	// Required: true
@@ -41,15 +41,15 @@ type DagStatusWithDetails struct {
 
 	// status
 	// Required: true
-	Status *DagStatusDetail `json:"Status"`
+	Status *DAGStatusDetails `json:"Status"`
 
 	// suspended
 	// Required: true
 	Suspended *bool `json:"Suspended"`
 }
 
-// Validate validates this dag status with details
-func (m *DagStatusWithDetails) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g status file details
+func (m *DAGStatusFileDetails) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDAG(formats); err != nil {
@@ -86,7 +86,7 @@ func (m *DagStatusWithDetails) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateDAG(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateDAG(formats strfmt.Registry) error {
 
 	if err := validate.Required("DAG", "body", m.DAG); err != nil {
 		return err
@@ -106,7 +106,7 @@ func (m *DagStatusWithDetails) validateDAG(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateDir(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateDir(formats strfmt.Registry) error {
 
 	if err := validate.Required("Dir", "body", m.Dir); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (m *DagStatusWithDetails) validateDir(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateError(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateError(formats strfmt.Registry) error {
 
 	if err := validate.Required("Error", "body", m.Error); err != nil {
 		return err
@@ -124,7 +124,7 @@ func (m *DagStatusWithDetails) validateError(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateErrorT(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateErrorT(formats strfmt.Registry) error {
 
 	if err := validate.Required("ErrorT", "body", m.ErrorT); err != nil {
 		return err
@@ -133,7 +133,7 @@ func (m *DagStatusWithDetails) validateErrorT(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateFile(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateFile(formats strfmt.Registry) error {
 
 	if err := validate.Required("File", "body", m.File); err != nil {
 		return err
@@ -142,7 +142,7 @@ func (m *DagStatusWithDetails) validateFile(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateStatus(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateStatus(formats strfmt.Registry) error {
 
 	if err := validate.Required("Status", "body", m.Status); err != nil {
 		return err
@@ -162,7 +162,7 @@ func (m *DagStatusWithDetails) validateStatus(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStatusWithDetails) validateSuspended(formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) validateSuspended(formats strfmt.Registry) error {
 
 	if err := validate.Required("Suspended", "body", m.Suspended); err != nil {
 		return err
@@ -171,8 +171,8 @@ func (m *DagStatusWithDetails) validateSuspended(formats strfmt.Registry) error 
 	return nil
 }
 
-// ContextValidate validate this dag status with details based on the context it is used
-func (m *DagStatusWithDetails) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this d a g status file details based on the context it is used
+func (m *DAGStatusFileDetails) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateDAG(ctx, formats); err != nil {
@@ -189,7 +189,7 @@ func (m *DagStatusWithDetails) ContextValidate(ctx context.Context, formats strf
 	return nil
 }
 
-func (m *DagStatusWithDetails) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.DAG != nil {
 
@@ -206,7 +206,7 @@ func (m *DagStatusWithDetails) contextValidateDAG(ctx context.Context, formats s
 	return nil
 }
 
-func (m *DagStatusWithDetails) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGStatusFileDetails) contextValidateStatus(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Status != nil {
 
@@ -224,7 +224,7 @@ func (m *DagStatusWithDetails) contextValidateStatus(ctx context.Context, format
 }
 
 // MarshalBinary interface implementation
-func (m *DagStatusWithDetails) MarshalBinary() ([]byte, error) {
+func (m *DAGStatusFileDetails) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -232,8 +232,8 @@ func (m *DagStatusWithDetails) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagStatusWithDetails) UnmarshalBinary(b []byte) error {
-	var res DagStatusWithDetails
+func (m *DAGStatusFileDetails) UnmarshalBinary(b []byte) error {
+	var res DAGStatusFileDetails
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

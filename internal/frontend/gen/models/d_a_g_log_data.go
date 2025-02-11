@@ -15,22 +15,22 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagLogResponse dag log response
+// DAGLogData d a g log data
 //
-// swagger:model dagLogResponse
-type DagLogResponse struct {
+// swagger:model DAGLogData
+type DAGLogData struct {
 
 	// grid data
 	// Required: true
-	GridData []*DagLogGridItem `json:"GridData"`
+	GridData []*DAGLogGridItem `json:"GridData"`
 
 	// logs
 	// Required: true
-	Logs []*DagStatusFile `json:"Logs"`
+	Logs []*DAGLogStatusFile `json:"Logs"`
 }
 
-// Validate validates this dag log response
-func (m *DagLogResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g log data
+func (m *DAGLogData) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateGridData(formats); err != nil {
@@ -47,7 +47,7 @@ func (m *DagLogResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagLogResponse) validateGridData(formats strfmt.Registry) error {
+func (m *DAGLogData) validateGridData(formats strfmt.Registry) error {
 
 	if err := validate.Required("GridData", "body", m.GridData); err != nil {
 		return err
@@ -74,7 +74,7 @@ func (m *DagLogResponse) validateGridData(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagLogResponse) validateLogs(formats strfmt.Registry) error {
+func (m *DAGLogData) validateLogs(formats strfmt.Registry) error {
 
 	if err := validate.Required("Logs", "body", m.Logs); err != nil {
 		return err
@@ -101,8 +101,8 @@ func (m *DagLogResponse) validateLogs(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this dag log response based on the context it is used
-func (m *DagLogResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this d a g log data based on the context it is used
+func (m *DAGLogData) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateGridData(ctx, formats); err != nil {
@@ -119,7 +119,7 @@ func (m *DagLogResponse) ContextValidate(ctx context.Context, formats strfmt.Reg
 	return nil
 }
 
-func (m *DagLogResponse) contextValidateGridData(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGLogData) contextValidateGridData(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.GridData); i++ {
 
@@ -144,7 +144,7 @@ func (m *DagLogResponse) contextValidateGridData(ctx context.Context, formats st
 	return nil
 }
 
-func (m *DagLogResponse) contextValidateLogs(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAGLogData) contextValidateLogs(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Logs); i++ {
 
@@ -170,7 +170,7 @@ func (m *DagLogResponse) contextValidateLogs(ctx context.Context, formats strfmt
 }
 
 // MarshalBinary interface implementation
-func (m *DagLogResponse) MarshalBinary() ([]byte, error) {
+func (m *DAGLogData) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -178,8 +178,8 @@ func (m *DagLogResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagLogResponse) UnmarshalBinary(b []byte) error {
-	var res DagLogResponse
+func (m *DAGLogData) UnmarshalBinary(b []byte) error {
+	var res DAGLogData
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

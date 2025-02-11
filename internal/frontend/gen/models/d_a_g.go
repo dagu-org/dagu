@@ -15,10 +15,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Dag dag
+// DAG d a g
 //
-// swagger:model dag
-type Dag struct {
+// swagger:model DAG
+type DAG struct {
 
 	// default params
 	// Required: true
@@ -49,8 +49,8 @@ type Dag struct {
 	Tags []string `json:"Tags"`
 }
 
-// Validate validates this dag
-func (m *Dag) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g
+func (m *DAG) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDefaultParams(formats); err != nil {
@@ -87,7 +87,7 @@ func (m *Dag) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateDefaultParams(formats strfmt.Registry) error {
+func (m *DAG) validateDefaultParams(formats strfmt.Registry) error {
 
 	if err := validate.Required("DefaultParams", "body", m.DefaultParams); err != nil {
 		return err
@@ -96,7 +96,7 @@ func (m *Dag) validateDefaultParams(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateDescription(formats strfmt.Registry) error {
+func (m *DAG) validateDescription(formats strfmt.Registry) error {
 
 	if err := validate.Required("Description", "body", m.Description); err != nil {
 		return err
@@ -105,7 +105,7 @@ func (m *Dag) validateDescription(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateGroup(formats strfmt.Registry) error {
+func (m *DAG) validateGroup(formats strfmt.Registry) error {
 
 	if err := validate.Required("Group", "body", m.Group); err != nil {
 		return err
@@ -114,7 +114,7 @@ func (m *Dag) validateGroup(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateName(formats strfmt.Registry) error {
+func (m *DAG) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("Name", "body", m.Name); err != nil {
 		return err
@@ -123,7 +123,7 @@ func (m *Dag) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateParams(formats strfmt.Registry) error {
+func (m *DAG) validateParams(formats strfmt.Registry) error {
 
 	if err := validate.Required("Params", "body", m.Params); err != nil {
 		return err
@@ -132,7 +132,7 @@ func (m *Dag) validateParams(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateSchedule(formats strfmt.Registry) error {
+func (m *DAG) validateSchedule(formats strfmt.Registry) error {
 
 	if err := validate.Required("Schedule", "body", m.Schedule); err != nil {
 		return err
@@ -159,7 +159,7 @@ func (m *Dag) validateSchedule(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *Dag) validateTags(formats strfmt.Registry) error {
+func (m *DAG) validateTags(formats strfmt.Registry) error {
 
 	if err := validate.Required("Tags", "body", m.Tags); err != nil {
 		return err
@@ -168,8 +168,8 @@ func (m *Dag) validateTags(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this dag based on the context it is used
-func (m *Dag) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this d a g based on the context it is used
+func (m *DAG) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateSchedule(ctx, formats); err != nil {
@@ -182,7 +182,7 @@ func (m *Dag) ContextValidate(ctx context.Context, formats strfmt.Registry) erro
 	return nil
 }
 
-func (m *Dag) contextValidateSchedule(ctx context.Context, formats strfmt.Registry) error {
+func (m *DAG) contextValidateSchedule(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Schedule); i++ {
 
@@ -208,7 +208,7 @@ func (m *Dag) contextValidateSchedule(ctx context.Context, formats strfmt.Regist
 }
 
 // MarshalBinary interface implementation
-func (m *Dag) MarshalBinary() ([]byte, error) {
+func (m *DAG) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -216,8 +216,8 @@ func (m *Dag) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *Dag) UnmarshalBinary(b []byte) error {
-	var res Dag
+func (m *DAG) UnmarshalBinary(b []byte) error {
+	var res DAG
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

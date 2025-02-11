@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagStepLogResponse dag step log response
+// StepLog step log
 //
-// swagger:model dagStepLogResponse
-type DagStepLogResponse struct {
+// swagger:model StepLog
+type StepLog struct {
 
 	// content
 	// Required: true
@@ -29,11 +29,11 @@ type DagStepLogResponse struct {
 
 	// step
 	// Required: true
-	Step *StatusNode `json:"Step"`
+	Step *Node `json:"Step"`
 }
 
-// Validate validates this dag step log response
-func (m *DagStepLogResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this step log
+func (m *StepLog) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateContent(formats); err != nil {
@@ -54,7 +54,7 @@ func (m *DagStepLogResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStepLogResponse) validateContent(formats strfmt.Registry) error {
+func (m *StepLog) validateContent(formats strfmt.Registry) error {
 
 	if err := validate.Required("Content", "body", m.Content); err != nil {
 		return err
@@ -63,7 +63,7 @@ func (m *DagStepLogResponse) validateContent(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStepLogResponse) validateLogFile(formats strfmt.Registry) error {
+func (m *StepLog) validateLogFile(formats strfmt.Registry) error {
 
 	if err := validate.Required("LogFile", "body", m.LogFile); err != nil {
 		return err
@@ -72,7 +72,7 @@ func (m *DagStepLogResponse) validateLogFile(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagStepLogResponse) validateStep(formats strfmt.Registry) error {
+func (m *StepLog) validateStep(formats strfmt.Registry) error {
 
 	if err := validate.Required("Step", "body", m.Step); err != nil {
 		return err
@@ -92,8 +92,8 @@ func (m *DagStepLogResponse) validateStep(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this dag step log response based on the context it is used
-func (m *DagStepLogResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this step log based on the context it is used
+func (m *StepLog) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateStep(ctx, formats); err != nil {
@@ -106,7 +106,7 @@ func (m *DagStepLogResponse) ContextValidate(ctx context.Context, formats strfmt
 	return nil
 }
 
-func (m *DagStepLogResponse) contextValidateStep(ctx context.Context, formats strfmt.Registry) error {
+func (m *StepLog) contextValidateStep(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Step != nil {
 
@@ -124,7 +124,7 @@ func (m *DagStepLogResponse) contextValidateStep(ctx context.Context, formats st
 }
 
 // MarshalBinary interface implementation
-func (m *DagStepLogResponse) MarshalBinary() ([]byte, error) {
+func (m *StepLog) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -132,8 +132,8 @@ func (m *DagStepLogResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagStepLogResponse) UnmarshalBinary(b []byte) error {
-	var res DagStepLogResponse
+func (m *StepLog) UnmarshalBinary(b []byte) error {
+	var res StepLog
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

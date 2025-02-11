@@ -77,7 +77,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/listDagsResponse"
+              "$ref": "#/definitions/ListDagsResponse"
             }
           },
           "default": {
@@ -101,7 +101,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/createDagRequest"
+              "$ref": "#/definitions/CreateDagRequest"
             }
           }
         ],
@@ -109,7 +109,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/createDagResponse"
+              "$ref": "#/definitions/CreateDagResponse"
             }
           },
           "default": {
@@ -160,7 +160,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/getDagDetailsResponse"
+              "$ref": "#/definitions/GetDagDetailsResponse"
             }
           },
           "default": {
@@ -191,7 +191,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/postDagActionRequest"
+              "$ref": "#/definitions/PostDagActionRequest"
             }
           }
         ],
@@ -199,7 +199,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/postDagActionResponse"
+              "$ref": "#/definitions/PostDagActionResponse"
             }
           },
           "default": {
@@ -260,7 +260,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/searchDagsResponse"
+              "$ref": "#/definitions/SearchDAGsResponse"
             }
           },
           "default": {
@@ -284,7 +284,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/listTagResponse"
+              "$ref": "#/definitions/ListTagResponse"
             }
           },
           "default": {
@@ -315,7 +315,7 @@ func init() {
         }
       }
     },
-    "condition": {
+    "Condition": {
       "type": "object",
       "properties": {
         "Condition": {
@@ -326,7 +326,7 @@ func init() {
         }
       }
     },
-    "createDagRequest": {
+    "CreateDagRequest": {
       "description": "Request body for creating a DAG.",
       "type": "object",
       "required": [
@@ -344,7 +344,7 @@ func init() {
         }
       }
     },
-    "createDagResponse": {
+    "CreateDagResponse": {
       "type": "object",
       "required": [
         "DagID"
@@ -355,7 +355,7 @@ func init() {
         }
       }
     },
-    "dag": {
+    "DAG": {
       "type": "object",
       "required": [
         "Group",
@@ -388,7 +388,7 @@ func init() {
         "Schedule": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/schedule"
+            "$ref": "#/definitions/Schedule"
           }
         },
         "Tags": {
@@ -399,7 +399,7 @@ func init() {
         }
       }
     },
-    "dagDetail": {
+    "DAGDetails": {
       "type": "object",
       "required": [
         "Location",
@@ -439,7 +439,7 @@ func init() {
           "type": "string"
         },
         "HandlerOn": {
-          "$ref": "#/definitions/handlerOn"
+          "$ref": "#/definitions/HandlerOn"
         },
         "HistRetentionDays": {
           "type": "integer"
@@ -465,13 +465,13 @@ func init() {
         "Preconditions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/condition"
+            "$ref": "#/definitions/Condition"
           }
         },
         "Schedule": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/schedule"
+            "$ref": "#/definitions/Schedule"
           }
         },
         "Steps": {
@@ -488,42 +488,28 @@ func init() {
         }
       }
     },
-    "dagListItem": {
+    "DAGLogData": {
       "type": "object",
       "required": [
-        "File",
-        "Dir",
-        "DAG",
-        "Status",
-        "Suspended",
-        "Error",
-        "ErrorT"
+        "GridData",
+        "Logs"
       ],
       "properties": {
-        "DAG": {
-          "$ref": "#/definitions/dag"
+        "GridData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DAGLogGridItem"
+          }
         },
-        "Dir": {
-          "type": "string"
-        },
-        "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
-          "type": "string"
-        },
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/dagStatus"
-        },
-        "Suspended": {
-          "type": "boolean"
+        "Logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DAGLogStatusFile"
+          }
         }
       }
     },
-    "dagLogGridItem": {
+    "DAGLogGridItem": {
       "type": "object",
       "required": [
         "Name",
@@ -541,43 +527,22 @@ func init() {
         }
       }
     },
-    "dagLogResponse": {
+    "DAGLogStatusFile": {
       "type": "object",
       "required": [
-        "GridData",
-        "Logs"
+        "File",
+        "Status"
       ],
       "properties": {
-        "GridData": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/dagLogGridItem"
-          }
+        "File": {
+          "type": "string"
         },
-        "Logs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/dagStatusFile"
-          }
+        "Status": {
+          "$ref": "#/definitions/DAGStatusDetails"
         }
       }
     },
-    "dagSchedulerLogResponse": {
-      "type": "object",
-      "required": [
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        }
-      }
-    },
-    "dagStatus": {
+    "DAGStatus": {
       "type": "object",
       "required": [
         "RequestId",
@@ -622,7 +587,7 @@ func init() {
         }
       }
     },
-    "dagStatusDetail": {
+    "DAGStatusDetails": {
       "type": "object",
       "required": [
         "RequestId",
@@ -654,20 +619,20 @@ func init() {
         "Nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/statusNode"
+            "$ref": "#/definitions/Node"
           }
         },
         "OnCancel": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "OnExit": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "OnFailure": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "OnSuccess": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "Params": {
           "type": "string"
@@ -690,22 +655,7 @@ func init() {
         }
       }
     },
-    "dagStatusFile": {
-      "type": "object",
-      "required": [
-        "File",
-        "Status"
-      ],
-      "properties": {
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/dagStatusDetail"
-        }
-      }
-    },
-    "dagStatusWithDetails": {
+    "DAGStatusFile": {
       "type": "object",
       "required": [
         "File",
@@ -718,7 +668,7 @@ func init() {
       ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/dagDetail"
+          "$ref": "#/definitions/DAG"
         },
         "Dir": {
           "type": "string"
@@ -733,33 +683,49 @@ func init() {
           "type": "string"
         },
         "Status": {
-          "$ref": "#/definitions/dagStatusDetail"
+          "$ref": "#/definitions/DAGStatus"
         },
         "Suspended": {
           "type": "boolean"
         }
       }
     },
-    "dagStepLogResponse": {
+    "DAGStatusFileDetails": {
       "type": "object",
       "required": [
-        "Step",
-        "LogFile",
-        "Content"
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
       ],
       "properties": {
-        "Content": {
+        "DAG": {
+          "$ref": "#/definitions/DAGDetails"
+        },
+        "Dir": {
           "type": "string"
         },
-        "LogFile": {
+        "Error": {
           "type": "string"
         },
-        "Step": {
-          "$ref": "#/definitions/statusNode"
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/DAGStatusDetails"
+        },
+        "Suspended": {
+          "type": "boolean"
         }
       }
     },
-    "getDagDetailsResponse": {
+    "GetDagDetailsResponse": {
       "type": "object",
       "required": [
         "Title",
@@ -775,7 +741,7 @@ func init() {
       ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/dagStatusWithDetails"
+          "$ref": "#/definitions/DAGStatusFileDetails"
         },
         "Definition": {
           "type": "string"
@@ -790,16 +756,16 @@ func init() {
           "type": "string"
         },
         "LogData": {
-          "$ref": "#/definitions/dagLogResponse"
+          "$ref": "#/definitions/DAGLogData"
         },
         "LogUrl": {
           "type": "string"
         },
         "ScLog": {
-          "$ref": "#/definitions/dagSchedulerLogResponse"
+          "$ref": "#/definitions/SchedulerLog"
         },
         "StepLog": {
-          "$ref": "#/definitions/dagStepLogResponse"
+          "$ref": "#/definitions/StepLog"
         },
         "Tab": {
           "type": "string"
@@ -809,7 +775,7 @@ func init() {
         }
       }
     },
-    "handlerOn": {
+    "HandlerOn": {
       "type": "object",
       "properties": {
         "Cancel": {
@@ -826,7 +792,7 @@ func init() {
         }
       }
     },
-    "listDagsResponse": {
+    "ListDagsResponse": {
       "type": "object",
       "required": [
         "DAGs",
@@ -838,7 +804,7 @@ func init() {
         "DAGs": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/dagListItem"
+            "$ref": "#/definitions/DAGStatusFile"
           }
         },
         "Errors": {
@@ -855,7 +821,7 @@ func init() {
         }
       }
     },
-    "listTagResponse": {
+    "ListTagResponse": {
       "type": "object",
       "required": [
         "Tags",
@@ -876,129 +842,7 @@ func init() {
         }
       }
     },
-    "postDagActionRequest": {
-      "description": "Request body for posting an action to a DAG.",
-      "type": "object",
-      "required": [
-        "action"
-      ],
-      "properties": {
-        "action": {
-          "description": "Action to be performed on the DAG.",
-          "type": "string",
-          "enum": [
-            "start",
-            "suspend",
-            "stop",
-            "retry",
-            "mark-success",
-            "mark-failed",
-            "save",
-            "rename"
-          ]
-        },
-        "params": {
-          "description": "Additional parameters for the action.",
-          "type": "string"
-        },
-        "requestId": {
-          "description": "Unique request ID for the action.",
-          "type": "string"
-        },
-        "step": {
-          "description": "Step name if the action targets a specific step.",
-          "type": "string"
-        },
-        "value": {
-          "description": "Optional extra value for the action.",
-          "type": "string"
-        }
-      }
-    },
-    "postDagActionResponse": {
-      "type": "object",
-      "properties": {
-        "NewDagID": {
-          "description": "New DAG ID, if the action triggered a DAG rename or duplication.",
-          "type": "string"
-        }
-      }
-    },
-    "repeatPolicy": {
-      "type": "object",
-      "properties": {
-        "Interval": {
-          "type": "integer"
-        },
-        "Repeat": {
-          "type": "boolean"
-        }
-      }
-    },
-    "schedule": {
-      "type": "object",
-      "required": [
-        "Expression"
-      ],
-      "properties": {
-        "Expression": {
-          "type": "string"
-        }
-      }
-    },
-    "searchDagsMatchItem": {
-      "type": "object",
-      "properties": {
-        "Line": {
-          "type": "string"
-        },
-        "LineNumber": {
-          "type": "integer"
-        },
-        "StartLine": {
-          "type": "integer"
-        }
-      }
-    },
-    "searchDagsResponse": {
-      "type": "object",
-      "required": [
-        "Results",
-        "Errors"
-      ],
-      "properties": {
-        "Errors": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Results": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/searchDagsResultItem"
-          }
-        }
-      }
-    },
-    "searchDagsResultItem": {
-      "type": "object",
-      "properties": {
-        "DAG": {
-          "$ref": "#/definitions/dag"
-        },
-        "Matches": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/searchDagsMatchItem"
-          }
-        },
-        "Name": {
-          "type": "string"
-        }
-      }
-    },
-    "statusNode": {
+    "Node": {
       "type": "object",
       "required": [
         "Step",
@@ -1040,6 +884,162 @@ func init() {
         },
         "Step": {
           "$ref": "#/definitions/stepObject"
+        }
+      }
+    },
+    "PostDagActionRequest": {
+      "description": "Request body for posting an action to a DAG.",
+      "type": "object",
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "description": "Action to be performed on the DAG.",
+          "type": "string",
+          "enum": [
+            "start",
+            "suspend",
+            "stop",
+            "retry",
+            "mark-success",
+            "mark-failed",
+            "save",
+            "rename"
+          ]
+        },
+        "params": {
+          "description": "Additional parameters for the action.",
+          "type": "string"
+        },
+        "requestId": {
+          "description": "Unique request ID for the action.",
+          "type": "string"
+        },
+        "step": {
+          "description": "Step name if the action targets a specific step.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Optional extra value for the action.",
+          "type": "string"
+        }
+      }
+    },
+    "PostDagActionResponse": {
+      "type": "object",
+      "properties": {
+        "NewDagID": {
+          "description": "New DAG ID, if the action triggered a DAG rename or duplication.",
+          "type": "string"
+        }
+      }
+    },
+    "RepeatPolicy": {
+      "type": "object",
+      "properties": {
+        "Interval": {
+          "type": "integer"
+        },
+        "Repeat": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Schedule": {
+      "type": "object",
+      "required": [
+        "Expression"
+      ],
+      "properties": {
+        "Expression": {
+          "type": "string"
+        }
+      }
+    },
+    "SchedulerLog": {
+      "type": "object",
+      "required": [
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        }
+      }
+    },
+    "SearchDAGsMatchItem": {
+      "type": "object",
+      "properties": {
+        "Line": {
+          "type": "string"
+        },
+        "LineNumber": {
+          "type": "integer"
+        },
+        "StartLine": {
+          "type": "integer"
+        }
+      }
+    },
+    "SearchDAGsResponse": {
+      "type": "object",
+      "required": [
+        "Results",
+        "Errors"
+      ],
+      "properties": {
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SearchDAGsResultItem"
+          }
+        }
+      }
+    },
+    "SearchDAGsResultItem": {
+      "type": "object",
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/DAG"
+        },
+        "Matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SearchDAGsMatchItem"
+          }
+        },
+        "Name": {
+          "type": "string"
+        }
+      }
+    },
+    "StepLog": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/Node"
         }
       }
     },
@@ -1102,11 +1102,11 @@ func init() {
         "Preconditions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/condition"
+            "$ref": "#/definitions/Condition"
           }
         },
         "RepeatPolicy": {
-          "$ref": "#/definitions/repeatPolicy"
+          "$ref": "#/definitions/RepeatPolicy"
         },
         "Run": {
           "type": "string"
@@ -1196,7 +1196,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/listDagsResponse"
+              "$ref": "#/definitions/ListDagsResponse"
             }
           },
           "default": {
@@ -1220,7 +1220,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/createDagRequest"
+              "$ref": "#/definitions/CreateDagRequest"
             }
           }
         ],
@@ -1228,7 +1228,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/createDagResponse"
+              "$ref": "#/definitions/CreateDagResponse"
             }
           },
           "default": {
@@ -1279,7 +1279,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/getDagDetailsResponse"
+              "$ref": "#/definitions/GetDagDetailsResponse"
             }
           },
           "default": {
@@ -1310,7 +1310,7 @@ func init() {
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/postDagActionRequest"
+              "$ref": "#/definitions/PostDagActionRequest"
             }
           }
         ],
@@ -1318,7 +1318,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/postDagActionResponse"
+              "$ref": "#/definitions/PostDagActionResponse"
             }
           },
           "default": {
@@ -1379,7 +1379,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/searchDagsResponse"
+              "$ref": "#/definitions/SearchDAGsResponse"
             }
           },
           "default": {
@@ -1403,7 +1403,7 @@ func init() {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/listTagResponse"
+              "$ref": "#/definitions/ListTagResponse"
             }
           },
           "default": {
@@ -1434,7 +1434,7 @@ func init() {
         }
       }
     },
-    "condition": {
+    "Condition": {
       "type": "object",
       "properties": {
         "Condition": {
@@ -1445,7 +1445,7 @@ func init() {
         }
       }
     },
-    "createDagRequest": {
+    "CreateDagRequest": {
       "description": "Request body for creating a DAG.",
       "type": "object",
       "required": [
@@ -1463,7 +1463,7 @@ func init() {
         }
       }
     },
-    "createDagResponse": {
+    "CreateDagResponse": {
       "type": "object",
       "required": [
         "DagID"
@@ -1474,7 +1474,7 @@ func init() {
         }
       }
     },
-    "dag": {
+    "DAG": {
       "type": "object",
       "required": [
         "Group",
@@ -1507,7 +1507,7 @@ func init() {
         "Schedule": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/schedule"
+            "$ref": "#/definitions/Schedule"
           }
         },
         "Tags": {
@@ -1518,7 +1518,7 @@ func init() {
         }
       }
     },
-    "dagDetail": {
+    "DAGDetails": {
       "type": "object",
       "required": [
         "Location",
@@ -1558,7 +1558,7 @@ func init() {
           "type": "string"
         },
         "HandlerOn": {
-          "$ref": "#/definitions/handlerOn"
+          "$ref": "#/definitions/HandlerOn"
         },
         "HistRetentionDays": {
           "type": "integer"
@@ -1584,13 +1584,13 @@ func init() {
         "Preconditions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/condition"
+            "$ref": "#/definitions/Condition"
           }
         },
         "Schedule": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/schedule"
+            "$ref": "#/definitions/Schedule"
           }
         },
         "Steps": {
@@ -1607,42 +1607,28 @@ func init() {
         }
       }
     },
-    "dagListItem": {
+    "DAGLogData": {
       "type": "object",
       "required": [
-        "File",
-        "Dir",
-        "DAG",
-        "Status",
-        "Suspended",
-        "Error",
-        "ErrorT"
+        "GridData",
+        "Logs"
       ],
       "properties": {
-        "DAG": {
-          "$ref": "#/definitions/dag"
+        "GridData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DAGLogGridItem"
+          }
         },
-        "Dir": {
-          "type": "string"
-        },
-        "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
-          "type": "string"
-        },
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/dagStatus"
-        },
-        "Suspended": {
-          "type": "boolean"
+        "Logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DAGLogStatusFile"
+          }
         }
       }
     },
-    "dagLogGridItem": {
+    "DAGLogGridItem": {
       "type": "object",
       "required": [
         "Name",
@@ -1660,43 +1646,22 @@ func init() {
         }
       }
     },
-    "dagLogResponse": {
+    "DAGLogStatusFile": {
       "type": "object",
       "required": [
-        "GridData",
-        "Logs"
+        "File",
+        "Status"
       ],
       "properties": {
-        "GridData": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/dagLogGridItem"
-          }
+        "File": {
+          "type": "string"
         },
-        "Logs": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/dagStatusFile"
-          }
+        "Status": {
+          "$ref": "#/definitions/DAGStatusDetails"
         }
       }
     },
-    "dagSchedulerLogResponse": {
-      "type": "object",
-      "required": [
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        }
-      }
-    },
-    "dagStatus": {
+    "DAGStatus": {
       "type": "object",
       "required": [
         "RequestId",
@@ -1741,7 +1706,7 @@ func init() {
         }
       }
     },
-    "dagStatusDetail": {
+    "DAGStatusDetails": {
       "type": "object",
       "required": [
         "RequestId",
@@ -1773,20 +1738,20 @@ func init() {
         "Nodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/statusNode"
+            "$ref": "#/definitions/Node"
           }
         },
         "OnCancel": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "OnExit": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "OnFailure": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "OnSuccess": {
-          "$ref": "#/definitions/statusNode"
+          "$ref": "#/definitions/Node"
         },
         "Params": {
           "type": "string"
@@ -1809,22 +1774,7 @@ func init() {
         }
       }
     },
-    "dagStatusFile": {
-      "type": "object",
-      "required": [
-        "File",
-        "Status"
-      ],
-      "properties": {
-        "File": {
-          "type": "string"
-        },
-        "Status": {
-          "$ref": "#/definitions/dagStatusDetail"
-        }
-      }
-    },
-    "dagStatusWithDetails": {
+    "DAGStatusFile": {
       "type": "object",
       "required": [
         "File",
@@ -1837,7 +1787,7 @@ func init() {
       ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/dagDetail"
+          "$ref": "#/definitions/DAG"
         },
         "Dir": {
           "type": "string"
@@ -1852,33 +1802,49 @@ func init() {
           "type": "string"
         },
         "Status": {
-          "$ref": "#/definitions/dagStatusDetail"
+          "$ref": "#/definitions/DAGStatus"
         },
         "Suspended": {
           "type": "boolean"
         }
       }
     },
-    "dagStepLogResponse": {
+    "DAGStatusFileDetails": {
       "type": "object",
       "required": [
-        "Step",
-        "LogFile",
-        "Content"
+        "File",
+        "Dir",
+        "DAG",
+        "Status",
+        "Suspended",
+        "Error",
+        "ErrorT"
       ],
       "properties": {
-        "Content": {
+        "DAG": {
+          "$ref": "#/definitions/DAGDetails"
+        },
+        "Dir": {
           "type": "string"
         },
-        "LogFile": {
+        "Error": {
           "type": "string"
         },
-        "Step": {
-          "$ref": "#/definitions/statusNode"
+        "ErrorT": {
+          "type": "string"
+        },
+        "File": {
+          "type": "string"
+        },
+        "Status": {
+          "$ref": "#/definitions/DAGStatusDetails"
+        },
+        "Suspended": {
+          "type": "boolean"
         }
       }
     },
-    "getDagDetailsResponse": {
+    "GetDagDetailsResponse": {
       "type": "object",
       "required": [
         "Title",
@@ -1894,7 +1860,7 @@ func init() {
       ],
       "properties": {
         "DAG": {
-          "$ref": "#/definitions/dagStatusWithDetails"
+          "$ref": "#/definitions/DAGStatusFileDetails"
         },
         "Definition": {
           "type": "string"
@@ -1909,16 +1875,16 @@ func init() {
           "type": "string"
         },
         "LogData": {
-          "$ref": "#/definitions/dagLogResponse"
+          "$ref": "#/definitions/DAGLogData"
         },
         "LogUrl": {
           "type": "string"
         },
         "ScLog": {
-          "$ref": "#/definitions/dagSchedulerLogResponse"
+          "$ref": "#/definitions/SchedulerLog"
         },
         "StepLog": {
-          "$ref": "#/definitions/dagStepLogResponse"
+          "$ref": "#/definitions/StepLog"
         },
         "Tab": {
           "type": "string"
@@ -1928,7 +1894,7 @@ func init() {
         }
       }
     },
-    "handlerOn": {
+    "HandlerOn": {
       "type": "object",
       "properties": {
         "Cancel": {
@@ -1945,7 +1911,7 @@ func init() {
         }
       }
     },
-    "listDagsResponse": {
+    "ListDagsResponse": {
       "type": "object",
       "required": [
         "DAGs",
@@ -1957,7 +1923,7 @@ func init() {
         "DAGs": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/dagListItem"
+            "$ref": "#/definitions/DAGStatusFile"
           }
         },
         "Errors": {
@@ -1974,7 +1940,7 @@ func init() {
         }
       }
     },
-    "listTagResponse": {
+    "ListTagResponse": {
       "type": "object",
       "required": [
         "Tags",
@@ -1995,129 +1961,7 @@ func init() {
         }
       }
     },
-    "postDagActionRequest": {
-      "description": "Request body for posting an action to a DAG.",
-      "type": "object",
-      "required": [
-        "action"
-      ],
-      "properties": {
-        "action": {
-          "description": "Action to be performed on the DAG.",
-          "type": "string",
-          "enum": [
-            "start",
-            "suspend",
-            "stop",
-            "retry",
-            "mark-success",
-            "mark-failed",
-            "save",
-            "rename"
-          ]
-        },
-        "params": {
-          "description": "Additional parameters for the action.",
-          "type": "string"
-        },
-        "requestId": {
-          "description": "Unique request ID for the action.",
-          "type": "string"
-        },
-        "step": {
-          "description": "Step name if the action targets a specific step.",
-          "type": "string"
-        },
-        "value": {
-          "description": "Optional extra value for the action.",
-          "type": "string"
-        }
-      }
-    },
-    "postDagActionResponse": {
-      "type": "object",
-      "properties": {
-        "NewDagID": {
-          "description": "New DAG ID, if the action triggered a DAG rename or duplication.",
-          "type": "string"
-        }
-      }
-    },
-    "repeatPolicy": {
-      "type": "object",
-      "properties": {
-        "Interval": {
-          "type": "integer"
-        },
-        "Repeat": {
-          "type": "boolean"
-        }
-      }
-    },
-    "schedule": {
-      "type": "object",
-      "required": [
-        "Expression"
-      ],
-      "properties": {
-        "Expression": {
-          "type": "string"
-        }
-      }
-    },
-    "searchDagsMatchItem": {
-      "type": "object",
-      "properties": {
-        "Line": {
-          "type": "string"
-        },
-        "LineNumber": {
-          "type": "integer"
-        },
-        "StartLine": {
-          "type": "integer"
-        }
-      }
-    },
-    "searchDagsResponse": {
-      "type": "object",
-      "required": [
-        "Results",
-        "Errors"
-      ],
-      "properties": {
-        "Errors": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "Results": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/searchDagsResultItem"
-          }
-        }
-      }
-    },
-    "searchDagsResultItem": {
-      "type": "object",
-      "properties": {
-        "DAG": {
-          "$ref": "#/definitions/dag"
-        },
-        "Matches": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/searchDagsMatchItem"
-          }
-        },
-        "Name": {
-          "type": "string"
-        }
-      }
-    },
-    "statusNode": {
+    "Node": {
       "type": "object",
       "required": [
         "Step",
@@ -2159,6 +2003,162 @@ func init() {
         },
         "Step": {
           "$ref": "#/definitions/stepObject"
+        }
+      }
+    },
+    "PostDagActionRequest": {
+      "description": "Request body for posting an action to a DAG.",
+      "type": "object",
+      "required": [
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "description": "Action to be performed on the DAG.",
+          "type": "string",
+          "enum": [
+            "start",
+            "suspend",
+            "stop",
+            "retry",
+            "mark-success",
+            "mark-failed",
+            "save",
+            "rename"
+          ]
+        },
+        "params": {
+          "description": "Additional parameters for the action.",
+          "type": "string"
+        },
+        "requestId": {
+          "description": "Unique request ID for the action.",
+          "type": "string"
+        },
+        "step": {
+          "description": "Step name if the action targets a specific step.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Optional extra value for the action.",
+          "type": "string"
+        }
+      }
+    },
+    "PostDagActionResponse": {
+      "type": "object",
+      "properties": {
+        "NewDagID": {
+          "description": "New DAG ID, if the action triggered a DAG rename or duplication.",
+          "type": "string"
+        }
+      }
+    },
+    "RepeatPolicy": {
+      "type": "object",
+      "properties": {
+        "Interval": {
+          "type": "integer"
+        },
+        "Repeat": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Schedule": {
+      "type": "object",
+      "required": [
+        "Expression"
+      ],
+      "properties": {
+        "Expression": {
+          "type": "string"
+        }
+      }
+    },
+    "SchedulerLog": {
+      "type": "object",
+      "required": [
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        }
+      }
+    },
+    "SearchDAGsMatchItem": {
+      "type": "object",
+      "properties": {
+        "Line": {
+          "type": "string"
+        },
+        "LineNumber": {
+          "type": "integer"
+        },
+        "StartLine": {
+          "type": "integer"
+        }
+      }
+    },
+    "SearchDAGsResponse": {
+      "type": "object",
+      "required": [
+        "Results",
+        "Errors"
+      ],
+      "properties": {
+        "Errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SearchDAGsResultItem"
+          }
+        }
+      }
+    },
+    "SearchDAGsResultItem": {
+      "type": "object",
+      "properties": {
+        "DAG": {
+          "$ref": "#/definitions/DAG"
+        },
+        "Matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SearchDAGsMatchItem"
+          }
+        },
+        "Name": {
+          "type": "string"
+        }
+      }
+    },
+    "StepLog": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/Node"
         }
       }
     },
@@ -2221,11 +2221,11 @@ func init() {
         "Preconditions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/condition"
+            "$ref": "#/definitions/Condition"
           }
         },
         "RepeatPolicy": {
-          "$ref": "#/definitions/repeatPolicy"
+          "$ref": "#/definitions/RepeatPolicy"
         },
         "Run": {
           "type": "string"

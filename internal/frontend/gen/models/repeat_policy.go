@@ -14,7 +14,7 @@ import (
 
 // RepeatPolicy repeat policy
 //
-// swagger:model repeatPolicy
+// swagger:model RepeatPolicy
 type RepeatPolicy struct {
 
 	// interval

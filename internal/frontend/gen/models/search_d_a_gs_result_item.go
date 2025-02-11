@@ -14,23 +14,23 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// SearchDagsResultItem search dags result item
+// SearchDAGsResultItem search d a gs result item
 //
-// swagger:model searchDagsResultItem
-type SearchDagsResultItem struct {
+// swagger:model SearchDAGsResultItem
+type SearchDAGsResultItem struct {
 
 	// d a g
-	DAG *Dag `json:"DAG,omitempty"`
+	DAG *DAG `json:"DAG,omitempty"`
 
 	// matches
-	Matches []*SearchDagsMatchItem `json:"Matches"`
+	Matches []*SearchDAGsMatchItem `json:"Matches"`
 
 	// name
 	Name string `json:"Name,omitempty"`
 }
 
-// Validate validates this search dags result item
-func (m *SearchDagsResultItem) Validate(formats strfmt.Registry) error {
+// Validate validates this search d a gs result item
+func (m *SearchDAGsResultItem) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDAG(formats); err != nil {
@@ -47,7 +47,7 @@ func (m *SearchDagsResultItem) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *SearchDagsResultItem) validateDAG(formats strfmt.Registry) error {
+func (m *SearchDAGsResultItem) validateDAG(formats strfmt.Registry) error {
 	if swag.IsZero(m.DAG) { // not required
 		return nil
 	}
@@ -66,7 +66,7 @@ func (m *SearchDagsResultItem) validateDAG(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *SearchDagsResultItem) validateMatches(formats strfmt.Registry) error {
+func (m *SearchDAGsResultItem) validateMatches(formats strfmt.Registry) error {
 	if swag.IsZero(m.Matches) { // not required
 		return nil
 	}
@@ -92,8 +92,8 @@ func (m *SearchDagsResultItem) validateMatches(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this search dags result item based on the context it is used
-func (m *SearchDagsResultItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this search d a gs result item based on the context it is used
+func (m *SearchDAGsResultItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateDAG(ctx, formats); err != nil {
@@ -110,7 +110,7 @@ func (m *SearchDagsResultItem) ContextValidate(ctx context.Context, formats strf
 	return nil
 }
 
-func (m *SearchDagsResultItem) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
+func (m *SearchDAGsResultItem) contextValidateDAG(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.DAG != nil {
 
@@ -131,7 +131,7 @@ func (m *SearchDagsResultItem) contextValidateDAG(ctx context.Context, formats s
 	return nil
 }
 
-func (m *SearchDagsResultItem) contextValidateMatches(ctx context.Context, formats strfmt.Registry) error {
+func (m *SearchDAGsResultItem) contextValidateMatches(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Matches); i++ {
 
@@ -157,7 +157,7 @@ func (m *SearchDagsResultItem) contextValidateMatches(ctx context.Context, forma
 }
 
 // MarshalBinary interface implementation
-func (m *SearchDagsResultItem) MarshalBinary() ([]byte, error) {
+func (m *SearchDAGsResultItem) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -165,8 +165,8 @@ func (m *SearchDagsResultItem) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *SearchDagsResultItem) UnmarshalBinary(b []byte) error {
-	var res SearchDagsResultItem
+func (m *SearchDAGsResultItem) UnmarshalBinary(b []byte) error {
+	var res SearchDAGsResultItem
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

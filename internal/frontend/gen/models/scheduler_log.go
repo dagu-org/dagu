@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagSchedulerLogResponse dag scheduler log response
+// SchedulerLog scheduler log
 //
-// swagger:model dagSchedulerLogResponse
-type DagSchedulerLogResponse struct {
+// swagger:model SchedulerLog
+type SchedulerLog struct {
 
 	// content
 	// Required: true
@@ -28,8 +28,8 @@ type DagSchedulerLogResponse struct {
 	LogFile *string `json:"LogFile"`
 }
 
-// Validate validates this dag scheduler log response
-func (m *DagSchedulerLogResponse) Validate(formats strfmt.Registry) error {
+// Validate validates this scheduler log
+func (m *SchedulerLog) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateContent(formats); err != nil {
@@ -46,7 +46,7 @@ func (m *DagSchedulerLogResponse) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagSchedulerLogResponse) validateContent(formats strfmt.Registry) error {
+func (m *SchedulerLog) validateContent(formats strfmt.Registry) error {
 
 	if err := validate.Required("Content", "body", m.Content); err != nil {
 		return err
@@ -55,7 +55,7 @@ func (m *DagSchedulerLogResponse) validateContent(formats strfmt.Registry) error
 	return nil
 }
 
-func (m *DagSchedulerLogResponse) validateLogFile(formats strfmt.Registry) error {
+func (m *SchedulerLog) validateLogFile(formats strfmt.Registry) error {
 
 	if err := validate.Required("LogFile", "body", m.LogFile); err != nil {
 		return err
@@ -64,13 +64,13 @@ func (m *DagSchedulerLogResponse) validateLogFile(formats strfmt.Registry) error
 	return nil
 }
 
-// ContextValidate validates this dag scheduler log response based on context it is used
-func (m *DagSchedulerLogResponse) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this scheduler log based on context it is used
+func (m *SchedulerLog) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *DagSchedulerLogResponse) MarshalBinary() ([]byte, error) {
+func (m *SchedulerLog) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -78,8 +78,8 @@ func (m *DagSchedulerLogResponse) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagSchedulerLogResponse) UnmarshalBinary(b []byte) error {
-	var res DagSchedulerLogResponse
+func (m *SchedulerLog) UnmarshalBinary(b []byte) error {
+	var res SchedulerLog
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

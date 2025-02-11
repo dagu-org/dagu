@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// StatusNode status node
+// Node node
 //
-// swagger:model statusNode
-type StatusNode struct {
+// swagger:model Node
+type Node struct {
 
 	// done count
 	// Required: true
@@ -56,8 +56,8 @@ type StatusNode struct {
 	Step *StepObject `json:"Step"`
 }
 
-// Validate validates this status node
-func (m *StatusNode) Validate(formats strfmt.Registry) error {
+// Validate validates this node
+func (m *Node) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateDoneCount(formats); err != nil {
@@ -102,7 +102,7 @@ func (m *StatusNode) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateDoneCount(formats strfmt.Registry) error {
+func (m *Node) validateDoneCount(formats strfmt.Registry) error {
 
 	if err := validate.Required("DoneCount", "body", m.DoneCount); err != nil {
 		return err
@@ -111,7 +111,7 @@ func (m *StatusNode) validateDoneCount(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateError(formats strfmt.Registry) error {
+func (m *Node) validateError(formats strfmt.Registry) error {
 
 	if err := validate.Required("Error", "body", m.Error); err != nil {
 		return err
@@ -120,7 +120,7 @@ func (m *StatusNode) validateError(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateFinishedAt(formats strfmt.Registry) error {
+func (m *Node) validateFinishedAt(formats strfmt.Registry) error {
 
 	if err := validate.Required("FinishedAt", "body", m.FinishedAt); err != nil {
 		return err
@@ -129,7 +129,7 @@ func (m *StatusNode) validateFinishedAt(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateLog(formats strfmt.Registry) error {
+func (m *Node) validateLog(formats strfmt.Registry) error {
 
 	if err := validate.Required("Log", "body", m.Log); err != nil {
 		return err
@@ -138,7 +138,7 @@ func (m *StatusNode) validateLog(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateRetryCount(formats strfmt.Registry) error {
+func (m *Node) validateRetryCount(formats strfmt.Registry) error {
 
 	if err := validate.Required("RetryCount", "body", m.RetryCount); err != nil {
 		return err
@@ -147,7 +147,7 @@ func (m *StatusNode) validateRetryCount(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateStartedAt(formats strfmt.Registry) error {
+func (m *Node) validateStartedAt(formats strfmt.Registry) error {
 
 	if err := validate.Required("StartedAt", "body", m.StartedAt); err != nil {
 		return err
@@ -156,7 +156,7 @@ func (m *StatusNode) validateStartedAt(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateStatus(formats strfmt.Registry) error {
+func (m *Node) validateStatus(formats strfmt.Registry) error {
 
 	if err := validate.Required("Status", "body", m.Status); err != nil {
 		return err
@@ -165,7 +165,7 @@ func (m *StatusNode) validateStatus(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateStatusText(formats strfmt.Registry) error {
+func (m *Node) validateStatusText(formats strfmt.Registry) error {
 
 	if err := validate.Required("StatusText", "body", m.StatusText); err != nil {
 		return err
@@ -174,7 +174,7 @@ func (m *StatusNode) validateStatusText(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StatusNode) validateStep(formats strfmt.Registry) error {
+func (m *Node) validateStep(formats strfmt.Registry) error {
 
 	if err := validate.Required("Step", "body", m.Step); err != nil {
 		return err
@@ -194,8 +194,8 @@ func (m *StatusNode) validateStep(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this status node based on the context it is used
-func (m *StatusNode) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this node based on the context it is used
+func (m *Node) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidateStep(ctx, formats); err != nil {
@@ -208,7 +208,7 @@ func (m *StatusNode) ContextValidate(ctx context.Context, formats strfmt.Registr
 	return nil
 }
 
-func (m *StatusNode) contextValidateStep(ctx context.Context, formats strfmt.Registry) error {
+func (m *Node) contextValidateStep(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Step != nil {
 
@@ -226,7 +226,7 @@ func (m *StatusNode) contextValidateStep(ctx context.Context, formats strfmt.Reg
 }
 
 // MarshalBinary interface implementation
-func (m *StatusNode) MarshalBinary() ([]byte, error) {
+func (m *Node) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -234,8 +234,8 @@ func (m *StatusNode) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *StatusNode) UnmarshalBinary(b []byte) error {
-	var res StatusNode
+func (m *Node) UnmarshalBinary(b []byte) error {
+	var res Node
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

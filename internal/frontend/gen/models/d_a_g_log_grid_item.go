@@ -14,10 +14,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DagLogGridItem dag log grid item
+// DAGLogGridItem d a g log grid item
 //
-// swagger:model dagLogGridItem
-type DagLogGridItem struct {
+// swagger:model DAGLogGridItem
+type DAGLogGridItem struct {
 
 	// name
 	// Required: true
@@ -28,8 +28,8 @@ type DagLogGridItem struct {
 	Vals []int64 `json:"Vals"`
 }
 
-// Validate validates this dag log grid item
-func (m *DagLogGridItem) Validate(formats strfmt.Registry) error {
+// Validate validates this d a g log grid item
+func (m *DAGLogGridItem) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateName(formats); err != nil {
@@ -46,7 +46,7 @@ func (m *DagLogGridItem) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagLogGridItem) validateName(formats strfmt.Registry) error {
+func (m *DAGLogGridItem) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("Name", "body", m.Name); err != nil {
 		return err
@@ -55,7 +55,7 @@ func (m *DagLogGridItem) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *DagLogGridItem) validateVals(formats strfmt.Registry) error {
+func (m *DAGLogGridItem) validateVals(formats strfmt.Registry) error {
 
 	if err := validate.Required("Vals", "body", m.Vals); err != nil {
 		return err
@@ -64,13 +64,13 @@ func (m *DagLogGridItem) validateVals(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this dag log grid item based on context it is used
-func (m *DagLogGridItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this d a g log grid item based on context it is used
+func (m *DAGLogGridItem) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *DagLogGridItem) MarshalBinary() ([]byte, error) {
+func (m *DAGLogGridItem) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -78,8 +78,8 @@ func (m *DagLogGridItem) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *DagLogGridItem) UnmarshalBinary(b []byte) error {
-	var res DagLogGridItem
+func (m *DAGLogGridItem) UnmarshalBinary(b []byte) error {
+	var res DAGLogGridItem
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

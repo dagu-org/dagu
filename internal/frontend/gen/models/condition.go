@@ -14,7 +14,7 @@ import (
 
 // Condition condition
 //
-// swagger:model condition
+// swagger:model Condition
 type Condition struct {
 
 	// condition

@@ -26,7 +26,7 @@ type SearchDagsOK struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.SearchDagsResponse `json:"body,omitempty"`
+	Payload *models.SearchDAGsResponse `json:"body,omitempty"`
 }
 
 // NewSearchDagsOK creates SearchDagsOK with default headers values
@@ -36,13 +36,13 @@ func NewSearchDagsOK() *SearchDagsOK {
 }
 
 // WithPayload adds the payload to the search dags o k response
-func (o *SearchDagsOK) WithPayload(payload *models.SearchDagsResponse) *SearchDagsOK {
+func (o *SearchDagsOK) WithPayload(payload *models.SearchDAGsResponse) *SearchDagsOK {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the search dags o k response
-func (o *SearchDagsOK) SetPayload(payload *models.SearchDagsResponse) {
+func (o *SearchDagsOK) SetPayload(payload *models.SearchDAGsResponse) {
 	o.Payload = payload
 }
 
