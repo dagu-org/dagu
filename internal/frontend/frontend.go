@@ -8,16 +8,10 @@ import (
 )
 
 func New(cfg *config.Config, cli client.Client) *server.Server {
-	var hs []server.Handler
+	var apiHandlers []server.Handler
 
-	hs = append(hs, handlers.NewHandler(
-		&handlers.NewHandlerArgs{
-			Client:             cli,
-			LogEncodingCharset: cfg.UI.LogEncodingCharset,
-			RemoteNodes:        cfg.RemoteNodes,
-			ApiBasePath:        cfg.APIBaseURL,
-		},
-	))
+	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.RemoteNodes, cfg.APIBaseURL)
+	apiHandlers = append(apiHandlers, dagAPIHandler)
 
 	var remoteNodes []string
 	for _, n := range cfg.RemoteNodes {
@@ -28,7 +22,7 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		Host:                  cfg.Host,
 		Port:                  cfg.Port,
 		TLS:                   cfg.TLS,
-		Handlers:              hs,
+		Handlers:              apiHandlers,
 		AssetsFS:              assetsFS,
 		NavbarColor:           cfg.UI.NavbarColor,
 		NavbarTitle:           cfg.UI.NavbarTitle,

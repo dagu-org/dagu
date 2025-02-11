@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,39 +39,33 @@ const (
 	dagTabTypeSchedulerLog = "scheduler-log"
 )
 
-var (
-	ErrReadingLastStatus = errors.New("error reading the last status")
-)
-
-// Handler is a handler for the DAG API.
-type Handler struct {
+// DAG is a handler for the DAG API.
+type DAG struct {
 	client             client.Client
 	logEncodingCharset string
 	remoteNodes        map[string]config.RemoteNode
 	apiBasePath        string
 }
 
-type NewHandlerArgs struct {
-	Client             client.Client
-	LogEncodingCharset string
-	RemoteNodes        []config.RemoteNode
-	ApiBasePath        string
-}
-
-func NewHandler(args *NewHandlerArgs) server.Handler {
+func NewDAG(
+	cli client.Client,
+	logEncodingCharset string,
+	remoteNodeConfigs []config.RemoteNode,
+	apiBasePath string,
+) server.Handler {
 	remoteNodes := make(map[string]config.RemoteNode)
-	for _, node := range args.RemoteNodes {
+	for _, node := range remoteNodeConfigs {
 		remoteNodes[node.Name] = node
 	}
-	return &Handler{
-		client:             args.Client,
-		logEncodingCharset: args.LogEncodingCharset,
+	return &DAG{
+		client:             cli,
+		logEncodingCharset: logEncodingCharset,
 		remoteNodes:        remoteNodes,
-		apiBasePath:        args.ApiBasePath,
+		apiBasePath:        apiBasePath,
 	}
 }
 
-func (h *Handler) Configure(api *operations.DaguAPI) {
+func (h *DAG) Configure(api *operations.DaguAPI) {
 	api.DagsListDagsHandler = dags.ListDagsHandlerFunc(
 		func(params dags.ListDagsParams) middleware.Responder {
 			if resp := h.handleRemoteNodeProxy(nil, params.HTTPRequest); resp != nil {
@@ -175,7 +168,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 // handleRemoteNodeProxy checks if 'remoteNode' is present in the query parameters.
 // If yes, it proxies the request to the remote node and returns the remote response.
 // If not, it returns nil, indicating to proceed locally.
-func (h *Handler) handleRemoteNodeProxy(body any, r *http.Request) middleware.Responder {
+func (h *DAG) handleRemoteNodeProxy(body any, r *http.Request) middleware.Responder {
 	if r == nil {
 		return nil
 	}
@@ -196,7 +189,7 @@ func (h *Handler) handleRemoteNodeProxy(body any, r *http.Request) middleware.Re
 }
 
 // doRemoteProxy performs the actual proxying of the request to the remote node.
-func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config.RemoteNode) middleware.Responder {
+func (h *DAG) doRemoteProxy(body any, originalReq *http.Request, node config.RemoteNode) middleware.Responder {
 	// Copy original query parameters except remoteNode
 	q := originalReq.URL.Query()
 	q.Del("remoteNode")
@@ -322,11 +315,11 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 	})
 }
 
-func (h *Handler) responderWithCodedError(err *codedError) middleware.Responder {
+func (h *DAG) responderWithCodedError(err *codedError) middleware.Responder {
 	return dags.NewListDagsDefault(err.HTTPCode).WithPayload(err.APIError)
 }
 
-func (h *Handler) createDAG(ctx context.Context, params dags.CreateDagParams) (
+func (h *DAG) createDAG(ctx context.Context, params dags.CreateDagParams) (
 	*models.CreateDagResponse, *codedError,
 ) {
 	if params.Body.Action == nil || params.Body.Value == nil {
@@ -345,7 +338,7 @@ func (h *Handler) createDAG(ctx context.Context, params dags.CreateDagParams) (
 		return nil, newBadRequestError(fmt.Errorf("invalid action: %s", *params.Body.Action))
 	}
 }
-func (h *Handler) deleteDAG(ctx context.Context, params dags.DeleteDagParams) *codedError {
+func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDagParams) *codedError {
 	dagStatus, err := h.client.GetStatus(ctx, params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
@@ -356,7 +349,7 @@ func (h *Handler) deleteDAG(ctx context.Context, params dags.DeleteDagParams) *c
 	return nil
 }
 
-func (h *Handler) getList(ctx context.Context, params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
+func (h *DAG) getList(ctx context.Context, params dags.ListDagsParams) (*models.ListDagsResponse, *codedError) {
 	dgs, result, err := h.client.GetAllStatusPagination(ctx, params)
 	if err != nil {
 		return nil, newInternalError(err)
@@ -413,7 +406,7 @@ func (h *Handler) getList(ctx context.Context, params dags.ListDagsParams) (*mod
 	return resp, nil
 }
 
-func (h *Handler) getDetail(
+func (h *DAG) getDetail(
 	ctx context.Context, params dags.GetDagDetailsParams,
 ) (*models.GetDagDetailsResponse, *codedError) {
 	dagID := params.DagID
@@ -528,7 +521,7 @@ func (h *Handler) getDetail(
 	}
 }
 
-func (h *Handler) processSchedulerLogRequest(
+func (h *DAG) processSchedulerLogRequest(
 	ctx context.Context,
 	dag *digraph.DAG,
 	params dags.GetDagDetailsParams,
@@ -565,7 +558,7 @@ func (h *Handler) processSchedulerLogRequest(
 	return resp, nil
 }
 
-func (h *Handler) processStepLogRequest(
+func (h *DAG) processStepLogRequest(
 	ctx context.Context,
 	dag *digraph.DAG,
 	params dags.GetDagDetailsParams,
@@ -641,7 +634,7 @@ func (h *Handler) processStepLogRequest(
 	return resp, nil
 }
 
-func (h *Handler) processSpecRequest(
+func (h *DAG) processSpecRequest(
 	ctx context.Context,
 	dagID string,
 	resp *models.GetDagDetailsResponse,
@@ -658,7 +651,7 @@ var (
 	defaultHistoryLimit = 30
 )
 
-func (h *Handler) processLogRequest(
+func (h *DAG) processLogRequest(
 	ctx context.Context,
 	resp *models.GetDagDetailsResponse,
 	dag *digraph.DAG,
@@ -755,7 +748,7 @@ func addNodeStatus(
 	data[nodeName][logIdx] = status
 }
 
-func (h *Handler) postAction(
+func (h *DAG) postAction(
 	ctx context.Context,
 	params dags.PostDagActionParams,
 ) (*models.PostDagActionResponse, *codedError) {
@@ -844,7 +837,7 @@ func (h *Handler) postAction(
 	}
 }
 
-func (h *Handler) processUpdateStatus(
+func (h *DAG) processUpdateStatus(
 	ctx context.Context,
 	params dags.PostDagActionParams,
 	dagStatus client.DAGStatus, to scheduler.NodeStatus,
@@ -894,7 +887,7 @@ func (h *Handler) processUpdateStatus(
 	return &models.PostDagActionResponse{}, nil
 }
 
-func (h *Handler) searchDAGs(ctx context.Context, params dags.SearchDagsParams) (
+func (h *DAG) searchDAGs(ctx context.Context, params dags.SearchDagsParams) (
 	*models.SearchDAGsResponse, *codedError,
 ) {
 	query := params.Q
@@ -948,7 +941,7 @@ func readFileContent(f string, decoder *encoding.Decoder) ([]byte, error) {
 	return ret, err
 }
 
-func (h *Handler) getTagList(ctx context.Context, _ dags.ListTagsParams) (*models.ListTagResponse, *codedError) {
+func (h *DAG) getTagList(ctx context.Context, _ dags.ListTagsParams) (*models.ListTagResponse, *codedError) {
 	tags, errs, err := h.client.GetTagList(ctx)
 	if err != nil {
 		return nil, newInternalError(err)
