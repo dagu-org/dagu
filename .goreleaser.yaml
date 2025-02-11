@@ -1,9 +1,6 @@
 version: 2
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
 builds:
   - dir: ./cmd
@@ -29,13 +26,12 @@ changelog:
       - "^docs:"
       - "^test:"
 brews:
-  # DEPRECATED: prefer using dagu-org/dagu for brew formula
   - repository:
-      owner: yohamta
-      name: homebrew-tap
+      owner: dagu-org
+      name: homebrew-brew
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
-    description: "A No-code workflow engine that runs DAGs defined in a simple YAML format"
+    description: "Dagu is a compact, portable, and language-agnostic workflow engine."
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
@@ -50,7 +46,7 @@ brews:
       name: homebrew-brew
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
-    description: "A No-code workflow engine that runs DAGs defined in a simple YAML format"
+    description: "Dagu is a compact, portable, and language-agnostic workflow engine."
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
@@ -60,3 +56,21 @@ brews:
         log_path var/"log/dagu.log"
         working_dir var
       end
+snapcrafts:
+  - name: dagu
+    title: Dagu
+    summary: "A compact, portable, and language-agnostic workflow engine."
+    description: "Dagu is a compact, portable, and language-agnostic workflow engine."
+    confinement: strict
+    grade: stable
+    base: core22
+    license: "GPL-3.0"
+    apps:
+      dagu:
+        command: dagu start-all
+        daemon: simple
+        restart_condition: "always"
+        plugs:
+          - network
+          - home
+          - personal-files
