@@ -413,8 +413,6 @@ definitions:
         type: boolean
       Error:
         type: string
-      ErrorT:
-        type: string
     required:
       - File
       - Dir
@@ -422,7 +420,6 @@ definitions:
       - Status
       - Suspended
       - Error
-      - ErrorT
 
   DAG:
     type: object
@@ -513,8 +510,6 @@ definitions:
         type: boolean
       Error:
         type: string
-      ErrorT:
-        type: string
     required:
       - File
       - Dir
@@ -522,7 +517,6 @@ definitions:
       - Status
       - Suspended
       - Error
-      - ErrorT
 
   DAGDetails:
     type: object

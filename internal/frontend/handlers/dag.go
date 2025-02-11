@@ -391,7 +391,7 @@ func (h *DAG) getList(ctx context.Context, params dags.ListDagsParams) (*models.
 
 		item := &models.DAGStatusFile{
 			Dir:       swag.String(dagStatus.Dir),
-			ErrorT:    dagStatus.ErrorT,
+			Error:     dagStatus.ErrorT,
 			File:      swag.String(dagStatus.File),
 			Status:    status,
 			Suspended: swag.Bool(dagStatus.Suspended),
@@ -479,7 +479,7 @@ func (h *DAG) getDetail(
 	statusWithDetails := &models.DAGStatusFileDetails{
 		DAG:       dagDetail,
 		Dir:       swag.String(dagStatus.Dir),
-		ErrorT:    dagStatus.ErrorT,
+		Error:     dagStatus.ErrorT,
 		File:      swag.String(dagStatus.File),
 		Status:    convertToStatusDetails(dagStatus.Status),
 		Suspended: swag.Bool(dagStatus.Suspended),

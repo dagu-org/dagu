@@ -16,11 +16,11 @@ function DAGErrors({ DAGs, errors, hasError }: Props) {
       <div>Please check the below errors!</div>
       <div className="content">
         <ul>
-          {DAGs.filter((w) => w.ErrorT).map((w) => {
+          {DAGs.filter((w) => w.Error).map((w) => {
             const url = encodeURI(w.File);
             return (
               <li>
-                <a href={url}>{w.File}</a>: {w.ErrorT}{' '}
+                <a href={url}>{w.File}</a>: {w.Error}{' '}
               </li>
             );
           })}

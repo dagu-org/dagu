@@ -31,10 +31,6 @@ type DAGStatusFileDetails struct {
 	// Required: true
 	Error *string `json:"Error"`
 
-	// error t
-	// Required: true
-	ErrorT *string `json:"ErrorT"`
-
 	// file
 	// Required: true
 	File *string `json:"File"`
@@ -61,10 +57,6 @@ func (m *DAGStatusFileDetails) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateError(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateErrorT(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -118,15 +110,6 @@ func (m *DAGStatusFileDetails) validateDir(formats strfmt.Registry) error {
 func (m *DAGStatusFileDetails) validateError(formats strfmt.Registry) error {
 
 	if err := validate.Required("Error", "body", m.Error); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *DAGStatusFileDetails) validateErrorT(formats strfmt.Registry) error {
-
-	if err := validate.Required("ErrorT", "body", m.ErrorT); err != nil {
 		return err
 	}
 

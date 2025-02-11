@@ -681,8 +681,7 @@ func init() {
         "DAG",
         "Status",
         "Suspended",
-        "Error",
-        "ErrorT"
+        "Error"
       ],
       "properties": {
         "DAG": {
@@ -692,9 +691,6 @@ func init() {
           "type": "string"
         },
         "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
           "type": "string"
         },
         "File": {
@@ -716,8 +712,7 @@ func init() {
         "DAG",
         "Status",
         "Suspended",
-        "Error",
-        "ErrorT"
+        "Error"
       ],
       "properties": {
         "DAG": {
@@ -727,9 +722,6 @@ func init() {
           "type": "string"
         },
         "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
           "type": "string"
         },
         "File": {
@@ -1880,8 +1872,7 @@ func init() {
         "DAG",
         "Status",
         "Suspended",
-        "Error",
-        "ErrorT"
+        "Error"
       ],
       "properties": {
         "DAG": {
@@ -1891,9 +1882,6 @@ func init() {
           "type": "string"
         },
         "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
           "type": "string"
         },
         "File": {
@@ -1915,8 +1903,7 @@ func init() {
         "DAG",
         "Status",
         "Suspended",
-        "Error",
-        "ErrorT"
+        "Error"
       ],
       "properties": {
         "DAG": {
@@ -1926,9 +1913,6 @@ func init() {
           "type": "string"
         },
         "Error": {
-          "type": "string"
-        },
-        "ErrorT": {
           "type": "string"
         },
         "File": {
