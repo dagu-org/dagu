@@ -3,15 +3,15 @@ package frontend
 import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/frontend/dag"
+	"github.com/dagu-org/dagu/internal/frontend/handlers"
 	"github.com/dagu-org/dagu/internal/frontend/server"
 )
 
 func New(cfg *config.Config, cli client.Client) *server.Server {
 	var hs []server.Handler
 
-	hs = append(hs, dag.NewHandler(
-		&dag.NewHandlerArgs{
+	hs = append(hs, handlers.NewHandler(
+		&handlers.NewHandlerArgs{
 			Client:             cli,
 			LogEncodingCharset: cfg.UI.LogEncodingCharset,
 			RemoteNodes:        cfg.RemoteNodes,

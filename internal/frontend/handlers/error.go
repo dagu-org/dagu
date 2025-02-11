@@ -1,4 +1,4 @@
-package dag
+package handlers
 
 import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/models"
