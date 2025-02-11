@@ -448,9 +448,9 @@ func (h *DAG) getDetail(
 		})
 	}
 
-	var preconditions []*models.Condition
+	var preconditions []*models.Precondition
 	for _, p := range dagStatus.DAG.Preconditions {
-		preconditions = append(preconditions, &models.Condition{
+		preconditions = append(preconditions, &models.Precondition{
 			Condition: p.Condition,
 			Expected:  p.Expected,
 		})

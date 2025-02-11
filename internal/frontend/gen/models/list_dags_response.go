@@ -15,24 +15,24 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// ListDagsResponse list dags response
+// ListDagsResponse Response object for listing all DAGs.
 //
 // swagger:model ListDagsResponse
 type ListDagsResponse struct {
 
-	// d a gs
+	// List of DAGs with their status and metadata.
 	// Required: true
 	DAGs []*DAGStatusFile `json:"DAGs"`
 
-	// errors
+	// List of errors encountered during the request.
 	// Required: true
 	Errors []string `json:"Errors"`
 
-	// has error
+	// Whether any errors were encountered.
 	// Required: true
 	HasError *bool `json:"HasError"`
 
-	// page count
+	// Total number of pages available.
 	// Required: true
 	PageCount *int64 `json:"PageCount"`
 }

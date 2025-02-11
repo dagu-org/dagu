@@ -14,7 +14,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGStatusFileDetails d a g status file details
+// DAGStatusFileDetails Detailed status information for a DAG instance
 //
 // swagger:model DAGStatusFileDetails
 type DAGStatusFileDetails struct {

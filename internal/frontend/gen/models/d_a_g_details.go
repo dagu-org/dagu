@@ -20,23 +20,23 @@ import (
 // swagger:model DAGDetails
 type DAGDetails struct {
 
-	// default params
+	// Default parameter values in JSON format if not specified at runtime
 	// Required: true
 	DefaultParams *string `json:"DefaultParams"`
 
-	// delay
+	// Time in seconds to wait before starting the DAG
 	// Required: true
 	Delay *int64 `json:"Delay"`
 
-	// description
+	// Human-readable description of the DAG's purpose and behavior
 	// Required: true
 	Description *string `json:"Description"`
 
-	// env
+	// List of environment variables to set before executing
 	// Required: true
 	Env []string `json:"Env"`
 
-	// group
+	// Logical grouping of related DAGs for organizational purposes
 	// Required: true
 	Group *string `json:"Group"`
 
@@ -44,43 +44,43 @@ type DAGDetails struct {
 	// Required: true
 	HandlerOn *HandlerOn `json:"HandlerOn"`
 
-	// hist retention days
+	// Number of days to retain historical logs
 	// Required: true
 	HistRetentionDays *int64 `json:"HistRetentionDays"`
 
-	// location
+	// Path to the DAG file
 	// Required: true
 	Location *string `json:"Location"`
 
-	// log dir
+	// Directory path for storing log files
 	// Required: true
 	LogDir *string `json:"LogDir"`
 
-	// max active runs
+	// Maximum number of concurrent steps to run
 	// Required: true
 	MaxActiveRuns *int64 `json:"MaxActiveRuns"`
 
-	// name
+	// Unique identifier for the DAG within its group
 	// Required: true
 	Name *string `json:"Name"`
 
-	// params
+	// List of parameter names that can be passed to the DAG at runtime
 	// Required: true
 	Params []string `json:"Params"`
 
-	// preconditions
+	// Conditions that must be met before the DAG can start
 	// Required: true
-	Preconditions []*Condition `json:"Preconditions"`
+	Preconditions []*Precondition `json:"Preconditions"`
 
-	// schedule
+	// List of scheduling expressions defining when the DAG should run
 	// Required: true
 	Schedule []*Schedule `json:"Schedule"`
 
-	// steps
+	// List of steps to execute in the DAG
 	// Required: true
 	Steps []*Step `json:"Steps"`
 
-	// tags
+	// List of tags for categorizing and filtering DAGs
 	// Required: true
 	Tags []string `json:"Tags"`
 }

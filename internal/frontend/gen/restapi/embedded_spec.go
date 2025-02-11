@@ -333,17 +333,6 @@ func init() {
     }
   },
   "definitions": {
-    "Condition": {
-      "type": "object",
-      "properties": {
-        "Condition": {
-          "type": "string"
-        },
-        "Expected": {
-          "type": "string"
-        }
-      }
-    },
     "CreateDagRequest": {
       "description": "Request body for creating a DAG.",
       "type": "object",
@@ -374,6 +363,7 @@ func init() {
       }
     },
     "DAG": {
+      "description": "Core DAG configuration containing workflow definition and metadata",
       "type": "object",
       "required": [
         "Group",
@@ -386,30 +376,37 @@ func init() {
       ],
       "properties": {
         "DefaultParams": {
+          "description": "Default parameter values in JSON format if not specified at runtime",
           "type": "string"
         },
         "Description": {
+          "description": "Human-readable description of the DAG's purpose and behavior",
           "type": "string"
         },
         "Group": {
+          "description": "Logical grouping of related DAGs for organizational purposes",
           "type": "string"
         },
         "Name": {
+          "description": "Unique identifier for the DAG within its group",
           "type": "string"
         },
         "Params": {
+          "description": "List of parameter names that can be passed to the DAG at runtime",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Schedule": {
+          "description": "List of scheduling expressions defining when the DAG should run",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Schedule"
           }
         },
         "Tags": {
+          "description": "List of tags for categorizing and filtering DAGs",
           "type": "array",
           "items": {
             "type": "string"
@@ -439,66 +436,81 @@ func init() {
       ],
       "properties": {
         "DefaultParams": {
+          "description": "Default parameter values in JSON format if not specified at runtime",
           "type": "string"
         },
         "Delay": {
+          "description": "Time in seconds to wait before starting the DAG",
           "type": "integer"
         },
         "Description": {
+          "description": "Human-readable description of the DAG's purpose and behavior",
           "type": "string"
         },
         "Env": {
+          "description": "List of environment variables to set before executing",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Group": {
+          "description": "Logical grouping of related DAGs for organizational purposes",
           "type": "string"
         },
         "HandlerOn": {
           "$ref": "#/definitions/HandlerOn"
         },
         "HistRetentionDays": {
+          "description": "Number of days to retain historical logs",
           "type": "integer"
         },
         "Location": {
+          "description": "Path to the DAG file",
           "type": "string"
         },
         "LogDir": {
+          "description": "Directory path for storing log files",
           "type": "string"
         },
         "MaxActiveRuns": {
+          "description": "Maximum number of concurrent steps to run",
           "type": "integer"
         },
         "Name": {
+          "description": "Unique identifier for the DAG within its group",
           "type": "string"
         },
         "Params": {
+          "description": "List of parameter names that can be passed to the DAG at runtime",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Preconditions": {
+          "description": "Conditions that must be met before the DAG can start",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Condition"
+            "$ref": "#/definitions/Precondition"
           }
         },
         "Schedule": {
+          "description": "List of scheduling expressions defining when the DAG should run",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Schedule"
           }
         },
         "Steps": {
+          "description": "List of steps to execute in the DAG",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Step"
           }
         },
         "Tags": {
+          "description": "List of tags for categorizing and filtering DAGs",
           "type": "array",
           "items": {
             "type": "string"
@@ -561,6 +573,7 @@ func init() {
       }
     },
     "DAGStatus": {
+      "description": "Current execution status of a DAG instance",
       "type": "object",
       "required": [
         "RequestId",
@@ -575,32 +588,39 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "Timestamp when the DAG finished.",
+          "description": "RFC 3339 timestamp when the DAG execution completed",
           "type": "string"
         },
         "Log": {
+          "description": "Path to the execution log file",
           "type": "string"
         },
         "Name": {
+          "description": "Name of the DAG being executed",
           "type": "string"
         },
         "Params": {
+          "description": "Runtime parameters passed to the DAG in JSON format",
           "type": "string"
         },
         "Pid": {
+          "description": "Process ID of the DAG execution",
           "type": "integer"
         },
         "RequestId": {
+          "description": "Unique identifier for the DAG execution request",
           "type": "string"
         },
         "StartedAt": {
-          "description": "Timestamp when the DAG started.",
+          "description": "RFC 3339 timestamp when the DAG execution started",
           "type": "string"
         },
         "Status": {
+          "description": "Numeric status code indicating current execution state",
           "type": "integer"
         },
         "StatusText": {
+          "description": "Human-readable status description",
           "type": "string"
         }
       }
@@ -705,6 +725,7 @@ func init() {
       }
     },
     "DAGStatusFileDetails": {
+      "description": "Detailed status information for a DAG instance",
       "type": "object",
       "required": [
         "File",
@@ -736,6 +757,7 @@ func init() {
       }
     },
     "Error": {
+      "description": "Generic error response object.",
       "type": "object",
       "required": [
         "code",
@@ -743,6 +765,7 @@ func init() {
       ],
       "properties": {
         "code": {
+          "description": "Error code indicating the type of error.",
           "type": "string",
           "enum": [
             "validation_error",
@@ -763,6 +786,7 @@ func init() {
       }
     },
     "GetDagDetailsResponse": {
+      "description": "Response object for getting details of a DAG.",
       "type": "object",
       "required": [
         "Title",
@@ -781,15 +805,18 @@ func init() {
           "$ref": "#/definitions/DAGStatusFileDetails"
         },
         "Definition": {
+          "description": "DAG definition.",
           "type": "string"
         },
         "Errors": {
+          "description": "List of errors encountered during the request.",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Graph": {
+          "description": "Graph data for visualization.",
           "type": "string"
         },
         "LogData": {
@@ -805,14 +832,17 @@ func init() {
           "$ref": "#/definitions/StepLog"
         },
         "Tab": {
+          "description": "Tab name for UI navigation.",
           "type": "string"
         },
         "Title": {
+          "description": "Title of the Page.",
           "type": "string"
         }
       }
     },
     "HandlerOn": {
+      "description": "Configuration for event handlers in a DAG",
       "type": "object",
       "properties": {
         "Cancel": {
@@ -830,6 +860,7 @@ func init() {
       }
     },
     "HealthResponse": {
+      "description": "Response object for the health check endpoint.",
       "type": "object",
       "required": [
         "status",
@@ -861,6 +892,7 @@ func init() {
       }
     },
     "ListDagsResponse": {
+      "description": "Response object for listing all DAGs.",
       "type": "object",
       "required": [
         "DAGs",
@@ -870,26 +902,31 @@ func init() {
       ],
       "properties": {
         "DAGs": {
+          "description": "List of DAGs with their status and metadata.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGStatusFile"
           }
         },
         "Errors": {
+          "description": "List of errors encountered during the request.",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "HasError": {
+          "description": "Whether any errors were encountered.",
           "type": "boolean"
         },
         "PageCount": {
+          "description": "Total number of pages available.",
           "type": "integer"
         }
       }
     },
     "ListTagResponse": {
+      "description": "Response object for listing all tags",
       "type": "object",
       "required": [
         "Tags",
@@ -897,12 +934,14 @@ func init() {
       ],
       "properties": {
         "Errors": {
+          "description": "List of errors encountered during the request",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Tags": {
+          "description": "List of unique tags",
           "type": "array",
           "items": {
             "type": "string"
@@ -911,6 +950,7 @@ func init() {
       }
     },
     "Node": {
+      "description": "Execution status of an individual step within a DAG",
       "type": "object",
       "required": [
         "Step",
@@ -925,29 +965,35 @@ func init() {
       ],
       "properties": {
         "DoneCount": {
+          "description": "Number of successful completions for repeating steps",
           "type": "integer"
         },
         "Error": {
+          "description": "Error message if the step failed",
           "type": "string"
         },
         "FinishedAt": {
-          "description": "Timestamp when the step finished.",
+          "description": "RFC 3339 timestamp when the step completed",
           "type": "string"
         },
         "Log": {
+          "description": "Path to step-specific log file",
           "type": "string"
         },
         "RetryCount": {
+          "description": "Number of retry attempts made for this step",
           "type": "integer"
         },
         "StartedAt": {
-          "description": "Timestamp when the step started.",
+          "description": "RFC 3339 timestamp when the step started executing",
           "type": "string"
         },
         "Status": {
+          "description": "Numeric status code for the step execution",
           "type": "integer"
         },
         "StatusText": {
+          "description": "Human-readable status description",
           "type": "string"
         },
         "Step": {
@@ -995,21 +1041,39 @@ func init() {
       }
     },
     "PostDagActionResponse": {
+      "description": "Response object for posting an action to a DAG.",
       "type": "object",
       "properties": {
         "NewDagID": {
-          "description": "New DAG ID, if the action triggered a DAG rename or duplication.",
+          "description": "New DAG ID, if the action resulted in a new DAG.",
+          "type": "string"
+        }
+      }
+    },
+    "Precondition": {
+      "description": "Precondition that must be satisfied before execution",
+      "type": "object",
+      "properties": {
+        "Condition": {
+          "description": "Expression or check to evaluate",
+          "type": "string"
+        },
+        "Expected": {
+          "description": "Expected result of the condition evaluation",
           "type": "string"
         }
       }
     },
     "RepeatPolicy": {
+      "description": "Configuration for step retry behavior",
       "type": "object",
       "properties": {
         "Interval": {
+          "description": "Time in seconds to wait between retry attempts",
           "type": "integer"
         },
         "Repeat": {
+          "description": "Whether the step should be retried on failure",
           "type": "boolean"
         }
       }
@@ -1093,11 +1157,11 @@ func init() {
       }
     },
     "Step": {
+      "description": "Individual task within a DAG that performs a specific operation",
       "type": "object",
       "required": [
         "Name",
         "Description",
-        "Variables",
         "Dir",
         "CmdWithArgs",
         "Command",
@@ -1113,67 +1177,76 @@ func init() {
       ],
       "properties": {
         "Args": {
+          "description": "List of arguments to pass to the command",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "CmdWithArgs": {
+          "description": "Complete command string including arguments to execute",
           "type": "string"
         },
         "Command": {
+          "description": "Base command to execute without arguments",
           "type": "string"
         },
         "Depends": {
+          "description": "List of step names that must complete before this step can start",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Description": {
+          "description": "Human-readable description of what the step does",
           "type": "string"
         },
         "Dir": {
+          "description": "Working directory for executing the step's command",
           "type": "string"
         },
         "MailOnError": {
+          "description": "Whether to send email notifications on step failure",
           "type": "boolean"
         },
         "Name": {
+          "description": "Unique identifier for the step within the DAG",
           "type": "string"
         },
         "Output": {
+          "description": "Variable name to store the step's output",
           "type": "string"
         },
         "Params": {
+          "description": "Parameters to pass to the sub DAG",
           "type": "string"
         },
         "Preconditions": {
+          "description": "Conditions that must be met before the step can start",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Condition"
+            "$ref": "#/definitions/Precondition"
           }
         },
         "RepeatPolicy": {
           "$ref": "#/definitions/RepeatPolicy"
         },
         "Run": {
+          "description": "Sub DAG to run",
           "type": "string"
         },
         "Script": {
+          "description": "Script content if the step executes a script file",
           "type": "string"
         },
         "Stderr": {
+          "description": "File path for capturing standard error",
           "type": "string"
         },
         "Stdout": {
+          "description": "File path for capturing standard output",
           "type": "string"
-        },
-        "Variables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       }
     },
@@ -1524,17 +1597,6 @@ func init() {
     }
   },
   "definitions": {
-    "Condition": {
-      "type": "object",
-      "properties": {
-        "Condition": {
-          "type": "string"
-        },
-        "Expected": {
-          "type": "string"
-        }
-      }
-    },
     "CreateDagRequest": {
       "description": "Request body for creating a DAG.",
       "type": "object",
@@ -1565,6 +1627,7 @@ func init() {
       }
     },
     "DAG": {
+      "description": "Core DAG configuration containing workflow definition and metadata",
       "type": "object",
       "required": [
         "Group",
@@ -1577,30 +1640,37 @@ func init() {
       ],
       "properties": {
         "DefaultParams": {
+          "description": "Default parameter values in JSON format if not specified at runtime",
           "type": "string"
         },
         "Description": {
+          "description": "Human-readable description of the DAG's purpose and behavior",
           "type": "string"
         },
         "Group": {
+          "description": "Logical grouping of related DAGs for organizational purposes",
           "type": "string"
         },
         "Name": {
+          "description": "Unique identifier for the DAG within its group",
           "type": "string"
         },
         "Params": {
+          "description": "List of parameter names that can be passed to the DAG at runtime",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Schedule": {
+          "description": "List of scheduling expressions defining when the DAG should run",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Schedule"
           }
         },
         "Tags": {
+          "description": "List of tags for categorizing and filtering DAGs",
           "type": "array",
           "items": {
             "type": "string"
@@ -1630,66 +1700,81 @@ func init() {
       ],
       "properties": {
         "DefaultParams": {
+          "description": "Default parameter values in JSON format if not specified at runtime",
           "type": "string"
         },
         "Delay": {
+          "description": "Time in seconds to wait before starting the DAG",
           "type": "integer"
         },
         "Description": {
+          "description": "Human-readable description of the DAG's purpose and behavior",
           "type": "string"
         },
         "Env": {
+          "description": "List of environment variables to set before executing",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Group": {
+          "description": "Logical grouping of related DAGs for organizational purposes",
           "type": "string"
         },
         "HandlerOn": {
           "$ref": "#/definitions/HandlerOn"
         },
         "HistRetentionDays": {
+          "description": "Number of days to retain historical logs",
           "type": "integer"
         },
         "Location": {
+          "description": "Path to the DAG file",
           "type": "string"
         },
         "LogDir": {
+          "description": "Directory path for storing log files",
           "type": "string"
         },
         "MaxActiveRuns": {
+          "description": "Maximum number of concurrent steps to run",
           "type": "integer"
         },
         "Name": {
+          "description": "Unique identifier for the DAG within its group",
           "type": "string"
         },
         "Params": {
+          "description": "List of parameter names that can be passed to the DAG at runtime",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Preconditions": {
+          "description": "Conditions that must be met before the DAG can start",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Condition"
+            "$ref": "#/definitions/Precondition"
           }
         },
         "Schedule": {
+          "description": "List of scheduling expressions defining when the DAG should run",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Schedule"
           }
         },
         "Steps": {
+          "description": "List of steps to execute in the DAG",
           "type": "array",
           "items": {
             "$ref": "#/definitions/Step"
           }
         },
         "Tags": {
+          "description": "List of tags for categorizing and filtering DAGs",
           "type": "array",
           "items": {
             "type": "string"
@@ -1752,6 +1837,7 @@ func init() {
       }
     },
     "DAGStatus": {
+      "description": "Current execution status of a DAG instance",
       "type": "object",
       "required": [
         "RequestId",
@@ -1766,32 +1852,39 @@ func init() {
       ],
       "properties": {
         "FinishedAt": {
-          "description": "Timestamp when the DAG finished.",
+          "description": "RFC 3339 timestamp when the DAG execution completed",
           "type": "string"
         },
         "Log": {
+          "description": "Path to the execution log file",
           "type": "string"
         },
         "Name": {
+          "description": "Name of the DAG being executed",
           "type": "string"
         },
         "Params": {
+          "description": "Runtime parameters passed to the DAG in JSON format",
           "type": "string"
         },
         "Pid": {
+          "description": "Process ID of the DAG execution",
           "type": "integer"
         },
         "RequestId": {
+          "description": "Unique identifier for the DAG execution request",
           "type": "string"
         },
         "StartedAt": {
-          "description": "Timestamp when the DAG started.",
+          "description": "RFC 3339 timestamp when the DAG execution started",
           "type": "string"
         },
         "Status": {
+          "description": "Numeric status code indicating current execution state",
           "type": "integer"
         },
         "StatusText": {
+          "description": "Human-readable status description",
           "type": "string"
         }
       }
@@ -1896,6 +1989,7 @@ func init() {
       }
     },
     "DAGStatusFileDetails": {
+      "description": "Detailed status information for a DAG instance",
       "type": "object",
       "required": [
         "File",
@@ -1927,6 +2021,7 @@ func init() {
       }
     },
     "Error": {
+      "description": "Generic error response object.",
       "type": "object",
       "required": [
         "code",
@@ -1934,6 +2029,7 @@ func init() {
       ],
       "properties": {
         "code": {
+          "description": "Error code indicating the type of error.",
           "type": "string",
           "enum": [
             "validation_error",
@@ -1954,6 +2050,7 @@ func init() {
       }
     },
     "GetDagDetailsResponse": {
+      "description": "Response object for getting details of a DAG.",
       "type": "object",
       "required": [
         "Title",
@@ -1972,15 +2069,18 @@ func init() {
           "$ref": "#/definitions/DAGStatusFileDetails"
         },
         "Definition": {
+          "description": "DAG definition.",
           "type": "string"
         },
         "Errors": {
+          "description": "List of errors encountered during the request.",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Graph": {
+          "description": "Graph data for visualization.",
           "type": "string"
         },
         "LogData": {
@@ -1996,14 +2096,17 @@ func init() {
           "$ref": "#/definitions/StepLog"
         },
         "Tab": {
+          "description": "Tab name for UI navigation.",
           "type": "string"
         },
         "Title": {
+          "description": "Title of the Page.",
           "type": "string"
         }
       }
     },
     "HandlerOn": {
+      "description": "Configuration for event handlers in a DAG",
       "type": "object",
       "properties": {
         "Cancel": {
@@ -2021,6 +2124,7 @@ func init() {
       }
     },
     "HealthResponse": {
+      "description": "Response object for the health check endpoint.",
       "type": "object",
       "required": [
         "status",
@@ -2052,6 +2156,7 @@ func init() {
       }
     },
     "ListDagsResponse": {
+      "description": "Response object for listing all DAGs.",
       "type": "object",
       "required": [
         "DAGs",
@@ -2061,26 +2166,31 @@ func init() {
       ],
       "properties": {
         "DAGs": {
+          "description": "List of DAGs with their status and metadata.",
           "type": "array",
           "items": {
             "$ref": "#/definitions/DAGStatusFile"
           }
         },
         "Errors": {
+          "description": "List of errors encountered during the request.",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "HasError": {
+          "description": "Whether any errors were encountered.",
           "type": "boolean"
         },
         "PageCount": {
+          "description": "Total number of pages available.",
           "type": "integer"
         }
       }
     },
     "ListTagResponse": {
+      "description": "Response object for listing all tags",
       "type": "object",
       "required": [
         "Tags",
@@ -2088,12 +2198,14 @@ func init() {
       ],
       "properties": {
         "Errors": {
+          "description": "List of errors encountered during the request",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Tags": {
+          "description": "List of unique tags",
           "type": "array",
           "items": {
             "type": "string"
@@ -2102,6 +2214,7 @@ func init() {
       }
     },
     "Node": {
+      "description": "Execution status of an individual step within a DAG",
       "type": "object",
       "required": [
         "Step",
@@ -2116,29 +2229,35 @@ func init() {
       ],
       "properties": {
         "DoneCount": {
+          "description": "Number of successful completions for repeating steps",
           "type": "integer"
         },
         "Error": {
+          "description": "Error message if the step failed",
           "type": "string"
         },
         "FinishedAt": {
-          "description": "Timestamp when the step finished.",
+          "description": "RFC 3339 timestamp when the step completed",
           "type": "string"
         },
         "Log": {
+          "description": "Path to step-specific log file",
           "type": "string"
         },
         "RetryCount": {
+          "description": "Number of retry attempts made for this step",
           "type": "integer"
         },
         "StartedAt": {
-          "description": "Timestamp when the step started.",
+          "description": "RFC 3339 timestamp when the step started executing",
           "type": "string"
         },
         "Status": {
+          "description": "Numeric status code for the step execution",
           "type": "integer"
         },
         "StatusText": {
+          "description": "Human-readable status description",
           "type": "string"
         },
         "Step": {
@@ -2186,21 +2305,39 @@ func init() {
       }
     },
     "PostDagActionResponse": {
+      "description": "Response object for posting an action to a DAG.",
       "type": "object",
       "properties": {
         "NewDagID": {
-          "description": "New DAG ID, if the action triggered a DAG rename or duplication.",
+          "description": "New DAG ID, if the action resulted in a new DAG.",
+          "type": "string"
+        }
+      }
+    },
+    "Precondition": {
+      "description": "Precondition that must be satisfied before execution",
+      "type": "object",
+      "properties": {
+        "Condition": {
+          "description": "Expression or check to evaluate",
+          "type": "string"
+        },
+        "Expected": {
+          "description": "Expected result of the condition evaluation",
           "type": "string"
         }
       }
     },
     "RepeatPolicy": {
+      "description": "Configuration for step retry behavior",
       "type": "object",
       "properties": {
         "Interval": {
+          "description": "Time in seconds to wait between retry attempts",
           "type": "integer"
         },
         "Repeat": {
+          "description": "Whether the step should be retried on failure",
           "type": "boolean"
         }
       }
@@ -2284,11 +2421,11 @@ func init() {
       }
     },
     "Step": {
+      "description": "Individual task within a DAG that performs a specific operation",
       "type": "object",
       "required": [
         "Name",
         "Description",
-        "Variables",
         "Dir",
         "CmdWithArgs",
         "Command",
@@ -2304,67 +2441,76 @@ func init() {
       ],
       "properties": {
         "Args": {
+          "description": "List of arguments to pass to the command",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "CmdWithArgs": {
+          "description": "Complete command string including arguments to execute",
           "type": "string"
         },
         "Command": {
+          "description": "Base command to execute without arguments",
           "type": "string"
         },
         "Depends": {
+          "description": "List of step names that must complete before this step can start",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "Description": {
+          "description": "Human-readable description of what the step does",
           "type": "string"
         },
         "Dir": {
+          "description": "Working directory for executing the step's command",
           "type": "string"
         },
         "MailOnError": {
+          "description": "Whether to send email notifications on step failure",
           "type": "boolean"
         },
         "Name": {
+          "description": "Unique identifier for the step within the DAG",
           "type": "string"
         },
         "Output": {
+          "description": "Variable name to store the step's output",
           "type": "string"
         },
         "Params": {
+          "description": "Parameters to pass to the sub DAG",
           "type": "string"
         },
         "Preconditions": {
+          "description": "Conditions that must be met before the step can start",
           "type": "array",
           "items": {
-            "$ref": "#/definitions/Condition"
+            "$ref": "#/definitions/Precondition"
           }
         },
         "RepeatPolicy": {
           "$ref": "#/definitions/RepeatPolicy"
         },
         "Run": {
+          "description": "Sub DAG to run",
           "type": "string"
         },
         "Script": {
+          "description": "Script content if the step executes a script file",
           "type": "string"
         },
         "Stderr": {
+          "description": "File path for capturing standard error",
           "type": "string"
         },
         "Stdout": {
+          "description": "File path for capturing standard output",
           "type": "string"
-        },
-        "Variables": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       }
     },

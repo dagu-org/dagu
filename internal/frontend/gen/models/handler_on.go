@@ -13,7 +13,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// HandlerOn handler on
+// HandlerOn Configuration for event handlers in a DAG
 //
 // swagger:model HandlerOn
 type HandlerOn struct {

@@ -15,36 +15,36 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAG d a g
+// DAG Core DAG configuration containing workflow definition and metadata
 //
 // swagger:model DAG
 type DAG struct {
 
-	// default params
+	// Default parameter values in JSON format if not specified at runtime
 	// Required: true
 	DefaultParams *string `json:"DefaultParams"`
 
-	// description
+	// Human-readable description of the DAG's purpose and behavior
 	// Required: true
 	Description *string `json:"Description"`
 
-	// group
+	// Logical grouping of related DAGs for organizational purposes
 	// Required: true
 	Group *string `json:"Group"`
 
-	// name
+	// Unique identifier for the DAG within its group
 	// Required: true
 	Name *string `json:"Name"`
 
-	// params
+	// List of parameter names that can be passed to the DAG at runtime
 	// Required: true
 	Params []string `json:"Params"`
 
-	// schedule
+	// List of scheduling expressions defining when the DAG should run
 	// Required: true
 	Schedule []*Schedule `json:"Schedule"`
 
-	// tags
+	// List of tags for categorizing and filtering DAGs
 	// Required: true
 	Tags []string `json:"Tags"`
 }

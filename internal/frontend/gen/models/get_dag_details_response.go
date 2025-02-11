@@ -14,7 +14,7 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// GetDagDetailsResponse get dag details response
+// GetDagDetailsResponse Response object for getting details of a DAG.
 //
 // swagger:model GetDagDetailsResponse
 type GetDagDetailsResponse struct {
@@ -23,15 +23,15 @@ type GetDagDetailsResponse struct {
 	// Required: true
 	DAG *DAGStatusFileDetails `json:"DAG"`
 
-	// definition
+	// DAG definition.
 	// Required: true
 	Definition *string `json:"Definition"`
 
-	// errors
+	// List of errors encountered during the request.
 	// Required: true
 	Errors []string `json:"Errors"`
 
-	// graph
+	// Graph data for visualization.
 	// Required: true
 	Graph *string `json:"Graph"`
 
@@ -51,11 +51,11 @@ type GetDagDetailsResponse struct {
 	// Required: true
 	StepLog *StepLog `json:"StepLog"`
 
-	// tab
+	// Tab name for UI navigation.
 	// Required: true
 	Tab *string `json:"Tab"`
 
-	// title
+	// Title of the Page.
 	// Required: true
 	Title *string `json:"Title"`
 }

@@ -71,9 +71,9 @@ func convertToNode(node *model.Node) *models.Node {
 }
 
 func convertToStepObject(step digraph.Step) *models.Step {
-	var conditions []*models.Condition
+	var conditions []*models.Precondition
 	for _, cond := range step.Preconditions {
-		conditions = append(conditions, &models.Condition{
+		conditions = append(conditions, &models.Precondition{
 			Condition: cond.Condition,
 			Expected:  cond.Expected,
 		})
@@ -97,8 +97,6 @@ func convertToStepObject(step digraph.Step) *models.Step {
 		Preconditions: conditions,
 		RepeatPolicy:  repeatPolicy,
 		Script:        swag.String(step.Script),
-		// Deprecated: Removed field but keeping for backward compatibility.
-		Variables: []string{},
 	}
 	if step.SubWorkflow != nil {
 		so.Run = step.SubWorkflow.Name

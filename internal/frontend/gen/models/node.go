@@ -14,40 +14,40 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Node node
+// Node Execution status of an individual step within a DAG
 //
 // swagger:model Node
 type Node struct {
 
-	// done count
+	// Number of successful completions for repeating steps
 	// Required: true
 	DoneCount *int64 `json:"DoneCount"`
 
-	// error
+	// Error message if the step failed
 	// Required: true
 	Error *string `json:"Error"`
 
-	// Timestamp when the step finished.
+	// RFC 3339 timestamp when the step completed
 	// Required: true
 	FinishedAt *string `json:"FinishedAt"`
 
-	// log
+	// Path to step-specific log file
 	// Required: true
 	Log *string `json:"Log"`
 
-	// retry count
+	// Number of retry attempts made for this step
 	// Required: true
 	RetryCount *int64 `json:"RetryCount"`
 
-	// Timestamp when the step started.
+	// RFC 3339 timestamp when the step started executing
 	// Required: true
 	StartedAt *string `json:"StartedAt"`
 
-	// status
+	// Numeric status code for the step execution
 	// Required: true
 	Status *int64 `json:"Status"`
 
-	// status text
+	// Human-readable status description
 	// Required: true
 	StatusText *string `json:"StatusText"`
 

@@ -15,76 +15,72 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// Step step
+// Step Individual task within a DAG that performs a specific operation
 //
 // swagger:model Step
 type Step struct {
 
-	// args
+	// List of arguments to pass to the command
 	// Required: true
 	Args []string `json:"Args"`
 
-	// cmd with args
+	// Complete command string including arguments to execute
 	// Required: true
 	CmdWithArgs *string `json:"CmdWithArgs"`
 
-	// command
+	// Base command to execute without arguments
 	// Required: true
 	Command *string `json:"Command"`
 
-	// depends
+	// List of step names that must complete before this step can start
 	// Required: true
 	Depends []string `json:"Depends"`
 
-	// description
+	// Human-readable description of what the step does
 	// Required: true
 	Description *string `json:"Description"`
 
-	// dir
+	// Working directory for executing the step's command
 	// Required: true
 	Dir *string `json:"Dir"`
 
-	// mail on error
+	// Whether to send email notifications on step failure
 	// Required: true
 	MailOnError *bool `json:"MailOnError"`
 
-	// name
+	// Unique identifier for the step within the DAG
 	// Required: true
 	Name *string `json:"Name"`
 
-	// output
+	// Variable name to store the step's output
 	// Required: true
 	Output *string `json:"Output"`
 
-	// params
+	// Parameters to pass to the sub DAG
 	Params string `json:"Params,omitempty"`
 
-	// preconditions
+	// Conditions that must be met before the step can start
 	// Required: true
-	Preconditions []*Condition `json:"Preconditions"`
+	Preconditions []*Precondition `json:"Preconditions"`
 
 	// repeat policy
 	// Required: true
 	RepeatPolicy *RepeatPolicy `json:"RepeatPolicy"`
 
-	// run
+	// Sub DAG to run
 	Run string `json:"Run,omitempty"`
 
-	// script
+	// Script content if the step executes a script file
 	// Required: true
 	Script *string `json:"Script"`
 
-	// stderr
+	// File path for capturing standard error
 	// Required: true
 	Stderr *string `json:"Stderr"`
 
-	// stdout
+	// File path for capturing standard output
 	// Required: true
 	Stdout *string `json:"Stdout"`
-
-	// variables
-	// Required: true
-	Variables []string `json:"Variables"`
 }
 
 // Validate validates this step
@@ -144,10 +140,6 @@ func (m *Step) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateStdout(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if err := m.validateVariables(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -306,15 +298,6 @@ func (m *Step) validateStderr(formats strfmt.Registry) error {
 func (m *Step) validateStdout(formats strfmt.Registry) error {
 
 	if err := validate.Required("Stdout", "body", m.Stdout); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Step) validateVariables(formats strfmt.Registry) error {
-
-	if err := validate.Required("Variables", "body", m.Variables); err != nil {
 		return err
 	}
 

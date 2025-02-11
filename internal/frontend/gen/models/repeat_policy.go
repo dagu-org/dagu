@@ -12,15 +12,15 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// RepeatPolicy repeat policy
+// RepeatPolicy Configuration for step retry behavior
 //
 // swagger:model RepeatPolicy
 type RepeatPolicy struct {
 
-	// interval
+	// Time in seconds to wait between retry attempts
 	Interval int64 `json:"Interval,omitempty"`
 
-	// repeat
+	// Whether the step should be retried on failure
 	Repeat bool `json:"Repeat,omitempty"`
 }
 

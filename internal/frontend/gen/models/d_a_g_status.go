@@ -14,44 +14,44 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// DAGStatus d a g status
+// DAGStatus Current execution status of a DAG instance
 //
 // swagger:model DAGStatus
 type DAGStatus struct {
 
-	// Timestamp when the DAG finished.
+	// RFC 3339 timestamp when the DAG execution completed
 	// Required: true
 	FinishedAt *string `json:"FinishedAt"`
 
-	// log
+	// Path to the execution log file
 	// Required: true
 	Log *string `json:"Log"`
 
-	// name
+	// Name of the DAG being executed
 	// Required: true
 	Name *string `json:"Name"`
 
-	// params
+	// Runtime parameters passed to the DAG in JSON format
 	// Required: true
 	Params *string `json:"Params"`
 
-	// pid
+	// Process ID of the DAG execution
 	// Required: true
 	Pid *int64 `json:"Pid"`
 
-	// request Id
+	// Unique identifier for the DAG execution request
 	// Required: true
 	RequestID *string `json:"RequestId"`
 
-	// Timestamp when the DAG started.
+	// RFC 3339 timestamp when the DAG execution started
 	// Required: true
 	StartedAt *string `json:"StartedAt"`
 
-	// status
+	// Numeric status code indicating current execution state
 	// Required: true
 	Status *int64 `json:"Status"`
 
-	// status text
+	// Human-readable status description
 	// Required: true
 	StatusText *string `json:"StatusText"`
 }

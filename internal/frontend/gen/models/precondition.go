@@ -12,30 +12,30 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// Condition condition
+// Precondition Precondition that must be satisfied before execution
 //
-// swagger:model Condition
-type Condition struct {
+// swagger:model Precondition
+type Precondition struct {
 
-	// condition
+	// Expression or check to evaluate
 	Condition string `json:"Condition,omitempty"`
 
-	// expected
+	// Expected result of the condition evaluation
 	Expected string `json:"Expected,omitempty"`
 }
 
-// Validate validates this condition
-func (m *Condition) Validate(formats strfmt.Registry) error {
+// Validate validates this precondition
+func (m *Precondition) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this condition based on context it is used
-func (m *Condition) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validates this precondition based on context it is used
+func (m *Precondition) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	return nil
 }
 
 // MarshalBinary interface implementation
-func (m *Condition) MarshalBinary() ([]byte, error) {
+func (m *Precondition) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -43,8 +43,8 @@ func (m *Condition) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *Condition) UnmarshalBinary(b []byte) error {
-	var res Condition
+func (m *Precondition) UnmarshalBinary(b []byte) error {
+	var res Precondition
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}
