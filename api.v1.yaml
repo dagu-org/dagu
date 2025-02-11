@@ -5,11 +5,15 @@ info:
   title: "Dagu"
   contact:
     name: "Dagu"
+    url: "https://github.com/dagu-org/dagu"
   description: >
-    Dagu is a compact, portable workflow engine implemented in Go. It provides
-    a declarative model for orchestrating command execution across diverse
-    environments, including shell scripts, Python commands, containerized
-    operations, or remote commands.
+    REST API for Dagu - a compact, portable workflow engine for orchestrating 
+    command execution across diverse environments including shell scripts, 
+    Python commands, containerized operations, and remote commands.
+  license:
+    name: "GPL-3.0"
+    url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
+
 basePath: "/api/v1"
 host: "localhost:8080"
 schemes:
@@ -60,7 +64,7 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
     post:
       summary: "Create a new DAG"
@@ -82,7 +86,7 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
   /dags/{dagId}:
     get:
@@ -120,7 +124,7 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
     post:
       summary: "Perform an action on a DAG"
@@ -147,7 +151,7 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
     delete:
       summary: "Delete a DAG"
@@ -167,7 +171,7 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
   /search:
     get:
@@ -190,7 +194,7 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
   /tags:
     get:
@@ -207,24 +211,32 @@ paths:
         default:
           description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
+            $ref: "#/definitions/Error"
 
 definitions:
   ################################################################
   # Common / Error
   ################################################################
-  ApiError:
+  Error:
     type: object
     properties:
+      code:
+        type: string
+        enum:
+          - "validation_error"
+          - "not_found"
+          - "internal_error"
+          - "unauthorized"
+          - "bad_gateway"
       message:
         type: string
         description: "Short error message."
-      detailedMessage:
-        type: string
-        description: "Detailed error description."
+      details:
+        type: object
+        description: "Additional error details."
     required:
+      - code
       - message
-      - detailedMessage
 
   ################################################################
   # Requests

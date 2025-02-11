@@ -69,7 +69,7 @@ type GetDagDetailsDefault struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.APIError `json:"body,omitempty"`
+	Payload *models.Error `json:"body,omitempty"`
 }
 
 // NewGetDagDetailsDefault creates GetDagDetailsDefault with default headers values
@@ -95,13 +95,13 @@ func (o *GetDagDetailsDefault) SetStatusCode(code int) {
 }
 
 // WithPayload adds the payload to the get dag details default response
-func (o *GetDagDetailsDefault) WithPayload(payload *models.APIError) *GetDagDetailsDefault {
+func (o *GetDagDetailsDefault) WithPayload(payload *models.Error) *GetDagDetailsDefault {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the get dag details default response
-func (o *GetDagDetailsDefault) SetPayload(payload *models.APIError) {
+func (o *GetDagDetailsDefault) SetPayload(payload *models.Error) {
 	o.Payload = payload
 }
 

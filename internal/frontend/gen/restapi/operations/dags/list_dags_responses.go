@@ -69,7 +69,7 @@ type ListDagsDefault struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.APIError `json:"body,omitempty"`
+	Payload *models.Error `json:"body,omitempty"`
 }
 
 // NewListDagsDefault creates ListDagsDefault with default headers values
@@ -95,13 +95,13 @@ func (o *ListDagsDefault) SetStatusCode(code int) {
 }
 
 // WithPayload adds the payload to the list dags default response
-func (o *ListDagsDefault) WithPayload(payload *models.APIError) *ListDagsDefault {
+func (o *ListDagsDefault) WithPayload(payload *models.Error) *ListDagsDefault {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the list dags default response
-func (o *ListDagsDefault) SetPayload(payload *models.APIError) {
+func (o *ListDagsDefault) SetPayload(payload *models.Error) {
 	o.Payload = payload
 }
 

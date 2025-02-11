@@ -2,14 +2,15 @@
 
 // Package restapi Dagu
 //
-//	Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+//	REST API for Dagu - a compact, portable workflow engine for orchestrating  command execution across diverse environments including shell scripts,  Python commands, containerized operations, and remote commands.
 //
 //	Schemes:
 //	  http
 //	Host: localhost:8080
 //	BasePath: /api/v1
 //	Version: 0.0.1
-//	Contact: Dagu
+//	License: GPL-3.0 https://github.com/dagu-org/dagu/blob/main/LICENSE.md
+//	Contact: Dagu https://github.com/dagu-org/dagu
 //
 //	Consumes:
 //	  - application/json

@@ -49,7 +49,7 @@ type DeleteDagDefault struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.APIError `json:"body,omitempty"`
+	Payload *models.Error `json:"body,omitempty"`
 }
 
 // NewDeleteDagDefault creates DeleteDagDefault with default headers values
@@ -75,13 +75,13 @@ func (o *DeleteDagDefault) SetStatusCode(code int) {
 }
 
 // WithPayload adds the payload to the delete dag default response
-func (o *DeleteDagDefault) WithPayload(payload *models.APIError) *DeleteDagDefault {
+func (o *DeleteDagDefault) WithPayload(payload *models.Error) *DeleteDagDefault {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the delete dag default response
-func (o *DeleteDagDefault) SetPayload(payload *models.APIError) {
+func (o *DeleteDagDefault) SetPayload(payload *models.Error) {
 	o.Payload = payload
 }
 

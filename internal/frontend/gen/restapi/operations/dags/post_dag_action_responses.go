@@ -69,7 +69,7 @@ type PostDagActionDefault struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.APIError `json:"body,omitempty"`
+	Payload *models.Error `json:"body,omitempty"`
 }
 
 // NewPostDagActionDefault creates PostDagActionDefault with default headers values
@@ -95,13 +95,13 @@ func (o *PostDagActionDefault) SetStatusCode(code int) {
 }
 
 // WithPayload adds the payload to the post dag action default response
-func (o *PostDagActionDefault) WithPayload(payload *models.APIError) *PostDagActionDefault {
+func (o *PostDagActionDefault) WithPayload(payload *models.Error) *PostDagActionDefault {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the post dag action default response
-func (o *PostDagActionDefault) SetPayload(payload *models.APIError) {
+func (o *PostDagActionDefault) SetPayload(payload *models.Error) {
 	o.Payload = payload
 }
 

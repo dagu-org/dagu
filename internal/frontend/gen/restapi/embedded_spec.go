@@ -29,10 +29,15 @@ func init() {
   ],
   "swagger": "2.0",
   "info": {
-    "description": "Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.\n",
+    "description": "REST API for Dagu - a compact, portable workflow engine for orchestrating  command execution across diverse environments including shell scripts,  Python commands, containerized operations, and remote commands.\n",
     "title": "Dagu",
     "contact": {
-      "name": "Dagu"
+      "name": "Dagu",
+      "url": "https://github.com/dagu-org/dagu"
+    },
+    "license": {
+      "name": "GPL-3.0",
+      "url": "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
     },
     "version": "0.0.1"
   },
@@ -83,7 +88,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -115,7 +120,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -166,7 +171,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -205,7 +210,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -233,7 +238,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -266,7 +271,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -290,7 +295,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -298,23 +303,6 @@ func init() {
     }
   },
   "definitions": {
-    "ApiError": {
-      "type": "object",
-      "required": [
-        "message",
-        "detailedMessage"
-      ],
-      "properties": {
-        "detailedMessage": {
-          "description": "Detailed error description.",
-          "type": "string"
-        },
-        "message": {
-          "description": "Short error message.",
-          "type": "string"
-        }
-      }
-    },
     "Condition": {
       "type": "object",
       "properties": {
@@ -722,6 +710,33 @@ func init() {
         },
         "Suspended": {
           "type": "boolean"
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "validation_error",
+            "not_found",
+            "internal_error",
+            "unauthorized",
+            "bad_gateway"
+          ]
+        },
+        "details": {
+          "description": "Additional error details.",
+          "type": "object"
+        },
+        "message": {
+          "description": "Short error message.",
+          "type": "string"
         }
       }
     },
@@ -1148,10 +1163,15 @@ func init() {
   ],
   "swagger": "2.0",
   "info": {
-    "description": "Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.\n",
+    "description": "REST API for Dagu - a compact, portable workflow engine for orchestrating  command execution across diverse environments including shell scripts,  Python commands, containerized operations, and remote commands.\n",
     "title": "Dagu",
     "contact": {
-      "name": "Dagu"
+      "name": "Dagu",
+      "url": "https://github.com/dagu-org/dagu"
+    },
+    "license": {
+      "name": "GPL-3.0",
+      "url": "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
     },
     "version": "0.0.1"
   },
@@ -1202,7 +1222,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1234,7 +1254,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1285,7 +1305,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1324,7 +1344,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1352,7 +1372,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1385,7 +1405,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1409,7 +1429,7 @@ func init() {
           "default": {
             "description": "Generic error response.",
             "schema": {
-              "$ref": "#/definitions/ApiError"
+              "$ref": "#/definitions/Error"
             }
           }
         }
@@ -1417,23 +1437,6 @@ func init() {
     }
   },
   "definitions": {
-    "ApiError": {
-      "type": "object",
-      "required": [
-        "message",
-        "detailedMessage"
-      ],
-      "properties": {
-        "detailedMessage": {
-          "description": "Detailed error description.",
-          "type": "string"
-        },
-        "message": {
-          "description": "Short error message.",
-          "type": "string"
-        }
-      }
-    },
     "Condition": {
       "type": "object",
       "properties": {
@@ -1841,6 +1844,33 @@ func init() {
         },
         "Suspended": {
           "type": "boolean"
+        }
+      }
+    },
+    "Error": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "validation_error",
+            "not_found",
+            "internal_error",
+            "unauthorized",
+            "bad_gateway"
+          ]
+        },
+        "details": {
+          "description": "Additional error details.",
+          "type": "object"
+        },
+        "message": {
+          "description": "Short error message.",
+          "type": "string"
         }
       }
     },

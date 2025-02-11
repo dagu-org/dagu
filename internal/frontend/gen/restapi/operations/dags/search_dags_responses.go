@@ -69,7 +69,7 @@ type SearchDagsDefault struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.APIError `json:"body,omitempty"`
+	Payload *models.Error `json:"body,omitempty"`
 }
 
 // NewSearchDagsDefault creates SearchDagsDefault with default headers values
@@ -95,13 +95,13 @@ func (o *SearchDagsDefault) SetStatusCode(code int) {
 }
 
 // WithPayload adds the payload to the search dags default response
-func (o *SearchDagsDefault) WithPayload(payload *models.APIError) *SearchDagsDefault {
+func (o *SearchDagsDefault) WithPayload(payload *models.Error) *SearchDagsDefault {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the search dags default response
-func (o *SearchDagsDefault) SetPayload(payload *models.APIError) {
+func (o *SearchDagsDefault) SetPayload(payload *models.Error) {
 	o.Payload = payload
 }
 

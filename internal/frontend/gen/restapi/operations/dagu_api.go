@@ -68,7 +68,7 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 	}
 }
 
-/*DaguAPI Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+/*DaguAPI REST API for Dagu - a compact, portable workflow engine for orchestrating  command execution across diverse environments including shell scripts,  Python commands, containerized operations, and remote commands.
  */
 type DaguAPI struct {
 	spec            *loads.Document

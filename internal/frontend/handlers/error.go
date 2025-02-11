@@ -6,27 +6,35 @@ import (
 )
 
 type codedError struct {
-	Code     int
-	APIError *models.APIError
+	HTTPCode int
+	Code     string
+	APIError *models.Error
 }
 
 func newInternalError(err error) *codedError {
-	return &codedError{Code: 500, APIError: &models.APIError{
-		Message:         swag.String("Internal Server Error"),
-		DetailedMessage: swag.String(err.Error()),
+	return &codedError{HTTPCode: 500, APIError: &models.Error{
+		Code:    swag.String(models.ErrorCodeInternalError),
+		Message: swag.String(err.Error()),
 	}}
 }
 
 func newNotFoundError(err error) *codedError {
-	return &codedError{Code: 404, APIError: &models.APIError{
-		Message:         swag.String("Not Found"),
-		DetailedMessage: swag.String(err.Error()),
+	return &codedError{HTTPCode: 404, APIError: &models.Error{
+		Code:    swag.String(models.ErrorCodeNotFound),
+		Message: swag.String(err.Error()),
 	}}
 }
 
 func newBadRequestError(err error) *codedError {
-	return &codedError{Code: 400, APIError: &models.APIError{
-		Message:         swag.String("Bad Request"),
-		DetailedMessage: swag.String(err.Error()),
+	return &codedError{HTTPCode: 400, APIError: &models.Error{
+		Code:    swag.String(models.ErrorCodeValidationError),
+		Message: swag.String(err.Error()),
+	}}
+}
+
+func newError(httpCode int, code string, message *string) *codedError {
+	return &codedError{HTTPCode: httpCode, APIError: &models.Error{
+		Code:    swag.String(code),
+		Message: message,
 	}}
 }

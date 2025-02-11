@@ -81,7 +81,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.getList(ctx, params)
 			if err != nil {
-				return dags.NewListDagsDefault(err.Code).
+				return dags.NewListDagsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewListDagsOK().WithPayload(resp)
@@ -95,7 +95,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.getDetail(ctx, params)
 			if err != nil {
-				return dags.NewGetDagDetailsDefault(err.Code).
+				return dags.NewGetDagDetailsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewGetDagDetailsOK().WithPayload(resp)
@@ -109,7 +109,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.postAction(ctx, params)
 			if err != nil {
-				return dags.NewPostDagActionDefault(err.Code).
+				return dags.NewPostDagActionDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewPostDagActionOK().WithPayload(resp)
@@ -123,7 +123,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.createDAG(ctx, params)
 			if err != nil {
-				return dags.NewCreateDagDefault(err.Code).
+				return dags.NewCreateDagDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewCreateDagOK().WithPayload(resp)
@@ -137,7 +137,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			err := h.deleteDAG(ctx, params)
 			if err != nil {
-				return dags.NewDeleteDagDefault(err.Code).
+				return dags.NewDeleteDagDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewDeleteDagOK()
@@ -151,7 +151,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			resp, err := h.searchDAGs(ctx, params)
 			if err != nil {
-				return dags.NewSearchDagsDefault(err.Code).
+				return dags.NewSearchDagsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewSearchDagsOK().WithPayload(resp)
@@ -165,7 +165,7 @@ func (h *Handler) Configure(api *operations.DaguAPI) {
 			ctx := params.HTTPRequest.Context()
 			tags, err := h.getTagList(ctx, params)
 			if err != nil {
-				return dags.NewListTagsDefault(err.Code).
+				return dags.NewListTagsDefault(err.HTTPCode).
 					WithPayload(err.APIError)
 			}
 			return dags.NewListTagsOK().WithPayload(tags)
@@ -204,11 +204,7 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 	// Build the new remote URL
 	urlComponents := strings.Split(originalReq.URL.Path, h.apiBasePath)
 	if len(urlComponents) < 2 {
-		return h.responderWithCodedError(&codedError{
-			Code: 400,
-			APIError: &models.APIError{
-				Message: swag.String("invalid API path"),
-			}})
+		return h.responderWithCodedError(newBadRequestError(fmt.Errorf("invalid API path")))
 	}
 	remoteURL := fmt.Sprintf("%s%s?%s", strings.TrimSuffix(node.APIBaseURL, "/"), urlComponents[1], q.Encode())
 
@@ -217,22 +213,22 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return h.responderWithCodedError(&codedError{
-				Code: 502,
-				APIError: &models.APIError{
-					Message: swag.String(fmt.Sprintf("failed to read request body: %v", err)),
-				}})
+			return h.responderWithCodedError(newError(
+				http.StatusInternalServerError,
+				models.ErrorCodeInternalError,
+				swag.String(fmt.Sprintf("failed to marshal request body: %v", err)),
+			))
 		}
 		bodyJSON = strings.NewReader(string(data))
 	}
 
 	req, err := http.NewRequest(method, remoteURL, bodyJSON)
 	if err != nil {
-		return h.responderWithCodedError(&codedError{
-			Code: 502,
-			APIError: &models.APIError{
-				Message: swag.String(fmt.Sprintf("failed to create request to remote node: %v", err)),
-			}})
+		return h.responderWithCodedError(newError(
+			http.StatusInternalServerError,
+			models.ErrorCodeInternalError,
+			swag.String(fmt.Sprintf("failed to create request to remote node: %v", err)),
+		))
 	}
 
 	// Copy headers from the original request if needed
@@ -267,19 +263,19 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return h.responderWithCodedError(&codedError{
-			Code: 502,
-			APIError: &models.APIError{
-				Message: swag.String(fmt.Sprintf("failed to send request to remote node: %v", err)),
-			}})
+		return h.responderWithCodedError(newError(
+			http.StatusBadGateway,
+			models.ErrorCodeBadGateway,
+			swag.String(fmt.Sprintf("failed to send request to remote node: %v", err)),
+		))
 	}
 
 	if resp == nil {
-		return h.responderWithCodedError(&codedError{
-			Code: 502,
-			APIError: &models.APIError{
-				Message: swag.String("received nil response from remote node"),
-			}})
+		return h.responderWithCodedError(newError(
+			http.StatusBadGateway,
+			models.ErrorCodeBadGateway,
+			swag.String("received nil response from remote node"),
+		))
 	}
 
 	defer func() {
@@ -290,33 +286,34 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 
 	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return h.responderWithCodedError(&codedError{
-			Code: 502,
-			APIError: &models.APIError{
-				Message: swag.String(fmt.Sprintf("failed to read response from remote node: %v", err)),
-			}})
+		return h.responderWithCodedError(newError(
+			http.StatusBadGateway,
+			models.ErrorCodeBadGateway,
+			swag.String(fmt.Sprintf("failed to read response from remote node: %v", err)),
+		))
 	}
 
 	// If not status 200, try to parse the error response
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Only try to decode JSON if we actually got some response data
 		if len(respData) > 0 {
-			var remoteErr models.APIError
+			var remoteErr models.Error
 			if err := json.Unmarshal(respData, &remoteErr); err == nil && remoteErr.Message != nil {
-				return h.responderWithCodedError(&codedError{
-					Code:     resp.StatusCode,
-					APIError: &remoteErr,
-				})
+				return h.responderWithCodedError(newError(
+					resp.StatusCode, fromPtr(remoteErr.Code),
+					remoteErr.Message,
+				))
 			}
 		}
 		// If we can't decode a proper error or have no data, return a generic one
-		payload := &models.APIError{
+		payload := &models.Error{
 			Message: swag.String(fmt.Sprintf("remote node responded with status %d", resp.StatusCode)),
 		}
-		return h.responderWithCodedError(&codedError{
-			Code:     resp.StatusCode,
-			APIError: payload,
-		})
+		return h.responderWithCodedError(newError(
+			resp.StatusCode,
+			models.ErrorCodeBadGateway,
+			payload.Message,
+		))
 	}
 
 	return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
@@ -326,8 +323,7 @@ func (h *Handler) doRemoteProxy(body any, originalReq *http.Request, node config
 }
 
 func (h *Handler) responderWithCodedError(err *codedError) middleware.Responder {
-	return dags.NewListDagsDefault(err.Code).
-		WithPayload(err.APIError)
+	return dags.NewListDagsDefault(err.HTTPCode).WithPayload(err.APIError)
 }
 
 func (h *Handler) createDAG(ctx context.Context, params dags.CreateDagParams) (
@@ -961,4 +957,12 @@ func (h *Handler) getTagList(ctx context.Context, _ dags.ListTagsParams) (*model
 		Errors: errs,
 		Tags:   tags,
 	}, nil
+}
+
+func fromPtr[T any](v *T) T {
+	if v == nil {
+		var zero T
+		return zero
+	}
+	return *v
 }
