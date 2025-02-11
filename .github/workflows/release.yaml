@@ -39,6 +39,9 @@ jobs:
         run: |
           cp ui/dist/* ./internal/frontend/assets/
 
+      - name: Install Snapcraft
+        run: sudo snap install snapcraft --classic
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
