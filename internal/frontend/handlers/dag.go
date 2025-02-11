@@ -425,7 +425,7 @@ func (h *Handler) getDetail(
 
 	dagStatus, err := h.client.GetStatus(ctx, dagID)
 
-	var steps []*models.StepObject
+	var steps []*models.Step
 	for _, step := range dagStatus.DAG.Steps {
 		steps = append(steps, convertToStepObject(step))
 	}

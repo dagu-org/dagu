@@ -26,8 +26,31 @@ produces:
 tags:
   - name: "dags"
     description: "Operations about DAGs"
+  - name: "system"
+    description: "System operations"
 
 paths:
+  /health:
+    get:
+      summary: "Health check endpoint"
+      description: "Returns the health status of the server and its dependencies"
+      operationId: "getHealth"
+      tags:
+        - "system"
+      responses:
+        "200":
+          description: "Server is healthy"
+          schema:
+            $ref: "#/definitions/HealthResponse"
+        "503":
+          description: "Server is unhealthy"
+          schema:
+            $ref: "#/definitions/HealthResponse"
+        default:
+          description: "Unexpected error"
+          schema:
+            $ref: "#/definitions/Error"
+
   /dags:
     get:
       summary: "List all DAGs"
@@ -214,9 +237,6 @@ paths:
             $ref: "#/definitions/Error"
 
 definitions:
-  ################################################################
-  # Common / Error
-  ################################################################
   Error:
     type: object
     properties:
@@ -238,9 +258,29 @@ definitions:
       - code
       - message
 
-  ################################################################
-  # Requests
-  ################################################################
+  HealthResponse:
+    type: object
+    properties:
+      status:
+        type: string
+        enum: ["healthy", "unhealthy"]
+        description: "Overall health status of the server"
+      version:
+        type: string
+        description: "Current version of the server"
+      uptime:
+        type: integer
+        description: "Server uptime in seconds"
+      timestamp:
+        type: string
+        format: "date-time"
+        description: "Current server time"
+    required:
+      - status
+      - version
+      - uptime
+      - timestamp
+
   CreateDagRequest:
     type: object
     description: "Request body for creating a DAG."
@@ -286,9 +326,6 @@ definitions:
     required:
       - action
 
-  ################################################################
-  # Responses
-  ################################################################
   ListDagsResponse:
     type: object
     properties:
@@ -362,9 +399,6 @@ definitions:
         type: string
         description: "New DAG ID, if the action triggered a DAG rename or duplication."
 
-  ################################################################
-  # DAG List / Status / Detail
-  ################################################################
   DAGStatusFile:
     type: object
     properties:
@@ -517,7 +551,7 @@ definitions:
       Steps:
         type: array
         items:
-          $ref: "#/definitions/stepObject"
+          $ref: "#/definitions/Step"
       Delay:
         type: integer
       HistRetentionDays:
@@ -560,13 +594,13 @@ definitions:
     type: object
     properties:
       Failure:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Success:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Cancel:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Exit:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
 
   DAGStatusDetails:
     type: object
@@ -623,7 +657,7 @@ definitions:
     type: object
     properties:
       Step:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Log:
         type: string
       StartedAt:
@@ -653,7 +687,7 @@ definitions:
       - Error
       - StatusText
 
-  stepObject:
+  Step:
     type: object
     properties:
       Name:
@@ -715,9 +749,6 @@ definitions:
       - MailOnError
       - Preconditions
 
-  ################################################################
-  # Search
-  ################################################################
   SearchDAGsResponse:
     type: object
     properties:
@@ -755,9 +786,6 @@ definitions:
       StartLine:
         type: integer
 
-  ################################################################
-  # Logging
-  ################################################################
   StepLog:
     type: object
     properties:
@@ -822,9 +850,6 @@ definitions:
       - File
       - Status
 
-  ################################################################
-  # Other
-  ################################################################
   Condition:
     type: object
     properties:

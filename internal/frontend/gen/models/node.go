@@ -53,7 +53,7 @@ type Node struct {
 
 	// step
 	// Required: true
-	Step *StepObject `json:"Step"`
+	Step *Step `json:"Step"`
 }
 
 // Validate validates this node

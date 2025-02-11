@@ -15,10 +15,10 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// StepObject step object
+// Step step
 //
-// swagger:model stepObject
-type StepObject struct {
+// swagger:model Step
+type Step struct {
 
 	// args
 	// Required: true
@@ -87,8 +87,8 @@ type StepObject struct {
 	Variables []string `json:"Variables"`
 }
 
-// Validate validates this step object
-func (m *StepObject) Validate(formats strfmt.Registry) error {
+// Validate validates this step
+func (m *Step) Validate(formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.validateArgs(formats); err != nil {
@@ -157,7 +157,7 @@ func (m *StepObject) Validate(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateArgs(formats strfmt.Registry) error {
+func (m *Step) validateArgs(formats strfmt.Registry) error {
 
 	if err := validate.Required("Args", "body", m.Args); err != nil {
 		return err
@@ -166,7 +166,7 @@ func (m *StepObject) validateArgs(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateCmdWithArgs(formats strfmt.Registry) error {
+func (m *Step) validateCmdWithArgs(formats strfmt.Registry) error {
 
 	if err := validate.Required("CmdWithArgs", "body", m.CmdWithArgs); err != nil {
 		return err
@@ -175,7 +175,7 @@ func (m *StepObject) validateCmdWithArgs(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateCommand(formats strfmt.Registry) error {
+func (m *Step) validateCommand(formats strfmt.Registry) error {
 
 	if err := validate.Required("Command", "body", m.Command); err != nil {
 		return err
@@ -184,7 +184,7 @@ func (m *StepObject) validateCommand(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateDepends(formats strfmt.Registry) error {
+func (m *Step) validateDepends(formats strfmt.Registry) error {
 
 	if err := validate.Required("Depends", "body", m.Depends); err != nil {
 		return err
@@ -193,7 +193,7 @@ func (m *StepObject) validateDepends(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateDescription(formats strfmt.Registry) error {
+func (m *Step) validateDescription(formats strfmt.Registry) error {
 
 	if err := validate.Required("Description", "body", m.Description); err != nil {
 		return err
@@ -202,7 +202,7 @@ func (m *StepObject) validateDescription(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateDir(formats strfmt.Registry) error {
+func (m *Step) validateDir(formats strfmt.Registry) error {
 
 	if err := validate.Required("Dir", "body", m.Dir); err != nil {
 		return err
@@ -211,7 +211,7 @@ func (m *StepObject) validateDir(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateMailOnError(formats strfmt.Registry) error {
+func (m *Step) validateMailOnError(formats strfmt.Registry) error {
 
 	if err := validate.Required("MailOnError", "body", m.MailOnError); err != nil {
 		return err
@@ -220,7 +220,7 @@ func (m *StepObject) validateMailOnError(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateName(formats strfmt.Registry) error {
+func (m *Step) validateName(formats strfmt.Registry) error {
 
 	if err := validate.Required("Name", "body", m.Name); err != nil {
 		return err
@@ -229,7 +229,7 @@ func (m *StepObject) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateOutput(formats strfmt.Registry) error {
+func (m *Step) validateOutput(formats strfmt.Registry) error {
 
 	if err := validate.Required("Output", "body", m.Output); err != nil {
 		return err
@@ -238,7 +238,7 @@ func (m *StepObject) validateOutput(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validatePreconditions(formats strfmt.Registry) error {
+func (m *Step) validatePreconditions(formats strfmt.Registry) error {
 
 	if err := validate.Required("Preconditions", "body", m.Preconditions); err != nil {
 		return err
@@ -265,7 +265,7 @@ func (m *StepObject) validatePreconditions(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateRepeatPolicy(formats strfmt.Registry) error {
+func (m *Step) validateRepeatPolicy(formats strfmt.Registry) error {
 
 	if err := validate.Required("RepeatPolicy", "body", m.RepeatPolicy); err != nil {
 		return err
@@ -285,7 +285,7 @@ func (m *StepObject) validateRepeatPolicy(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateScript(formats strfmt.Registry) error {
+func (m *Step) validateScript(formats strfmt.Registry) error {
 
 	if err := validate.Required("Script", "body", m.Script); err != nil {
 		return err
@@ -294,7 +294,7 @@ func (m *StepObject) validateScript(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateStderr(formats strfmt.Registry) error {
+func (m *Step) validateStderr(formats strfmt.Registry) error {
 
 	if err := validate.Required("Stderr", "body", m.Stderr); err != nil {
 		return err
@@ -303,7 +303,7 @@ func (m *StepObject) validateStderr(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateStdout(formats strfmt.Registry) error {
+func (m *Step) validateStdout(formats strfmt.Registry) error {
 
 	if err := validate.Required("Stdout", "body", m.Stdout); err != nil {
 		return err
@@ -312,7 +312,7 @@ func (m *StepObject) validateStdout(formats strfmt.Registry) error {
 	return nil
 }
 
-func (m *StepObject) validateVariables(formats strfmt.Registry) error {
+func (m *Step) validateVariables(formats strfmt.Registry) error {
 
 	if err := validate.Required("Variables", "body", m.Variables); err != nil {
 		return err
@@ -321,8 +321,8 @@ func (m *StepObject) validateVariables(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validate this step object based on the context it is used
-func (m *StepObject) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+// ContextValidate validate this step based on the context it is used
+func (m *Step) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
 	if err := m.contextValidatePreconditions(ctx, formats); err != nil {
@@ -339,7 +339,7 @@ func (m *StepObject) ContextValidate(ctx context.Context, formats strfmt.Registr
 	return nil
 }
 
-func (m *StepObject) contextValidatePreconditions(ctx context.Context, formats strfmt.Registry) error {
+func (m *Step) contextValidatePreconditions(ctx context.Context, formats strfmt.Registry) error {
 
 	for i := 0; i < len(m.Preconditions); i++ {
 
@@ -364,7 +364,7 @@ func (m *StepObject) contextValidatePreconditions(ctx context.Context, formats s
 	return nil
 }
 
-func (m *StepObject) contextValidateRepeatPolicy(ctx context.Context, formats strfmt.Registry) error {
+func (m *Step) contextValidateRepeatPolicy(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.RepeatPolicy != nil {
 
@@ -382,7 +382,7 @@ func (m *StepObject) contextValidateRepeatPolicy(ctx context.Context, formats st
 }
 
 // MarshalBinary interface implementation
-func (m *StepObject) MarshalBinary() ([]byte, error) {
+func (m *Step) MarshalBinary() ([]byte, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -390,8 +390,8 @@ func (m *StepObject) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary interface implementation
-func (m *StepObject) UnmarshalBinary(b []byte) error {
-	var res StepObject
+func (m *Step) UnmarshalBinary(b []byte) error {
+	var res Step
 	if err := swag.ReadJSON(b, &res); err != nil {
 		return err
 	}

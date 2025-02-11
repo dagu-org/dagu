@@ -244,6 +244,36 @@ func init() {
         }
       }
     },
+    "/health": {
+      "get": {
+        "description": "Returns the health status of the server and its dependencies",
+        "tags": [
+          "system"
+        ],
+        "summary": "Health check endpoint",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
+            }
+          },
+          "503": {
+            "description": "Server is unhealthy",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
+            }
+          },
+          "default": {
+            "description": "Unexpected error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "get": {
         "description": "Searches for DAGs based on a query string.",
@@ -465,7 +495,7 @@ func init() {
         "Steps": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/stepObject"
+            "$ref": "#/definitions/Step"
           }
         },
         "Tags": {
@@ -794,16 +824,48 @@ func init() {
       "type": "object",
       "properties": {
         "Cancel": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         },
         "Exit": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         },
         "Failure": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         },
         "Success": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
+        }
+      }
+    },
+    "HealthResponse": {
+      "type": "object",
+      "required": [
+        "status",
+        "version",
+        "uptime",
+        "timestamp"
+      ],
+      "properties": {
+        "status": {
+          "description": "Overall health status of the server",
+          "type": "string",
+          "enum": [
+            "healthy",
+            "unhealthy"
+          ]
+        },
+        "timestamp": {
+          "description": "Current server time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "uptime": {
+          "description": "Server uptime in seconds",
+          "type": "integer"
+        },
+        "version": {
+          "description": "Current version of the server",
+          "type": "string"
         }
       }
     },
@@ -898,7 +960,7 @@ func init() {
           "type": "string"
         },
         "Step": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         }
       }
     },
@@ -1039,26 +1101,7 @@ func init() {
         }
       }
     },
-    "StepLog": {
-      "type": "object",
-      "required": [
-        "Step",
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        },
-        "Step": {
-          "$ref": "#/definitions/Node"
-        }
-      }
-    },
-    "stepObject": {
+    "Step": {
       "type": "object",
       "required": [
         "Name",
@@ -1142,12 +1185,35 @@ func init() {
           }
         }
       }
+    },
+    "StepLog": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/Node"
+        }
+      }
     }
   },
   "tags": [
     {
       "description": "Operations about DAGs",
       "name": "dags"
+    },
+    {
+      "description": "System operations",
+      "name": "system"
     }
   ]
 }`))
@@ -1378,6 +1444,36 @@ func init() {
         }
       }
     },
+    "/health": {
+      "get": {
+        "description": "Returns the health status of the server and its dependencies",
+        "tags": [
+          "system"
+        ],
+        "summary": "Health check endpoint",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
+            }
+          },
+          "503": {
+            "description": "Server is unhealthy",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
+            }
+          },
+          "default": {
+            "description": "Unexpected error",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
     "/search": {
       "get": {
         "description": "Searches for DAGs based on a query string.",
@@ -1599,7 +1695,7 @@ func init() {
         "Steps": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/stepObject"
+            "$ref": "#/definitions/Step"
           }
         },
         "Tags": {
@@ -1928,16 +2024,48 @@ func init() {
       "type": "object",
       "properties": {
         "Cancel": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         },
         "Exit": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         },
         "Failure": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         },
         "Success": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
+        }
+      }
+    },
+    "HealthResponse": {
+      "type": "object",
+      "required": [
+        "status",
+        "version",
+        "uptime",
+        "timestamp"
+      ],
+      "properties": {
+        "status": {
+          "description": "Overall health status of the server",
+          "type": "string",
+          "enum": [
+            "healthy",
+            "unhealthy"
+          ]
+        },
+        "timestamp": {
+          "description": "Current server time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "uptime": {
+          "description": "Server uptime in seconds",
+          "type": "integer"
+        },
+        "version": {
+          "description": "Current version of the server",
+          "type": "string"
         }
       }
     },
@@ -2032,7 +2160,7 @@ func init() {
           "type": "string"
         },
         "Step": {
-          "$ref": "#/definitions/stepObject"
+          "$ref": "#/definitions/Step"
         }
       }
     },
@@ -2173,26 +2301,7 @@ func init() {
         }
       }
     },
-    "StepLog": {
-      "type": "object",
-      "required": [
-        "Step",
-        "LogFile",
-        "Content"
-      ],
-      "properties": {
-        "Content": {
-          "type": "string"
-        },
-        "LogFile": {
-          "type": "string"
-        },
-        "Step": {
-          "$ref": "#/definitions/Node"
-        }
-      }
-    },
-    "stepObject": {
+    "Step": {
       "type": "object",
       "required": [
         "Name",
@@ -2276,12 +2385,35 @@ func init() {
           }
         }
       }
+    },
+    "StepLog": {
+      "type": "object",
+      "required": [
+        "Step",
+        "LogFile",
+        "Content"
+      ],
+      "properties": {
+        "Content": {
+          "type": "string"
+        },
+        "LogFile": {
+          "type": "string"
+        },
+        "Step": {
+          "$ref": "#/definitions/Node"
+        }
+      }
     }
   },
   "tags": [
     {
       "description": "Operations about DAGs",
       "name": "dags"
+    },
+    {
+      "description": "System operations",
+      "name": "system"
     }
   ]
 }`))

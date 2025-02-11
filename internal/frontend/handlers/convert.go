@@ -70,7 +70,7 @@ func convertToNode(node *model.Node) *models.Node {
 	}
 }
 
-func convertToStepObject(step digraph.Step) *models.StepObject {
+func convertToStepObject(step digraph.Step) *models.Step {
 	var conditions []*models.Condition
 	for _, cond := range step.Preconditions {
 		conditions = append(conditions, &models.Condition{
@@ -84,7 +84,7 @@ func convertToStepObject(step digraph.Step) *models.StepObject {
 		Interval: int64(step.RepeatPolicy.Interval),
 	}
 
-	so := &models.StepObject{
+	so := &models.Step{
 		Args:          step.Args,
 		CmdWithArgs:   swag.String(step.CmdWithArgs),
 		Command:       swag.String(step.Command),

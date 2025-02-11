@@ -78,7 +78,7 @@ type DAGDetails struct {
 
 	// steps
 	// Required: true
-	Steps []*StepObject `json:"Steps"`
+	Steps []*Step `json:"Steps"`
 
 	// tags
 	// Required: true

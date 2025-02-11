@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
+	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/system"
 )
 
 // NewDaguAPI creates a new Dagu instance
@@ -52,6 +53,9 @@ func NewDaguAPI(spec *loads.Document) *DaguAPI {
 		}),
 		DagsGetDagDetailsHandler: dags.GetDagDetailsHandlerFunc(func(params dags.GetDagDetailsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.GetDagDetails has not yet been implemented")
+		}),
+		SystemGetHealthHandler: system.GetHealthHandlerFunc(func(params system.GetHealthParams) middleware.Responder {
+			return middleware.NotImplemented("operation system.GetHealth has not yet been implemented")
 		}),
 		DagsListDagsHandler: dags.ListDagsHandlerFunc(func(params dags.ListDagsParams) middleware.Responder {
 			return middleware.NotImplemented("operation dags.ListDags has not yet been implemented")
@@ -108,6 +112,8 @@ type DaguAPI struct {
 	DagsDeleteDagHandler dags.DeleteDagHandler
 	// DagsGetDagDetailsHandler sets the operation handler for the get dag details operation
 	DagsGetDagDetailsHandler dags.GetDagDetailsHandler
+	// SystemGetHealthHandler sets the operation handler for the get health operation
+	SystemGetHealthHandler system.GetHealthHandler
 	// DagsListDagsHandler sets the operation handler for the list dags operation
 	DagsListDagsHandler dags.ListDagsHandler
 	// DagsListTagsHandler sets the operation handler for the list tags operation
@@ -201,6 +207,9 @@ func (o *DaguAPI) Validate() error {
 	}
 	if o.DagsGetDagDetailsHandler == nil {
 		unregistered = append(unregistered, "dags.GetDagDetailsHandler")
+	}
+	if o.SystemGetHealthHandler == nil {
+		unregistered = append(unregistered, "system.GetHealthHandler")
 	}
 	if o.DagsListDagsHandler == nil {
 		unregistered = append(unregistered, "dags.ListDagsHandler")
@@ -314,6 +323,10 @@ func (o *DaguAPI) initHandlerCache() {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/dags/{dagId}"] = dags.NewGetDagDetails(o.context, o.DagsGetDagDetailsHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/health"] = system.NewGetHealth(o.context, o.SystemGetHealthHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
