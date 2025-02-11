@@ -69,7 +69,7 @@ type ListTagsDefault struct {
 	/*
 	  In: Body
 	*/
-	Payload *models.APIError `json:"body,omitempty"`
+	Payload *models.Error `json:"body,omitempty"`
 }
 
 // NewListTagsDefault creates ListTagsDefault with default headers values
@@ -95,13 +95,13 @@ func (o *ListTagsDefault) SetStatusCode(code int) {
 }
 
 // WithPayload adds the payload to the list tags default response
-func (o *ListTagsDefault) WithPayload(payload *models.APIError) *ListTagsDefault {
+func (o *ListTagsDefault) WithPayload(payload *models.Error) *ListTagsDefault {
 	o.Payload = payload
 	return o
 }
 
 // SetPayload sets the payload to the list tags default response
-func (o *ListTagsDefault) SetPayload(payload *models.APIError) {
+func (o *ListTagsDefault) SetPayload(payload *models.Error) {
 	o.Payload = payload
 }
 

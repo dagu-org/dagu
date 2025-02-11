@@ -14,16 +14,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
-// ListTagResponse list tag response
+// ListTagResponse Response object for listing all tags
 //
-// swagger:model listTagResponse
+// swagger:model ListTagResponse
 type ListTagResponse struct {
 
-	// errors
+	// List of errors encountered during the request
 	// Required: true
 	Errors []string `json:"Errors"`
 
-	// tags
+	// List of unique tags
 	// Required: true
 	Tags []string `json:"Tags"`
 }

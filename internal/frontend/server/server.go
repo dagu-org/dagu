@@ -11,6 +11,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi"
+	"github.com/dagu-org/dagu/internal/frontend/metrics"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/go-openapi/loads"
 	"github.com/jessevdk/go-flags"
@@ -161,6 +162,7 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	}
 
 	// Run the server
+	metrics.StartUptime(ctx)
 	err = svr.server.Serve()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logger.Error(ctx, "Server error", "err", err)

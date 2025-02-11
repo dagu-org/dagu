@@ -13,22 +13,22 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// HandlerOn handler on
+// HandlerOn Configuration for event handlers in a DAG
 //
-// swagger:model handlerOn
+// swagger:model HandlerOn
 type HandlerOn struct {
 
 	// cancel
-	Cancel *StepObject `json:"Cancel,omitempty"`
+	Cancel *Step `json:"Cancel,omitempty"`
 
 	// exit
-	Exit *StepObject `json:"Exit,omitempty"`
+	Exit *Step `json:"Exit,omitempty"`
 
 	// failure
-	Failure *StepObject `json:"Failure,omitempty"`
+	Failure *Step `json:"Failure,omitempty"`
 
 	// success
-	Success *StepObject `json:"Success,omitempty"`
+	Success *Step `json:"Success,omitempty"`
 }
 
 // Validate validates this handler on

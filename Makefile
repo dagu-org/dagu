@@ -240,7 +240,7 @@ golangci-lint:
 .PHONY: clean-swagger
 clean-swagger:
 	@echo "${COLOR_GREEN}Cleaning the swagger files...${COLOR_RESET}"
-	@rm -rf ${FE_GEN_DIR}/restapi/models
+	@rm -rf ${FE_GEN_DIR}/models
 	@rm -rf ${FE_GEN_DIR}/restapi/operations
 
 # gen-swagger generates go files for the API schema.

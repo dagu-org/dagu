@@ -66,7 +66,7 @@ export type WorkflowListItem = {
   Dir: string;
   Status?: WorkflowStatus;
   Suspended: boolean;
-  ErrorT: string;
+  Error: string;
   DAG: Workflow;
 };
 

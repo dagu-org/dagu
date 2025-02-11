@@ -32,7 +32,9 @@ func NewListTags(ctx *middleware.Context, handler ListTagsHandler) *ListTags {
 /*
 	ListTags swagger:route GET /tags dags listTags
 
-Returns a list of tags.
+# List all tags
+
+Returns a list of tags used in DAGs.
 */
 type ListTags struct {
 	Context *middleware.Context

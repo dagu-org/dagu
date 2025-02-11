@@ -28,7 +28,7 @@ type Client interface {
 	UpdateDAG(ctx context.Context, id string, spec string) error
 	DeleteDAG(ctx context.Context, id, loc string) error
 	GetAllStatus(ctx context.Context) (statuses []DAGStatus, errs []string, err error)
-	GetAllStatusPagination(ctx context.Context, params dags.ListDagsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error)
+	GetAllStatusPagination(ctx context.Context, params dags.ListDAGsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error)
 	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
 	IsSuspended(ctx context.Context, id string) bool
 	ToggleSuspend(ctx context.Context, id string, suspend bool) error

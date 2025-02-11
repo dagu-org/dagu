@@ -16,7 +16,7 @@ import (
 
 // Schedule schedule
 //
-// swagger:model schedule
+// swagger:model Schedule
 type Schedule struct {
 
 	// expression

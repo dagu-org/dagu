@@ -70,7 +70,7 @@ function DAGs() {
     const ret: DAGItem[] = [];
     if (data && data.DAGs) {
       for (const val of data.DAGs) {
-        if (!val.ErrorT) {
+        if (!val.Error) {
           ret.push({
             Type: DAGDataType.DAG,
             Name: val.DAG.Name,

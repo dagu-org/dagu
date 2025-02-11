@@ -1,266 +1,360 @@
 ---
 swagger: "2.0"
 info:
-  version: 0.0.1
-  title: Dagu
+  version: "0.0.1" # バージョンは据え置きで互換性維持
+  title: "Dagu"
   contact:
-    name: Dagu
-  description: |
-    Dagu is a simple DAG (Directed Acyclic Graph) runner.
-    It is a simple tool to run a series of tasks in a specific order
-consumes:
-  - application/json
-produces:
-  - application/json
+    name: "Dagu"
+    url: "https://github.com/dagu-org/dagu"
+  description: >
+    REST API for Dagu - a compact, portable workflow engine for orchestrating 
+    command execution across diverse environments including shell scripts, 
+    Python commands, containerized operations, and remote commands.
+  license:
+    name: "GPL-3.0"
+    url: "https://github.com/dagu-org/dagu/blob/main/LICENSE.md"
+
 basePath: "/api/v1"
-schemes:
-  - http
 host: "localhost:8080"
+schemes:
+  - "http"
+consumes:
+  - "application/json"
+produces:
+  - "application/json"
+
 tags:
-  - name: dags
-    description: Operations about DAGs
+  - name: "dags"
+    description: "Operations about DAGs"
+  - name: "system"
+    description: "System operations"
 
 paths:
+  /health:
+    get:
+      summary: "Health check endpoint"
+      description: "Returns the health status of the server and its dependencies"
+      operationId: "getHealth"
+      tags:
+        - "system"
+      responses:
+        "200":
+          description: "Server is healthy"
+          schema:
+            $ref: "#/definitions/HealthResponse"
+        "503":
+          description: "Server is unhealthy"
+          schema:
+            $ref: "#/definitions/HealthResponse"
+        default:
+          description: "Unexpected error"
+          schema:
+            $ref: "#/definitions/Error"
+
   /dags:
     get:
-      description: Returns a list of DAGs.
-      produces:
-        - application/json
-      operationId: listDags
+      summary: "List all DAGs"
+      description: "Returns a list of DAGs with optional pagination and search filters."
+      operationId: "listDAGs"
+      tags:
+        - "dags"
       parameters:
-        - name: page
-          in: query
+        - name: "page"
+          in: "query"
           required: false
-          type: integer
-        - name: limit
-          in: query
+          type: "integer"
+          description: "Page number (for pagination)."
+        - name: "limit"
+          in: "query"
           required: false
-          type: integer
-        - name: searchName
-          in: query
+          type: "integer"
+          description: "Number of items to return per page."
+        - name: "searchName"
+          in: "query"
           required: false
-          type: string
-        - name: searchTag
-          in: query
+          type: "string"
+          description: "Filter DAGs by matching name."
+        - name: "searchTag"
+          in: "query"
           required: false
-          type: string
+          type: "string"
+          description: "Filter DAGs by matching tag."
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
           schema:
-            $ref: "#/definitions/listDagsResponse"
+            $ref: "#/definitions/ListDAGsResponse"
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
+
     post:
-      description: Creates a new DAG.
-      produces:
-        - application/json
-      operationId: createDag
+      summary: "Create a new DAG"
+      description: "Creates a new DAG."
+      operationId: "createDAG"
+      tags:
+        - "dags"
       parameters:
-        - in: body
-          name: body
+        - in: "body"
+          name: "body"
+          required: true
           schema:
-            type: object
-            properties:
-              action:
-                type: string
-              value:
-                type: string
-            required:
-              - action
-              - value
+            $ref: "#/definitions/CreateDAGRequest"
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
           schema:
-            $ref: "#/definitions/createDagResponse"
+            $ref: "#/definitions/CreateDAGResponse"
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
 
   /dags/{dagId}:
     get:
-      description: Returns details of a DAG.
+      summary: "Get DAG details"
+      description: "Returns details of a DAG, including files, logs, etc."
+      operationId: "getDAGDetails"
+      tags:
+        - "dags"
       parameters:
-        - name: dagId
-          in: path
+        - name: "dagId"
+          in: "path"
           required: true
-          type: string
-        - name: tab
-          in: query
+          type: "string"
+          description: "The ID of the DAG."
+        - name: "tab"
+          in: "query"
           required: false
-          type: string
-        - name: file
-          in: query
+          type: "string"
+          description: "Tab name for UI navigation."
+        - name: "file"
+          in: "query"
           required: false
-          type: string
-        - name: step
-          in: query
+          type: "string"
+          description: "Specific file related to the DAG."
+        - name: "step"
+          in: "query"
           required: false
-          type: string
-      produces:
-        - application/json
-      operationId: getDagDetails
+          type: "string"
+          description: "Step name within the DAG."
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
           schema:
-            $ref: "#/definitions/getDagDetailsResponse"
+            $ref: "#/definitions/GetDAGDetailsResponse"
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
+
     post:
-      description: Performs an action on a DAG.
+      summary: "Perform an action on a DAG"
+      description: "Performs a specified action (e.g., start, stop) on the given DAG."
+      operationId: "postDAGAction"
+      tags:
+        - "dags"
       parameters:
-        - name: dagId
-          in: path
+        - name: "dagId"
+          in: "path"
           required: true
-          type: string
-        - in: body
-          name: body
+          type: "string"
+          description: "The ID of the DAG."
+        - in: "body"
+          name: "body"
+          required: true
           schema:
-            type: object
-            properties:
-              action:
-                type: string
-                enum:
-                  - start
-                  - suspend
-                  - stop
-                  - retry
-                  - mark-success
-                  - mark-failed
-                  - save
-                  - rename
-              value:
-                type: string
-              requestId:
-                type: string
-              step:
-                type: string
-              params:
-                type: string
-            required:
-              - action
-      produces:
-        - application/json
-      operationId: postDagAction
+            $ref: "#/definitions/PostDAGActionRequest"
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
           schema:
-            $ref: "#/definitions/postDagActionResponse"
+            $ref: "#/definitions/PostDAGActionResponse"
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
 
     delete:
-      description: Deletes a DAG.
+      summary: "Delete a DAG"
+      description: "Deletes a DAG by its ID."
+      operationId: "deleteDAG"
+      tags:
+        - "dags"
       parameters:
-        - name: dagId
-          in: path
+        - name: "dagId"
+          in: "path"
           required: true
-          type: string
-      produces:
-        - application/json
-      operationId: deleteDag
+          type: "string"
+          description: "The ID of the DAG."
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
 
   /search:
     get:
-      description: Searches for DAGs.
-      produces:
-        - application/json
-      operationId: searchDags
+      summary: "Search DAGs"
+      description: "Searches for DAGs based on a query string."
+      operationId: "searchDAGs"
+      tags:
+        - "dags"
       parameters:
-        - name: q
-          in: query
+        - name: "q"
+          in: "query"
           required: true
-          type: string
+          type: "string"
+          description: "A search query string."
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
           schema:
-            $ref: "#/definitions/searchDagsResponse"
+            $ref: "#/definitions/SearchDAGsResponse"
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
+
   /tags:
     get:
-      description: Returns a list of tags.
-      produces:
-        - application/json
-      operationId: listTags
+      summary: "List all tags"
+      description: "Returns a list of tags used in DAGs."
+      operationId: "listTags"
+      tags:
+        - "dags"
       responses:
         "200":
-          description: A successful response.
+          description: "A successful response."
           schema:
-            $ref: "#/definitions/listTagResponse"
+            $ref: "#/definitions/ListTagResponse"
         default:
-          description: Generic error response.
+          description: "Generic error response."
           schema:
-            $ref: "#/definitions/ApiError"
-      tags:
-        - dags
+            $ref: "#/definitions/Error"
 
 definitions:
-  ApiError:
+  Error:
     type: object
+    description: "Generic error response object."
     properties:
+      code:
+        type: string
+        description: "Error code indicating the type of error."
+        enum:
+          - "validation_error"
+          - "not_found"
+          - "internal_error"
+          - "unauthorized"
+          - "bad_gateway"
       message:
         type: string
-      detailedMessage:
-        type: string
+        description: "Short error message."
+      details:
+        type: object
+        description: "Additional error details."
     required:
+      - code
       - message
-      - detailedMessage
 
-  listDagsResponse:
+  HealthResponse:
     type: object
+    description: "Response object for the health check endpoint."
+    properties:
+      status:
+        type: string
+        enum: ["healthy", "unhealthy"]
+        description: "Overall health status of the server"
+      version:
+        type: string
+        description: "Current version of the server"
+      uptime:
+        type: integer
+        description: "Server uptime in seconds"
+      timestamp:
+        type: string
+        description: "Current server time"
+    required:
+      - status
+      - version
+      - uptime
+      - timestamp
+
+  CreateDAGRequest:
+    type: object
+    description: "Request body for creating a DAG."
+    properties:
+      action:
+        type: string
+        description: "Action to perform upon creation (if any)."
+      value:
+        type: string
+        description: "Associated value for the action."
+    required:
+      - action
+      - value
+
+  PostDAGActionRequest:
+    type: object
+    description: "Request body for posting an action to a DAG."
+    properties:
+      action:
+        type: string
+        enum:
+          - start
+          - suspend
+          - stop
+          - retry
+          - mark-success
+          - mark-failed
+          - save
+          - rename
+        description: "Action to be performed on the DAG."
+      value:
+        type: string
+        description: "Optional extra value for the action."
+      requestId:
+        type: string
+        description: "Unique request ID for the action."
+      step:
+        type: string
+        description: "Step name if the action targets a specific step."
+      params:
+        type: string
+        description: "Additional parameters for the action."
+    required:
+      - action
+
+  ListDAGsResponse:
+    type: object
+    description: "Response object for listing all DAGs."
     properties:
       DAGs:
         type: array
+        description: "List of DAGs with their status and metadata."
         items:
-          $ref: "#/definitions/dagListItem"
+          $ref: "#/definitions/DAGStatusFile"
       Errors:
         type: array
+        description: "List of errors encountered during the request."
         items:
           type: string
       HasError:
         type: boolean
+        description: "Whether any errors were encountered."
       PageCount:
         type: integer
+        description: "Total number of pages available."
     required:
       - DAGs
       - Errors
       - HasError
       - PageCount
 
-  createDagResponse:
+  CreateDAGResponse:
     type: object
     properties:
       DagID:
@@ -268,127 +362,35 @@ definitions:
     required:
       - DagID
 
-  dagListItem:
+  GetDAGDetailsResponse:
     type: object
-    properties:
-      File:
-        type: string
-      Dir:
-        type: string
-      DAG:
-        $ref: "#/definitions/dag"
-      Status:
-        $ref: "#/definitions/dagStatus"
-      Suspended:
-        type: boolean
-      Error:
-        type: string
-      ErrorT:
-        type: string
-    required:
-      - File
-      - Dir
-      - DAG
-      - Status
-      - Suspended
-      - Error
-      - ErrorT
-
-  dag:
-    type: object
-    properties:
-      Group:
-        type: string
-      Name:
-        type: string
-      Schedule:
-        type: array
-        items:
-          $ref: "#/definitions/schedule"
-      Description:
-        type: string
-      Params:
-        type: array
-        items:
-          type: string
-      DefaultParams:
-        type: string
-      Tags:
-        type: array
-        items:
-          type: string
-    required:
-      - Group
-      - Name
-      - Schedule
-      - Description
-      - Params
-      - DefaultParams
-      - Tags
-
-  schedule:
-    type: object
-    properties:
-      Expression:
-        type: string
-    required:
-      - Expression
-
-  dagStatus:
-    type: object
-    properties:
-      RequestId:
-        type: string
-      Name:
-        type: string
-      Status:
-        type: integer
-      StatusText:
-        type: string
-      Pid:
-        type: integer
-      StartedAt:
-        type: string
-      FinishedAt:
-        type: string
-      Log:
-        type: string
-      Params:
-        type: string
-    required:
-      - RequestId
-      - Name
-      - Status
-      - StatusText
-      - Pid
-      - StartedAt
-      - FinishedAt
-      - Log
-      - Params
-
-  getDagDetailsResponse:
-    type: object
+    description: "Response object for getting details of a DAG."
     properties:
       Title:
         type: string
+        description: "Title of the Page."
       DAG:
-        $ref: "#/definitions/dagStatusWithDetails"
+        $ref: "#/definitions/DAGStatusFileDetails"
       Tab:
         type: string
+        description: "Tab name for UI navigation."
       Graph:
         type: string
+        description: "Graph data for visualization."
       Definition:
         type: string
+        description: "DAG definition."
       LogData:
-        $ref: "#/definitions/dagLogResponse"
+        $ref: "#/definitions/DAGLogData"
       LogUrl:
         type: string
       StepLog:
-        $ref: "#/definitions/dagStepLogResponse"
+        $ref: "#/definitions/StepLog"
       ScLog:
-        $ref: "#/definitions/dagSchedulerLogResponse"
+        $ref: "#/definitions/SchedulerLog"
       Errors:
         type: array
+        description: "List of errors encountered during the request."
         items:
           type: string
     required:
@@ -403,76 +405,15 @@ definitions:
       - ScLog
       - Errors
 
-  postDagActionResponse:
+  PostDAGActionResponse:
     type: object
+    description: "Response object for posting an action to a DAG."
     properties:
       NewDagID:
         type: string
+        description: "New DAG ID, if the action resulted in a new DAG."
 
-  dagStepLogResponse:
-    type: object
-    properties:
-      Step:
-        $ref: "#/definitions/statusNode"
-      LogFile:
-        type: string
-      Content:
-        type: string
-    required:
-      - Step
-      - LogFile
-      - Content
-
-  dagSchedulerLogResponse:
-    type: object
-    properties:
-      LogFile:
-        type: string
-      Content:
-        type: string
-    required:
-      - LogFile
-      - Content
-
-  dagLogResponse:
-    type: object
-    properties:
-      GridData:
-        type: array
-        items:
-          $ref: "#/definitions/dagLogGridItem"
-      Logs:
-        type: array
-        items:
-          $ref: "#/definitions/dagStatusFile"
-    required:
-      - GridData
-      - Logs
-
-  dagLogGridItem:
-    type: object
-    properties:
-      Name:
-        type: string
-      Vals:
-        type: array
-        items:
-          type: integer
-    required:
-      - Name
-      - Vals
-
-  dagStatusFile:
-    type: object
-    properties:
-      File:
-        type: string
-      Status:
-        $ref: "#/definitions/dagStatusDetail"
-    required:
-      - File
-
-  dagStatusWithDetails:
+  DAGStatusFile:
     type: object
     properties:
       File:
@@ -480,14 +421,12 @@ definitions:
       Dir:
         type: string
       DAG:
-        $ref: "#/definitions/dagDetail"
+        $ref: "#/definitions/DAG"
       Status:
-        $ref: "#/definitions/dagStatusDetail"
+        $ref: "#/definitions/DAGStatus"
       Suspended:
         type: boolean
       Error:
-        type: string
-      ErrorT:
         type: string
     required:
       - File
@@ -496,53 +435,181 @@ definitions:
       - Status
       - Suspended
       - Error
-      - ErrorT
 
-  dagDetail:
+  DAG:
     type: object
+    description: "Core DAG configuration containing workflow definition and metadata"
     properties:
-      Location:
-        type: string
       Group:
         type: string
+        description: "Logical grouping of related DAGs for organizational purposes"
       Name:
         type: string
+        description: "Unique identifier for the DAG within its group"
       Schedule:
         type: array
+        description: "List of scheduling expressions defining when the DAG should run"
         items:
-          $ref: "#/definitions/schedule"
+          $ref: "#/definitions/Schedule"
       Description:
         type: string
-      Env:
-        type: array
-        items:
-          type: string
-      LogDir:
-        type: string
-      HandlerOn:
-        $ref: "#/definitions/handlerOn"
-      Steps:
-        type: array
-        items:
-          $ref: "#/definitions/stepObject"
-      Delay:
-        type: integer
-      HistRetentionDays:
-        type: integer
-      Preconditions:
-        type: array
-        items:
-          $ref: "#/definitions/condition"
-      MaxActiveRuns:
-        type: integer
+        description: "Human-readable description of the DAG's purpose and behavior"
       Params:
         type: array
+        description: "List of parameter names that can be passed to the DAG at runtime"
         items:
           type: string
       DefaultParams:
         type: string
+        description: "Default parameter values in JSON format if not specified at runtime"
       Tags:
         type: array
+        description: "List of tags for categorizing and filtering DAGs"
+        items:
+          type: string
+    required:
+      - Group
+      - Name
+      - Schedule
+      - Description
+      - Params
+      - DefaultParams
+      - Tags
+
+  Schedule:
+    type: object
+    properties:
+      Expression:
+        type: string
+    required:
+      - Expression
+
+  DAGStatus:
+    type: object
+    description: "Current execution status of a DAG instance"
+    properties:
+      RequestId:
+        type: string
+        description: "Unique identifier for the DAG execution request"
+      Name:
+        type: string
+        description: "Name of the DAG being executed"
+      Status:
+        type: integer
+        description: "Numeric status code indicating current execution state"
+      StatusText:
+        type: string
+        description: "Human-readable status description"
+      Pid:
+        type: integer
+        description: "Process ID of the DAG execution"
+      StartedAt:
+        type: string
+        description: "RFC 3339 timestamp when the DAG execution started"
+      FinishedAt:
+        type: string
+        description: "RFC 3339 timestamp when the DAG execution completed"
+      Log:
+        type: string
+        description: "Path to the execution log file"
+      Params:
+        type: string
+        description: "Runtime parameters passed to the DAG in JSON format"
+    required:
+      - RequestId
+      - Name
+      - Status
+      - StatusText
+      - Pid
+      - StartedAt
+      - FinishedAt
+      - Log
+      - Params
+
+  DAGStatusFileDetails:
+    type: object
+    description: "Detailed status information for a DAG instance"
+    properties:
+      File:
+        type: string
+      Dir:
+        type: string
+      DAG:
+        $ref: "#/definitions/DAGDetails"
+      Status:
+        $ref: "#/definitions/DAGStatusDetails"
+      Suspended:
+        type: boolean
+      Error:
+        type: string
+    required:
+      - File
+      - Dir
+      - DAG
+      - Status
+      - Suspended
+      - Error
+
+  DAGDetails:
+    type: object
+    properties:
+      Location:
+        type: string
+        description: "Path to the DAG file"
+      Group:
+        type: string
+        description: "Logical grouping of related DAGs for organizational purposes"
+      Name:
+        type: string
+        description: "Unique identifier for the DAG within its group"
+      Schedule:
+        type: array
+        description: "List of scheduling expressions defining when the DAG should run"
+        items:
+          $ref: "#/definitions/Schedule"
+      Description:
+        type: string
+        description: "Human-readable description of the DAG's purpose and behavior"
+      Env:
+        type: array
+        description: "List of environment variables to set before executing"
+        items:
+          type: string
+      LogDir:
+        type: string
+        description: "Directory path for storing log files"
+      HandlerOn:
+        $ref: "#/definitions/HandlerOn"
+      Steps:
+        type: array
+        description: "List of steps to execute in the DAG"
+        items:
+          $ref: "#/definitions/Step"
+      Delay:
+        type: integer
+        description: "Time in seconds to wait before starting the DAG"
+      HistRetentionDays:
+        type: integer
+        description: "Number of days to retain historical logs"
+      Preconditions:
+        type: array
+        description: "Conditions that must be met before the DAG can start"
+        items:
+          $ref: "#/definitions/Precondition"
+      MaxActiveRuns:
+        type: integer
+        description: "Maximum number of concurrent steps to run"
+      Params:
+        type: array
+        description: "List of parameter names that can be passed to the DAG at runtime"
+        items:
+          type: string
+      DefaultParams:
+        type: string
+        description: "Default parameter values in JSON format if not specified at runtime"
+      Tags:
+        type: array
+        description: "List of tags for categorizing and filtering DAGs"
         items:
           type: string
     required:
@@ -563,19 +630,20 @@ definitions:
       - DefaultParams
       - Tags
 
-  handlerOn:
+  HandlerOn:
     type: object
+    description: "Configuration for event handlers in a DAG"
     properties:
       Failure:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Success:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Cancel:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Exit:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
 
-  dagStatusDetail:
+  DAGStatusDetails:
     type: object
     properties:
       RequestId:
@@ -591,19 +659,21 @@ definitions:
       Nodes:
         type: array
         items:
-          $ref: "#/definitions/statusNode"
+          $ref: "#/definitions/Node"
       OnExit:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       OnSuccess:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       OnFailure:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       OnCancel:
-        $ref: "#/definitions/statusNode"
+        $ref: "#/definitions/Node"
       StartedAt:
         type: string
+        description: "Timestamp when the DAG started."
       FinishedAt:
         type: string
+        description: "Timestamp when the DAG finished."
       Log:
         type: string
       Params:
@@ -624,27 +694,36 @@ definitions:
       - Log
       - Params
 
-  statusNode:
+  Node:
     type: object
+    description: "Execution status of an individual step within a DAG"
     properties:
       Step:
-        $ref: "#/definitions/stepObject"
+        $ref: "#/definitions/Step"
       Log:
         type: string
+        description: "Path to step-specific log file"
       StartedAt:
         type: string
+        description: "RFC 3339 timestamp when the step started executing"
       FinishedAt:
         type: string
+        description: "RFC 3339 timestamp when the step completed"
       Status:
         type: integer
+        description: "Numeric status code for the step execution"
       RetryCount:
         type: integer
+        description: "Number of retry attempts made for this step"
       DoneCount:
         type: integer
+        description: "Number of successful completions for repeating steps"
       Error:
         type: string
+        description: "Error message if the step failed"
       StatusText:
         type: string
+        description: "Human-readable status description"
     required:
       - Step
       - Log
@@ -656,55 +735,66 @@ definitions:
       - Error
       - StatusText
 
-  stepObject:
+  Step:
     type: object
+    description: "Individual task within a DAG that performs a specific operation"
     properties:
       Name:
         type: string
+        description: "Unique identifier for the step within the DAG"
       Description:
         type: string
-      Variables:
-        type: array
-        items:
-          type: string
+        description: "Human-readable description of what the step does"
       Dir:
         type: string
+        description: "Working directory for executing the step's command"
       CmdWithArgs:
         type: string
+        description: "Complete command string including arguments to execute"
       Command:
         type: string
+        description: "Base command to execute without arguments"
       Script:
         type: string
+        description: "Script content if the step executes a script file"
       Stdout:
         type: string
+        description: "File path for capturing standard output"
       Stderr:
         type: string
+        description: "File path for capturing standard error"
       Output:
         type: string
+        description: "Variable name to store the step's output"
       Args:
         type: array
+        description: "List of arguments to pass to the command"
         items:
           type: string
       Run:
         type: string
+        description: "Sub DAG to run"
       Params:
         type: string
+        description: "Parameters to pass to the sub DAG"
       Depends:
         type: array
+        description: "List of step names that must complete before this step can start"
         items:
           type: string
       RepeatPolicy:
-        $ref: "#/definitions/repeatPolicy"
+        $ref: "#/definitions/RepeatPolicy"
       MailOnError:
         type: boolean
+        description: "Whether to send email notifications on step failure"
       Preconditions:
         type: array
+        description: "Conditions that must be met before the step can start"
         items:
-          $ref: "#/definitions/condition"
+          $ref: "#/definitions/Precondition"
     required:
       - Name
       - Description
-      - Variables
       - Dir
       - CmdWithArgs
       - Command
@@ -718,13 +808,13 @@ definitions:
       - MailOnError
       - Preconditions
 
-  searchDagsResponse:
+  SearchDAGsResponse:
     type: object
     properties:
       Results:
         type: array
         items:
-          $ref: "#/definitions/searchDagsResultItem"
+          $ref: "#/definitions/SearchDAGsResultItem"
       Errors:
         type: array
         items:
@@ -733,19 +823,19 @@ definitions:
       - Results
       - Errors
 
-  searchDagsResultItem:
+  SearchDAGsResultItem:
     type: object
     properties:
       Name:
         type: string
       DAG:
-        $ref: "#/definitions/dag"
+        $ref: "#/definitions/DAG"
       Matches:
         type: array
         items:
-          $ref: "#/definitions/searchDagsMatchItem"
+          $ref: "#/definitions/SearchDAGsMatchItem"
 
-  searchDagsMatchItem:
+  SearchDAGsMatchItem:
     type: object
     properties:
       Line:
@@ -755,30 +845,103 @@ definitions:
       StartLine:
         type: integer
 
-  condition:
+  StepLog:
     type: object
+    properties:
+      Step:
+        $ref: "#/definitions/Node"
+      LogFile:
+        type: string
+      Content:
+        type: string
+    required:
+      - Step
+      - LogFile
+      - Content
+
+  SchedulerLog:
+    type: object
+    properties:
+      LogFile:
+        type: string
+      Content:
+        type: string
+    required:
+      - LogFile
+      - Content
+
+  DAGLogData:
+    type: object
+    properties:
+      GridData:
+        type: array
+        items:
+          $ref: "#/definitions/DAGLogGridItem"
+      Logs:
+        type: array
+        items:
+          $ref: "#/definitions/DAGLogStatusFile"
+    required:
+      - GridData
+      - Logs
+
+  DAGLogGridItem:
+    type: object
+    properties:
+      Name:
+        type: string
+      Vals:
+        type: array
+        items:
+          type: integer
+    required:
+      - Name
+      - Vals
+
+  DAGLogStatusFile:
+    type: object
+    properties:
+      File:
+        type: string
+      Status:
+        $ref: "#/definitions/DAGStatusDetails"
+    required:
+      - File
+      - Status
+
+  Precondition:
+    type: object
+    description: "Precondition that must be satisfied before execution"
     properties:
       Condition:
         type: string
+        description: "Expression or check to evaluate"
       Expected:
         type: string
+        description: "Expected result of the condition evaluation"
 
-  repeatPolicy:
+  RepeatPolicy:
     type: object
+    description: "Configuration for step retry behavior"
     properties:
       Repeat:
         type: boolean
+        description: "Whether the step should be retried on failure"
       Interval:
         type: integer
+        description: "Time in seconds to wait between retry attempts"
 
-  listTagResponse:
+  ListTagResponse:
     type: object
+    description: "Response object for listing all tags"
     properties:
       Tags:
         type: array
+        description: "List of unique tags"
         items:
           type: string
       Errors:
+        description: "List of errors encountered during the request"
         type: array
         items:
           type: string

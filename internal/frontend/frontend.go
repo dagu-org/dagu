@@ -3,21 +3,18 @@ package frontend
 import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/config"
-	"github.com/dagu-org/dagu/internal/frontend/dag"
+	"github.com/dagu-org/dagu/internal/frontend/handlers"
 	"github.com/dagu-org/dagu/internal/frontend/server"
 )
 
 func New(cfg *config.Config, cli client.Client) *server.Server {
-	var hs []server.Handler
+	var apiHandlers []server.Handler
 
-	hs = append(hs, dag.NewHandler(
-		&dag.NewHandlerArgs{
-			Client:             cli,
-			LogEncodingCharset: cfg.UI.LogEncodingCharset,
-			RemoteNodes:        cfg.RemoteNodes,
-			ApiBasePath:        cfg.APIBaseURL,
-		},
-	))
+	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.RemoteNodes, cfg.APIBaseURL)
+	apiHandlers = append(apiHandlers, dagAPIHandler)
+
+	systemAPIHandler := handlers.NewSystem()
+	apiHandlers = append(apiHandlers, systemAPIHandler)
 
 	var remoteNodes []string
 	for _, n := range cfg.RemoteNodes {
@@ -28,7 +25,7 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		Host:                  cfg.Host,
 		Port:                  cfg.Port,
 		TLS:                   cfg.TLS,
-		Handlers:              hs,
+		Handlers:              apiHandlers,
 		AssetsFS:              assetsFS,
 		NavbarColor:           cfg.UI.NavbarColor,
 		NavbarTitle:           cfg.UI.NavbarTitle,
