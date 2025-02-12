@@ -187,9 +187,9 @@ func TestNode(t *testing.T) {
 		node.Execute(t)
 		node.AssertOutput(t, "SCRIPT_TEST", "hello")
 		// check script file is removed
-		scriptFilePath := node.ScriptFilename()
-		require.NotEmpty(t, scriptFilePath)
-		require.NoFileExists(t, scriptFilePath, "script file not removed")
+		script := node.Script()
+		require.NotNil(t, script)
+		require.NoFileExists(t, script.Name(), "script file not removed")
 	})
 }
 

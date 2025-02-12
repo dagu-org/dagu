@@ -40,10 +40,22 @@ type Node struct {
 	stderrWriter *bufio.Writer
 	outputWriter *os.File
 	outputReader *os.File
-	scriptFile   *os.File
+	script       *Script
 	done         bool
 	retryPolicy  retryPolicy
 	cmdEvaluated bool
+}
+
+type Script struct {
+	name string
+}
+
+func (s *Script) Name() string {
+	return s.name
+}
+
+func (s *Script) SilentRemove() {
+	_ = os.Remove(s.name)
 }
 
 type NodeData struct {
@@ -110,16 +122,15 @@ func NewNode(step digraph.Step, state NodeState) *Node {
 func (n *Node) Data() NodeData {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
+
 	return n.data
 }
 
-func (n *Node) ScriptFilename() string {
+func (n *Node) Script() *Script {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	if n.scriptFile != nil {
-		return n.scriptFile.Name()
-	}
-	return ""
+
+	return n.script
 }
 
 func (n *Node) CloseLog() error {
@@ -333,10 +344,10 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 		return nil, err
 	}
 
-	if n.scriptFile != nil {
+	if n.script != nil {
 		var args []string
 		args = append(args, n.data.Step.Args...)
-		n.data.Step.Args = append(args, n.scriptFile.Name())
+		n.data.Step.Args = append(args, n.script.Name())
 	}
 
 	cmd, err := executor.NewExecutor(ctx, n.data.Step)
@@ -642,8 +653,8 @@ func (n *Node) Teardown() error {
 	}
 	n.logLock.Unlock()
 
-	if n.scriptFile != nil {
-		_ = os.Remove(n.scriptFile.Name())
+	if n.script != nil {
+		n.script.SilentRemove()
 	}
 	if lastErr != nil {
 		n.setError(lastErr)
@@ -673,14 +684,22 @@ func (n *Node) setupScript() (err error) {
 		if len(n.data.Step.Dir) > 0 && !fileutil.FileExists(n.data.Step.Dir) {
 			return ErrWorkingDirNotExist
 		}
-		n.scriptFile, _ = os.CreateTemp(n.data.Step.Dir, "dagu_script-")
-		if _, err = n.scriptFile.WriteString(n.data.Step.Script); err != nil {
-			return err
+		file, err := os.CreateTemp(n.data.Step.Dir, "dagu_script-")
+		if err != nil {
+			return fmt.Errorf("failed to create script file: %w", err)
 		}
 		defer func() {
-			_ = n.scriptFile.Close()
+			_ = file.Close()
 		}()
-		err = n.scriptFile.Sync()
+		if _, err = file.WriteString(n.data.Step.Script); err != nil {
+			return fmt.Errorf("failed to write script to file: %w", err)
+		}
+		if err = file.Sync(); err != nil {
+			return fmt.Errorf("failed to sync script file: %w", err)
+		}
+		n.script = &Script{
+			name: file.Name(),
+		}
 	}
 	return err
 }
