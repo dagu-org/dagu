@@ -275,7 +275,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.38.1
-	golang.org/x/crypto v0.30.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/net v0.32.0
 	golang.org/x/sys v0.28.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
