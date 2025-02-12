@@ -156,7 +156,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	var status scheduler.Status
 	var lock sync.Mutex
 
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		lock.Lock()
 		defer lock.Unlock()
 

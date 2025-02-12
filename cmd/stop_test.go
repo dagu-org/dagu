@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStopCommand(t *testing.T) {
@@ -30,6 +31,20 @@ func TestStopCommand(t *testing.T) {
 		th.RunCommand(t, stopCmd(), cmdTest{
 			args:        []string{"stop", dagFile.Location},
 			expectedOut: []string{"DAG stopped"}})
+
+		// Log the status of the DAG.
+		go func() {
+			for {
+				select {
+				case <-time.After(time.Millisecond * 100):
+					status, err := th.Client.GetLatestStatus(th.Context, dagFile.DAG)
+					require.NoError(t, err)
+					t.Logf("status: %s, started: %s, finished: %s", status.Status, status.StartedAt, status.FinishedAt)
+				case <-done:
+					return
+				}
+			}
+		}()
 
 		// Check the DAG is stopped.
 		dagFile.AssertLatestStatus(t, scheduler.StatusCancel)
