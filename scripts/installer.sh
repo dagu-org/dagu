@@ -38,9 +38,12 @@ esac
 TMPDIR=$(mktemp -d)
 export TAR_FILE="${TMPDIR}/${FILE_BASENAME}_$(uname -s)_${ARCHITECTURE}.tar.gz"
 
+# Get system type (Linux | Freebsd | Darwin ) as lowercase
+SYSTEM=$(uname -s | awk '{print tolower($0)}')
+
 # Download the binary
 echo "Downloading Dagu $VERSION..."
-curl -sfLo "$TAR_FILE" "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_${VERSION:1}_$(uname -s)_${ARCHITECTURE}.tar.gz" || {
+curl -sfLo "$TAR_FILE" "$RELEASES_URL/download/$VERSION/${FILE_BASENAME}_${VERSION#v}_${SYSTEM}_${ARCHITECTURE}.tar.gz" || {
     echo "Failed to download the file. Check your internet connection and the URL." >&2
     exit 1
 }
