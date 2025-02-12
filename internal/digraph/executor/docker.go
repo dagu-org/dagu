@@ -80,8 +80,8 @@ func (e *docker) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *docker) Run(_ context.Context) error {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+func (e *docker) Run(ctx context.Context) error {
+	ctx, cancelFunc := context.WithCancel(ctx)
 	e.context = ctx
 	e.cancel = cancelFunc
 
@@ -114,6 +114,7 @@ func (e *docker) Run(_ context.Context) error {
 		e.containerConfig.Image = e.image
 	}
 
+	// Evaluate args
 	stepContext := digraph.GetStepContext(ctx)
 	var args []string
 	for _, arg := range e.step.Args {
