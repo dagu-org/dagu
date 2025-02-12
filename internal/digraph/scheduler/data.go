@@ -26,7 +26,6 @@ type NodeData struct {
 type NodeState struct {
 	Status     NodeStatus
 	Log        string
-	ScriptFile string
 	StartedAt  time.Time
 	FinishedAt time.Time
 	RetryCount int
@@ -107,20 +106,6 @@ func (s *SafeData) SetStep(step digraph.Step) {
 	defer s.mu.Unlock()
 
 	s.inner.Step = step
-}
-
-func (s *SafeData) SetScriptFile(scriptFile string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.inner.State.ScriptFile = scriptFile
-}
-
-func (s *SafeData) ScriptFile() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.inner.State.ScriptFile
 }
 
 func (s *SafeData) Data() NodeData {

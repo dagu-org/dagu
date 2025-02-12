@@ -429,6 +429,10 @@ func (th *DAG) AssertEnv(t *testing.T, key, val string) {
 		}
 	}
 	t.Errorf("expected env %s=%s not found", key, val)
+	for i, env := range th.Env {
+		// print all envs that were found for debugging
+		t.Logf("env[%d]: %s", i, env)
+	}
 }
 
 func (th *DAG) AssertParam(t *testing.T, params ...string) {

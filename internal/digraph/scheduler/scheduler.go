@@ -39,6 +39,11 @@ func (s Status) String() string {
 	}
 }
 
+var (
+	ErrUpstreamFailed  = fmt.Errorf("upstream failed")
+	ErrUpstreamSkipped = fmt.Errorf("upstream skipped")
+)
+
 // Scheduler is a scheduler that runs a graph of steps.
 type Scheduler struct {
 	logDir        string
@@ -459,7 +464,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			}
 			ready = false
 			node.data.SetStatus(NodeStatusCancel)
-			node.data.SetError(errUpstreamFailed)
+			node.data.SetError(ErrUpstreamFailed)
 
 		case NodeStatusSkipped:
 			if dep.shouldContinue(ctx) {
@@ -467,7 +472,7 @@ func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 			}
 			ready = false
 			node.data.SetStatus(NodeStatusSkipped)
-			node.data.SetError(errUpstreamSkipped)
+			node.data.SetError(ErrUpstreamSkipped)
 
 		case NodeStatusCancel:
 			ready = false
@@ -582,8 +587,3 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
 	return sc.timeout > 0 && time.Since(startedAt) > sc.timeout
 }
-
-var (
-	errUpstreamFailed  = fmt.Errorf("upstream failed")
-	errUpstreamSkipped = fmt.Errorf("upstream skipped")
-)

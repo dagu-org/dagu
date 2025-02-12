@@ -180,16 +180,6 @@ func TestNode(t *testing.T) {
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello "world"`)
 	})
-	t.Run("Script", func(t *testing.T) {
-		t.Parallel()
-
-		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
-		node.Execute(t)
-		node.AssertOutput(t, "SCRIPT_TEST", "hello")
-		scriptFile := node.Data().State.ScriptFile
-		require.NotNil(t, scriptFile)
-		require.NoFileExists(t, scriptFile, "script file not removed")
-	})
 }
 
 type nodeHelper struct {

@@ -3,4 +3,4 @@ schedule:
   stop: "1 * * * *"
 steps:
   - name: step 1
-    command: "sleep 100"
+    command: "sleep 10"

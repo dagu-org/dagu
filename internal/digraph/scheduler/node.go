@@ -140,7 +140,7 @@ func (n *Node) State() NodeState {
 }
 
 func (n *Node) Execute(ctx context.Context) error {
-	cmd, err := n.setupExec(ctx)
+	cmd, err := n.setupExecutor(ctx)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (n *Node) clearVariable(key string) {
 	n.data.ClearVariable(key)
 }
 
-func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
+func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -198,12 +198,6 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	// Evaluate the command and args if not already evaluated
 	if err := n.evaluateCommandArgs(ctx); err != nil {
 		return nil, err
-	}
-
-	if scriptFile := n.data.ScriptFile(); scriptFile != "" {
-		args := n.data.Args()
-		args = append(args, scriptFile)
-		n.data.SetArgs(args)
 	}
 
 	cmd, err := executor.NewExecutor(ctx, n.data.Step())
@@ -386,9 +380,6 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	if err := n.setupRetryPolicy(ctx); err != nil {
 		return fmt.Errorf("failed to setup retry policy: %w", err)
 	}
-	if err := n.setupScript(); err != nil {
-		return fmt.Errorf("failed to setup script: %w", err)
-	}
 	return nil
 }
 
@@ -403,42 +394,11 @@ func (n *Node) Teardown(ctx context.Context) error {
 		lastErr = err
 	}
 
-	if scriptFile := n.data.ScriptFile(); scriptFile != "" {
-		_ = os.Remove(scriptFile)
-	}
 	if lastErr != nil {
 		n.data.SetError(lastErr)
 	}
 
 	return lastErr
-}
-
-func (n *Node) setupScript() (err error) {
-	step := n.data.Step()
-	if step.Script != "" {
-		if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
-			return fmt.Errorf("directory %q does not exist", step.Dir)
-		}
-
-		file, err := os.CreateTemp(step.Dir, "dagu_script-")
-		if err != nil {
-			return fmt.Errorf("failed to create script file: %w", err)
-		}
-		defer func() {
-			_ = file.Close()
-		}()
-
-		if _, err = file.WriteString(step.Script); err != nil {
-			return fmt.Errorf("failed to write script to file: %w", err)
-		}
-
-		if err = file.Sync(); err != nil {
-			return fmt.Errorf("failed to sync script file: %w", err)
-		}
-
-		n.data.SetScriptFile(file.Name())
-	}
-	return err
 }
 
 // LogContainsPattern checks if any of the given patterns exist in the node's log file.
