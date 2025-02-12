@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,183 +32,9 @@ type Node struct {
 	mu           sync.RWMutex
 	cmd          executor.Executor
 	cancelFunc   func()
-	script       *Script
 	done         atomic.Bool
 	retryPolicy  RetryPolicy
 	cmdEvaluated atomic.Bool
-}
-
-type SafeData struct {
-	mu   sync.RWMutex
-	data NodeData
-}
-
-func newSafeData(data NodeData) SafeData {
-	return SafeData{data: data}
-}
-
-func (s *SafeData) ResetError() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data.State.Error = nil
-	s.data.State.ExitCode = 0
-}
-
-func (s *SafeData) Args() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	args := make([]string, len(s.data.Step.Args))
-	copy(args, s.data.Step.Args)
-	return args
-}
-
-func (s *SafeData) SetArgs(args []string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data.Step.Args = args
-}
-
-func (s *SafeData) Step() digraph.Step {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.Step
-}
-
-func (s *SafeData) SetStep(step digraph.Step) {
-	// TODO: refactor to avoid modifying the step
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data.Step = step
-}
-
-func (s *SafeData) Data() NodeData {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data
-}
-
-func (s *SafeData) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data.State.Log = logFile
-	s.data.State.StartedAt = startedAt
-
-	stepContext := digraph.GetStepContext(ctx)
-
-	// Evaluate the stdout and stderr fields
-	stdout, err := stepContext.EvalString(s.data.Step.Stdout)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate stdout field: %w", err)
-	}
-	s.data.Step.Stdout = stdout
-
-	stderr, err := stepContext.EvalString(s.data.Step.Stderr)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate stderr field: %w", err)
-	}
-	s.data.Step.Stderr = stderr
-
-	// Evaluate the dir field
-	dir, err := stepContext.EvalString(s.data.Step.Dir)
-	if err != nil {
-		return fmt.Errorf("failed to evaluate dir field: %w", err)
-	}
-	s.data.Step.Dir = dir
-
-	return nil
-}
-
-func (s *SafeData) State() NodeState {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.State
-}
-
-func (s *SafeData) Status() NodeStatus {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.State.Status
-}
-
-func (s *SafeData) SetStatus(status NodeStatus) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data.State.Status = status
-}
-
-func (s *SafeData) ContinueOn() digraph.ContinueOn {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.Step.ContinueOn
-}
-
-func (s *SafeData) Log() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.State.Log
-}
-
-func (s *SafeData) SignalOnStop() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.Step.SignalOnStop
-}
-
-func (s *SafeData) Name() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.Step.Name
-}
-
-func (s *SafeData) Error() error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.data.State.Error
-}
-
-func (s *SafeData) SetError(err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.data.State.Error = err
-}
-
-func (s *SafeData) ClearVariable(key string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.data.Step.OutputVariables == nil {
-		return
-	}
-
-	s.data.Step.OutputVariables.Delete(key)
-}
-
-func (s *SafeData) MatchExitCode(exitCodes []int) bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, code := range exitCodes {
-		if code == s.data.State.ExitCode {
-			return true
-		}
-	}
-	return false
 }
 
 func NewNode(step digraph.Step, state NodeState) *Node {
@@ -221,55 +46,6 @@ func NewNode(step digraph.Step, state NodeState) *Node {
 func NodeWithData(data NodeData) *Node {
 	return &Node{
 		data: newSafeData(data),
-	}
-}
-
-type NodeData struct {
-	Step  digraph.Step
-	State NodeState
-}
-
-// NodeState contains the state of a node.
-type NodeState struct {
-	Status     NodeStatus
-	Log        string
-	StartedAt  time.Time
-	FinishedAt time.Time
-	RetryCount int
-	RetriedAt  time.Time
-	DoneCount  int
-	Error      error
-	ExitCode   int
-}
-
-// NodeStatus represents the status of a node.
-type NodeStatus int
-
-const (
-	NodeStatusNone NodeStatus = iota
-	NodeStatusRunning
-	NodeStatusError
-	NodeStatusCancel
-	NodeStatusSuccess
-	NodeStatusSkipped
-)
-
-func (s NodeStatus) String() string {
-	switch s {
-	case NodeStatusRunning:
-		return "running"
-	case NodeStatusError:
-		return "failed"
-	case NodeStatusCancel:
-		return "canceled"
-	case NodeStatusSuccess:
-		return "finished"
-	case NodeStatusSkipped:
-		return "skipped"
-	case NodeStatusNone:
-		fallthrough
-	default:
-		return "not started"
 	}
 }
 
@@ -289,13 +65,6 @@ func (n *Node) SetStatus(status NodeStatus) {
 	defer n.mu.Unlock()
 
 	n.data.SetStatus(status)
-}
-
-func (n *Node) Script() *Script {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.script
 }
 
 func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
@@ -409,52 +178,6 @@ func (n *Node) clearVariable(key string) {
 	n.data.ClearVariable(key)
 }
 
-func (n *SafeData) getVariable(key string) (stringutil.KeyValue, bool) {
-	// n.mu.RLock()
-	// defer n.mu.RUnlock()
-
-	if n.data.Step.OutputVariables == nil {
-		return "", false
-	}
-
-	v, ok := n.data.Step.OutputVariables.Load(key)
-	if !ok {
-		return "", false
-	}
-
-	return stringutil.KeyValue(v.(string)), true
-}
-
-func (n *SafeData) getBoolVariable(key string) (bool, bool) {
-	v, ok := n.getVariable(key)
-	if !ok {
-		return false, false
-	}
-
-	return v.Bool(), true
-}
-
-func (n *SafeData) setBoolVariable(key string, value bool) {
-	if n.data.Step.OutputVariables == nil {
-		n.data.Step.OutputVariables = &digraph.SyncMap{}
-	}
-	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
-}
-
-func (n *SafeData) setVariable(key, value string) {
-	if n.data.Step.OutputVariables == nil {
-		n.data.Step.OutputVariables = &digraph.SyncMap{}
-	}
-	n.data.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
-}
-
-func (n *SafeData) Finish() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State.FinishedAt = time.Now()
-}
-
 func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -477,9 +200,9 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 		return nil, err
 	}
 
-	if n.script != nil {
+	if scriptFile := n.data.ScriptFile(); scriptFile != "" {
 		args := n.data.Args()
-		args = append(args, n.script.Name())
+		args = append(args, scriptFile)
 		n.data.SetArgs(args)
 	}
 
@@ -593,56 +316,6 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	return nil
 }
 
-func (n *SafeData) GetRetryCount() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.data.State.RetryCount
-}
-
-func (n *SafeData) SetRetriedAt(retriedAt time.Time) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State.RetriedAt = retriedAt
-}
-
-func (n *SafeData) GetDoneCount() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.data.State.DoneCount
-}
-
-func (n *SafeData) GetExitCode() int {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	return n.data.State.ExitCode
-}
-
-func (n *SafeData) SetExitCode(exitCode int) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State.ExitCode = exitCode
-}
-
-func (n *SafeData) ClearState() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State = NodeState{}
-}
-
-func (n *SafeData) MarkError(err error) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State.Error = err
-	n.data.State.Status = NodeStatusError
-}
-
 func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -704,10 +377,11 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	}
 
 	logFile := filepath.Join(logDir, logFilename)
-	n.data.Setup(ctx, logFile, startedAt)
-
+	if err := n.data.Setup(ctx, logFile, startedAt); err != nil {
+		return fmt.Errorf("failed to setup node data: %w", err)
+	}
 	if err := n.outputs.setup(ctx, n.data.Data()); err != nil {
-		n.data.SetError(err)
+		return fmt.Errorf("failed to setup outputs: %w", err)
 	}
 	if err := n.setupRetryPolicy(ctx); err != nil {
 		return fmt.Errorf("failed to setup retry policy: %w", err)
@@ -729,8 +403,8 @@ func (n *Node) Teardown(ctx context.Context) error {
 		lastErr = err
 	}
 
-	if n.script != nil {
-		n.script.SilentRemove()
+	if scriptFile := n.data.ScriptFile(); scriptFile != "" {
+		_ = os.Remove(scriptFile)
 	}
 	if lastErr != nil {
 		n.data.SetError(lastErr)
@@ -739,29 +413,11 @@ func (n *Node) Teardown(ctx context.Context) error {
 	return lastErr
 }
 
-func (n *SafeData) IncRetryCount() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State.RetryCount++
-}
-
-func (n *SafeData) IncDoneCount() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.State.DoneCount++
-}
-
-var (
-	ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
-)
-
 func (n *Node) setupScript() (err error) {
 	step := n.data.Step()
 	if step.Script != "" {
 		if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
-			return ErrWorkingDirNotExist
+			return fmt.Errorf("directory %q does not exist", step.Dir)
 		}
 
 		file, err := os.CreateTemp(step.Dir, "dagu_script-")
@@ -780,7 +436,7 @@ func (n *Node) setupScript() (err error) {
 			return fmt.Errorf("failed to sync script file: %w", err)
 		}
 
-		n.script = &Script{name: file.Name()}
+		n.data.SetScriptFile(file.Name())
 	}
 	return err
 }
@@ -898,18 +554,6 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-type Script struct {
-	name string
-}
-
-func (s *Script) Name() string {
-	return s.name
-}
-
-func (s *Script) SilentRemove() {
-	_ = os.Remove(s.name)
 }
 
 type OutputCoordinator struct {

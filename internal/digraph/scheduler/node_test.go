@@ -186,10 +186,9 @@ func TestNode(t *testing.T) {
 		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
 		node.Execute(t)
 		node.AssertOutput(t, "SCRIPT_TEST", "hello")
-		// check script file is removed
-		script := node.Script()
-		require.NotNil(t, script)
-		require.NoFileExists(t, script.Name(), "script file not removed")
+		scriptFile := node.Data().State.ScriptFile
+		require.NotNil(t, scriptFile)
+		require.NoFileExists(t, scriptFile, "script file not removed")
 	})
 }
 
