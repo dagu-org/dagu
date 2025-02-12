@@ -218,7 +218,7 @@ func TestBuildEnv(t *testing.T) {
 			name: "ValidEnvWithSubstitutionAndEnv",
 			file: "valid_env_substitution_and_env.yaml",
 			expected: map[string]string{
-				"FOO": "BAR:BAZ:BAR:FOO",
+				"FOO": "BEE:BAZ:BOO:FOO",
 			},
 		},
 	}
