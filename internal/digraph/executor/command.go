@@ -39,7 +39,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 	}
 
 	if e.config.Script != "" {
-		scriptFile, err := setupScript(context.Background(), digraph.Step{Dir: e.config.Dir, Script: e.config.Script})
+		scriptFile, err := setupScript(ctx, digraph.Step{Dir: e.config.Dir, Script: e.config.Script})
 		if err != nil {
 			e.mu.Unlock()
 			return fmt.Errorf("failed to setup script: %w", err)
@@ -50,7 +50,7 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 			_ = os.Remove(scriptFile)
 		}()
 	}
-	e.cmd = e.config.Cmd(ctx, e.scriptFile)
+	e.cmd = e.config.newCmd(ctx, e.scriptFile)
 
 	if err := e.cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
@@ -98,12 +98,22 @@ type commandConfig struct {
 	Stderr           io.Writer
 }
 
-func (cfg *commandConfig) Cmd(ctx context.Context, scriptFile string) *exec.Cmd {
+func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) *exec.Cmd {
 	var cmd *exec.Cmd
-	if cfg.ShellCommand != "" && cfg.ShellCommandArgs != "" {
-		cmd = createShellCommand(cfg.Ctx, cfg.ShellCommand, cfg.ShellCommandArgs)
-	} else {
+	switch {
+	case cfg.ShellCommand != "" && scriptFile != "":
+		// If script is provided ignore the shell command args
+
+		// nolint: gosec
+		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, scriptFile)
+
+	case cfg.ShellCommand != "" && cfg.ShellCommandArgs != "":
+		// nolint: gosec
+		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, "-c", cfg.ShellCommandArgs)
+
+	default:
 		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
+
 	}
 
 	stepContext := digraph.GetStepContext(ctx)
@@ -196,9 +206,4 @@ func createDirectCommand(ctx context.Context, cmd string, args []string, scriptF
 
 	// nolint: gosec
 	return exec.CommandContext(ctx, cmd, arguments...)
-}
-
-// createShellCommand creates a command that runs through a shell
-func createShellCommand(ctx context.Context, shell, shellCmd string) *exec.Cmd {
-	return exec.CommandContext(ctx, shell, "-c", shellCmd)
 }

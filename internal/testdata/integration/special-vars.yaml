@@ -1,0 +1,20 @@
+steps:
+  - name: step1
+    command: echo $DAG_EXECUTION_LOG_PATH
+    output: OUT1
+  - name: step2
+    command: echo $DAG_EXECUTION_LOG_PATH
+    output: OUT2
+  - name: step3
+    command: echo $DAG_REQUEST_ID
+    output: OUT3
+  - name: step4
+    command: sh
+    output: OUT4
+    script: |
+      echo $DAG_EXECUTION_LOG_PATH
+  - name: step5
+    command: bash
+    output: OUT5
+    script: |
+      echo $DAG_REQUEST_ID
