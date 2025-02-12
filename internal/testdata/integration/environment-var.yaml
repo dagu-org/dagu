@@ -13,6 +13,6 @@ steps:
     precondition:
       - condition: "${DATA_DIR}_${PROCESS_DATE}"
         expected: "re:[0-9]{8}_[0-9]{6}"
-  # - name: cleanup
-  #   command: rm ${DATA_DIR}_${PROCESS_DATE}
-  #   depends: make tmp file
+  - name: cleanup
+    command: rm ${DATA_DIR}_${PROCESS_DATE}
+    depends: make tmp file
