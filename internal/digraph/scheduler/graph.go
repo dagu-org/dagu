@@ -31,7 +31,7 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 		nodes: []*Node{},
 	}
 	for _, step := range steps {
-		node := &Node{data: NodeData{Step: step}}
+		node := &Node{data: newSafeData(NodeData{Step: step})}
 		node.Init()
 		graph.dict[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -134,7 +134,7 @@ func (g *ExecutionGraph) NodeData() []NodeData {
 	var ret []NodeData
 	for _, node := range g.nodes {
 		node.mu.Lock()
-		ret = append(ret, node.data)
+		ret = append(ret, node.data.Data())
 		node.mu.Unlock()
 	}
 
@@ -149,12 +149,12 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 	dict := map[int]NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
-		dict[node.id] = node.data.State.Status
+		dict[node.id] = node.data.Status()
 		retry[node.id] = false
 	}
 	var frontier []int
 	for _, node := range g.nodes {
-		if len(node.data.Step.Depends) == 0 {
+		if len(node.data.Step().Depends) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
@@ -163,8 +163,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
-				logger.Info(ctx, "clear node state", "step", g.dict[u].data.Step.Name)
-				g.dict[u].ClearState()
+				logger.Info(ctx, "clear node state", "step", g.dict[u].data.Name())
+				g.dict[u].data.ClearState()
 				retry[u] = true
 			}
 			for _, v := range g.from[u] {
@@ -181,7 +181,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 
 func (g *ExecutionGraph) setup() error {
 	for _, node := range g.nodes {
-		for _, dep := range node.data.Step.Depends {
+		for _, dep := range node.data.Step().Depends {
 			depStep, err := g.findStep(dep)
 			if err != nil {
 				return err
@@ -240,7 +240,7 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	for _, n := range g.dict {
-		if n.data.Step.Name == name {
+		if n.data.Name() == name {
 			return n, nil
 		}
 	}
