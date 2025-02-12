@@ -114,7 +114,17 @@ func (e *docker) Run(_ context.Context) error {
 		e.containerConfig.Image = e.image
 	}
 
-	e.containerConfig.Cmd = append([]string{e.step.Command}, e.step.Args...)
+	stepContext := digraph.GetStepContext(ctx)
+	var args []string
+	for _, arg := range e.step.Args {
+		val, err := stepContext.EvalString(arg)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
+		}
+		args = append(args, val)
+	}
+
+	e.containerConfig.Cmd = append([]string{e.step.Command}, args...)
 
 	resp, err := cli.ContainerCreate(
 		ctx, e.containerConfig, e.hostConfig, nil, nil, "",
