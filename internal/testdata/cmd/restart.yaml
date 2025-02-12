@@ -1,8 +1,8 @@
 params: "p1"
 steps:
   - name: "1"
-    command: "echo $1"
+    script: "echo $1"
   - name: "2"
-    command: "sleep 10"
+    script: "sleep 10"
     depends:
       - "1"

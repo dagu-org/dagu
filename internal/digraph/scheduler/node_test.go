@@ -180,17 +180,6 @@ func TestNode(t *testing.T) {
 		node.Execute(t)
 		node.AssertOutput(t, "OUTPUT", `hello "world"`)
 	})
-	t.Run("Script", func(t *testing.T) {
-		t.Parallel()
-
-		node := setupNode(t, withNodeScript("echo hello"), withNodeOutput("SCRIPT_TEST"))
-		node.Execute(t)
-		node.AssertOutput(t, "SCRIPT_TEST", "hello")
-		// check script file is removed
-		scriptFilePath := node.ScriptFilename()
-		require.NotEmpty(t, scriptFilePath)
-		require.NoFileExists(t, scriptFilePath, "script file not removed")
-	})
 }
 
 type nodeHelper struct {
@@ -268,7 +257,7 @@ func (n nodeHelper) Execute(t *testing.T) {
 	err = n.Node.Execute(n.execContext(reqID))
 	require.NoError(t, err, "failed to execute node")
 
-	err = n.Teardown()
+	err = n.Teardown(n.Context)
 	require.NoError(t, err, "failed to teardown node")
 }
 
@@ -283,8 +272,8 @@ func (n nodeHelper) ExecuteFail(t *testing.T, expectedErr string) {
 func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
 	t.Helper()
 
-	dat, err := os.ReadFile(n.Node.LogFilename())
-	require.NoErrorf(t, err, "failed to read log file %q", n.Node.LogFilename())
+	dat, err := os.ReadFile(n.Node.LogFile())
+	require.NoErrorf(t, err, "failed to read log file %q", n.Node.LogFile())
 	require.Contains(t, string(dat), expected, "log file does not contain expected string")
 }
 

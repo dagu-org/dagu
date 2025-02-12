@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -156,7 +157,7 @@ func (d *DAG) AssertLatestStatus(t *testing.T, expected scheduler.Status) {
 	var status scheduler.Status
 	var lock sync.Mutex
 
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		lock.Lock()
 		defer lock.Unlock()
 
@@ -196,7 +197,7 @@ func (d *DAG) AssertCurrentStatus(t *testing.T, expected scheduler.Status) {
 // AssertOutputs checks the given outputs against the actual outputs of the DAG
 // Note that this function does not respect dependencies between nodes
 // making the outputs with the same key indeterministic
-func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]string) {
+func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 	t.Helper()
 
 	status, err := d.Client.GetLatestStatus(d.Context, d.DAG)
@@ -217,12 +218,26 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]string) {
 	// compare the actual outputs with the expected outputs
 	for key, expected := range outputs {
 		if actual, ok := actualOutputs[key]; ok {
-			assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
+			switch expected := expected.(type) {
+			case string:
+				assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
+
+			case NotEmpty:
+				parts := strings.SplitN(actual, "=", 2)
+				assert.Len(t, parts, 2, "expected output %q to be in the form key=value", key)
+				assert.NotEmpty(t, parts[1], "expected output %q to be not empty", key)
+
+			default:
+				t.Errorf("unsupported value matcher type %T", expected)
+
+			}
 		} else {
 			t.Errorf("expected output %q not found", key)
 		}
 	}
 }
+
+type NotEmpty struct{}
 
 type AgentOption func(*Agent)
 

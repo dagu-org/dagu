@@ -265,7 +265,7 @@ func TestScheduler(t *testing.T) {
 		// 1 -> 2 (cancel when running) -> 3 (should not be executed)
 		graph := sc.newGraph(t,
 			successStep("1"),
-			newStep("2", withDepends("1"), withCommand("sleep 100")),
+			newStep("2", withDepends("1"), withCommand("sleep 10")),
 			failStep("3", "2"),
 		)
 
@@ -316,6 +316,39 @@ func TestScheduler(t *testing.T) {
 
 		node := result.Node(t, "1")
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
+	})
+	t.Run("RetryWithScript", func(t *testing.T) {
+		sc := setup(t)
+
+		const testEnv = "TEST_RETRY_WITH_SCRIPT"
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(`
+					if [ "$TEST_RETRY_WITH_SCRIPT" -eq 1 ]; then
+						exit 1
+					fi
+					exit 0
+				`),
+				withRetryPolicy(1, time.Millisecond*500),
+			),
+		)
+
+		_ = os.Setenv(testEnv, "1")
+		go func() {
+			time.Sleep(time.Millisecond * 300)
+			_ = os.Setenv(testEnv, "0")
+			t.Cleanup(func() {
+				_ = os.Unsetenv(testEnv)
+			})
+		}()
+
+		result := graph.Schedule(t, scheduler.StatusSuccess)
+
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+
+		node := result.Node(t, "1")
+		require.Equal(t, 2, node.State().DoneCount)  // 2 executions
+		require.Equal(t, 1, node.State().RetryCount) // 1 retry
 	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
 		file := filepath.Join(
@@ -587,28 +620,7 @@ func TestScheduler(t *testing.T) {
 
 		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
 
-		require.Contains(t, result.Error.Error(), "failed to setup script")
-	})
-	t.Run("NodeTeardownFailure", func(t *testing.T) {
-		sc := setup(t)
-
-		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 1")),
-		)
-
-		nodes := graph.Nodes()
-		go func() {
-			time.Sleep(time.Millisecond * 300)
-			_ = nodes[0].CloseLog()
-		}()
-
-		result := graph.Schedule(t, scheduler.StatusError)
-
-		// file already closed
-		require.Error(t, result.Error)
-
-		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
-		require.Contains(t, result.Error.Error(), "file already closed")
+		require.Contains(t, result.Error.Error(), "directory does not exist")
 	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		sc := setup(t)

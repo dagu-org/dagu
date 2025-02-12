@@ -80,8 +80,8 @@ func (e *docker) Kill(_ os.Signal) error {
 	return nil
 }
 
-func (e *docker) Run(_ context.Context) error {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+func (e *docker) Run(ctx context.Context) error {
+	ctx, cancelFunc := context.WithCancel(ctx)
 	e.context = ctx
 	e.cancel = cancelFunc
 
@@ -114,7 +114,18 @@ func (e *docker) Run(_ context.Context) error {
 		e.containerConfig.Image = e.image
 	}
 
-	e.containerConfig.Cmd = append([]string{e.step.Command}, e.step.Args...)
+	// Evaluate args
+	stepContext := digraph.GetStepContext(ctx)
+	var args []string
+	for _, arg := range e.step.Args {
+		val, err := stepContext.EvalString(arg)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
+		}
+		args = append(args, val)
+	}
+
+	e.containerConfig.Cmd = append([]string{e.step.Command}, args...)
 
 	resp, err := cli.ContainerCreate(
 		ctx, e.containerConfig, e.hostConfig, nil, nil, "",
