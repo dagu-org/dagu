@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -25,37 +26,29 @@ import (
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {
-	data NodeData
+	data    NodeData
+	outputs OutputCoordinator
 
 	id           int
 	mu           sync.RWMutex
-	logLock      sync.Mutex
 	cmd          executor.Executor
 	cancelFunc   func()
-	logFile      *os.File
-	logWriter    *bufio.Writer
-	stdoutFile   *os.File
-	stdoutWriter *bufio.Writer
-	stderrFile   *os.File
-	stderrWriter *bufio.Writer
-	outputWriter *os.File
-	outputReader *os.File
 	script       *Script
-	done         bool
-	retryPolicy  retryPolicy
+	done         atomic.Bool
+	retryPolicy  RetryPolicy
 	cmdEvaluated bool
 }
 
-type Script struct {
-	name string
+func NewNode(step digraph.Step, state NodeState) *Node {
+	return &Node{
+		data: NodeData{Step: step, State: state},
+	}
 }
 
-func (s *Script) Name() string {
-	return s.name
-}
-
-func (s *Script) SilentRemove() {
-	_ = os.Remove(s.name)
+func NodeWithData(data NodeData) *Node {
+	return &Node{
+		data: data,
+	}
 }
 
 type NodeData struct {
@@ -107,18 +100,6 @@ func (s NodeStatus) String() string {
 	}
 }
 
-func NodeWithData(data NodeData) *Node {
-	return &Node{
-		data: data,
-	}
-}
-
-func NewNode(step digraph.Step, state NodeState) *Node {
-	return &Node{
-		data: NodeData{Step: step, State: state},
-	}
-}
-
 func (n *Node) Data() NodeData {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
@@ -126,29 +107,18 @@ func (n *Node) Data() NodeData {
 	return n.data
 }
 
+func (n *Node) LogFile() string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return n.outputs.LogFile()
+}
+
 func (n *Node) Script() *Script {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.script
-}
-
-func (n *Node) CloseLog() error {
-	n.logLock.Lock()
-	defer n.logLock.Unlock()
-	if n.logFile != nil {
-		return n.logFile.Close()
-	}
-	return nil
-}
-
-func (n *Node) LogFilename() string {
-	n.logLock.Lock()
-	defer n.logLock.Unlock()
-	if n.logFile != nil {
-		return n.logFile.Name()
-	}
-	return ""
 }
 
 func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
@@ -238,7 +208,6 @@ func (n *Node) State() NodeState {
 	return n.data.State
 }
 
-// Execute runs the command synchronously and returns error if any.
 func (n *Node) Execute(ctx context.Context) error {
 	cmd, err := n.setupExec(ctx)
 	if err != nil {
@@ -262,15 +231,12 @@ func (n *Node) Execute(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if n.outputReader != nil && n.data.Step.Output != "" {
-		if err := n.outputWriter.Close(); err != nil {
-			logger.Error(ctx, "failed to close pipe writer", "err", err)
+	if output := n.data.Step.Output; output != "" {
+		value, err := n.outputs.capturedOutput(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to capture output: %w", err)
 		}
-		var buf bytes.Buffer
-		// TODO: handle the case where the error or output is too large
-		_, _ = io.Copy(&buf, n.outputReader)
-		value := strings.TrimSpace(buf.String())
-		n.setVariable(n.data.Step.Output, value)
+		n.setVariable(output, value)
 	}
 
 	return n.data.State.Error
@@ -339,6 +305,9 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	n.data.State.Error = nil
 	n.data.State.ExitCode = 0
 
+	// Reset the done flag
+	n.done.Store(false)
+
 	// Evaluate the command and args if not already evaluated
 	if err := n.evaluateCommandArgs(ctx); err != nil {
 		return nil, err
@@ -356,30 +325,8 @@ func (n *Node) setupExec(ctx context.Context) (executor.Executor, error) {
 	}
 	n.cmd = cmd
 
-	var stdout io.Writer
-
-	if n.logWriter != nil {
-		stdout = n.logWriter
-		cmd.SetStderr(stdout)
-	}
-
-	if n.stdoutWriter != nil {
-		stdout = io.MultiWriter(n.logWriter, n.stdoutWriter)
-	}
-
-	if n.data.Step.Output != "" {
-		var err error
-		if n.outputReader, n.outputWriter, err = os.Pipe(); err != nil {
-			return nil, err
-		}
-		stdout = io.MultiWriter(stdout, n.outputWriter)
-	}
-
-	cmd.SetStdout(stdout)
-	if n.stderrWriter != nil {
-		cmd.SetStderr(n.stderrWriter)
-	} else {
-		cmd.SetStderr(stdout)
+	if err := n.outputs.setupExecutorIO(ctx, cmd, n.data); err != nil {
+		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
 	return cmd, nil
@@ -611,14 +558,8 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	}
 	n.data.Step.Dir = dir
 
-	if err := n.setupLog(); err != nil {
-		return fmt.Errorf("failed to setup log: %w", err)
-	}
-	if err := n.setupStdout(); err != nil {
-		return fmt.Errorf("failed to setup stdout: %w", err)
-	}
-	if err := n.setupStderr(); err != nil {
-		return fmt.Errorf("failed to setup stderr: %w", err)
+	if err := n.outputs.setup(ctx, n.data); err != nil {
+		n.data.State.Error = err
 	}
 	if err := n.setupRetryPolicy(ctx); err != nil {
 		return fmt.Errorf("failed to setup retry policy: %w", err)
@@ -629,29 +570,16 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	return nil
 }
 
-func (n *Node) Teardown() error {
-	if n.done {
+func (n *Node) Teardown(ctx context.Context) error {
+	if n.done.Load() {
 		return nil
 	}
-	n.logLock.Lock()
-	n.done = true
+	n.done.Store(true)
+
 	var lastErr error
-	for _, w := range []*bufio.Writer{n.logWriter, n.stdoutWriter} {
-		if w != nil {
-			if err := w.Flush(); err != nil {
-				lastErr = err
-			}
-		}
+	if err := n.outputs.closeResources(ctx); err != nil {
+		lastErr = err
 	}
-	for _, f := range []*os.File{n.logFile, n.stdoutFile} {
-		if f != nil {
-			if err := f.Sync(); err != nil {
-				lastErr = err
-			}
-			_ = f.Close()
-		}
-	}
-	n.logLock.Unlock()
 
 	if n.script != nil {
 		n.script.SilentRemove()
@@ -704,56 +632,6 @@ func (n *Node) setupScript() (err error) {
 	return err
 }
 
-func (n *Node) setupStdout() error {
-	if n.data.Step.Stdout != "" {
-		f := n.data.Step.Stdout
-		if !filepath.IsAbs(f) {
-			f = filepath.Join(n.data.Step.Dir, f)
-		}
-		var err error
-		n.stdoutFile, err = fileutil.OpenOrCreateFile(f)
-		if err != nil {
-			n.data.State.Error = err
-			return err
-		}
-		n.stdoutWriter = bufio.NewWriter(n.stdoutFile)
-	}
-	return nil
-}
-
-func (n *Node) setupStderr() error {
-	if n.data.Step.Stderr != "" {
-		f := n.data.Step.Stderr
-		if !filepath.IsAbs(f) {
-			f = filepath.Join(n.data.Step.Dir, f)
-		}
-		var err error
-		n.stderrFile, err = fileutil.OpenOrCreateFile(f)
-		if err != nil {
-			n.data.State.Error = err
-			return err
-		}
-		n.stderrWriter = bufio.NewWriter(n.stderrFile)
-	}
-	return nil
-}
-
-func (n *Node) setupLog() error {
-	if n.data.State.Log == "" {
-		return nil
-	}
-	n.logLock.Lock()
-	defer n.logLock.Unlock()
-	var err error
-	n.logFile, err = fileutil.OpenOrCreateFile(n.data.State.Log)
-	if err != nil {
-		n.data.State.Error = err
-		return err
-	}
-	n.logWriter = bufio.NewWriter(n.logFile)
-	return nil
-}
-
 // LogContainsPattern checks if any of the given patterns exist in the node's log file.
 // If a pattern starts with "regexp:", it will be treated as a regular expression.
 // Returns false if no log file exists or no pattern is found.
@@ -764,7 +642,7 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	}
 
 	// Get the log filename and check if it exists
-	logFilename := n.LogFilename()
+	logFilename := n.outputs.LogFile()
 	if logFilename == "" {
 		return false, nil
 	}
@@ -787,8 +665,8 @@ func (n *Node) LogContainsPattern(ctx context.Context, patterns []string) (bool,
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024) // Set max line size to 1MB
 
 	// Use the logLock to prevent concurrent file operations
-	n.logLock.Lock()
-	defer n.logLock.Unlock()
+	n.outputs.lock()
+	defer n.outputs.unlock()
 
 	if stringutil.MatchPatternScanner(ctx, scanner, patterns) {
 		return true, nil
@@ -826,20 +704,23 @@ func (n *Node) Init() {
 	}
 }
 
-type retryPolicy struct {
+type RetryPolicy struct {
 	Limit    int
 	Interval time.Duration
 }
 
 func (n *Node) setupRetryPolicy(ctx context.Context) error {
-	var retryPolicy retryPolicy
+	var limit int
+	var interval time.Duration
 
 	if n.data.Step.RetryPolicy.Limit > 0 {
-		retryPolicy.Limit = n.data.Step.RetryPolicy.Limit
+		limit = n.data.Step.RetryPolicy.Limit
 	}
+
 	if n.data.Step.RetryPolicy.Interval > 0 {
-		retryPolicy.Interval = n.data.Step.RetryPolicy.Interval
+		interval = n.data.Step.RetryPolicy.Interval
 	}
+
 	// Evaluate the configuration if it's configured as a string
 	// e.g. environment variable or command substitution
 	if n.data.Step.RetryPolicy.LimitStr != "" {
@@ -847,15 +728,222 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry limit %q: %w", n.data.Step.RetryPolicy.LimitStr, err)
 		}
-		retryPolicy.Limit = v
+
+		limit = v
 	}
+
 	if n.data.Step.RetryPolicy.IntervalSecStr != "" {
 		v, err := cmdutil.EvalIntString(ctx, n.data.Step.RetryPolicy.IntervalSecStr)
 		if err != nil {
 			return fmt.Errorf("failed to substitute retry interval %q: %w", n.data.Step.RetryPolicy.IntervalSecStr, err)
 		}
-		retryPolicy.Interval = time.Duration(v) * time.Second
+
+		interval = time.Duration(v) * time.Second
 	}
-	n.retryPolicy = retryPolicy
+
+	n.retryPolicy = RetryPolicy{
+		Limit:    limit,
+		Interval: interval,
+	}
+
 	return nil
+}
+
+type Script struct {
+	name string
+}
+
+func (s *Script) Name() string {
+	return s.name
+}
+
+func (s *Script) SilentRemove() {
+	_ = os.Remove(s.name)
+}
+
+type OutputCoordinator struct {
+	mu           sync.Mutex
+	logFilename  string
+	logFile      *os.File
+	logWriter    *bufio.Writer
+	stdoutFile   *os.File
+	stdoutWriter *bufio.Writer
+	stderrFile   *os.File
+	stderrWriter *bufio.Writer
+	outputWriter *os.File
+	outputReader *os.File
+}
+
+func (oc *OutputCoordinator) LogFile() string {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	return oc.logFilename
+}
+
+func (oc *OutputCoordinator) lock() {
+	oc.mu.Lock()
+}
+
+func (oc *OutputCoordinator) unlock() {
+	oc.mu.Unlock()
+}
+
+func (oc *OutputCoordinator) setup(ctx context.Context, data NodeData) error {
+	if err := oc.setupLog(ctx, data); err != nil {
+		return err
+	}
+	if err := oc.setupStdout(ctx, data); err != nil {
+		return err
+	}
+	return oc.setupStderr(ctx, data)
+}
+
+func (oc *OutputCoordinator) setupExecutorIO(_ context.Context, cmd executor.Executor, data NodeData) error {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	var stdout io.Writer
+
+	// Output to log only
+	if oc.logWriter != nil {
+		stdout = oc.logWriter
+		cmd.SetStderr(stdout)
+	}
+
+	// Output to both log and stdout
+	if oc.stdoutWriter != nil {
+		stdout = io.MultiWriter(oc.logWriter, oc.stdoutWriter)
+	}
+
+	// Setup output capture
+	if data.Step.Output != "" {
+		var err error
+		if oc.outputReader, oc.outputWriter, err = os.Pipe(); err != nil {
+			return fmt.Errorf("failed to create pipe: %w", err)
+		}
+		stdout = io.MultiWriter(stdout, oc.outputWriter)
+	}
+
+	cmd.SetStdout(stdout)
+
+	if oc.stderrWriter != nil {
+		cmd.SetStderr(oc.stderrWriter)
+	} else {
+		// If stderr output is not set, use stdout for stderr as well
+		cmd.SetStderr(stdout)
+	}
+
+	return nil
+}
+
+func (oc *OutputCoordinator) closeResources(_ context.Context) error {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	var lastErr error
+	for _, w := range []*bufio.Writer{oc.logWriter, oc.stdoutWriter, oc.stderrWriter} {
+		if w != nil {
+			if err := w.Flush(); err != nil {
+				lastErr = err
+			}
+		}
+	}
+	for _, f := range []*os.File{oc.logFile, oc.stdoutFile, oc.stderrFile} {
+		if f != nil {
+			if err := f.Sync(); err != nil {
+				lastErr = err
+			}
+			_ = f.Close()
+		}
+	}
+	return lastErr
+}
+
+func (oc *OutputCoordinator) setupStdout(ctx context.Context, data NodeData) error {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	if data.Step.Stdout == "" {
+		return nil
+	}
+
+	file, err := oc.setupFile(ctx, data.Step.Stdout, data)
+	if err != nil {
+		return fmt.Errorf("failed to setup stdout file: %w", err)
+	}
+
+	oc.stdoutFile = file
+	oc.stdoutWriter = bufio.NewWriter(oc.stdoutFile)
+
+	return nil
+}
+
+func (oc *OutputCoordinator) setupStderr(ctx context.Context, data NodeData) error {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	if data.Step.Stderr == "" {
+		return nil
+	}
+
+	file, err := oc.setupFile(ctx, data.Step.Stderr, data)
+	if err != nil {
+		return fmt.Errorf("failed to setup stderr file: %w", err)
+	}
+
+	oc.stderrFile = file
+	oc.stderrWriter = bufio.NewWriter(oc.stderrFile)
+
+	return nil
+}
+
+func (oc *OutputCoordinator) setupLog(_ context.Context, data NodeData) error {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	var err error
+	oc.logFile, err = fileutil.OpenOrCreateFile(data.State.Log)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	oc.logWriter = bufio.NewWriter(oc.logFile)
+	oc.logFilename = data.State.Log
+
+	return nil
+}
+
+func (oc *OutputCoordinator) setupFile(_ context.Context, filePath string, data NodeData) (*os.File, error) {
+	absFilePath := filePath
+	if !filepath.IsAbs(absFilePath) {
+		absFilePath = filepath.Join(data.Step.Dir, absFilePath)
+		absFilePath = filepath.Clean(absFilePath)
+	}
+
+	file, err := fileutil.OpenOrCreateFile(absFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file %q: %w", absFilePath, err)
+	}
+
+	return file, nil
+}
+
+func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error) {
+	oc.mu.Lock()
+	defer oc.mu.Unlock()
+
+	if oc.outputReader == nil {
+		return "", nil
+	}
+
+	if err := oc.outputWriter.Close(); err != nil {
+		logger.Error(ctx, "failed to close pipe writer", "err", err)
+	}
+
+	var buf bytes.Buffer
+	// TODO: Handle case where output is too large
+	if _, err := io.Copy(&buf, oc.outputReader); err != nil {
+		return "", fmt.Errorf("io: failed to read output: %w", err)
+	}
+	return strings.TrimSpace(buf.String()), nil
 }

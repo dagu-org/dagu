@@ -589,27 +589,6 @@ func TestScheduler(t *testing.T) {
 
 		require.Contains(t, result.Error.Error(), "failed to setup script")
 	})
-	t.Run("NodeTeardownFailure", func(t *testing.T) {
-		sc := setup(t)
-
-		graph := sc.newGraph(t,
-			newStep("1", withCommand("sleep 1")),
-		)
-
-		nodes := graph.Nodes()
-		go func() {
-			time.Sleep(time.Millisecond * 300)
-			_ = nodes[0].CloseLog()
-		}()
-
-		result := graph.Schedule(t, scheduler.StatusError)
-
-		// file already closed
-		require.Error(t, result.Error)
-
-		result.AssertNodeStatus(t, "1", scheduler.NodeStatusError)
-		require.Contains(t, result.Error.Error(), "file already closed")
-	})
 	t.Run("OutputVariables", func(t *testing.T) {
 		sc := setup(t)
 

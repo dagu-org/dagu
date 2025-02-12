@@ -167,7 +167,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 				ctx = node.SetupContextBeforeExec(ctx)
 
 				defer func() {
-					_ = sc.teardownNode(node)
+					_ = sc.teardownNode(ctx, node)
 				}()
 
 			ExecRepeat: // repeat execution
@@ -238,7 +238,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 					node.SetStatus(NodeStatusSuccess)
 				}
 
-				if err := sc.teardownNode(node); err != nil {
+				if err := sc.teardownNode(ctx, node); err != nil {
 					sc.setLastError(err)
 					node.SetStatus(NodeStatusError)
 				}
@@ -306,9 +306,9 @@ func (sc *Scheduler) setupNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-func (sc *Scheduler) teardownNode(node *Node) error {
+func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 	if !sc.dry {
-		return node.Teardown()
+		return node.Teardown(ctx)
 	}
 	return nil
 }
@@ -496,7 +496,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 		}
 
 		defer func() {
-			_ = node.Teardown()
+			_ = node.Teardown(ctx)
 		}()
 
 		ctx = sc.buildStepContextForHandler(ctx, graph, node)
