@@ -317,39 +317,39 @@ func TestScheduler(t *testing.T) {
 		node := result.Node(t, "1")
 		require.Equal(t, 2, node.State().RetryCount) // 2 retry
 	})
-	// t.Run("RetryWithScript", func(t *testing.T) {
-	// 	sc := setup(t)
+	t.Run("RetryWithScript", func(t *testing.T) {
+		sc := setup(t)
 
-	// 	const testEnv = "TEST_RETRY_WITH_SCRIPT"
-	// 	graph := sc.newGraph(t,
-	// 		newStep("1",
-	// 			withScript(`
-	// 				if [ "$TEST_RETRY_WITH_SCRIPT" -eq 1 ]; then
-	// 					exit 1
-	// 				fi
-	// 				exit 0
-	// 			`),
-	// 			withRetryPolicy(1, time.Millisecond*500),
-	// 		),
-	// 	)
+		const testEnv = "TEST_RETRY_WITH_SCRIPT"
+		graph := sc.newGraph(t,
+			newStep("1",
+				withScript(`
+					if [ "$TEST_RETRY_WITH_SCRIPT" -eq 1 ]; then
+						exit 1
+					fi
+					exit 0
+				`),
+				withRetryPolicy(1, time.Millisecond*500),
+			),
+		)
 
-	// 	_ = os.Setenv(testEnv, "1")
-	// 	go func() {
-	// 		time.Sleep(time.Millisecond * 300)
-	// 		_ = os.Setenv(testEnv, "0")
-	// 		t.Cleanup(func() {
-	// 			_ = os.Unsetenv(testEnv)
-	// 		})
-	// 	}()
+		_ = os.Setenv(testEnv, "1")
+		go func() {
+			time.Sleep(time.Millisecond * 300)
+			_ = os.Setenv(testEnv, "0")
+			t.Cleanup(func() {
+				_ = os.Unsetenv(testEnv)
+			})
+		}()
 
-	// 	result := graph.Schedule(t, scheduler.StatusSuccess)
+		result := graph.Schedule(t, scheduler.StatusSuccess)
 
-	// 	result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
+		result.AssertNodeStatus(t, "1", scheduler.NodeStatusSuccess)
 
-	// 	node := result.Node(t, "1")
-	// 	require.Equal(t, 2, node.State().DoneCount)  // 2 executions
-	// 	require.Equal(t, 1, node.State().RetryCount) // 1 retry
-	// })
+		node := result.Node(t, "1")
+		require.Equal(t, 2, node.State().DoneCount)  // 2 executions
+		require.Equal(t, 1, node.State().RetryCount) // 1 retry
+	})
 	t.Run("RetryPolicySuccess", func(t *testing.T) {
 		file := filepath.Join(
 			os.TempDir(), fmt.Sprintf("flag_test_retry_success_%s", uuid.Must(uuid.NewRandom()).String()),
