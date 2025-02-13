@@ -5,30 +5,21 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func startAllCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "start-all",
-		Short:   "Launches both the Dagu web UI server and the scheduler process.",
-		Long:    `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
-		PreRunE: bindStartAllFlags,
-		RunE:    wrapRunE(runStartAll),
+		Use:   "start-all",
+		Short: "Launches both the Dagu web UI server and the scheduler process.",
+		Long:  `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>] [--config=<config file>]`,
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, []string{"dags", "host", "port"})
+		},
+		RunE: wrapRunE(runStartAll),
 	}
 
 	initStartAllFlags(cmd)
 	return cmd
-}
-
-func bindStartAllFlags(cmd *cobra.Command, _ []string) error {
-	flags := []string{"port", "host", "dags"}
-	for _, flag := range flags {
-		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
-			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
-		}
-	}
-	return nil
 }
 
 func runStartAll(cmd *cobra.Command, _ []string) error {
@@ -37,7 +28,6 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
 
-	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		setup.cfg.Paths.DAGsDir = dagsDir
 	}
@@ -66,7 +56,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	// Start server in main thread
+	// Start server in a goroutine
 	logger.Info(ctx, "Server initialization", "host", setup.cfg.Host, "port", setup.cfg.Port)
 
 	serverErr := make(chan error, 1)
@@ -89,41 +79,13 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	case <-ctx.Done():
-		return ctx.Err()
+		logger.Info(ctx, "Context cancelled")
+		return nil
 	}
 
 	return nil
 }
 
 func initStartAllFlags(cmd *cobra.Command) {
-	flags := []struct {
-		name, shorthand, defaultValue, usage string
-	}{
-		{
-			name:      "dags",
-			shorthand: "d",
-			usage:     "location of DAG files (default is $HOME/.config/dagu/dags)",
-		},
-		{
-			name:         "host",
-			shorthand:    "s",
-			defaultValue: defaultHost,
-			usage:        "server host",
-		},
-		{
-			name:         "port",
-			shorthand:    "p",
-			defaultValue: defaultPort,
-			usage:        "server port",
-		},
-	}
-
-	for _, flag := range flags {
-		cmd.Flags().StringP(
-			flag.name,
-			flag.shorthand,
-			flag.defaultValue,
-			flag.usage,
-		)
-	}
+	initCommonFlags(cmd, []commandLineFlag{dagsFlag, hostFlag, portFlag})
 }

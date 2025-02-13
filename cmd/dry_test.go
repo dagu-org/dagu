@@ -14,6 +14,11 @@ func TestDryCommand(t *testing.T) {
 				expectedOut: []string{"Dry-run finished"},
 			},
 			{
+				name:        "DryRunDAGWithParams",
+				args:        []string{"dry", th.DAG(t, "cmd/dry_with_params.yaml").Location, "--params", "p3 p4"},
+				expectedOut: []string{`[p3 p4]`},
+			},
+			{
 				name:        "DryRunDAGWithParamsAfterDash",
 				args:        []string{"dry", th.DAG(t, "cmd/dry_with_params.yaml").Location, "--", "p5", "p6"},
 				expectedOut: []string{`[p5 p6]`},

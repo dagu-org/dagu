@@ -9,18 +9,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	dryPrefix = "dry_"
-)
-
 func dryCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
-		RunE:  wrapRunE(runDry),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runDry),
 	}
+
+	initCommonFlags(cmd, []commandLineFlag{paramsFlag})
+
+	return cmd
 }
 
 func runDry(cmd *cobra.Command, args []string) error {
@@ -28,8 +31,6 @@ func runDry(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
-
-	cmd.Flags().StringP("params", "p", "", "parameters")
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
@@ -60,7 +61,8 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(ctx, dryPrefix, dag, requestID)
+	const logPrefix = "dry_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -78,7 +80,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -89,13 +91,13 @@ func runDry(cmd *cobra.Command, args []string) error {
 		agent.Options{Dry: true},
 	)
 
-	listenSignals(ctx, agt)
+	listenSignals(ctx, agentInstance)
 
-	if err := agt.Run(ctx); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 	}
 
-	agt.PrintSummary(ctx)
+	agentInstance.PrintSummary(ctx)
 
 	return nil
 }

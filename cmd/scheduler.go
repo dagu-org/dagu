@@ -5,24 +5,20 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func schedulerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
 		Short: "Start the scheduler",
-		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
-		RunE:  wrapRunE(runScheduler),
+		Long:  `dagu scheduler [--dags=<DAGs dir>] [--config=<config file>]`,
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, []string{"dags"})
+		},
+		RunE: wrapRunE(runScheduler),
 	}
 
-	cmd.Flags().StringP(
-		"dags",
-		"d",
-		"",
-		"location of DAG files (default is $HOME/.config/dagu/dags)",
-	)
-	_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
+	initCommonFlags(cmd, []commandLineFlag{dagsFlag})
 
 	return cmd
 }
@@ -35,7 +31,6 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
-	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		setup.cfg.Paths.DAGsDir = dagsDir
 	}

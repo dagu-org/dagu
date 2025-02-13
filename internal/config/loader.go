@@ -16,11 +16,24 @@ import (
 )
 
 type ConfigLoader struct {
-	lock sync.Mutex
+	lock       sync.Mutex
+	configFile string
 }
 
-func NewConfigLoader() *ConfigLoader {
-	return &ConfigLoader{}
+type ConfigLoaderOption func(*ConfigLoader)
+
+func WithConfigFile(configFile string) ConfigLoaderOption {
+	return func(l *ConfigLoader) {
+		l.configFile = configFile
+	}
+}
+
+func NewConfigLoader(options ...ConfigLoaderOption) *ConfigLoader {
+	loader := &ConfigLoader{}
+	for _, option := range options {
+		option(loader)
+	}
+	return loader
 }
 
 func (l *ConfigLoader) Load() (*Config, error) {
@@ -99,9 +112,13 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 }
 
 func (l *ConfigLoader) configureViper(resolver PathResolver) {
-	viper.AddConfigPath(resolver.ConfigDir)
+	if l.configFile == "" {
+		viper.AddConfigPath(resolver.ConfigDir)
+		viper.SetConfigName("config")
+	} else {
+		viper.SetConfigFile(l.configFile)
+	}
 	viper.SetConfigType("yaml")
-	viper.SetConfigName("config")
 	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()

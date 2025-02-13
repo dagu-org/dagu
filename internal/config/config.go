@@ -222,8 +222,8 @@ func (c *Config) cleanBasePath() {
 }
 
 // Load creates a new configuration with backward compatibility
-func Load() (*Config, error) {
-	loader := NewConfigLoader()
+func Load(opts ...ConfigLoaderOption) (*Config, error) {
+	loader := NewConfigLoader(opts...)
 	cfg, err := loader.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)

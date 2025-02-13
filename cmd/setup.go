@@ -27,6 +27,7 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func wrapRunE(f func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
@@ -44,7 +45,12 @@ type setup struct {
 }
 
 func createSetup() (*setup, error) {
-	cfg, err := config.Load()
+	var configLoaderOpts []config.ConfigLoaderOption
+	if cfgPath := viper.GetString("config"); cfgPath != "" {
+		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
+	}
+
+	cfg, err := config.Load(configLoaderOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}

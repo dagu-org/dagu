@@ -1,0 +1,3 @@
+port: 54321
+headless: true
+dags: /tmp/.dagu_test

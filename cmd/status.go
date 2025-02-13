@@ -9,13 +9,20 @@ import (
 )
 
 func statusCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "status /path/to/spec.yaml",
 		Short: "Display current status of the DAG",
 		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runStatus),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runStatus),
 	}
+
+	initCommonFlags(cmd, nil)
+
+	return cmd
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
@@ -26,7 +33,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
-	// Load the DAG
 	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
@@ -45,7 +51,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to retrieve current status: %w", err)
 	}
 
-	// Log the status information
 	logger.Info(ctx, "Current status", "pid", status.PID, "status", status.Status)
 
 	return nil

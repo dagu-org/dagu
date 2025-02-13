@@ -128,6 +128,7 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		}
 	}()
 
+	logger.Info(ctx, "Scheduler started")
 	s.start(ctx)
 
 	return nil

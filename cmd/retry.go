@@ -13,23 +13,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	retryPrefix = "retry_"
-)
-
 func retryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retry --req=<request-id> /path/to/spec.yaml",
 		Short: "Retry the DAG execution",
 		Long:  `dagu retry --req=<request-id> /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runRetry),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runRetry),
 	}
 
-	cmd.Flags().StringP("req", "r", "", "request-id")
-	_ = cmd.MarkFlagRequired("req")
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	initRetryFlags(cmd)
+
 	return cmd
+}
+
+func initRetryFlags(cmd *cobra.Command) {
+	initCommonFlags(cmd, []commandLineFlag{withRequired(requestIDFlag)})
+	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
 func runRetry(cmd *cobra.Command, args []string) error {
@@ -99,7 +102,8 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		return fmt.Errorf("failed to generate new request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(ctx, retryPrefix, dag, newRequestID)
+	const logPrefix = "retry_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, newRequestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -121,7 +125,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		newRequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -132,19 +136,19 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		agent.Options{RetryTarget: &originalStatus.Status},
 	)
 
-	listenSignals(ctx, agt)
+	listenSignals(ctx, agentInstance)
 
-	if err := agt.Run(ctx); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		if quiet {
 			os.Exit(1)
 		} else {
-			agt.PrintSummary(ctx)
+			agentInstance.PrintSummary(ctx)
 			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
 		}
 	}
 
 	if !quiet {
-		agt.PrintSummary(ctx)
+		agentInstance.PrintSummary(ctx)
 	}
 
 	return nil

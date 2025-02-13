@@ -12,15 +12,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const startPrefix = "start_"
-
 func startCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
 		Short: "Runs the DAG",
 		Long:  `dagu start /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
-		RunE:  wrapRunE(runStart),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runStart),
 	}
 
 	initStartFlags(cmd)
@@ -28,8 +29,7 @@ func startCmd() *cobra.Command {
 }
 
 func initStartFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("params", "p", "", "parameters")
-	cmd.Flags().StringP("requestID", "r", "", "specify request ID")
+	initCommonFlags(cmd, []commandLineFlag{paramsFlag, withUsage(requestIDFlag, "request ID for the DAG execution")})
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
@@ -44,7 +44,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	requestID, err := cmd.Flags().GetString("requestID")
+	requestID, err := cmd.Flags().GetString("req")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -87,7 +87,8 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		}
 	}
 
-	logFile, err := setup.openLogFile(ctx, startPrefix, dag, requestID)
+	const logPrefix = "start_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
@@ -110,7 +111,7 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -121,21 +122,21 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		agent.Options{},
 	)
 
-	listenSignals(ctx, agt)
+	listenSignals(ctx, agentInstance)
 
-	if err := agt.Run(ctx); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
 
 		if quiet {
 			os.Exit(1)
 		} else {
-			agt.PrintSummary(ctx)
+			agentInstance.PrintSummary(ctx)
 			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 		}
 	}
 
 	if !quiet {
-		agt.PrintSummary(ctx)
+		agentInstance.PrintSummary(ctx)
 	}
 
 	return nil
