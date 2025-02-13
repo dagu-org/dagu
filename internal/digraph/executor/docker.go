@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-viper/mapstructure/v2"
@@ -63,6 +64,9 @@ type docker struct {
 	// execConfig is configuration for exec in existing container
 	// See https://pkg.go.dev/github.com/docker/docker/api/types/container#ExecOptions
 	execConfig container.ExecOptions
+	// networkConfig is configuration for the container network
+	// See https://pkg.go.dev/github.com/docker/docker@v27.5.1+incompatible/api/types/network#NetworkingConfig
+	networkConfig *network.NetworkingConfig
 }
 
 func (e *docker) SetStdout(out io.Writer) {
@@ -93,9 +97,20 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 	defer cli.Close()
 
+	// Evaluate args
+	stepContext := digraph.GetStepContext(ctx)
+	var args []string
+	for _, arg := range e.step.Args {
+		val, err := stepContext.EvalString(arg)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
+		}
+		args = append(args, val)
+	}
+
 	// If containerName is set, use exec instead of creating a new container
 	if e.containerName != "" {
-		return e.execInContainer(ctx, cli)
+		return e.execInContainer(ctx, cli, args)
 	}
 
 	// New container creation logic
@@ -114,21 +129,10 @@ func (e *docker) Run(ctx context.Context) error {
 		e.containerConfig.Image = e.image
 	}
 
-	// Evaluate args
-	stepContext := digraph.GetStepContext(ctx)
-	var args []string
-	for _, arg := range e.step.Args {
-		val, err := stepContext.EvalString(arg)
-		if err != nil {
-			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
-		}
-		args = append(args, val)
-	}
-
 	e.containerConfig.Cmd = append([]string{e.step.Command}, args...)
 
 	resp, err := cli.ContainerCreate(
-		ctx, e.containerConfig, e.hostConfig, nil, nil, "",
+		ctx, e.containerConfig, e.hostConfig, e.networkConfig, nil, "",
 	)
 	if err != nil {
 		return err
@@ -164,7 +168,7 @@ func (e *docker) Run(ctx context.Context) error {
 	return e.attachAndWait(ctx, cli, resp.ID)
 }
 
-func (e *docker) execInContainer(ctx context.Context, cli *client.Client) error {
+func (e *docker) execInContainer(ctx context.Context, cli *client.Client, args []string) error {
 	// Check if containerInfo exists and is running
 	containerInfo, err := cli.ContainerInspect(ctx, e.containerName)
 	if err != nil {
@@ -183,7 +187,7 @@ func (e *docker) execInContainer(ctx context.Context, cli *client.Client) error 
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
-		Cmd:          append([]string{e.step.Command}, e.step.Args...),
+		Cmd:          append([]string{e.step.Command}, args...),
 		Env:          e.execConfig.Env,
 		WorkingDir:   e.execConfig.WorkingDir,
 	}
@@ -274,6 +278,7 @@ func newDocker(
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
 	execConfig := container.ExecOptions{}
+	networkConfig := &network.NetworkingConfig{}
 	execCfg := step.ExecutorConfig
 	stepContext := digraph.GetStepContext(ctx)
 
@@ -310,6 +315,23 @@ func newDocker(
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
 		*hostConfig = replaced
+	}
+
+	if cfg, ok := execCfg.Config["network"]; ok {
+		md, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+			Result: networkConfig,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create decoder: %w", err)
+		}
+		if err := md.Decode(cfg); err != nil {
+			return nil, fmt.Errorf("failed to decode config: %w", err)
+		}
+		replaced, err := digraph.EvalStringFields(stepContext, *networkConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
+		}
+		*networkConfig = replaced
 	}
 
 	if cfg, ok := execCfg.Config["exec"]; ok {
@@ -358,6 +380,7 @@ func newDocker(
 		stdout:          os.Stdout,
 		containerConfig: containerConfig,
 		hostConfig:      hostConfig,
+		networkConfig:   networkConfig,
 		execConfig:      execConfig,
 		autoRemove:      autoRemove,
 	}
