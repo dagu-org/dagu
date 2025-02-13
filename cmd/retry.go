@@ -13,10 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	retryPrefix = "retry_"
-)
-
 func retryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retry --req=<request-id> /path/to/spec.yaml",
@@ -35,14 +31,7 @@ func retryCmd() *cobra.Command {
 }
 
 func initRetryFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{
-		{
-			name:      "req",
-			shorthand: "r",
-			usage:     "request ID to retry",
-			required:  true,
-		},
-	})
+	initCommonFlags(cmd, []commandLineFlag{withRequired(requestIDFlag)})
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
@@ -113,7 +102,8 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		return fmt.Errorf("failed to generate new request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(ctx, retryPrefix, dag, newRequestID)
+	const logPrefix = "retry_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, newRequestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -135,7 +125,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		newRequestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -146,19 +136,19 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		agent.Options{RetryTarget: &originalStatus.Status},
 	)
 
-	listenSignals(ctx, agt)
+	listenSignals(ctx, agentInstance)
 
-	if err := agt.Run(ctx); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		if quiet {
 			os.Exit(1)
 		} else {
-			agt.PrintSummary(ctx)
+			agentInstance.PrintSummary(ctx)
 			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, newRequestID, err)
 		}
 	}
 
 	if !quiet {
-		agt.PrintSummary(ctx)
+		agentInstance.PrintSummary(ctx)
 	}
 
 	return nil

@@ -28,7 +28,6 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
 
-	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		setup.cfg.Paths.DAGsDir = dagsDir
 	}
@@ -57,7 +56,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	// Start server in main thread
+	// Start server in a goroutine
 	logger.Info(ctx, "Server initialization", "host", setup.cfg.Host, "port", setup.cfg.Port)
 
 	serverErr := make(chan error, 1)
@@ -80,6 +79,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	case <-ctx.Done():
+		logger.Info(ctx, "Context cancelled")
 		return nil
 	}
 
@@ -87,23 +87,5 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 }
 
 func initStartAllFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{
-		{
-			name:      "dags",
-			shorthand: "d",
-			usage:     "location of DAG files (default is $HOME/.config/dagu/dags)",
-		},
-		{
-			name:         "host",
-			shorthand:    "s",
-			defaultValue: defaultHost,
-			usage:        "server host",
-		},
-		{
-			name:         "port",
-			shorthand:    "p",
-			defaultValue: defaultPort,
-			usage:        "server port",
-		},
-	})
+	initCommonFlags(cmd, []commandLineFlag{dagsFlag, hostFlag, portFlag})
 }

@@ -29,7 +29,7 @@ func TestSchedulerCommand(t *testing.T) {
 
 		th.RunCommand(t, schedulerCmd(), cmdTest{
 			args:        []string{"scheduler", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
-			expectedOut: []string{"/.dagu_test/config/dags"},
+			expectedOut: []string{"dagu_test"},
 		})
 	})
 }

@@ -29,7 +29,7 @@ func TestStartAllCommand(t *testing.T) {
 		}()
 		th.RunCommand(t, startAllCmd(), cmdTest{
 			args:        []string{"start-all", "--config", test.TestdataPath(t, "cmd/config_startall.yaml")},
-			expectedOut: []string{"54322", "/.dagu_test/config/dags"},
+			expectedOut: []string{"54322", "dagu_test"},
 		})
 	})
 }

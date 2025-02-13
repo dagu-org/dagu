@@ -16,11 +16,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	restartPrefix    = "restart_"
-	stopPollInterval = 100 * time.Millisecond
-)
-
 func restartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart /path/to/spec.yaml",
@@ -51,15 +46,12 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
-
-	// Load initial DAG configuration
 	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
 	}
 
-	// Handle the restart process
 	if err := handleRestartProcess(ctx, setup, dag, quiet, specFilePath); err != nil {
 		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
@@ -115,7 +107,8 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(ctx, restartPrefix, dag, requestID)
+	const logPrefix = "restart_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
@@ -131,7 +124,7 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -141,12 +134,12 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		setup.historyStore(),
 		agent.Options{Dry: false})
 
-	listenSignals(ctx, agt)
-	if err := agt.Run(ctx); err != nil {
+	listenSignals(ctx, agentInstance)
+	if err := agentInstance.Run(ctx); err != nil {
 		if quiet {
 			os.Exit(1)
 		} else {
-			agt.PrintSummary(ctx)
+			agentInstance.PrintSummary(ctx)
 			return fmt.Errorf("DAG execution failed: %w", err)
 		}
 	}
@@ -170,6 +163,7 @@ func stopDAGIfRunning(ctx context.Context, cli client.Client, dag *digraph.DAG) 
 }
 
 func stopRunningDAG(ctx context.Context, cli client.Client, dag *digraph.DAG) error {
+	const stopPollInterval = 100 * time.Millisecond
 	for {
 		status, err := cli.GetCurrentStatus(ctx, dag)
 		if err != nil {

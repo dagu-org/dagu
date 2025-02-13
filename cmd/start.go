@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const startPrefix = "start_"
-
 func startCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
@@ -31,18 +29,7 @@ func startCmd() *cobra.Command {
 }
 
 func initStartFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{
-		{
-			name:      "params",
-			shorthand: "p",
-			usage:     "parameters to pass to the DAG",
-		},
-		{
-			name:      "req",
-			shorthand: "r",
-			usage:     "specify request ID instead of generating one",
-		},
-	})
+	initCommonFlags(cmd, []commandLineFlag{paramsFlag, withUsage(requestIDFlag, "request ID for the DAG execution")})
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
@@ -100,7 +87,8 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		}
 	}
 
-	logFile, err := setup.openLogFile(ctx, startPrefix, dag, requestID)
+	const logPrefix = "start_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
@@ -123,7 +111,7 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -134,21 +122,21 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		agent.Options{},
 	)
 
-	listenSignals(ctx, agt)
+	listenSignals(ctx, agentInstance)
 
-	if err := agt.Run(ctx); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
 
 		if quiet {
 			os.Exit(1)
 		} else {
-			agt.PrintSummary(ctx)
+			agentInstance.PrintSummary(ctx)
 			return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 		}
 	}
 
 	if !quiet {
-		agt.PrintSummary(ctx)
+		agentInstance.PrintSummary(ctx)
 	}
 
 	return nil

@@ -9,10 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	dryPrefix = "dry_"
-)
-
 func dryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
@@ -25,13 +21,7 @@ func dryCmd() *cobra.Command {
 		RunE: wrapRunE(runDry),
 	}
 
-	initCommonFlags(cmd, []commandLineFlag{
-		{
-			name:      "params",
-			shorthand: "p",
-			usage:     "parameters to pass to the DAG",
-		},
-	})
+	initCommonFlags(cmd, []commandLineFlag{paramsFlag})
 
 	return cmd
 }
@@ -71,7 +61,8 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to generate request ID: %w", err)
 	}
 
-	logFile, err := setup.openLogFile(ctx, dryPrefix, dag, requestID)
+	const logPrefix = "dry_"
+	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -89,7 +80,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	agt := agent.New(
+	agentInstance := agent.New(
 		requestID,
 		dag,
 		filepath.Dir(logFile.Name()),
@@ -100,13 +91,13 @@ func runDry(cmd *cobra.Command, args []string) error {
 		agent.Options{Dry: true},
 	)
 
-	listenSignals(ctx, agt)
+	listenSignals(ctx, agentInstance)
 
-	if err := agt.Run(ctx); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		return fmt.Errorf("failed to execute DAG %s (requestID: %s): %w", dag.Name, requestID, err)
 	}
 
-	agt.PrintSummary(ctx)
+	agentInstance.PrintSummary(ctx)
 
 	return nil
 }

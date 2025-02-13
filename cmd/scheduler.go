@@ -18,13 +18,7 @@ func schedulerCmd() *cobra.Command {
 		RunE: wrapRunE(runScheduler),
 	}
 
-	initCommonFlags(cmd, []commandLineFlag{
-		{
-			name:      "dags",
-			shorthand: "d",
-			usage:     "location of DAG files (default is $HOME/.config/dagu/dags)",
-		},
-	})
+	initCommonFlags(cmd, []commandLineFlag{dagsFlag})
 
 	return cmd
 }
@@ -37,7 +31,6 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
-	// Update DAGs directory if specified
 	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
 		setup.cfg.Paths.DAGsDir = dagsDir
 	}

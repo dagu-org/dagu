@@ -7,11 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	defaultHost = "localhost"
-	defaultPort = "8080"
-)
-
 func serverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "server",
