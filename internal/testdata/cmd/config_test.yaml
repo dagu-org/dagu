@@ -1,3 +1,3 @@
 port: 54321
 headless: true
-dags: ~/.dagu_test/config/dags
+dags: /tmp/.dagu_test/config/dags

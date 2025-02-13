@@ -46,6 +46,7 @@ func registerCommands() {
 
 type commandLineFlag struct {
 	name, shorthand, defaultValue, usage string
+	required                             bool
 }
 
 var configFlag = commandLineFlag{
@@ -59,6 +60,11 @@ func initCommonFlags(cmd *cobra.Command, addFlags []commandLineFlag) {
 	addFlags = append(addFlags, configFlag)
 	for _, flag := range addFlags {
 		cmd.Flags().StringP(flag.name, flag.shorthand, flag.defaultValue, flag.usage)
+		if flag.required {
+			if err := cmd.MarkFlagRequired(flag.name); err != nil {
+				fmt.Printf("failed to mark flag %s as required: %v\n", flag.name, err)
+			}
+		}
 	}
 }
 

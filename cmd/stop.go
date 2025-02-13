@@ -14,8 +14,14 @@ func stopCmd() *cobra.Command {
 		Short: "Stop the running DAG",
 		Long:  `dagu stop /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runStop),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runStop),
 	}
+
+	initCommonFlags(cmd, nil)
+
 	return cmd
 }
 

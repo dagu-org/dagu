@@ -20,7 +20,10 @@ func startCmd() *cobra.Command {
 		Short: "Runs the DAG",
 		Long:  `dagu start /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
-		RunE:  wrapRunE(runStart),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runStart),
 	}
 
 	initStartFlags(cmd)
@@ -28,8 +31,18 @@ func startCmd() *cobra.Command {
 }
 
 func initStartFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("params", "p", "", "parameters")
-	cmd.Flags().StringP("requestID", "r", "", "specify request ID")
+	initCommonFlags(cmd, []commandLineFlag{
+		{
+			name:      "params",
+			shorthand: "p",
+			usage:     "parameters to pass to the DAG",
+		},
+		{
+			name:      "req",
+			shorthand: "r",
+			usage:     "specify request ID instead of generating one",
+		},
+	})
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
@@ -44,7 +57,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	requestID, err := cmd.Flags().GetString("requestID")
+	requestID, err := cmd.Flags().GetString("req")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}

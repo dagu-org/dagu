@@ -22,6 +22,7 @@ func serverCmd() *cobra.Command {
 	}
 
 	initServerFlags(cmd)
+
 	return cmd
 }
 

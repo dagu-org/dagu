@@ -27,8 +27,12 @@ func restartCmd() *cobra.Command {
 		Short: "Stop the running DAG and restart it",
 		Long:  `dagu restart /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runRestart),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runRestart),
 	}
+	initCommonFlags(cmd, nil)
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 	return cmd
 }

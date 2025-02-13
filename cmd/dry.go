@@ -14,13 +14,26 @@ const (
 )
 
 func dryCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
-		RunE:  wrapRunE(runDry),
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, nil)
+		},
+		RunE: wrapRunE(runDry),
 	}
+
+	initCommonFlags(cmd, []commandLineFlag{
+		{
+			name:      "params",
+			shorthand: "p",
+			usage:     "parameters to pass to the DAG",
+		},
+	})
+
+	return cmd
 }
 
 func runDry(cmd *cobra.Command, args []string) error {
@@ -28,8 +41,6 @@ func runDry(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
-
-	cmd.Flags().StringP("params", "p", "", "parameters")
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
