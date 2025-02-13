@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -40,4 +42,34 @@ func registerCommands() {
 	rootCmd.AddCommand(schedulerCmd())
 	rootCmd.AddCommand(retryCmd())
 	rootCmd.AddCommand(startAllCmd())
+}
+
+type commandLineFlag struct {
+	name, shorthand, defaultValue, usage string
+}
+
+var configFlag = commandLineFlag{
+	name:      "config",
+	shorthand: "c",
+	usage:     "config file (default is $HOME/.config/dagu/config.yaml)",
+}
+
+// initCommonFlags initializes common flags for the command
+func initCommonFlags(cmd *cobra.Command, addFlags []commandLineFlag) {
+	addFlags = append(addFlags, configFlag)
+	for _, flag := range addFlags {
+		cmd.Flags().StringP(flag.name, flag.shorthand, flag.defaultValue, flag.usage)
+	}
+}
+
+// bindCommonFlags binds common flags to the command
+func bindCommonFlags(cmd *cobra.Command, addFlags []string) error {
+	flags := []string{"config"}
+	flags = append(flags, addFlags...)
+	for _, flag := range flags {
+		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
+			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
+		}
+	}
+	return nil
 }

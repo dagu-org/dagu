@@ -5,30 +5,21 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func startAllCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "start-all",
-		Short:   "Launches both the Dagu web UI server and the scheduler process.",
-		Long:    `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
-		PreRunE: bindStartAllFlags,
-		RunE:    wrapRunE(runStartAll),
+		Use:   "start-all",
+		Short: "Launches both the Dagu web UI server and the scheduler process.",
+		Long:  `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			return bindCommonFlags(cmd, []string{"dags", "host", "port"})
+		},
+		RunE: wrapRunE(runStartAll),
 	}
 
 	initStartAllFlags(cmd)
 	return cmd
-}
-
-func bindStartAllFlags(cmd *cobra.Command, _ []string) error {
-	flags := []string{"port", "host", "dags", "config"}
-	for _, flag := range flags {
-		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
-			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
-		}
-	}
-	return nil
 }
 
 func runStartAll(cmd *cobra.Command, _ []string) error {
@@ -96,9 +87,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 }
 
 func initStartAllFlags(cmd *cobra.Command) {
-	flags := []struct {
-		name, shorthand, defaultValue, usage string
-	}{
+	initCommonFlags(cmd, []commandLineFlag{
 		{
 			name:      "dags",
 			shorthand: "d",
@@ -116,19 +105,5 @@ func initStartAllFlags(cmd *cobra.Command) {
 			defaultValue: defaultPort,
 			usage:        "server port",
 		},
-		{
-			name:      "config",
-			shorthand: "c",
-			usage:     "config file",
-		},
-	}
-
-	for _, flag := range flags {
-		cmd.Flags().StringP(
-			flag.name,
-			flag.shorthand,
-			flag.defaultValue,
-			flag.usage,
-		)
-	}
+	})
 }

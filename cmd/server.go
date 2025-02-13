@@ -5,7 +5,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -27,13 +26,7 @@ func serverCmd() *cobra.Command {
 }
 
 func bindServerFlags(cmd *cobra.Command, _ []string) error {
-	flags := []string{"port", "host", "dags", "config"}
-	for _, flag := range flags {
-		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
-			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
-		}
-	}
-	return nil
+	return bindCommonFlags(cmd, []string{"port", "host", "dags"})
 }
 
 func runServer(cmd *cobra.Command, _ []string) error {
@@ -59,39 +52,25 @@ func runServer(cmd *cobra.Command, _ []string) error {
 }
 
 func initServerFlags(cmd *cobra.Command) {
-	flags := []struct {
-		name, shorthand, defaultValue, usage string
-	}{
-		{
-			name:      "dags",
-			shorthand: "d",
-			usage:     "location of DAG files (default is $HOME/.config/dagu/dags)",
+	initCommonFlags(cmd,
+		[]commandLineFlag{
+			{
+				name:      "dags",
+				shorthand: "d",
+				usage:     "location of DAG files (default is $HOME/.config/dagu/dags)",
+			},
+			{
+				name:         "host",
+				shorthand:    "s",
+				defaultValue: defaultHost,
+				usage:        "server host",
+			},
+			{
+				name:         "port",
+				shorthand:    "p",
+				defaultValue: defaultPort,
+				usage:        "server port",
+			},
 		},
-		{
-			name:         "host",
-			shorthand:    "s",
-			defaultValue: defaultHost,
-			usage:        "server host",
-		},
-		{
-			name:         "port",
-			shorthand:    "p",
-			defaultValue: defaultPort,
-			usage:        "server port",
-		},
-		{
-			name:      "config",
-			shorthand: "c",
-			usage:     "config file",
-		},
-	}
-
-	for _, flag := range flags {
-		cmd.Flags().StringP(
-			flag.name,
-			flag.shorthand,
-			flag.defaultValue,
-			flag.usage,
-		)
-	}
+	)
 }
