@@ -53,17 +53,22 @@ func TestAgent_Run(t *testing.T) {
 		th := test.Setup(t)
 		dag := th.DAG(t, "agent/is_running.yaml")
 		dagAgent := dag.Agent()
+		done := make(chan struct{})
 
 		go func() {
 			// Run the DAG in the background so that it is running
 			dagAgent.RunSuccess(t)
+			close(done)
 		}()
 
 		dag.AssertCurrentStatus(t, scheduler.StatusRunning)
 
 		// Try to run the DAG again while it is running
-		dagAgent = dag.Agent()
-		dagAgent.RunCheckErr(t, "is already running")
+		dagAgent2 := dag.Agent()
+		dagAgent2.RunCheckErr(t, "is already running")
+
+		// Wait for the DAG to finish
+		<-done
 	})
 	t.Run("PreConditionNotMet", func(t *testing.T) {
 		th := test.Setup(t)

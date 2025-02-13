@@ -147,9 +147,12 @@ func (svr *Server) Serve(ctx context.Context) (err error) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
-		<-sig
+		select {
+		case <-serverCtx.Done():
+		case <-sig:
+			serverStopCtx()
+		}
 		_ = svr.server.Shutdown()
-		serverStopCtx()
 	}()
 
 	// Run with or without TLS

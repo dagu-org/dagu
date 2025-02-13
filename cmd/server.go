@@ -17,8 +17,8 @@ func serverCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "server",
 		Short:   "Start the server",
-		Long:    `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>]`,
-		PreRunE: bindFlags,
+		Long:    `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>] [--config=<config file>]`,
+		PreRunE: bindServerFlags,
 		RunE:    wrapRunE(runServer),
 	}
 
@@ -26,8 +26,8 @@ func serverCmd() *cobra.Command {
 	return cmd
 }
 
-func bindFlags(cmd *cobra.Command, _ []string) error {
-	flags := []string{"port", "host", "dags"}
+func bindServerFlags(cmd *cobra.Command, _ []string) error {
+	flags := []string{"port", "host", "dags", "config"}
 	for _, flag := range flags {
 		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
 			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
@@ -51,7 +51,7 @@ func runServer(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
-	if err := server.Serve(cmd.Context()); err != nil {
+	if err := server.Serve(ctx); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 
@@ -78,6 +78,11 @@ func initServerFlags(cmd *cobra.Command) {
 			shorthand:    "p",
 			defaultValue: defaultPort,
 			usage:        "server port",
+		},
+		{
+			name:      "config",
+			shorthand: "c",
+			usage:     "config file",
 		},
 	}
 

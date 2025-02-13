@@ -99,6 +99,10 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		helper.Context = logger.WithFixedLogger(helper.Context, loggerInstance)
 	}
 
+	ctx, cancel := context.WithCancel(helper.Context)
+	helper.Context = ctx
+	helper.Cancel = cancel
+
 	// setup the default shell for reproducible result
 	setShell(t, "sh")
 
@@ -109,6 +113,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 // Helper provides test utilities and configuration
 type Helper struct {
 	Context       context.Context
+	Cancel        context.CancelFunc
 	Config        *config.Config
 	LoggingOutput *SyncBuffer
 	Client        client.Client
@@ -120,6 +125,9 @@ type Helper struct {
 
 // Cleanup removes temporary test directories
 func (h Helper) Cleanup() {
+	if h.Cancel != nil {
+		h.Cancel()
+	}
 	_ = os.RemoveAll(h.tmpDir)
 }
 
