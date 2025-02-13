@@ -8,6 +8,9 @@ on:
         required: true
         type: string
 
+env:
+  SNAPCRAFT_STORE_CREDENTIALS: ${{secrets.SNAPCRAFT_TOKEN}}
+
 jobs:
   # Build release binaries
   goreleaser:
