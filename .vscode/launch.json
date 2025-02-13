@@ -28,15 +28,23 @@
             ]
         },
         {
-            "name": "Hello World",
+            "name": "Start",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/cmd/",
             "args": [
                 "start",
-                "${workspaceFolder}/examples/hello_world.yaml"
+                "${input:pathToSpec}"
             ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "pathToSpec",
+            "type": "promptString",
+            "description": "Enter the path to the spec file",
+            "default": "${workspaceFolder}/examples/hello_world.yaml"
         }
     ]
 }
