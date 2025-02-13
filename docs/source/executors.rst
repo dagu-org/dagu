@@ -71,10 +71,30 @@ For example:
             autoRemove: true
         command: echo "${FOO}"
 
+The container's network can be configured as well.
+
+.. code-block:: yaml
+
+    steps:
+      - name: hello
+        executor:
+          type: docker
+          config:
+            image: alpine
+            pull: false
+            network:
+              EndpointsConfig:
+                my-network:
+                  Aliases:
+                    - my-alias
+            autoRemove: true
+        command: echo "hello"
+
 See the Docker's API documentation for all available options.
 
 - For `container`, see `ContainerConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#Config>`_.
 - For `host`, see `HostConfig <https://pkg.go.dev/github.com/docker/docker/api/types/container#HostConfig>`_.
+- For `network`, see `NetworkingConfig <https://pkg.go.dev/github.com/docker/docker/api/types/network#NetworkingConfig>`_.
 
 Execute Commands in Existing Containers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
