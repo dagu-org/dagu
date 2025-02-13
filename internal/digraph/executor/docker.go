@@ -141,11 +141,6 @@ func (e *docker) Run(ctx context.Context) error {
 	}
 	containerConfig.Env = env
 
-	logger.Info(ctx, "environment variables", "env", e.containerConfig.Env)
-	for _, env := range e.containerConfig.Env {
-		logger.Info(ctx, "docker executor: env", "env", env)
-	}
-
 	resp, err := cli.ContainerCreate(
 		ctx, &containerConfig, e.hostConfig, e.networkConfig, nil, "",
 	)
