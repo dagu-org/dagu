@@ -66,6 +66,7 @@ For example:
             host:
               binds:
                 - /app:/app
+            container:
               env:
                 - FOO=BAR
             autoRemove: true
@@ -89,6 +90,25 @@ The container's network can be configured as well.
                     - my-alias
             autoRemove: true
         command: echo "hello"
+
+Note that the environment variables of the host (where `dagu` is running) will not be passed to `docker` executor automatically but you can explicitly tell `dagu` to pass the environment like below example. This is particularly useful when combining with `dotenv`.
+
+.. code-block:: yaml
+
+    env:
+      - TEST_ENV: test_value
+    steps:
+      - name: hello
+        executor:
+          type: docker
+          config:
+            image: alpine
+            pull: false
+            container:
+              env:
+                - TEST_ENV=${TEST_ENV}
+            autoRemove: true
+        command: printenv
 
 See the Docker's API documentation for all available options.
 
