@@ -6,6 +6,9 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+-*"
 
+env:
+  SNAPCRAFT_STORE_CREDENTIALS: ${{secrets.SNAPCRAFT_TOKEN}}
+
 jobs:
   # Build release binaries
   goreleaser:
