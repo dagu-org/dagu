@@ -22,7 +22,7 @@ func startAllCmd() *cobra.Command {
 }
 
 func bindStartAllFlags(cmd *cobra.Command, _ []string) error {
-	flags := []string{"port", "host", "dags"}
+	flags := []string{"port", "host", "dags", "config"}
 	for _, flag := range flags {
 		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
 			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
@@ -89,7 +89,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil
 	}
 
 	return nil
@@ -115,6 +115,11 @@ func initStartAllFlags(cmd *cobra.Command) {
 			shorthand:    "p",
 			defaultValue: defaultPort,
 			usage:        "server port",
+		},
+		{
+			name:      "config",
+			shorthand: "c",
+			usage:     "config file",
 		},
 	}
 

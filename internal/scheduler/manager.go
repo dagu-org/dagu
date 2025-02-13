@@ -121,6 +121,7 @@ func (m *dagJobManager) initialize(ctx context.Context) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	logger.Info(ctx, "Loading DAGs", "dir", m.targetDir)
 	fis, err := os.ReadDir(m.targetDir)
 	if err != nil {
 		return err
@@ -139,7 +140,7 @@ func (m *dagJobManager) initialize(ctx context.Context) error {
 		}
 	}
 
-	logger.Info(ctx, "Scheduler initialized", "dags", strings.Join(dags, ","))
+	logger.Info(ctx, "DAGs loaded", "dags", strings.Join(dags, ","))
 	return nil
 }
 

@@ -5,15 +5,11 @@ import (
 
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
 	// version is set at build time
 	version = "0.0.0"
-
-	cfgFile string
-
 	rootCmd = &cobra.Command{
 		Use:   build.Slug,
 		Short: "YAML-based DAG scheduling tool.",
@@ -31,18 +27,6 @@ func init() {
 	build.Version = version
 
 	registerCommands()
-
-	rootCmd.PersistentFlags().
-		StringVar(
-			&cfgFile, "config", "",
-			"config file (default is $HOME/.config/dagu/config.yaml)",
-		)
-
-	cobra.OnInitialize(func() {
-		if cfgFile != "" {
-			viper.SetConfigFile(cfgFile)
-		}
-	})
 }
 
 func registerCommands() {

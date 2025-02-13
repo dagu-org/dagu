@@ -10,21 +10,26 @@ import (
 
 func schedulerCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "scheduler",
-		Short: "Start the scheduler",
-		Long:  `dagu scheduler [--dags=<DAGs dir>]`,
-		RunE:  wrapRunE(runScheduler),
+		Use:     "scheduler",
+		Short:   "Start the scheduler",
+		Long:    `dagu scheduler [--dags=<DAGs dir>] [--config=<config file>]`,
+		PreRunE: bindSchedulerFlags,
+		RunE:    wrapRunE(runScheduler),
 	}
 
-	cmd.Flags().StringP(
-		"dags",
-		"d",
-		"",
-		"location of DAG files (default is $HOME/.config/dagu/dags)",
-	)
-	_ = viper.BindPFlag("dags", cmd.Flags().Lookup("dags"))
-
+	cmd.Flags().StringP("dags", "d", "", "location of DAG files (default is $HOME/.config/dagu/dags)")
+	cmd.Flags().StringP("config", "c", "", "config file (default is $HOME/.config/dagu/config.yaml)")
 	return cmd
+}
+
+func bindSchedulerFlags(cmd *cobra.Command, _ []string) error {
+	flags := []string{"dags", "config"}
+	for _, flag := range flags {
+		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
+			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
+		}
+	}
+	return nil
 }
 
 func runScheduler(cmd *cobra.Command, _ []string) error {
