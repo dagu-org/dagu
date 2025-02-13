@@ -27,6 +27,9 @@ builds:
       - "6"
       - "7"
 
+release:
+  mode: keep-existing
+
 checksum:
   name_template: "checksums.txt"
 
