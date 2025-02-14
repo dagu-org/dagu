@@ -27,7 +27,7 @@ func TestBuild(t *testing.T) {
 		t.Parallel()
 
 		th := testLoad(t, "params_with_substitution.yaml")
-		th.AssertParam(t, "x", "x")
+		th.AssertParam(t, "1=x", "2=x")
 	})
 	t.Run("ParamsWithQuotedValues", func(t *testing.T) {
 		t.Parallel()
@@ -62,7 +62,7 @@ func TestBuild(t *testing.T) {
 
 		th := testLoad(t, "params_with_complex_values.yaml")
 		th.AssertParam(t,
-			"first",
+			"1=first",
 			"P1=foo",
 			"P2=TEXT",
 			"P3=BAR",

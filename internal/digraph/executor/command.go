@@ -50,7 +50,12 @@ func (e *commandExecutor) Run(ctx context.Context) error {
 			_ = os.Remove(scriptFile)
 		}()
 	}
-	e.cmd = e.config.newCmd(ctx, e.scriptFile)
+	cmd, err := e.config.newCmd(ctx, e.scriptFile)
+	if err != nil {
+		e.mu.Unlock()
+		return fmt.Errorf("failed to create command: %w", err)
+	}
+	e.cmd = cmd
 
 	if err := e.cmd.Start(); err != nil {
 		e.exitCode = exitCodeFromError(err)
@@ -98,7 +103,9 @@ type commandConfig struct {
 	Stderr           io.Writer
 }
 
-func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) *exec.Cmd {
+func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) (*exec.Cmd, error) {
+	stepContext := digraph.GetStepContext(ctx)
+
 	var cmd *exec.Cmd
 	switch {
 	case cfg.ShellCommand != "" && scriptFile != "":
@@ -112,11 +119,19 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) *exec.C
 		cmd = exec.CommandContext(cfg.Ctx, cfg.ShellCommand, "-c", cfg.ShellCommandArgs)
 
 	default:
-		cmd = createDirectCommand(cfg.Ctx, cfg.Command, cfg.Args, scriptFile)
+		args := make([]string, len(cfg.Args))
+		for i, arg := range cfg.Args {
+			arg, err := cmdutil.EvalString(cfg.Ctx, arg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to evaluate command args: %w", err)
+			}
+			args[i] = arg
+		}
+
+		cmd = createDirectCommand(cfg.Ctx, cfg.Command, args, scriptFile)
 
 	}
 
-	stepContext := digraph.GetStepContext(ctx)
 	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
 	cmd.Dir = cfg.Dir
 	cmd.Stdout = cfg.Stdout
@@ -126,7 +141,7 @@ func (cfg *commandConfig) newCmd(ctx context.Context, scriptFile string) *exec.C
 		Pgid:    0,
 	}
 
-	return cmd
+	return cmd, nil
 }
 
 func init() {
@@ -175,7 +190,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 	}, nil
 }
 
-func setupScript(_ context.Context, step digraph.Step) (string, error) {
+func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 	file, err := os.CreateTemp(step.Dir, "dagu_script-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
@@ -184,7 +199,13 @@ func setupScript(_ context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	if _, err = file.WriteString(step.Script); err != nil {
+	stepContext := digraph.GetStepContext(ctx)
+	script, err := stepContext.EvalString(step.Script, cmdutil.OnlyReplaceVars())
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate script: %w", err)
+	}
+
+	if _, err = file.WriteString(script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 

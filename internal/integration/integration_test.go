@@ -46,6 +46,26 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name: "PositionalParams",
+			dag:  "positional-params.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"$1 is foo",
+					"$2 is bar",
+				},
+			},
+		},
+		{
+			name: "PositionalParams",
+			dag:  "positional-params-script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"$1 is foo",
+					"$2 is bar",
+				},
+			},
+		},
+		{
 			name: "Script",
 			dag:  "script.yaml",
 			expectedOutputs: map[string]any{
@@ -68,10 +88,20 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
-			name: "EnvironmentVar",
+			name: "EnvVar",
 			dag:  "environment-var.yaml",
 			expectedOutputs: map[string]any{
 				"OUT1": "foo",
+			},
+		},
+		{
+			name: "EnvScript",
+			dag:  "env-script.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"E1 is foo",
+					"E2 is bar",
+				},
 			},
 		},
 		{
@@ -83,6 +113,20 @@ func TestIntegration(t *testing.T) {
 				"OUT3": test.NotEmpty{},
 				"OUT4": test.NotEmpty{},
 				"OUT5": test.NotEmpty{},
+			},
+		},
+		{
+			name: "JQ",
+			dag:  "jq.yaml",
+			expectedOutputs: map[string]any{
+				"NAME": `"John"`,
+			},
+		},
+		{
+			name: "JsonVar",
+			dag:  "json_var.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "Starting server at localhost:8080",
 			},
 		},
 		{

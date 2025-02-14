@@ -1,0 +1,7 @@
+params: "foo bar"
+
+steps:
+  - name: step 1
+    output: OUT1
+    script: |
+      echo '$1' is $1, '$2' is ${2}

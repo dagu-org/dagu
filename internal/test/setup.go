@@ -230,6 +230,14 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 			case string:
 				assert.Equal(t, fmt.Sprintf("%s=%s", key, expected), actual)
 
+			case Contains:
+				assert.Contains(t, actual, string(expected), "expected output %q to include %q", key, expected)
+
+			case []Contains:
+				for _, c := range expected {
+					assert.Contains(t, actual, string(c), "expected output %q to include %q", key, c)
+				}
+
 			case NotEmpty:
 				parts := strings.SplitN(actual, "=", 2)
 				assert.Len(t, parts, 2, "expected output %q to be in the form key=value", key)
@@ -246,6 +254,8 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 }
 
 type NotEmpty struct{}
+
+type Contains string
 
 type AgentOption func(*Agent)
 

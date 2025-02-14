@@ -3,6 +3,7 @@ package digraph
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/dagu-org/dagu/internal/cmdutil"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -50,24 +51,43 @@ func (c Context) EvalString(s string, opts ...cmdutil.EvalOption) (string, error
 	return cmdutil.EvalString(c.ctx, s, opts...)
 }
 
-func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string) context.Context {
+func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string, params []string) context.Context {
+	var envs = map[string]string{
+		EnvKeySchedulerLogPath: logFile,
+		EnvKeyRequestID:        requestID,
+		EnvKeyDAGName:          dag.Name,
+	}
+	for _, param := range params {
+		parts := strings.SplitN(param, "=", 2)
+		if len(parts) != 2 {
+			logger.Error(ctx, "invalid parameter: %s", param)
+			continue
+		}
+		envs[parts[0]] = parts[1]
+	}
+
 	return context.WithValue(ctx, ctxKey{}, Context{
 		ctx:    ctx,
 		dag:    dag,
 		client: client,
-		envs: map[string]string{
-			EnvKeySchedulerLogPath: logFile,
-			EnvKeyRequestID:        requestID,
-			EnvKeyDAGName:          dag.Name,
-		},
+		envs:   envs,
 	})
 }
 
 func GetContext(ctx context.Context) Context {
-	contextValue, ok := ctx.Value(ctxKey{}).(Context)
+	value := ctx.Value(ctxKey{})
+	if value == nil {
+		logger.Error(ctx, "failed to get the DAG context")
+		return Context{
+			ctx: ctx,
+		}
+	}
+	contextValue, ok := value.(Context)
 	if !ok {
 		logger.Error(ctx, "failed to get the DAG context")
-		return Context{}
+		return Context{
+			ctx: ctx,
+		}
 	}
 	return contextValue
 }

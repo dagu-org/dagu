@@ -1,0 +1,12 @@
+steps:
+  - name: extract value
+    executor: jq
+    command: .user.name # Get user name from JSON
+    output: NAME
+    script: |
+      {
+        "user": {
+          "name": "John",
+          "age": 30
+        }
+      }
