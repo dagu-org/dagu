@@ -97,7 +97,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG execution
 	dbClient := newDBClient(a.historyStore, a.dagStore)
-	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile, a.dag.Params)
 
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
@@ -359,7 +359,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 

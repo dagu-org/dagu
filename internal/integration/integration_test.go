@@ -46,6 +46,16 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name: "PositionalParams",
+			dag:  "positional-params.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": []test.Contains{
+					"$1 is foo",
+					"$2 is bar",
+				},
+			},
+		},
+		{
 			name: "Script",
 			dag:  "script.yaml",
 			expectedOutputs: map[string]any{

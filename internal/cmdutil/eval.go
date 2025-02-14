@@ -211,13 +211,13 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 	//   group 2 => .bar.baz (the path portion)
 	// Explanation:
 	//   \${            matches literal ${
-	//   ([A-Za-z_]\w*) captures a variable name starting with letter/underscore
+	//   ([A-Za-z0-9_]\w*) captures a variable name starting with letter/underscore
 	//   (              start capture for the path
 	//     \.[^}]+      match a '.' then anything up to a '}', allowing dot notation
 	//   )              end capture group for path
 	//   }              matches literal }
 	//
-	re := regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Za-z_]\w*)(\.[^\s]+)`)
+	re := regexp.MustCompile(`\$\{([A-Za-z0-9_]\w*)(\.[^}]+)\}|\$([A-Za-z0-9_]\w*)(\.[^\s]+)`)
 
 	// We'll do a "ReplaceAllStringFunc" approach. For each match, we parse out the JSON path.
 	result := re.ReplaceAllStringFunc(input, func(match string) string {
@@ -290,10 +290,14 @@ func ExpandReferences(ctx context.Context, input string, dataMap map[string]stri
 }
 
 func replaceVars(template string, vars map[string]string) string {
-	re := regexp.MustCompile(`\$\{([^}]+)\}|\$([a-zA-Z_][a-zA-Z0-9_]*)`)
+	re := regexp.MustCompile(`[']{0,1}\$\{([^}]+)\}[']{0,1}|[']{0,1}\$([a-zA-Z0-9_][a-zA-Z0-9_]*)[']{0,1}`)
 
 	return re.ReplaceAllStringFunc(template, func(match string) string {
 		var key string
+		if match[0] == '\'' && match[len(match)-1] == '\'' {
+			// If the match is surrounded by single quotes, leave it as-is
+			return match
+		}
 		if strings.HasPrefix(match, "${") {
 			key = match[2 : len(match)-1]
 		} else {

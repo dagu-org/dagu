@@ -18,17 +18,17 @@ func TestStartCommand(t *testing.T) {
 		{
 			name:        "StartDAGWithDefaultParams",
 			args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location},
-			expectedOut: []string{`params="[p1 p2]"`},
+			expectedOut: []string{`params="[1=p1 2=p2]"`},
 		},
 		{
 			name:        "StartDAGWithParams",
 			args:        []string{"start", `--params="p3 p4"`, th.DAG(t, "cmd/start_with_params.yaml").Location},
-			expectedOut: []string{`params="[p3 p4]"`},
+			expectedOut: []string{`params="[1=p3 2=p4]"`},
 		},
 		{
 			name:        "StartDAGWithParamsAfterDash",
 			args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location, "--", "p5", "p6"},
-			expectedOut: []string{`params="[p5 p6]"`},
+			expectedOut: []string{`params="[1=p5 2=p6]"`},
 		},
 	}
 

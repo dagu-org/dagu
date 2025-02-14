@@ -136,6 +136,10 @@ func parseParams(ctx BuildContext, value any, params *[]paramPair, envs *[]strin
 				return wrapError("params", paramString, fmt.Errorf("failed to set environment variable: %w", err))
 			}
 		}
+
+		if paramPair.Name == "" {
+			(*params)[index].Name = strconv.Itoa(index + 1)
+		}
 	}
 
 	return nil

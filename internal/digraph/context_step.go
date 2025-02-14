@@ -61,6 +61,8 @@ func (c StepContext) MailerConfig() (mailer.Config, error) {
 }
 
 func (c StepContext) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
+	dagContext := GetContext(c.ctx)
+	opts = append(opts, cmdutil.WithVariables(dagContext.envs))
 	opts = append(opts, cmdutil.WithVariables(c.envs))
 	opts = append(opts, cmdutil.WithVariables(c.outputVariables.Variables()))
 	return cmdutil.EvalString(c.ctx, s, opts...)
@@ -95,6 +97,7 @@ func GetStepContext(ctx context.Context) StepContext {
 	if !ok {
 		return NewStepContext(ctx, Step{})
 	}
+	contextValue.ctx = ctx
 	return contextValue
 }
 
