@@ -190,7 +190,7 @@ func createCommandConfig(ctx context.Context, step digraph.Step) (*commandConfig
 	}, nil
 }
 
-func setupScript(_ context.Context, step digraph.Step) (string, error) {
+func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 	file, err := os.CreateTemp(step.Dir, "dagu_script-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
@@ -199,7 +199,13 @@ func setupScript(_ context.Context, step digraph.Step) (string, error) {
 		_ = file.Close()
 	}()
 
-	if _, err = file.WriteString(step.Script); err != nil {
+	stepContext := digraph.GetStepContext(ctx)
+	script, err := stepContext.EvalString(step.Script, cmdutil.OnlyReplaceVars())
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate script: %w", err)
+	}
+
+	if _, err = file.WriteString(script); err != nil {
 		return "", fmt.Errorf("failed to write script to file: %w", err)
 	}
 
