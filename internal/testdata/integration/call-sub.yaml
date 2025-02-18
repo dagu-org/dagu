@@ -1,6 +1,6 @@
 steps:
   - name: step1
-    run: /Users/hamadayouta/dev/dagu/internal/testdata/integration/sub.yaml
+    run: sub
     params: "P1=foo"
     output: OUT1
   - name: step2
