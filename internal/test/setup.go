@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -64,6 +65,9 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	random := uuid.New().String()
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
+
+	root := getProjectRoot(t)
+	os.Setenv("DAGU_EXECUTABLE", path.Join(root, ".local", "bin", "dagu"))
 
 	cfg, err := config.Load()
 	require.NoError(t, err)

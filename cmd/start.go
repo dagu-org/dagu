@@ -44,7 +44,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	requestID, err := cmd.Flags().GetString("req")
+	requestID, err := cmd.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}

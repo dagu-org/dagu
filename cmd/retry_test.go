@@ -30,7 +30,7 @@ func TestRetryCommand(t *testing.T) {
 		requestID := status.Status.RequestID
 
 		// Retry with the request ID.
-		args = []string{"retry", fmt.Sprintf("--req=%s", requestID), dagFile.Location}
+		args = []string{"retry", fmt.Sprintf("--request-id=%s", requestID), dagFile.Location}
 		th.RunCommand(t, retryCmd(), cmdTest{
 			args:        args,
 			expectedOut: []string{`[1=foo]`},

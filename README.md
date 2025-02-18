@@ -259,7 +259,7 @@ dagu start <file or DAG name> [-- value1 value2 ...]
 dagu status <file or DAG name>
 
 # Re-runs the specified DAG run
-dagu retry --req=<request-id> <file or DAG name>
+dagu retry --request-id=<request-id> <file or DAG name>
 
 # Stops the DAG execution
 dagu stop <file or DAG name>

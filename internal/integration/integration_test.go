@@ -88,6 +88,13 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name: "CallSubWorkflow",
+			dag:  "call-sub.yaml",
+			expectedOutputs: map[string]any{
+				"OUT2": "foo",
+			},
+		},
+		{
 			name: "EnvVar",
 			dag:  "environment-var.yaml",
 			expectedOutputs: map[string]any{
