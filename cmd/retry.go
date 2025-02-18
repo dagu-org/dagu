@@ -15,9 +15,9 @@ import (
 
 func retryCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "retry --req=<request-id> /path/to/spec.yaml",
+		Use:   "retry --request-id=<request-id> /path/to/spec.yaml",
 		Short: "Retry the DAG execution",
-		Long:  `dagu retry --req=<request-id> /path/to/spec.yaml`,
+		Long:  `dagu retry --request-id=<request-id> /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return bindCommonFlags(cmd, nil)
@@ -47,7 +47,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	requestID, err := cmd.Flags().GetString("req")
+	requestID, err := cmd.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}

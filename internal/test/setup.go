@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -31,23 +32,25 @@ import (
 )
 
 var setupLock sync.Mutex
-var executablePath string
-
-func init() {
-	executablePath = filepath.Join(fileutil.MustGetwd(), "../../.local/bin/dagu")
-}
 
 // TestHelperOption defines functional options for Helper
 type TestHelperOption func(*TestOptions)
 
 type TestOptions struct {
 	CaptureLoggingOutput bool // CaptureLoggingOutput enables capturing of logging output
+	DAGsDir              string
 }
 
 // WithCaptureLoggingOutput creates a logging capture option
 func WithCaptureLoggingOutput() TestHelperOption {
 	return func(opts *TestOptions) {
 		opts.CaptureLoggingOutput = true
+	}
+}
+
+func WithDAGsDir(dir string) TestHelperOption {
+	return func(opts *TestOptions) {
+		opts.DAGsDir = dir
 	}
 }
 
@@ -65,11 +68,18 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 	tmpDir := fileutil.MustTempDir(fmt.Sprintf("dagu-test-%s", random))
 	require.NoError(t, os.Setenv("DAGU_HOME", tmpDir))
 
+	root := getProjectRoot(t)
+	executablePath := path.Join(root, ".local", "bin", "dagu")
+	os.Setenv("DAGU_EXECUTABLE", executablePath)
+
 	cfg, err := config.Load()
 	require.NoError(t, err)
 
 	cfg.Paths.Executable = executablePath
 	cfg.Paths.LogDir = filepath.Join(tmpDir, "logs")
+	if options.DAGsDir != "" {
+		cfg.Paths.DAGsDir = options.DAGsDir
+	}
 
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
 	historyStore := jsondb.New(cfg.Paths.DataDir)

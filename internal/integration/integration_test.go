@@ -88,6 +88,13 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name: "CallSubWorkflow",
+			dag:  "call-sub.yaml",
+			expectedOutputs: map[string]any{
+				"OUT2": "foo",
+			},
+		},
+		{
 			name: "EnvVar",
 			dag:  "environment-var.yaml",
 			expectedOutputs: map[string]any{
@@ -141,7 +148,7 @@ func TestIntegration(t *testing.T) {
 		},
 	}
 
-	th := test.Setup(t)
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dag := th.DAG(t, filepath.Join("integration", tc.dag))

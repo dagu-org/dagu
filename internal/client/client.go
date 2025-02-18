@@ -156,7 +156,7 @@ func (e *client) Restart(_ context.Context, dag *digraph.DAG, opts RestartOption
 
 func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) error {
 	args := []string{"retry"}
-	args = append(args, fmt.Sprintf("--req=%s", requestID))
+	args = append(args, fmt.Sprintf("--request-id=%s", requestID))
 	args = append(args, dag.Location)
 	// nolint:gosec
 	cmd := exec.Command(e.executable, args...)

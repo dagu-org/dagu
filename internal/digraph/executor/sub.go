@@ -25,12 +25,12 @@ type subWorkflow struct {
 	writer    io.Writer
 }
 
-var errWorkingDirNotExist = fmt.Errorf("working directory does not exist")
+var ErrWorkingDirNotExist = fmt.Errorf("working directory does not exist")
 
 func newSubWorkflow(
 	ctx context.Context, step digraph.Step,
 ) (Executor, error) {
-	executable, err := os.Executable()
+	executable, err := executablePath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
@@ -62,7 +62,7 @@ func newSubWorkflow(
 
 	args := []string{
 		"start",
-		fmt.Sprintf("--requestID=%s", requestID),
+		fmt.Sprintf("--request-id=%s", requestID),
 		"--quiet",
 		subDAG.Location,
 	}
@@ -74,7 +74,7 @@ func newSubWorkflow(
 
 	cmd := exec.CommandContext(ctx, executable, args...)
 	if len(step.Dir) > 0 && !fileutil.FileExists(step.Dir) {
-		return nil, errWorkingDirNotExist
+		return nil, ErrWorkingDirNotExist
 	}
 	cmd.Dir = step.Dir
 	cmd.Env = append(cmd.Env, stepContext.AllEnvs()...)
@@ -151,4 +151,15 @@ func generateRequestID() (string, error) {
 		return "", err
 	}
 	return id.String(), nil
+}
+
+func executablePath() (string, error) {
+	if os.Getenv("DAGU_EXECUTABLE") != "" {
+		return os.Getenv("DAGU_EXECUTABLE"), nil
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	return executable, nil
 }

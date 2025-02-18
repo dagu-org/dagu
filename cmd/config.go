@@ -47,7 +47,7 @@ var (
 		usage:     "parameters to pass to the DAG",
 	}
 	requestIDFlag = commandLineFlag{
-		name:      "req",
+		name:      "request-id",
 		shorthand: "r",
 		usage:     "request ID",
 	}
