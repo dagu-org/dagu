@@ -147,6 +147,122 @@ func TestConfigLoader_Load(t *testing.T) {
 
 	tests := []testCase{
 		{
+			name: "Defaults",
+			data: `
+dagsDir: "/dags"
+logsDir: "/logs"
+dataDir: "/data"
+suspendFlagsDir: "/suspend"
+adminLogsDir: "/admin/logs"
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				UI: UI{
+					NavbarTitle:           "Dagu",
+					MaxDashboardPageLimit: 100,
+					LogEncodingCharset:    "utf-8",
+				},
+			},
+		},
+		{
+			name: "TopLevelFields",
+			data: `
+dagsDir: "/dags"
+logsDir: "/logs"
+dataDir: "/data"
+suspendFlagsDir: "/suspend"
+adminLogsDir: "/admin/logs"
+baseConfig: "/base.yaml"
+BasePath: "/proxy"
+APIBasePath: "/proxy/api/v1"
+WorkDir: "/work"
+Headless: true
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/proxy/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				BasePath:    "/proxy",
+				WorkDir:     "/work",
+				Headless:    true,
+				UI: UI{
+					NavbarTitle:           "Dagu",
+					MaxDashboardPageLimit: 100,
+					LogEncodingCharset:    "utf-8",
+				},
+			},
+		},
+		{
+			name: "Auth",
+			data: `
+dagsDir: "/dags"
+logsDir: "/logs"
+dataDir: "/data"
+suspendFlagsDir: "/suspend"
+adminLogsDir: "/admin/logs"
+auth:
+  basic:
+    enabled: true
+    username: "admin"	
+    password: "password"
+  token:
+    enabled: true
+    value: "abc123"
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				UI: UI{
+					NavbarTitle:           "Dagu",
+					MaxDashboardPageLimit: 100,
+					LogEncodingCharset:    "utf-8",
+				},
+				Auth: Auth{
+					Basic: AuthBasic{
+						Enabled:  true,
+						Username: "admin",
+						Password: "password",
+					},
+					Token: AuthToken{
+						Enabled: true,
+						Value:   "abc123",
+					},
+				},
+			},
+		},
+		{
+			name: "UI",
+			data: `
+ui:
+  logEncodingCharset: "shift-jis"
+  navbarColor: "#FF0000"
+  navbarTitle: "Test Dashboard"
+  maxDashboardPageLimit: 50
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				UI: UI{
+					NavbarTitle:           "Test Dashboard",
+					NavbarColor:           "#FF0000",
+					MaxDashboardPageLimit: 50,
+					LogEncodingCharset:    "shift-jis",
+				},
+			},
+		},
+		{
 			name: "LoadFromEnv",
 			data: `
 host: "127.0.0.1"
@@ -206,7 +322,9 @@ ui:
 				os.Unsetenv("DAGU_TZ")
 			})
 
-			tc.setup(t)
+			if tc.setup != nil {
+				tc.setup(t)
+			}
 
 			configDir := filepath.Join(tmpDir, ".config", "dagu")
 			err = os.MkdirAll(configDir, 0755)
