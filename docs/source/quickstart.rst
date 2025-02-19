@@ -29,6 +29,22 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
     steps:
       - name: Hello world
         command: echo Hello $NAME
+
+      - name: Simulate unclean Command Output
+        command: |
+          cat <<EOF
+          INFO: Starting process...
+          DEBUG: Initializing variables...
+          DATA: User count is 42
+          INFO: Process completed successfully.
+          EOF
+        output: raw_output
+    
+      - name: Extract Relevant Data
+        command: |
+          echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
+        output: cleaned_data
+
       - name: Done
         command: echo Done!
         depends:
@@ -38,3 +54,10 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
 -------------------
 
 You can execute the example by pressing the `Start` button.
+
+5. Next Steps
+--------------
+
+Check out the [examples](https://github.com/dagu-org/dagu/tree/main/examples) to learn more
+
+
