@@ -58,6 +58,6 @@ You can execute the example by pressing the `Start` button.
 5. Next Steps
 --------------
 
-Check out the [examples](https://github.com/dagu-org/dagu/tree/main/examples) to learn more
+Check out the `Examples provided by Dagu team <https://github.com/dagu-org/dagu/tree/main/examples>`_ to learn more
 
 
