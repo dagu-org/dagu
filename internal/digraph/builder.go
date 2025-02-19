@@ -272,11 +272,9 @@ func buildDotenv(ctx BuildContext, spec *definition, dag *DAG) error {
 			if err != nil {
 				continue
 			}
-			if err := godotenv.Load(resolvedPath); err != nil {
+			if err := godotenv.Overload(resolvedPath); err != nil {
 				return wrapError("dotenv", filePath, fmt.Errorf("failed to load dotenv file %s: %w", filePath, err))
 			}
-			// Break after the first successful load.
-			break
 		}
 	}
 

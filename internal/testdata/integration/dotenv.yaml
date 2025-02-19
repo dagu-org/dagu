@@ -1,0 +1,7 @@
+dotenv:
+  - dotenv1
+  - dotenv2
+steps:
+  - name: step1
+    command: echo "${ENV1} ${ENV2}"
+    output: OUT1 #123 abc

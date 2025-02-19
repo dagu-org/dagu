@@ -30,6 +30,13 @@ func TestIntegration(t *testing.T) {
 			},
 		},
 		{
+			name: "DotEnv",
+			dag:  "dotenv.yaml",
+			expectedOutputs: map[string]any{
+				"OUT1": "123 abc",
+			},
+		},
+		{
 			name: "NamedParams",
 			dag:  "named-params.yaml",
 			expectedOutputs: map[string]any{
