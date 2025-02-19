@@ -45,7 +45,7 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
           echo "$raw_output" | grep '^DATA:' | sed 's/^DATA: //'
         output: cleaned_data
         depends:
-          - pass 'Simulate unclean Command Output'
+          - Simulate unclean Command Output
 
       - name: Done
         command: echo Done!
