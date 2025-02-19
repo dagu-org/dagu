@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfig_MigrateLegacyConfig(t *testing.T) {
@@ -135,32 +138,133 @@ func TestConfig_MigrateLegacyConfig(t *testing.T) {
 }
 
 func TestConfigLoader_Load(t *testing.T) {
-	// Create temporary directory for test files
-	tmpDir, err := os.MkdirTemp("", "dagu-config-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Set up test environment
-	os.Setenv("HOME", tmpDir)
-	os.Setenv("DAGU_HOST", "localhost")
-	os.Setenv("DAGU_PORT", "9090")
-	defer func() {
-		os.Unsetenv("HOME")
-		os.Unsetenv("DAGU_HOST")
-		os.Unsetenv("DAGU_PORT")
-	}()
-
-	// Create test config directory
-	configDir := filepath.Join(tmpDir, ".config", "dagu")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
+	type testCase struct {
+		name           string
+		data           string
+		setup          func(t *testing.T)
+		expectedConfig *Config
 	}
 
-	// Create test config file
-	configFile := filepath.Join(configDir, "config.yaml")
-	testConfig := []byte(`
+	tests := []testCase{
+		{
+			name: "Defaults",
+			data: `
+dagsDir: "/dags"
+logsDir: "/logs"
+dataDir: "/data"
+suspendFlagsDir: "/suspend"
+adminLogsDir: "/admin/logs"
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				UI: UI{
+					NavbarTitle:           "Dagu",
+					MaxDashboardPageLimit: 100,
+					LogEncodingCharset:    "utf-8",
+				},
+			},
+		},
+		{
+			name: "TopLevelFields",
+			data: `
+dagsDir: "/dags"
+logsDir: "/logs"
+dataDir: "/data"
+suspendFlagsDir: "/suspend"
+adminLogsDir: "/admin/logs"
+baseConfig: "/base.yaml"
+BasePath: "/proxy"
+APIBasePath: "/proxy/api/v1"
+WorkDir: "/work"
+Headless: true
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/proxy/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				BasePath:    "/proxy",
+				WorkDir:     "/work",
+				Headless:    true,
+				UI: UI{
+					NavbarTitle:           "Dagu",
+					MaxDashboardPageLimit: 100,
+					LogEncodingCharset:    "utf-8",
+				},
+			},
+		},
+		{
+			name: "Auth",
+			data: `
+dagsDir: "/dags"
+logsDir: "/logs"
+dataDir: "/data"
+suspendFlagsDir: "/suspend"
+adminLogsDir: "/admin/logs"
+auth:
+  basic:
+    enabled: true
+    username: "admin"	
+    password: "password"
+  token:
+    enabled: true
+    value: "abc123"
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				UI: UI{
+					NavbarTitle:           "Dagu",
+					MaxDashboardPageLimit: 100,
+					LogEncodingCharset:    "utf-8",
+				},
+				Auth: Auth{
+					Basic: AuthBasic{
+						Enabled:  true,
+						Username: "admin",
+						Password: "password",
+					},
+					Token: AuthToken{
+						Enabled: true,
+						Value:   "abc123",
+					},
+				},
+			},
+		},
+		{
+			name: "UI",
+			data: `
+ui:
+  logEncodingCharset: "shift-jis"
+  navbarColor: "#FF0000"
+  navbarTitle: "Test Dashboard"
+  maxDashboardPageLimit: 50
+`,
+			expectedConfig: &Config{
+				Host:        "127.0.0.1",
+				Port:        8080,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				UI: UI{
+					NavbarTitle:           "Test Dashboard",
+					NavbarColor:           "#FF0000",
+					MaxDashboardPageLimit: 50,
+					LogEncodingCharset:    "shift-jis",
+				},
+			},
+		},
+		{
+			name: "LoadFromEnv",
+			data: `
 host: "127.0.0.1"
 port: 8080
 debug: true
@@ -172,39 +276,86 @@ auth:
 ui:
   navbarTitle: "Test Dashboard"
   maxDashboardPageLimit: 50
-`)
-	if err := os.WriteFile(configFile, testConfig, 0644); err != nil {
-		t.Fatalf("failed to write config file: %v", err)
+`,
+			setup: func(t *testing.T) {
+				os.Setenv("DAGU_HOST", "localhost")
+				os.Setenv("DAGU_PORT", "9090")
+				t.Cleanup(func() {
+					os.Unsetenv("DAGU_HOST")
+					os.Unsetenv("DAGU_PORT")
+				})
+			},
+			expectedConfig: &Config{
+				Host:        "localhost",
+				Port:        9090,
+				Debug:       true,
+				APIBasePath: "/api/v1",
+				LogFormat:   "text",
+				TZ:          "Asia/Tokyo",
+				Auth: Auth{
+					Basic: AuthBasic{
+						Enabled:  true,
+						Username: "admin",
+						Password: "secret",
+					},
+				},
+				UI: UI{
+					NavbarTitle:           "Test Dashboard",
+					MaxDashboardPageLimit: 50,
+					LogEncodingCharset:    "utf-8",
+				},
+			},
+		},
 	}
 
-	loader := NewConfigLoader()
-	cfg, err := loader.Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir, err := os.MkdirTemp("", "dagu-config-test")
+			require.NoError(t, err, "failed to create temp dir: %v", err)
+
+			os.Setenv("HOME", tmpDir)
+			os.Setenv("DAGU_TZ", "Asia/Tokyo")
+
+			t.Cleanup(func() {
+				os.RemoveAll(tmpDir)
+				os.Unsetenv("HOME")
+				os.Unsetenv("DAGU_TZ")
+			})
+
+			if tc.setup != nil {
+				tc.setup(t)
+			}
+
+			configDir := filepath.Join(tmpDir, ".config", "dagu")
+			err = os.MkdirAll(configDir, 0755)
+			require.NoError(t, err, "failed to create config dir: %v", err)
+
+			configFile := filepath.Join(configDir, "config.yaml")
+			testConfig := []byte(tc.data)
+			err = os.WriteFile(configFile, testConfig, 0644)
+			require.NoError(t, err, "failed to write config file: %v", err)
+
+			cfg, err := Load()
+			require.NoError(t, err, "failed to load config: %v", err)
+
+			// assert.EqualValues(t, tc.expectedConfig, cfg)
+			assert.Equal(t, tc.expectedConfig.Host, cfg.Host, "Host = %v, want %v", cfg.Host, tc.expectedConfig.Host)
+			assert.Equal(t, tc.expectedConfig.Port, cfg.Port, "Port = %v, want %v", cfg.Port, tc.expectedConfig.Port)
+			assert.Equal(t, tc.expectedConfig.Debug, cfg.Debug, "Debug = %v, want %v", cfg.Debug, tc.expectedConfig.Debug)
+			assert.Equal(t, tc.expectedConfig.BasePath, cfg.BasePath, "BasePath = %v, want %v", cfg.BasePath, tc.expectedConfig.BasePath)
+			assert.Equal(t, tc.expectedConfig.APIBasePath, cfg.APIBasePath, "APIBasePath = %v, want %v", cfg.APIBasePath, tc.expectedConfig.APIBasePath)
+			assert.Equal(t, tc.expectedConfig.WorkDir, cfg.WorkDir, "WorkDir = %v, want %v", cfg.WorkDir, tc.expectedConfig.WorkDir)
+			assert.Equal(t, tc.expectedConfig.Headless, cfg.Headless, "Headless = %v, want %v", cfg.Headless, tc.expectedConfig.Headless)
+			assert.Equal(t, tc.expectedConfig.LogFormat, cfg.LogFormat, "LogFormat = %v, want %v", cfg.LogFormat, tc.expectedConfig.LogFormat)
+			assert.Equal(t, tc.expectedConfig.LatestStatusToday, cfg.LatestStatusToday, "LatestStatusToday = %v, want %v", cfg.LatestStatusToday, tc.expectedConfig.LatestStatusToday)
+			assert.Equal(t, tc.expectedConfig.TZ, cfg.TZ, "TZ = %v, want %v", cfg.TZ, tc.expectedConfig.TZ)
+			assert.Equal(t, tc.expectedConfig.Auth, cfg.Auth, "Auth = %v, want %v", cfg.Auth, tc.expectedConfig.Auth)
+			assert.Equal(t, tc.expectedConfig.UI, cfg.UI, "UI = %v, want %v", cfg.UI, tc.expectedConfig.UI)
+			assert.Equal(t, tc.expectedConfig.RemoteNodes, cfg.RemoteNodes, "RemoteNodes = %v, want %v", cfg.RemoteNodes, tc.expectedConfig.RemoteNodes)
+			assert.Equal(t, tc.expectedConfig.TLS, cfg.TLS, "TLS = %v, want %v", cfg.TLS, tc.expectedConfig.TLS)
+		})
 	}
 
-	// Verify loaded configuration
-	if cfg.Host != "localhost" {
-		t.Errorf("Host = %v, want localhost", cfg.Host)
-	}
-	if cfg.Port != 9090 {
-		t.Errorf("Port = %v, want 9090", cfg.Port)
-	}
-	if !cfg.Debug {
-		t.Error("Debug = false, want true")
-	}
-	if !cfg.Auth.Basic.Enabled {
-		t.Error("Auth.Basic.Enabled = false, want true")
-	}
-	if cfg.Auth.Basic.Username != "admin" {
-		t.Errorf("Auth.Basic.Username = %v, want admin", cfg.Auth.Basic.Username)
-	}
-	if cfg.Auth.Basic.Password != "secret" {
-		t.Errorf("Auth.Basic.Password = %v, want secret", cfg.Auth.Basic.Password)
-	}
-	if cfg.UI.NavbarTitle != "Test Dashboard" {
-		t.Errorf("UI.NavbarTitle = %v, want Test Dashboard", cfg.UI.NavbarTitle)
-	}
 }
 
 func TestConfigLoader_ValidateConfig(t *testing.T) {

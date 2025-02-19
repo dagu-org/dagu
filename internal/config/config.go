@@ -9,6 +9,7 @@ import (
 )
 
 // Config represents the server configuration with both new and legacy fields
+// TODO: Separate loading struct and runtime struct
 type Config struct {
 	// Server settings
 	Host        string `mapstructure:"host"`
@@ -16,9 +17,10 @@ type Config struct {
 	Debug       bool   `mapstructure:"debug"`
 	BasePath    string `mapstructure:"basePath"`
 	APIBasePath string `mapstructure:"apiBasePath"`
-	APIBaseURL  string `mapstructure:"apiBaseURL"` // For backward compatibility
-	WorkDir     string `mapstructure:"workDir"`
-	Headless    bool   `mapstructure:"headless"`
+	// Deprecated: Use APIBasePath instead
+	APIBaseURL string `mapstructure:"apiBaseURL"`
+	WorkDir    string `mapstructure:"workDir"`
+	Headless   bool   `mapstructure:"headless"`
 
 	// Authentication
 	Auth Auth `mapstructure:"auth"`
@@ -30,6 +32,8 @@ type Config struct {
 	// Note: These fields are used for backward compatibility and should not be used in new code
 	// Deprecated: Use Auth.Basic.Enabled instead
 	DAGs string `mapstructure:"dags"`
+	// Deprecated: Use Paths.DAGsDir instead
+	DAGsDir string `mapstructure:"dagsDir"`
 	// Deprecated: Use Paths.Executable instead
 	Executable string `mapstructure:"executable"`
 	// Deprecated: Use Paths.LogDir instead
@@ -152,7 +156,7 @@ func (c *Config) MigrateLegacyConfig() {
 }
 
 func (c *Config) migrateServerSettings() {
-	if c.APIBaseURL != "" {
+	if c.APIBasePath == "" && c.APIBaseURL != "" {
 		c.APIBasePath = c.APIBaseURL
 	}
 }
@@ -173,6 +177,9 @@ func (c *Config) migrateAuthSettings() {
 func (c *Config) migratePaths() {
 	if c.DAGs != "" {
 		c.Paths.DAGsDir = c.DAGs
+	}
+	if c.DAGsDir != "" {
+		c.Paths.DAGsDir = c.DAGsDir
 	}
 	if c.Executable != "" {
 		c.Paths.Executable = c.Executable

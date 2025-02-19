@@ -140,6 +140,7 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("basePath", "")
 	viper.SetDefault("apiBaseURL", "/api/v1")
+	viper.SetDefault("apiBasePath", "/api/v1")
 	viper.SetDefault("latestStatusToday", false)
 
 	// UI settings

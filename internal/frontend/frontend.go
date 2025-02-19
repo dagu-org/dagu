@@ -10,7 +10,7 @@ import (
 func New(cfg *config.Config, cli client.Client) *server.Server {
 	var apiHandlers []server.Handler
 
-	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.RemoteNodes, cfg.APIBaseURL)
+	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.RemoteNodes, cfg.APIBasePath)
 	apiHandlers = append(apiHandlers, dagAPIHandler)
 
 	systemAPIHandler := handlers.NewSystem()
@@ -30,7 +30,7 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		NavbarColor:           cfg.UI.NavbarColor,
 		NavbarTitle:           cfg.UI.NavbarTitle,
 		MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
-		APIBaseURL:            cfg.APIBaseURL,
+		APIBaseURL:            cfg.APIBasePath,
 		TimeZone:              cfg.TZ,
 		RemoteNodes:           remoteNodes,
 		Headless:              cfg.Headless,
