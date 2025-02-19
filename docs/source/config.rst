@@ -65,10 +65,12 @@ Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. 
     tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
     
     # Directory Configuration
-    dagsDir: "${HOME}/.config/dagu/dags"          # DAG definitions location
-    workDir: "/path/to/work"                      # Default working directory
-    logDir: "${HOME}/.local/share/dagu/logs"      # Log files location
-    dataDir: "${HOME}/.local/share/dagu/history"  # Application data location
+    dagsDir: "${HOME}/.config/dagu/dags"            # DAG definitions location
+    workDir: "/path/to/work"                        # Default working directory
+    logDir: "${HOME}/.local/share/dagu/logs"        # Log files location
+    dataDir: "${HOME}/.local/share/dagu/history"    # Application data location
+    suspendFlagsDir: "${HOME}/.config/dagu/suspend" # DAG suspend flags location
+    adminLogsDir: "${HOME}/.local/share/admin"      # Admin logs location
 
     # Common Configuration for all DAGs
     baseConfig: "${HOME}/.config/dagu/base.yaml"  # Base DAG config
