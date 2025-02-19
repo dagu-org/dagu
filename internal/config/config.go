@@ -16,9 +16,10 @@ type Config struct {
 	Debug       bool   `mapstructure:"debug"`
 	BasePath    string `mapstructure:"basePath"`
 	APIBasePath string `mapstructure:"apiBasePath"`
-	APIBaseURL  string `mapstructure:"apiBaseURL"` // For backward compatibility
-	WorkDir     string `mapstructure:"workDir"`
-	Headless    bool   `mapstructure:"headless"`
+	// Deprecated: Use APIBasePath instead
+	APIBaseURL string `mapstructure:"apiBaseURL"`
+	WorkDir    string `mapstructure:"workDir"`
+	Headless   bool   `mapstructure:"headless"`
 
 	// Authentication
 	Auth Auth `mapstructure:"auth"`
