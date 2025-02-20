@@ -1,0 +1,24 @@
+name: dagu
+base: core24
+version: "0.1"
+summary: A compact, portable, and language-agnostic workflow engine for developers.
+description: |
+  Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+  Dagu’s design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
+
+grade: stable
+confinement: strict
+
+parts:
+  my-part:
+    plugin: nil
+
+apps:
+  dagu:
+    command: dagu start-all
+    daemon: simple
+    restart-condition: always
+    plugs:
+      - network
+      - home
+      - personal-files
