@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -59,6 +60,7 @@ func (r *PathResolver) setXDGPaths() {
 }
 
 func (r *PathResolver) setLegacyPaths() {
+	fmt.Sprintf("Warning: Legacy path detected. Update configuration paths")
 	r.DataDir = filepath.Join(r.ConfigDir, "data")
 	r.LogsDir = filepath.Join(r.ConfigDir, "logs")
 	r.BaseConfigFile = filepath.Join(r.ConfigDir, "base.yaml")

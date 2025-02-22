@@ -54,6 +54,11 @@ UI Customization
 
 Configuration File
 ----------------
+
+.. note::
+  
+  Storing Dagu configuration in ``$HOME/.dagu`` is deprecated.
+   
 Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. Below is a complete example with all available options:
 
 .. code-block:: yaml
