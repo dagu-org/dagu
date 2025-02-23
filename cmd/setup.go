@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
+	"path/filepath" // Uses OS-specific separators (backslash on Windows, slash on Unix)
 	"syscall"
 	"time"
 
@@ -30,6 +30,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+// wrapRunE is a helper that wraps a cobra RunE function.
+// If the wrapped function returns an error, it prints the error and exits the process.
+// This ensures that all errors are handled consistently.
 func wrapRunE(f func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		if err := f(cmd, args); err != nil {
@@ -40,13 +43,17 @@ func wrapRunE(f func(cmd *cobra.Command, args []string) error) func(cmd *cobra.C
 	}
 }
 
+// setup holds the application's configuration and context.
 type setup struct {
 	cfg *config.Config
 	ctx context.Context
 }
 
+// createSetup initializes the application setup by loading configuration,
+// setting up logger context, and logging any warnings.
 func createSetup(ctx context.Context, quiet bool) (*setup, error) {
 	var configLoaderOpts []config.ConfigLoaderOption
+	// Use a custom config file if provided via the viper flag "config"
 	if cfgPath := viper.GetString("config"); cfgPath != "" {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
 	}
@@ -56,8 +63,10 @@ func createSetup(ctx context.Context, quiet bool) (*setup, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Create a logger context based on config and quiet mode
 	ctx = setupLoggerContext(cfg, ctx, quiet)
 
+	// Log any warnings collected during configuration loading
 	for _, w := range cfg.Warnings {
 		logger.Warn(ctx, w)
 	}
@@ -65,6 +74,8 @@ func createSetup(ctx context.Context, quiet bool) (*setup, error) {
 	return &setup{cfg: cfg, ctx: ctx}, nil
 }
 
+// setupLoggerContext builds a logger context using options derived from configuration.
+// It checks debug mode, quiet mode, and log format.
 func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) context.Context {
 	var opts []logger.Option
 	if cfg.Global.Debug {
@@ -79,10 +90,13 @@ func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) con
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
+// setupWithConfig creates a setup instance from an existing configuration.
 func setupWithConfig(ctx context.Context, cfg *config.Config) *setup {
 	return &setup{cfg: cfg, ctx: setupLoggerContext(cfg, ctx, false)}
 }
 
+// loggerContextWithFile returns a new logger context that writes logs to the given file.
+// Useful when logs need to be persisted to a file.
 func (s *setup) loggerContextWithFile(ctx context.Context, quiet bool, f *os.File) context.Context {
 	var opts []logger.Option
 	if quiet {
@@ -94,25 +108,31 @@ func (s *setup) loggerContextWithFile(ctx context.Context, quiet bool, f *os.Fil
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
 
+// clientOption defines functional options for configuring the client.
 type clientOption func(*clientOptions)
 
+// clientOptions holds optional dependencies for constructing a client.
 type clientOptions struct {
 	dagStore     persistence.DAGStore
 	historyStore persistence.HistoryStore
 }
 
+// withDAGStore returns a clientOption that sets a custom DAGStore.
 func withDAGStore(dagStore persistence.DAGStore) clientOption {
 	return func(o *clientOptions) {
 		o.dagStore = dagStore
 	}
 }
 
+// withHistoryStore returns a clientOption that sets a custom HistoryStore.
 func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
 	return func(o *clientOptions) {
 		o.historyStore = historyStore
 	}
 }
 
+// client initializes a client using the provided options. If not supplied,
+// it creates default DAGStore and HistoryStore instances.
 func (s *setup) client(opts ...clientOption) (client.Client, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
@@ -130,6 +150,7 @@ func (s *setup) client(opts ...clientOption) (client.Client, error) {
 	if historyStore == nil {
 		historyStore = s.historyStore()
 	}
+	// Create a flag store based on the suspend flags directory.
 	flagStore := local.NewFlagStore(storage.NewStorage(
 		s.cfg.Paths.SuspendFlagsDir,
 	))
@@ -143,6 +164,8 @@ func (s *setup) client(opts ...clientOption) (client.Client, error) {
 	), nil
 }
 
+// server creates and returns a new web UI server.
+// It initializes in-memory caches for DAGs and history, and uses them in the client.
 func (s *setup) server(ctx context.Context) (*server.Server, error) {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
@@ -159,6 +182,8 @@ func (s *setup) server(ctx context.Context) (*server.Server, error) {
 	return frontend.New(s.cfg, cli), nil
 }
 
+// scheduler creates a new scheduler instance using the default client.
+// It builds a DAG job manager to handle scheduled executions.
 func (s *setup) scheduler() (*scheduler.Scheduler, error) {
 	cli, err := s.client()
 	if err != nil {
@@ -169,6 +194,8 @@ func (s *setup) scheduler() (*scheduler.Scheduler, error) {
 	return scheduler.New(s.cfg, manager), nil
 }
 
+// dagStore returns a new DAGStore instance. It ensures that the directory exists
+// (creating it if necessary) before returning the store.
 func (s *setup) dagStore() (persistence.DAGStore, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
@@ -181,16 +208,20 @@ func (s *setup) dagStore() (persistence.DAGStore, error) {
 	return local.NewDAGStore(s.cfg.Paths.DAGsDir), nil
 }
 
+// dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
 func (s *setup) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
 	return local.NewDAGStore(s.cfg.Paths.DAGsDir, local.WithFileCache(cache))
 }
 
+// historyStore returns a new HistoryStore instance using JSON database storage.
+// It applies the "latestStatusToday" setting from the server configuration.
 func (s *setup) historyStore() persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
 		s.cfg.Server.LatestStatusToday,
 	))
 }
 
+// historyStoreWithCache returns a HistoryStore that uses an in-memory cache.
 func (s *setup) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir,
 		jsondb.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
@@ -198,6 +229,9 @@ func (s *setup) historyStoreWithCache(cache *filecache.Cache[*model.Status]) per
 	)
 }
 
+// openLogFile creates and opens a log file for a given DAG execution.
+// It evaluates the log directory, validates settings, creates the log directory,
+// builds a filename using the current timestamp and request ID, and then opens the file.
 func (s *setup) openLogFile(
 	ctx context.Context,
 	prefix string,
@@ -230,8 +264,7 @@ func (s *setup) openLogFile(
 	return createLogFile(filepath.Join(outputDir, filename))
 }
 
-// generateRequestID generates a new request ID.
-// For simplicity, we use UUIDs as request IDs.
+// generateRequestID creates a new UUID string to be used as a request identifier.
 func generateRequestID() (string, error) {
 	id, err := uuid.NewRandom()
 	if err != nil {
@@ -240,37 +273,42 @@ func generateRequestID() (string, error) {
 	return id.String(), nil
 }
 
+// signalListener is an interface for types that can receive OS signals.
 type signalListener interface {
 	Signal(context.Context, os.Signal)
 }
 
+// signalChan is a buffered channel to receive OS signals.
 var signalChan = make(chan os.Signal, 100)
 
-// listenSignals subscribes to the OS signals and passes them to the listener.
-// It listens for the context cancellation as well.
+// listenSignals subscribes to SIGINT and SIGTERM signals and forwards them to the provided listener.
+// It also listens for context cancellation and signals the listener with an os.Interrupt.
 func listenSignals(ctx context.Context, listener signalListener) {
 	go func() {
 		signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 		select {
+		// If context is cancelled, signal with os.Interrupt.
 		case <-ctx.Done():
 			listener.Signal(ctx, os.Interrupt)
+		// Forward the received signal.
 		case sig := <-signalChan:
 			listener.Signal(ctx, sig)
 		}
 	}()
 }
 
-// logFileSettings contains the settings for the log file.
+// logFileSettings defines configuration for log file creation.
 type logFileSettings struct {
-	Prefix    string
-	LogDir    string
-	DAGLogDir string
-	DAGName   string
-	RequestID string
+	Prefix    string // Prefix for the log filename (e.g. "start_", "retry_").
+	LogDir    string // Base directory for logs.
+	DAGLogDir string // Optional alternative log directory specified by the DAG.
+	DAGName   string // Name of the DAG; used for generating a safe directory name.
+	RequestID string // Unique request ID used in the filename.
 }
 
-// validateSettings ensures all required fields are properly set
+// validateSettings checks that essential fields are provided.
+// It requires that DAGName is not empty and that at least one log directory is specified.
 func validateSettings(config logFileSettings) error {
 	if config.DAGName == "" {
 		return fmt.Errorf("DAGName cannot be empty")
@@ -281,11 +319,12 @@ func validateSettings(config logFileSettings) error {
 	return nil
 }
 
-// setupLogDirectory creates and returns the appropriate log directory
+// setupLogDirectory creates (if necessary) and returns the log directory based on the log file settings.
+// It uses a safe version of the DAG name to avoid issues with invalid filesystem characters.
 func setupLogDirectory(config logFileSettings) (string, error) {
 	safeName := fileutil.SafeName(config.DAGName)
 
-	// Determine the base directory
+	// Choose the base directory: if DAGLogDir is provided, use it; otherwise use LogDir.
 	baseDir := config.LogDir
 	if config.DAGLogDir != "" {
 		baseDir = config.DAGLogDir
@@ -299,7 +338,8 @@ func setupLogDirectory(config logFileSettings) (string, error) {
 	return logDir, nil
 }
 
-// buildLogFilename generates the log filename using the configured format
+// buildLogFilename constructs the log filename using the prefix, safe DAG name, current timestamp,
+// and a truncated version of the request ID.
 func buildLogFilename(config logFileSettings) string {
 	timestamp := time.Now().Format("20060102.15:04:05.000")
 	truncatedRequestID := stringutil.TruncString(config.RequestID, 8)
@@ -313,7 +353,8 @@ func buildLogFilename(config logFileSettings) string {
 	)
 }
 
-// createLogFile opens or creates a log file with appropriate permissions
+// createLogFile opens (or creates) the log file with flags for creation, write-only access,
+// appending, and synchronous I/O. It sets file permissions to 0644.
 func createLogFile(filepath string) (*os.File, error) {
 	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND | os.O_SYNC
 	permissions := os.FileMode(0644)
