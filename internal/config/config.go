@@ -4,259 +4,168 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sync"
 	"time"
 )
 
-// Config represents the server configuration with both new and legacy fields
-// TODO: Separate loading struct and runtime struct
+// Config holds the overall configuration for the application.
 type Config struct {
-	// Server settings
-	Host        string `mapstructure:"host"`
-	Port        int    `mapstructure:"port"`
-	Debug       bool   `mapstructure:"debug"`
-	BasePath    string `mapstructure:"basePath"`
-	APIBasePath string `mapstructure:"apiBasePath"`
-	// Deprecated: Use APIBasePath instead
-	APIBaseURL string `mapstructure:"apiBaseURL"`
-	WorkDir    string `mapstructure:"workDir"`
-	Headless   bool   `mapstructure:"headless"`
+	// Global contains global configuration settings.
+	Global Global
 
-	// Authentication
-	Auth Auth `mapstructure:"auth"`
+	// Server contains the API server configuration.
+	Server Server
 
-	// File system paths
-	Paths PathsConfig `mapstructure:"paths"`
+	// Paths holds various filesystem path configurations used throughout the application.
+	Paths PathsConfig
 
-	// Legacy fields for backward compatibility - Start
-	// Note: These fields are used for backward compatibility and should not be used in new code
-	// Deprecated: Use Auth.Basic.Enabled instead
-	DAGs string `mapstructure:"dags"`
-	// Deprecated: Use Paths.DAGsDir instead
-	DAGsDir string `mapstructure:"dagsDir"`
-	// Deprecated: Use Paths.Executable instead
-	Executable string `mapstructure:"executable"`
-	// Deprecated: Use Paths.LogDir instead
-	LogDir string `mapstructure:"logDir"`
-	// Deprecated: Use Paths.DataDir instead
-	DataDir string `mapstructure:"dataDir"`
-	// Deprecated: Use Paths.SuspendFlagsDir instead
-	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
-	// Deprecated: Use Paths.AdminLogsDir instead
-	AdminLogsDir string `mapstructure:"adminLogsDir"`
-	// Deprecated: Use Paths.BaseConfig instead
-	BaseConfig string `mapstructure:"baseConfig"`
-	// Deprecated: Use Auth.Token.Enabled instead
-	IsBasicAuth bool `mapstructure:"isBasicAuth"`
-	// Deprecated: Use Auth.Basic.Username instead
-	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
-	// Deprecated: Use Auth.Basic.Password instead
-	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
-	// Deprecated: Use Auth.Token.Enabled instead
-	IsAuthToken bool `mapstructure:"isAuthToken"`
-	// Deprecated: Use Auth.Token.Value instead
-	AuthToken string `mapstructure:"authToken"`
-	// Deprecated: Use UI.LogEncodingCharset instead
-	LogEncodingCharset string `mapstructure:"logEncodingCharset"`
-	// Deprecated: Use UI.NavbarColor instead
-	NavbarColor string `mapstructure:"navbarColor"`
-	// Deprecated: Use UI.NavbarTitle instead
-	NavbarTitle string `mapstructure:"navbarTitle"`
-	// Deprecated: Use UI.MaxDashboardPageLimit instead
-	MaxDashboardPageLimit int `mapstructure:"maxDashboardPageLimit"`
-	// Legacy fields for backward compatibility - End
+	// UI contains settings specific to the application's user interface.
+	UI UI
+}
 
-	// Other settings
-	LogFormat         string         `mapstructure:"logFormat"`
-	LatestStatusToday bool           `mapstructure:"latestStatusToday"`
-	TZ                string         `mapstructure:"tz"`
-	Location          *time.Location `mapstructure:"-"`
-	Env               sync.Map       `mapstructure:"-"`
+type Global struct {
+	// Debug toggles debug mode; when true, the application may output extra logs and error details.
+	Debug bool
 
-	UI UI `mapstructure:"ui"`
+	// LogFormat defines the output format for log messages (e.g., JSON, plain text).
+	LogFormat string
 
-	// Remote nodes configuration
-	RemoteNodes []RemoteNode `mapstructure:"remoteNodes"`
+	// TZ represents the timezone setting for the application (for example, "UTC" or "America/New_York").
+	TZ string
 
-	// TLS configuration
-	TLS *TLSConfig `mapstructure:"tls"`
+	// Location represents the time location for the application based on the TZ setting.
+	Location *time.Location
+
+	// WorkDir specifies the default working directory for DAG (Directed Acyclic Graph) files.
+	// If not explicitly provided, it defaults to the directory where the DAG file resides.
+	WorkDir string
+}
+
+func (cfg *Global) setTimezone() error {
+	if cfg.TZ != "" {
+		loc, err := time.LoadLocation(cfg.TZ)
+		if err != nil {
+			return fmt.Errorf("failed to load timezone: %w", err)
+		}
+		cfg.Location = loc
+		os.Setenv("TZ", cfg.TZ)
+	} else {
+		_, offset := time.Now().Zone()
+		if offset == 0 {
+			cfg.TZ = "UTC"
+		} else {
+			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
+		}
+		cfg.Location = time.Local
+	}
+	return nil
+}
+
+// Server contains the API server configuration
+type Server struct {
+	// Host defines the hostname or IP address on which the application will run.
+	Host string
+
+	// Port specifies the network port for incoming connections.
+	Port int
+
+	// BasePath is the root URL path from which the application is served.
+	// This is useful when hosting the app behind a reverse proxy under a subpath.
+	BasePath string
+
+	// APIBasePath sets the base path for all API endpoints provided by the application.
+	APIBasePath string
+
+	// Headless determines if the application should run without a graphical user interface.
+	// Useful for automated or headless server environments.
+	Headless bool
+
+	// LatestStatusToday indicates whether the application should display only the most recent status for the current day.
+	LatestStatusToday bool
+
+	// TLS contains configuration details for enabling TLS/SSL encryption,
+	// such as certificate and key file paths.
+	TLS *TLSConfig
+
+	// Auth contains authentication settings (such as credentials or tokens) needed to secure the application.
+	Auth Auth
+
+	// RemoteNodes holds a list of configurations for connecting to remote nodes.
+	// This enables the management of DAGs on external servers.
+	RemoteNodes []RemoteNode
+}
+
+func (cfg *Server) cleanBasePath() {
+	if cfg.BasePath == "" {
+		return
+	}
+
+	// Clean the provided BasePath.
+	cleanPath := path.Clean(cfg.BasePath)
+
+	// Ensure the path is absolute.
+	if !path.IsAbs(cleanPath) {
+		cleanPath = path.Join("/", cleanPath)
+	}
+
+	// If the cleaned path is the root, reset it to an empty string.
+	if cleanPath == "/" {
+		cfg.BasePath = ""
+	} else {
+		cfg.BasePath = cleanPath
+	}
 }
 
 // Auth represents the authentication configuration
 type Auth struct {
-	Basic AuthBasic `mapstructure:"basic"`
-	Token AuthToken `mapstructure:"token"`
+	Basic AuthBasic
+	Token AuthToken
 }
 
 // AuthBasic represents the basic authentication configuration
 type AuthBasic struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
+	Enabled  bool
+	Username string
+	Password string
 }
 
 // AuthToken represents the authentication token configuration
 type AuthToken struct {
-	Enabled bool   `mapstructure:"enabled"`
-	Value   string `mapstructure:"value"`
+	Enabled bool
+	Value   string
 }
 
 // Paths represents the file system paths configuration
 type PathsConfig struct {
-	DAGsDir         string `mapstructure:"dagsDir"`
-	Executable      string `mapstructure:"executable"`
-	LogDir          string `mapstructure:"logDir"`
-	DataDir         string `mapstructure:"dataDir"`
-	SuspendFlagsDir string `mapstructure:"suspendFlagsDir"`
-	AdminLogsDir    string `mapstructure:"adminLogsDir"`
-	BaseConfig      string `mapstructure:"baseConfig"`
+	DAGsDir         string
+	Executable      string
+	LogDir          string
+	DataDir         string
+	SuspendFlagsDir string
+	AdminLogsDir    string
+	BaseConfig      string
 }
 
 type UI struct {
-	LogEncodingCharset    string `mapstructure:"logEncodingCharset"`
-	NavbarColor           string `mapstructure:"navbarColor"`
-	NavbarTitle           string `mapstructure:"navbarTitle"`
-	MaxDashboardPageLimit int    `mapstructure:"maxDashboardPageLimit"`
+	LogEncodingCharset    string
+	NavbarColor           string
+	NavbarTitle           string
+	MaxDashboardPageLimit int
 }
 
 // RemoteNode represents a remote node configuration
 type RemoteNode struct {
-	Name              string `mapstructure:"name"`
-	APIBaseURL        string `mapstructure:"apiBaseURL"`
-	IsBasicAuth       bool   `mapstructure:"isBasicAuth"`
-	BasicAuthUsername string `mapstructure:"basicAuthUsername"`
-	BasicAuthPassword string `mapstructure:"basicAuthPassword"`
-	IsAuthToken       bool   `mapstructure:"isAuthToken"`
-	AuthToken         string `mapstructure:"authToken"`
-	SkipTLSVerify     bool   `mapstructure:"skipTLSVerify"`
+	Name              string
+	APIBaseURL        string
+	IsBasicAuth       bool
+	BasicAuthUsername string
+	BasicAuthPassword string
+	IsAuthToken       bool
+	AuthToken         string
+	SkipTLSVerify     bool
 }
 
 // TLSConfig represents TLS configuration
 type TLSConfig struct {
-	CertFile string `mapstructure:"certFile"`
-	KeyFile  string `mapstructure:"keyFile"`
-}
-
-// MigrateLegacyConfig migrates legacy configuration
-func (c *Config) MigrateLegacyConfig() {
-	// Migrate server settings
-	c.migrateServerSettings()
-
-	// Migrate authentication settings
-	c.migrateAuthSettings()
-
-	// Migrate paths
-	c.migratePaths()
-
-	// Migrate UI settings
-	c.migrateUISettings()
-
-	// Clean base path
-	c.cleanBasePath()
-}
-
-func (c *Config) migrateServerSettings() {
-	if c.APIBasePath == "" && c.APIBaseURL != "" {
-		c.APIBasePath = c.APIBaseURL
-	}
-}
-
-func (c *Config) migrateAuthSettings() {
-	if c.IsBasicAuth {
-		c.Auth.Basic.Enabled = c.IsBasicAuth
-		c.Auth.Basic.Username = c.BasicAuthUsername
-		c.Auth.Basic.Password = c.BasicAuthPassword
-	}
-
-	if c.IsAuthToken {
-		c.Auth.Token.Enabled = c.IsAuthToken
-		c.Auth.Token.Value = c.AuthToken
-	}
-}
-
-func (c *Config) migratePaths() {
-	if c.DAGs != "" {
-		c.Paths.DAGsDir = c.DAGs
-	}
-	if c.DAGsDir != "" {
-		c.Paths.DAGsDir = c.DAGsDir
-	}
-	if c.Executable != "" {
-		c.Paths.Executable = c.Executable
-	}
-	if c.LogDir != "" {
-		c.Paths.LogDir = c.LogDir
-	}
-	if c.DataDir != "" {
-		c.Paths.DataDir = c.DataDir
-	}
-	if c.SuspendFlagsDir != "" {
-		c.Paths.SuspendFlagsDir = c.SuspendFlagsDir
-	}
-	if c.AdminLogsDir != "" {
-		c.Paths.AdminLogsDir = c.AdminLogsDir
-	}
-	if c.BaseConfig != "" {
-		c.Paths.BaseConfig = c.BaseConfig
-	}
-}
-
-func (c *Config) migrateUISettings() {
-	if c.LogEncodingCharset != "" {
-		c.UI.LogEncodingCharset = c.LogEncodingCharset
-	}
-	if c.NavbarColor != "" {
-		c.UI.NavbarColor = c.NavbarColor
-	}
-	if c.NavbarTitle != "" {
-		c.UI.NavbarTitle = c.NavbarTitle
-	}
-	if c.MaxDashboardPageLimit > 0 {
-		c.UI.MaxDashboardPageLimit = c.MaxDashboardPageLimit
-	}
-}
-
-func (c *Config) cleanBasePath() {
-	if c.BasePath != "" {
-		c.BasePath = path.Clean(c.BasePath)
-		if !path.IsAbs(c.BasePath) {
-			c.BasePath = path.Join("/", c.BasePath)
-		}
-		if c.BasePath == "/" {
-			c.BasePath = ""
-		}
-	}
-}
-
-// Load creates a new configuration with backward compatibility
-func Load(opts ...ConfigLoaderOption) (*Config, error) {
-	loader := NewConfigLoader(opts...)
-	cfg, err := loader.Load()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Load legacy environment variables
-	if err := loader.LoadLegacyEnv(cfg); err != nil {
-		return nil, fmt.Errorf("failed to load legacy env: %w", err)
-	}
-
-	// Migrate legacy configuration
-	cfg.MigrateLegacyConfig()
-
-	// Set environment variables
-	cfg.setEnvVariables()
-
-	return cfg, nil
-}
-
-func (c *Config) setEnvVariables() {
-	c.Env.Range(func(k, v any) bool {
-		key := k.(string)
-		value := v.(string)
-		if err := os.Setenv(key, value); err != nil {
-			fmt.Printf("failed to set env variable %s: %v\n", key, err)
-		}
-		return true
-	})
+	CertFile string
+	KeyFile  string
 }

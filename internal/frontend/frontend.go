@@ -10,42 +10,42 @@ import (
 func New(cfg *config.Config, cli client.Client) *server.Server {
 	var apiHandlers []server.Handler
 
-	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.RemoteNodes, cfg.APIBasePath)
+	dagAPIHandler := handlers.NewDAG(cli, cfg.UI.LogEncodingCharset, cfg.Server.RemoteNodes, cfg.Server.APIBasePath)
 	apiHandlers = append(apiHandlers, dagAPIHandler)
 
 	systemAPIHandler := handlers.NewSystem()
 	apiHandlers = append(apiHandlers, systemAPIHandler)
 
 	var remoteNodes []string
-	for _, n := range cfg.RemoteNodes {
+	for _, n := range cfg.Server.RemoteNodes {
 		remoteNodes = append(remoteNodes, n.Name)
 	}
 
 	serverParams := server.NewServerArgs{
-		Host:                  cfg.Host,
-		Port:                  cfg.Port,
-		TLS:                   cfg.TLS,
+		Host:                  cfg.Server.Host,
+		Port:                  cfg.Server.Port,
+		TLS:                   cfg.Server.TLS,
+		APIBaseURL:            cfg.Server.APIBasePath,
+		Headless:              cfg.Server.Headless,
 		Handlers:              apiHandlers,
 		AssetsFS:              assetsFS,
 		NavbarColor:           cfg.UI.NavbarColor,
 		NavbarTitle:           cfg.UI.NavbarTitle,
 		MaxDashboardPageLimit: cfg.UI.MaxDashboardPageLimit,
-		APIBaseURL:            cfg.APIBasePath,
-		TimeZone:              cfg.TZ,
+		TimeZone:              cfg.Global.TZ,
 		RemoteNodes:           remoteNodes,
-		Headless:              cfg.Headless,
 	}
 
-	if cfg.Auth.Token.Enabled {
+	if cfg.Server.Auth.Token.Enabled {
 		serverParams.AuthToken = &server.AuthToken{
-			Token: cfg.Auth.Token.Value,
+			Token: cfg.Server.Auth.Token.Value,
 		}
 	}
 
-	if cfg.Auth.Basic.Enabled {
+	if cfg.Server.Auth.Basic.Enabled {
 		serverParams.BasicAuth = &server.BasicAuth{
-			Username: cfg.Auth.Basic.Username,
-			Password: cfg.Auth.Basic.Password,
+			Username: cfg.Server.Auth.Basic.Username,
+			Password: cfg.Server.Auth.Basic.Password,
 		}
 	}
 

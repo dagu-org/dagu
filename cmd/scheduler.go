@@ -35,7 +35,7 @@ func runScheduler(cmd *cobra.Command, _ []string) error {
 		setup.cfg.Paths.DAGsDir = dagsDir
 	}
 
-	logger.Info(ctx, "Scheduler initialization", "specsDirectory", setup.cfg.Paths.DAGsDir, "logFormat", setup.cfg.LogFormat)
+	logger.Info(ctx, "Scheduler initialization", "specsDirectory", setup.cfg.Paths.DAGsDir, "logFormat", setup.cfg.Global.LogFormat)
 
 	scheduler, err := setup.scheduler()
 	if err != nil {

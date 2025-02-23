@@ -8,12 +8,21 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/spf13/viper"
 )
+
+// Load creates a new configuration.
+func Load(opts ...ConfigLoaderOption) (*Config, error) {
+	loader := NewConfigLoader(opts...)
+	cfg, err := loader.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	return cfg, nil
+}
 
 type ConfigLoader struct {
 	lock       sync.Mutex
@@ -44,7 +53,7 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("viper setup failed: %w", err)
 	}
 
-	var cfg Config
+	var def Definition
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("failed to read config: %w", err)
@@ -59,26 +68,156 @@ func (l *ConfigLoader) Load() (*Config, error) {
 		}
 	}
 
-	if err := viper.Unmarshal(&cfg); err != nil {
+	if err := viper.Unmarshal(&def); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Set executable path if not already set
-	if err := l.setExecutable(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to set executable: %w", err)
+	cfg, err := l.buildConfig(def)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
 
-	// Set timezone configuration
-	if err := l.setTimezone(&cfg); err != nil {
+	return cfg, nil
+}
+
+func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
+	var cfg Config
+
+	cfg.Global = Global{
+		Debug:     def.Debug,
+		LogFormat: def.LogFormat,
+		TZ:        def.TZ,
+		WorkDir:   def.WorkDir,
+	}
+
+	if err := cfg.Global.setTimezone(); err != nil {
 		return nil, fmt.Errorf("failed to set timezone: %w", err)
 	}
 
-	// Validate the configuration
+	cfg.Server = Server{
+		Host:        def.Host,
+		Port:        def.Port,
+		BasePath:    def.BasePath,
+		APIBasePath: def.APIBaseURL,
+	}
+
+	for _, node := range def.RemoteNodes {
+		cfg.Server.RemoteNodes = append(cfg.Server.RemoteNodes, RemoteNode{
+			Name:       node.Name,
+			APIBaseURL: node.APIBaseURL,
+		})
+	}
+
+	if def.APIBaseURL != "" {
+		cfg.Server.APIBasePath = def.APIBaseURL
+	}
+
+	if def.Headless != nil {
+		cfg.Server.Headless = *def.Headless
+	}
+
+	if def.LatestStatusToday != nil {
+		cfg.Server.LatestStatusToday = *def.LatestStatusToday
+	}
+
+	if def.TLS != nil {
+		cfg.Server.TLS = &TLSConfig{
+			CertFile: def.TLS.CertFile,
+			KeyFile:  def.TLS.KeyFile,
+		}
+	}
+
+	if def.Auth != nil {
+		if def.Auth.Basic != nil {
+			cfg.Server.Auth.Basic.Enabled = def.Auth.Basic.Enabled
+			cfg.Server.Auth.Basic.Username = def.Auth.Basic.Username
+			cfg.Server.Auth.Basic.Password = def.Auth.Basic.Password
+		}
+		if def.Auth.Token != nil {
+			cfg.Server.Auth.Token.Enabled = def.Auth.Token.Enabled
+			cfg.Server.Auth.Token.Value = def.Auth.Token.Value
+		}
+	}
+
+	cfg.Server.cleanBasePath()
+
+	if def.Paths != nil {
+		cfg.Paths.DAGsDir = def.Paths.DAGsDir
+		cfg.Paths.SuspendFlagsDir = def.Paths.SuspendFlagsDir
+		cfg.Paths.DataDir = def.Paths.DataDir
+		cfg.Paths.LogDir = def.Paths.LogDir
+		cfg.Paths.AdminLogsDir = def.Paths.AdminLogsDir
+		cfg.Paths.BaseConfig = def.Paths.BaseConfig
+		cfg.Paths.Executable = def.Paths.Executable
+	}
+
+	if def.UI != nil {
+		cfg.UI.NavbarColor = def.UI.NavbarColor
+		cfg.UI.NavbarTitle = def.UI.NavbarTitle
+		cfg.UI.MaxDashboardPageLimit = def.UI.MaxDashboardPageLimit
+		cfg.UI.LogEncodingCharset = def.UI.LogEncodingCharset
+	}
+
+	l.LoadLegacyFields(&cfg, def)
+	l.LoadLegacyEnv(&cfg)
+
+	if err := l.setExecutable(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to set executable: %w", err)
+	}
 	if err := l.validateConfig(&cfg); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return &cfg, nil
+}
+
+func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
+	if def.BasicAuthUsername != "" {
+		cfg.Server.Auth.Basic.Username = def.BasicAuthUsername
+	}
+	if def.BasicAuthPassword != "" {
+		cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
+	}
+	if def.IsAuthToken {
+		cfg.Server.Auth.Token.Enabled = true
+		cfg.Server.Auth.Token.Value = def.AuthToken
+	}
+	if def.DAGs != "" {
+		cfg.Paths.DAGsDir = def.DAGs
+	}
+	if def.DAGsDir != "" {
+		cfg.Paths.DAGsDir = def.DAGsDir
+	}
+	if def.Executable != "" {
+		cfg.Paths.Executable = def.Executable
+	}
+	if def.LogDir != "" {
+		cfg.Paths.LogDir = def.LogDir
+	}
+	if def.DataDir != "" {
+		cfg.Paths.DataDir = def.DataDir
+	}
+	if def.SuspendFlagsDir != "" {
+		cfg.Paths.SuspendFlagsDir = def.SuspendFlagsDir
+	}
+	if def.AdminLogsDir != "" {
+		cfg.Paths.AdminLogsDir = def.AdminLogsDir
+	}
+	if def.BaseConfig != "" {
+		cfg.Paths.BaseConfig = def.BaseConfig
+	}
+	if def.LogEncodingCharset != "" {
+		cfg.UI.LogEncodingCharset = def.LogEncodingCharset
+	}
+	if def.NavbarColor != "" {
+		cfg.UI.NavbarColor = def.NavbarColor
+	}
+	if def.NavbarTitle != "" {
+		cfg.UI.NavbarTitle = def.NavbarTitle
+	}
+	if def.MaxDashboardPageLimit > 0 {
+		cfg.UI.MaxDashboardPageLimit = def.MaxDashboardPageLimit
+	}
 }
 
 func (l *ConfigLoader) setupViper() error {
@@ -87,13 +226,13 @@ func (l *ConfigLoader) setupViper() error {
 		return err
 	}
 	xdgConfig := l.getXDGConfig(homeDir)
-	resolver := newResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+	resolver := NewResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
 
 	l.configureViper(resolver)
 	l.bindEnvironmentVariables()
 	l.setDefaultValues(resolver)
 
-	return l.setExecutableDefault()
+	return nil
 }
 
 func (l *ConfigLoader) getHomeDir() (string, error) {
@@ -213,7 +352,7 @@ func (l *ConfigLoader) bindEnv(key, env string) {
 	_ = viper.BindEnv(key, prefix+env)
 }
 
-func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) error {
+func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) {
 	legacyEnvs := map[string]struct {
 		newKey string
 		setter func(*Config, string)
@@ -230,13 +369,13 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) error {
 			newKey: "DAGU_PORT",
 			setter: func(c *Config, v string) {
 				if i, err := strconv.Atoi(v); err == nil {
-					c.Port = i
+					c.Server.Port = i
 				}
 			},
 		},
 		"DAGU__ADMIN_HOST": {
 			newKey: "DAGU_HOST",
-			setter: func(c *Config, v string) { c.Host = v },
+			setter: func(c *Config, v string) { c.Server.Host = v },
 		},
 		"DAGU__DATA": {
 			newKey: "DAGU_DATA_DIR",
@@ -258,28 +397,6 @@ func (l *ConfigLoader) LoadLegacyEnv(cfg *Config) error {
 			mapping.setter(cfg, value)
 		}
 	}
-
-	return nil
-}
-
-func (l *ConfigLoader) setTimezone(cfg *Config) error {
-	if cfg.TZ != "" {
-		loc, err := time.LoadLocation(cfg.TZ)
-		if err != nil {
-			return fmt.Errorf("failed to load timezone: %w", err)
-		}
-		cfg.Location = loc
-		os.Setenv("TZ", cfg.TZ)
-	} else {
-		_, offset := time.Now().Zone()
-		if offset == 0 {
-			cfg.TZ = "UTC"
-		} else {
-			cfg.TZ = fmt.Sprintf("UTC%+d", offset/3600)
-		}
-		cfg.Location = time.Local
-	}
-	return nil
 }
 
 func (l *ConfigLoader) setExecutable(cfg *Config) error {
@@ -293,36 +410,27 @@ func (l *ConfigLoader) setExecutable(cfg *Config) error {
 	return nil
 }
 
-func (l *ConfigLoader) setExecutableDefault() error {
-	executable, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get executable path: %w", err)
-	}
-	viper.SetDefault("executable", executable)
-	return nil
-}
-
 func (l *ConfigLoader) validateConfig(cfg *Config) error {
-	if cfg.Port < 0 || cfg.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d", cfg.Port)
-	}
-
-	if cfg.Auth.Basic.Enabled && (cfg.Auth.Basic.Username == "" || cfg.Auth.Basic.Password == "") {
+	if cfg.Server.Auth.Basic.Enabled && (cfg.Server.Auth.Basic.Username == "" || cfg.Server.Auth.Basic.Password == "") {
 		return fmt.Errorf("basic auth enabled but username or password is not set")
 	}
 
-	if cfg.Auth.Token.Enabled && cfg.Auth.Token.Value == "" {
+	if cfg.Server.Auth.Token.Enabled && cfg.Server.Auth.Token.Value == "" {
 		return fmt.Errorf("auth token enabled but token is not set")
 	}
 
-	if cfg.TLS != nil {
-		if cfg.TLS.CertFile == "" || cfg.TLS.KeyFile == "" {
+	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
+		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
+	}
+
+	if cfg.Server.TLS != nil {
+		if cfg.Server.TLS.CertFile == "" || cfg.Server.TLS.KeyFile == "" {
 			return fmt.Errorf("TLS configuration incomplete: both cert and key files are required")
 		}
 	}
 
-	if cfg.Port < 0 || cfg.Port > 65535 {
-		return fmt.Errorf("invalid port number: %d", cfg.Port)
+	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
+		return fmt.Errorf("invalid port number: %d", cfg.Server.Port)
 	}
 
 	if cfg.UI.MaxDashboardPageLimit < 1 {

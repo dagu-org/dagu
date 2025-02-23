@@ -33,7 +33,7 @@ func runServer(cmd *cobra.Command, _ []string) error {
 
 	ctx := setup.loggerContext(cmd.Context(), false)
 
-	logger.Info(ctx, "Server initialization", "host", setup.cfg.Host, "port", setup.cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", setup.cfg.Server.Host, "port", setup.cfg.Server.Port)
 
 	server, err := setup.server(ctx)
 	if err != nil {

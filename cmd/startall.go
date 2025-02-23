@@ -57,7 +57,7 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Start server in a goroutine
-	logger.Info(ctx, "Server initialization", "host", setup.cfg.Host, "port", setup.cfg.Port)
+	logger.Info(ctx, "Server initialization", "host", setup.cfg.Server.Host, "port", setup.cfg.Server.Port)
 
 	serverErr := make(chan error, 1)
 	go func() {

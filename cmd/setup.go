@@ -64,14 +64,14 @@ func setupWithConfig(cfg *config.Config) *setup {
 
 func (s *setup) loggerContext(ctx context.Context, quiet bool) context.Context {
 	var opts []logger.Option
-	if s.cfg.Debug {
+	if s.cfg.Global.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	if s.cfg.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(s.cfg.LogFormat))
+	if s.cfg.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(s.cfg.Global.LogFormat))
 	}
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
 }
@@ -132,7 +132,7 @@ func (s *setup) client(opts ...clientOption) (client.Client, error) {
 		historyStore,
 		flagStore,
 		s.cfg.Paths.Executable,
-		s.cfg.WorkDir,
+		s.cfg.Global.WorkDir,
 	), nil
 }
 
@@ -158,7 +158,7 @@ func (s *setup) scheduler() (*scheduler.Scheduler, error) {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, cli, s.cfg.Paths.Executable, s.cfg.WorkDir)
+	manager := scheduler.NewDAGJobManager(s.cfg.Paths.DAGsDir, cli, s.cfg.Paths.Executable, s.cfg.Global.WorkDir)
 	return scheduler.New(s.cfg, manager), nil
 }
 
@@ -180,13 +180,13 @@ func (s *setup) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persiste
 
 func (s *setup) historyStore() persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
-		s.cfg.LatestStatusToday,
+		s.cfg.Server.LatestStatusToday,
 	))
 }
 
 func (s *setup) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir,
-		jsondb.WithLatestStatusToday(s.cfg.LatestStatusToday),
+		jsondb.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
 		jsondb.WithFileCache(cache),
 	)
 }

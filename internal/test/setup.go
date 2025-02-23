@@ -87,7 +87,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
 	)
 
-	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.WorkDir)
+	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
 		Context:      createDefaultContext(),

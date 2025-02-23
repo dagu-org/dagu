@@ -35,7 +35,7 @@ type Scheduler struct {
 }
 
 func New(cfg *config.Config, manager JobManager) *Scheduler {
-	timeLoc := cfg.Location
+	timeLoc := cfg.Global.Location
 	if timeLoc == nil {
 		timeLoc = time.Local
 	}

@@ -28,7 +28,7 @@ type XDGConfig struct {
 	ConfigHome string
 }
 
-func newResolver(appHomeEnv, legacyPath string, xdg XDGConfig) PathResolver {
+func NewResolver(appHomeEnv, legacyPath string, xdg XDGConfig) PathResolver {
 	resolver := PathResolver{XDGConfig: xdg}
 	resolver.resolve(appHomeEnv, legacyPath)
 
