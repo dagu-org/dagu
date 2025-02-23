@@ -42,9 +42,10 @@ func wrapRunE(f func(cmd *cobra.Command, args []string) error) func(cmd *cobra.C
 
 type setup struct {
 	cfg *config.Config
+	ctx context.Context
 }
 
-func createSetup() (*setup, error) {
+func createSetup(ctx context.Context, quiet bool) (*setup, error) {
 	var configLoaderOpts []config.ConfigLoaderOption
 	if cfgPath := viper.GetString("config"); cfgPath != "" {
 		configLoaderOpts = append(configLoaderOpts, config.WithConfigFile(cfgPath))
@@ -55,25 +56,31 @@ func createSetup() (*setup, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	return &setup{cfg: cfg}, nil
+	ctx = setupLoggerContext(cfg, ctx, quiet)
+
+	for _, w := range cfg.Warnings {
+		logger.Warn(ctx, w)
+	}
+
+	return &setup{cfg: cfg, ctx: ctx}, nil
 }
 
-func setupWithConfig(cfg *config.Config) *setup {
-	return &setup{cfg: cfg}
-}
-
-func (s *setup) loggerContext(ctx context.Context, quiet bool) context.Context {
+func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) context.Context {
 	var opts []logger.Option
-	if s.cfg.Global.Debug {
+	if cfg.Global.Debug {
 		opts = append(opts, logger.WithDebug())
 	}
 	if quiet {
 		opts = append(opts, logger.WithQuiet())
 	}
-	if s.cfg.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(s.cfg.Global.LogFormat))
+	if cfg.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
 	}
 	return logger.WithLogger(ctx, logger.NewLogger(opts...))
+}
+
+func setupWithConfig(ctx context.Context, cfg *config.Config) *setup {
+	return &setup{cfg: cfg, ctx: setupLoggerContext(cfg, ctx, false)}
 }
 
 func (s *setup) loggerContextWithFile(ctx context.Context, quiet bool, f *os.File) context.Context {

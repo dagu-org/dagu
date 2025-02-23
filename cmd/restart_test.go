@@ -49,7 +49,7 @@ func TestRestartCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check parameter was the same as the first execution
-		setup := setupWithConfig(th.Config)
+		setup := setupWithConfig(th.Context, th.Config)
 		client, err := setup.client()
 		require.NoError(t, err)
 

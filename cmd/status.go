@@ -26,12 +26,12 @@ func statusCmd() *cobra.Command {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
+	setup, err := createSetup(cmd.Context(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), false)
+	ctx := setup.ctx
 
 	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {

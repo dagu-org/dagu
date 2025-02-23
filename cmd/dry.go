@@ -27,12 +27,10 @@ func dryCmd() *cobra.Command {
 }
 
 func runDry(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
+	setup, err := createSetup(cmd.Context(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
-
-	ctx := setup.loggerContext(cmd.Context(), false)
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
@@ -51,6 +49,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
+	ctx := setup.ctx
 	dag, err := digraph.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)

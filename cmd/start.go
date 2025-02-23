@@ -34,11 +34,6 @@ func initStartFlags(cmd *cobra.Command) {
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
-
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
@@ -49,7 +44,10 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), quiet)
+	setup, err := createSetup(cmd.Context(), quiet)
+	if err != nil {
+		return fmt.Errorf("failed to create setup: %w", err)
+	}
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
@@ -68,7 +66,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(ctx, setup, args[0], loadOpts, quiet, requestID)
+	return executeDag(setup.ctx, setup, args[0], loadOpts, quiet, requestID)
 }
 
 func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {

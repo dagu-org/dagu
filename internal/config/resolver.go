@@ -21,6 +21,7 @@ type Paths struct {
 	LogsDir         string
 	AdminLogsDir    string
 	BaseConfigFile  string
+	Warnings        []string
 }
 
 type XDGConfig struct {
@@ -41,6 +42,7 @@ func (r *PathResolver) resolve(appHomeEnv, legacyPath string) {
 		r.Paths.ConfigDir = os.Getenv(appHomeEnv)
 		r.setLegacyPaths()
 	case fileutil.FileExists(legacyPath):
+		r.Warnings = append(r.Warnings, "Legacy path detected. Update configuration paths.")
 		r.Paths.ConfigDir = legacyPath
 		r.setLegacyPaths()
 	default:

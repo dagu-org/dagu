@@ -26,13 +26,12 @@ func bindServerFlags(cmd *cobra.Command, _ []string) error {
 }
 
 func runServer(cmd *cobra.Command, _ []string) error {
-	setup, err := createSetup()
+	setup, err := createSetup(cmd.Context(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), false)
-
+	ctx := setup.ctx
 	logger.Info(ctx, "Server initialization", "host", setup.cfg.Server.Host, "port", setup.cfg.Server.Port)
 
 	server, err := setup.server(ctx)

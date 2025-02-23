@@ -20,6 +20,9 @@ type Config struct {
 
 	// UI contains settings specific to the application's user interface.
 	UI UI
+
+	// Warnings contains a list of warnings generated during the configuration loading process.
+	Warnings []string
 }
 
 type Global struct {

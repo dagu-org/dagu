@@ -36,11 +36,6 @@ func initRetryFlags(cmd *cobra.Command) {
 }
 
 func runRetry(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
-
 	// Get quiet flag
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
@@ -52,8 +47,12 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), quiet)
+	setup, err := createSetup(cmd.Context(), quiet)
+	if err != nil {
+		return fmt.Errorf("failed to create setup: %w", err)
+	}
 
+	ctx := setup.ctx
 	specFilePath := args[0]
 
 	absolutePath, err := filepath.Abs(specFilePath)

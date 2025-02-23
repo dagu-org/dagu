@@ -26,14 +26,14 @@ func stopCmd() *cobra.Command {
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
+	setup, err := createSetup(cmd.Context(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), false)
+	ctx := setup.ctx
 
-	dag, err := digraph.Load(cmd.Context(), args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
+	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)

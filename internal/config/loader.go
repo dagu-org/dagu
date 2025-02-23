@@ -27,6 +27,7 @@ func Load(opts ...ConfigLoaderOption) (*Config, error) {
 type ConfigLoader struct {
 	lock       sync.Mutex
 	configFile string
+	warnings   []string
 }
 
 type ConfigLoaderOption func(*ConfigLoader)
@@ -76,6 +77,8 @@ func (l *ConfigLoader) Load() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to build config: %w", err)
 	}
+
+	cfg.Warnings = l.warnings
 
 	return cfg, nil
 }
@@ -227,6 +230,8 @@ func (l *ConfigLoader) setupViper() error {
 	}
 	xdgConfig := l.getXDGConfig(homeDir)
 	resolver := NewResolver("DAGU_HOME", filepath.Join(homeDir, ".dagu"), xdgConfig)
+
+	l.warnings = append(l.warnings, resolver.Warnings...)
 
 	l.configureViper(resolver)
 	l.bindEnvironmentVariables()

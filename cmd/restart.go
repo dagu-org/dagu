@@ -33,19 +33,19 @@ func restartCmd() *cobra.Command {
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
-
 	quiet, err := cmd.Flags().GetBool("quiet")
 	if err != nil {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	ctx := setup.loggerContext(cmd.Context(), quiet)
+	setup, err := createSetup(cmd.Context(), quiet)
+	if err != nil {
+		return fmt.Errorf("failed to create setup: %w", err)
+	}
 
+	ctx := setup.ctx
 	specFilePath := args[0]
+
 	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)

@@ -54,6 +54,7 @@ func TestResolver(t *testing.T) {
 				LogsDir:         filepath.Join(tmpDir, hiddenDir, "logs"),
 				AdminLogsDir:    filepath.Join(tmpDir, hiddenDir, "logs", "admin"),
 				BaseConfigFile:  filepath.Join(tmpDir, hiddenDir, "base.yaml"),
+				Warnings:        []string{"Legacy path detected. Update configuration paths."},
 			},
 		})
 	})
