@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/test"
 )
 
-func TestIntegration(t *testing.T) {
+func TestDAGExecution(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
