@@ -26,7 +26,7 @@ This process runs continuously to automatically execute scheduled DAGs.
 var schedulerFlags = []commandLineFlag{dagsFlag}
 
 func runScheduler(ctx *Context, _ []string) error {
-	if dagsDir, _ := ctx.cmd.Flags().GetString("dags"); dagsDir != "" {
+	if dagsDir, _ := ctx.Flags().GetString("dags"); dagsDir != "" {
 		ctx.cfg.Paths.DAGsDir = dagsDir
 	}
 

@@ -35,12 +35,12 @@ func runDry(ctx *Context, args []string) error {
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
-	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err := ctx.cmd.Flags().GetString("params")
+		params, err := ctx.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}

@@ -34,7 +34,8 @@ var _ context.Context = (*Context)(nil)
 
 // Context holds the configuration for a command.
 type Context struct {
-	cmd   *cobra.Command
+	*cobra.Command
+
 	run   func(cmd *Context, args []string) error
 	flags []commandLineFlag
 	cfg   *config.Config
@@ -106,7 +107,7 @@ func (c *Context) init(cmd *cobra.Command) error {
 		logger.Warn(ctx, w)
 	}
 
-	c.cmd = cmd
+	c.Command = cmd
 	c.cfg = cfg
 	c.ctx = ctx
 	c.quiet = quiet

@@ -32,7 +32,7 @@ This command is useful for recovering from errors or transient issues by re-runn
 var retryFlags = []commandLineFlag{requestIDFlagRetry}
 
 func runRetry(ctx *Context, args []string) error {
-	requestID, err := ctx.cmd.Flags().GetString("request-id")
+	requestID, err := ctx.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}

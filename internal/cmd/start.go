@@ -34,7 +34,7 @@ This command parses the DAG specification, resolves parameters, and initiates th
 var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart}
 
 func runStart(ctx *Context, args []string) error {
-	requestID, err := ctx.cmd.Flags().GetString("request-id")
+	requestID, err := ctx.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
@@ -44,12 +44,12 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	var params string
-	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = ctx.cmd.Flags().GetString("params")
+		params, err = ctx.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
