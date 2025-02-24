@@ -18,7 +18,7 @@ func CmdScheduler() *cobra.Command {
 		RunE: wrapRunE(runScheduler),
 	}
 
-	initCommonFlags(cmd, []commandLineFlag{dagsFlag})
+	initFlags(cmd, dagsFlag)
 
 	return cmd
 }

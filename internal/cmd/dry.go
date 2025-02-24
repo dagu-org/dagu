@@ -21,7 +21,7 @@ func CmdDry() *cobra.Command {
 		RunE: wrapRunE(runDry),
 	}
 
-	initCommonFlags(cmd, []commandLineFlag{paramsFlag})
+	initFlags(cmd, paramsFlag)
 
 	return cmd
 }

@@ -25,14 +25,9 @@ func CmdRetry() *cobra.Command {
 		RunE: wrapRunE(runRetry),
 	}
 
-	initRetryFlags(cmd)
+	initFlags(cmd, requestIDFlagRetry, quietFlag)
 
 	return cmd
-}
-
-func initRetryFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{requestIDFlagRetry})
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 
 func runRetry(cmd *cobra.Command, args []string) error {

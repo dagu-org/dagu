@@ -29,8 +29,7 @@ func CmdStart() *cobra.Command {
 }
 
 func initStartFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{paramsFlag, requestIDFlagStart})
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	initFlags(cmd, paramsFlag, requestIDFlagStart, quietFlag)
 }
 
 func runStart(cmd *cobra.Command, args []string) error {

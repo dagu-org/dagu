@@ -87,5 +87,5 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 }
 
 func initStartAllFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{dagsFlag, hostFlag, portFlag})
+	initFlags(cmd, dagsFlag, hostFlag, portFlag)
 }

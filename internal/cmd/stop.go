@@ -20,7 +20,7 @@ func CmdStop() *cobra.Command {
 		RunE: wrapRunE(runStop),
 	}
 
-	initCommonFlags(cmd, nil)
+	initFlags(cmd)
 
 	return cmd
 }

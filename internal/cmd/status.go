@@ -20,7 +20,7 @@ func CmdStatus() *cobra.Command {
 		RunE: wrapRunE(runStatus),
 	}
 
-	initCommonFlags(cmd, nil)
+	initFlags(cmd)
 
 	return cmd
 }

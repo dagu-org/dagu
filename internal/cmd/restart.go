@@ -27,8 +27,7 @@ func CmdRestart() *cobra.Command {
 		},
 		RunE: wrapRunE(runRestart),
 	}
-	initCommonFlags(cmd, nil)
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
+	initFlags(cmd, quietFlag)
 	return cmd
 }
 

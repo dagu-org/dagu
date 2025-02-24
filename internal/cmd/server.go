@@ -16,7 +16,7 @@ func CmdServer() *cobra.Command {
 		RunE:    wrapRunE(runServer),
 	}
 
-	initServerFlags(cmd)
+	initFlags(cmd, dagsFlag, hostFlag, portFlag)
 
 	return cmd
 }
@@ -44,28 +44,4 @@ func runServer(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
-}
-
-func initServerFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd,
-		[]commandLineFlag{
-			{
-				name:      "dags",
-				shorthand: "d",
-				usage:     "location of DAG files (default is $HOME/.config/dagu/dags)",
-			},
-			{
-				name:         "host",
-				shorthand:    "s",
-				defaultValue: defaultHost,
-				usage:        "server host",
-			},
-			{
-				name:         "port",
-				shorthand:    "p",
-				defaultValue: defaultPort,
-				usage:        "server port",
-			},
-		},
-	)
 }
