@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func serverCmd() *cobra.Command {
+func ServerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "server",
 		Short:   "Start the server",

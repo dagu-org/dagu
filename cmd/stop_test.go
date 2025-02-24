@@ -1,9 +1,10 @@
-package main
+package main_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,7 @@ func TestStopCommand(t *testing.T) {
 		go func() {
 			// Start the DAG to stop.
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, startCmd(), test.CmdTest{Args: args})
+			th.RunCommand(t, cmd.StartCmd(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -29,7 +30,7 @@ func TestStopCommand(t *testing.T) {
 		dagFile.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		// Stop the DAG.
-		th.RunCommand(t, stopCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.StopCmd(), test.CmdTest{
 			Args:        []string{"stop", dagFile.Location},
 			ExpectedOut: []string{"DAG stopped"}})
 

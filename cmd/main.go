@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -30,14 +31,14 @@ func init() {
 }
 
 func registerCommands() {
-	rootCmd.AddCommand(startCmd())
-	rootCmd.AddCommand(stopCmd())
-	rootCmd.AddCommand(restartCmd())
-	rootCmd.AddCommand(dryCmd())
-	rootCmd.AddCommand(statusCmd())
-	rootCmd.AddCommand(versionCmd())
-	rootCmd.AddCommand(serverCmd())
-	rootCmd.AddCommand(schedulerCmd())
-	rootCmd.AddCommand(retryCmd())
-	rootCmd.AddCommand(startAllCmd())
+	rootCmd.AddCommand(cmd.StartCmd())
+	rootCmd.AddCommand(cmd.StopCmd())
+	rootCmd.AddCommand(cmd.RestartCmd())
+	rootCmd.AddCommand(cmd.DryCmd())
+	rootCmd.AddCommand(cmd.StatusCmd())
+	rootCmd.AddCommand(cmd.VersionCmd())
+	rootCmd.AddCommand(cmd.ServerCmd())
+	rootCmd.AddCommand(cmd.SchedulerCmd())
+	rootCmd.AddCommand(cmd.RetryCmd())
+	rootCmd.AddCommand(cmd.StartAllCmd())
 }

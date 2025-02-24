@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func dryCmd() *cobra.Command {
+func DryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",
@@ -61,7 +61,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 
 	const logPrefix = "dry_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := setup.OpenLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -74,7 +74,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.client()
+	cli, err := setup.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}

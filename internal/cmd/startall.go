@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func startAllCmd() *cobra.Command {
+func StartAllCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start-all",
 		Short: "Launches both the Dagu web UI server and the scheduler process.",

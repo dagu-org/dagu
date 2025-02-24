@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func schedulerCmd() *cobra.Command {
+func SchedulerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
 		Short: "Start the scheduler",

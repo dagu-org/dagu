@@ -1,11 +1,11 @@
-package main
+package cmd
 
 import (
 	"github.com/dagu-org/dagu/internal/build"
 	"github.com/spf13/cobra"
 )
 
-func versionCmd() *cobra.Command {
+func VersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Display the binary version",

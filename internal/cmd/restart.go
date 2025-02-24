@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func restartCmd() *cobra.Command {
+func RestartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart /path/to/spec.yaml",
 		Short: "Stop the running DAG and restart it",
@@ -60,8 +60,8 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, quiet bool, specFilePath string) error {
-	cli, err := setup.client()
+func handleRestartProcess(ctx context.Context, setup *Setup, dag *digraph.DAG, quiet bool, specFilePath string) error {
+	cli, err := setup.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -99,7 +99,7 @@ func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, q
 	return executeDAG(ctx, cli, setup, dag, quiet)
 }
 
-func executeDAG(ctx context.Context, cli client.Client, setup *setup,
+func executeDAG(ctx context.Context, cli client.Client, setup *Setup,
 	dag *digraph.DAG, quiet bool) error {
 
 	requestID, err := generateRequestID()
@@ -108,7 +108,7 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 	}
 
 	const logPrefix = "restart_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := setup.OpenLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}

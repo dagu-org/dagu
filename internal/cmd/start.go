@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func startCmd() *cobra.Command {
+func StartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
 		Short: "Runs the DAG",
@@ -69,7 +69,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	return executeDag(setup.ctx, setup, args[0], loadOpts, quiet, requestID)
 }
 
-func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
+func executeDag(ctx context.Context, setup *Setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
 	dag, err := digraph.Load(ctx, specPath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
@@ -86,7 +86,7 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 	}
 
 	const logPrefix = "start_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := setup.OpenLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
@@ -103,7 +103,7 @@ func executeDag(ctx context.Context, setup *setup, specPath string, loadOpts []d
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.client()
+	cli, err := setup.Client()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)

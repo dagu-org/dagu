@@ -1,8 +1,9 @@
-package main
+package main_test
 
 import (
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
 )
 
@@ -29,7 +30,7 @@ func TestDryCommand(t *testing.T) {
 
 		for _, tc := range tests {
 			t.Run(tc.Name, func(t *testing.T) {
-				th.RunCommand(t, dryCmd(), tc)
+				th.RunCommand(t, cmd.DryCmd(), tc)
 			})
 		}
 	})

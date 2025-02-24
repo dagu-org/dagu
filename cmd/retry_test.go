@@ -1,10 +1,11 @@
-package main
+package main_test
 
 import (
 	"context"
 	"fmt"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestRetryCommand(t *testing.T) {
 
 		// Run a DAG.
 		args := []string{"start", `--params="foo"`, dagFile.Location}
-		th.RunCommand(t, startCmd(), test.CmdTest{Args: args})
+		th.RunCommand(t, cmd.StartCmd(), test.CmdTest{Args: args})
 
 		// Find the request ID.
 		cli := th.Client
@@ -32,7 +33,7 @@ func TestRetryCommand(t *testing.T) {
 
 		// Retry with the request ID.
 		args = []string{"retry", fmt.Sprintf("--request-id=%s", requestID), dagFile.Location}
-		th.RunCommand(t, retryCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.RetryCmd(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},
 		})

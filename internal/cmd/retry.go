@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func retryCmd() *cobra.Command {
+func RetryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retry --request-id=<request-id> /path/to/spec.yaml",
 		Short: "Retry the DAG execution",
@@ -95,14 +95,14 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalStatus *model.StatusFile, quiet bool) error {
+func executeRetry(ctx context.Context, dag *digraph.DAG, setup *Setup, originalStatus *model.StatusFile, quiet bool) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)
 	}
 
 	const logPrefix = "retry_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, newRequestID)
+	logFile, err := setup.OpenLogFile(ctx, logPrefix, dag, newRequestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -118,7 +118,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.client()
+	cli, err := setup.Client()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)

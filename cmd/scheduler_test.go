@@ -1,9 +1,10 @@
-package main
+package main_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/test"
 )
 
@@ -15,7 +16,7 @@ func TestSchedulerCommand(t *testing.T) {
 			th.Cancel()
 		}()
 
-		th.RunCommand(t, schedulerCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.SchedulerCmd(), test.CmdTest{
 			Args:        []string{"scheduler"},
 			ExpectedOut: []string{"Scheduler started"},
 		})
@@ -27,7 +28,7 @@ func TestSchedulerCommand(t *testing.T) {
 			th.Cancel()
 		}()
 
-		th.RunCommand(t, schedulerCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.SchedulerCmd(), test.CmdTest{
 			Args:        []string{"scheduler", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
 			ExpectedOut: []string{"dagu_test"},
 		})
