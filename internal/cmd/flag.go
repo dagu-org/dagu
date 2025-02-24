@@ -56,7 +56,6 @@ var (
 		name:      "request-id",
 		shorthand: "r",
 		usage:     "request ID for the DAG execution",
-		required:  true,
 	}
 )
 
