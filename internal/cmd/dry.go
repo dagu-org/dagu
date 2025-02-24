@@ -30,24 +30,23 @@ Example:
 
 var dryFlags = []commandLineFlag{paramsFlag}
 
-func runDry(cmd *Command, args []string) error {
+func runDry(ctx *Context, args []string) error {
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
-	if argsLenAtDash := cmd.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err := cmd.cmd.Flags().GetString("params")
+		params, err := ctx.cmd.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	ctx := cmd.ctx
 	dag, err := digraph.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -59,20 +58,20 @@ func runDry(cmd *Command, args []string) error {
 	}
 
 	const logPrefix = "dry_"
-	logFile, err := cmd.OpenLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx = cmd.loggerContextWithFile(logFile)
+	ctx.LogToFile(logFile)
 
-	dagStore, err := cmd.dagStore()
+	dagStore, err := ctx.dagStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := cmd.Client()
+	cli, err := ctx.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -84,7 +83,7 @@ func runDry(cmd *Command, args []string) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		cmd.historyStore(),
+		ctx.historyStore(),
 		agent.Options{Dry: true},
 	)
 

@@ -25,22 +25,21 @@ This process runs continuously to automatically execute scheduled DAGs.
 
 var schedulerFlags = []commandLineFlag{dagsFlag}
 
-func runScheduler(cmd *Command, _ []string) error {
-	if dagsDir, _ := cmd.cmd.Flags().GetString("dags"); dagsDir != "" {
-		cmd.cfg.Paths.DAGsDir = dagsDir
+func runScheduler(ctx *Context, _ []string) error {
+	if dagsDir, _ := ctx.cmd.Flags().GetString("dags"); dagsDir != "" {
+		ctx.cfg.Paths.DAGsDir = dagsDir
 	}
 
-	ctx := cmd.ctx
-	logger.Info(ctx, "Scheduler initialization", "specsDirectory", cmd.cfg.Paths.DAGsDir, "logFormat", cmd.cfg.Global.LogFormat)
+	logger.Info(ctx, "Scheduler initialization", "specsDirectory", ctx.cfg.Paths.DAGsDir, "logFormat", ctx.cfg.Global.LogFormat)
 
-	scheduler, err := cmd.scheduler()
+	scheduler, err := ctx.scheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
 
 	if err := scheduler.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start scheduler in directory %s: %w",
-			cmd.cfg.Paths.DAGsDir, err)
+			ctx.cfg.Paths.DAGsDir, err)
 	}
 
 	return nil

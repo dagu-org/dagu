@@ -23,11 +23,10 @@ Example:
 
 var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 
-func runServer(cmd *Command, _ []string) error {
-	ctx := cmd.ctx
-	logger.Info(ctx, "Server initialization", "host", cmd.cfg.Server.Host, "port", cmd.cfg.Server.Port)
+func runServer(ctx *Context, _ []string) error {
+	logger.Info(ctx, "Server initialization", "host", ctx.cfg.Server.Host, "port", ctx.cfg.Server.Port)
 
-	server, err := cmd.server(ctx)
+	server, err := ctx.server()
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}

@@ -18,12 +18,11 @@ func TestOpenLogFile(t *testing.T) {
 	t.Run("successful log file creation", func(t *testing.T) {
 		tempDir := t.TempDir() // Using t.TempDir() for automatic cleanup
 
-		ctx := context.Background()
-		setup := cmd.SetupWithConfig(ctx, &config.Config{
+		setup := cmd.NewContext(context.Background(), &config.Config{
 			Paths: config.PathsConfig{LogDir: tempDir},
 		})
 
-		file, err := setup.OpenLogFile(ctx, "test_", &digraph.DAG{
+		file, err := setup.OpenLogFile("test_", &digraph.DAG{
 			Name:   "test_dag",
 			LogDir: "",
 		}, "12345678")

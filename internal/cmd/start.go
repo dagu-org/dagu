@@ -33,36 +33,36 @@ This command parses the DAG specification, resolves parameters, and initiates th
 
 var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart}
 
-func runStart(cmd *Command, args []string) error {
-	requestID, err := cmd.cmd.Flags().GetString("request-id")
+func runStart(ctx *Context, args []string) error {
+	requestID, err := ctx.cmd.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
 	var params string
-	if argsLenAtDash := cmd.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = cmd.cmd.Flags().GetString("params")
+		params, err = ctx.cmd.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(cmd, args[0], loadOpts, requestID)
+	return executeDag(ctx, args[0], loadOpts, requestID)
 }
 
-func executeDag(cmd *Command, specPath string, loadOpts []digraph.LoadOption, requestID string) error {
-	dag, err := digraph.Load(cmd.ctx, specPath, loadOpts...)
+func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, requestID string) error {
+	dag, err := digraph.Load(ctx, specPath, loadOpts...)
 	if err != nil {
-		logger.Error(cmd.ctx, "Failed to load DAG", "path", specPath, "err", err)
+		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
 	}
 
@@ -70,30 +70,30 @@ func executeDag(cmd *Command, specPath string, loadOpts []digraph.LoadOption, re
 		var err error
 		requestID, err = generateRequestID()
 		if err != nil {
-			logger.Error(cmd.ctx, "Failed to generate request ID", "err", err)
+			logger.Error(ctx, "Failed to generate request ID", "err", err)
 			return fmt.Errorf("failed to generate request ID: %w", err)
 		}
 	}
 
 	const logPrefix = "start_"
-	logFile, err := cmd.OpenLogFile(cmd.ctx, logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
 	if err != nil {
-		logger.Error(cmd.ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
+		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx := cmd.loggerContextWithFile(logFile)
+	ctx.LogToFile(logFile)
 
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := cmd.dagStore()
+	dagStore, err := ctx.dagStore()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := cmd.Client()
+	cli, err := ctx.Client()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -106,7 +106,7 @@ func executeDag(cmd *Command, specPath string, loadOpts []digraph.LoadOption, re
 		logFile.Name(),
 		cli,
 		dagStore,
-		cmd.historyStore(),
+		ctx.historyStore(),
 		agent.Options{},
 	)
 
@@ -115,7 +115,7 @@ func executeDag(cmd *Command, specPath string, loadOpts []digraph.LoadOption, re
 	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
 
-		if cmd.quiet {
+		if ctx.quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
@@ -123,7 +123,7 @@ func executeDag(cmd *Command, specPath string, loadOpts []digraph.LoadOption, re
 		}
 	}
 
-	if !cmd.quiet {
+	if !ctx.quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 

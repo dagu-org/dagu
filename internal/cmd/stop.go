@@ -27,10 +27,8 @@ Example:
 
 var stopFlags = []commandLineFlag{}
 
-func runStop(cmd *Command, args []string) error {
-	ctx := cmd.ctx
-
-	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig))
+func runStop(ctx *Context, args []string) error {
+	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -38,13 +36,13 @@ func runStop(cmd *Command, args []string) error {
 
 	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
-	cli, err := cmd.Client()
+	cli, err := ctx.Client()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	if err := cli.Stop(cmd.ctx, dag); err != nil {
+	if err := cli.Stop(ctx, dag); err != nil {
 		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}

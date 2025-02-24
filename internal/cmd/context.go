@@ -30,40 +30,53 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Command holds the configuration for a command.
-type Command struct {
+var _ context.Context = (*Context)(nil)
+
+// Context holds the configuration for a command.
+type Context struct {
 	cmd   *cobra.Command
-	run   func(cmd *Command, args []string) error
+	run   func(cmd *Context, args []string) error
 	flags []commandLineFlag
 	cfg   *config.Config
 	ctx   context.Context
 	quiet bool
 }
 
-// NewCommand creates a new command instance with the given cobra command and run function.
-func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Command, args []string) error) *cobra.Command {
-	initFlags(cmd, flags...)
+// Deadline implements context.Context.
+func (c *Context) Deadline() (deadline time.Time, ok bool) {
+	return c.ctx.Deadline()
+}
 
-	command := &Command{flags: flags, run: run}
+// Done implements context.Context.
+func (c *Context) Done() <-chan struct{} {
+	return c.ctx.Done()
+}
 
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		if err := command.init(cmd); err != nil {
-			fmt.Printf("Initialization error: %v\n", err)
-			os.Exit(1)
-		}
-		if err := command.run(command, args); err != nil {
-			logger.Error(command.ctx, "Command failed", "err", err)
-			os.Exit(1)
-		}
-		return nil
+// Err implements context.Context.
+func (c *Context) Err() error {
+	return c.ctx.Err()
+}
+
+// Value implements context.Context.
+func (c *Context) Value(key any) any {
+	return c.ctx.Value(key)
+}
+
+// LogToFile creates a new logger context with a file writer.
+func (c *Context) LogToFile(f *os.File) {
+	var opts []logger.Option
+	if c.quiet {
+		opts = append(opts, logger.WithQuiet())
 	}
-
-	return cmd
+	if f != nil {
+		opts = append(opts, logger.WithWriter(f))
+	}
+	c.ctx = logger.WithLogger(c.ctx, logger.NewLogger(opts...))
 }
 
 // init initializes the application setup by loading configuration,
 // setting up logger context, and logging any warnings.
-func (c *Command) init(cmd *cobra.Command) error {
+func (c *Context) init(cmd *cobra.Command) error {
 	ctx := cmd.Context()
 
 	bindFlags(cmd, c.flags...)
@@ -97,69 +110,13 @@ func (c *Command) init(cmd *cobra.Command) error {
 	c.cfg = cfg
 	c.ctx = ctx
 	c.quiet = quiet
+
 	return nil
-}
-
-// setupLoggerContext builds a logger context using options derived from configuration.
-// It checks debug mode, quiet mode, and log format.
-func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) context.Context {
-	var opts []logger.Option
-	if cfg.Global.Debug {
-		opts = append(opts, logger.WithDebug())
-	}
-	if quiet {
-		opts = append(opts, logger.WithQuiet())
-	}
-	if cfg.Global.LogFormat != "" {
-		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
-	}
-	return logger.WithLogger(ctx, logger.NewLogger(opts...))
-}
-
-// SetupWithConfig creates a setup instance from an existing configuration.
-func SetupWithConfig(ctx context.Context, cfg *config.Config) *Command {
-	return &Command{cfg: cfg, ctx: setupLoggerContext(cfg, ctx, false)}
-}
-
-// loggerContextWithFile returns a new logger context that writes logs to the given file.
-// Useful when logs need to be persisted to a file.
-func (cmd *Command) loggerContextWithFile(f *os.File) context.Context {
-	var opts []logger.Option
-	if cmd.quiet {
-		opts = append(opts, logger.WithQuiet())
-	}
-	if f != nil {
-		opts = append(opts, logger.WithWriter(f))
-	}
-	return logger.WithLogger(cmd.ctx, logger.NewLogger(opts...))
-}
-
-// clientOption defines functional options for configuring the client.
-type clientOption func(*clientOptions)
-
-// clientOptions holds optional dependencies for constructing a client.
-type clientOptions struct {
-	dagStore     persistence.DAGStore
-	historyStore persistence.HistoryStore
-}
-
-// withDAGStore returns a clientOption that sets a custom DAGStore.
-func withDAGStore(dagStore persistence.DAGStore) clientOption {
-	return func(o *clientOptions) {
-		o.dagStore = dagStore
-	}
-}
-
-// withHistoryStore returns a clientOption that sets a custom HistoryStore.
-func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
-	return func(o *clientOptions) {
-		o.historyStore = historyStore
-	}
 }
 
 // Client initializes a Client using the provided options. If not supplied,
 // it creates default DAGStore and HistoryStore instances.
-func (s *Command) Client(opts ...clientOption) (client.Client, error) {
+func (s *Context) Client(opts ...clientOption) (client.Client, error) {
 	options := &clientOptions{}
 	for _, opt := range opts {
 		opt(options)
@@ -192,25 +149,25 @@ func (s *Command) Client(opts ...clientOption) (client.Client, error) {
 
 // server creates and returns a new web UI server.
 // It initializes in-memory caches for DAGs and history, and uses them in the client.
-func (s *Command) server(ctx context.Context) (*server.Server, error) {
+func (ctx *Context) server() (*server.Server, error) {
 	dagCache := filecache.New[*digraph.DAG](0, time.Hour*12)
 	dagCache.StartEviction(ctx)
-	dagStore := s.dagStoreWithCache(dagCache)
+	dagStore := ctx.dagStoreWithCache(dagCache)
 
 	historyCache := filecache.New[*model.Status](0, time.Hour*12)
 	historyCache.StartEviction(ctx)
-	historyStore := s.historyStoreWithCache(historyCache)
+	historyStore := ctx.historyStoreWithCache(historyCache)
 
-	cli, err := s.Client(withDAGStore(dagStore), withHistoryStore(historyStore))
+	cli, err := ctx.Client(withDAGStore(dagStore), withHistoryStore(historyStore))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
-	return frontend.New(s.cfg, cli), nil
+	return frontend.New(ctx.cfg, cli), nil
 }
 
 // scheduler creates a new scheduler instance using the default client.
 // It builds a DAG job manager to handle scheduled executions.
-func (s *Command) scheduler() (*scheduler.Scheduler, error) {
+func (s *Context) scheduler() (*scheduler.Scheduler, error) {
 	cli, err := s.Client()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
@@ -222,7 +179,7 @@ func (s *Command) scheduler() (*scheduler.Scheduler, error) {
 
 // dagStore returns a new DAGStore instance. It ensures that the directory exists
 // (creating it if necessary) before returning the store.
-func (s *Command) dagStore() (persistence.DAGStore, error) {
+func (s *Context) dagStore() (persistence.DAGStore, error) {
 	baseDir := s.cfg.Paths.DAGsDir
 	_, err := os.Stat(baseDir)
 	if os.IsNotExist(err) {
@@ -235,20 +192,20 @@ func (s *Command) dagStore() (persistence.DAGStore, error) {
 }
 
 // dagStoreWithCache returns a DAGStore instance that uses an in-memory file cache.
-func (s *Command) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
+func (s *Context) dagStoreWithCache(cache *filecache.Cache[*digraph.DAG]) persistence.DAGStore {
 	return local.NewDAGStore(s.cfg.Paths.DAGsDir, local.WithFileCache(cache))
 }
 
 // historyStore returns a new HistoryStore instance using JSON database storage.
 // It applies the "latestStatusToday" setting from the server configuration.
-func (s *Command) historyStore() persistence.HistoryStore {
+func (s *Context) historyStore() persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir, jsondb.WithLatestStatusToday(
 		s.cfg.Server.LatestStatusToday,
 	))
 }
 
 // historyStoreWithCache returns a HistoryStore that uses an in-memory cache.
-func (s *Command) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
+func (s *Context) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir,
 		jsondb.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
 		jsondb.WithFileCache(cache),
@@ -258,13 +215,12 @@ func (s *Command) historyStoreWithCache(cache *filecache.Cache[*model.Status]) p
 // OpenLogFile creates and opens a log file for a given DAG execution.
 // It evaluates the log directory, validates settings, creates the log directory,
 // builds a filename using the current timestamp and request ID, and then opens the file.
-func (s *Command) OpenLogFile(
-	ctx context.Context,
+func (ctx *Context) OpenLogFile(
 	prefix string,
 	dag *digraph.DAG,
 	requestID string,
 ) (*os.File, error) {
-	logDir, err := cmdutil.EvalString(ctx, s.cfg.Paths.LogDir)
+	logDir, err := cmdutil.EvalString(ctx, ctx.cfg.Paths.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}
@@ -288,6 +244,71 @@ func (s *Command) OpenLogFile(
 
 	filename := BuildLogFilename(config)
 	return CreateLogFile(filepath.Join(outputDir, filename))
+}
+
+// NewCommand creates a new command instance with the given cobra command and run function.
+func NewCommand(cmd *cobra.Command, flags []commandLineFlag, run func(cmd *Context, args []string) error) *cobra.Command {
+	initFlags(cmd, flags...)
+
+	ctx := &Context{flags: flags, run: run}
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := ctx.init(cmd); err != nil {
+			fmt.Printf("Initialization error: %v\n", err)
+			os.Exit(1)
+		}
+		if err := ctx.run(ctx, args); err != nil {
+			logger.Error(ctx.ctx, "Command failed", "err", err)
+			os.Exit(1)
+		}
+		return nil
+	}
+
+	return cmd
+}
+
+// setupLoggerContext builds a logger context using options derived from configuration.
+// It checks debug mode, quiet mode, and log format.
+func setupLoggerContext(cfg *config.Config, ctx context.Context, quiet bool) context.Context {
+	var opts []logger.Option
+	if cfg.Global.Debug {
+		opts = append(opts, logger.WithDebug())
+	}
+	if quiet {
+		opts = append(opts, logger.WithQuiet())
+	}
+	if cfg.Global.LogFormat != "" {
+		opts = append(opts, logger.WithFormat(cfg.Global.LogFormat))
+	}
+	return logger.WithLogger(ctx, logger.NewLogger(opts...))
+}
+
+// NewContext creates a setup instance from an existing configuration.
+func NewContext(ctx context.Context, cfg *config.Config) *Context {
+	return &Context{cfg: cfg, ctx: setupLoggerContext(cfg, ctx, false)}
+}
+
+// clientOption defines functional options for configuring the client.
+type clientOption func(*clientOptions)
+
+// clientOptions holds optional dependencies for constructing a client.
+type clientOptions struct {
+	dagStore     persistence.DAGStore
+	historyStore persistence.HistoryStore
+}
+
+// withDAGStore returns a clientOption that sets a custom DAGStore.
+func withDAGStore(dagStore persistence.DAGStore) clientOption {
+	return func(o *clientOptions) {
+		o.dagStore = dagStore
+	}
+}
+
+// withHistoryStore returns a clientOption that sets a custom HistoryStore.
+func withHistoryStore(historyStore persistence.HistoryStore) clientOption {
+	return func(o *clientOptions) {
+		o.historyStore = historyStore
+	}
 }
 
 // generateRequestID creates a new UUID string to be used as a request identifier.

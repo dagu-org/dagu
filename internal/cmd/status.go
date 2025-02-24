@@ -25,16 +25,14 @@ Example:
 
 var statusFlags = []commandLineFlag{}
 
-func runStatus(cmd *Command, args []string) error {
-	ctx := cmd.ctx
-
-	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig))
+func runStatus(ctx *Context, args []string) error {
+	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	cli, err := cmd.Client()
+	cli, err := ctx.Client()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
