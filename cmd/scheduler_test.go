@@ -10,7 +10,7 @@ import (
 
 func TestSchedulerCommand(t *testing.T) {
 	t.Run("StartScheduler", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
@@ -22,7 +22,7 @@ func TestSchedulerCommand(t *testing.T) {
 		})
 	})
 	t.Run("StartSchedulerWithConfig", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()

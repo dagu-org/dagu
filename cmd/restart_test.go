@@ -13,7 +13,7 @@ import (
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, "cmd/restart.yaml")
 

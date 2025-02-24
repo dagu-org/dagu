@@ -25,6 +25,7 @@ func New(cfg *config.Config, cli client.Client) *server.Server {
 		Host:                  cfg.Server.Host,
 		Port:                  cfg.Server.Port,
 		TLS:                   cfg.Server.TLS,
+		BasePath:              cfg.Server.BasePath,
 		APIBaseURL:            cfg.Server.APIBasePath,
 		Headless:              cfg.Server.Headless,
 		Handlers:              apiHandlers,

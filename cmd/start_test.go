@@ -10,7 +10,7 @@ import (
 func TestStartCommand(t *testing.T) {
 	t.Parallel()
 
-	th := test.SetupCommandTest(t)
+	th := test.SetupCommand(t)
 
 	tests := []test.CmdTest{
 		{

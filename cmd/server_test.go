@@ -13,7 +13,7 @@ import (
 
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
@@ -25,7 +25,7 @@ func TestServerCommand(t *testing.T) {
 
 	})
 	t.Run("StartServerWithConfig", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()

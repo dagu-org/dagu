@@ -12,7 +12,7 @@ import (
 
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAG", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, "cmd/status.yaml")
 

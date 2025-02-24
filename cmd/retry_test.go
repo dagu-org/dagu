@@ -13,7 +13,7 @@ import (
 
 func TestRetryCommand(t *testing.T) {
 	t.Run("RetryDAG", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, "cmd/retry.yaml")
 

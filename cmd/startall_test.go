@@ -11,7 +11,7 @@ import (
 
 func TestStartAllCommand(t *testing.T) {
 	t.Run("StartAll", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
@@ -23,7 +23,7 @@ func TestStartAllCommand(t *testing.T) {
 
 	})
 	t.Run("StartAllWithConfig", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()

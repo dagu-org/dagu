@@ -40,7 +40,7 @@ func (th CmdTestHelper) RunCommand(t *testing.T, cmd *cobra.Command, testCase Cm
 	}
 }
 
-func SetupCommandTest(t *testing.T) CmdTestHelper {
+func SetupCommand(t *testing.T) CmdTestHelper {
 	t.Helper()
 
 	return CmdTestHelper{Helper: Setup(t, WithCaptureLoggingOutput())}

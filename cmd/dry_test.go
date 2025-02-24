@@ -9,7 +9,7 @@ import (
 
 func TestDryCommand(t *testing.T) {
 	t.Run("DryRun", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 		tests := []test.CmdTest{
 			{
 				Name:        "DryRunDAG",

@@ -12,7 +12,7 @@ import (
 
 func TestStopCommand(t *testing.T) {
 	t.Run("StopDAG", func(t *testing.T) {
-		th := test.SetupCommandTest(t)
+		th := test.SetupCommand(t)
 
 		dagFile := th.DAG(t, "cmd/stop.yaml")
 
