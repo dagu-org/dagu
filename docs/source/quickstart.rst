@@ -55,6 +55,9 @@ Go to the ``SPEC`` Tab and hit the ``Edit`` button. Copy & Paste the following Y
 4. Execute the DAG
 -------------------
 
+.. note::
+   In the `examples <https://github.com/dagu-org/dagu/tree/main/examples>`_ folder, there is a ``docker-compose.yaml`` which can be used to test out DAGs, and get up to speed with examples like the above.
+
 You can execute the example by pressing the `Start` button.
 
 5. Next Steps
