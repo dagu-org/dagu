@@ -15,14 +15,9 @@ func CmdDry() *cobra.Command {
 		Short: "Dry-runs specified DAG",
 		Long:  `dagu dry /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runDry),
+		RunE:  wrapRunE(runDry),
 	}
-
 	initFlags(cmd, paramsFlag)
-
 	return cmd
 }
 

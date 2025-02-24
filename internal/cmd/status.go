@@ -14,14 +14,9 @@ func CmdStatus() *cobra.Command {
 		Short: "Display current status of the DAG",
 		Long:  `dagu status /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runStatus),
+		RunE:  wrapRunE(runStatus),
 	}
-
 	initFlags(cmd)
-
 	return cmd
 }
 

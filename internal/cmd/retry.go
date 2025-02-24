@@ -19,14 +19,9 @@ func CmdRetry() *cobra.Command {
 		Short: "Retry the DAG execution",
 		Long:  `dagu retry --request-id=<request-id> /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runRetry),
+		RunE:  wrapRunE(runRetry),
 	}
-
 	initFlags(cmd, requestIDFlagRetry, quietFlag)
-
 	return cmd
 }
 

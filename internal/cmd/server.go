@@ -9,20 +9,13 @@ import (
 
 func CmdServer() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "server",
-		Short:   "Start the server",
-		Long:    `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>] [--config=<config file>]`,
-		PreRunE: bindServerFlags,
-		RunE:    wrapRunE(runServer),
+		Use:   "server",
+		Short: "Start the server",
+		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>] [--config=<config file>]`,
+		RunE:  wrapRunE(runServer),
 	}
-
 	initFlags(cmd, dagsFlag, hostFlag, portFlag)
-
 	return cmd
-}
-
-func bindServerFlags(cmd *cobra.Command, _ []string) error {
-	return bindCommonFlags(cmd, []string{"port", "host", "dags"})
 }
 
 func runServer(cmd *cobra.Command, _ []string) error {

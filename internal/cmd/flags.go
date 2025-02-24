@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -14,6 +12,7 @@ var (
 		name:      "config",
 		shorthand: "c",
 		usage:     "Path to the configuration file (default: $HOME/.config/dagu/config.yaml)",
+		bindViper: true,
 	}
 
 	// Directory where DAG definition files are stored.
@@ -22,6 +21,7 @@ var (
 		name:      "dags",
 		shorthand: "d",
 		usage:     "Directory containing DAG files (default: $HOME/.config/dagu/dags)",
+		bindViper: true,
 	}
 
 	// The hostname or IP address on which the server will listen.
@@ -30,6 +30,7 @@ var (
 		shorthand:    "s",
 		defaultValue: "localhost",
 		usage:        "Server hostname or IP address (default: localhost)",
+		bindViper:    true,
 	}
 
 	// The port number for the server.
@@ -38,6 +39,7 @@ var (
 		shorthand:    "p",
 		defaultValue: "8080",
 		usage:        "Server port number (default: 8080)",
+		bindViper:    true,
 	}
 
 	// Additional parameters to pass to the DAG execution.
@@ -80,31 +82,23 @@ type commandLineFlag struct {
 	name, shorthand, defaultValue, usage string
 	required                             bool
 	isBool                               bool
+	bindViper                            bool
 }
 
-func initFlags(cmd *cobra.Command, addFlags ...commandLineFlag) {
-	addFlags = append(addFlags, configFlag)
-	for _, flag := range addFlags {
+func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
+	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
+
+	for _, flag := range flags {
 		if flag.isBool {
 			cmd.Flags().BoolP(flag.name, flag.shorthand, false, flag.usage)
 		} else {
 			cmd.Flags().StringP(flag.name, flag.shorthand, flag.defaultValue, flag.usage)
 		}
 		if flag.required {
-			if err := cmd.MarkFlagRequired(flag.name); err != nil {
-				fmt.Printf("failed to mark flag %s as required: %v\n", flag.name, err)
-			}
+			_ = cmd.MarkFlagRequired(flag.name)
+		}
+		if flag.bindViper {
+			_ = viper.BindPFlag(flag.name, cmd.Flags().Lookup(flag.name))
 		}
 	}
-}
-
-func bindCommonFlags(cmd *cobra.Command, addFlags []string) error {
-	flags := []string{"config"}
-	flags = append(flags, addFlags...)
-	for _, flag := range flags {
-		if err := viper.BindPFlag(flag, cmd.Flags().Lookup(flag)); err != nil {
-			return fmt.Errorf("failed to bind flag %s: %w", flag, err)
-		}
-	}
-	return nil
 }

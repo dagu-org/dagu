@@ -12,14 +12,9 @@ func CmdScheduler() *cobra.Command {
 		Use:   "scheduler",
 		Short: "Start the scheduler",
 		Long:  `dagu scheduler [--dags=<DAGs dir>] [--config=<config file>]`,
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, []string{"dags"})
-		},
-		RunE: wrapRunE(runScheduler),
+		RunE:  wrapRunE(runScheduler),
 	}
-
 	initFlags(cmd, dagsFlag)
-
 	return cmd
 }
 

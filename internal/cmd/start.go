@@ -18,18 +18,11 @@ func CmdStart() *cobra.Command {
 		Short: "Runs the DAG",
 		Long:  `dagu start /path/to/spec.yaml -- params1 params2`,
 		Args:  cobra.MinimumNArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runStart),
+		RunE:  wrapRunE(runStart),
 	}
 
-	initStartFlags(cmd)
-	return cmd
-}
-
-func initStartFlags(cmd *cobra.Command) {
 	initFlags(cmd, paramsFlag, requestIDFlagStart, quietFlag)
+	return cmd
 }
 
 func runStart(cmd *cobra.Command, args []string) error {

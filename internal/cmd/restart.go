@@ -22,10 +22,7 @@ func CmdRestart() *cobra.Command {
 		Short: "Stop the running DAG and restart it",
 		Long:  `dagu restart /path/to/spec.yaml`,
 		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runRestart),
+		RunE:  wrapRunE(runRestart),
 	}
 	initFlags(cmd, quietFlag)
 	return cmd
