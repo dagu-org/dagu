@@ -2,14 +2,16 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStatusCommand(t *testing.T) {
 	t.Run("StatusDAG", func(t *testing.T) {
-		th := testSetup(t)
+		th := test.SetupCommandTest(t)
 
 		dagFile := th.DAG(t, "cmd/status.yaml")
 
@@ -17,7 +19,7 @@ func TestStatusCommand(t *testing.T) {
 		go func() {
 			// Start a DAG to check the status.
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, startCmd(), cmdTest{args: args})
+			th.RunCommand(t, startCmd(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -28,17 +30,17 @@ func TestStatusCommand(t *testing.T) {
 			}
 			println(status[0].Status.Status.String())
 			return scheduler.StatusRunning == status[0].Status.Status
-		}, waitForStatusTimeout, statusCheckInterval)
+		}, time.Second*3, time.Millisecond*50)
 
 		// Check the current status.
-		th.RunCommand(t, statusCmd(), cmdTest{
-			args:        []string{"status", dagFile.Location},
-			expectedOut: []string{"status=running"},
+		th.RunCommand(t, statusCmd(), test.CmdTest{
+			Args:        []string{"status", dagFile.Location},
+			ExpectedOut: []string{"status=running"},
 		})
 
 		// Stop the DAG.
 		args := []string{"stop", dagFile.Location}
-		th.RunCommand(t, stopCmd(), cmdTest{args: args})
+		th.RunCommand(t, stopCmd(), test.CmdTest{Args: args})
 		<-done
 	})
 }

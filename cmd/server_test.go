@@ -12,26 +12,26 @@ import (
 
 func TestServerCommand(t *testing.T) {
 	t.Run("StartServer", func(t *testing.T) {
-		th := testSetup(t)
+		th := test.SetupCommandTest(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, serverCmd(), cmdTest{
-			args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
-			expectedOut: []string{"Serving"},
+		th.RunCommand(t, serverCmd(), test.CmdTest{
+			Args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
+			ExpectedOut: []string{"Serving"},
 		})
 
 	})
 	t.Run("StartServerWithConfig", func(t *testing.T) {
-		th := testSetup(t)
+		th := test.SetupCommandTest(t)
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, serverCmd(), cmdTest{
-			args:        []string{"server", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
-			expectedOut: []string{"54321"},
+		th.RunCommand(t, serverCmd(), test.CmdTest{
+			Args:        []string{"server", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
+			ExpectedOut: []string{"54321"},
 		})
 	})
 }

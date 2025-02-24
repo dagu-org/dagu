@@ -2,38 +2,40 @@ package main
 
 import (
 	"testing"
+
+	"github.com/dagu-org/dagu/internal/test"
 )
 
 func TestStartCommand(t *testing.T) {
 	t.Parallel()
 
-	th := testSetup(t)
+	th := test.SetupCommandTest(t)
 
-	tests := []cmdTest{
+	tests := []test.CmdTest{
 		{
-			name:        "StartDAG",
-			args:        []string{"start", th.DAG(t, "cmd/start.yaml").Location},
-			expectedOut: []string{"Step execution started"},
+			Name:        "StartDAG",
+			Args:        []string{"start", th.DAG(t, "cmd/start.yaml").Location},
+			ExpectedOut: []string{"Step execution started"},
 		},
 		{
-			name:        "StartDAGWithDefaultParams",
-			args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location},
-			expectedOut: []string{`params="[1=p1 2=p2]"`},
+			Name:        "StartDAGWithDefaultParams",
+			Args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location},
+			ExpectedOut: []string{`params="[1=p1 2=p2]"`},
 		},
 		{
-			name:        "StartDAGWithParams",
-			args:        []string{"start", `--params="p3 p4"`, th.DAG(t, "cmd/start_with_params.yaml").Location},
-			expectedOut: []string{`params="[1=p3 2=p4]"`},
+			Name:        "StartDAGWithParams",
+			Args:        []string{"start", `--params="p3 p4"`, th.DAG(t, "cmd/start_with_params.yaml").Location},
+			ExpectedOut: []string{`params="[1=p3 2=p4]"`},
 		},
 		{
-			name:        "StartDAGWithParamsAfterDash",
-			args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location, "--", "p5", "p6"},
-			expectedOut: []string{`params="[1=p5 2=p6]"`},
+			Name:        "StartDAGWithParamsAfterDash",
+			Args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location, "--", "p5", "p6"},
+			ExpectedOut: []string{`params="[1=p5 2=p6]"`},
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.Name, func(t *testing.T) {
 			th.RunCommand(t, startCmd(), tc)
 		})
 	}
