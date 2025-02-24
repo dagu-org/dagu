@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -9,42 +9,38 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func dryCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "dry [flags] /path/to/spec.yaml",
-		Short: "Dry-runs specified DAG",
-		Long:  `dagu dry /path/to/spec.yaml -- params1 params2`,
-		Args:  cobra.MinimumNArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runDry),
-	}
+func CmdDry() *cobra.Command {
+	return NewCommand(
+		&cobra.Command{
+			Use:   "dry [flags] /path/to/spec.yaml [-- param1 param2 ...]",
+			Short: "Perform a dry-run of a DAG",
+			Long: `Simulate the execution of a DAG without performing any real actions.
 
-	initCommonFlags(cmd, []commandLineFlag{paramsFlag})
+The specified YAML file defines the DAG. Any parameters provided after "--" override default values.
+This simulation shows the planned execution steps and configuration without side effects.
 
-	return cmd
+Example:
+  dagu dry my_dag.yaml -- P1=foo P2=bar
+`,
+			Args: cobra.MinimumNArgs(1),
+		}, dryFlags,
+		runDry,
+	)
 }
 
-func runDry(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
+var dryFlags = []commandLineFlag{paramsFlag}
 
-	ctx := setup.loggerContext(cmd.Context(), false)
-
+func runDry(ctx *Context, args []string) error {
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
-	var params string
-	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := ctx.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = cmd.Flags().GetString("params")
+		params, err := ctx.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
@@ -62,20 +58,20 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 
 	const logPrefix = "dry_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx = setup.loggerContextWithFile(ctx, false, logFile)
+	ctx.LogToFile(logFile)
 
-	dagStore, err := setup.dagStore()
+	dagStore, err := ctx.dagStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.client()
+	cli, err := ctx.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -87,7 +83,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		setup.historyStore(),
+		ctx.historyStore(),
 		agent.Options{Dry: true},
 	)
 

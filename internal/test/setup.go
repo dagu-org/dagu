@@ -87,7 +87,7 @@ func Setup(t *testing.T, opts ...TestHelperOption) Helper {
 		storage.NewStorage(cfg.Paths.SuspendFlagsDir),
 	)
 
-	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.WorkDir)
+	client := client.New(dagStore, historyStore, flagStore, cfg.Paths.Executable, cfg.Global.WorkDir)
 
 	helper := Helper{
 		Context:      createDefaultContext(),
@@ -235,6 +235,12 @@ func (d *DAG) AssertOutputs(t *testing.T, outputs map[string]any) {
 
 	// compare the actual outputs with the expected outputs
 	for key, expected := range outputs {
+		if expected == "" {
+			_, ok := actualOutputs[key]
+			assert.False(t, ok, "expected output %q to be empty", key)
+			continue
+		}
+
 		if actual, ok := actualOutputs[key]; ok {
 			switch expected := expected.(type) {
 			case string:

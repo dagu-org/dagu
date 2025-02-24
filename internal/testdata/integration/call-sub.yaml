@@ -1,7 +1,7 @@
 steps:
   - name: step1
     run: sub
-    params: "P1=foo"
+    params: "SUB_P1=foo"
     output: OUT1
   - name: step2
     command: echo "${OUT1.outputs.OUT}"

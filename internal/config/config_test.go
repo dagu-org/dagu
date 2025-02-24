@@ -1,477 +1,396 @@
-package config
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/dagu-org/dagu/internal/config"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfig_MigrateLegacyConfig(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func(*Config)
-		validate func(*testing.T, *Config)
-	}{
-		{
-			name: "migrate server settings",
-			setup: func(cfg *Config) {
-				cfg.APIBaseURL = "/legacy/api"
-			},
-			validate: func(t *testing.T, cfg *Config) {
-				if cfg.APIBaseURL != "/legacy/api" {
-					t.Errorf("APIBaseURL = %v, want %v", cfg.APIBaseURL, "/legacy/api")
-				}
-				if cfg.APIBasePath != "/legacy/api" {
-					t.Errorf("APIBasePath = %v, want %v", cfg.APIBasePath, "/legacy/api")
-				}
-			},
-		},
-		{
-			name: "migrate auth settings",
-			setup: func(cfg *Config) {
-				cfg.IsBasicAuth = true
-				cfg.BasicAuthUsername = "user"
-				cfg.BasicAuthPassword = "pass"
-				cfg.IsAuthToken = true
-				cfg.AuthToken = "token123"
-			},
-			validate: func(t *testing.T, cfg *Config) {
-				if !cfg.Auth.Basic.Enabled {
-					t.Error("Auth.Basic.Enabled = false, want true")
-				}
-				if cfg.Auth.Basic.Username != "user" {
-					t.Errorf("Auth.Basic.Username = %v, want user", cfg.Auth.Basic.Username)
-				}
-				if cfg.Auth.Basic.Password != "pass" {
-					t.Errorf("Auth.Basic.Password = %v, want pass", cfg.Auth.Basic.Password)
-				}
-				if !cfg.Auth.Token.Enabled {
-					t.Error("Auth.Token.Enabled = false, want true")
-				}
-				if cfg.Auth.Token.Value != "token123" {
-					t.Errorf("Auth.Token.Value = %v, want token123", cfg.Auth.Token.Value)
-				}
-			},
-		},
-		{
-			name: "migrate paths",
-			setup: func(cfg *Config) {
-				cfg.DAGs = "/dags"
-				cfg.Executable = "/bin/exec"
-				cfg.LogDir = "/logs"
-				cfg.DataDir = "/data"
-				cfg.SuspendFlagsDir = "/suspend"
-				cfg.AdminLogsDir = "/admin/logs"
-				cfg.BaseConfig = "/base.yaml"
-			},
-			validate: func(t *testing.T, cfg *Config) {
-				if cfg.Paths.DAGsDir != "/dags" {
-					t.Errorf("Paths.DAGsDir = %v, want /dags", cfg.Paths.DAGsDir)
-				}
-				if cfg.Paths.Executable != "/bin/exec" {
-					t.Errorf("Paths.Executable = %v, want /bin/exec", cfg.Paths.Executable)
-				}
-				if cfg.Paths.LogDir != "/logs" {
-					t.Errorf("Paths.LogDir = %v, want /logs", cfg.Paths.LogDir)
-				}
-				if cfg.Paths.DataDir != "/data" {
-					t.Errorf("Paths.DataDir = %v, want /data", cfg.Paths.DataDir)
-				}
-				if cfg.Paths.SuspendFlagsDir != "/suspend" {
-					t.Errorf("Paths.SuspendFlagsDir = %v, want /suspend", cfg.Paths.SuspendFlagsDir)
-				}
-				if cfg.Paths.AdminLogsDir != "/admin/logs" {
-					t.Errorf("Paths.AdminLogsDir = %v, want /admin/logs", cfg.Paths.AdminLogsDir)
-				}
-				if cfg.Paths.BaseConfig != "/base.yaml" {
-					t.Errorf("Paths.BaseConfig = %v, want /base.yaml", cfg.Paths.BaseConfig)
-				}
-			},
-		},
-		{
-			name: "migrate UI settings",
-			setup: func(cfg *Config) {
-				cfg.LogEncodingCharset = "utf-8"
-				cfg.NavbarColor = "#000000"
-				cfg.NavbarTitle = "Test Dashboard"
-				cfg.MaxDashboardPageLimit = 50
-			},
-			validate: func(t *testing.T, cfg *Config) {
-				if cfg.UI.LogEncodingCharset != "utf-8" {
-					t.Errorf("UI.LogEncodingCharset = %v, want utf-8", cfg.UI.LogEncodingCharset)
-				}
-				if cfg.UI.NavbarColor != "#000000" {
-					t.Errorf("UI.NavbarColor = %v, want #000000", cfg.UI.NavbarColor)
-				}
-				if cfg.UI.NavbarTitle != "Test Dashboard" {
-					t.Errorf("UI.NavbarTitle = %v, want Test Dashboard", cfg.UI.NavbarTitle)
-				}
-				if cfg.UI.MaxDashboardPageLimit != 50 {
-					t.Errorf("UI.MaxDashboardPageLimit = %v, want 50", cfg.UI.MaxDashboardPageLimit)
-				}
-			},
-		},
-		{
-			name: "clean base path",
-			setup: func(cfg *Config) {
-				cfg.BasePath = "//api/v1/"
-			},
-			validate: func(t *testing.T, cfg *Config) {
-				if cfg.BasePath != "/api/v1" {
-					t.Errorf("BasePath = %v, want /api/v1", cfg.BasePath)
-				}
-			},
-		},
-	}
+func TestLoadConfig_WithValidFile(t *testing.T) {
+	// Reset viper between tests to avoid leakage of global state.
+	viper.Reset()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &Config{}
-			tt.setup(cfg)
-			cfg.MigrateLegacyConfig()
-			tt.validate(t, cfg)
-		})
-	}
-}
-
-func TestConfigLoader_Load(t *testing.T) {
-	type testCase struct {
-		name           string
-		data           string
-		setup          func(t *testing.T)
-		expectedConfig *Config
-	}
-
-	tests := []testCase{
-		{
-			name: "Defaults",
-			data: `
-dagsDir: "/dags"
-logsDir: "/logs"
-dataDir: "/data"
-suspendFlagsDir: "/suspend"
-adminLogsDir: "/admin/logs"
-`,
-			expectedConfig: &Config{
-				Host:        "127.0.0.1",
-				Port:        8080,
-				APIBasePath: "/api/v1",
-				LogFormat:   "text",
-				TZ:          "Asia/Tokyo",
-				UI: UI{
-					NavbarTitle:           "Dagu",
-					MaxDashboardPageLimit: 100,
-					LogEncodingCharset:    "utf-8",
-				},
-			},
-		},
-		{
-			name: "TopLevelFields",
-			data: `
-dagsDir: "/dags"
-logsDir: "/logs"
-dataDir: "/data"
-suspendFlagsDir: "/suspend"
-adminLogsDir: "/admin/logs"
-baseConfig: "/base.yaml"
-BasePath: "/proxy"
-APIBasePath: "/proxy/api/v1"
-WorkDir: "/work"
-Headless: true
-`,
-			expectedConfig: &Config{
-				Host:        "127.0.0.1",
-				Port:        8080,
-				APIBasePath: "/proxy/api/v1",
-				LogFormat:   "text",
-				TZ:          "Asia/Tokyo",
-				BasePath:    "/proxy",
-				WorkDir:     "/work",
-				Headless:    true,
-				UI: UI{
-					NavbarTitle:           "Dagu",
-					MaxDashboardPageLimit: 100,
-					LogEncodingCharset:    "utf-8",
-				},
-			},
-		},
-		{
-			name: "Auth",
-			data: `
-dagsDir: "/dags"
-logsDir: "/logs"
-dataDir: "/data"
-suspendFlagsDir: "/suspend"
-adminLogsDir: "/admin/logs"
-auth:
-  basic:
-    enabled: true
-    username: "admin"	
-    password: "password"
-  token:
-    enabled: true
-    value: "abc123"
-`,
-			expectedConfig: &Config{
-				Host:        "127.0.0.1",
-				Port:        8080,
-				APIBasePath: "/api/v1",
-				LogFormat:   "text",
-				TZ:          "Asia/Tokyo",
-				UI: UI{
-					NavbarTitle:           "Dagu",
-					MaxDashboardPageLimit: 100,
-					LogEncodingCharset:    "utf-8",
-				},
-				Auth: Auth{
-					Basic: AuthBasic{
-						Enabled:  true,
-						Username: "admin",
-						Password: "password",
-					},
-					Token: AuthToken{
-						Enabled: true,
-						Value:   "abc123",
-					},
-				},
-			},
-		},
-		{
-			name: "UI",
-			data: `
-ui:
-  logEncodingCharset: "shift-jis"
-  navbarColor: "#FF0000"
-  navbarTitle: "Test Dashboard"
-  maxDashboardPageLimit: 50
-`,
-			expectedConfig: &Config{
-				Host:        "127.0.0.1",
-				Port:        8080,
-				APIBasePath: "/api/v1",
-				LogFormat:   "text",
-				TZ:          "Asia/Tokyo",
-				UI: UI{
-					NavbarTitle:           "Test Dashboard",
-					NavbarColor:           "#FF0000",
-					MaxDashboardPageLimit: 50,
-					LogEncodingCharset:    "shift-jis",
-				},
-			},
-		},
-		{
-			name: "LoadFromEnv",
-			data: `
-host: "127.0.0.1"
-port: 8080
+	// Create a temporary config file with a valid YAML configuration.
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+host: "0.0.0.0"
+port: 9090
 debug: true
+basePath: "/dagu"
+apiBasePath: "/api/v1"
+tz: "UTC"
+logFormat: "json"
+workDir: "/var/dagu/work"
+headless: true
+paths:
+  dagsDir: "/var/dagu/dags"
+  logDir: "/var/dagu/logs"
+  dataDir: "/var/dagu/data"
+  suspendFlagsDir: "/var/dagu/suspend"
+  adminLogsDir: "/var/dagu/adminlogs"
+  baseConfig: "/var/dagu/base.yaml"
+  executable: "/usr/local/bin/dagu"
+ui:
+  navbarTitle: "Test Dagu"
+  maxDashboardPageLimit: 50
+  logEncodingCharset: "utf-8"
 auth:
   basic:
     enabled: true
     username: "admin"
     password: "secret"
-ui:
-  navbarTitle: "Test Dashboard"
-  maxDashboardPageLimit: 50
-`,
-			setup: func(t *testing.T) {
-				os.Setenv("DAGU_HOST", "localhost")
-				os.Setenv("DAGU_PORT", "9090")
-				t.Cleanup(func() {
-					os.Unsetenv("DAGU_HOST")
-					os.Unsetenv("DAGU_PORT")
-				})
-			},
-			expectedConfig: &Config{
-				Host:        "localhost",
-				Port:        9090,
-				Debug:       true,
-				APIBasePath: "/api/v1",
-				LogFormat:   "text",
-				TZ:          "Asia/Tokyo",
-				Auth: Auth{
-					Basic: AuthBasic{
-						Enabled:  true,
-						Username: "admin",
-						Password: "secret",
-					},
-				},
-				UI: UI{
-					NavbarTitle:           "Test Dashboard",
-					MaxDashboardPageLimit: 50,
-					LogEncodingCharset:    "utf-8",
-				},
-			},
-		},
-	}
+  token:
+    enabled: false
+remoteNodes:
+  - name: "node1"
+    apiBaseURL: "http://node1.example.com/api"
+tls:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	require.NoError(t, err)
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tmpDir, err := os.MkdirTemp("", "dagu-config-test")
-			require.NoError(t, err, "failed to create temp dir: %v", err)
+	// Load the configuration using the provided config file option.
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
 
-			os.Setenv("HOME", tmpDir)
-			os.Setenv("DAGU_TZ", "Asia/Tokyo")
+	// Verify global settings.
+	assert.Equal(t, true, cfg.Global.Debug)
+	assert.Equal(t, "json", cfg.Global.LogFormat)
+	assert.Equal(t, "UTC", cfg.Global.TZ)
+	assert.Equal(t, "/var/dagu/work", cfg.Global.WorkDir)
+	assert.NotNil(t, cfg.Global.Location)
 
-			t.Cleanup(func() {
-				os.RemoveAll(tmpDir)
-				os.Unsetenv("HOME")
-				os.Unsetenv("DAGU_TZ")
-			})
+	// Verify server settings.
+	assert.Equal(t, "0.0.0.0", cfg.Server.Host)
+	assert.Equal(t, 9090, cfg.Server.Port)
+	// cleanBasePath should clean the basePath as provided.
+	assert.Equal(t, "/dagu", cfg.Server.BasePath)
+	assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
+	assert.Equal(t, true, cfg.Server.Headless)
 
-			if tc.setup != nil {
-				tc.setup(t)
-			}
+	// Verify authentication.
+	assert.True(t, cfg.Server.Auth.Basic.Enabled)
+	assert.Equal(t, "admin", cfg.Server.Auth.Basic.Username)
+	assert.Equal(t, "secret", cfg.Server.Auth.Basic.Password)
 
-			configDir := filepath.Join(tmpDir, ".config", "dagu")
-			err = os.MkdirAll(configDir, 0755)
-			require.NoError(t, err, "failed to create config dir: %v", err)
+	// Verify TLS configuration.
+	require.NotNil(t, cfg.Server.TLS)
+	assert.Equal(t, "/path/to/cert.pem", cfg.Server.TLS.CertFile)
+	assert.Equal(t, "/path/to/key.pem", cfg.Server.TLS.KeyFile)
 
-			configFile := filepath.Join(configDir, "config.yaml")
-			testConfig := []byte(tc.data)
-			err = os.WriteFile(configFile, testConfig, 0644)
-			require.NoError(t, err, "failed to write config file: %v", err)
+	// Verify remote nodes.
+	require.Len(t, cfg.Server.RemoteNodes, 1)
+	assert.Equal(t, "node1", cfg.Server.RemoteNodes[0].Name)
+	assert.Equal(t, "http://node1.example.com/api", cfg.Server.RemoteNodes[0].APIBaseURL)
 
-			cfg, err := Load()
-			require.NoError(t, err, "failed to load config: %v", err)
+	// Verify paths.
+	assert.Equal(t, "/var/dagu/dags", cfg.Paths.DAGsDir)
+	assert.Equal(t, "/var/dagu/logs", cfg.Paths.LogDir)
+	assert.Equal(t, "/var/dagu/data", cfg.Paths.DataDir)
+	assert.Equal(t, "/var/dagu/suspend", cfg.Paths.SuspendFlagsDir)
+	assert.Equal(t, "/var/dagu/adminlogs", cfg.Paths.AdminLogsDir)
+	assert.Equal(t, "/var/dagu/base.yaml", cfg.Paths.BaseConfig)
+	assert.Equal(t, "/usr/local/bin/dagu", cfg.Paths.Executable)
 
-			// assert.EqualValues(t, tc.expectedConfig, cfg)
-			assert.Equal(t, tc.expectedConfig.Host, cfg.Host, "Host = %v, want %v", cfg.Host, tc.expectedConfig.Host)
-			assert.Equal(t, tc.expectedConfig.Port, cfg.Port, "Port = %v, want %v", cfg.Port, tc.expectedConfig.Port)
-			assert.Equal(t, tc.expectedConfig.Debug, cfg.Debug, "Debug = %v, want %v", cfg.Debug, tc.expectedConfig.Debug)
-			assert.Equal(t, tc.expectedConfig.BasePath, cfg.BasePath, "BasePath = %v, want %v", cfg.BasePath, tc.expectedConfig.BasePath)
-			assert.Equal(t, tc.expectedConfig.APIBasePath, cfg.APIBasePath, "APIBasePath = %v, want %v", cfg.APIBasePath, tc.expectedConfig.APIBasePath)
-			assert.Equal(t, tc.expectedConfig.WorkDir, cfg.WorkDir, "WorkDir = %v, want %v", cfg.WorkDir, tc.expectedConfig.WorkDir)
-			assert.Equal(t, tc.expectedConfig.Headless, cfg.Headless, "Headless = %v, want %v", cfg.Headless, tc.expectedConfig.Headless)
-			assert.Equal(t, tc.expectedConfig.LogFormat, cfg.LogFormat, "LogFormat = %v, want %v", cfg.LogFormat, tc.expectedConfig.LogFormat)
-			assert.Equal(t, tc.expectedConfig.LatestStatusToday, cfg.LatestStatusToday, "LatestStatusToday = %v, want %v", cfg.LatestStatusToday, tc.expectedConfig.LatestStatusToday)
-			assert.Equal(t, tc.expectedConfig.TZ, cfg.TZ, "TZ = %v, want %v", cfg.TZ, tc.expectedConfig.TZ)
-			assert.Equal(t, tc.expectedConfig.Auth, cfg.Auth, "Auth = %v, want %v", cfg.Auth, tc.expectedConfig.Auth)
-			assert.Equal(t, tc.expectedConfig.UI, cfg.UI, "UI = %v, want %v", cfg.UI, tc.expectedConfig.UI)
-			assert.Equal(t, tc.expectedConfig.RemoteNodes, cfg.RemoteNodes, "RemoteNodes = %v, want %v", cfg.RemoteNodes, tc.expectedConfig.RemoteNodes)
-			assert.Equal(t, tc.expectedConfig.TLS, cfg.TLS, "TLS = %v, want %v", cfg.TLS, tc.expectedConfig.TLS)
-		})
-	}
-
+	// Verify UI settings.
+	assert.Equal(t, "Test Dagu", cfg.UI.NavbarTitle)
+	assert.Equal(t, 50, cfg.UI.MaxDashboardPageLimit)
+	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
 }
 
-func TestConfigLoader_ValidateConfig(t *testing.T) {
+func TestLoadConfig_Defaults(t *testing.T) {
+	viper.Reset()
+	// When no config file is provided, the defaults should be applied.
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// According to setDefaultValues, defaults should be:
+	// host: "127.0.0.1", port: 8080, debug: false, logFormat: "text"
+	assert.Equal(t, "127.0.0.1", cfg.Server.Host)
+	assert.Equal(t, 8080, cfg.Server.Port)
+	assert.False(t, cfg.Global.Debug)
+	assert.Equal(t, "text", cfg.Global.LogFormat)
+
+	// For UI defaults, maxDashboardPageLimit should be 100 and logEncodingCharset "utf-8".
+	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
+	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
+}
+
+func TestValidateConfig_BasicAuthError(t *testing.T) {
+	viper.Reset()
+	// Create a temporary config file where basic auth is enabled but username is missing.
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+auth:
+  basic:
+    enabled: true
+    username: ""
+    password: "secret"
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	_, err = config.Load(config.WithConfigFile(configFile))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "basic auth enabled but username or password is not set")
+}
+
+func TestValidateConfig_TLSError(t *testing.T) {
+	viper.Reset()
+	// Create a config file with incomplete TLS settings.
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+tls:
+  certFile: "/path/to/cert.pem"
+  keyFile: ""
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	_, err = config.Load(config.WithConfigFile(configFile))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "TLS configuration incomplete")
+}
+
+func TestLoadLegacyEnv_AllCases(t *testing.T) {
+	// Reset viper to ensure a clean state.
+	viper.Reset()
+
+	// Define a slice of test cases, each corresponding to one legacy environment variable.
 	tests := []struct {
-		name    string
-		setup   func(*Config)
-		wantErr bool
+		envVar string
+		value  string
+		verify func(cfg *config.Config, t *testing.T)
 	}{
 		{
-			name: "valid config",
-			setup: func(cfg *Config) {
-				cfg.Port = 8080
-				cfg.Auth.Basic.Enabled = true
-				cfg.Auth.Basic.Username = "user"
-				cfg.Auth.Basic.Password = "pass"
-				cfg.UI.MaxDashboardPageLimit = 100
+			envVar: "DAGU__ADMIN_NAVBAR_COLOR",
+			value:  "blue",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, "blue", cfg.UI.NavbarColor, "expected legacy navbar color to be blue")
 			},
-			wantErr: false,
 		},
 		{
-			name: "invalid port",
-			setup: func(cfg *Config) {
-				cfg.Port = 70000
+			envVar: "DAGU__ADMIN_NAVBAR_TITLE",
+			value:  "MyLegacyTitle",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, "MyLegacyTitle", cfg.UI.NavbarTitle, "expected legacy navbar title to be MyLegacyTitle")
 			},
-			wantErr: true,
 		},
 		{
-			name: "invalid basic auth",
-			setup: func(cfg *Config) {
-				cfg.Port = 8080
-				cfg.Auth.Basic.Enabled = true
+			envVar: "DAGU__ADMIN_PORT",
+			value:  "1234",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, 1234, cfg.Server.Port, "expected legacy port to be 1234")
 			},
-			wantErr: true,
 		},
 		{
-			name: "invalid token auth",
-			setup: func(cfg *Config) {
-				cfg.Port = 8080
-				cfg.Auth.Token.Enabled = true
+			envVar: "DAGU__ADMIN_HOST",
+			value:  "0.0.0.0",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, "0.0.0.0", cfg.Server.Host, "expected legacy host to be 0.0.0.0")
 			},
-			wantErr: true,
 		},
 		{
-			name: "invalid TLS config",
-			setup: func(cfg *Config) {
-				cfg.Port = 8080
-				cfg.TLS = &TLSConfig{
-					CertFile: "/cert.pem",
-				}
+			envVar: "DAGU__DATA",
+			value:  "/data/legacy",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, "/data/legacy", cfg.Paths.DataDir, "expected legacy data directory to be /data/legacy")
 			},
-			wantErr: true,
 		},
 		{
-			name: "invalid dashboard limit",
-			setup: func(cfg *Config) {
-				cfg.Port = 8080
-				cfg.UI.MaxDashboardPageLimit = 0
+			envVar: "DAGU__SUSPEND_FLAGS_DIR",
+			value:  "/suspend/legacy",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, "/suspend/legacy", cfg.Paths.SuspendFlagsDir, "expected legacy suspend flags directory to be /suspend/legacy")
 			},
-			wantErr: true,
+		},
+		{
+			envVar: "DAGU__ADMIN_LOGS_DIR",
+			value:  "/admin/legacy",
+			verify: func(cfg *config.Config, t *testing.T) {
+				assert.Equal(t, "/admin/legacy", cfg.Paths.AdminLogsDir, "expected legacy admin logs directory to be /admin/legacy")
+			},
 		},
 	}
 
-	loader := NewConfigLoader()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := &Config{}
-			tt.setup(cfg)
-			err := loader.validateConfig(cfg)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+	// Set all legacy environment variables.
+	for _, tc := range tests {
+		err := os.Setenv(tc.envVar, tc.value)
+		require.NoError(t, err, "failed to set environment variable %s", tc.envVar)
+		defer os.Unsetenv(tc.envVar)
+	}
+
+	// Load the configuration.
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	// Run each verification function to ensure the legacy env values were properly loaded.
+	for _, tc := range tests {
+		tc.verify(cfg, t)
 	}
 }
 
-func TestConfigLoader_LoadLegacyEnv(t *testing.T) {
-	// Set up test environment variables
-	envVars := map[string]string{
-		"DAGU__ADMIN_NAVBAR_COLOR": "#FF0000",
-		"DAGU__ADMIN_NAVBAR_TITLE": "Legacy Dashboard",
-		"DAGU__ADMIN_PORT":         "9000",
-		"DAGU__ADMIN_HOST":         "0.0.0.0",
-		"DAGU__DATA":               "/data/legacy",
+func TestSetExecutable(t *testing.T) {
+	viper.Reset()
+	// Create a config file that leaves the executable path empty.
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+paths:
+  executable: ""
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	// The setExecutable function should fill in the executable path.
+	assert.NotEmpty(t, cfg.Paths.Executable)
+}
+
+func TestCleanBasePath(t *testing.T) {
+	viper.Reset()
+	// Create a config file with an unclean basePath.
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := `
+basePath: "////dagu//"
+`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	require.NoError(t, err)
+
+	cfg, err := config.Load(config.WithConfigFile(configFile))
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	// Expect cleanBasePath to produce "/dagu" from "////dagu//"
+	assert.Equal(t, "/dagu", cfg.Server.BasePath)
+}
+
+// TestLoadLegacyFields_AllSet verifies that when legacy fields are set in the config definition,
+// they properly override or populate the corresponding fields in the Config.
+func TestLoadLegacyFields_AllSet(t *testing.T) {
+	loader := &config.ConfigLoader{}
+
+	// Create a sample configDef with all legacy fields populated.
+	def := config.Definition{
+		BasicAuthUsername:     "legacyUser",
+		BasicAuthPassword:     "legacyPass",
+		IsAuthToken:           true,
+		AuthToken:             "legacyToken",
+		DAGs:                  "legacyDags",
+		DAGsDir:               "newDags", // should override def.DAGs if both are set
+		Executable:            "/usr/bin/legacy",
+		LogDir:                "/var/log/legacy",
+		DataDir:               "/var/data/legacy",
+		SuspendFlagsDir:       "/var/suspend/legacy",
+		AdminLogsDir:          "/var/admin/legacy",
+		BaseConfig:            "/etc/legacy/base.yaml",
+		LogEncodingCharset:    "latin1",
+		NavbarColor:           "red",
+		NavbarTitle:           "Legacy Dagu",
+		MaxDashboardPageLimit: 42,
 	}
 
-	// Set environment variables
-	for k, v := range envVars {
-		os.Setenv(k, v)
-	}
-	defer func() {
-		for k := range envVars {
-			os.Unsetenv(k)
-		}
-	}()
-
-	cfg := &Config{}
-	loader := NewConfigLoader()
-	err := loader.LoadLegacyEnv(cfg)
-	if err != nil {
-		t.Fatalf("LoadLegacyEnv() error = %v", err)
+	// Initialize a Config instance with zero (or default) values.
+	cfg := config.Config{
+		Server: config.Server{
+			Auth: config.Auth{
+				Basic: config.AuthBasic{},
+				Token: config.AuthToken{},
+			},
+		},
+		Paths: config.PathsConfig{},
+		UI:    config.UI{},
 	}
 
-	// Verify legacy environment variables were properly loaded
-	if cfg.UI.NavbarColor != "#FF0000" {
-		t.Errorf("UI.NavbarColor = %v, want #FF0000", cfg.UI.NavbarColor)
+	loader.LoadLegacyFields(&cfg, def)
+
+	// Check that legacy fields are correctly assigned.
+	assert.Equal(t, "legacyUser", cfg.Server.Auth.Basic.Username, "BasicAuthUsername should be set")
+	assert.Equal(t, "legacyPass", cfg.Server.Auth.Basic.Password, "BasicAuthPassword should be set")
+	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled when IsAuthToken is true")
+	assert.Equal(t, "legacyToken", cfg.Server.Auth.Token.Value, "Auth token value should be set")
+	// When both DAGs and DAGsDir are provided, DAGsDir takes precedence.
+	assert.Equal(t, "newDags", cfg.Paths.DAGsDir, "DAGsDir should be set from def.DAGsDir")
+	assert.Equal(t, "/usr/bin/legacy", cfg.Paths.Executable, "Executable should be set")
+	assert.Equal(t, "/var/log/legacy", cfg.Paths.LogDir, "LogDir should be set")
+	assert.Equal(t, "/var/data/legacy", cfg.Paths.DataDir, "DataDir should be set")
+	assert.Equal(t, "/var/suspend/legacy", cfg.Paths.SuspendFlagsDir, "SuspendFlagsDir should be set")
+	assert.Equal(t, "/var/admin/legacy", cfg.Paths.AdminLogsDir, "AdminLogsDir should be set")
+	assert.Equal(t, "/etc/legacy/base.yaml", cfg.Paths.BaseConfig, "BaseConfig should be set")
+	assert.Equal(t, "latin1", cfg.UI.LogEncodingCharset, "LogEncodingCharset should be set")
+	assert.Equal(t, "red", cfg.UI.NavbarColor, "NavbarColor should be set")
+	assert.Equal(t, "Legacy Dagu", cfg.UI.NavbarTitle, "NavbarTitle should be set")
+	assert.Equal(t, 42, cfg.UI.MaxDashboardPageLimit, "MaxDashboardPageLimit should be set")
+}
+
+// TestLoadLegacyFields_NoneSet verifies that if none of the legacy fields are set in the config definition,
+// the Config instance remains unchanged.
+func TestLoadLegacyFields_NoneSet(t *testing.T) {
+	loader := &config.ConfigLoader{}
+	def := config.Definition{} // All legacy fields are zero values.
+
+	// Create a Config instance with preset (non-zero) values.
+	cfg := config.Config{
+		Server: config.Server{
+			Auth: config.Auth{
+				Basic: config.AuthBasic{
+					Username: "presetUser",
+					Password: "presetPass",
+				},
+				Token: config.AuthToken{
+					Enabled: false,
+					Value:   "presetToken",
+				},
+			},
+		},
+		Paths: config.PathsConfig{
+			DAGsDir:         "presetDags",
+			Executable:      "/usr/bin/preset",
+			LogDir:          "presetLog",
+			DataDir:         "presetData",
+			SuspendFlagsDir: "presetSuspend",
+			AdminLogsDir:    "presetAdmin",
+			BaseConfig:      "presetBase",
+		},
+		UI: config.UI{
+			LogEncodingCharset:    "utf-8",
+			NavbarColor:           "green",
+			NavbarTitle:           "Preset Dagu",
+			MaxDashboardPageLimit: 100,
+		},
 	}
-	if cfg.UI.NavbarTitle != "Legacy Dashboard" {
-		t.Errorf("UI.NavbarTitle = %v, want Legacy Dashboard", cfg.UI.NavbarTitle)
-	}
-	if cfg.Port != 9000 {
-		t.Errorf("Port = %v, want 9000", cfg.Port)
-	}
-	if cfg.Host != "0.0.0.0" {
-		t.Errorf("Host = %v, want 0.0.0.0", cfg.Host)
-	}
-	if cfg.Paths.DataDir != "/data/legacy" {
-		t.Errorf("Paths.DataDir = %v, want /data/legacy", cfg.Paths.DataDir)
-	}
+
+	loader.LoadLegacyFields(&cfg, def)
+
+	// Verify that none of the preset values have been overwritten.
+	assert.Equal(t, "presetUser", cfg.Server.Auth.Basic.Username)
+	assert.Equal(t, "presetPass", cfg.Server.Auth.Basic.Password)
+	assert.False(t, cfg.Server.Auth.Token.Enabled)
+	assert.Equal(t, "presetToken", cfg.Server.Auth.Token.Value)
+	assert.Equal(t, "presetDags", cfg.Paths.DAGsDir)
+	assert.Equal(t, "/usr/bin/preset", cfg.Paths.Executable)
+	assert.Equal(t, "presetLog", cfg.Paths.LogDir)
+	assert.Equal(t, "presetData", cfg.Paths.DataDir)
+	assert.Equal(t, "presetSuspend", cfg.Paths.SuspendFlagsDir)
+	assert.Equal(t, "presetAdmin", cfg.Paths.AdminLogsDir)
+	assert.Equal(t, "presetBase", cfg.Paths.BaseConfig)
+	assert.Equal(t, "utf-8", cfg.UI.LogEncodingCharset)
+	assert.Equal(t, "green", cfg.UI.NavbarColor)
+	assert.Equal(t, "Preset Dagu", cfg.UI.NavbarTitle)
+	assert.Equal(t, 100, cfg.UI.MaxDashboardPageLimit)
 }

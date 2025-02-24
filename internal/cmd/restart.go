@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -16,43 +16,38 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func restartCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "restart /path/to/spec.yaml",
-		Short: "Stop the running DAG and restart it",
-		Long:  `dagu restart /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runRestart),
-	}
-	initCommonFlags(cmd, nil)
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
-	return cmd
+func CmdRestart() *cobra.Command {
+	return NewCommand(
+		&cobra.Command{
+			Use:   "restart [flags] /path/to/spec.yaml",
+			Short: "Restart a running DAG",
+			Long: `Stop the currently running DAG and immediately restart it with the same configuration.
+
+Flags:
+  --request-id string   (Optional) Unique identifier for tracking the restart execution.
+
+Example:
+  dagu restart my_dag.yaml --request-id=abc123
+
+This command gracefully stops the active DAG execution before reinitiating it.
+`,
+			Args: cobra.ExactArgs(1),
+		}, restartFlags, runRestart,
+	)
 }
 
-func runRestart(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
+var restartFlags = []commandLineFlag{}
 
-	quiet, err := cmd.Flags().GetBool("quiet")
-	if err != nil {
-		return fmt.Errorf("failed to get quiet flag: %w", err)
-	}
-
-	ctx := setup.loggerContext(cmd.Context(), quiet)
-
+func runRestart(ctx *Context, args []string) error {
 	specFilePath := args[0]
-	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
+
+	dag, err := digraph.Load(ctx, specFilePath, digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specFilePath, err)
 	}
 
-	if err := handleRestartProcess(ctx, setup, dag, quiet, specFilePath); err != nil {
+	if err := handleRestartProcess(ctx, dag, specFilePath); err != nil {
 		logger.Error(ctx, "Failed to restart process", "path", specFilePath, "err", err)
 		return fmt.Errorf("restart process failed for DAG %s: %w", dag.Name, err)
 	}
@@ -60,8 +55,8 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, quiet bool, specFilePath string) error {
-	cli, err := setup.client()
+func handleRestartProcess(ctx *Context, dag *digraph.DAG, specFilePath string) error {
+	cli, err := ctx.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -81,7 +76,7 @@ func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, q
 	}
 
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 	if status.Params != "" {
 		// backward compatibility
@@ -96,11 +91,10 @@ func handleRestartProcess(ctx context.Context, setup *setup, dag *digraph.DAG, q
 		return fmt.Errorf("failed to reload DAG with params: %w", err)
 	}
 
-	return executeDAG(ctx, cli, setup, dag, quiet)
+	return executeDAG(ctx, cli, dag)
 }
 
-func executeDAG(ctx context.Context, cli client.Client, setup *setup,
-	dag *digraph.DAG, quiet bool) error {
+func executeDAG(ctx *Context, cli client.Client, dag *digraph.DAG) error {
 
 	requestID, err := generateRequestID()
 	if err != nil {
@@ -108,17 +102,17 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 	}
 
 	const logPrefix = "restart_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := ctx.OpenLogFile(logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file: %w", err)
 	}
 	defer logFile.Close()
 
-	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
+	ctx.LogToFile(logFile)
 
 	logger.Info(ctx, "DAG restart initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := setup.dagStore()
+	dagStore, err := ctx.dagStore()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
@@ -131,12 +125,12 @@ func executeDAG(ctx context.Context, cli client.Client, setup *setup,
 		logFile.Name(),
 		cli,
 		dagStore,
-		setup.historyStore(),
+		ctx.historyStore(),
 		agent.Options{Dry: false})
 
 	listenSignals(ctx, agentInstance)
 	if err := agentInstance.Run(ctx); err != nil {
-		if quiet {
+		if ctx.quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)

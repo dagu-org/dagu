@@ -59,13 +59,15 @@ func setupTest(t *testing.T) testHelper {
 			DAGsDir:         testdataDir,
 			SuspendFlagsDir: tempDir,
 		},
-		WorkDir: tempDir,
+		Global: config.Global{
+			WorkDir: tempDir,
+		},
 	}
 
 	dagStore := local.NewDAGStore(cfg.Paths.DAGsDir)
 	historyStore := jsondb.New(cfg.Paths.DataDir)
 	flagStore := local.NewFlagStore(storage.NewStorage(cfg.Paths.SuspendFlagsDir))
-	cli := client.New(dagStore, historyStore, flagStore, "", cfg.WorkDir)
+	cli := client.New(dagStore, historyStore, flagStore, "", cfg.Global.WorkDir)
 	jobManager := NewDAGJobManager(testdataDir, cli, "", "")
 
 	return testHelper{

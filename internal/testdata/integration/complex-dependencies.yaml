@@ -1,0 +1,22 @@
+steps:
+  - name: start
+    command: echo "start"
+    output: START
+  - name: branch1
+    command: echo "branch1"
+    depends: start
+    output: BRANCH1
+  - name: branch2
+    command: echo "branch2"
+    depends: start
+    output: BRANCH2
+  - name: merge
+    command: echo "merge"
+    depends:
+      - branch1
+      - branch2
+    output: MERGE
+  - name: final
+    command: echo "final"
+    depends: merge
+    output: FINAL

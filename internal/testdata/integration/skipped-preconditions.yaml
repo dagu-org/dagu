@@ -1,0 +1,16 @@
+steps:
+  - name: run-step
+    command: echo "executed"
+    output: OUT_RUN
+  - name: skip-step
+    command: echo "should not execute"
+    preconditions:
+      - condition: "`echo no`"
+        expected: "yes"
+    output: OUT_SKIP1
+  - name: skip-step
+    command: echo "should execute"
+    preconditions:
+      - condition: "`echo yes`"
+        expected: "yes"
+    output: OUT_SKIP2

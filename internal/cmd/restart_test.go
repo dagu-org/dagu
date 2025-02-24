@@ -1,24 +1,26 @@
-package main
+package cmd_test
 
 import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRestartCommand(t *testing.T) {
 	t.Run("RestartDAG", func(t *testing.T) {
-		th := testSetup(t)
+		th := test.SetupCommand(t)
 
 		dag := th.DAG(t, "cmd/restart.yaml")
 
 		go func() {
 			// Start the DAG to restart.
 			args := []string{"start", `--params="foo"`, dag.Location}
-			th.RunCommand(t, startCmd(), cmdTest{args: args})
+			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 		}()
 
 		// Wait for the DAG to be running.
@@ -30,7 +32,7 @@ func TestRestartCommand(t *testing.T) {
 		go func() {
 			defer close(done)
 			args := []string{"restart", dag.Location}
-			th.RunCommand(t, restartCmd(), cmdTest{args: args})
+			th.RunCommand(t, cmd.CmdRestart(), test.CmdTest{Args: args})
 		}()
 
 		// Wait for the DAG running again.
@@ -39,7 +41,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
 
 		// Stop the restarted DAG.
-		th.RunCommand(t, stopCmd(), cmdTest{args: []string{"stop", dag.Location}})
+		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
 
 		// Wait for the DAG is stopped.
 		dag.AssertCurrentStatus(t, scheduler.StatusNone)
@@ -49,8 +51,8 @@ func TestRestartCommand(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check parameter was the same as the first execution
-		setup := setupWithConfig(th.Config)
-		client, err := setup.client()
+		setup := cmd.NewContext(th.Context, th.Config)
+		client, err := setup.Client()
 		require.NoError(t, err)
 
 		time.Sleep(time.Millisecond * 300) // Wait for the history to be updated.

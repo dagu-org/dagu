@@ -1,7 +1,6 @@
-package main
+package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,46 +12,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func retryCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "retry --request-id=<request-id> /path/to/spec.yaml",
-		Short: "Retry the DAG execution",
-		Long:  `dagu retry --request-id=<request-id> /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runRetry),
-	}
+func CmdRetry() *cobra.Command {
+	return NewCommand(
+		&cobra.Command{
+			Use:   "retry [flags] /path/to/spec.yaml",
+			Short: "Retry a DAG execution",
+			Long: `Re-execute a previously run DAG using its unique request ID.
 
-	initRetryFlags(cmd)
+Example:
+  dagu retry my_dag.yaml --request-id=abc123
 
-	return cmd
+This command is useful for recovering from errors or transient issues by re-running the DAG.
+`,
+			Args: cobra.ExactArgs(1),
+		}, retryFlags, runRetry,
+	)
 }
 
-func initRetryFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{withRequired(requestIDFlag)})
-	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
-}
+var retryFlags = []commandLineFlag{requestIDFlagRetry}
 
-func runRetry(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
-
-	// Get quiet flag
-	quiet, err := cmd.Flags().GetBool("quiet")
-	if err != nil {
-		return fmt.Errorf("failed to get quiet flag: %w", err)
-	}
-
-	requestID, err := cmd.Flags().GetString("request-id")
+func runRetry(ctx *Context, args []string) error {
+	requestID, err := ctx.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
-
-	ctx := setup.loggerContext(cmd.Context(), quiet)
 
 	specFilePath := args[0]
 
@@ -62,14 +45,14 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
 	}
 
-	status, err := setup.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	status, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
 	}
 
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
 	}
 
 	if status.Status.Params != "" {
@@ -88,7 +71,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	}
 
 	// Execute DAG retry
-	if err := executeRetry(ctx, dag, setup, status, quiet); err != nil {
+	if err := executeRetry(ctx, dag, status); err != nil {
 		logger.Error(ctx, "Failed to execute retry", "path", specFilePath, "err", err)
 		return fmt.Errorf("failed to execute retry: %w", err)
 	}
@@ -96,14 +79,14 @@ func runRetry(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalStatus *model.StatusFile, quiet bool) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *model.StatusFile) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)
 	}
 
 	const logPrefix = "retry_"
-	logFile, err := setup.openLogFile(ctx, logPrefix, dag, newRequestID)
+	logFile, err := ctx.OpenLogFile(logPrefix, dag, newRequestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
@@ -111,15 +94,15 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 
 	logger.Info(ctx, "DAG retry initiated", "DAG", dag.Name, "originalRequestID", originalStatus.Status.RequestID, "newRequestID", newRequestID, "logFile", logFile.Name())
 
-	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
+	ctx.LogToFile(logFile)
 
-	dagStore, err := setup.dagStore()
+	dagStore, err := ctx.dagStore()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.client()
+	cli, err := ctx.Client()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -132,14 +115,14 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		logFile.Name(),
 		cli,
 		dagStore,
-		setup.historyStore(),
+		ctx.historyStore(),
 		agent.Options{RetryTarget: &originalStatus.Status},
 	)
 
 	listenSignals(ctx, agentInstance)
 
 	if err := agentInstance.Run(ctx); err != nil {
-		if quiet {
+		if ctx.quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
@@ -147,7 +130,7 @@ func executeRetry(ctx context.Context, dag *digraph.DAG, setup *setup, originalS
 		}
 	}
 
-	if !quiet {
+	if !ctx.quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 

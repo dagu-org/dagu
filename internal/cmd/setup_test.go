@@ -1,4 +1,4 @@
-package main
+package cmd_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/stretchr/testify/assert"
@@ -17,12 +18,11 @@ func TestOpenLogFile(t *testing.T) {
 	t.Run("successful log file creation", func(t *testing.T) {
 		tempDir := t.TempDir() // Using t.TempDir() for automatic cleanup
 
-		setup := setupWithConfig(&config.Config{
+		setup := cmd.NewContext(context.Background(), &config.Config{
 			Paths: config.PathsConfig{LogDir: tempDir},
 		})
 
-		ctx := setup.loggerContext(context.Background(), false)
-		file, err := setup.openLogFile(ctx, "test_", &digraph.DAG{
+		file, err := setup.OpenLogFile("test_", &digraph.DAG{
 			Name:   "test_dag",
 			LogDir: "",
 		}, "12345678")
@@ -40,13 +40,13 @@ func TestOpenLogFile(t *testing.T) {
 func TestSetupLogDirectory(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   logFileSettings
+		config   cmd.LogFileSettings
 		wantErr  bool
 		validate func(t *testing.T, path string)
 	}{
 		{
 			name: "using LogDir",
-			config: logFileSettings{
+			config: cmd.LogFileSettings{
 				LogDir:  t.TempDir(),
 				DAGName: "test_dag",
 			},
@@ -57,7 +57,7 @@ func TestSetupLogDirectory(t *testing.T) {
 		},
 		{
 			name: "using DAGLogDir",
-			config: logFileSettings{
+			config: cmd.LogFileSettings{
 				DAGLogDir: filepath.Join(t.TempDir(), "custom"),
 				DAGName:   "test_dag",
 			},
@@ -69,7 +69,7 @@ func TestSetupLogDirectory(t *testing.T) {
 		},
 		{
 			name: "with special characters in DAGName",
-			config: logFileSettings{
+			config: cmd.LogFileSettings{
 				LogDir:  t.TempDir(),
 				DAGName: "test/dag*special",
 			},
@@ -82,7 +82,7 @@ func TestSetupLogDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := setupLogDirectory(tt.config)
+			result, err := cmd.SetupLogDirectory(tt.config)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -95,13 +95,13 @@ func TestSetupLogDirectory(t *testing.T) {
 
 func TestBuildLogFilename(t *testing.T) {
 	t.Run("filename format", func(t *testing.T) {
-		config := logFileSettings{
+		config := cmd.LogFileSettings{
 			Prefix:    "test_",
 			DAGName:   "test dag",
 			RequestID: "12345678901234", // Longer than 8 chars to test truncation
 		}
 
-		filename := buildLogFilename(config)
+		filename := cmd.BuildLogFilename(config)
 
 		assert.Contains(t, filename, "test_")
 		assert.Contains(t, filename, "test_dag")
@@ -120,7 +120,7 @@ func TestCreateLogFile(t *testing.T) {
 		dir := t.TempDir()
 		filePath := filepath.Join(dir, "test.log")
 
-		file, err := createLogFile(filePath)
+		file, err := cmd.CreateLogFile(filePath)
 		require.NoError(t, err)
 		defer file.Close()
 
@@ -133,7 +133,7 @@ func TestCreateLogFile(t *testing.T) {
 	})
 
 	t.Run("invalid path", func(t *testing.T) {
-		_, err := createLogFile("/nonexistent/directory/test.log")
+		_, err := cmd.CreateLogFile("/nonexistent/directory/test.log")
 		assert.Error(t, err)
 	})
 }
@@ -141,12 +141,12 @@ func TestCreateLogFile(t *testing.T) {
 func TestValidateSettings(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  logFileSettings
+		config  cmd.LogFileSettings
 		wantErr bool
 	}{
 		{
 			name: "valid settings",
-			config: logFileSettings{
+			config: cmd.LogFileSettings{
 				LogDir:  "/tmp",
 				DAGName: "test",
 			},
@@ -154,14 +154,14 @@ func TestValidateSettings(t *testing.T) {
 		},
 		{
 			name: "empty DAGName",
-			config: logFileSettings{
+			config: cmd.LogFileSettings{
 				LogDir: "/tmp",
 			},
 			wantErr: true,
 		},
 		{
 			name: "no directories",
-			config: logFileSettings{
+			config: cmd.LogFileSettings{
 				DAGName: "test",
 			},
 			wantErr: true,
@@ -170,7 +170,7 @@ func TestValidateSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateSettings(tt.config)
+			err := cmd.ValidateSettings(tt.config)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

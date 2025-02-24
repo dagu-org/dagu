@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -8,38 +8,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func statusCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status /path/to/spec.yaml",
-		Short: "Display current status of the DAG",
-		Long:  `dagu status /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return bindCommonFlags(cmd, nil)
-		},
-		RunE: wrapRunE(runStatus),
-	}
+func CmdStatus() *cobra.Command {
+	return NewCommand(
+		&cobra.Command{
+			Use:   "status [flags] /path/to/spec.yaml",
+			Short: "Display the current status of a DAG",
+			Long: `Show real-time status information for a specified DAG execution.
 
-	initCommonFlags(cmd, nil)
-
-	return cmd
+Example:
+  dagu status my_dag.yaml
+`,
+			Args: cobra.ExactArgs(1),
+		}, statusFlags, runStatus,
+	)
 }
 
-func runStatus(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup()
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
+var statusFlags = []commandLineFlag{}
 
-	ctx := setup.loggerContext(cmd.Context(), false)
-
-	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
+func runStatus(ctx *Context, args []string) error {
+	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", args[0], "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
 	}
 
-	cli, err := setup.client()
+	cli, err := ctx.Client()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)

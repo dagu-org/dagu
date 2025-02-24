@@ -1,4 +1,4 @@
-package config
+package config_test
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/config"
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,10 +20,10 @@ func TestResolver(t *testing.T) {
 		defer os.RemoveAll(tmpDir)
 
 		os.Setenv("TEST_APP_HOME", filepath.Join(tmpDir, build.Slug))
-		r := newResolver("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), XDGConfig{})
+		r := config.NewResolver("TEST_APP_HOME", filepath.Join(tmpDir, ".dagu"), config.XDGConfig{})
 
-		assert.Equal(t, r, PathResolver{
-			Paths: Paths{
+		assert.Equal(t, r, config.PathResolver{
+			Paths: config.Paths{
 				ConfigDir:       filepath.Join(tmpDir, build.Slug),
 				DAGsDir:         filepath.Join(tmpDir, build.Slug, "dags"),
 				SuspendFlagsDir: filepath.Join(tmpDir, build.Slug, "suspend"),
@@ -42,10 +43,10 @@ func TestResolver(t *testing.T) {
 		err := os.MkdirAll(legacyPath, os.ModePerm)
 		require.NoError(t, err)
 
-		r := newResolver("UNSET_APP_HOME", legacyPath, XDGConfig{})
+		r := config.NewResolver("UNSET_APP_HOME", legacyPath, config.XDGConfig{})
 
-		assert.Equal(t, r, PathResolver{
-			Paths: Paths{
+		assert.Equal(t, r, config.PathResolver{
+			Paths: config.Paths{
 				ConfigDir:       filepath.Join(tmpDir, hiddenDir),
 				DAGsDir:         filepath.Join(tmpDir, hiddenDir, "dags"),
 				SuspendFlagsDir: filepath.Join(tmpDir, hiddenDir, "suspend"),
@@ -53,16 +54,17 @@ func TestResolver(t *testing.T) {
 				LogsDir:         filepath.Join(tmpDir, hiddenDir, "logs"),
 				AdminLogsDir:    filepath.Join(tmpDir, hiddenDir, "logs", "admin"),
 				BaseConfigFile:  filepath.Join(tmpDir, hiddenDir, "base.yaml"),
+				Warnings:        []string{"Legacy path detected. Update configuration paths."},
 			},
 		})
 	})
 	t.Run("XDG_CONFIG_HOME", func(t *testing.T) {
-		r := newResolver("UNSET_APP_HOME", ".test", XDGConfig{
+		r := config.NewResolver("UNSET_APP_HOME", ".test", config.XDGConfig{
 			DataHome:   "/home/user/.local/share",
 			ConfigHome: "/home/user/.config",
 		})
-		assert.Equal(t, r, PathResolver{
-			Paths: Paths{
+		assert.Equal(t, r, config.PathResolver{
+			Paths: config.Paths{
 				ConfigDir:       path.Join("/home/user/.config", build.Slug),
 				DAGsDir:         path.Join("/home/user/.config", build.Slug, "dags"),
 				SuspendFlagsDir: path.Join("/home/user/.local/share", build.Slug, "suspend"),
@@ -71,7 +73,7 @@ func TestResolver(t *testing.T) {
 				AdminLogsDir:    path.Join("/home/user/.local/share", build.Slug, "logs", "admin"),
 				BaseConfigFile:  path.Join("/home/user/.config", build.Slug, "base.yaml"),
 			},
-			XDGConfig: XDGConfig{
+			XDGConfig: config.XDGConfig{
 				DataHome:   "/home/user/.local/share",
 				ConfigHome: "/home/user/.config",
 			},

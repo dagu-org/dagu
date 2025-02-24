@@ -4,18 +4,20 @@ import (
 	"os"
 
 	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/cmd"
 	"github.com/spf13/cobra"
 )
 
-var (
-	// version is set at build time
-	version = "0.0.0"
-	rootCmd = &cobra.Command{
-		Use:   build.Slug,
-		Short: "YAML-based DAG scheduling tool.",
-		Long:  `YAML-based DAG scheduling tool.`,
-	}
-)
+var rootCmd = &cobra.Command{
+	Use:   build.Slug,
+	Short: "Dagu is a compact, portable workflow engine",
+	Long: `Dagu is a compact, portable workflow engine.
+
+It provides a declarative model for orchestrating command execution across
+diverse environments, including shell scripts, Python commands, containerized
+operations, or remote commands.
+`,
+}
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -24,20 +26,18 @@ func main() {
 }
 
 func init() {
+	rootCmd.AddCommand(cmd.CmdStart())
+	rootCmd.AddCommand(cmd.CmdStop())
+	rootCmd.AddCommand(cmd.CmdRestart())
+	rootCmd.AddCommand(cmd.CmdDry())
+	rootCmd.AddCommand(cmd.CmdStatus())
+	rootCmd.AddCommand(cmd.CmdVersion())
+	rootCmd.AddCommand(cmd.CmdServer())
+	rootCmd.AddCommand(cmd.CmdScheduler())
+	rootCmd.AddCommand(cmd.CmdRetry())
+	rootCmd.AddCommand(cmd.CmdStartAll())
+
 	build.Version = version
-
-	registerCommands()
 }
 
-func registerCommands() {
-	rootCmd.AddCommand(startCmd())
-	rootCmd.AddCommand(stopCmd())
-	rootCmd.AddCommand(restartCmd())
-	rootCmd.AddCommand(dryCmd())
-	rootCmd.AddCommand(statusCmd())
-	rootCmd.AddCommand(versionCmd())
-	rootCmd.AddCommand(serverCmd())
-	rootCmd.AddCommand(schedulerCmd())
-	rootCmd.AddCommand(retryCmd())
-	rootCmd.AddCommand(startAllCmd())
-}
+var version = "0.0.0"

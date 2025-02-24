@@ -1,4 +1,4 @@
-package integration
+package integration_test
 
 import (
 	"path/filepath"
@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/test"
 )
 
-func TestIntegration(t *testing.T) {
+func TestDAGExecution(t *testing.T) {
 	t.Parallel()
 
 	type testCase struct {
@@ -155,9 +155,10 @@ func TestIntegration(t *testing.T) {
 		},
 	}
 
-	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+
 			dag := th.DAG(t, filepath.Join("integration", tc.dag))
 			agent := dag.Agent()
 
@@ -167,4 +168,55 @@ func TestIntegration(t *testing.T) {
 			dag.AssertOutputs(t, tc.expectedOutputs)
 		})
 	}
+}
+
+// TestSkippedPreconditions verifies that steps with unmet preconditions are skipped.
+func TestSkippedPreconditions(t *testing.T) {
+	t.Parallel()
+
+	// Setup the test helper with the integration DAGs directory.
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	// Load the DAG from testdata/integration/skipped-preconditions.yaml.
+	dag := th.DAG(t, filepath.Join("integration", "skipped-preconditions.yaml"))
+	agent := dag.Agent()
+
+	// Run the DAG and expect it to complete successfully.
+	agent.RunSuccess(t)
+
+	// Assert that the final status is successful.
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Verify outputs:
+	// OUT_RUN should be "executed" and OUT_SKIP should be empty (indicating the step was skipped).
+	dag.AssertOutputs(t, map[string]any{
+		"OUT_RUN":   "executed",
+		"OUT_SKIP":  "",
+		"OUT_SKIP2": "should execute",
+	})
+}
+
+// TestComplexDependencies verifies that a DAG with complex dependencies executes steps in the correct order.
+func TestComplexDependencies(t *testing.T) {
+	t.Parallel()
+
+	// Setup the test helper with the integration DAGs directory.
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	// Load the DAG from testdata/integration/complex-dependencies.yaml.
+	dag := th.DAG(t, filepath.Join("integration", "complex-dependencies.yaml"))
+	agent := dag.Agent()
+
+	// Run the DAG and expect it to complete successfully.
+	agent.RunSuccess(t)
+
+	// Assert that the final status is successful.
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Verify the outputs from each step.
+	dag.AssertOutputs(t, map[string]any{
+		"START":   "start",
+		"BRANCH1": "branch1",
+		"BRANCH2": "branch2",
+		"MERGE":   "merge",
+		"FINAL":   "final",
+	})
 }

@@ -51,7 +51,7 @@ type funcsConfig struct {
 	NavbarColor           string
 	NavbarTitle           string
 	BasePath              string
-	APIBaseURL            string
+	APIBasePath           string
 	TZ                    string
 	MaxDashboardPageLimit int
 	RemoteNodes           []string
@@ -79,7 +79,7 @@ func defaultFunctions(cfg funcsConfig) template.FuncMap {
 			return cfg.BasePath
 		},
 		"apiURL": func() string {
-			return path.Join(cfg.BasePath, cfg.APIBaseURL)
+			return path.Join(cfg.BasePath, cfg.APIBasePath)
 		},
 		"tz": func() string {
 			return cfg.TZ
