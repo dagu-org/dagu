@@ -16,7 +16,7 @@ func TestStartAllCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, cmd.StartAllCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
 			Args:        []string{"start-all", fmt.Sprintf("--port=%s", findPort(t))},
 			ExpectedOut: []string{"Serving"},
 		})
@@ -28,7 +28,7 @@ func TestStartAllCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, cmd.StartAllCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdStartAll(), test.CmdTest{
 			Args:        []string{"start-all", "--config", test.TestdataPath(t, "cmd/config_startall.yaml")},
 			ExpectedOut: []string{"54322", "dagu_test"},
 		})

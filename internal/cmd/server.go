@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func ServerCmd() *cobra.Command {
+func CmdServer() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "server",
 		Short:   "Start the server",

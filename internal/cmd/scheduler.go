@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func SchedulerCmd() *cobra.Command {
+func CmdScheduler() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "scheduler",
 		Short: "Start the scheduler",

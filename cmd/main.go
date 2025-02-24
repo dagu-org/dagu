@@ -31,14 +31,14 @@ func init() {
 }
 
 func registerCommands() {
-	rootCmd.AddCommand(cmd.StartCmd())
-	rootCmd.AddCommand(cmd.StopCmd())
-	rootCmd.AddCommand(cmd.RestartCmd())
-	rootCmd.AddCommand(cmd.DryCmd())
-	rootCmd.AddCommand(cmd.StatusCmd())
-	rootCmd.AddCommand(cmd.VersionCmd())
-	rootCmd.AddCommand(cmd.ServerCmd())
-	rootCmd.AddCommand(cmd.SchedulerCmd())
-	rootCmd.AddCommand(cmd.RetryCmd())
-	rootCmd.AddCommand(cmd.StartAllCmd())
+	rootCmd.AddCommand(cmd.CmdStart())
+	rootCmd.AddCommand(cmd.CmdStop())
+	rootCmd.AddCommand(cmd.CmdRestart())
+	rootCmd.AddCommand(cmd.CmdDry())
+	rootCmd.AddCommand(cmd.CmdStatus())
+	rootCmd.AddCommand(cmd.CmdVersion())
+	rootCmd.AddCommand(cmd.CmdServer())
+	rootCmd.AddCommand(cmd.CmdScheduler())
+	rootCmd.AddCommand(cmd.CmdRetry())
+	rootCmd.AddCommand(cmd.CmdStartAll())
 }

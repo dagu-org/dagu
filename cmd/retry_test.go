@@ -19,7 +19,7 @@ func TestRetryCommand(t *testing.T) {
 
 		// Run a DAG.
 		args := []string{"start", `--params="foo"`, dagFile.Location}
-		th.RunCommand(t, cmd.StartCmd(), test.CmdTest{Args: args})
+		th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 
 		// Find the request ID.
 		cli := th.Client
@@ -33,7 +33,7 @@ func TestRetryCommand(t *testing.T) {
 
 		// Retry with the request ID.
 		args = []string{"retry", fmt.Sprintf("--request-id=%s", requestID), dagFile.Location}
-		th.RunCommand(t, cmd.RetryCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdRetry(), test.CmdTest{
 			Args:        args,
 			ExpectedOut: []string{`[1=foo]`},
 		})

@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func StatusCmd() *cobra.Command {
+func CmdStatus() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status /path/to/spec.yaml",
 		Short: "Display current status of the DAG",

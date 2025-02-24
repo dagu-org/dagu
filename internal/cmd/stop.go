@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func StopCmd() *cobra.Command {
+func CmdStop() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop /path/to/spec.yaml",
 		Short: "Stop the running DAG",

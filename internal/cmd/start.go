@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func StartCmd() *cobra.Command {
+func CmdStart() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
 		Short: "Runs the DAG",

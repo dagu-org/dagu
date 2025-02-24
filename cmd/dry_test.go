@@ -30,7 +30,7 @@ func TestDryCommand(t *testing.T) {
 
 		for _, tc := range tests {
 			t.Run(tc.Name, func(t *testing.T) {
-				th.RunCommand(t, cmd.DryCmd(), tc)
+				th.RunCommand(t, cmd.CmdDry(), tc)
 			})
 		}
 	})

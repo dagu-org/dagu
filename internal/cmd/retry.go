@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func RetryCmd() *cobra.Command {
+func CmdRetry() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "retry --request-id=<request-id> /path/to/spec.yaml",
 		Short: "Retry the DAG execution",

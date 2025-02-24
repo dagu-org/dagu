@@ -20,7 +20,7 @@ func TestRestartCommand(t *testing.T) {
 		go func() {
 			// Start the DAG to restart.
 			args := []string{"start", `--params="foo"`, dag.Location}
-			th.RunCommand(t, cmd.StartCmd(), test.CmdTest{Args: args})
+			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 		}()
 
 		// Wait for the DAG to be running.
@@ -32,7 +32,7 @@ func TestRestartCommand(t *testing.T) {
 		go func() {
 			defer close(done)
 			args := []string{"restart", dag.Location}
-			th.RunCommand(t, cmd.RestartCmd(), test.CmdTest{Args: args})
+			th.RunCommand(t, cmd.CmdRestart(), test.CmdTest{Args: args})
 		}()
 
 		// Wait for the DAG running again.
@@ -41,7 +41,7 @@ func TestRestartCommand(t *testing.T) {
 		time.Sleep(time.Millisecond * 300) // Wait a bit (need to investigate why this is needed).
 
 		// Stop the restarted DAG.
-		th.RunCommand(t, cmd.StopCmd(), test.CmdTest{Args: []string{"stop", dag.Location}})
+		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: []string{"stop", dag.Location}})
 
 		// Wait for the DAG is stopped.
 		dag.AssertCurrentStatus(t, scheduler.StatusNone)

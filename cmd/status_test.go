@@ -20,7 +20,7 @@ func TestStatusCommand(t *testing.T) {
 		go func() {
 			// Start a DAG to check the status.
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, cmd.StartCmd(), test.CmdTest{Args: args})
+			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -34,14 +34,14 @@ func TestStatusCommand(t *testing.T) {
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the current status.
-		th.RunCommand(t, cmd.StatusCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdStatus(), test.CmdTest{
 			Args:        []string{"status", dagFile.Location},
 			ExpectedOut: []string{"status=running"},
 		})
 
 		// Stop the DAG.
 		args := []string{"stop", dagFile.Location}
-		th.RunCommand(t, cmd.StopCmd(), test.CmdTest{Args: args})
+		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{Args: args})
 		<-done
 	})
 }

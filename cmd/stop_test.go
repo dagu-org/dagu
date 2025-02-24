@@ -20,7 +20,7 @@ func TestStopCommand(t *testing.T) {
 		go func() {
 			// Start the DAG to stop.
 			args := []string{"start", dagFile.Location}
-			th.RunCommand(t, cmd.StartCmd(), test.CmdTest{Args: args})
+			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{Args: args})
 			close(done)
 		}()
 
@@ -30,7 +30,7 @@ func TestStopCommand(t *testing.T) {
 		dagFile.AssertLatestStatus(t, scheduler.StatusRunning)
 
 		// Stop the DAG.
-		th.RunCommand(t, cmd.StopCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdStop(), test.CmdTest{
 			Args:        []string{"stop", dagFile.Location},
 			ExpectedOut: []string{"DAG stopped"}})
 

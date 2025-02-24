@@ -18,7 +18,7 @@ func TestServerCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, cmd.ServerCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
 			Args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
 			ExpectedOut: []string{"Serving"},
 		})
@@ -30,7 +30,7 @@ func TestServerCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
-		th.RunCommand(t, cmd.ServerCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
 			Args:        []string{"server", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
 			ExpectedOut: []string{"54321"},
 		})

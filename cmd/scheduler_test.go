@@ -16,7 +16,7 @@ func TestSchedulerCommand(t *testing.T) {
 			th.Cancel()
 		}()
 
-		th.RunCommand(t, cmd.SchedulerCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdScheduler(), test.CmdTest{
 			Args:        []string{"scheduler"},
 			ExpectedOut: []string{"Scheduler started"},
 		})
@@ -28,7 +28,7 @@ func TestSchedulerCommand(t *testing.T) {
 			th.Cancel()
 		}()
 
-		th.RunCommand(t, cmd.SchedulerCmd(), test.CmdTest{
+		th.RunCommand(t, cmd.CmdScheduler(), test.CmdTest{
 			Args:        []string{"scheduler", "--config", test.TestdataPath(t, "cmd/config_test.yaml")},
 			ExpectedOut: []string{"dagu_test"},
 		})

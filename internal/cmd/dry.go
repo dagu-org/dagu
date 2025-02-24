@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func DryCmd() *cobra.Command {
+func CmdDry() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dry [flags] /path/to/spec.yaml",
 		Short: "Dry-runs specified DAG",

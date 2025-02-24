@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func RestartCmd() *cobra.Command {
+func CmdRestart() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart /path/to/spec.yaml",
 		Short: "Stop the running DAG and restart it",
