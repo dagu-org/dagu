@@ -29,7 +29,7 @@ func CmdStart() *cobra.Command {
 }
 
 func initStartFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{paramsFlag, withUsage(requestIDFlag, "request ID for the DAG execution")})
+	initCommonFlags(cmd, []commandLineFlag{paramsFlag, requestIDFlagStart})
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 

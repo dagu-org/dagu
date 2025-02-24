@@ -31,7 +31,7 @@ func CmdRetry() *cobra.Command {
 }
 
 func initRetryFlags(cmd *cobra.Command) {
-	initCommonFlags(cmd, []commandLineFlag{withRequired(requestIDFlag)})
+	initCommonFlags(cmd, []commandLineFlag{requestIDFlagRetry})
 	cmd.Flags().BoolP("quiet", "q", false, "suppress output")
 }
 

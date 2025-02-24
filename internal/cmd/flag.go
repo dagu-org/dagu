@@ -46,23 +46,19 @@ var (
 		shorthand: "p",
 		usage:     "parameters to pass to the DAG",
 	}
-	requestIDFlag = commandLineFlag{
+	requestIDFlagRetry = commandLineFlag{
 		name:      "request-id",
 		shorthand: "r",
-		usage:     "request ID",
+		usage:     "request ID (required)",
+		required:  true,
+	}
+	requestIDFlagStart = commandLineFlag{
+		name:      "request-id",
+		shorthand: "r",
+		usage:     "request ID for the DAG execution",
+		required:  true,
 	}
 )
-
-func withRequired(flag commandLineFlag) commandLineFlag {
-	flag.required = true
-	flag.usage = fmt.Sprintf("%s (required)", flag.usage)
-	return flag
-}
-
-func withUsage(flag commandLineFlag, usage string) commandLineFlag {
-	flag.usage = usage
-	return flag
-}
 
 func initCommonFlags(cmd *cobra.Command, addFlags []commandLineFlag) {
 	addFlags = append(addFlags, configFlag)
