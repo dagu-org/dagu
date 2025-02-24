@@ -168,3 +168,28 @@ func TestIntegration(t *testing.T) {
 		})
 	}
 }
+
+// TestSkippedPreconditions verifies that steps with unmet preconditions are skipped.
+func TestSkippedPreconditions(t *testing.T) {
+	t.Parallel()
+
+	// Setup the test helper with the integration DAGs directory.
+	th := test.Setup(t, test.WithDAGsDir(test.TestdataPath(t, "integration")))
+	// Load the DAG from testdata/integration/skipped-preconditions.yaml.
+	dag := th.DAG(t, filepath.Join("integration", "skipped-preconditions.yaml"))
+	agent := dag.Agent()
+
+	// Run the DAG and expect it to complete successfully.
+	agent.RunSuccess(t)
+
+	// Assert that the final status is successful.
+	dag.AssertLatestStatus(t, scheduler.StatusSuccess)
+
+	// Verify outputs:
+	// OUT_RUN should be "executed" and OUT_SKIP should be empty (indicating the step was skipped).
+	dag.AssertOutputs(t, map[string]any{
+		"OUT_RUN":   "executed",
+		"OUT_SKIP":  "",
+		"OUT_SKIP2": "should execute",
+	})
+}
