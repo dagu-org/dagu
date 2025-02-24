@@ -9,7 +9,7 @@ func CmdVersion() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Display the binary version",
-		Long:  `dagu version`,
+		Long:  `Print the current version and build details of the Dagu executable.`,
 		Run: func(_ *cobra.Command, _ []string) {
 			println(build.Version)
 		},

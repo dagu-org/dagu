@@ -51,7 +51,9 @@ type Setup struct {
 
 // createSetup initializes the application setup by loading configuration,
 // setting up logger context, and logging any warnings.
-func createSetup(ctx context.Context, quiet bool) (*Setup, error) {
+func createSetup(cmd *cobra.Command, flags []commandLineFlag, quiet bool) (*Setup, error) {
+	bindFlags(cmd, flags...)
+
 	var configLoaderOpts []config.ConfigLoaderOption
 	// Use a custom config file if provided via the viper flag "config"
 	if cfgPath := viper.GetString("config"); cfgPath != "" {
@@ -64,7 +66,7 @@ func createSetup(ctx context.Context, quiet bool) (*Setup, error) {
 	}
 
 	// Create a logger context based on config and quiet mode
-	ctx = setupLoggerContext(cfg, ctx, quiet)
+	ctx := setupLoggerContext(cfg, cmd.Context(), quiet)
 
 	// Log any warnings collected during configuration loading
 	for _, w := range cfg.Warnings {

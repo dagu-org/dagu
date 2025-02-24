@@ -10,8 +10,13 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   build.Slug,
-	Short: "A compact, portable, and language-agnostic workflow engine.",
-	Long:  `Dagu is a comprehensive workflow orchestration tool that leverages a simple, human-readable YAML syntax to define and execute directed acyclic graphs (DAGs) of tasks. It supports advanced features such as parameterized execution (both positional and named), dry-run simulations, automated retries, and real-time status monitoring. With built-in integration for multiple executors (Docker, HTTP, SSH, mail, etc.) and an intuitive web UI, Dagu streamlines the management of job dependencies, error recovery, and logging across both local and production environments. Its modular architecture and minimal configuration requirements make it an ideal solution for automating complex processes while ensuring flexibility and reliability.`,
+	Short: "Dagu is a compact, portable workflow engine",
+	Long: `Dagu is a compact, portable workflow engine.
+
+It provides a declarative model for orchestrating command execution across
+diverse environments, including shell scripts, Python commands, containerized
+operations, or remote commands.
+`,
 }
 
 func main() {

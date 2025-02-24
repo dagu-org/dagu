@@ -9,17 +9,25 @@ import (
 
 func CmdServer() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "server",
-		Short: "Start the server",
-		Long:  `dagu server [--dags=<DAGs dir>] [--host=<host>] [--port=<port>] [--config=<config file>]`,
-		RunE:  wrapRunE(runServer),
+		Use:   "server [flags]",
+		Short: "Start the web server",
+		Long: `Launch the Dagu web server, providing a real-time graphical interface for monitoring and managing DAG executions.
+
+Example:
+  dagu server --host=0.0.0.0 --port=8080 --dags=/path/to/dags
+`,
+		RunE: wrapRunE(runServer),
 	}
-	initFlags(cmd, dagsFlag, hostFlag, portFlag)
+	initFlags(cmd, serverFlags...)
 	return cmd
 }
 
+var serverFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
+
 func runServer(cmd *cobra.Command, _ []string) error {
-	setup, err := createSetup(cmd.Context(), false)
+	bindFlags(cmd, serverFlags...)
+
+	setup, err := createSetup(cmd, serverFlags, false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

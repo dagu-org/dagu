@@ -18,9 +18,10 @@ func TestServerCommand(t *testing.T) {
 			time.Sleep(time.Millisecond * 500)
 			th.Cancel()
 		}()
+		port := findPort(t)
 		th.RunCommand(t, cmd.CmdServer(), test.CmdTest{
-			Args:        []string{"server", fmt.Sprintf("--port=%s", findPort(t))},
-			ExpectedOut: []string{"Serving"},
+			Args:        []string{"server", fmt.Sprintf("--port=%s", port)},
+			ExpectedOut: []string{"Serving", port},
 		})
 
 	})

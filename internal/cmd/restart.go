@@ -18,15 +18,26 @@ import (
 
 func CmdRestart() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "restart /path/to/spec.yaml",
-		Short: "Stop the running DAG and restart it",
-		Long:  `dagu restart /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runRestart),
+		Use:   "restart [flags] /path/to/spec.yaml",
+		Short: "Restart a running DAG",
+		Long: `Stop the currently running DAG and immediately restart it with the same configuration.
+
+Flags:
+  --request-id string   (Optional) Unique identifier for tracking the restart execution.
+
+Example:
+  dagu restart my_dag.yaml --request-id=abc123
+
+This command gracefully stops the active DAG execution before reinitiating it.
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: wrapRunE(runRestart),
 	}
-	initFlags(cmd, quietFlag)
+	initFlags(cmd, restartFlags...)
 	return cmd
 }
+
+var restartFlags = []commandLineFlag{quietFlag}
 
 func runRestart(cmd *cobra.Command, args []string) error {
 	quiet, err := cmd.Flags().GetBool("quiet")
@@ -34,7 +45,7 @@ func runRestart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get quiet flag: %w", err)
 	}
 
-	setup, err := createSetup(cmd.Context(), quiet)
+	setup, err := createSetup(cmd, restartFlags, quiet)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

@@ -15,15 +15,23 @@ import (
 
 func CmdRetry() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "retry --request-id=<request-id> /path/to/spec.yaml",
-		Short: "Retry the DAG execution",
-		Long:  `dagu retry --request-id=<request-id> /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runRetry),
+		Use:   "retry [flags] /path/to/spec.yaml",
+		Short: "Retry a DAG execution",
+		Long: `Re-execute a previously run DAG using its unique request ID.
+
+Example:
+  dagu retry my_dag.yaml --request-id=abc123
+
+This command is useful for recovering from errors or transient issues by re-running the DAG.
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: wrapRunE(runRetry),
 	}
-	initFlags(cmd, requestIDFlagRetry, quietFlag)
+	initFlags(cmd, retryFlags...)
 	return cmd
 }
+
+var retryFlags = []commandLineFlag{requestIDFlagRetry, quietFlag}
 
 func runRetry(cmd *cobra.Command, args []string) error {
 	// Get quiet flag
@@ -37,7 +45,7 @@ func runRetry(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	setup, err := createSetup(cmd.Context(), quiet)
+	setup, err := createSetup(cmd, retryFlags, quiet)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

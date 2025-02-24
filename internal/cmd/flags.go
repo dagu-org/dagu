@@ -97,6 +97,13 @@ func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
 		if flag.required {
 			_ = cmd.MarkFlagRequired(flag.name)
 		}
+	}
+}
+
+func bindFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
+	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
+
+	for _, flag := range flags {
 		if flag.bindViper {
 			_ = viper.BindPFlag(flag.name, cmd.Flags().Lookup(flag.name))
 		}

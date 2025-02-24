@@ -14,16 +14,27 @@ import (
 
 func CmdStart() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start [flags] /path/to/spec.yaml [-- params1 params2]",
-		Short: "Runs the DAG",
-		Long:  `dagu start /path/to/spec.yaml -- params1 params2`,
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  wrapRunE(runStart),
+		Use:   "start [flags] /path/to/spec.yaml [-- param1 param2 ...]",
+		Short: "Execute a DAG",
+		Long: `Begin execution of a DAG defined in a YAML file.
+
+Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
+Flags can override default settings such as request ID or suppress output.
+
+Example:
+  dagu start my_dag.yaml -- P1=foo P2=bar
+
+This command parses the DAG specification, resolves parameters, and initiates the execution process.
+`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: wrapRunE(runStart),
 	}
 
-	initFlags(cmd, paramsFlag, requestIDFlagStart, quietFlag)
+	initFlags(cmd, startFlags...)
 	return cmd
 }
+
+var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, quietFlag}
 
 func runStart(cmd *cobra.Command, args []string) error {
 	quiet, err := cmd.Flags().GetBool("quiet")
@@ -36,7 +47,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	setup, err := createSetup(cmd.Context(), quiet)
+	setup, err := createSetup(cmd, startFlags, quiet)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

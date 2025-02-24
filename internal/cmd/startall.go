@@ -9,17 +9,23 @@ import (
 
 func CmdStartAll() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "start-all",
-		Short: "Launches both the Dagu web UI server and the scheduler process.",
-		Long:  `dagu start-all [--dags=<DAGs dir>] [--host=<host>] [--port=<port>] [--config=<config file>]`,
-		RunE:  wrapRunE(runStartAll),
+		Use:   "start-all [flags]",
+		Short: "Launch both web server and scheduler concurrently",
+		Long: `Simultaneously start the Dagu web UI server and the scheduler process.
+
+Example:
+  dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags
+`,
+		RunE: wrapRunE(runStartAll),
 	}
-	initStartAllFlags(cmd)
+	initFlags(cmd, startAllFlags...)
 	return cmd
 }
 
+var startAllFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
+
 func runStartAll(cmd *cobra.Command, _ []string) error {
-	setup, err := createSetup(cmd.Context(), false)
+	setup, err := createSetup(cmd, startAllFlags, false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
@@ -80,8 +86,4 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
-}
-
-func initStartAllFlags(cmd *cobra.Command) {
-	initFlags(cmd, dagsFlag, hostFlag, portFlag)
 }

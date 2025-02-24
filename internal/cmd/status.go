@@ -10,18 +10,24 @@ import (
 
 func CmdStatus() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status /path/to/spec.yaml",
-		Short: "Display current status of the DAG",
-		Long:  `dagu status /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runStatus),
+		Use:   "status [flags] /path/to/spec.yaml",
+		Short: "Display the current status of a DAG",
+		Long: `Show real-time status information for a specified DAG execution.
+
+Example:
+  dagu status my_dag.yaml
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: wrapRunE(runStatus),
 	}
-	initFlags(cmd)
+	initFlags(cmd, statusFlags...)
 	return cmd
 }
 
+var statusFlags = []commandLineFlag{}
+
 func runStatus(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup(cmd.Context(), false)
+	setup, err := createSetup(cmd, statusFlags, false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

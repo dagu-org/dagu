@@ -9,17 +9,25 @@ import (
 
 func CmdScheduler() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "scheduler",
-		Short: "Start the scheduler",
-		Long:  `dagu scheduler [--dags=<DAGs dir>] [--config=<config file>]`,
-		RunE:  wrapRunE(runScheduler),
+		Use:   "scheduler [flags]",
+		Short: "Start the scheduler process",
+		Long: `Launch the scheduler process that monitors and triggers DAG executions based on cron schedules.
+
+Example:
+  dagu scheduler --dags=/path/to/dags
+
+This process runs continuously to automatically execute scheduled DAGs.
+`,
+		RunE: wrapRunE(runScheduler),
 	}
-	initFlags(cmd, dagsFlag)
+	initFlags(cmd, schedulerFlags...)
 	return cmd
 }
 
+var schedulerFlags = []commandLineFlag{dagsFlag}
+
 func runScheduler(cmd *cobra.Command, _ []string) error {
-	setup, err := createSetup(cmd.Context(), false)
+	setup, err := createSetup(cmd, schedulerFlags, false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

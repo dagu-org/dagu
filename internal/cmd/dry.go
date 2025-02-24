@@ -11,18 +11,27 @@ import (
 
 func CmdDry() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "dry [flags] /path/to/spec.yaml",
-		Short: "Dry-runs specified DAG",
-		Long:  `dagu dry /path/to/spec.yaml -- params1 params2`,
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  wrapRunE(runDry),
+		Use:   "dry [flags] /path/to/spec.yaml [-- param1 param2 ...]",
+		Short: "Perform a dry-run of a DAG",
+		Long: `Simulate the execution of a DAG without performing any real actions.
+
+The specified YAML file defines the DAG. Any parameters provided after "--" override default values.
+This simulation shows the planned execution steps and configuration without side effects.
+
+Example:
+  dagu dry my_dag.yaml -- P1=foo P2=bar
+`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: wrapRunE(runDry),
 	}
-	initFlags(cmd, paramsFlag)
+	initFlags(cmd, dryFlags...)
 	return cmd
 }
 
+var dryFlags = []commandLineFlag{paramsFlag}
+
 func runDry(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup(cmd.Context(), false)
+	setup, err := createSetup(cmd, dryFlags, false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}

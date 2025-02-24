@@ -10,18 +10,26 @@ import (
 
 func CmdStop() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "stop /path/to/spec.yaml",
-		Short: "Stop the running DAG",
-		Long:  `dagu stop /path/to/spec.yaml`,
-		Args:  cobra.ExactArgs(1),
-		RunE:  wrapRunE(runStop),
+		Use:   "stop [flags] /path/to/spec.yaml",
+		Short: "Stop a running DAG",
+		Long: `Gracefully terminate an active DAG execution.
+
+This command stops all running tasks of the specified DAG, ensuring resources are properly released.
+
+Example:
+  dagu stop my_dag.yaml
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: wrapRunE(runStop),
 	}
-	initFlags(cmd)
+	initFlags(cmd, stopFlags...)
 	return cmd
 }
 
+var stopFlags = []commandLineFlag{}
+
 func runStop(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup(cmd.Context(), false)
+	setup, err := createSetup(cmd, stopFlags, false)
 	if err != nil {
 		return fmt.Errorf("failed to create setup: %w", err)
 	}
