@@ -86,7 +86,7 @@ type commandLineFlag struct {
 }
 
 func initFlags(cmd *cobra.Command, additionalFlags ...commandLineFlag) {
-	flags := append([]commandLineFlag{configFlag}, additionalFlags...)
+	flags := append([]commandLineFlag{configFlag, quietFlag}, additionalFlags...)
 
 	for _, flag := range flags {
 		if flag.isBool {

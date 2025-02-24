@@ -33,6 +33,11 @@ func TestStartCommand(t *testing.T) {
 			Args:        []string{"start", th.DAG(t, "cmd/start_with_params.yaml").Location, "--", "p5", "p6"},
 			ExpectedOut: []string{`params="[1=p5 2=p6]"`},
 		},
+		{
+			Name:        "StartDAGWithRequestID",
+			Args:        []string{"start", th.DAG(t, "cmd/start_with_reqid.yaml").Location, "--request-id", "abcdefg"},
+			ExpectedOut: []string{"abcdefg"},
+		},
 	}
 
 	for _, tc := range tests {

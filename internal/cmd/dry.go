@@ -10,10 +10,11 @@ import (
 )
 
 func CmdDry() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "dry [flags] /path/to/spec.yaml [-- param1 param2 ...]",
-		Short: "Perform a dry-run of a DAG",
-		Long: `Simulate the execution of a DAG without performing any real actions.
+	return NewCommand(
+		&cobra.Command{
+			Use:   "dry [flags] /path/to/spec.yaml [-- param1 param2 ...]",
+			Short: "Perform a dry-run of a DAG",
+			Long: `Simulate the execution of a DAG without performing any real actions.
 
 The specified YAML file defines the DAG. Any parameters provided after "--" override default values.
 This simulation shows the planned execution steps and configuration without side effects.
@@ -21,39 +22,32 @@ This simulation shows the planned execution steps and configuration without side
 Example:
   dagu dry my_dag.yaml -- P1=foo P2=bar
 `,
-		Args: cobra.MinimumNArgs(1),
-		RunE: wrapRunE(runDry),
-	}
-	initFlags(cmd, dryFlags...)
-	return cmd
+			Args: cobra.MinimumNArgs(1),
+		}, dryFlags,
+		runDry,
+	)
 }
 
 var dryFlags = []commandLineFlag{paramsFlag}
 
-func runDry(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup(cmd, dryFlags, false)
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
-
+func runDry(cmd *Command, args []string) error {
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig),
 	}
 
-	var params string
-	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := cmd.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = cmd.Flags().GetString("params")
+		params, err := cmd.cmd.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	ctx := setup.ctx
+	ctx := cmd.ctx
 	dag, err := digraph.Load(ctx, args[0], loadOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -65,20 +59,20 @@ func runDry(cmd *cobra.Command, args []string) error {
 	}
 
 	const logPrefix = "dry_"
-	logFile, err := setup.OpenLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := cmd.OpenLogFile(ctx, logPrefix, dag, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx = setup.loggerContextWithFile(ctx, false, logFile)
+	ctx = cmd.loggerContextWithFile(logFile)
 
-	dagStore, err := setup.dagStore()
+	dagStore, err := cmd.dagStore()
 	if err != nil {
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.Client()
+	cli, err := cmd.Client()
 	if err != nil {
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
@@ -90,7 +84,7 @@ func runDry(cmd *cobra.Command, args []string) error {
 		logFile.Name(),
 		cli,
 		dagStore,
-		setup.historyStore(),
+		cmd.historyStore(),
 		agent.Options{Dry: true},
 	)
 

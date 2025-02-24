@@ -8,43 +8,37 @@ import (
 )
 
 func CmdStartAll() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "start-all [flags]",
-		Short: "Launch both web server and scheduler concurrently",
-		Long: `Simultaneously start the Dagu web UI server and the scheduler process.
+	return NewCommand(
+		&cobra.Command{
+			Use:   "start-all [flags]",
+			Short: "Launch both web server and scheduler concurrently",
+			Long: `Simultaneously start the Dagu web UI server and the scheduler process.
 
 Example:
   dagu start-all --host=0.0.0.0 --port=8080 --dags=/path/to/dags
 `,
-		RunE: wrapRunE(runStartAll),
-	}
-	initFlags(cmd, startAllFlags...)
-	return cmd
+		}, startAllFlags, runStartAll,
+	)
 }
 
 var startAllFlags = []commandLineFlag{dagsFlag, hostFlag, portFlag}
 
-func runStartAll(cmd *cobra.Command, _ []string) error {
-	setup, err := createSetup(cmd, startAllFlags, false)
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
+func runStartAll(cmd *Command, _ []string) error {
+	if dagsDir, _ := cmd.cmd.Flags().GetString("dags"); dagsDir != "" {
+		cmd.cfg.Paths.DAGsDir = dagsDir
 	}
 
-	if dagsDir, _ := cmd.Flags().GetString("dags"); dagsDir != "" {
-		setup.cfg.Paths.DAGsDir = dagsDir
-	}
-
-	scheduler, err := setup.scheduler()
+	scheduler, err := cmd.scheduler()
 	if err != nil {
 		return fmt.Errorf("failed to initialize scheduler: %w", err)
 	}
 
-	ctx := setup.ctx
+	ctx := cmd.ctx
 
 	// Start scheduler in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Info(ctx, "Scheduler initialization", "dags", setup.cfg.Paths.DAGsDir)
+		logger.Info(ctx, "Scheduler initialization", "dags", cmd.cfg.Paths.DAGsDir)
 
 		if err := scheduler.Start(ctx); err != nil {
 			errChan <- fmt.Errorf("scheduler initialization failed: %w", err)
@@ -53,13 +47,13 @@ func runStartAll(cmd *cobra.Command, _ []string) error {
 		errChan <- nil
 	}()
 
-	server, err := setup.server(ctx)
+	server, err := cmd.server(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %w", err)
 	}
 
 	// Start server in a goroutine
-	logger.Info(ctx, "Server initialization", "host", setup.cfg.Server.Host, "port", setup.cfg.Server.Port)
+	logger.Info(ctx, "Server initialization", "host", cmd.cfg.Server.Host, "port", cmd.cfg.Server.Port)
 
 	serverErr := make(chan error, 1)
 	go func() {

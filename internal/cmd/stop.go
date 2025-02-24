@@ -9,34 +9,28 @@ import (
 )
 
 func CmdStop() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "stop [flags] /path/to/spec.yaml",
-		Short: "Stop a running DAG",
-		Long: `Gracefully terminate an active DAG execution.
+	return NewCommand(
+		&cobra.Command{
+			Use:   "stop [flags] /path/to/spec.yaml",
+			Short: "Stop a running DAG",
+			Long: `Gracefully terminate an active DAG execution.
 
 This command stops all running tasks of the specified DAG, ensuring resources are properly released.
 
 Example:
   dagu stop my_dag.yaml
 `,
-		Args: cobra.ExactArgs(1),
-		RunE: wrapRunE(runStop),
-	}
-	initFlags(cmd, stopFlags...)
-	return cmd
+			Args: cobra.ExactArgs(1),
+		}, stopFlags, runStop,
+	)
 }
 
 var stopFlags = []commandLineFlag{}
 
-func runStop(cmd *cobra.Command, args []string) error {
-	setup, err := createSetup(cmd, stopFlags, false)
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
+func runStop(cmd *Command, args []string) error {
+	ctx := cmd.ctx
 
-	ctx := setup.ctx
-
-	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig))
+	dag, err := digraph.Load(ctx, args[0], digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig))
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", args[0], err)
@@ -44,13 +38,13 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	logger.Info(ctx, "DAG is stopping", "dag", dag.Name)
 
-	cli, err := setup.Client()
+	cli, err := cmd.Client()
 	if err != nil {
 		logger.Error(ctx, "failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	if err := cli.Stop(cmd.Context(), dag); err != nil {
+	if err := cli.Stop(cmd.ctx, dag); err != nil {
 		logger.Error(ctx, "Failed to stop DAG", "dag", dag.Name, "err", err)
 		return fmt.Errorf("failed to stop DAG: %w", err)
 	}

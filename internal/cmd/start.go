@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,10 +12,11 @@ import (
 )
 
 func CmdStart() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "start [flags] /path/to/spec.yaml [-- param1 param2 ...]",
-		Short: "Execute a DAG",
-		Long: `Begin execution of a DAG defined in a YAML file.
+	return NewCommand(
+		&cobra.Command{
+			Use:   "start [flags] /path/to/spec.yaml [-- param1 param2 ...]",
+			Short: "Execute a DAG",
+			Long: `Begin execution of a DAG defined in a YAML file.
 
 Parameters after the "--" separator are passed as execution parameters (either positional or key=value pairs).
 Flags can override default settings such as request ID or suppress output.
@@ -26,56 +26,43 @@ Example:
 
 This command parses the DAG specification, resolves parameters, and initiates the execution process.
 `,
-		Args: cobra.MinimumNArgs(1),
-		RunE: wrapRunE(runStart),
-	}
-
-	initFlags(cmd, startFlags...)
-	return cmd
+			Args: cobra.MinimumNArgs(1),
+		}, startFlags, runStart,
+	)
 }
 
-var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, quietFlag}
+var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart}
 
-func runStart(cmd *cobra.Command, args []string) error {
-	quiet, err := cmd.Flags().GetBool("quiet")
-	if err != nil {
-		return fmt.Errorf("failed to get quiet flag: %w", err)
-	}
-
-	requestID, err := cmd.Flags().GetString("request-id")
+func runStart(cmd *Command, args []string) error {
+	requestID, err := cmd.cmd.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
 
-	setup, err := createSetup(cmd, startFlags, quiet)
-	if err != nil {
-		return fmt.Errorf("failed to create setup: %w", err)
-	}
-
 	loadOpts := []digraph.LoadOption{
-		digraph.WithBaseConfig(setup.cfg.Paths.BaseConfig),
+		digraph.WithBaseConfig(cmd.cfg.Paths.BaseConfig),
 	}
 
 	var params string
-	if argsLenAtDash := cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
+	if argsLenAtDash := cmd.cmd.ArgsLenAtDash(); argsLenAtDash != -1 {
 		// Get parameters from command line arguments after "--"
 		loadOpts = append(loadOpts, digraph.WithParams(args[argsLenAtDash:]))
 	} else {
 		// Get parameters from flags
-		params, err = cmd.Flags().GetString("params")
+		params, err = cmd.cmd.Flags().GetString("params")
 		if err != nil {
 			return fmt.Errorf("failed to get parameters: %w", err)
 		}
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(setup.ctx, setup, args[0], loadOpts, quiet, requestID)
+	return executeDag(cmd, args[0], loadOpts, requestID)
 }
 
-func executeDag(ctx context.Context, setup *Setup, specPath string, loadOpts []digraph.LoadOption, quiet bool, requestID string) error {
-	dag, err := digraph.Load(ctx, specPath, loadOpts...)
+func executeDag(cmd *Command, specPath string, loadOpts []digraph.LoadOption, requestID string) error {
+	dag, err := digraph.Load(cmd.ctx, specPath, loadOpts...)
 	if err != nil {
-		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
+		logger.Error(cmd.ctx, "Failed to load DAG", "path", specPath, "err", err)
 		return fmt.Errorf("failed to load DAG from %s: %w", specPath, err)
 	}
 
@@ -83,30 +70,30 @@ func executeDag(ctx context.Context, setup *Setup, specPath string, loadOpts []d
 		var err error
 		requestID, err = generateRequestID()
 		if err != nil {
-			logger.Error(ctx, "Failed to generate request ID", "err", err)
+			logger.Error(cmd.ctx, "Failed to generate request ID", "err", err)
 			return fmt.Errorf("failed to generate request ID: %w", err)
 		}
 	}
 
 	const logPrefix = "start_"
-	logFile, err := setup.OpenLogFile(ctx, logPrefix, dag, requestID)
+	logFile, err := cmd.OpenLogFile(cmd.ctx, logPrefix, dag, requestID)
 	if err != nil {
-		logger.Error(ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
+		logger.Error(cmd.ctx, "failed to initialize log file", "DAG", dag.Name, "err", err)
 		return fmt.Errorf("failed to initialize log file for DAG %s: %w", dag.Name, err)
 	}
 	defer logFile.Close()
 
-	ctx = setup.loggerContextWithFile(ctx, quiet, logFile)
+	ctx := cmd.loggerContextWithFile(logFile)
 
 	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
-	dagStore, err := setup.dagStore()
+	dagStore, err := cmd.dagStore()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize DAG store", "err", err)
 		return fmt.Errorf("failed to initialize DAG store: %w", err)
 	}
 
-	cli, err := setup.Client()
+	cli, err := cmd.Client()
 	if err != nil {
 		logger.Error(ctx, "Failed to initialize client", "err", err)
 		return fmt.Errorf("failed to initialize client: %w", err)
@@ -119,7 +106,7 @@ func executeDag(ctx context.Context, setup *Setup, specPath string, loadOpts []d
 		logFile.Name(),
 		cli,
 		dagStore,
-		setup.historyStore(),
+		cmd.historyStore(),
 		agent.Options{},
 	)
 
@@ -128,7 +115,7 @@ func executeDag(ctx context.Context, setup *Setup, specPath string, loadOpts []d
 	if err := agentInstance.Run(ctx); err != nil {
 		logger.Error(ctx, "Failed to execute DAG", "DAG", dag.Name, "requestID", requestID, "err", err)
 
-		if quiet {
+		if cmd.quiet {
 			os.Exit(1)
 		} else {
 			agentInstance.PrintSummary(ctx)
@@ -136,7 +123,7 @@ func executeDag(ctx context.Context, setup *Setup, specPath string, loadOpts []d
 		}
 	}
 
-	if !quiet {
+	if !cmd.quiet {
 		agentInstance.PrintSummary(ctx)
 	}
 
