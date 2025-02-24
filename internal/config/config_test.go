@@ -23,7 +23,7 @@ host: "0.0.0.0"
 port: 9090
 debug: true
 basePath: "/dagu"
-apiBaseURL: "/api/v1"
+apiBasePath: "/api/v1"
 tz: "UTC"
 logFormat: "json"
 workDir: "/var/dagu/work"
@@ -74,7 +74,6 @@ tls:
 	assert.Equal(t, 9090, cfg.Server.Port)
 	// cleanBasePath should clean the basePath as provided.
 	assert.Equal(t, "/dagu", cfg.Server.BasePath)
-	// When APIBaseURL is provided, it is also used for APIBasePath.
 	assert.Equal(t, "/api/v1", cfg.Server.APIBasePath)
 	assert.Equal(t, true, cfg.Server.Headless)
 

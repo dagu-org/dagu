@@ -119,7 +119,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 		Host:        def.Host,
 		Port:        def.Port,
 		BasePath:    def.BasePath,
-		APIBasePath: def.APIBaseURL, // Default to APIBaseURL, may be overridden below.
+		APIBasePath: def.APIBasePath,
 	}
 
 	// Process remote node definitions.
@@ -128,11 +128,6 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 			Name:       node.Name,
 			APIBaseURL: node.APIBaseURL,
 		})
-	}
-
-	// If APIBaseURL is explicitly provided, use it as the API base path.
-	if def.APIBaseURL != "" {
-		cfg.Server.APIBasePath = def.APIBaseURL
 	}
 
 	// Dereference pointer fields if they are provided.
@@ -211,6 +206,9 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 	if def.BasicAuthPassword != "" {
 		cfg.Server.Auth.Basic.Password = def.BasicAuthPassword
+	}
+	if def.APIBaseURL != "" {
+		cfg.Server.APIBasePath = def.APIBaseURL
 	}
 	if def.IsAuthToken {
 		cfg.Server.Auth.Token.Enabled = true
@@ -323,7 +321,6 @@ func (l *ConfigLoader) setDefaultValues(resolver PathResolver) {
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("debug", false)
 	viper.SetDefault("basePath", "")
-	viper.SetDefault("apiBaseURL", "/api/v1")
 	viper.SetDefault("apiBasePath", "/api/v1")
 	viper.SetDefault("latestStatusToday", false)
 

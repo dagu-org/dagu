@@ -81,7 +81,7 @@ func New(params NewServerArgs) *Server {
 			NavbarColor:           params.NavbarColor,
 			NavbarTitle:           params.NavbarTitle,
 			BasePath:              params.BasePath,
-			APIBaseURL:            params.APIBaseURL,
+			APIBasePath:           params.APIBaseURL,
 			TZ:                    params.TimeZone,
 			MaxDashboardPageLimit: params.MaxDashboardPageLimit,
 			RemoteNodes:           params.RemoteNodes,
