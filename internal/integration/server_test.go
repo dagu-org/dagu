@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/cmd"
-	"github.com/dagu-org/dagu/internal/test" // provides testSetup helper
+	"github.com/dagu-org/dagu/internal/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +35,7 @@ basePath: "/dagu"
 	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
 
 	// Use the provided test helper to set up context and cancellation.
-	th := test.SetupCommand(t) // from github.com/dagu-org/dagu/internal/test
+	th := test.SetupCommand(t)
 
 	// Cancel the test context after a delay so the server doesn’t run forever.
 	go func() {
