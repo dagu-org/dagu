@@ -49,7 +49,7 @@ brews:
       name: homebrew-brew
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
-    description: "A compact, portable, and language-agnostic workflow engine. It aims to solve greater problems for developers."
+    description: "A compact, portable, and language-agnostic workflow engine"
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
@@ -66,7 +66,7 @@ brews:
       name: homebrew-tap
     directory: Formula
     homepage: "https://github.com/dagu-org/dagu"
-    description: "A compact, portable, and language-agnostic workflow engine. It aims to solve greater problems for developers."
+    description: "A compact, portable, and language-agnostic workflow engine"
     license: "GNU General Public License v3.0"
     custom_block: |
       service do
@@ -81,7 +81,7 @@ snapcrafts:
   - name: dagu
     title: Dagu
     publish: true
-    summary: "A compact, portable, and language-agnostic workflow engine. It aims to solve greater problems for developers."
+    summary: "A compact, portable, and language-agnostic workflow engine"
     description: |
       Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
       Dagu’s design emphasizes minimal external dependencies: it operates solely as a single binary without requiring an external database. A browser-based graphical interface (UI) is provided for real-time monitoring, rendering the status and logs of workflows. This zero-dependency structure makes the system easy to install and well-suited to various infrastructures, including local or air-gapped systems. This local-first architecture also ensures that sensitive data or proprietary workflows remain secure.
