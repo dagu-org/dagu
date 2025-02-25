@@ -13,37 +13,87 @@ import (
 )
 
 func TestServer_StartWithConfig(t *testing.T) {
-	// Create a temporary config file with BasePath set to "/dagu"
-	tempDir := t.TempDir()
+	testCases := []struct {
+		name       string
+		setupFunc  func(t *testing.T) (string, string) // returns configFile and tempDir
+		dagPath    func(t *testing.T, tempDir string) string
+		envVarName string
+	}{
+		{
+			name: "GlobalLogDir",
+			setupFunc: func(t *testing.T) (string, string) {
+				tempDir := t.TempDir()
+				configFile := filepath.Join(tempDir, "config.yaml")
+				configContent := `logDir: ${TMP_LOGS_DIR}/logs`
+				require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+				return configFile, tempDir
+			},
+			dagPath: func(t *testing.T, _ string) string {
+				return test.TestdataPath(t, path.Join("integration", "basic"))
+			},
+			envVarName: "TMP_LOGS_DIR",
+		},
+		{
+			name: "DAGLocalLogDir",
+			setupFunc: func(t *testing.T) (string, string) {
+				tempDir := t.TempDir()
+				dagFile := filepath.Join(tempDir, "basic.yaml")
+				dagContent := `
+logDir: ${DAG_TMP_LOGS_DIR}/logs
+steps:
+  - name: step1
+    command: echo "Hello, world!"
+`
+				require.NoError(t, os.WriteFile(dagFile, []byte(dagContent), 0644))
+				return dagFile, tempDir
+			},
+			dagPath: func(_ *testing.T, tempDir string) string {
+				return filepath.Join(tempDir, "basic.yaml")
+			},
+			envVarName: "DAG_TMP_LOGS_DIR",
+		},
+	}
 
-	// Set the environment variable to test logs directory configuration.
-	os.Setenv("TMP_LOGS_DIR", tempDir)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup test case
+			configFile, tempDir := tc.setupFunc(t)
+			os.Setenv(tc.envVarName, tempDir)
+			defer os.Unsetenv(tc.envVarName)
 
-	configFile := filepath.Join(tempDir, "config.yaml")
-	// The YAML configuration sets host, port, and basePath.
-	// (Other config fields use default values.)
-	configContent := `logDir: ${TMP_LOGS_DIR}/logs`
-	require.NoError(t, os.WriteFile(configFile, []byte(configContent), 0644))
+			// Get DAG path
+			dagPath := tc.dagPath(t, tempDir)
 
-	// Use the provided test helper to set up context and cancellation.
-	th := test.SetupCommand(t)
+			// Run command
+			th := test.SetupCommand(t)
+			args := []string{"start"}
+			if tc.name == "GlobalLogDir" {
+				args = append(args, "--config", configFile)
+			}
+			args = append(args, dagPath)
 
-	// Execute the DAG using the temporary config.
-	th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
-		Args:        []string{"start", "--config", configFile, test.TestdataPath(t, path.Join("integration", "basic"))},
-		ExpectedOut: []string{"DAG execution finished"},
-	})
+			th.RunCommand(t, cmd.CmdStart(), test.CmdTest{
+				Args:        args,
+				ExpectedOut: []string{"DAG execution finished"},
+			})
 
-	// Check if the logs directory was created.
+			// Verify log directory and files
+			verifyLogs(t, tempDir)
+		})
+	}
+}
+
+// verifyLogs checks if the expected log directory and files exist
+func verifyLogs(t *testing.T, tempDir string) {
+	// Check if the logs directory was created
 	_, err := os.Stat(tempDir + "/logs/basic")
 	require.NoError(t, err)
 
-	// Check if the log file was created.
-	// The log file has the format "start_basic.<timestamp>.log".
+	// Check if the log file was created with the expected pattern
 	files, err := os.ReadDir(tempDir + "/logs/basic")
 	require.NoError(t, err)
 
-	// Check if there's at least one log file that matches the expected pattern
+	// Look for a log file that matches the expected pattern
 	logFileFound := false
 	for _, file := range files {
 		if strings.HasPrefix(file.Name(), "start_basic.") && strings.HasSuffix(file.Name(), ".log") {

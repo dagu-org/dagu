@@ -225,11 +225,15 @@ func (ctx *Context) OpenLogFile(
 	if err != nil {
 		return nil, fmt.Errorf("failed to expand log directory: %w", err)
 	}
+	dagLogDir, err := cmdutil.EvalString(ctx, dag.LogDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand DAG log directory: %w", err)
+	}
 
 	config := LogFileSettings{
 		Prefix:    prefix,
 		LogDir:    logDir,
-		DAGLogDir: dag.LogDir,
+		DAGLogDir: dagLogDir,
 		DAGName:   dag.Name,
 		RequestID: requestID,
 	}

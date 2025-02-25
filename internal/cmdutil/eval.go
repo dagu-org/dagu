@@ -88,6 +88,10 @@ func BuildCommandEscapedString(command string, args []string) string {
 
 // EvalString substitutes environment variables and commands in the input string
 func EvalString(ctx context.Context, input string, opts ...EvalOption) (string, error) {
+	if input == "" {
+		return "", nil // nothing to do
+	}
+
 	options := newEvalOptions()
 	for _, opt := range opts {
 		opt(options)
