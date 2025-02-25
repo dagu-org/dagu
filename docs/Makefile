@@ -31,7 +31,7 @@ install-libs:
 build:
 	sphinx-build -b html -D language=ja_JP source/ build/html
 
-PYTHON_VER = 3.7.16
+PYTHON_VER = 3.11.9
 
 venv:
 	pyenv local $(PYTHON_VER)
