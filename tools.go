@@ -12,6 +12,5 @@ import (
 	_ "github.com/google/addlicense"
 	_ "github.com/rhysd/changelog-from-release/v3"
 	_ "github.com/segmentio/golines"
-	_ "github.com/yohamta/gomerger"
 	_ "gotest.tools/gotestsum"
 )
