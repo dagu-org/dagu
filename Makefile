@@ -55,6 +55,7 @@ PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
 PKG_gomerger=github.com/yohamta/gomerger
 PKG_addlicense=github.com/google/addlicense
+PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest
 
 # Certificates for the development environment
 
@@ -252,6 +253,13 @@ gen-swagger:
 	@${LOCAL_BIN_DIR}/swagger validate ./api.v1.yaml
 	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./api.v1.yaml
 	@go mod tidy
+
+# changelog generates a changelog from the releases.
+.PHONY: changelog
+changelog:
+	@echo "${COLOR_GREEN}Running changelog...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_changelog-from-release)
+	@${LOCAL_BIN_DIR}/changelog-from-release > CHANGELOG.md
 
 ##############################################################################
 # Certificates
