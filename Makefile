@@ -53,8 +53,8 @@ COLOR_RED=\033[0;31m
 PKG_swagger=github.com/go-swagger/go-swagger/cmd/swagger
 PKG_golangci_lint=github.com/golangci/golangci-lint/cmd/golangci-lint
 PKG_gotestsum=gotest.tools/gotestsum
-PKG_gomerger=github.com/yohamta/gomerger
 PKG_addlicense=github.com/google/addlicense
+PKG_changelog-from-release=github.com/rhysd/changelog-from-release/v3@latest
 
 # Certificates for the development environment
 
@@ -171,15 +171,6 @@ build-image-latest:
 	@echo "${COLOR_GREEN}Building the docker image...${COLOR_RESET}"
 	$(DOCKER_CMD) -t ghcr.io/dagu-org/${APP_NAME}:latest .
 
-# gomerger merges all go files into a single file.
-.PHONY: gomerger
-gomerger: ${LOCAL_DIR}/merged
-	@echo "${COLOR_GREEN}Merging Go files...${COLOR_RESET}"
-	@rm -f ${LOCAL_DIR}/merged/merged_project.go
-	@GOBIN=${LOCAL_BIN_DIR} go install ${PKG_gomerger}
-	@${LOCAL_BIN_DIR}/gomerger .
-	@mv merged_project.go ${LOCAL_DIR}/merged/
-
 ${LOCAL_DIR}/merged:
 	@mkdir -p ${LOCAL_DIR}/merged
 
@@ -252,6 +243,13 @@ gen-swagger:
 	@${LOCAL_BIN_DIR}/swagger validate ./api.v1.yaml
 	@${LOCAL_BIN_DIR}/swagger generate server -t ${FE_GEN_DIR} --server-package=restapi --exclude-main -f ./api.v1.yaml
 	@go mod tidy
+
+# changelog generates a changelog from the releases.
+.PHONY: changelog
+changelog:
+	@echo "${COLOR_GREEN}Running changelog...${COLOR_RESET}"
+	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_changelog-from-release)
+	@${LOCAL_BIN_DIR}/changelog-from-release > CHANGELOG.md
 
 ##############################################################################
 # Certificates
