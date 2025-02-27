@@ -12,7 +12,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/spf13/cobra"
 )
 
@@ -183,10 +183,10 @@ func waitForRestart(ctx context.Context, restartWait time.Duration) {
 	}
 }
 
-func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (model.Status, error) {
+func getPreviousExecutionStatus(ctx context.Context, cli client.Client, dag *digraph.DAG) (persistence.Status, error) {
 	status, err := cli.GetLatestStatus(ctx, dag)
 	if err != nil {
-		return model.Status{}, fmt.Errorf("failed to get latest status: %w", err)
+		return persistence.Status{}, fmt.Errorf("failed to get latest status: %w", err)
 	}
 	return status, nil
 }

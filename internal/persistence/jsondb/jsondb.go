@@ -22,7 +22,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
@@ -38,7 +37,7 @@ var (
 type Config struct {
 	Location          string
 	LatestStatusToday bool
-	FileCache         *filecache.Cache[*model.Status]
+	FileCache         *filecache.Cache[*persistence.Status]
 }
 
 const (
@@ -55,18 +54,18 @@ var _ persistence.HistoryStore = (*JSONDB)(nil)
 type JSONDB struct {
 	baseDir           string
 	latestStatusToday bool
-	fileCache         *filecache.Cache[*model.Status]
+	fileCache         *filecache.Cache[*persistence.Status]
 	writer            *writer
 }
 
 type Option func(*Options)
 
 type Options struct {
-	FileCache         *filecache.Cache[*model.Status]
+	FileCache         *filecache.Cache[*persistence.Status]
 	LatestStatusToday bool
 }
 
-func WithFileCache(cache *filecache.Cache[*model.Status]) Option {
+func WithFileCache(cache *filecache.Cache[*persistence.Status]) Option {
 	return func(o *Options) {
 		o.FileCache = cache
 	}
@@ -93,7 +92,7 @@ func New(baseDir string, opts ...Option) *JSONDB {
 	}
 }
 
-func (db *JSONDB) Update(ctx context.Context, key, requestID string, status model.Status) error {
+func (db *JSONDB) Update(ctx context.Context, key, requestID string, status persistence.Status) error {
 	statusFile, err := db.FindByRequestID(ctx, key, requestID)
 	if err != nil {
 		return err
@@ -133,7 +132,7 @@ func (db *JSONDB) Open(ctx context.Context, key string, timestamp time.Time, req
 	return nil
 }
 
-func (db *JSONDB) Write(_ context.Context, status model.Status) error {
+func (db *JSONDB) Write(_ context.Context, status persistence.Status) error {
 	return db.writer.write(status)
 }
 
@@ -157,8 +156,8 @@ func (db *JSONDB) Close(ctx context.Context) error {
 	return db.writer.close()
 }
 
-func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []model.StatusFile {
-	var ret []model.StatusFile
+func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []persistence.StatusFile {
+	var ret []persistence.StatusFile
 
 	files := db.getLatestMatches(db.globPattern(key), itemLimit)
 	for _, file := range files {
@@ -166,7 +165,7 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 		if err != nil {
 			continue
 		}
-		ret = append(ret, model.StatusFile{
+		ret = append(ret, persistence.StatusFile{
 			File:   file,
 			Status: *status,
 		})
@@ -175,7 +174,7 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 	return ret
 }
 
-func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*model.Status, error) {
+func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*persistence.Status, error) {
 	file, err := db.latestToday(key, time.Now(), db.latestStatusToday)
 	if err != nil {
 		return nil, err
@@ -183,7 +182,7 @@ func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*model.Status,
 	return db.parseStatusFile(file)
 }
 
-func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (*model.StatusFile, error) {
+func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (*persistence.StatusFile, error) {
 	if requestID == "" {
 		return nil, errRequestIDNotFound
 	}
@@ -201,7 +200,7 @@ func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID strin
 			continue
 		}
 		if status != nil && status.RequestID == requestID {
-			return &model.StatusFile{
+			return &persistence.StatusFile{
 				File:   match,
 				Status: *status,
 			}, nil
@@ -316,9 +315,9 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 	return nil
 }
 
-func (db *JSONDB) parseStatusFile(file string) (*model.Status, error) {
+func (db *JSONDB) parseStatusFile(file string) (*persistence.Status, error) {
 	if db.fileCache != nil {
-		return db.fileCache.LoadLatest(file, func() (*model.Status, error) {
+		return db.fileCache.LoadLatest(file, func() (*persistence.Status, error) {
 			return ParseStatusFile(file)
 		})
 	}
@@ -400,7 +399,7 @@ func (s *JSONDB) exists(filePath string) bool {
 	return !os.IsNotExist(err)
 }
 
-func ParseStatusFile(filePath string) (*model.Status, error) {
+func ParseStatusFile(filePath string) (*persistence.Status, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		log.Printf("failed to open file. err: %v", err)
@@ -410,7 +409,7 @@ func ParseStatusFile(filePath string) (*model.Status, error) {
 
 	var (
 		offset int64
-		result *model.Status
+		result *persistence.Status
 	)
 	for {
 		line, err := readLineFrom(f, offset)
@@ -424,7 +423,7 @@ func ParseStatusFile(filePath string) (*model.Status, error) {
 		}
 		offset += int64(len(line)) + 1 // +1 for newline
 		if len(line) > 0 {
-			status, err := model.StatusFromJSON(string(line))
+			status, err := persistence.StatusFromJSON(string(line))
 			if err == nil {
 				result = status
 			}

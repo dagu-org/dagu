@@ -21,7 +21,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/mailer"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -34,7 +33,7 @@ import (
 type Agent struct {
 	dag          *digraph.DAG
 	dry          bool
-	retryTarget  *model.Status
+	retryTarget  *persistence.Status
 	dagStore     persistence.DAGStore
 	client       client.Client
 	scheduler    *scheduler.Scheduler
@@ -62,7 +61,7 @@ type Options struct {
 	// RetryTarget is the target status (history of execution) to retry.
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
-	RetryTarget *model.Status
+	RetryTarget *persistence.Status
 }
 
 // New creates a new Agent.
@@ -217,7 +216,7 @@ func (a *Agent) PrintSummary(ctx context.Context) {
 }
 
 // Status collects the current running status of the DAG and returns it.
-func (a *Agent) Status() model.Status {
+func (a *Agent) Status() persistence.Status {
 	// Lock to avoid race condition.
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -229,19 +228,19 @@ func (a *Agent) Status() model.Status {
 	}
 
 	// Create the status object to record the current status.
-	return model.NewStatusFactory(a.dag).
+	return persistence.NewStatusFactory(a.dag).
 		Create(
 			a.requestID,
 			schedulerStatus,
 			os.Getpid(),
 			a.graph.StartAt(),
-			model.WithFinishedAt(a.graph.FinishAt()),
-			model.WithNodes(a.graph.NodeData()),
-			model.WithLogFilePath(a.logFile),
-			model.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
-			model.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
-			model.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
-			model.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+			persistence.WithFinishedAt(a.graph.FinishAt()),
+			persistence.WithNodes(a.graph.NodeData()),
+			persistence.WithLogFilePath(a.logFile),
+			persistence.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
+			persistence.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
+			persistence.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
+			persistence.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
 		)
 }
 

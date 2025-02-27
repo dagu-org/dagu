@@ -1,4 +1,4 @@
-package model
+package persistence
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ func (f *StatusFactory) CreateDefault() Status {
 		Name:       f.dag.Name,
 		Status:     scheduler.StatusNone,
 		StatusText: scheduler.StatusNone.String(),
-		PID:        PID(pidNotRunning),
+		PID:        PID(0),
 		Nodes:      FromSteps(f.dag.Steps),
 		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
 		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
@@ -166,17 +166,15 @@ func Time(t time.Time) *time.Time {
 
 type PID int
 
-const pidNotRunning PID = -1
-
 func (p PID) String() string {
-	if p == pidNotRunning {
+	if p <= 0 {
 		return ""
 	}
 	return fmt.Sprintf("%d", p)
 }
 
 func (p PID) IsRunning() bool {
-	return p != pidNotRunning
+	return p > 0
 }
 
 func nodeOrNil(s *digraph.Step) *Node {

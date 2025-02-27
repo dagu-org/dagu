@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ func TestWriter(t *testing.T) {
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusRunning, testPID, time.Now(),
 		)
 		writer := dag.Writer(t, requestID, time.Now())
@@ -35,7 +35,7 @@ func TestWriter(t *testing.T) {
 
 		writer := dag.Writer(t, requestID, startedAt)
 
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusCancel, testPID, time.Now(),
 		)
 
@@ -71,7 +71,7 @@ func TestWriterErrorHandling(t *testing.T) {
 
 		dag := th.DAG("test_write_to_closed_writer")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-		status := model.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, testPID, time.Now())
+		status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, testPID, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
@@ -90,7 +90,7 @@ func TestWriterRename(t *testing.T) {
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
 	requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-	status := model.NewStatusFactory(dag.DAG).Create(
+	status := persistence.NewStatusFactory(dag.DAG).Create(
 		requestID, scheduler.StatusRunning, testPID, time.Now(),
 	)
 	writer.Write(t, status)

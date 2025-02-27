@@ -20,8 +20,8 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/frontend/server"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/swag"
@@ -567,7 +567,7 @@ func (h *DAG) processStepLogRequest(
 	params dags.GetDAGDetailsParams,
 	resp *models.GetDAGDetailsResponse,
 ) (*models.GetDAGDetailsResponse, *codedError) {
-	var status *model.Status
+	var status *persistence.Status
 
 	if params.Step == nil {
 		return nil, newBadRequestError(fmt.Errorf("missing required parameter: step"))
@@ -590,7 +590,7 @@ func (h *DAG) processStepLogRequest(
 	}
 
 	// Find the step in the status to get the log file.
-	var node *model.Node
+	var node *persistence.Node
 
 	for _, n := range status.Nodes {
 		if n.Step.Name == *params.Step {

@@ -7,7 +7,6 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 )
 
 type Client interface {
@@ -20,11 +19,11 @@ type Client interface {
 	Start(ctx context.Context, dag *digraph.DAG, opts StartOptions) error
 	Restart(ctx context.Context, dag *digraph.DAG, opts RestartOptions) error
 	Retry(ctx context.Context, dag *digraph.DAG, requestID string) error
-	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*model.Status, error)
-	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*model.Status, error)
-	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error)
-	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile
-	UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error
+	GetCurrentStatus(ctx context.Context, dag *digraph.DAG) (*persistence.Status, error)
+	GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (*persistence.Status, error)
+	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)
+	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile
+	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
 	UpdateDAG(ctx context.Context, id string, spec string) error
 	DeleteDAG(ctx context.Context, id, loc string) error
 	GetAllStatus(ctx context.Context) (statuses []DAGStatus, errs []string, err error)
@@ -48,7 +47,7 @@ type DAGStatus struct {
 	File      string
 	Dir       string
 	DAG       *digraph.DAG
-	Status    model.Status
+	Status    persistence.Status
 	Suspended bool
 	Error     error
 	ErrorT    *string
@@ -60,7 +59,7 @@ type DagListPaginationSummaryResult struct {
 }
 
 func newDAGStatus(
-	dag *digraph.DAG, status model.Status, suspended bool, err error,
+	dag *digraph.DAG, status persistence.Status, suspended bool, err error,
 ) DAGStatus {
 	ret := DAGStatus{
 		File:      filepath.Base(dag.Location),
