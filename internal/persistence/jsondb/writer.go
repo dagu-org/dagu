@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 )
 
 var (
@@ -54,7 +54,7 @@ func (w *writer) open() error {
 }
 
 // write appends the status to the local file.
-func (w *writer) write(st model.Status) error {
+func (w *writer) write(st persistence.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 

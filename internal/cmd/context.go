@@ -22,7 +22,6 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/jsondb"
 	"github.com/dagu-org/dagu/internal/persistence/local"
 	"github.com/dagu-org/dagu/internal/persistence/local/storage"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/scheduler"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/google/uuid"
@@ -155,7 +154,7 @@ func (ctx *Context) server() (*server.Server, error) {
 	dagCache.StartEviction(ctx)
 	dagStore := ctx.dagStoreWithCache(dagCache)
 
-	historyCache := filecache.New[*model.Status](0, time.Hour*12)
+	historyCache := filecache.New[*persistence.Status](0, time.Hour*12)
 	historyCache.StartEviction(ctx)
 	historyStore := ctx.historyStoreWithCache(historyCache)
 
@@ -206,7 +205,7 @@ func (s *Context) historyStore() persistence.HistoryStore {
 }
 
 // historyStoreWithCache returns a HistoryStore that uses an in-memory cache.
-func (s *Context) historyStoreWithCache(cache *filecache.Cache[*model.Status]) persistence.HistoryStore {
+func (s *Context) historyStoreWithCache(cache *filecache.Cache[*persistence.Status]) persistence.HistoryStore {
 	return jsondb.New(s.cfg.Paths.DataDir,
 		jsondb.WithLatestStatusToday(s.cfg.Server.LatestStatusToday),
 		jsondb.WithFileCache(cache),

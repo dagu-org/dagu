@@ -9,7 +9,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +26,7 @@ func TestJSONDB_Basic(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusRunning, testPID, time.Now(),
 		)
 		err = th.DB.Write(th.Context, status)
@@ -46,7 +45,7 @@ func TestJSONDB_Basic(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusRunning, testPID, time.Now(),
 		)
 		err = th.DB.Write(th.Context, status)
@@ -80,7 +79,7 @@ func TestJSONDB_ReadStatus(t *testing.T) {
 			err := th.DB.Open(th.Context, dag.Location, now, requestID)
 			require.NoError(t, err)
 
-			status := model.NewStatusFactory(dag.DAG).Create(
+			status := persistence.NewStatusFactory(dag.DAG).Create(
 				requestID, scheduler.StatusRunning, testPID, time.Now(),
 			)
 			status.RequestID = requestID
@@ -104,7 +103,7 @@ func TestJSONDB_ReadStatus(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, now, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusRunning, testPID, time.Now(),
 		)
 		status.RequestID = requestID
@@ -139,7 +138,7 @@ func TestJSONDB_ReadStatusRecent_EdgeCases(t *testing.T) {
 
 			err := th.DB.Open(th.Context, dag.Location, now, requestID)
 			require.NoError(t, err)
-			status := model.NewStatusFactory(dag.DAG).Create(
+			status := persistence.NewStatusFactory(dag.DAG).Create(
 				requestID, scheduler.StatusRunning, testPID, time.Now(),
 			)
 			err = th.DB.Write(th.Context, status)
@@ -166,7 +165,7 @@ func TestJSONDB_ReadStatusToday_EdgeCases(t *testing.T) {
 
 		err := th.DB.Open(th.Context, dag.Location, yesterdayTime, requestID)
 		require.NoError(t, err)
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusSuccess, testPID, time.Now(),
 		)
 		status.RequestID = requestID
@@ -200,7 +199,7 @@ func TestJSONDB_RemoveAll(t *testing.T) {
 
 			err := th.DB.Open(th.Context, dag.Location, now, requestID)
 			require.NoError(t, err)
-			status := model.NewStatusFactory(dag.DAG).Create(
+			status := persistence.NewStatusFactory(dag.DAG).Create(
 				requestID, scheduler.StatusRunning, testPID, time.Now(),
 			)
 			err = th.DB.Write(th.Context, status)
@@ -237,7 +236,7 @@ func TestJSONDB_Update_EdgeCases(t *testing.T) {
 	t.Run("UpdateNonExistentStatus", func(t *testing.T) {
 		dag := th.DAG("test_update_nonexistent")
 		requestID := "request-id-nonexistent"
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusSuccess, testPID, time.Now(),
 		)
 		err := th.DB.Update(th.Context, dag.Location, "nonexistent-id", status)
@@ -247,7 +246,7 @@ func TestJSONDB_Update_EdgeCases(t *testing.T) {
 	t.Run("UpdateWithEmptyRequestID", func(t *testing.T) {
 		dag := th.DAG("test_update_empty_id")
 		requestID := ""
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusSuccess, testPID, time.Now(),
 		)
 		err := th.DB.Update(th.Context, dag.Location, "", status)
@@ -290,7 +289,7 @@ func TestJSONDB_FileManagement(t *testing.T) {
 		err := th.DB.Open(th.Context, dag.Location, oldTime, requestID)
 		require.NoError(t, err)
 
-		status := model.NewStatusFactory(dag.DAG).Create(
+		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusSuccess, testPID, time.Now(),
 		)
 
@@ -325,7 +324,7 @@ func TestJSONDB_FileManagement(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 3; i++ {
-			status := model.NewStatusFactory(dag.DAG).Create(
+			status := persistence.NewStatusFactory(dag.DAG).Create(
 				requestID, scheduler.StatusRunning, testPID, time.Now(),
 			)
 			err = th.DB.Write(th.Context, status)
