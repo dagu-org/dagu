@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 )
@@ -31,7 +31,7 @@ func TestClient_GetStatus(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := model.NewStatusFactory(dag.DAG).Create(
+				status := persistence.NewStatusFactory(dag.DAG).Create(
 					requestID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
@@ -308,11 +308,11 @@ func TestClient_ReadHistory(t *testing.T) {
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) model.Status {
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) persistence.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
-	startedAt := model.Time(time.Now())
-	return model.NewStatusFactory(dag).Create(
-		requestID, status, 0, *startedAt, model.WithNodes(nodes),
+	startedAt := persistence.Time(time.Now())
+	return persistence.NewStatusFactory(dag).Create(
+		requestID, status, 0, *startedAt, persistence.WithNodes(nodes),
 	)
 }
 

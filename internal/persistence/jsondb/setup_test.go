@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,7 +73,7 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 	}
 }
 
-func (w writerTestHelper) Write(t *testing.T, status model.Status) {
+func (w writerTestHelper) Write(t *testing.T, status persistence.Status) {
 	t.Helper()
 
 	err := w.Writer.write(status)
