@@ -1,7 +1,6 @@
 package jsondb
 
 import (
-	"bufio"
 	"context"
 
 	// nolint: gosec
@@ -9,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,7 +17,6 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -54,7 +51,7 @@ var _ persistence.HistoryStore = (*JSONDB)(nil)
 type JSONDB struct {
 	baseDir           string
 	latestStatusToday bool
-	fileCache         *filecache.Cache[*persistence.Status]
+	cache             *filecache.Cache[*persistence.Status]
 	writer            *writer
 }
 
@@ -88,101 +85,59 @@ func New(baseDir string, opts ...Option) *JSONDB {
 	return &JSONDB{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
-		fileCache:         options.FileCache,
+		cache:             options.FileCache,
 	}
 }
 
 func (db *JSONDB) Update(ctx context.Context, key, requestID string, status persistence.Status) error {
-	statusFile, err := db.FindByRequestID(ctx, key, requestID)
+	historyRecord, err := db.FindByRequestID(ctx, key, requestID)
 	if err != nil {
 		return err
 	}
 
-	writer := newWriter(statusFile.File)
-	if err := writer.open(); err != nil {
-		return err
+	if err := historyRecord.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open history record: %w", err)
 	}
-	defer func() {
-		_ = writer.close()
-	}()
-
-	if db.fileCache != nil {
-		defer func() {
-			db.fileCache.Invalidate(statusFile.File)
-		}()
+	if err := historyRecord.Write(ctx, status); err != nil {
+		return fmt.Errorf("failed to write status: %w", err)
 	}
-
-	return writer.write(status)
-}
-
-func (db *JSONDB) Open(ctx context.Context, key string, timestamp time.Time, requestID string) error {
-	filePath, err := db.generateFilePath(key, newUTC(timestamp), requestID)
-	if err != nil {
-		return err
+	if err := historyRecord.Close(ctx); err != nil {
+		return fmt.Errorf("failed to close history record: %w", err)
 	}
-
-	logger.Infof(ctx, "Initializing status file: %s", filePath)
-
-	writer := newWriter(filePath)
-	if err := writer.open(); err != nil {
-		return err
-	}
-
-	db.writer = writer
 	return nil
 }
 
-func (db *JSONDB) Write(_ context.Context, status persistence.Status) error {
-	return db.writer.write(status)
+func (db *JSONDB) NewStatus(ctx context.Context, key string, timestamp time.Time, requestID string) (persistence.HistoryRecord, error) {
+	filePath, err := db.generateFilePath(key, newUTC(timestamp), requestID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate file path: %w", err)
+	}
+
+	return NewHistoryRecord(filePath, db.cache), nil
 }
 
-func (db *JSONDB) Close(ctx context.Context) error {
-	if db.writer == nil {
-		return nil
-	}
-
-	defer func() {
-		_ = db.writer.close()
-		db.writer = nil
-	}()
-
-	if err := db.Compact(ctx, db.writer.target); err != nil {
-		return err
-	}
-
-	if db.fileCache != nil {
-		db.fileCache.Invalidate(db.writer.target)
-	}
-	return db.writer.close()
-}
-
-func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []persistence.StatusFile {
-	var ret []persistence.StatusFile
+func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []persistence.HistoryRecord {
+	var records []persistence.HistoryRecord
 
 	files := db.getLatestMatches(db.globPattern(key), itemLimit)
+
 	for _, file := range files {
-		status, err := db.parseStatusFile(file)
-		if err != nil {
-			continue
-		}
-		ret = append(ret, persistence.StatusFile{
-			File:   file,
-			Status: *status,
-		})
+		records = append(records, NewHistoryRecord(file, db.cache))
 	}
 
-	return ret
+	return records
 }
 
-func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*persistence.Status, error) {
+func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (persistence.HistoryRecord, error) {
 	file, err := db.latestToday(key, time.Now(), db.latestStatusToday)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read status today for %s: %w", key, err)
 	}
-	return db.parseStatusFile(file)
+
+	return NewHistoryRecord(file, db.cache), nil
 }
 
-func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (*persistence.StatusFile, error) {
+func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (persistence.HistoryRecord, error) {
 	if requestID == "" {
 		return nil, errRequestIDNotFound
 	}
@@ -193,18 +148,9 @@ func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID strin
 	}
 
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
+
 	for _, match := range matches {
-		status, err := ParseStatusFile(match)
-		if err != nil {
-			log.Printf("parsing failed %s : %s", match, err)
-			continue
-		}
-		if status != nil && status.RequestID == requestID {
-			return &persistence.StatusFile{
-				File:   match,
-				Status: *status,
-			}, nil
-		}
+		return NewHistoryRecord(match, db.cache), nil
 	}
 
 	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
@@ -239,43 +185,6 @@ func (db *JSONDB) RemoveOld(_ context.Context, key string, retentionDays int) er
 	}
 
 	return lastErr
-}
-
-func (db *JSONDB) Compact(_ context.Context, targetFilePath string) error {
-	status, err := ParseStatusFile(targetFilePath)
-	if err == io.EOF {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %s", err, targetFilePath)
-	}
-
-	newFile := fmt.Sprintf("%s_c.dat", strings.TrimSuffix(filepath.Base(targetFilePath), filepath.Ext(targetFilePath)))
-	tempFilePath := filepath.Join(filepath.Dir(targetFilePath), newFile)
-	writer := newWriter(tempFilePath)
-	if err := writer.open(); err != nil {
-		return err
-	}
-	defer writer.close()
-
-	if err := writer.write(*status); err != nil {
-		if removeErr := os.Remove(tempFilePath); removeErr != nil {
-			return fmt.Errorf("%w: %s", err, removeErr)
-		}
-		return fmt.Errorf("%w: %s", err, tempFilePath)
-	}
-
-	// remove the original file
-	if err := os.Remove(targetFilePath); err != nil {
-		return fmt.Errorf("%w: %s", err, targetFilePath)
-	}
-
-	// rename the file to the original
-	if err := os.Rename(tempFilePath, targetFilePath); err != nil {
-		return fmt.Errorf("%w: %s", err, targetFilePath)
-	}
-
-	return nil
 }
 
 func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
@@ -313,15 +222,6 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 		_ = os.Remove(oldDir)
 	}
 	return nil
-}
-
-func (db *JSONDB) parseStatusFile(file string) (*persistence.Status, error) {
-	if db.fileCache != nil {
-		return db.fileCache.LoadLatest(file, func() (*persistence.Status, error) {
-			return ParseStatusFile(file)
-		})
-	}
-	return ParseStatusFile(file)
 }
 
 func (db *JSONDB) getDirectory(key string, prefix string) string {
@@ -399,38 +299,6 @@ func (s *JSONDB) exists(filePath string) bool {
 	return !os.IsNotExist(err)
 }
 
-func ParseStatusFile(filePath string) (*persistence.Status, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		log.Printf("failed to open file. err: %v", err)
-		return nil, err
-	}
-	defer f.Close()
-
-	var (
-		offset int64
-		result *persistence.Status
-	)
-	for {
-		line, err := readLineFrom(f, offset)
-		if err == io.EOF {
-			if result == nil {
-				return nil, err
-			}
-			return result, nil
-		} else if err != nil {
-			return nil, err
-		}
-		offset += int64(len(line)) + 1 // +1 for newline
-		if len(line) > 0 {
-			status, err := persistence.StatusFromJSON(string(line))
-			if err == nil {
-				result = status
-			}
-		}
-	}
-}
-
 func filterLatest(files []string, itemLimit int) []string {
 	if len(files) == 0 {
 		return nil
@@ -466,25 +334,6 @@ func findTimestamp(file string) (time.Time, error) {
 		return time.Time{}, nil
 	}
 	return t, nil
-}
-
-func readLineFrom(f *os.File, offset int64) ([]byte, error) {
-	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		return nil, err
-	}
-	reader := bufio.NewReader(f)
-	var ret []byte
-	for {
-		line, isPrefix, err := reader.ReadLine()
-		if err != nil {
-			return ret, err
-		}
-		ret = append(ret, line...)
-		if !isPrefix {
-			break
-		}
-	}
-	return ret, nil
 }
 
 func getPrefix(key string) string {

@@ -124,6 +124,13 @@ type StatusFile struct {
 	Status Status
 }
 
+func NewStatusFile(file string, status Status) *StatusFile {
+	return &StatusFile{
+		File:   file,
+		Status: status,
+	}
+}
+
 type StatusResponse struct {
 	Status *Status `json:"status"`
 }
