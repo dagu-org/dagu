@@ -141,7 +141,7 @@ func (hr *HistoryRecord) Compact(ctx context.Context) error {
 }
 
 // compactLocked performs actual compaction with the lock already held
-func (hr *HistoryRecord) compactLocked(_ context.Context) error {
+func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
 	status, err := hr.parseLocked()
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact
@@ -173,7 +173,7 @@ func (hr *HistoryRecord) compactLocked(_ context.Context) error {
 		writer.close() // Best effort close
 		if removeErr := os.Remove(tempFilePath); removeErr != nil {
 			// Log but continue with the original error
-			logger.Errorf(nil, "Failed to remove temp file: %v", removeErr)
+			logger.Errorf(ctx, "Failed to remove temp file: %v", removeErr)
 		}
 		return fmt.Errorf("failed to write compacted data: %w", err)
 	}
