@@ -56,7 +56,7 @@ func TestHistoryRecord_Write(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify file content
-	actual, err := hr.ReadStatus()
+	actual, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "test", actual.RequestID)
 	assert.Equal(t, scheduler.StatusRunning, actual.Status)
@@ -99,12 +99,12 @@ func TestHistoryRecord_Read(t *testing.T) {
 	hr := NewHistoryRecord(file, nil)
 
 	// Read status - should get the last entry (test2)
-	statusFile, err := hr.Read()
+	statusFile, err := hr.Read(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusSuccess.String(), statusFile.Status.Status.String())
 
 	// Read using ReadStatus
-	status, err := hr.ReadStatus()
+	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusSuccess.String(), status.Status.String())
 }
@@ -161,7 +161,7 @@ func TestHistoryRecord_Compact(t *testing.T) {
 	assert.Less(t, afterSize, beforeSize)
 
 	// Verify content is still correct
-	status, err := hr.ReadStatus()
+	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusSuccess, status.Status)
 }
@@ -207,7 +207,7 @@ func TestHistoryRecord_HandleNonExistentFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify the file was created with correct data
-	status, err := hr.ReadStatus()
+	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "test", status.RequestID)
 
@@ -228,7 +228,7 @@ func TestHistoryRecord_EmptyFile(t *testing.T) {
 	hr := NewHistoryRecord(file, nil)
 
 	// Reading an empty file should return EOF
-	_, err = hr.ReadStatus()
+	_, err = hr.ReadStatus(context.Background())
 	assert.ErrorIs(t, err, io.EOF)
 
 	// Compacting an empty file should be safe
@@ -253,7 +253,7 @@ func TestHistoryRecord_InvalidJSON(t *testing.T) {
 	hr := NewHistoryRecord(file, nil)
 
 	// Should be able to read and get the valid entry
-	status, err := hr.ReadStatus()
+	status, err := hr.ReadStatus(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, scheduler.StatusRunning.String(), status.Status.String())
 }

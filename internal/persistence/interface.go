@@ -16,10 +16,10 @@ var (
 )
 
 type HistoryStore interface {
-	NewStatus(ctx context.Context, key string, timestamp time.Time, requestID string) (HistoryRecord, error)
+	NewRecord(ctx context.Context, key string, timestamp time.Time, requestID string) HistoryRecord
 	Update(ctx context.Context, key, requestID string, status Status) error
-	ReadStatusRecent(ctx context.Context, key string, itemLimit int) []HistoryRecord
-	ReadStatusToday(ctx context.Context, key string) (HistoryRecord, error)
+	ReadRecent(ctx context.Context, key string, itemLimit int) []HistoryRecord
+	ReadToday(ctx context.Context, key string) (HistoryRecord, error)
 	FindByRequestID(ctx context.Context, key string, requestID string) (HistoryRecord, error)
 	RemoveAll(ctx context.Context, key string) error
 	RemoveOld(ctx context.Context, key string, retentionDays int) error
@@ -30,6 +30,8 @@ type HistoryRecord interface {
 	Open(ctx context.Context) error
 	Write(ctx context.Context, status Status) error
 	Close(ctx context.Context) error
+	Read(ctx context.Context) (*StatusFile, error)
+	ReadStatus(ctx context.Context) (*Status, error)
 }
 
 type DAGStore interface {

@@ -25,6 +25,8 @@ var (
 	ErrCompactFailed     = errors.New("failed to compact status file")
 )
 
+var _ persistence.HistoryRecord = (*HistoryRecord)(nil)
+
 // HistoryRecord manages an append-only status file with read, write, and compaction capabilities.
 type HistoryRecord struct {
 	file      string
@@ -210,8 +212,8 @@ func safeRename(source, target string) error {
 }
 
 // ReadStatus reads the latest status from the file, using cache if available.
-func (hr *HistoryRecord) ReadStatus() (*persistence.Status, error) {
-	statusFile, err := hr.Read()
+func (hr *HistoryRecord) ReadStatus(ctx context.Context) (*persistence.Status, error) {
+	statusFile, err := hr.Read(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +221,7 @@ func (hr *HistoryRecord) ReadStatus() (*persistence.Status, error) {
 }
 
 // Read returns the full status file information, including the file path.
-func (hr *HistoryRecord) Read() (*persistence.StatusFile, error) {
+func (hr *HistoryRecord) Read(_ context.Context) (*persistence.StatusFile, error) {
 	// Try to use cache first if available
 	if hr.cache != nil {
 		status, err := hr.cache.LoadLatest(hr.file, func() (*persistence.Status, error) {

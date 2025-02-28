@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
-	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,9 +52,7 @@ type dagTestHelper struct {
 func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Time) writerTestHelper {
 	t.Helper()
 
-	filePath, err := d.th.DB.generateFilePath(d.DAG.Location, newUTC(startedAt), requestID)
-	require.NoError(t, err)
-
+	filePath := d.th.DB.generateFilePath(d.th.Context, d.DAG.Location, newUTC(startedAt), requestID)
 	writer := newWriter(filePath)
 	require.NoError(t, writer.open())
 
@@ -80,6 +76,7 @@ func (w writerTestHelper) Write(t *testing.T, status persistence.Status) {
 	require.NoError(t, err)
 }
 
+/*
 func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, status scheduler.Status) {
 	t.Helper()
 
@@ -90,6 +87,7 @@ func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, st
 	assert.Equal(t, requestID, data.RequestID)
 	assert.Equal(t, status, data.Status)
 }
+*/
 
 func (w writerTestHelper) Close(t *testing.T) {
 	t.Helper()

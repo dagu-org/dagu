@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 	"github.com/dagu-org/dagu/internal/stringutil"
@@ -25,7 +26,6 @@ import (
 var (
 	errRequestIDNotFound  = errors.New("request ID not found")
 	errCreateNewDirectory = errors.New("failed to create new directory")
-	errKeyEmpty           = errors.New("dagFile is empty")
 
 	// rTimestamp is a regular expression to match the timestamp in the file name.
 	rTimestamp = regexp.MustCompile(`2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}|2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}Z`)
@@ -52,7 +52,6 @@ type JSONDB struct {
 	baseDir           string
 	latestStatusToday bool
 	cache             *filecache.Cache[*persistence.Status]
-	writer            *writer
 }
 
 type Option func(*Options)
@@ -107,16 +106,12 @@ func (db *JSONDB) Update(ctx context.Context, key, requestID string, status pers
 	return nil
 }
 
-func (db *JSONDB) NewStatus(ctx context.Context, key string, timestamp time.Time, requestID string) (persistence.HistoryRecord, error) {
-	filePath, err := db.generateFilePath(key, newUTC(timestamp), requestID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate file path: %w", err)
-	}
-
-	return NewHistoryRecord(filePath, db.cache), nil
+func (db *JSONDB) NewRecord(ctx context.Context, key string, timestamp time.Time, requestID string) persistence.HistoryRecord {
+	filePath := db.generateFilePath(ctx, key, newUTC(timestamp), requestID)
+	return NewHistoryRecord(filePath, db.cache)
 }
 
-func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []persistence.HistoryRecord {
+func (db *JSONDB) ReadRecent(_ context.Context, key string, itemLimit int) []persistence.HistoryRecord {
 	var records []persistence.HistoryRecord
 
 	files := db.getLatestMatches(db.globPattern(key), itemLimit)
@@ -128,7 +123,7 @@ func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int)
 	return records
 }
 
-func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (persistence.HistoryRecord, error) {
+func (db *JSONDB) ReadToday(_ context.Context, key string) (persistence.HistoryRecord, error) {
 	file, err := db.latestToday(key, time.Now(), db.latestStatusToday)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read status today for %s: %w", key, err)
@@ -237,14 +232,17 @@ func (db *JSONDB) getDirectory(key string, prefix string) string {
 	return filepath.Join(db.baseDir, key)
 }
 
-func (db *JSONDB) generateFilePath(key string, timestamp timeInUTC, requestID string) (string, error) {
+func (db *JSONDB) generateFilePath(ctx context.Context, key string, timestamp timeInUTC, requestID string) string {
 	if key == "" {
-		return "", errKeyEmpty
+		logger.Error(ctx, "key is empty")
+	}
+	if requestID == "" {
+		logger.Error(ctx, "requestID is empty")
 	}
 	prefix := db.createPrefix(key)
 	timestampString := timestamp.Format(dateTimeFormatUTC)
 	requestID = stringutil.TruncString(requestID, requestIDLenSafe)
-	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestampString, requestID), nil
+	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestampString, requestID)
 }
 
 func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool) (string, error) {
