@@ -24,8 +24,8 @@ import (
 )
 
 var (
-	errRequestIDNotFound  = errors.New("request ID not found")
-	errCreateNewDirectory = errors.New("failed to create new directory")
+	ErrRequestIDNotFound  = errors.New("request ID not found")
+	ErrCreateNewDirectory = errors.New("failed to create new directory")
 
 	// rTimestamp is a regular expression to match the timestamp in the file name.
 	rTimestamp = regexp.MustCompile(`2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}|2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}Z`)
@@ -103,6 +103,7 @@ func (db *JSONDB) Update(ctx context.Context, key, requestID string, status pers
 	if err := historyRecord.Close(ctx); err != nil {
 		return fmt.Errorf("failed to close history record: %w", err)
 	}
+
 	return nil
 }
 
@@ -134,7 +135,7 @@ func (db *JSONDB) ReadToday(_ context.Context, key string) (persistence.HistoryR
 
 func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (persistence.HistoryRecord, error) {
 	if requestID == "" {
-		return nil, errRequestIDNotFound
+		return nil, ErrRequestIDNotFound
 	}
 
 	matches, err := filepath.Glob(db.globPattern(key))
@@ -195,7 +196,7 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 	newDir := db.getDirectory(newKey, getPrefix(newKey))
 	if !db.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err)
+			return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, newDir, err)
 		}
 	}
 

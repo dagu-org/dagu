@@ -25,7 +25,7 @@ func TestWriter(t *testing.T) {
 		writer := dag.Writer(t, requestID, time.Now())
 		writer.Write(t, status)
 
-		// writer.AssertContent(t, "test_write_status", requestID, scheduler.StatusRunning)
+		writer.AssertContent(t, "test_write_status", requestID, scheduler.StatusRunning)
 	})
 
 	t.Run("WriteStatusToExistingFile", func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestWriter(t *testing.T) {
 		// Write initial status
 		writer.Write(t, status)
 		writer.Close(t)
-		// writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusCancel)
+		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusCancel)
 
 		// Append to existing file
 		writer = dag.Writer(t, requestID, startedAt)
@@ -51,7 +51,7 @@ func TestWriter(t *testing.T) {
 		writer.Close(t)
 
 		// Verify appended data
-		// writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusSuccess)
+		writer.AssertContent(t, "test_append_to_existing", requestID, scheduler.StatusSuccess)
 	})
 }
 
@@ -59,27 +59,27 @@ func TestWriterErrorHandling(t *testing.T) {
 	th := testSetup(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
-		writer := newWriter("/nonexistent/dir/file.dat")
-		err := writer.open()
+		writer := NewWriter("/nonexistent/dir/file.dat")
+		err := writer.Open()
 		assert.Error(t, err)
 	})
 
 	t.Run("WriteToClosedWriter", func(t *testing.T) {
-		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
-		require.NoError(t, writer.open())
-		require.NoError(t, writer.close())
+		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.Open())
+		require.NoError(t, writer.Close())
 
 		dag := th.DAG("test_write_to_closed_writer")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
-		assert.Error(t, writer.write(status))
+		assert.Error(t, writer.Write(status))
 	})
 
 	t.Run("CloseMultipleTimes", func(t *testing.T) {
-		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
-		require.NoError(t, writer.open())
-		require.NoError(t, writer.close())
-		assert.NoError(t, writer.close()) // Second close should not return an error
+		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.Open())
+		require.NoError(t, writer.Close())
+		assert.NoError(t, writer.Close()) // Second close should not return an error
 	})
 }
 

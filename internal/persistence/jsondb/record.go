@@ -30,7 +30,7 @@ var _ persistence.HistoryRecord = (*HistoryRecord)(nil)
 // HistoryRecord manages an append-only status file with read, write, and compaction capabilities.
 type HistoryRecord struct {
 	file      string
-	writer    *writer
+	writer    *Writer
 	mu        sync.RWMutex
 	cache     *filecache.Cache[*persistence.Status]
 	isClosing atomic.Bool // Used to prevent writes during Close/Compact operations
@@ -61,8 +61,8 @@ func (hr *HistoryRecord) Open(ctx context.Context) error {
 
 	logger.Infof(ctx, "Initializing status file: %s", hr.file)
 
-	writer := newWriter(hr.file)
-	if err := writer.open(); err != nil {
+	writer := NewWriter(hr.file)
+	if err := writer.Open(); err != nil {
 		return fmt.Errorf("failed to open writer: %w", err)
 	}
 
@@ -85,7 +85,7 @@ func (hr *HistoryRecord) Write(_ context.Context, status persistence.Status) err
 		return fmt.Errorf("status file not open: %w", ErrStatusFileNotOpen)
 	}
 
-	if err := hr.writer.write(status); err != nil {
+	if err := hr.writer.Write(status); err != nil {
 		return fmt.Errorf("failed to write status: %w", ErrWriteFailed)
 	}
 
@@ -122,7 +122,7 @@ func (hr *HistoryRecord) Close(ctx context.Context) error {
 	}
 
 	// Close the writer
-	if err := w.close(); err != nil {
+	if err := w.Close(); err != nil {
 		return fmt.Errorf("failed to close writer: %w", err)
 	}
 
@@ -166,13 +166,13 @@ func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
 	}
 
 	// Write the compacted data to the temp file
-	writer := newWriter(tempFilePath)
-	if err := writer.open(); err != nil {
+	writer := NewWriter(tempFilePath)
+	if err := writer.Open(); err != nil {
 		return fmt.Errorf("failed to open temp file writer: %w", err)
 	}
 
-	if err := writer.write(*status); err != nil {
-		writer.close() // Best effort close
+	if err := writer.Write(*status); err != nil {
+		writer.Close() // Best effort close
 		if removeErr := os.Remove(tempFilePath); removeErr != nil {
 			// Log but continue with the original error
 			logger.Errorf(ctx, "Failed to remove temp file: %v", removeErr)
@@ -180,7 +180,7 @@ func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
 		return fmt.Errorf("failed to write compacted data: %w", err)
 	}
 
-	if err := writer.close(); err != nil {
+	if err := writer.Close(); err != nil {
 		return fmt.Errorf("failed to close temp file writer: %w", err)
 	}
 

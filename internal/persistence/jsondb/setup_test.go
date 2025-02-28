@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
+	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,11 +55,11 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 	t.Helper()
 
 	filePath := d.th.DB.generateFilePath(d.th.Context, d.DAG.Location, newUTC(startedAt), requestID)
-	writer := newWriter(filePath)
-	require.NoError(t, writer.open())
+	writer := NewWriter(filePath)
+	require.NoError(t, writer.Open())
 
 	t.Cleanup(func() {
-		require.NoError(t, writer.close())
+		require.NoError(t, writer.Close())
 	})
 
 	return writerTestHelper{
@@ -72,11 +74,10 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 func (w writerTestHelper) Write(t *testing.T, status persistence.Status) {
 	t.Helper()
 
-	err := w.Writer.write(status)
+	err := w.Writer.Write(status)
 	require.NoError(t, err)
 }
 
-/*
 func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, status scheduler.Status) {
 	t.Helper()
 
@@ -87,12 +88,11 @@ func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, st
 	assert.Equal(t, requestID, data.RequestID)
 	assert.Equal(t, status, data.Status)
 }
-*/
 
 func (w writerTestHelper) Close(t *testing.T) {
 	t.Helper()
 
-	require.NoError(t, w.Writer.close())
+	require.NoError(t, w.Writer.Close())
 }
 
 type writerTestHelper struct {
@@ -100,6 +100,6 @@ type writerTestHelper struct {
 
 	RequestID string
 	FilePath  string
-	Writer    *writer
+	Writer    *Writer
 	Closed    bool
 }

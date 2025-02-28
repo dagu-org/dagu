@@ -220,7 +220,7 @@ func TestJSONDB_Update_EdgeCases(t *testing.T) {
 			requestID, scheduler.StatusSuccess, testPID, time.Now(),
 		)
 		err := th.DB.Update(th.Context, dag.Location, "", status)
-		assert.ErrorIs(t, err, errRequestIDNotFound)
+		assert.ErrorIs(t, err, ErrRequestIDNotFound)
 	})
 }
 
