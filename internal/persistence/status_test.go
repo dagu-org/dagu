@@ -50,7 +50,7 @@ func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
 	requestID := "request-id-testII"
 	status := persistence.NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
-	status.CorrectRunningStatus()
+	status.SetStatusToErrorIfRunning()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }
 

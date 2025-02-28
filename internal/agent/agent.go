@@ -118,16 +118,17 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Make a connection to the database.
 	// It should close the connection to the history database when the DAG
 	// execution is finished.
-	if err := a.setupDatabase(ctx); err != nil {
-		return err
+	historyRecord := a.setupHistoryRecord(ctx)
+	if err := historyRecord.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open history record: %w", err)
 	}
 	defer func() {
-		if err := a.historyStore.Close(ctx); err != nil {
+		if err := historyRecord.Close(ctx); err != nil {
 			logger.Error(ctx, "Failed to close history store", "err", err)
 		}
 	}()
 
-	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
+	if err := historyRecord.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Failed to write status", "err", err)
 	}
 
@@ -136,6 +137,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err := a.setupSocketServer(ctx); err != nil {
 		return fmt.Errorf("failed to setup unix socket server: %w", err)
 	}
+
 	listenerErrCh := make(chan error)
 	go execWithRecovery(ctx, func() {
 		err := a.socketServer.Serve(ctx, listenerErrCh)
@@ -164,7 +166,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	go execWithRecovery(ctx, func() {
 		for node := range done {
 			status := a.Status()
-			if err := a.historyStore.Write(ctx, status); err != nil {
+			if err := historyRecord.Write(ctx, status); err != nil {
 				logger.Error(ctx, "Failed to write status", "err", err)
 			}
 			if err := a.reporter.reportStep(ctx, a.dag, status, node); err != nil {
@@ -180,7 +182,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		if a.finished.Load() {
 			return
 		}
-		if err := a.historyStore.Write(ctx, a.Status()); err != nil {
+		if err := historyRecord.Write(ctx, a.Status()); err != nil {
 			logger.Error(ctx, "Status write failed", "err", err)
 		}
 	})
@@ -192,7 +194,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
 	logger.Info(ctx, "DAG execution finished", "status", finishedStatus.Status)
-	if err := a.historyStore.Write(ctx, a.Status()); err != nil {
+	if err := historyRecord.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
 
@@ -435,14 +437,13 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-// setup database prepare database connection and remove old history data.
-func (a *Agent) setupDatabase(ctx context.Context) error {
+func (a *Agent) setupHistoryRecord(ctx context.Context) persistence.HistoryRecord {
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(ctx, location, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	return a.historyStore.Open(ctx, a.dag.Location, time.Now(), a.requestID)
+	return a.historyStore.NewRecord(ctx, location, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.
@@ -535,13 +536,17 @@ func (o *dbClient) GetDAG(ctx context.Context, name string) (*digraph.DAG, error
 }
 
 func (o *dbClient) GetStatus(ctx context.Context, name string, requestID string) (*digraph.Status, error) {
-	status, err := o.historyStore.FindByRequestID(ctx, name, requestID)
+	historyRecord, err := o.historyStore.FindByRequestID(ctx, name, requestID)
+	if err != nil {
+		return nil, err
+	}
+	status, err := historyRecord.ReadStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	outputVariables := map[string]string{}
-	for _, node := range status.Status.Nodes {
+	for _, node := range status.Nodes {
 		if node.Step.OutputVariables != nil {
 			node.Step.OutputVariables.Range(func(_, value any) bool {
 				// split the value by '=' to get the key and value
@@ -556,7 +561,7 @@ func (o *dbClient) GetStatus(ctx context.Context, name string, requestID string)
 
 	return &digraph.Status{
 		Outputs: outputVariables,
-		Name:    status.Status.Name,
-		Params:  status.Status.Params,
+		Name:    status.Name,
+		Params:  status.Params,
 	}, nil
 }

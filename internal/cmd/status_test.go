@@ -25,12 +25,16 @@ func TestStatusCommand(t *testing.T) {
 		}()
 
 		require.Eventually(t, func() bool {
-			status := th.HistoryStore.ReadStatusRecent(th.Context, dagFile.Location, 1)
-			if len(status) < 1 {
+			historyRecords := th.HistoryStore.ReadRecent(th.Context, dagFile.Location, 1)
+			if len(historyRecords) < 1 {
 				return false
 			}
-			println(status[0].Status.Status.String())
-			return scheduler.StatusRunning == status[0].Status.Status
+			status, err := historyRecords[0].ReadStatus(th.Context)
+			if err != nil {
+				return false
+			}
+
+			return scheduler.StatusRunning == status.Status
 		}, time.Second*3, time.Millisecond*50)
 
 		// Check the current status.

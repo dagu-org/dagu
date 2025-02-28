@@ -249,7 +249,13 @@ func (hr *HistoryRecord) Read(_ context.Context) (*persistence.StatusFile, error
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
 func (hr *HistoryRecord) parseLocked() (*persistence.Status, error) {
-	f, err := os.Open(hr.file)
+	return ParseStatusFile(hr.file)
+}
+
+// ParseStatusFile reads the status file and returns the last valid status.
+// TODO: Remove this function and use HistoryRecord.ReadStatus instead.
+func ParseStatusFile(file string) (*persistence.Status, error) {
+	f, err := os.Open(file)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrReadFailed, err)
 	}

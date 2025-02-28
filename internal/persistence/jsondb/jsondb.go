@@ -213,9 +213,11 @@ func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
 			log.Printf("failed to rename %s to %s: %s", m, f, err)
 		}
 	}
+
 	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
 		_ = os.Remove(oldDir)
 	}
+
 	return nil
 }
 

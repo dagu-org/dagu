@@ -75,14 +75,16 @@ func TestClient_GetStatus(t *testing.T) {
 		cli := th.Client
 
 		// Open the history store and write a status before updating it.
-		err := th.HistoryStore.Open(ctx, dag.Location, now, requestID)
+		record := th.HistoryStore.NewRecord(ctx, dag.Location, now, requestID)
+
+		err := record.Open(ctx)
 		require.NoError(t, err)
 
 		status := testNewStatus(dag.DAG, requestID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
-		err = th.HistoryStore.Write(ctx, status)
+		err = record.Write(ctx, status)
 		require.NoError(t, err)
-		_ = th.HistoryStore.Close(ctx)
+		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
 		statusToCheck, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)

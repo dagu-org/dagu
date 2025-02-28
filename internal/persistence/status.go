@@ -153,7 +153,7 @@ type Status struct {
 	ParamsList []string         `json:"ParamsList,omitempty"`
 }
 
-func (st *Status) CorrectRunningStatus() {
+func (st *Status) SetStatusToErrorIfRunning() {
 	if st.Status == scheduler.StatusRunning {
 		st.Status = scheduler.StatusError
 		st.StatusText = st.Status.String()
