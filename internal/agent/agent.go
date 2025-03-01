@@ -386,33 +386,45 @@ func (a *Agent) dryRun(ctx context.Context) error {
 // process by sending a SIGKILL to force the process to be shutdown.
 // if processes do not terminate after MaxCleanUp time, it sends KILL signal.
 func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
-	logger.Info(ctx, "Sending signal to running child processes", "signal", sig)
-	done := make(chan bool)
+	logger.Info(ctx, "Sending signal to running child processes",
+		"signal", sig.String(),
+		"allowOverride", allowOverride,
+		"maxCleanupTime", a.dag.MaxCleanUpTime)
+
+	signalCtx, cancel := context.WithTimeout(ctx, a.dag.MaxCleanUpTime)
+	defer cancel()
+
+	done := make(chan bool, 1)
 	go func() {
 		a.scheduler.Signal(ctx, a.graph, sig, done, allowOverride)
 	}()
-	timeout := time.NewTimer(a.dag.MaxCleanUpTime)
-	tick := time.NewTimer(time.Second * 5)
-	defer timeout.Stop()
-	defer tick.Stop()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-done:
 			logger.Info(ctx, "All child processes have been terminated")
 			return
-		case <-timeout.C:
-			logger.Info(ctx, "Time reached to max cleanup time")
-			logger.Info(ctx, "Sending KILL signal to running child processes.")
+
+		case <-signalCtx.Done():
+			logger.Info(ctx, "Max cleanup time reached, sending SIGKILL to force termination")
+			// Force kill with SIGKILL and don't wait for completion
 			a.scheduler.Signal(ctx, a.graph, syscall.SIGKILL, nil, false)
 			return
-		case <-tick.C:
-			logger.Info(ctx, "Sending signal again")
+
+		case <-ticker.C:
+			logger.Info(ctx, "Resending signal to processes that haven't terminated",
+				"signal", sig.String())
 			a.scheduler.Signal(ctx, a.graph, sig, nil, false)
-			tick.Reset(time.Second * 5)
-		default:
-			logger.Info(ctx, "Waiting for child processes to exit...")
-			time.Sleep(time.Second * 3)
+
+		case <-time.After(500 * time.Millisecond):
+			// Quick check to avoid busy waiting, but still responsive
+			if a.graph != nil && !a.graph.IsRunning() {
+				logger.Info(ctx, "No running processes detected, termination complete")
+				return
+			}
 		}
 	}
 }
