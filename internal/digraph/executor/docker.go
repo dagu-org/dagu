@@ -299,7 +299,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(ctx, *containerConfig)
+		replaced, err := digraph.EvalObject(ctx, *containerConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -316,7 +316,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(ctx, *hostConfig)
+		replaced, err := digraph.EvalObject(ctx, *hostConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -333,7 +333,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(ctx, *networkConfig)
+		replaced, err := digraph.EvalObject(ctx, *networkConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}
@@ -350,7 +350,7 @@ func newDocker(
 		if err := md.Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config: %w", err)
 		}
-		replaced, err := digraph.EvalStringFields(ctx, *execConfig)
+		replaced, err := digraph.EvalObject(ctx, *execConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate string fields: %w", err)
 		}

@@ -345,11 +345,12 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
-	c := digraph.GetStepContext(ctx)
-	c = c.WithEnv(digraph.EnvKeyLogPath, n.data.Log())
-	c = c.WithEnv(digraph.EnvKeyDAGStepLogPath, n.data.Log())
-
-	return digraph.WithStepContext(ctx, c)
+	c := digraph.GetExecContext(ctx)
+	c = c.WithEnv(
+		digraph.EnvKeyLogPath, n.data.Log(),
+		digraph.EnvKeyStepLogPath, n.data.Log(),
+	)
+	return digraph.WithExecContext(ctx, c)
 }
 
 func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error {

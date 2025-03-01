@@ -122,7 +122,7 @@ func (s *SafeData) Setup(ctx context.Context, logFile string, startedAt time.Tim
 	s.inner.State.Log = logFile
 	s.inner.State.StartedAt = startedAt
 
-	c := digraph.GetStepContext(ctx)
+	c := digraph.GetExecContext(ctx)
 
 	// Evaluate the stdout and stderr fields
 	stdout, err := c.EvalString(s.inner.Step.Stdout)

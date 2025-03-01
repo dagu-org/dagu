@@ -35,9 +35,9 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	c := digraph.GetStepContext(ctx)
+	c := digraph.GetExecContext(ctx)
 
-	config, err := digraph.EvalStringFields(ctx, struct {
+	config, err := digraph.EvalObject(ctx, struct {
 		Name   string
 		Params string
 	}{
@@ -103,7 +103,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the subworkflow
-	c := digraph.GetStepContext(ctx)
+	c := digraph.GetExecContext(ctx)
 	result, err := c.GetResult(e.subDAG, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)

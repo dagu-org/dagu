@@ -320,7 +320,7 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 
 // setupContext builds the context for a step.
 func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	stepCtx := digraph.NewStepContext(ctx, node.data.Step())
+	stepCtx := digraph.NewExecContext(ctx, node.data.Step())
 
 	// get output variables that are available to the next steps
 	curr := node.id
@@ -342,13 +342,13 @@ func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, no
 		stepCtx.LoadOutputVariables(node.data.Step().OutputVariables)
 	}
 
-	return digraph.WithStepContext(ctx, stepCtx)
+	return digraph.WithExecContext(ctx, stepCtx)
 }
 
 // buildStepContextForHandler builds the context for a handler.
 func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	step := node.data.Step()
-	stepCtx := digraph.NewStepContext(ctx, step)
+	stepCtx := digraph.NewExecContext(ctx, step)
 
 	// get all output variables
 	for _, node := range graph.Nodes() {
@@ -360,7 +360,7 @@ func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *Exec
 		stepCtx.LoadOutputVariables(nodeStep.OutputVariables)
 	}
 
-	return digraph.WithStepContext(ctx, stepCtx)
+	return digraph.WithExecContext(ctx, stepCtx)
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {

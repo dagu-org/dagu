@@ -9,23 +9,6 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
-func AllEnvs(ctx context.Context) []string {
-	return GetStepContext(ctx).AllEnvs()
-}
-
-func EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	return GetStepContext(ctx).EvalString(s, opts...)
-}
-
-func EvalBool(ctx context.Context, value any) (bool, error) {
-	return GetStepContext(ctx).EvalBool(value)
-}
-
-func EvalStringFields[T any](ctx context.Context, obj T) (T, error) {
-	vars := GetStepContext(ctx).vars.Variables()
-	return cmdutil.EvalStringFields(ctx, obj, cmdutil.WithVariables(vars))
-}
-
 type Context struct {
 	ctx    context.Context
 	dag    *DAG
