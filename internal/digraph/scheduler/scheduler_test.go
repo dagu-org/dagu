@@ -1029,26 +1029,20 @@ func (sr scheduleResult) AssertDoneCount(t *testing.T, expected int) {
 func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expected scheduler.NodeStatus) {
 	t.Helper()
 
-	var target *scheduler.Node
-
-	nodes := sr.ExecutionGraph.Nodes()
-	for _, node := range nodes {
-		if node.Data().Step.Name == stepName {
-			target = node
+	target := sr.ExecutionGraph.NodeByName(stepName)
+	if target == nil {
+		if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
 		}
-	}
-
-	if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
-	}
-	if sr.Config.OnSuccess != nil && sr.Config.OnSuccess.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnSuccess)
-	}
-	if sr.Config.OnFailure != nil && sr.Config.OnFailure.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnFailure)
-	}
-	if sr.Config.OnCancel != nil && sr.Config.OnCancel.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnCancel)
+		if sr.Config.OnSuccess != nil && sr.Config.OnSuccess.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnSuccess)
+		}
+		if sr.Config.OnFailure != nil && sr.Config.OnFailure.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnFailure)
+		}
+		if sr.Config.OnCancel != nil && sr.Config.OnCancel.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnCancel)
+		}
 	}
 
 	if target == nil {
@@ -1061,11 +1055,8 @@ func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expecte
 func (sr scheduleResult) Node(t *testing.T, stepName string) *scheduler.Node {
 	t.Helper()
 
-	nodes := sr.ExecutionGraph.Nodes()
-	for _, node := range nodes {
-		if node.Data().Step.Name == stepName {
-			return node
-		}
+	if node := sr.ExecutionGraph.NodeByName(stepName); node != nil {
+		return node
 	}
 
 	if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {

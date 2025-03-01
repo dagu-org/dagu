@@ -115,7 +115,7 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 		}
 
 	NodesIteration:
-		for _, node := range graph.Nodes() {
+		for _, node := range graph.nodes {
 			if node.State().Status != NodeStatusNone || !isReady(ctx, graph, node) {
 				continue NodesIteration
 			}
@@ -318,11 +318,9 @@ func (sc *Scheduler) teardownNode(ctx context.Context, node *Node) error {
 	return nil
 }
 
-// setupContext builds the context for a step.
 func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
 	stepCtx := digraph.NewExecContext(ctx, node.data.Step())
 
-	// get output variables that are available to the next steps
 	curr := node.id
 	visited := make(map[int]struct{})
 	queue := []int{curr}
@@ -332,9 +330,9 @@ func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, no
 			continue
 		}
 		visited[curr] = struct{}{}
-		queue = append(queue, graph.to[curr]...)
+		queue = append(queue, graph.To[curr]...)
 
-		node := graph.node(curr)
+		node := graph.nodeByID[curr]
 		if node.data.Step().OutputVariables == nil {
 			continue
 		}
@@ -345,22 +343,20 @@ func (sc *Scheduler) setupContext(ctx context.Context, graph *ExecutionGraph, no
 	return digraph.WithExecContext(ctx, stepCtx)
 }
 
-// buildStepContextForHandler builds the context for a handler.
-func (sc *Scheduler) buildStepContextForHandler(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
-	step := node.data.Step()
-	stepCtx := digraph.NewExecContext(ctx, step)
+func (sc *Scheduler) setupExecCtxForHandlerNode(ctx context.Context, graph *ExecutionGraph, node *Node) context.Context {
+	c := digraph.NewExecContext(ctx, node.data.Step())
 
 	// get all output variables
-	for _, node := range graph.Nodes() {
+	for _, node := range graph.nodes {
 		nodeStep := node.data.Step()
 		if nodeStep.OutputVariables == nil {
 			continue
 		}
 
-		stepCtx.LoadOutputVariables(nodeStep.OutputVariables)
+		c.LoadOutputVariables(nodeStep.OutputVariables)
 	}
 
-	return digraph.WithExecContext(ctx, stepCtx)
+	return digraph.WithExecContext(ctx, c)
 }
 
 func (sc *Scheduler) execNode(ctx context.Context, node *Node) error {
@@ -383,7 +379,7 @@ func (sc *Scheduler) Signal(
 		sc.setCanceled()
 	}
 
-	for _, node := range graph.Nodes() {
+	for _, node := range graph.nodes {
 		// for a repetitive task, we'll wait for the job to finish
 		// until time reaches max wait time
 		if !node.data.Step().RepeatPolicy.Repeat {
@@ -405,7 +401,7 @@ func (sc *Scheduler) Signal(
 // Cancel sends -1 signal to all nodes.
 func (sc *Scheduler) Cancel(ctx context.Context, g *ExecutionGraph) {
 	sc.setCanceled()
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		node.Cancel(ctx)
 	}
 }
@@ -451,8 +447,8 @@ func (sc *Scheduler) isCanceled() bool {
 
 func isReady(ctx context.Context, g *ExecutionGraph, node *Node) bool {
 	ready := true
-	for _, dep := range g.to[node.id] {
-		dep := g.node(dep)
+	for _, dep := range g.To[node.id] {
+		dep := g.nodeByID[dep]
 
 		switch dep.State().Status {
 		case NodeStatusSuccess:
@@ -504,7 +500,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 			_ = node.Teardown(ctx)
 		}()
 
-		ctx = sc.buildStepContextForHandler(ctx, graph, node)
+		ctx = sc.setupExecCtxForHandlerNode(ctx, graph, node)
 		if err := node.Execute(ctx); err != nil {
 			node.data.SetStatus(NodeStatusError)
 			return err
@@ -553,7 +549,7 @@ func (sc *Scheduler) setCanceled() {
 
 func (*Scheduler) runningCount(g *ExecutionGraph) int {
 	count := 0
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusRunning {
 			count++
 		}
@@ -562,7 +558,7 @@ func (*Scheduler) runningCount(g *ExecutionGraph) int {
 }
 
 func (*Scheduler) isFinished(g *ExecutionGraph) bool {
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusRunning ||
 			node.State().Status == NodeStatusNone {
 			return false
@@ -574,7 +570,7 @@ func (*Scheduler) isFinished(g *ExecutionGraph) bool {
 func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	for _, node := range g.Nodes() {
+	for _, node := range g.nodes {
 		nodeStatus := node.State().Status
 		if nodeStatus == NodeStatusSuccess || nodeStatus == NodeStatusSkipped {
 			continue
