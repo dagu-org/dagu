@@ -1,4 +1,4 @@
-package model
+package persistence
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ func (f *StatusFactory) CreateDefault() Status {
 		Name:       f.dag.Name,
 		Status:     scheduler.StatusNone,
 		StatusText: scheduler.StatusNone.String(),
-		PID:        PID(pidNotRunning),
+		PID:        PID(0),
 		Nodes:      FromSteps(f.dag.Steps),
 		OnExit:     nodeOrNil(f.dag.HandlerOn.Exit),
 		OnSuccess:  nodeOrNil(f.dag.HandlerOn.Success),
@@ -54,7 +54,7 @@ func WithFinishedAt(t time.Time) StatusOption {
 func WithOnExitNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnExit = FromNode(node.Data())
+			s.OnExit = FromNode(node.NodeData())
 		}
 	}
 }
@@ -62,7 +62,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnSuccess = FromNode(node.Data())
+			s.OnSuccess = FromNode(node.NodeData())
 		}
 	}
 }
@@ -70,7 +70,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnFailure = FromNode(node.Data())
+			s.OnFailure = FromNode(node.NodeData())
 		}
 	}
 }
@@ -78,7 +78,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnCancel = FromNode(node.Data())
+			s.OnCancel = FromNode(node.NodeData())
 		}
 	}
 }
@@ -124,6 +124,13 @@ type StatusFile struct {
 	Status Status
 }
 
+func NewStatusFile(file string, status Status) *StatusFile {
+	return &StatusFile{
+		File:   file,
+		Status: status,
+	}
+}
+
 type StatusResponse struct {
 	Status *Status `json:"status"`
 }
@@ -146,7 +153,7 @@ type Status struct {
 	ParamsList []string         `json:"ParamsList,omitempty"`
 }
 
-func (st *Status) CorrectRunningStatus() {
+func (st *Status) SetStatusToErrorIfRunning() {
 	if st.Status == scheduler.StatusRunning {
 		st.Status = scheduler.StatusError
 		st.StatusText = st.Status.String()
@@ -166,17 +173,15 @@ func Time(t time.Time) *time.Time {
 
 type PID int
 
-const pidNotRunning PID = -1
-
 func (p PID) String() string {
-	if p == pidNotRunning {
+	if p <= 0 {
 		return ""
 	}
 	return fmt.Sprintf("%d", p)
 }
 
 func (p PID) IsRunning() bool {
-	return p != pidNotRunning
+	return p > 0
 }
 
 func nodeOrNil(s *digraph.Step) *Node {

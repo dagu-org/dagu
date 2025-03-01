@@ -75,7 +75,7 @@ func TestNode(t *testing.T) {
 		node := setupNode(t, withNodeCommand("echo hello"), withNodeStdout(random))
 		node.Execute(t)
 
-		file := node.Data().Step.Stdout
+		file := node.NodeData().Step.Stdout
 		dat, _ := os.ReadFile(file)
 		require.Equalf(t, "hello\n", string(dat), "unexpected stdout content: %s", string(dat))
 	})
@@ -92,7 +92,7 @@ func TestNode(t *testing.T) {
 		)
 		node.Execute(t)
 
-		file := node.Data().Step.Stderr
+		file := node.NodeData().Step.Stderr
 		dat, _ := os.ReadFile(file)
 		require.Equalf(t, "hello\n", string(dat), "unexpected stderr content: %s", string(dat))
 	})
@@ -280,8 +280,8 @@ func (n nodeHelper) AssertLogContains(t *testing.T, expected string) {
 func (n nodeHelper) AssertOutput(t *testing.T, key, value string) {
 	t.Helper()
 
-	require.NotNil(t, n.Node.Data().Step.OutputVariables, "output variables not set")
-	data, ok := n.Node.Data().Step.OutputVariables.Load(key)
+	require.NotNil(t, n.Node.NodeData().Step.OutputVariables, "output variables not set")
+	data, ok := n.Node.NodeData().Step.OutputVariables.Load(key)
 	require.True(t, ok, "output variable not found")
 	require.Equal(t, fmt.Sprintf(`%s=%s`, key, value), data, "output variable value mismatch")
 }

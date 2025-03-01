@@ -1,4 +1,4 @@
-package model
+package persistence_test
 
 import (
 	"encoding/json"
@@ -7,20 +7,10 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
+	"github.com/dagu-org/dagu/internal/persistence"
 
 	"github.com/stretchr/testify/require"
 )
-
-func TestPID(t *testing.T) {
-	if pidNotRunning.IsRunning() {
-		t.Error()
-	}
-	var pid = PID(-1)
-	require.Equal(t, "", pid.String())
-
-	pid = PID(12345)
-	require.Equal(t, "12345", pid.String())
-}
 
 func TestStatusSerialization(t *testing.T) {
 	startedAt, finishedAt := time.Now(), time.Now().Add(time.Second*1)
@@ -41,14 +31,14 @@ func TestStatusSerialization(t *testing.T) {
 		SMTP:      &digraph.SMTPConfig{},
 	}
 	requestID := "request-id-testI"
-	statusToPersist := NewStatusFactory(dag).Create(
-		requestID, scheduler.StatusSuccess, 0, startedAt, WithFinishedAt(finishedAt),
+	statusToPersist := persistence.NewStatusFactory(dag).Create(
+		requestID, scheduler.StatusSuccess, 0, startedAt, persistence.WithFinishedAt(finishedAt),
 	)
 
 	rawJSON, err := json.Marshal(statusToPersist)
 	require.NoError(t, err)
 
-	statusObject, err := StatusFromJSON(string(rawJSON))
+	statusObject, err := persistence.StatusFromJSON(string(rawJSON))
 	require.NoError(t, err)
 
 	require.Equal(t, statusToPersist.Name, statusObject.Name)
@@ -59,8 +49,8 @@ func TestStatusSerialization(t *testing.T) {
 func TestCorrectRunningStatus(t *testing.T) {
 	dag := &digraph.DAG{Name: "test"}
 	requestID := "request-id-testII"
-	status := NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
-	status.CorrectRunningStatus()
+	status := persistence.NewStatusFactory(dag).Create(requestID, scheduler.StatusRunning, 0, time.Now())
+	status.SetStatusToErrorIfRunning()
 	require.Equal(t, scheduler.StatusError, status.Status)
 }
 

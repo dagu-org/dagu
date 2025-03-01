@@ -188,8 +188,33 @@ func (d *DAG) String() string {
 	return sb.String()
 }
 
-// setup sets the default values for the DAG.
-func (d *DAG) setup() {
+// Validate performs basic validation of the DAG structure
+func (d *DAG) Validate() error {
+	// Ensure all referenced steps exist
+	stepMap := make(map[string]bool)
+	for _, step := range d.Steps {
+		stepMap[step.Name] = true
+	}
+
+	// Check dependencies
+	for _, step := range d.Steps {
+		for _, dep := range step.Depends {
+			if !stepMap[dep] {
+				return fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep)
+			}
+		}
+	}
+
+	return nil
+}
+
+// initializeDefaults sets the default values for the DAG.
+func (d *DAG) initializeDefaults() {
+	// Set the name if not set.
+	if d.Name == "" {
+		d.Name = defaultName(d.Location)
+	}
+
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
 		d.HistRetentionDays = defaultHistoryRetentionDays
@@ -200,7 +225,13 @@ func (d *DAG) setup() {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime
 	}
 
+	// Ensure we have a valid working directory
 	workDir := filepath.Dir(d.Location)
+	if workDir == "" {
+		workDir = "."
+	}
+
+	// Setup steps and handlers with the working directory
 	d.setupSteps(workDir)
 	d.setupHandlers(workDir)
 }

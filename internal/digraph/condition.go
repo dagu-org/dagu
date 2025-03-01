@@ -54,39 +54,17 @@ func (c Condition) eval(ctx context.Context) (bool, error) {
 }
 
 func (c Condition) evalCommand(ctx context.Context) (bool, error) {
-	var commandToRun string
-	if IsStepContext(ctx) {
-		command, err := GetStepContext(ctx).EvalString(c.Command, cmdutil.OnlyReplaceVars())
-		if err != nil {
-			return false, err
-		}
-		commandToRun = command
-	} else if IsContext(ctx) {
-		command, err := GetContext(ctx).EvalString(c.Command, cmdutil.OnlyReplaceVars())
-		if err != nil {
-			return false, err
-		}
-		commandToRun = command
-	} else {
-		command, err := cmdutil.EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
-		if err != nil {
-			return false, err
-		}
-		commandToRun = command
+	commandToRun, err := EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
+	if err != nil {
+		return false, fmt.Errorf("failed to evaluate command: %w", err)
 	}
-
-	shell := cmdutil.GetShellCommand("")
-	if shell == "" {
-		// Run the command directly
-		cmd := exec.CommandContext(ctx, commandToRun)
-		_, err := cmd.Output()
-		if err != nil {
-			return false, fmt.Errorf("%w: %s", ErrConditionNotMet, err)
-		}
-		return true, nil
+	if shell := cmdutil.GetShellCommand(""); shell != "" {
+		return c.runShellCommand(ctx, shell, commandToRun)
 	}
+	return c.runCommandDirectly(ctx, commandToRun)
+}
 
-	// Run the command through a shell
+func (c Condition) runShellCommand(ctx context.Context, shell, commandToRun string) (bool, error) {
 	cmd := exec.CommandContext(ctx, shell, "-c", commandToRun)
 	_, err := cmd.Output()
 	if err != nil {
@@ -95,25 +73,23 @@ func (c Condition) evalCommand(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (c Condition) evalCondition(ctx context.Context) (bool, error) {
-	var (
-		evaluatedVal string
-		err          error
-	)
-
-	if IsStepContext(ctx) {
-		evaluatedVal, err = GetStepContext(ctx).EvalString(c.Condition)
-	} else {
-		evaluatedVal, err = GetContext(ctx).EvalString(c.Condition)
-	}
+func (c Condition) runCommandDirectly(ctx context.Context, commandToRun string) (bool, error) {
+	cmd := exec.CommandContext(ctx, commandToRun)
+	_, err := cmd.Output()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: %s", ErrConditionNotMet, err)
 	}
+	return true, nil
+}
 
+func (c Condition) evalCondition(ctx context.Context) (bool, error) {
+	evaluatedVal, err := EvalString(ctx, c.Condition)
+	if err != nil {
+		return false, fmt.Errorf("failed to evaluate condition: Condition=%s Error=%v", c.Condition, err)
+	}
 	if stringutil.MatchPattern(ctx, evaluatedVal, []string{c.Expected}, stringutil.WithExactMatch()) {
 		return true, nil
 	}
-
 	return false, fmt.Errorf("%w: Condition=%s Expected=%s", ErrConditionNotMet, c.Condition, c.Expected)
 }
 

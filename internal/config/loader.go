@@ -292,17 +292,20 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 
 // configureViper sets up viper's configuration file location, type, and environment variable handling.
 func (l *ConfigLoader) configureViper(resolver PathResolver) {
+	l.setupViperConfigPath(resolver.ConfigDir)
+	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
+}
+
+func (l *ConfigLoader) setupViperConfigPath(configDir string) {
 	if l.configFile == "" {
-		viper.AddConfigPath(resolver.ConfigDir)
+		viper.AddConfigPath(configDir)
 		viper.SetConfigName("config")
 	} else {
 		viper.SetConfigFile(l.configFile)
 	}
 	viper.SetConfigType("yaml")
-	// Use the application slug as prefix and replace hyphens with underscores.
-	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viper.AutomaticEnv()
 }
 
 // setDefaultValues establishes the default configuration values for various keys.
