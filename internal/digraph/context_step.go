@@ -11,17 +11,16 @@ import (
 
 type StepContext struct {
 	Context
-	outputVariables *SyncMap
-	step            Step
-	envs            map[string]string
+	vars *SyncMap
+	step Step
+	envs map[string]string
 }
 
 func NewStepContext(ctx context.Context, step Step) StepContext {
 	return StepContext{
 		Context: GetContext(ctx),
-
-		outputVariables: &SyncMap{},
-		step:            step,
+		vars:    &SyncMap{},
+		step:    step,
 		envs: map[string]string{
 			EnvKeyDAGStepName: step.Name,
 		},
@@ -33,7 +32,7 @@ func (c StepContext) AllEnvs() []string {
 	for k, v := range c.envs {
 		envs = append(envs, k+"="+v)
 	}
-	c.outputVariables.Range(func(_, value any) bool {
+	c.vars.Range(func(_, value any) bool {
 		envs = append(envs, value.(string))
 		return true
 	})
@@ -43,28 +42,28 @@ func (c StepContext) AllEnvs() []string {
 func (c StepContext) LoadOutputVariables(vars *SyncMap) {
 	vars.Range(func(key, value any) bool {
 		// Skip if the key already exists
-		if _, ok := c.outputVariables.Load(key); ok {
+		if _, ok := c.vars.Load(key); ok {
 			return true
 		}
-		c.outputVariables.Store(key, value)
+		c.vars.Store(key, value)
 		return true
 	})
 }
 
 func (c StepContext) MailerConfig() (mailer.Config, error) {
-	return EvalStringFields(c, mailer.Config{
+	return cmdutil.EvalStringFields(c.ctx, mailer.Config{
 		Host:     c.dag.SMTP.Host,
 		Port:     c.dag.SMTP.Port,
 		Username: c.dag.SMTP.Username,
 		Password: c.dag.SMTP.Password,
-	})
+	}, cmdutil.WithVariables(c.vars.Variables()))
 }
 
 func (c StepContext) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagContext := GetContext(c.ctx)
-	opts = append(opts, cmdutil.WithVariables(dagContext.envs))
+	ctx := GetContext(c.ctx)
+	opts = append(opts, cmdutil.WithVariables(ctx.envs))
 	opts = append(opts, cmdutil.WithVariables(c.envs))
-	opts = append(opts, cmdutil.WithVariables(c.outputVariables.Variables()))
+	opts = append(opts, cmdutil.WithVariables(c.vars.Variables()))
 	return cmdutil.EvalString(c.ctx, s, opts...)
 }
 
@@ -107,8 +106,3 @@ func IsStepContext(ctx context.Context) bool {
 }
 
 type stepCtxKey struct{}
-
-func EvalStringFields[T any](stepContext StepContext, obj T) (T, error) {
-	return cmdutil.EvalStringFields(stepContext.ctx, obj,
-		cmdutil.WithVariables(stepContext.outputVariables.Variables()))
-}
