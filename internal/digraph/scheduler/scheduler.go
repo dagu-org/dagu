@@ -152,6 +152,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 			logger.Info(ctx, "Step execution started", "step", node.Name())
 			node.SetStatus(NodeStatusRunning)
 			go func(ctx context.Context, node *Node) {
+				nodeStartTime := time.Now()
+
 				nodeCtx, nodeCancel := context.WithCancel(ctx)
 				defer nodeCancel()
 
@@ -177,6 +179,32 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 				// Ensure node is finished and wg is decremented
 				defer func() {
+					// Calculate node execution time
+					nodeDuration := time.Since(nodeStartTime)
+
+					// Update metrics based on node status
+					sc.mu.Lock()
+					sc.metrics.nodeExecutionTimes[node.Name()] = nodeDuration
+
+					// Track longest running node
+					if nodeDuration > sc.metrics.longestNodeTime {
+						sc.metrics.longestNodeTime = nodeDuration
+						sc.metrics.longestNodeName = node.Name()
+					}
+
+					// Update node status counts
+					switch node.State().Status {
+					case NodeStatusSuccess:
+						sc.metrics.completedNodes++
+					case NodeStatusError:
+						sc.metrics.failedNodes++
+					case NodeStatusSkipped:
+						sc.metrics.skippedNodes++
+					case NodeStatusCancel:
+						sc.metrics.canceledNodes++
+					}
+					sc.mu.Unlock()
+
 					node.Finish()
 					wg.Done()
 				}()
