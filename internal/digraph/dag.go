@@ -188,8 +188,13 @@ func (d *DAG) String() string {
 	return sb.String()
 }
 
-// setup sets the default values for the DAG.
-func (d *DAG) setup() {
+// initializeDefaults sets the default values for the DAG.
+func (d *DAG) initializeDefaults() {
+	// Set the name if not set.
+	if d.Name == "" {
+		d.Name = defaultName(d.Location)
+	}
+
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
 		d.HistRetentionDays = defaultHistoryRetentionDays
