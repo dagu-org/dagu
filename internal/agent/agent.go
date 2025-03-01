@@ -103,7 +103,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Add structured logging context
 	ctx = logger.WithValues(ctx,
-		"dagName", a.dag.Name,
+		"dag", a.dag.Name,
 		"requestID", a.requestID,
 	)
 
@@ -202,7 +202,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Update the finished status to the history database.
 	finishedStatus := a.Status()
-	logger.Info(ctx, "DAG execution finished", "status", finishedStatus.Status)
+	logger.Info(ctx, "DAG execution finished", "status", finishedStatus.Status.String())
 	if err := historyRecord.Write(ctx, a.Status()); err != nil {
 		logger.Error(ctx, "Status write failed", "err", err)
 	}
@@ -389,7 +389,7 @@ func (a *Agent) signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	logger.Info(ctx, "Sending signal to running child processes",
 		"signal", sig.String(),
 		"allowOverride", allowOverride,
-		"maxCleanupTime", a.dag.MaxCleanUpTime)
+		"maxCleanupTime", a.dag.MaxCleanUpTime/time.Second)
 
 	signalCtx, cancel := context.WithTimeout(ctx, a.dag.MaxCleanUpTime)
 	defer cancel()

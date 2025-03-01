@@ -97,7 +97,7 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 
 	case NodeStatusRunning:
 		// Unexpected state
-		logger.Error(ctx, "unexpected node status", "status", status)
+		logger.Error(ctx, "unexpected node status", "status", status.String())
 		return false
 
 	}

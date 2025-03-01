@@ -70,10 +70,7 @@ type Scheduler struct {
 		failedNodes        int
 		skippedNodes       int
 		canceledNodes      int
-		longestNodeTime    time.Duration
-		longestNodeName    string
 		totalExecutionTime time.Duration
-		nodeExecutionTimes map[string]time.Duration
 	}
 }
 
@@ -152,8 +149,6 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 			logger.Info(ctx, "Step execution started", "step", node.Name())
 			node.SetStatus(NodeStatusRunning)
 			go func(ctx context.Context, node *Node) {
-				nodeStartTime := time.Now()
-
 				nodeCtx, nodeCancel := context.WithCancel(ctx)
 				defer nodeCancel()
 
@@ -179,18 +174,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 				// Ensure node is finished and wg is decremented
 				defer func() {
-					// Calculate node execution time
-					nodeDuration := time.Since(nodeStartTime)
-
 					// Update metrics based on node status
 					sc.mu.Lock()
-					sc.metrics.nodeExecutionTimes[node.Name()] = nodeDuration
-
-					// Track longest running node
-					if nodeDuration > sc.metrics.longestNodeTime {
-						sc.metrics.longestNodeTime = nodeDuration
-						sc.metrics.longestNodeName = node.Name()
-					}
 
 					// Update node status counts
 					switch node.State().Status {
@@ -202,6 +187,8 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 						sc.metrics.skippedNodes++
 					case NodeStatusCancel:
 						sc.metrics.canceledNodes++
+					case NodeStatusNone, NodeStatusRunning:
+						// Should not happen at this point
 					}
 					sc.mu.Unlock()
 
@@ -331,14 +318,12 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	logger.Info(ctx, "DAG execution completed",
 		"requestID", sc.requestID,
 		"status", sc.Status(graph).String(),
-		"totalTime", sc.metrics.totalExecutionTime,
+		"totalTime", sc.metrics.totalExecutionTime/time.Second,
 		"totalNodes", sc.metrics.totalNodes,
 		"completedNodes", sc.metrics.completedNodes,
 		"failedNodes", sc.metrics.failedNodes,
 		"skippedNodes", sc.metrics.skippedNodes,
-		"canceledNodes", sc.metrics.canceledNodes,
-		"longestNode", sc.metrics.longestNodeName,
-		"longestNodeTime", sc.metrics.longestNodeTime)
+		"canceledNodes", sc.metrics.canceledNodes)
 
 	var handlers []digraph.HandlerType
 	switch sc.Status(graph) {
@@ -619,7 +604,6 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 
 	// Initialize metrics
 	sc.metrics.startTime = time.Now()
-	sc.metrics.nodeExecutionTimes = make(map[string]time.Duration)
 
 	// Log scheduler setup
 	logger.Info(ctx, "Scheduler setup complete",
@@ -675,26 +659,17 @@ func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
 }
 
 // GetMetrics returns the current metrics for the scheduler
-func (sc *Scheduler) GetMetrics() map[string]interface{} {
+func (sc *Scheduler) GetMetrics() map[string]any {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
 
-	metrics := map[string]interface{}{
+	metrics := map[string]any{
 		"totalNodes":         sc.metrics.totalNodes,
 		"completedNodes":     sc.metrics.completedNodes,
 		"failedNodes":        sc.metrics.failedNodes,
 		"skippedNodes":       sc.metrics.skippedNodes,
 		"canceledNodes":      sc.metrics.canceledNodes,
 		"totalExecutionTime": sc.metrics.totalExecutionTime.String(),
-		"longestNodeName":    sc.metrics.longestNodeName,
-		"longestNodeTime":    sc.metrics.longestNodeTime.String(),
-		"nodeExecutionTimes": make(map[string]string),
-	}
-
-	// Convert duration maps to string for easier serialization
-	nodeTimesMap := metrics["nodeExecutionTimes"].(map[string]string)
-	for name, duration := range sc.metrics.nodeExecutionTimes {
-		nodeTimesMap[name] = duration.String()
 	}
 
 	return metrics
