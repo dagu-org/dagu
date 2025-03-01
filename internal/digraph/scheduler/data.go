@@ -11,8 +11,8 @@ import (
 	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
-// SafeData is a thread-safe wrapper around NodeData.
-type SafeData struct {
+// Data is a thread-safe wrapper around NodeData.
+type Data struct {
 	mu    sync.RWMutex
 	inner NodeData
 }
@@ -65,11 +65,11 @@ func (s NodeStatus) String() string {
 	}
 }
 
-func newSafeData(data NodeData) SafeData {
-	return SafeData{inner: data}
+func newSafeData(data NodeData) Data {
+	return Data{inner: data}
 }
 
-func (s *SafeData) ResetError() {
+func (s *Data) ResetError() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -77,7 +77,7 @@ func (s *SafeData) ResetError() {
 	s.inner.State.ExitCode = 0
 }
 
-func (s *SafeData) Args() []string {
+func (s *Data) Args() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -86,21 +86,21 @@ func (s *SafeData) Args() []string {
 	return args
 }
 
-func (s *SafeData) SetArgs(args []string) {
+func (s *Data) SetArgs(args []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.inner.Step.Args = args
 }
 
-func (s *SafeData) Step() digraph.Step {
+func (s *Data) Step() digraph.Step {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step
 }
 
-func (s *SafeData) SetStep(step digraph.Step) {
+func (s *Data) SetStep(step digraph.Step) {
 	// TODO: refactor to avoid modifying the step
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -108,14 +108,14 @@ func (s *SafeData) SetStep(step digraph.Step) {
 	s.inner.Step = step
 }
 
-func (s *SafeData) Data() NodeData {
+func (s *Data) Data() NodeData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner
 }
 
-func (s *SafeData) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
+func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -147,70 +147,70 @@ func (s *SafeData) Setup(ctx context.Context, logFile string, startedAt time.Tim
 	return nil
 }
 
-func (s *SafeData) State() NodeState {
+func (s *Data) State() NodeState {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State
 }
 
-func (s *SafeData) Status() NodeStatus {
+func (s *Data) Status() NodeStatus {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State.Status
 }
 
-func (s *SafeData) SetStatus(status NodeStatus) {
+func (s *Data) SetStatus(status NodeStatus) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.inner.State.Status = status
 }
 
-func (s *SafeData) ContinueOn() digraph.ContinueOn {
+func (s *Data) ContinueOn() digraph.ContinueOn {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step.ContinueOn
 }
 
-func (s *SafeData) Log() string {
+func (s *Data) Log() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State.Log
 }
 
-func (s *SafeData) SignalOnStop() string {
+func (s *Data) SignalOnStop() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step.SignalOnStop
 }
 
-func (s *SafeData) Name() string {
+func (s *Data) Name() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.Step.Name
 }
 
-func (s *SafeData) Error() error {
+func (s *Data) Error() error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.inner.State.Error
 }
 
-func (s *SafeData) SetError(err error) {
+func (s *Data) SetError(err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.inner.State.Error = err
 }
 
-func (s *SafeData) ClearVariable(key string) {
+func (s *Data) ClearVariable(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -221,7 +221,7 @@ func (s *SafeData) ClearVariable(key string) {
 	s.inner.Step.OutputVariables.Delete(key)
 }
 
-func (s *SafeData) MatchExitCode(exitCodes []int) bool {
+func (s *Data) MatchExitCode(exitCodes []int) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -233,7 +233,7 @@ func (s *SafeData) MatchExitCode(exitCodes []int) bool {
 	return false
 }
 
-func (n *SafeData) getVariable(key string) (stringutil.KeyValue, bool) {
+func (n *Data) getVariable(key string) (stringutil.KeyValue, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
@@ -249,7 +249,7 @@ func (n *SafeData) getVariable(key string) (stringutil.KeyValue, bool) {
 	return stringutil.KeyValue(v.(string)), true
 }
 
-func (n *SafeData) getBoolVariable(key string) (bool, bool) {
+func (n *Data) getBoolVariable(key string) (bool, bool) {
 	v, ok := n.getVariable(key)
 	if !ok {
 		return false, false
@@ -258,84 +258,84 @@ func (n *SafeData) getBoolVariable(key string) (bool, bool) {
 	return v.Bool(), true
 }
 
-func (n *SafeData) setBoolVariable(key string, value bool) {
+func (n *Data) setBoolVariable(key string, value bool) {
 	if n.inner.Step.OutputVariables == nil {
 		n.inner.Step.OutputVariables = &digraph.SyncMap{}
 	}
 	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, strconv.FormatBool(value)).String())
 }
 
-func (n *SafeData) setVariable(key, value string) {
+func (n *Data) setVariable(key, value string) {
 	if n.inner.Step.OutputVariables == nil {
 		n.inner.Step.OutputVariables = &digraph.SyncMap{}
 	}
 	n.inner.Step.OutputVariables.Store(key, stringutil.NewKeyValue(key, value).String())
 }
 
-func (n *SafeData) Finish() {
+func (n *Data) Finish() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.FinishedAt = time.Now()
 }
 
-func (n *SafeData) IncRetryCount() {
+func (n *Data) IncRetryCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.RetryCount++
 }
 
-func (n *SafeData) GetRetryCount() int {
+func (n *Data) GetRetryCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.inner.State.RetryCount
 }
 
-func (n *SafeData) SetRetriedAt(retriedAt time.Time) {
+func (n *Data) SetRetriedAt(retriedAt time.Time) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.RetriedAt = retriedAt
 }
 
-func (n *SafeData) IncDoneCount() {
+func (n *Data) IncDoneCount() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.DoneCount++
 }
 
-func (n *SafeData) GetDoneCount() int {
+func (n *Data) GetDoneCount() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.inner.State.DoneCount
 }
 
-func (n *SafeData) GetExitCode() int {
+func (n *Data) GetExitCode() int {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
 	return n.inner.State.ExitCode
 }
 
-func (n *SafeData) SetExitCode(exitCode int) {
+func (n *Data) SetExitCode(exitCode int) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State.ExitCode = exitCode
 }
 
-func (n *SafeData) ClearState() {
+func (n *Data) ClearState() {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	n.inner.State = NodeState{}
 }
 
-func (n *SafeData) MarkError(err error) {
+func (n *Data) MarkError(err error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 

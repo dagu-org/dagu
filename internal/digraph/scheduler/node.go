@@ -25,7 +25,7 @@ import (
 
 // Node is a node in a DAG. It executes a command.
 type Node struct {
-	data    SafeData
+	Data
 	outputs OutputCoordinator
 
 	id           int
@@ -39,18 +39,18 @@ type Node struct {
 
 func NewNode(step digraph.Step, state NodeState) *Node {
 	return &Node{
-		data: newSafeData(NodeData{Step: step, State: state}),
+		Data: newSafeData(NodeData{Step: step, State: state}),
 	}
 }
 
 func NodeWithData(data NodeData) *Node {
 	return &Node{
-		data: newSafeData(data),
+		Data: newSafeData(data),
 	}
 }
 
-func (n *Node) Data() NodeData {
-	return n.data.Data()
+func (n *Node) NodeData() NodeData {
+	return n.Data.Data()
 }
 
 func (n *Node) LogFile() string {
@@ -60,29 +60,22 @@ func (n *Node) LogFile() string {
 	return n.outputs.LogFile()
 }
 
-func (n *Node) SetStatus(status NodeStatus) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.data.SetStatus(status)
-}
-
 func (n *Node) shouldMarkSuccess(ctx context.Context) bool {
 	if !n.shouldContinue(ctx) {
 		return false
 	}
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	return n.data.ContinueOn().MarkSuccess
+	return n.ContinueOn().MarkSuccess
 }
 
 func (n *Node) shouldContinue(ctx context.Context) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	continueOn := n.data.ContinueOn()
+	continueOn := n.ContinueOn()
 
-	status := n.data.Status()
+	status := n.Status()
 	switch status {
 	case NodeStatusSuccess:
 		return true
@@ -109,13 +102,13 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 
 	}
 
-	cacheKey := digraph.SystemVariablePrefix + "CONTINUE_ON." + n.data.Name()
-	if v, ok := n.data.getBoolVariable(cacheKey); ok {
+	cacheKey := digraph.SystemVariablePrefix + "CONTINUE_ON." + n.Name()
+	if v, ok := n.getBoolVariable(cacheKey); ok {
 		return v
 	}
 
-	if n.data.MatchExitCode(continueOn.ExitCode) {
-		n.data.setBoolVariable(cacheKey, true)
+	if n.MatchExitCode(continueOn.ExitCode) {
+		n.setBoolVariable(cacheKey, true)
 		return true
 	}
 
@@ -126,17 +119,13 @@ func (n *Node) shouldContinue(ctx context.Context) bool {
 			return false
 		}
 		if ok {
-			n.data.setBoolVariable(cacheKey, true)
+			n.setBoolVariable(cacheKey, true)
 			return true
 		}
 	}
 
-	n.data.setBoolVariable(cacheKey, false)
+	n.setBoolVariable(cacheKey, false)
 	return false
-}
-
-func (n *Node) State() NodeState {
-	return n.data.State()
 }
 
 func (n *Node) Execute(ctx context.Context) error {
@@ -147,7 +136,7 @@ func (n *Node) Execute(ctx context.Context) error {
 
 	var exitCode int
 	if err := cmd.Run(ctx); err != nil {
-		n.data.SetError(err)
+		n.SetError(err)
 
 		// Set the exit code if the command implements ExitCoder
 		if cmd, ok := cmd.(executor.ExitCoder); ok {
@@ -157,25 +146,25 @@ func (n *Node) Execute(ctx context.Context) error {
 		}
 	}
 
-	n.data.SetExitCode(exitCode)
+	n.SetExitCode(exitCode)
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if output := n.data.Step().Output; output != "" {
+	if output := n.Step().Output; output != "" {
 		value, err := n.outputs.capturedOutput(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to capture output: %w", err)
 		}
-		n.data.setVariable(output, value)
+		n.setVariable(output, value)
 	}
 
-	return n.data.Error()
+	return n.Error()
 }
 
 func (n *Node) clearVariable(key string) {
 	_ = os.Unsetenv(key)
-	n.data.ClearVariable(key)
+	n.ClearVariable(key)
 }
 
 func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
@@ -187,10 +176,10 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 	n.cancelFunc = fn
 
 	// Clear the cache
-	n.clearVariable(digraph.SystemVariablePrefix + "CONTINUE_ON." + n.data.Name())
+	n.clearVariable(digraph.SystemVariablePrefix + "CONTINUE_ON." + n.Name())
 
 	// Reset the state
-	n.data.ResetError()
+	n.ResetError()
 
 	// Reset the done flag
 	n.done.Store(false)
@@ -200,13 +189,13 @@ func (n *Node) setupExecutor(ctx context.Context) (executor.Executor, error) {
 		return nil, err
 	}
 
-	cmd, err := executor.NewExecutor(ctx, n.data.Step())
+	cmd, err := executor.NewExecutor(ctx, n.Step())
 	if err != nil {
 		return nil, err
 	}
 	n.cmd = cmd
 
-	if err := n.outputs.setupExecutorIO(ctx, cmd, n.data.Data()); err != nil {
+	if err := n.outputs.setupExecutorIO(ctx, cmd, n.NodeData()); err != nil {
 		return nil, fmt.Errorf("failed to setup executor IO: %w", err)
 	}
 
@@ -218,7 +207,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		return nil
 	}
 
-	step := n.data.Step()
+	step := n.Step()
 	switch {
 	case step.CmdArgsSys != "":
 		// In case of the command and args are defined as a list. In this case,
@@ -303,7 +292,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		}
 	}
 
-	n.data.SetStep(step)
+	n.SetStep(step)
 	n.cmdEvaluated.Store(true)
 	return nil
 }
@@ -312,31 +301,31 @@ func (n *Node) Signal(ctx context.Context, sig os.Signal, allowOverride bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	status := n.data.Status()
+	status := n.Status()
 	if status == NodeStatusRunning && n.cmd != nil {
 		sigsig := sig
-		if allowOverride && n.data.SignalOnStop() != "" {
-			sigsig = unix.SignalNum(n.data.SignalOnStop())
+		if allowOverride && n.SignalOnStop() != "" {
+			sigsig = unix.SignalNum(n.SignalOnStop())
 		}
-		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.data.Name())
+		logger.Info(ctx, "Sending signal", "signal", sigsig, "step", n.Name())
 		if err := n.cmd.Kill(sigsig); err != nil {
-			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.data.Name())
+			logger.Error(ctx, "Failed to send signal", "err", err, "step", n.Name())
 		}
 	}
 	if status == NodeStatusRunning {
-		n.data.SetStatus(NodeStatusCancel)
+		n.SetStatus(NodeStatusCancel)
 	}
 }
 
 func (n *Node) Cancel(ctx context.Context) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	status := n.data.Status()
+	status := n.Status()
 	if status == NodeStatusRunning {
-		n.data.SetStatus(NodeStatusCancel)
+		n.SetStatus(NodeStatusCancel)
 	}
 	if n.cancelFunc != nil {
-		logger.Info(ctx, "canceling node", "step", n.data.Name())
+		logger.Info(ctx, "canceling node", "step", n.Name())
 		n.cancelFunc()
 	}
 }
@@ -347,8 +336,8 @@ func (n *Node) SetupContextBeforeExec(ctx context.Context) context.Context {
 
 	c := digraph.GetExecContext(ctx)
 	c = c.WithEnv(
-		digraph.EnvKeyLogPath, n.data.Log(),
-		digraph.EnvKeyStepLogPath, n.data.Log(),
+		digraph.EnvKeyLogPath, n.Log(),
+		digraph.EnvKeyStepLogPath, n.Log(),
 	)
 	return digraph.WithExecContext(ctx, c)
 }
@@ -359,7 +348,7 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 
 	// Set the log file path
 	startedAt := time.Now()
-	safeName := fileutil.SafeName(n.data.Name())
+	safeName := fileutil.SafeName(n.Name())
 	timestamp := startedAt.Format("20060102.15:04:05.000")
 	postfix := stringutil.TruncString(requestID, 8)
 	logFilename := fmt.Sprintf("%s.%s.%s.log", safeName, timestamp, postfix)
@@ -370,10 +359,10 @@ func (n *Node) Setup(ctx context.Context, logDir string, requestID string) error
 	}
 
 	logFile := filepath.Join(logDir, logFilename)
-	if err := n.data.Setup(ctx, logFile, startedAt); err != nil {
+	if err := n.Data.Setup(ctx, logFile, startedAt); err != nil {
 		return fmt.Errorf("failed to setup node data: %w", err)
 	}
-	if err := n.outputs.setup(ctx, n.data.Data()); err != nil {
+	if err := n.outputs.setup(ctx, n.NodeData()); err != nil {
 		return fmt.Errorf("failed to setup outputs: %w", err)
 	}
 	if err := n.setupRetryPolicy(ctx); err != nil {
@@ -394,7 +383,7 @@ func (n *Node) Teardown(ctx context.Context) error {
 	}
 
 	if lastErr != nil {
-		n.data.SetError(lastErr)
+		n.SetError(lastErr)
 	}
 
 	return lastErr
@@ -478,7 +467,7 @@ func (n *Node) setupRetryPolicy(ctx context.Context) error {
 	var limit int
 	var interval time.Duration
 
-	step := n.data.Step()
+	step := n.Step()
 	if step.RetryPolicy.Limit > 0 {
 		limit = step.RetryPolicy.Limit
 	}

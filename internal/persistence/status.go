@@ -54,7 +54,7 @@ func WithFinishedAt(t time.Time) StatusOption {
 func WithOnExitNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnExit = FromNode(node.Data())
+			s.OnExit = FromNode(node.NodeData())
 		}
 	}
 }
@@ -62,7 +62,7 @@ func WithOnExitNode(node *scheduler.Node) StatusOption {
 func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnSuccess = FromNode(node.Data())
+			s.OnSuccess = FromNode(node.NodeData())
 		}
 	}
 }
@@ -70,7 +70,7 @@ func WithOnSuccessNode(node *scheduler.Node) StatusOption {
 func WithOnFailureNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnFailure = FromNode(node.Data())
+			s.OnFailure = FromNode(node.NodeData())
 		}
 	}
 }
@@ -78,7 +78,7 @@ func WithOnFailureNode(node *scheduler.Node) StatusOption {
 func WithOnCancelNode(node *scheduler.Node) StatusOption {
 	return func(s *Status) {
 		if node != nil {
-			s.OnCancel = FromNode(node.Data())
+			s.OnCancel = FromNode(node.NodeData())
 		}
 	}
 }

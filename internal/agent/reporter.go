@@ -32,9 +32,9 @@ func (r *reporter) reportStep(
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		logger.Info(ctx, "Step execution finished", "step", node.Data().Step.Name, "status", nodeStatus)
+		logger.Info(ctx, "Step execution finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
+	if nodeStatus == scheduler.NodeStatusError && node.NodeData().Step.MailOnError {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := []string{dag.ErrorMail.To}
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)

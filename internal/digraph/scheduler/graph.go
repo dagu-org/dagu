@@ -31,7 +31,7 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 		nodes:    []*Node{},
 	}
 	for _, step := range steps {
-		node := &Node{data: newSafeData(NodeData{Step: step})}
+		node := &Node{Data: newSafeData(NodeData{Step: step})}
 		node.Init()
 		graph.nodeByID[node.id] = node
 		graph.nodes = append(graph.nodes, node)
@@ -129,7 +129,7 @@ func (g *ExecutionGraph) NodeData() []NodeData {
 	var ret []NodeData
 	for _, node := range g.nodes {
 		node.mu.Lock()
-		ret = append(ret, node.data.Data())
+		ret = append(ret, node.NodeData())
 		node.mu.Unlock()
 	}
 
@@ -138,7 +138,7 @@ func (g *ExecutionGraph) NodeData() []NodeData {
 
 func (g *ExecutionGraph) NodeByName(name string) *Node {
 	for _, node := range g.nodes {
-		if node.data.Name() == name {
+		if node.Name() == name {
 			return node
 		}
 	}
@@ -149,12 +149,12 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 	dict := map[int]NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
-		dict[node.id] = node.data.Status()
+		dict[node.id] = node.Status()
 		retry[node.id] = false
 	}
 	var frontier []int
 	for _, node := range g.nodes {
-		if len(node.data.Step().Depends) == 0 {
+		if len(node.Step().Depends) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
@@ -163,8 +163,8 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
-				logger.Info(ctx, "clear node state", "step", g.nodeByID[u].data.Name())
-				g.nodeByID[u].data.ClearState()
+				logger.Info(ctx, "clear node state", "step", g.nodeByID[u].Name())
+				g.nodeByID[u].ClearState()
 				retry[u] = true
 			}
 			for _, v := range g.From[u] {
@@ -181,7 +181,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 
 func (g *ExecutionGraph) setup() error {
 	for _, node := range g.nodes {
-		for _, dep := range node.data.Step().Depends {
+		for _, dep := range node.Step().Depends {
 			depStep, err := g.findStep(dep)
 			if err != nil {
 				return err
@@ -240,7 +240,7 @@ func (g *ExecutionGraph) addEdge(from, to *Node) {
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
 	for _, n := range g.nodeByID {
-		if n.data.Name() == name {
+		if n.Name() == name {
 			return n, nil
 		}
 	}
