@@ -271,28 +271,26 @@ func TestReadLineFrom(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	buffer := make([]byte, 16)
-
 	// Read first line
-	line1, offset, err := readLineFrom(f, 0, buffer)
+	line1, offset, err := readLineFrom(f, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, "line1", string(line1))
 	assert.Equal(t, int64(6), offset) // "line1\n" = 6 bytes
 
 	// Read second line
-	line2, offset, err := readLineFrom(f, offset, buffer)
+	line2, offset, err := readLineFrom(f, offset)
 	assert.NoError(t, err)
 	assert.Equal(t, "line2", string(line2))
 	assert.Equal(t, int64(12), offset) // offset 6 + "line2\n" = 12 bytes
 
 	// Read third line
-	line3, offset, err := readLineFrom(f, offset, buffer)
+	line3, offset, err := readLineFrom(f, offset)
 	assert.NoError(t, err)
 	assert.Equal(t, "line3", string(line3))
 	assert.Equal(t, int64(18), offset) // offset 12 + "line3\n" = 18 bytes
 
 	// Try to read beyond EOF
-	_, _, err = readLineFrom(f, offset, buffer)
+	_, _, err = readLineFrom(f, offset)
 	assert.ErrorIs(t, err, io.EOF)
 }
 

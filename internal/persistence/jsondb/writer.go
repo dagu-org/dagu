@@ -1,7 +1,9 @@
+// Package jsondb provides a JSON-based database implementation for storing DAG execution history.
 package jsondb
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 )
 
@@ -28,22 +31,32 @@ var (
 )
 
 // Writer manages writing status to a local file.
-// The name is capitalized to make it a public type, assuming it should be accessible
-// outside the package (otherwise, keep it lowercase).
+// It provides thread-safe operations and ensures data durability.
 type Writer struct {
-	target string
-	state  WriterState
-	writer *bufio.Writer
-	file   *os.File
-	mu     sync.Mutex
+	target     string        // Path to the target file
+	state      WriterState   // Current state of the writer
+	writer     *bufio.Writer // Buffered writer for performance
+	file       *os.File      // Underlying file handle
+	mu         sync.Mutex    // Mutex for thread safety
+	bufferSize int           // Size of the write buffer
 }
 
+// WriterOption defines functional options for configuring a Writer.
+type WriterOption func(*Writer)
+
 // NewWriter creates a new Writer instance for the specified target file path.
-func NewWriter(target string) *Writer {
-	return &Writer{
-		target: target,
-		state:  WriterStateClosed,
+func NewWriter(target string, opts ...WriterOption) *Writer {
+	w := &Writer{
+		target:     target,
+		state:      WriterStateClosed,
+		bufferSize: 4096, // Default buffer size
 	}
+
+	for _, opt := range opts {
+		opt(w)
+	}
+
+	return w
 }
 
 // Open prepares the writer for writing by creating necessary directories
@@ -69,39 +82,66 @@ func (w *Writer) Open() error {
 	}
 
 	w.file = file
-	w.writer = bufio.NewWriter(file)
+	w.writer = bufio.NewWriterSize(file, w.bufferSize)
 	w.state = WriterStateOpen
 	return nil
 }
 
 // Write serializes the status to JSON and appends it to the file.
+// It automatically flushes data to ensure durability.
 func (w *Writer) Write(st persistence.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
+	var err error
+
 	if w.state != WriterStateOpen {
-		return ErrWriterNotOpen
+		err = ErrWriterNotOpen
+		return err
 	}
 
 	// Marshal status to JSON
-	jsonBytes, err := json.Marshal(st)
-	if err != nil {
-		return fmt.Errorf("failed to marshal status: %w", err)
+	jsonBytes, jsonErr := json.Marshal(st)
+	if jsonErr != nil {
+		err = fmt.Errorf("failed to marshal status: %w", jsonErr)
+		return err
 	}
 
 	// Write JSON line
-	if _, err := w.writer.Write(jsonBytes); err != nil {
-		return fmt.Errorf("failed to write JSON: %w", err)
+	if _, writeErr := w.writer.Write(jsonBytes); writeErr != nil {
+		err = fmt.Errorf("failed to write JSON: %w", writeErr)
+		return err
 	}
 
 	// Add newline
-	if err := w.writer.WriteByte('\n'); err != nil {
-		return fmt.Errorf("failed to write newline: %w", err)
+	if nlErr := w.writer.WriteByte('\n'); nlErr != nil {
+		err = fmt.Errorf("failed to write newline: %w", nlErr)
+		return err
 	}
 
 	// Flush to ensure data is written to the underlying file
-	if err := w.writer.Flush(); err != nil {
-		return fmt.Errorf("failed to flush data: %w", err)
+	if flushErr := w.writer.Flush(); flushErr != nil {
+		err = fmt.Errorf("failed to flush data: %w", flushErr)
+		return err
+	}
+
+	return nil
+}
+
+// WriteWithContext is a context-aware version of Write that respects cancellation.
+func (w *Writer) WriteWithContext(ctx context.Context, st persistence.Status) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Continue with write operation
+	}
+
+	// Add context info to logs if write fails
+	if err := w.Write(st); err != nil {
+		logger.Errorf(ctx, "Failed to write status: %v", err)
+		return err
 	}
 
 	return nil
@@ -148,4 +188,30 @@ func (w *Writer) Close() error {
 	}
 
 	return nil
+}
+
+// CloseWithContext is a context-aware version of Close that respects cancellation.
+func (w *Writer) CloseWithContext(ctx context.Context) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		// Continue with close operation
+	}
+
+	// Add context info to logs if close fails
+	if err := w.Close(); err != nil {
+		logger.Errorf(ctx, "Failed to close writer: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// IsOpen returns true if the writer is currently open.
+func (w *Writer) IsOpen() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.state == WriterStateOpen
 }
