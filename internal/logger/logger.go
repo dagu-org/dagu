@@ -76,6 +76,20 @@ func WithQuiet() Option {
 	}
 }
 
+// WithValues adds key-value pairs to the context for structured logging
+func WithValues(ctx context.Context, keyvals ...any) context.Context {
+	// Validate we have even number of key-value pairs
+	if len(keyvals)%2 != 0 {
+		keyvals = append(keyvals, "MISSING_VALUE")
+	}
+
+	// Create a new logger with these attributes
+	logger := FromContext(ctx).With(keyvals...)
+
+	// Store the new logger in the context
+	return context.WithValue(ctx, loggerKey{}, logger)
+}
+
 var defaultLogger = NewLogger(WithFormat("text"))
 
 func NewLogger(opts ...Option) Logger {

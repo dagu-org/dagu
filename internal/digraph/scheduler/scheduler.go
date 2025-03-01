@@ -98,16 +98,21 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	if err := sc.setup(ctx); err != nil {
 		return err
 	}
+
+	// Create a cancellable context for the entire execution
+	var cancel context.CancelFunc
+	if sc.timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, sc.timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
+	// Start execution and ensure cleanup
 	graph.Start()
 	defer graph.Finish()
 
 	var wg = sync.WaitGroup{}
-
-	var cancel context.CancelFunc
-	if sc.timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, sc.timeout)
-		defer cancel()
-	}
 
 	for !sc.isFinished(graph) {
 		if sc.isCanceled() {
@@ -131,22 +136,31 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 			logger.Info(ctx, "Step execution started", "step", node.Name())
 			node.SetStatus(NodeStatusRunning)
 			go func(ctx context.Context, node *Node) {
+				nodeCtx, nodeCancel := context.WithCancel(ctx)
+				defer nodeCancel()
+
+				// Recover from panics
 				defer func() {
 					if panicObj := recover(); panicObj != nil {
 						stack := string(debug.Stack())
-						err := fmt.Errorf("panic recovered: %v\n%s", panicObj, stack)
-						logger.Error(ctx, "Panic occurred", "error", err, "step", node.Name(), "stack", stack)
+						err := fmt.Errorf("panic recovered in node %s: %v\n%s", node.Name(), panicObj, stack)
+						logger.Error(ctx, "Panic occurred",
+							"error", err,
+							"step", node.Name(),
+							"stack", stack,
+							"requestID", sc.requestID)
 						node.MarkError(err)
 						sc.setLastError(err)
 					}
 				}()
 
+				// Ensure node is finished and wg is decremented
 				defer func() {
 					node.Finish()
 					wg.Done()
 				}()
 
-				ctx = sc.setupContext(ctx, graph, node)
+				ctx = sc.setupContext(nodeCtx, graph, node)
 
 				// Check preconditions
 				if len(node.Step().Preconditions) > 0 {

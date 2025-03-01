@@ -112,10 +112,10 @@ func (db *JSONDB) NewRecord(ctx context.Context, key string, timestamp time.Time
 	return NewHistoryRecord(filePath, db.cache)
 }
 
-func (db *JSONDB) ReadRecent(_ context.Context, key string, itemLimit int) []persistence.HistoryRecord {
+func (db *JSONDB) ReadRecent(ctx context.Context, key string, itemLimit int) []persistence.HistoryRecord {
 	var records []persistence.HistoryRecord
 
-	files := db.getLatestMatches(db.globPattern(key), itemLimit)
+	files := db.getLatestMatches(ctx, db.globPattern(key), itemLimit)
 
 	for _, file := range files {
 		records = append(records, NewHistoryRecord(file, db.cache))
@@ -143,13 +143,14 @@ func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID strin
 		return nil, err
 	}
 
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-
-	for _, match := range matches {
-		return NewHistoryRecord(match, db.cache), nil
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("%w: %s", persistence.ErrRequestIDNotFound, requestID)
 	}
 
-	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
+	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
+
+	// Return the most recent file
+	return NewHistoryRecord(matches[0], db.cache), nil
 }
 
 func (db *JSONDB) RemoveAll(ctx context.Context, key string) error {
@@ -277,9 +278,14 @@ func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool)
 	return ret[0], nil
 }
 
-func (s *JSONDB) getLatestMatches(pattern string, itemLimit int) []string {
+func (s *JSONDB) getLatestMatches(ctx context.Context, pattern string, itemLimit int) []string {
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
+		logger.Error(ctx, "failed to find matches for pattern %s: %s", pattern, err)
+		return nil
+	}
+
+	if len(matches) == 0 {
 		return nil
 	}
 
@@ -304,18 +310,41 @@ func filterLatest(files []string, itemLimit int) []string {
 	if len(files) == 0 {
 		return nil
 	}
-	sort.Slice(files, func(i, j int) bool {
-		a, err := findTimestamp(files[i])
-		if err != nil {
+
+	// Pre-compute timestamps to avoid repeated regex operations
+	type fileWithTime struct {
+		path string
+		time time.Time
+		err  error
+	}
+
+	filesWithTime := make([]fileWithTime, len(files))
+	for i, file := range files {
+		t, err := findTimestamp(file)
+		filesWithTime[i] = fileWithTime{file, t, err}
+	}
+
+	// Sort by timestamp
+	sort.Slice(filesWithTime, func(i, j int) bool {
+		// Files with errors go to the end
+		if filesWithTime[i].err != nil {
 			return false
 		}
-		b, err := findTimestamp(files[j])
-		if err != nil {
+		if filesWithTime[j].err != nil {
 			return true
 		}
-		return a.After(b)
+		return filesWithTime[i].time.After(filesWithTime[j].time)
 	})
-	return files[:min(len(files), itemLimit)]
+
+	// Extract just the paths
+	result := make([]string, 0, min(len(files), itemLimit))
+	for i := 0; i < min(len(filesWithTime), itemLimit); i++ {
+		if filesWithTime[i].err == nil {
+			result = append(result, filesWithTime[i].path)
+		}
+	}
+
+	return result
 }
 
 func findTimestamp(file string) (time.Time, error) {

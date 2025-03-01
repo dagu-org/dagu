@@ -90,13 +90,22 @@ func New(
 
 // Run setups the scheduler and runs the DAG.
 func (a *Agent) Run(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	if err := a.setup(ctx); err != nil {
-		return err
+		return fmt.Errorf("agent setup failed: %w", err)
 	}
 
-	// Create a new context for the DAG execution
+	// Create a new context for the DAG execution with all necessary information
 	dbClient := newDBClient(a.historyStore, a.dagStore)
 	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile, a.dag.Params)
+
+	// Add structured logging context
+	ctx = logger.WithValues(ctx,
+		"dagName", a.dag.Name,
+		"requestID", a.requestID,
+	)
 
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
