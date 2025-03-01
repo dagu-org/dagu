@@ -9,6 +9,18 @@ import (
 	"github.com/dagu-org/dagu/internal/logger"
 )
 
+func EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
+	if c, ok := ctx.Value(stepCtxKey{}).(StepContext); ok {
+		c.ctx = ctx
+		return c.EvalString(s, opts...)
+	}
+	if c, ok := ctx.Value(ctxKey{}).(Context); ok {
+		c.ctx = ctx
+		return c.EvalString(s, opts...)
+	}
+	return cmdutil.EvalString(ctx, s, opts...)
+}
+
 type Context struct {
 	ctx    context.Context
 	dag    *DAG
