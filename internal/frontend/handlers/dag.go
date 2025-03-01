@@ -503,6 +503,10 @@ func (h *DAG) getDetail(
 		resp.Errors = append(resp.Errors, err.Error())
 	}
 
+	if err := dagStatus.DAG.Validate(); err != nil {
+		resp.Errors = append(resp.Errors, err.Error())
+	}
+
 	switch tab {
 	case dagTabTypeStatus:
 		return resp, nil
