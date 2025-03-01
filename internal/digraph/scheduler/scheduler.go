@@ -125,6 +125,9 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	graph.Start()
 	defer graph.Finish()
 
+	// Initialize node count metrics
+	sc.metrics.totalNodes = len(graph.nodes)
+
 	var wg = sync.WaitGroup{}
 
 	for !sc.isFinished(graph) {
@@ -164,6 +167,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 							"requestID", sc.requestID)
 						node.MarkError(err)
 						sc.setLastError(err)
+
+						// Update metrics for failed node
+						sc.mu.Lock()
+						sc.metrics.failedNodes++
+						sc.mu.Unlock()
 					}
 				}()
 
@@ -637,11 +645,12 @@ func (sc *Scheduler) isSucceed(g *ExecutionGraph) bool {
 func (sc *Scheduler) isTimeout(startedAt time.Time) bool {
 	return sc.timeout > 0 && time.Since(startedAt) > sc.timeout
 }
+
 // GetMetrics returns the current metrics for the scheduler
 func (sc *Scheduler) GetMetrics() map[string]interface{} {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	metrics := map[string]interface{}{
 		"totalNodes":         sc.metrics.totalNodes,
 		"completedNodes":     sc.metrics.completedNodes,
@@ -653,12 +662,12 @@ func (sc *Scheduler) GetMetrics() map[string]interface{} {
 		"longestNodeTime":    sc.metrics.longestNodeTime.String(),
 		"nodeExecutionTimes": make(map[string]string),
 	}
-	
+
 	// Convert duration maps to string for easier serialization
 	nodeTimesMap := metrics["nodeExecutionTimes"].(map[string]string)
 	for name, duration := range sc.metrics.nodeExecutionTimes {
 		nodeTimesMap[name] = duration.String()
 	}
-	
+
 	return metrics
 }
