@@ -504,18 +504,34 @@ func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
 	return nil
 }
 
+// execWithRecovery executes a function with panic recovery and detailed error reporting
+// It captures stack traces and provides structured error information for debugging
 func execWithRecovery(ctx context.Context, fn func()) {
 	defer func() {
 		if panicObj := recover(); panicObj != nil {
-			err, ok := panicObj.(error)
-			if !ok {
-				err = fmt.Errorf("panic: %v", panicObj)
+			stack := debug.Stack()
+
+			// Convert panic object to error
+			var err error
+			switch v := panicObj.(type) {
+			case error:
+				err = v
+			case string:
+				err = fmt.Errorf("panic: %s", v)
+			default:
+				err = fmt.Errorf("panic: %v", v)
 			}
-			st := string(debug.Stack())
-			logger.Error(ctx, "Panic occurred", "err", err, "st", st)
+
+			// Log with structured information
+			logger.Error(ctx, "Recovered from panic",
+				"error", err.Error(),
+				"errorType", fmt.Sprintf("%T", panicObj),
+				"stackTrace", stack,
+				"fullStack", string(stack))
 		}
 	}()
 
+	// Execute the function
 	fn()
 }
 

@@ -2,6 +2,8 @@ package jsondb
 
 import (
 	"context"
+	"runtime"
+	"sync"
 
 	// nolint: gosec
 	"crypto/md5"
@@ -306,6 +308,8 @@ func (s *JSONDB) exists(filePath string) bool {
 	return !os.IsNotExist(err)
 }
 
+// filterLatest returns the most recent files up to itemLimit
+// Uses parallel processing for large file sets to improve performance
 func filterLatest(files []string, itemLimit int) []string {
 	if len(files) == 0 {
 		return nil
@@ -319,12 +323,27 @@ func filterLatest(files []string, itemLimit int) []string {
 	}
 
 	filesWithTime := make([]fileWithTime, len(files))
+
+	// Process files in parallel with worker pool
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, runtime.NumCPU())
+
 	for i, file := range files {
-		t, err := findTimestamp(file)
-		filesWithTime[i] = fileWithTime{file, t, err}
+		wg.Add(1)
+		semaphore <- struct{}{}
+
+		go func(idx int, filePath string) {
+			defer wg.Done()
+			defer func() { <-semaphore }()
+
+			t, err := findTimestamp(filePath)
+			filesWithTime[idx] = fileWithTime{filePath, t, err}
+		}(i, file)
 	}
 
-	// Sort by timestamp
+	wg.Wait()
+
+	// Sort by timestamp (most recent first)
 	sort.Slice(filesWithTime, func(i, j int) bool {
 		// Files with errors go to the end
 		if filesWithTime[i].err != nil {
@@ -336,9 +355,12 @@ func filterLatest(files []string, itemLimit int) []string {
 		return filesWithTime[i].time.After(filesWithTime[j].time)
 	})
 
-	// Extract just the paths
-	result := make([]string, 0, min(len(files), itemLimit))
-	for i := 0; i < min(len(filesWithTime), itemLimit); i++ {
+	// Extract just the paths, limiting to requested count
+	// Pre-allocate with exact capacity for efficiency
+	limit := min(len(filesWithTime), itemLimit)
+	result := make([]string, 0, limit)
+
+	for i := 0; i < limit; i++ {
 		if filesWithTime[i].err == nil {
 			result = append(result, filesWithTime[i].path)
 		}
