@@ -62,6 +62,19 @@ type Scheduler struct {
 	pause     time.Duration
 	lastError error
 	handlers  map[digraph.HandlerType]*Node
+
+	metrics struct {
+		startTime          time.Time
+		totalNodes         int
+		completedNodes     int
+		failedNodes        int
+		skippedNodes       int
+		canceledNodes      int
+		longestNodeTime    time.Duration
+		longestNodeName    string
+		totalExecutionTime time.Duration
+		nodeExecutionTimes map[string]time.Duration
+	}
 }
 
 func New(cfg *Config) *Scheduler {
@@ -275,6 +288,22 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 
 	wg.Wait()
 
+	// Collect final metrics
+	sc.metrics.totalExecutionTime = time.Since(sc.metrics.startTime)
+
+	// Log execution summary
+	logger.Info(ctx, "DAG execution completed",
+		"requestID", sc.requestID,
+		"status", sc.Status(graph).String(),
+		"totalTime", sc.metrics.totalExecutionTime,
+		"totalNodes", sc.metrics.totalNodes,
+		"completedNodes", sc.metrics.completedNodes,
+		"failedNodes", sc.metrics.failedNodes,
+		"skippedNodes", sc.metrics.skippedNodes,
+		"canceledNodes", sc.metrics.canceledNodes,
+		"longestNode", sc.metrics.longestNodeName,
+		"longestNodeTime", sc.metrics.longestNodeTime)
+
 	var handlers []digraph.HandlerType
 	switch sc.Status(graph) {
 	case StatusSuccess:
@@ -286,12 +315,11 @@ func (sc *Scheduler) Schedule(ctx context.Context, graph *ExecutionGraph, done c
 	case StatusCancel:
 		handlers = append(handlers, digraph.HandlerOnCancel)
 
-	case StatusNone:
-		// do nothing (should not happen)
-
-	case StatusRunning:
-		// do nothing (should not happen)
-
+	case StatusNone, StatusRunning:
+		// These states should not occur at this point
+		logger.Warn(ctx, "Unexpected final status",
+			"status", sc.Status(graph).String(),
+			"requestID", sc.requestID)
 	}
 
 	handlers = append(handlers, digraph.HandlerOnExit)
@@ -538,6 +566,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 		}
 	}
 
+	// Initialize handlers
 	sc.handlers = map[digraph.HandlerType]*Node{}
 	if sc.onExit != nil {
 		sc.handlers[digraph.HandlerOnExit] = &Node{Data: newSafeData(NodeData{Step: *sc.onExit})}
@@ -551,6 +580,17 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 	if sc.onCancel != nil {
 		sc.handlers[digraph.HandlerOnCancel] = &Node{Data: newSafeData(NodeData{Step: *sc.onCancel})}
 	}
+
+	// Initialize metrics
+	sc.metrics.startTime = time.Now()
+	sc.metrics.nodeExecutionTimes = make(map[string]time.Duration)
+
+	// Log scheduler setup
+	logger.Info(ctx, "Scheduler setup complete",
+		"requestID", sc.requestID,
+		"maxActiveRuns", sc.maxActiveRuns,
+		"timeout", sc.timeout,
+		"dry", sc.dry)
 
 	return err
 }
