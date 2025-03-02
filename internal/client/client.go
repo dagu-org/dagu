@@ -239,8 +239,7 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persist
 
 handleError:
 
-	if errors.Is(err, persistence.ErrNoStatusDataToday) ||
-		errors.Is(err, persistence.ErrNoStatusData) {
+	if errors.Is(err, persistence.ErrNoStatusData) {
 		// No status for today
 		return persistence.NewStatusFactory(dag).CreateDefault(), nil
 	}

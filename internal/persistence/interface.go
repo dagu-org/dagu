@@ -11,7 +11,6 @@ import (
 
 var (
 	ErrRequestIDNotFound = fmt.Errorf("request id not found")
-	ErrNoStatusDataToday = fmt.Errorf("no status data today")
 	ErrNoStatusData      = fmt.Errorf("no status data")
 )
 
