@@ -67,19 +67,19 @@ func TestWriterErrorHandling(t *testing.T) {
 	t.Run("WriteToClosedWriter", func(t *testing.T) {
 		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
 		require.NoError(t, writer.Open())
-		require.NoError(t, writer.Close())
+		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
 		status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
-		assert.Error(t, writer.Write(status))
+		assert.Error(t, writer.write(status))
 	})
 
 	t.Run("CloseMultipleTimes", func(t *testing.T) {
 		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
 		require.NoError(t, writer.Open())
-		require.NoError(t, writer.Close())
-		assert.NoError(t, writer.Close()) // Second close should not return an error
+		require.NoError(t, writer.close())
+		assert.NoError(t, writer.close()) // Second close should not return an error
 	})
 }
 

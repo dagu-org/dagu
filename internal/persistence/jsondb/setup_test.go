@@ -59,7 +59,7 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 	require.NoError(t, writer.Open())
 
 	t.Cleanup(func() {
-		require.NoError(t, writer.Close())
+		require.NoError(t, writer.close())
 	})
 
 	return writerTestHelper{
@@ -74,7 +74,7 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 func (w writerTestHelper) Write(t *testing.T, status persistence.Status) {
 	t.Helper()
 
-	err := w.Writer.Write(status)
+	err := w.Writer.write(status)
 	require.NoError(t, err)
 }
 
@@ -92,7 +92,7 @@ func (w writerTestHelper) AssertContent(t *testing.T, name, requestID string, st
 func (w writerTestHelper) Close(t *testing.T) {
 	t.Helper()
 
-	require.NoError(t, w.Writer.Close())
+	require.NoError(t, w.Writer.close())
 }
 
 type writerTestHelper struct {

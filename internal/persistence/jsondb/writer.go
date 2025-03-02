@@ -89,7 +89,17 @@ func (w *Writer) Open() error {
 
 // Write serializes the status to JSON and appends it to the file.
 // It automatically flushes data to ensure durability.
-func (w *Writer) Write(st persistence.Status) error {
+func (w *Writer) Write(ctx context.Context, st persistence.Status) error {
+	// Add context info to logs if write fails
+	if err := w.write(st); err != nil {
+		logger.Errorf(ctx, "Failed to write status: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (w *Writer) write(st persistence.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -128,28 +138,20 @@ func (w *Writer) Write(st persistence.Status) error {
 	return nil
 }
 
-// WriteWithContext is a context-aware version of Write that respects cancellation.
-func (w *Writer) WriteWithContext(ctx context.Context, st persistence.Status) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Continue with write operation
-	}
-
-	// Add context info to logs if write fails
-	if err := w.Write(st); err != nil {
-		logger.Errorf(ctx, "Failed to write status: %v", err)
+// Close flushes any buffered data and closes the underlying file.
+// It's safe to call close multiple times.
+func (w *Writer) Close(ctx context.Context) error {
+	// Add context info to logs if close fails
+	if err := w.close(); err != nil {
+		logger.Errorf(ctx, "Failed to close writer: %v", err)
 		return err
 	}
 
 	return nil
 }
 
-// Close flushes any buffered data and closes the underlying file.
-// It's safe to call Close multiple times.
-func (w *Writer) Close() error {
+// close flushes any buffered data and closes the underlying file.
+func (w *Writer) close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -185,25 +187,6 @@ func (w *Writer) Close() error {
 	// Return combined errors if any
 	if len(errs) > 0 {
 		return errors.Join(errs...)
-	}
-
-	return nil
-}
-
-// CloseWithContext is a context-aware version of Close that respects cancellation.
-func (w *Writer) CloseWithContext(ctx context.Context) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		// Continue with close operation
-	}
-
-	// Add context info to logs if close fails
-	if err := w.Close(); err != nil {
-		logger.Errorf(ctx, "Failed to close writer: %v", err)
-		return err
 	}
 
 	return nil

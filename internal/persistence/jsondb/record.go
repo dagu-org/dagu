@@ -85,14 +85,6 @@ func (hr *HistoryRecord) Open(ctx context.Context) error {
 // Write adds a new status record to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
 func (hr *HistoryRecord) Write(ctx context.Context, status persistence.Status) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Check if we're closing before acquiring the mutex to reduce contention
 	if hr.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
@@ -105,7 +97,7 @@ func (hr *HistoryRecord) Write(ctx context.Context, status persistence.Status) e
 		return fmt.Errorf("status file not open: %w", ErrStatusFileNotOpen)
 	}
 
-	if writeErr := hr.writer.WriteWithContext(ctx, status); writeErr != nil {
+	if writeErr := hr.writer.Write(ctx, status); writeErr != nil {
 		return fmt.Errorf("failed to write status: %w", ErrWriteFailed)
 	}
 
@@ -120,14 +112,6 @@ func (hr *HistoryRecord) Write(ctx context.Context, status persistence.Status) e
 // Close properly closes the status file, performs compaction, and invalidates the cache.
 // It's safe to call Close multiple times. The context can be used to cancel the operation.
 func (hr *HistoryRecord) Close(ctx context.Context) error {
-	// Check for context cancellation
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, ctx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Set the closing flag to prevent new writes
 	hr.isClosing.Store(true)
 	defer hr.isClosing.Store(false)
@@ -155,7 +139,7 @@ func (hr *HistoryRecord) Close(ctx context.Context) error {
 	}
 
 	// Close the writer
-	if closeErr := w.CloseWithContext(ctx); closeErr != nil {
+	if closeErr := w.Close(ctx); closeErr != nil {
 		return fmt.Errorf("failed to close writer: %w", closeErr)
 	}
 
@@ -231,12 +215,12 @@ func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
 		return fmt.Errorf("failed to open temp file writer: %w", err)
 	}
 
-	if err := writer.WriteWithContext(ctx, *status); err != nil {
-		_ = writer.Close() // Best effort close
+	if err := writer.Write(ctx, *status); err != nil {
+		_ = writer.close() // Best effort close
 		return fmt.Errorf("failed to write compacted data: %w", err)
 	}
 
-	if err := writer.Close(); err != nil {
+	if err := writer.close(); err != nil {
 		return fmt.Errorf("failed to close temp file writer: %w", err)
 	}
 

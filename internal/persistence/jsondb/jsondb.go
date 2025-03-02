@@ -45,7 +45,6 @@ const (
 	dateTimeFormatUTC = "20060102.15:04:05.000Z"
 	dateTimeFormat    = "20060102.15:04:05.000"
 	dateFormat        = "20060102"
-	defaultBufferSize = 8192
 	defaultWorkers    = 4
 )
 
@@ -56,9 +55,7 @@ type JSONDB struct {
 	baseDir           string                                // Base directory for all status files
 	latestStatusToday bool                                  // Whether to only return today's status
 	cache             *filecache.Cache[*persistence.Status] // Optional cache for read operations
-	bufferSize        int                                   // Buffer size for read/write operations
 	maxWorkers        int                                   // Maximum number of parallel workers
-	operationTimeout  time.Duration                         // Timeout for operations
 }
 
 // Option defines functional options for configuring JSONDB.
@@ -68,7 +65,6 @@ type Option func(*Options)
 type Options struct {
 	FileCache         *filecache.Cache[*persistence.Status]
 	LatestStatusToday bool
-	BufferSize        int
 	MaxWorkers        int
 	OperationTimeout  time.Duration
 }
@@ -87,18 +83,10 @@ func WithLatestStatusToday(latestStatusToday bool) Option {
 	}
 }
 
-// WithOperationTimeout sets the timeout for operations.
-func WithOperationTimeout(timeout time.Duration) Option {
-	return func(o *Options) {
-		o.OperationTimeout = timeout
-	}
-}
-
 // New creates a new JSONDB instance with the specified options.
 func New(baseDir string, opts ...Option) *JSONDB {
 	options := &Options{
 		LatestStatusToday: true,
-		BufferSize:        defaultBufferSize,
 		MaxWorkers:        runtime.NumCPU(),
 		OperationTimeout:  60 * time.Second,
 	}
@@ -111,27 +99,13 @@ func New(baseDir string, opts ...Option) *JSONDB {
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
-		bufferSize:        options.BufferSize,
 		maxWorkers:        options.MaxWorkers,
-		operationTimeout:  options.OperationTimeout,
 	}
 }
 
 // Update updates the status for a specific request ID.
 // It handles the entire lifecycle of opening, writing, and closing the history record.
 func (db *JSONDB) Update(ctx context.Context, key, requestID string, status persistence.Status) error {
-	// Create a timeout context if none is provided
-	opCtx, cancel := context.WithTimeout(ctx, db.operationTimeout)
-	defer cancel()
-
-	// Check for context cancellation
-	select {
-	case <-opCtx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, opCtx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Validate inputs
 	if key == "" {
 		return ErrKeyEmpty
@@ -141,26 +115,26 @@ func (db *JSONDB) Update(ctx context.Context, key, requestID string, status pers
 	}
 
 	// Find the history record
-	historyRecord, err := db.FindByRequestID(opCtx, key, requestID)
+	historyRecord, err := db.FindByRequestID(ctx, key, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to find history record: %w", err)
 	}
 
 	// Open, write, and close the history record
-	if err := historyRecord.Open(opCtx); err != nil {
+	if err := historyRecord.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open history record: %w", err)
 	}
 
-	if err := historyRecord.Write(opCtx, status); err != nil {
+	if err := historyRecord.Write(ctx, status); err != nil {
 		// Try to close the record even if write fails
-		closeErr := historyRecord.Close(opCtx)
+		closeErr := historyRecord.Close(ctx)
 		if closeErr != nil {
-			logger.Errorf(opCtx, "Failed to close history record after write error: %v", closeErr)
+			logger.Errorf(ctx, "Failed to close history record after write error: %v", closeErr)
 		}
 		return fmt.Errorf("failed to write status: %w", err)
 	}
 
-	if err := historyRecord.Close(opCtx); err != nil {
+	if err := historyRecord.Close(ctx); err != nil {
 		return fmt.Errorf("failed to close history record: %w", err)
 	}
 	return nil
@@ -183,14 +157,10 @@ func (db *JSONDB) NewRecord(ctx context.Context, key string, timestamp time.Time
 
 // ReadRecent returns the most recent history records for the specified key, up to itemLimit.
 func (db *JSONDB) ReadRecent(ctx context.Context, key string, itemLimit int) []persistence.HistoryRecord {
-	// Create a timeout context if none is provided
-	opCtx, cancel := context.WithTimeout(ctx, db.operationTimeout)
-	defer cancel()
-
 	// Check for context cancellation
 	select {
-	case <-opCtx.Done():
-		logger.Errorf(opCtx, "ReadRecent canceled: %v", opCtx.Err())
+	case <-ctx.Done():
+		logger.Errorf(ctx, "ReadRecent canceled: %v", ctx.Err())
 		return nil
 	default:
 		// Continue with operation
@@ -198,18 +168,18 @@ func (db *JSONDB) ReadRecent(ctx context.Context, key string, itemLimit int) []p
 
 	// Validate inputs
 	if key == "" {
-		logger.Error(opCtx, "key is empty")
+		logger.Error(ctx, "key is empty")
 		return nil
 	}
 	if itemLimit <= 0 {
-		logger.Warnf(opCtx, "Invalid itemLimit %d, using default of 10", itemLimit)
+		logger.Warnf(ctx, "Invalid itemLimit %d, using default of 10", itemLimit)
 		itemLimit = 10
 	}
 
 	// Get the latest matches
-	files := db.getLatestMatches(opCtx, db.globPattern(key), itemLimit)
+	files := db.getLatestMatches(ctx, db.globPattern(key), itemLimit)
 	if len(files) == 0 {
-		logger.Debugf(opCtx, "No recent records found for key %s", key)
+		logger.Debugf(ctx, "No recent records found for key %s", key)
 		return nil
 	}
 
@@ -223,19 +193,7 @@ func (db *JSONDB) ReadRecent(ctx context.Context, key string, itemLimit int) []p
 }
 
 // ReadToday returns the most recent history record for today.
-func (db *JSONDB) ReadToday(ctx context.Context, key string) (persistence.HistoryRecord, error) {
-	// Create a timeout context if none is provided
-	opCtx, cancel := context.WithTimeout(ctx, db.operationTimeout)
-	defer cancel()
-
-	// Check for context cancellation
-	select {
-	case <-opCtx.Done():
-		return nil, fmt.Errorf("%w: %v", ErrContextCanceled, opCtx.Err())
-	default:
-		// Continue with operation
-	}
-
+func (db *JSONDB) ReadToday(_ context.Context, key string) (persistence.HistoryRecord, error) {
 	// Validate inputs
 	if key == "" {
 		return nil, ErrKeyEmpty
@@ -251,19 +209,7 @@ func (db *JSONDB) ReadToday(ctx context.Context, key string) (persistence.Histor
 }
 
 // FindByRequestID finds a history record by request ID.
-func (db *JSONDB) FindByRequestID(ctx context.Context, key string, requestID string) (persistence.HistoryRecord, error) {
-	// Create a timeout context if none is provided
-	opCtx, cancel := context.WithTimeout(ctx, db.operationTimeout)
-	defer cancel()
-
-	// Check for context cancellation
-	select {
-	case <-opCtx.Done():
-		return nil, fmt.Errorf("%w: %v", ErrContextCanceled, opCtx.Err())
-	default:
-		// Continue with operation
-	}
-
+func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (persistence.HistoryRecord, error) {
 	// Validate inputs
 	if key == "" {
 		return nil, ErrKeyEmpty
@@ -296,24 +242,12 @@ func (db *JSONDB) RemoveAll(ctx context.Context, key string) error {
 
 // RemoveOld removes history records older than retentionDays for the specified key.
 func (db *JSONDB) RemoveOld(ctx context.Context, key string, retentionDays int) error {
-	// Create a timeout context if none is provided
-	opCtx, cancel := context.WithTimeout(ctx, db.operationTimeout)
-	defer cancel()
-
-	// Check for context cancellation
-	select {
-	case <-opCtx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, opCtx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Validate inputs
 	if key == "" {
 		return ErrKeyEmpty
 	}
 	if retentionDays < 0 {
-		logger.Warnf(opCtx, "Negative retentionDays %d, no files will be removed", retentionDays)
+		logger.Warnf(ctx, "Negative retentionDays %d, no files will be removed", retentionDays)
 		return nil
 	}
 
@@ -324,7 +258,7 @@ func (db *JSONDB) RemoveOld(ctx context.Context, key string, retentionDays int) 
 	}
 
 	if len(matches) == 0 {
-		logger.Debugf(opCtx, "No files to remove for key %s", key)
+		logger.Debugf(ctx, "No files to remove for key %s", key)
 		return nil
 	}
 
@@ -347,7 +281,7 @@ func (db *JSONDB) RemoveOld(ctx context.Context, key string, retentionDays int) 
 			// Check if the file is older than the cutoff date
 			info, err := os.Stat(filePath)
 			if err != nil {
-				logger.Debugf(opCtx, "Failed to stat file %s: %v", filePath, err)
+				logger.Debugf(ctx, "Failed to stat file %s: %v", filePath, err)
 				return
 			}
 
@@ -355,7 +289,7 @@ func (db *JSONDB) RemoveOld(ctx context.Context, key string, retentionDays int) 
 				if err := os.Remove(filePath); err != nil {
 					errChan <- fmt.Errorf("failed to remove file %s: %w", filePath, err)
 				} else {
-					logger.Debugf(opCtx, "Removed old file %s", filePath)
+					logger.Debugf(ctx, "Removed old file %s", filePath)
 				}
 			}
 		}(m)
@@ -381,18 +315,6 @@ func (db *JSONDB) RemoveOld(ctx context.Context, key string, retentionDays int) 
 
 // Rename renames all history records from oldKey to newKey.
 func (db *JSONDB) Rename(ctx context.Context, oldKey, newKey string) error {
-	// Create a timeout context if none is provided
-	opCtx, cancel := context.WithTimeout(ctx, db.operationTimeout)
-	defer cancel()
-
-	// Check for context cancellation
-	select {
-	case <-opCtx.Done():
-		return fmt.Errorf("%w: %v", ErrContextCanceled, opCtx.Err())
-	default:
-		// Continue with operation
-	}
-
 	// Validate inputs
 	if oldKey == "" || newKey == "" {
 		return ErrKeyEmpty
@@ -404,7 +326,7 @@ func (db *JSONDB) Rename(ctx context.Context, oldKey, newKey string) error {
 	// Get the old directory
 	oldDir := db.getDirectory(oldKey, getPrefix(oldKey))
 	if !db.exists(oldDir) {
-		logger.Debugf(opCtx, "Old directory %s does not exist, nothing to rename", oldDir)
+		logger.Debugf(ctx, "Old directory %s does not exist, nothing to rename", oldDir)
 		return nil
 	}
 
@@ -423,7 +345,7 @@ func (db *JSONDB) Rename(ctx context.Context, oldKey, newKey string) error {
 	}
 
 	if len(matches) == 0 {
-		logger.Debugf(opCtx, "No files to rename for key %s", oldKey)
+		logger.Debugf(ctx, "No files to rename for key %s", oldKey)
 		return nil
 	}
 
@@ -452,9 +374,9 @@ func (db *JSONDB) Rename(ctx context.Context, oldKey, newKey string) error {
 			// Rename the file
 			if err := os.Rename(filePath, newPath); err != nil {
 				errChan <- fmt.Errorf("failed to rename %s to %s: %w", filePath, newPath, err)
-				logger.Errorf(opCtx, "Failed to rename %s to %s: %v", filePath, newPath, err)
+				logger.Errorf(ctx, "Failed to rename %s to %s: %v", filePath, newPath, err)
 			} else {
-				logger.Debugf(opCtx, "Renamed %s to %s", filePath, newPath)
+				logger.Debugf(ctx, "Renamed %s to %s", filePath, newPath)
 			}
 		}(m)
 	}
@@ -472,7 +394,7 @@ func (db *JSONDB) Rename(ctx context.Context, oldKey, newKey string) error {
 	// Try to remove the old directory if it's empty
 	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
 		if err := os.Remove(oldDir); err != nil {
-			logger.Warnf(opCtx, "Failed to remove empty directory %s: %v", oldDir, err)
+			logger.Warnf(ctx, "Failed to remove empty directory %s: %v", oldDir, err)
 		}
 	}
 
