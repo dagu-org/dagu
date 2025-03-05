@@ -16,7 +16,7 @@ import (
 
 type testHelper struct {
 	Context context.Context
-	DB      *JSONDB
+	DB      *HistoryStore
 	tmpDir  string
 }
 

@@ -2,7 +2,7 @@ package jsondb
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" // nolint: gosec
 	"encoding/hex"
 	"errors"
 	"fmt"
