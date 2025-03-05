@@ -219,7 +219,7 @@ func TestHistoryData_Remove(t *testing.T) {
 		}
 
 		// Verify files exist
-		matches, err := filepath.Glob(data.globPattern(dag.Location))
+		matches, err := filepath.Glob(data.globPattern())
 		require.NoError(t, err)
 		assert.Len(t, matches, 3)
 
@@ -228,7 +228,7 @@ func TestHistoryData_Remove(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify all files are removed
-		matches, err = filepath.Glob(data.globPattern(dag.Location))
+		matches, err = filepath.Glob(data.globPattern())
 		require.NoError(t, err)
 		assert.Empty(t, matches)
 	})

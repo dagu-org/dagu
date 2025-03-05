@@ -126,7 +126,7 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(hd.globPattern(hd.dagName))
+	matches, err := filepath.Glob(hd.globPattern())
 	if err != nil {
 		return fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -210,7 +210,7 @@ func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.
 	}
 
 	// Get the latest matches
-	files := hd.getLatestMatches(ctx, hd.globPattern(hd.dagName), itemLimit)
+	files := hd.getLatestMatches(ctx, hd.globPattern(), itemLimit)
 	if len(files) == 0 {
 		return nil
 	}
@@ -286,7 +286,7 @@ func (hd *HistoryData) FindByRequestID(_ context.Context, requestID string) (per
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(hd.globPattern(hd.dagName))
+	matches, err := filepath.Glob(hd.globPattern())
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -310,7 +310,7 @@ func (hd *HistoryData) RemoveOld(ctx context.Context, retentionDays int) error {
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(hd.globPattern(hd.dagName))
+	matches, err := filepath.Glob(hd.globPattern())
 	if err != nil {
 		return fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -387,8 +387,8 @@ func (hd *HistoryData) getLatestMatches(ctx context.Context, pattern string, ite
 }
 
 // globPattern returns the glob pattern for the specified key.
-func (hd *HistoryData) globPattern(key string) string {
-	return hd.createPrefix(key) + "*" + extDat
+func (hd *HistoryData) globPattern() string {
+	return hd.createPrefix(hd.dagName) + "*" + extDat
 }
 
 // createPrefix creates a prefix for the specified key.
