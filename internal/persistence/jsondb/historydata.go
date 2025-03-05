@@ -43,19 +43,25 @@ const (
 )
 
 type HistoryData struct {
+	parentDir  string
 	baseDir    string
 	dagName    string
+	key        string
 	maxWorkers int                                   // Maximum number of parallel workers
 	cache      *filecache.Cache[*persistence.Status] // Optional cache for read operations
 }
 
-func NewHistoryData(ctx context.Context, baseDir, dagName string, cache *filecache.Cache[*persistence.Status]) *HistoryData {
+func NewHistoryData(ctx context.Context, parentDir, dagName string, cache *filecache.Cache[*persistence.Status]) *HistoryData {
 	if dagName == "" {
 		logger.Error(ctx, "dagName is empty")
 	}
+	key := normalizeKey(dagName)
+	baseDir := getDirectory(parentDir, dagName, key)
 	return &HistoryData{
-		baseDir:    baseDir,
+		parentDir:  parentDir,
 		dagName:    dagName,
+		baseDir:    baseDir,
+		key:        key,
 		cache:      cache,
 		maxWorkers: runtime.NumCPU(),
 	}
@@ -111,14 +117,15 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 	}
 
 	// Get the old directory
-	oldDir := hd.getDirectory(hd.dagName, getPrefix(hd.dagName))
+	oldDir := hd.baseDir
 	if !hd.exists(oldDir) {
 		logger.Debugf(ctx, "Old directory %s does not exist, nothing to rename", oldDir)
 		return nil
 	}
 
 	// Create the new directory if it doesn't exist
-	newDir := hd.getDirectory(newPath, getPrefix(newPath))
+	newKey := normalizeKey(newPath)
+	newDir := getDirectory(hd.parentDir, newPath, newKey)
 	if !hd.exists(newDir) {
 		if err := os.MkdirAll(newDir, 0755); err != nil {
 			return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, newDir, err)
@@ -189,6 +196,11 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 	if len(errs) > 0 {
 		return errors.Join(errs...)
 	}
+
+	// Update the base directory
+	hd.baseDir = newDir
+	hd.dagName = newPath
+	hd.key = newKey
 
 	return nil
 }
@@ -393,22 +405,22 @@ func (hd *HistoryData) globPattern() string {
 
 // createPrefix creates a prefix for the specified key.
 func (hd *HistoryData) createPrefix(key string) string {
-	prefix := getPrefix(key)
-	return filepath.Join(hd.getDirectory(key, prefix), prefix)
+	prefix := normalizeKey(key)
+	return filepath.Join(hd.baseDir, prefix)
 }
 
 // getDirectory returns the directory for the specified key and prefix.
-func (hd *HistoryData) getDirectory(key string, prefix string) string {
-	if key != prefix {
+func getDirectory(baseDir, originalKey, normalizedKey string) string {
+	if originalKey != normalizedKey {
 		// Add a hash postfix to the directory name to avoid conflicts.
 		// nolint: gosec
 		h := md5.New()
-		_, _ = h.Write([]byte(key))
+		_, _ = h.Write([]byte(originalKey))
 		v := hex.EncodeToString(h.Sum(nil))
-		return filepath.Join(hd.baseDir, fmt.Sprintf("%s-%s", prefix, v))
+		return filepath.Join(baseDir, fmt.Sprintf("%s-%s", normalizedKey, v))
 	}
 
-	return filepath.Join(hd.baseDir, key)
+	return filepath.Join(baseDir, originalKey)
 }
 
 // generateFilePath generates a file path for the specified key, timestamp, and request ID.
@@ -519,8 +531,8 @@ func parseFileTimestamp(file string) (time.Time, error) {
 	return t, nil
 }
 
-// getPrefix extracts the prefix from a key.
-func getPrefix(key string) string {
+// normalizeKey normalizes the key by removing the extension and directory path.
+func normalizeKey(key string) string {
 	ext := filepath.Ext(key)
 	if ext == "" {
 		// No extension
