@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -55,12 +56,12 @@ func NewHistoryData(ctx context.Context, parentDir, dagName string, cache *filec
 	if dagName == "" {
 		logger.Error(ctx, "dagName is empty")
 	}
+
 	key := normalizeKey(dagName)
-	baseDir := getDirectory(parentDir, dagName, key)
 	return &HistoryData{
 		parentDir:  parentDir,
 		dagName:    dagName,
-		baseDir:    baseDir,
+		baseDir:    getDirectory(parentDir, dagName, key),
 		key:        key,
 		cache:      cache,
 		maxWorkers: runtime.NumCPU(),
@@ -125,10 +126,10 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 
 	// Create the new directory if it doesn't exist
 	newKey := normalizeKey(newPath)
-	newDir := getDirectory(hd.parentDir, newPath, newKey)
-	if !hd.exists(newDir) {
-		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, newDir, err)
+	newBaseDir := getDirectory(hd.parentDir, newPath, newKey)
+	if !hd.exists(newBaseDir) {
+		if err := os.MkdirAll(newBaseDir, 0755); err != nil {
+			return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, newBaseDir, err)
 		}
 	}
 
@@ -142,10 +143,6 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 		logger.Debugf(ctx, "No files to rename for key %s", hd.dagName)
 		return nil
 	}
-
-	// Get the old and new prefixes
-	oldPrefix := filepath.Base(hd.createPrefix(hd.dagName))
-	newPrefix := filepath.Base(hd.createPrefix(newPath))
 
 	// Use a worker pool to rename files in parallel
 	var wg sync.WaitGroup
@@ -162,8 +159,8 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 
 			// Replace the old prefix with the new prefix
 			base := filepath.Base(filePath)
-			newName := strings.Replace(base, oldPrefix, newPrefix, 1)
-			newPath := filepath.Join(newDir, newName)
+			newName := strings.Replace(base, hd.key, newKey, 1)
+			newPath := filepath.Join(newBaseDir, newName)
 
 			// Rename the file
 			if err := os.Rename(filePath, newPath); err != nil {
@@ -198,7 +195,7 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 	}
 
 	// Update the base directory
-	hd.baseDir = newDir
+	hd.baseDir = newBaseDir
 	hd.dagName = newPath
 	hd.key = newKey
 
@@ -263,8 +260,7 @@ func (hd *HistoryData) Latest(_ context.Context) (persistence.HistoryRecord, err
 
 // latest returns the latest history record for the specified key.
 func (hd *HistoryData) latest(cutoff timeInUTC) (string, error) {
-	prefix := hd.createPrefix(hd.dagName)
-	pattern := fmt.Sprintf("%s.*.*.dat", prefix)
+	pattern := path.Join(hd.baseDir, hd.key+"*"+extDat)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
@@ -400,13 +396,7 @@ func (hd *HistoryData) getLatestMatches(ctx context.Context, pattern string, ite
 
 // globPattern returns the glob pattern for the specified key.
 func (hd *HistoryData) globPattern() string {
-	return hd.createPrefix(hd.dagName) + "*" + extDat
-}
-
-// createPrefix creates a prefix for the specified key.
-func (hd *HistoryData) createPrefix(key string) string {
-	prefix := normalizeKey(key)
-	return filepath.Join(hd.baseDir, prefix)
+	return path.Join(hd.baseDir, hd.key+"*"+extDat)
 }
 
 // getDirectory returns the directory for the specified key and prefix.
@@ -424,16 +414,15 @@ func getDirectory(baseDir, originalKey, normalizedKey string) string {
 }
 
 // generateFilePath generates a file path for the specified key, timestamp, and request ID.
-func (hd *HistoryData) generateFilePath(ctx context.Context, timestamp timeInUTC, requestID string) string {
-	if requestID == "" {
+func (hd *HistoryData) generateFilePath(ctx context.Context, timestamp timeInUTC, reqID string) string {
+	if reqID == "" {
 		logger.Error(ctx, "requestID is empty")
 	}
 
-	prefix := hd.createPrefix(hd.dagName)
-	timestampString := timestamp.Format(dateTimeFormatUTC)
-	requestID = stringutil.TruncString(requestID, requestIDLenSafe)
+	ts := timestamp.Format(dateTimeFormatUTC)
+	reqID = stringutil.TruncString(reqID, requestIDLenSafe)
 
-	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestampString, requestID)
+	return path.Join(hd.baseDir, fmt.Sprintf("%s.%s.%s.dat", hd.key, ts, reqID))
 }
 
 // exists returns true if the specified file path exists.
