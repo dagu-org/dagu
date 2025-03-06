@@ -458,7 +458,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupHistoryRecord(ctx context.Context) persistence.HistoryRecord {
+func (a *Agent) setupHistoryRecord(ctx context.Context) persistence.Record {
 	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(ctx, location, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)

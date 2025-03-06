@@ -21,7 +21,7 @@ func TestHistoryRecord_Open(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Test successful open
 	err := hr.Open(context.Background())
@@ -40,7 +40,7 @@ func TestHistoryRecord_Write(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "status.dat")
 
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Test write without open
 	status := createTestStatus(scheduler.StatusRunning)
@@ -96,7 +96,7 @@ func TestHistoryRecord_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	// Initialize HistoryRecord and test reading
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Read status - should get the last entry (test2)
 	statusFile, err := hr.Read(context.Background())
@@ -146,7 +146,7 @@ func TestHistoryRecord_Compact(t *testing.T) {
 	beforeSize := fileInfo.Size()
 
 	// Initialize HistoryRecord
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Compact the file
 	err = hr.Compact(context.Background())
@@ -171,7 +171,7 @@ func TestHistoryRecord_Close(t *testing.T) {
 	file := filepath.Join(dir, "status.dat")
 
 	// Initialize and open HistoryRecord
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 	err := hr.Open(context.Background())
 	require.NoError(t, err)
 
@@ -196,7 +196,7 @@ func TestHistoryRecord_HandleNonExistentFile(t *testing.T) {
 	dir := createTempDir(t)
 	file := filepath.Join(dir, "nonexistent", "status.dat")
 
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Should be able to open a non-existent file
 	err := hr.Open(context.Background())
@@ -225,7 +225,7 @@ func TestHistoryRecord_EmptyFile(t *testing.T) {
 	require.NoError(t, err)
 	f.Close()
 
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Reading an empty file should return EOF
 	_, err = hr.ReadStatus(context.Background())
@@ -250,7 +250,7 @@ func TestHistoryRecord_InvalidJSON(t *testing.T) {
 	_, err = f.Write([]byte("invalid json\n"))
 	require.NoError(t, err)
 
-	hr := NewHistoryRecord(file, nil)
+	hr := NewRecord(file, nil)
 
 	// Should be able to read and get the valid entry
 	status, err := hr.ReadStatus(context.Background())

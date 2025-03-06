@@ -76,13 +76,13 @@ func NewHistoryData(ctx context.Context, parentDir, dagName string, cache *filec
 
 // NewRecord creates a new history record for the specified timestamp and request ID.
 // The record is not opened or written to until explicitly requested.
-func (hd *HistoryData) NewRecord(ctx context.Context, timestamp time.Time, requestID string) persistence.HistoryRecord {
+func (hd *HistoryData) NewRecord(ctx context.Context, timestamp time.Time, requestID string) persistence.Record {
 	if requestID == "" {
 		logger.Error(ctx, "requestID is empty")
 	}
 
 	filePath := hd.generateFilePath(ctx, newUTC(timestamp), requestID)
-	return NewHistoryRecord(filePath, hd.cache)
+	return NewRecord(filePath, hd.cache)
 }
 
 // Update updates the status for a specific request ID.
@@ -206,7 +206,7 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 
 // Recent returns the most recent history records up to itemLimit.
 // Records are sorted by timestamp with the most recent first.
-func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.HistoryRecord {
+func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.Record {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -228,9 +228,9 @@ func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.
 	}
 
 	// Create history records
-	records := make([]persistence.HistoryRecord, 0, len(files))
+	records := make([]persistence.Record, 0, len(files))
 	for _, file := range files {
-		records = append(records, NewHistoryRecord(file, hd.cache))
+		records = append(records, NewRecord(file, hd.cache))
 	}
 
 	return records
@@ -238,7 +238,7 @@ func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.
 
 // LatestToday returns the most recent history record for today.
 // If no records exist for today, it returns an error.
-func (hd *HistoryData) LatestToday(ctx context.Context) (persistence.HistoryRecord, error) {
+func (hd *HistoryData) LatestToday(ctx context.Context) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -256,12 +256,12 @@ func (hd *HistoryData) LatestToday(ctx context.Context) (persistence.HistoryReco
 		return nil, err
 	}
 
-	return NewHistoryRecord(file, hd.cache), nil
+	return NewRecord(file, hd.cache), nil
 }
 
 // Latest returns the most recent history record regardless of date.
 // If no records exist, it returns an error.
-func (hd *HistoryData) Latest(ctx context.Context) (persistence.HistoryRecord, error) {
+func (hd *HistoryData) Latest(ctx context.Context) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -276,12 +276,12 @@ func (hd *HistoryData) Latest(ctx context.Context) (persistence.HistoryRecord, e
 		return nil, err
 	}
 
-	return NewHistoryRecord(file, hd.cache), nil
+	return NewRecord(file, hd.cache), nil
 }
 
 // FindByRequestID finds a history record by request ID.
 // It returns the most recent record if multiple matches exist.
-func (hd *HistoryData) FindByRequestID(ctx context.Context, requestID string) (persistence.HistoryRecord, error) {
+func (hd *HistoryData) FindByRequestID(ctx context.Context, requestID string) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -308,7 +308,7 @@ func (hd *HistoryData) FindByRequestID(ctx context.Context, requestID string) (p
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 
 	// Return the most recent file
-	return NewHistoryRecord(matches[0], hd.cache), nil
+	return NewRecord(matches[0], hd.cache), nil
 }
 
 // RemoveOld removes history records older than retentionDays.

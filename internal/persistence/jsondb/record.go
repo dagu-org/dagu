@@ -26,11 +26,11 @@ var (
 	ErrContextCanceled   = errors.New("operation canceled by context")
 )
 
-var _ persistence.HistoryRecord = (*HistoryRecord)(nil)
+var _ persistence.Record = (*Record)(nil)
 
-// HistoryRecord manages an append-only status file with read, write, and compaction capabilities.
+// Record manages an append-only status file with read, write, and compaction capabilities.
 // It provides thread-safe operations and supports metrics collection.
-type HistoryRecord struct {
+type Record struct {
 	file      string                                // Path to the status file
 	writer    *Writer                               // Writer for appending status updates
 	mu        sync.RWMutex                          // Mutex for thread safety
@@ -38,9 +38,9 @@ type HistoryRecord struct {
 	isClosing atomic.Bool                           // Flag to prevent writes during Close/Compact
 }
 
-// NewHistoryRecord creates a new HistoryRecord for the specified file.
-func NewHistoryRecord(file string, cache *filecache.Cache[*persistence.Status]) *HistoryRecord {
-	return &HistoryRecord{
+// NewRecord creates a new HistoryRecord for the specified file.
+func NewRecord(file string, cache *filecache.Cache[*persistence.Status]) *Record {
+	return &Record{
 		file:  file,
 		cache: cache,
 	}
@@ -48,7 +48,7 @@ func NewHistoryRecord(file string, cache *filecache.Cache[*persistence.Status]) 
 
 // Open initializes the status file for writing. It returns an error if the file is already open.
 // The context can be used to cancel the operation.
-func (hr *HistoryRecord) Open(ctx context.Context) error {
+func (r *Record) Open(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -57,53 +57,53 @@ func (hr *HistoryRecord) Open(ctx context.Context) error {
 		// Continue with operation
 	}
 
-	hr.mu.Lock()
-	defer hr.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if hr.writer != nil {
+	if r.writer != nil {
 		return fmt.Errorf("status file already open: %w", ErrStatusFileOpen)
 	}
 
 	// Ensure the directory exists
-	dir := filepath.Dir(hr.file)
+	dir := filepath.Dir(r.file)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	logger.Infof(ctx, "Initializing status file: %s", hr.file)
+	logger.Infof(ctx, "Initializing status file: %s", r.file)
 
-	writer := NewWriter(hr.file)
+	writer := NewWriter(r.file)
 
 	if err := writer.Open(); err != nil {
 		return fmt.Errorf("failed to open writer: %w", err)
 	}
 
-	hr.writer = writer
+	r.writer = writer
 	return nil
 }
 
 // Write adds a new status record to the file. It returns an error if the file is not open
 // or is currently being closed. The context can be used to cancel the operation.
-func (hr *HistoryRecord) Write(ctx context.Context, status persistence.Status) error {
+func (r *Record) Write(ctx context.Context, status persistence.Status) error {
 	// Check if we're closing before acquiring the mutex to reduce contention
-	if hr.isClosing.Load() {
+	if r.isClosing.Load() {
 		return fmt.Errorf("cannot write while file is closing: %w", ErrStatusFileNotOpen)
 	}
 
-	hr.mu.Lock()
-	defer hr.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if hr.writer == nil {
+	if r.writer == nil {
 		return fmt.Errorf("status file not open: %w", ErrStatusFileNotOpen)
 	}
 
-	if writeErr := hr.writer.Write(ctx, status); writeErr != nil {
+	if writeErr := r.writer.Write(ctx, status); writeErr != nil {
 		return fmt.Errorf("failed to write status: %w", ErrWriteFailed)
 	}
 
 	// Invalidate cache after successful write
-	if hr.cache != nil {
-		hr.cache.Invalidate(hr.file)
+	if r.cache != nil {
+		r.cache.Invalidate(r.file)
 	}
 
 	return nil
@@ -111,31 +111,31 @@ func (hr *HistoryRecord) Write(ctx context.Context, status persistence.Status) e
 
 // Close properly closes the status file, performs compaction, and invalidates the cache.
 // It's safe to call Close multiple times. The context can be used to cancel the operation.
-func (hr *HistoryRecord) Close(ctx context.Context) error {
+func (r *Record) Close(ctx context.Context) error {
 	// Set the closing flag to prevent new writes
-	hr.isClosing.Store(true)
-	defer hr.isClosing.Store(false)
+	r.isClosing.Store(true)
+	defer r.isClosing.Store(false)
 
-	hr.mu.Lock()
-	defer hr.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if hr.writer == nil {
+	if r.writer == nil {
 		return nil
 	}
 
 	// Create a copy to avoid nil dereference in deferred function
-	w := hr.writer
-	hr.writer = nil
+	w := r.writer
+	r.writer = nil
 
 	// Attempt to compact the file
-	if compactErr := hr.compactLocked(ctx); compactErr != nil {
+	if compactErr := r.compactLocked(ctx); compactErr != nil {
 		logger.Warnf(ctx, "Failed to compact file during close: %v", compactErr)
 		// Continue with close even if compaction fails
 	}
 
 	// Invalidate the cache
-	if hr.cache != nil {
-		hr.cache.Invalidate(hr.file)
+	if r.cache != nil {
+		r.cache.Invalidate(r.file)
 	}
 
 	// Close the writer
@@ -148,7 +148,7 @@ func (hr *HistoryRecord) Close(ctx context.Context) error {
 
 // Compact performs file compaction to optimize storage and read performance.
 // It's safe to call while the file is open or closed. The context can be used to cancel the operation.
-func (hr *HistoryRecord) Compact(ctx context.Context) error {
+func (r *Record) Compact(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -158,17 +158,17 @@ func (hr *HistoryRecord) Compact(ctx context.Context) error {
 	}
 
 	// Set the closing flag to prevent new writes during compaction
-	hr.isClosing.Store(true)
-	defer hr.isClosing.Store(false)
+	r.isClosing.Store(true)
+	defer r.isClosing.Store(false)
 
-	hr.mu.Lock()
-	defer hr.mu.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	return hr.compactLocked(ctx)
+	return r.compactLocked(ctx)
 }
 
 // compactLocked performs actual compaction with the lock already held
-func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
+func (r *Record) compactLocked(ctx context.Context) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -177,16 +177,16 @@ func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
 		// Continue with operation
 	}
 
-	status, err := hr.parseLocked()
+	status, err := r.parseLocked()
 	if err == io.EOF {
 		return nil // Empty file, nothing to compact
 	}
 	if err != nil {
-		return fmt.Errorf("%w: %s: %v", ErrCompactFailed, hr.file, err)
+		return fmt.Errorf("%w: %s: %v", ErrCompactFailed, r.file, err)
 	}
 
 	// Create a temporary file in the same directory
-	dir := filepath.Dir(hr.file)
+	dir := filepath.Dir(r.file)
 	tempFile, err := os.CreateTemp(dir, "compact_*.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
@@ -225,13 +225,13 @@ func (hr *HistoryRecord) compactLocked(ctx context.Context) error {
 	}
 
 	// Use atomic rename for safer file replacement
-	if err := safeRename(tempFilePath, hr.file); err != nil {
+	if err := safeRename(tempFilePath, r.file); err != nil {
 		return fmt.Errorf("failed to replace original file: %w", err)
 	}
 
 	// Invalidate the cache after successful compaction
-	if hr.cache != nil {
-		hr.cache.Invalidate(hr.file)
+	if r.cache != nil {
+		r.cache.Invalidate(r.file)
 	}
 
 	success = true
@@ -253,7 +253,7 @@ func safeRename(source, target string) error {
 
 // ReadStatus reads the latest status from the file, using cache if available.
 // The context can be used to cancel the operation.
-func (hr *HistoryRecord) ReadStatus(ctx context.Context) (*persistence.Status, error) {
+func (r *Record) ReadStatus(ctx context.Context) (*persistence.Status, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -262,7 +262,7 @@ func (hr *HistoryRecord) ReadStatus(ctx context.Context) (*persistence.Status, e
 		// Continue with operation
 	}
 
-	statusFile, err := hr.Read(ctx)
+	statusFile, err := r.Read(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (hr *HistoryRecord) ReadStatus(ctx context.Context) (*persistence.Status, e
 
 // Read returns the full status file information, including the file path.
 // The context can be used to cancel the operation.
-func (hr *HistoryRecord) Read(ctx context.Context) (*persistence.StatusFile, error) {
+func (r *Record) Read(ctx context.Context) (*persistence.StatusFile, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -281,34 +281,34 @@ func (hr *HistoryRecord) Read(ctx context.Context) (*persistence.StatusFile, err
 	}
 
 	// Try to use cache first if available
-	if hr.cache != nil {
-		status, cacheErr := hr.cache.LoadLatest(hr.file, func() (*persistence.Status, error) {
-			hr.mu.RLock()
-			defer hr.mu.RUnlock()
-			return hr.parseLocked()
+	if r.cache != nil {
+		status, cacheErr := r.cache.LoadLatest(r.file, func() (*persistence.Status, error) {
+			r.mu.RLock()
+			defer r.mu.RUnlock()
+			return r.parseLocked()
 		})
 
 		if cacheErr == nil {
-			return persistence.NewStatusFile(hr.file, *status), nil
+			return persistence.NewStatusFile(r.file, *status), nil
 		}
 	}
 
 	// Cache miss or disabled, perform a direct read
-	hr.mu.RLock()
-	parsed, parseErr := hr.parseLocked()
-	hr.mu.RUnlock()
+	r.mu.RLock()
+	parsed, parseErr := r.parseLocked()
+	r.mu.RUnlock()
 
 	if parseErr != nil {
 		return nil, fmt.Errorf("failed to parse status file: %w", parseErr)
 	}
 
-	return persistence.NewStatusFile(hr.file, *parsed), nil
+	return persistence.NewStatusFile(r.file, *parsed), nil
 }
 
 // parseLocked reads the status file and returns the last valid status.
 // Must be called with a lock (read or write) already held.
-func (hr *HistoryRecord) parseLocked() (*persistence.Status, error) {
-	return ParseStatusFile(hr.file)
+func (r *Record) parseLocked() (*persistence.Status, error) {
+	return ParseStatusFile(r.file)
 }
 
 // ParseStatusFile reads the status file and returns the last valid status.
