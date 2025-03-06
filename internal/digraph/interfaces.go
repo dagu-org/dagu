@@ -1,6 +1,3 @@
-// Copyright (C) 2025 Yota Hamada
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 package digraph
 
 import "context"

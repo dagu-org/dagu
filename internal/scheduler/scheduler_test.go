@@ -7,7 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/stringutil"
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/require"
@@ -157,7 +157,7 @@ func TestJobReady(t *testing.T) {
 				Next:     tt.now,
 			}
 
-			lastRunStatus := model.Status{
+			lastRunStatus := persistence.Status{
 				Status:    tt.lastStatus,
 				StartedAt: stringutil.FormatTime(tt.lastRunTime),
 			}

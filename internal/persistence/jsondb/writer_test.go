@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,8 +19,8 @@ func TestWriter(t *testing.T) {
 	t.Run("WriteStatusToNewFile", func(t *testing.T) {
 		dag := th.DAG("test_write_status")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-		status := model.NewStatusFactory(dag.DAG).Create(
-			requestID, scheduler.StatusRunning, testPID, time.Now(),
+		status := persistence.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusRunning, 1, time.Now(),
 		)
 		writer := dag.Writer(t, requestID, time.Now())
 		writer.Write(t, status)
@@ -35,8 +35,8 @@ func TestWriter(t *testing.T) {
 
 		writer := dag.Writer(t, requestID, startedAt)
 
-		status := model.NewStatusFactory(dag.DAG).Create(
-			requestID, scheduler.StatusCancel, testPID, time.Now(),
+		status := persistence.NewStatusFactory(dag.DAG).Create(
+			requestID, scheduler.StatusCancel, 1, time.Now(),
 		)
 
 		// Write initial status
@@ -59,25 +59,25 @@ func TestWriterErrorHandling(t *testing.T) {
 	th := testSetup(t)
 
 	t.Run("OpenNonExistentDirectory", func(t *testing.T) {
-		writer := newWriter("/nonexistent/dir/file.dat")
-		err := writer.open()
+		writer := NewWriter("/nonexistent/dir/file.dat")
+		err := writer.Open()
 		assert.Error(t, err)
 	})
 
 	t.Run("WriteToClosedWriter", func(t *testing.T) {
-		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
-		require.NoError(t, writer.open())
+		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.Open())
 		require.NoError(t, writer.close())
 
 		dag := th.DAG("test_write_to_closed_writer")
 		requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-		status := model.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, testPID, time.Now())
+		status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
 		assert.Error(t, writer.write(status))
 	})
 
 	t.Run("CloseMultipleTimes", func(t *testing.T) {
-		writer := newWriter(filepath.Join(th.tmpDir, "test.dat"))
-		require.NoError(t, writer.open())
+		writer := NewWriter(filepath.Join(th.tmpDir, "test.dat"))
+		require.NoError(t, writer.Open())
 		require.NoError(t, writer.close())
 		assert.NoError(t, writer.close()) // Second close should not return an error
 	})
@@ -90,9 +90,7 @@ func TestWriterRename(t *testing.T) {
 	dag := th.DAG("test_rename_old")
 	writer := dag.Writer(t, "request-id-1", time.Now())
 	requestID := fmt.Sprintf("request-id-%d", time.Now().Unix())
-	status := model.NewStatusFactory(dag.DAG).Create(
-		requestID, scheduler.StatusRunning, testPID, time.Now(),
-	)
+	status := persistence.NewStatusFactory(dag.DAG).Create(requestID, scheduler.StatusRunning, 1, time.Now())
 	writer.Write(t, status)
 	writer.Close(t)
 	require.FileExists(t, writer.FilePath)

@@ -640,7 +640,7 @@ func TestScheduler(t *testing.T) {
 		node := result.Node(t, "2")
 
 		// check if RESULT variable is set to "hello"
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=hello", output, "expected output %q, got %q", "hello", output)
 	})
@@ -663,11 +663,11 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 
 		node := result.Node(t, "3")
-		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=hello world", output, "expected output %q, got %q", "hello world", output)
 
 		node2 := result.Node(t, "5")
-		output2, _ := node2.Data().Step.OutputVariables.Load("RESULT2")
+		output2, _ := node2.NodeData().Step.OutputVariables.Load("RESULT2")
 		require.Equal(t, "RESULT2=", output2, "expected output %q, got %q", "", output)
 	})
 	t.Run("OutputJSONReference", func(t *testing.T) {
@@ -684,7 +684,7 @@ func TestScheduler(t *testing.T) {
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
 
-		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("HandlingJSONWithSpecialChars", func(t *testing.T) {
@@ -701,7 +701,7 @@ func TestScheduler(t *testing.T) {
 		// check if RESULT variable is set to "value"
 		node := result.Node(t, "2")
 
-		output, _ := node.Data().Step.OutputVariables.Load("RESULT")
+		output, _ := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.Equal(t, "RESULT=value", output, "expected output %q, got %q", "value", output)
 	})
 	t.Run("SpecialVars_DAG_EXECUTION_LOG_PATH", func(t *testing.T) {
@@ -714,7 +714,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
@@ -728,7 +728,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
@@ -742,7 +742,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `^RESULT=/.*/.*\.log$`, output, "unexpected output %q", output)
 	})
@@ -756,7 +756,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Regexp(t, `RESULT=[a-f0-9-]+`, output, "unexpected output %q", output)
 	})
@@ -770,7 +770,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "1")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=test_dag", output, "unexpected output %q", output)
 	})
@@ -784,7 +784,7 @@ func TestScheduler(t *testing.T) {
 		result := graph.Schedule(t, scheduler.StatusSuccess)
 		node := result.Node(t, "step_test")
 
-		output, ok := node.Data().Step.OutputVariables.Load("RESULT")
+		output, ok := node.NodeData().Step.OutputVariables.Load("RESULT")
 		require.True(t, ok, "output variable not found")
 		require.Equal(t, "RESULT=step_test", output, "unexpected output %q", output)
 	})
@@ -1029,26 +1029,20 @@ func (sr scheduleResult) AssertDoneCount(t *testing.T, expected int) {
 func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expected scheduler.NodeStatus) {
 	t.Helper()
 
-	var target *scheduler.Node
-
-	nodes := sr.ExecutionGraph.Nodes()
-	for _, node := range nodes {
-		if node.Data().Step.Name == stepName {
-			target = node
+	target := sr.ExecutionGraph.NodeByName(stepName)
+	if target == nil {
+		if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
 		}
-	}
-
-	if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnExit)
-	}
-	if sr.Config.OnSuccess != nil && sr.Config.OnSuccess.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnSuccess)
-	}
-	if sr.Config.OnFailure != nil && sr.Config.OnFailure.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnFailure)
-	}
-	if sr.Config.OnCancel != nil && sr.Config.OnCancel.Name == stepName {
-		target = sr.Scheduler.HandlerNode(digraph.HandlerOnCancel)
+		if sr.Config.OnSuccess != nil && sr.Config.OnSuccess.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnSuccess)
+		}
+		if sr.Config.OnFailure != nil && sr.Config.OnFailure.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnFailure)
+		}
+		if sr.Config.OnCancel != nil && sr.Config.OnCancel.Name == stepName {
+			target = sr.Scheduler.HandlerNode(digraph.HandlerOnCancel)
+		}
 	}
 
 	if target == nil {
@@ -1061,11 +1055,8 @@ func (sr scheduleResult) AssertNodeStatus(t *testing.T, stepName string, expecte
 func (sr scheduleResult) Node(t *testing.T, stepName string) *scheduler.Node {
 	t.Helper()
 
-	nodes := sr.ExecutionGraph.Nodes()
-	for _, node := range nodes {
-		if node.Data().Step.Name == stepName {
-			return node
-		}
+	if node := sr.ExecutionGraph.NodeByName(stepName); node != nil {
+		return node
 	}
 
 	if sr.Config.OnExit != nil && sr.Config.OnExit.Name == stepName {

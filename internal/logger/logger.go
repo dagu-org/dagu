@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -76,6 +77,20 @@ func WithQuiet() Option {
 	}
 }
 
+// WithValues adds key-value pairs to the context for structured logging
+func WithValues(ctx context.Context, keyvals ...any) context.Context {
+	// Validate we have even number of key-value pairs
+	if len(keyvals)%2 != 0 {
+		keyvals = append(keyvals, "MISSING_VALUE")
+	}
+
+	// Create a new logger with these attributes
+	logger := FromContext(ctx).With(keyvals...)
+
+	// Store the new logger in the context
+	return context.WithValue(ctx, loggerKey{}, logger)
+}
+
 var defaultLogger = NewLogger(WithFormat("text"))
 
 func NewLogger(opts ...Option) Logger {
@@ -105,12 +120,20 @@ func NewLogger(opts ...Option) Logger {
 	)
 
 	if !cfg.quiet {
-		handlers = append(handlers, newHandler(os.Stderr, cfg.format, handlerOpts))
+		consoleHandler := newHandler(os.Stderr, cfg.format, handlerOpts)
+		handlers = append(handlers, consoleHandler)
 	}
 
 	if cfg.writer != nil {
-		handler := newHandler(cfg.writer, cfg.format, handlerOpts)
-		guardedHandler = newGuardedHandler(handler, cfg.writer)
+		var bufferedWriter io.Writer
+		if f, ok := cfg.writer.(*os.File); ok {
+			bufferedWriter = bufio.NewWriterSize(f, 8192)
+		} else {
+			bufferedWriter = cfg.writer
+		}
+
+		handler := newHandler(bufferedWriter, cfg.format, handlerOpts)
+		guardedHandler = newGuardedHandler(handler, bufferedWriter)
 		handlers = append(handlers, guardedHandler)
 	}
 
