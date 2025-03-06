@@ -44,10 +44,10 @@ const (
 	dateFormat        = "20060102"
 )
 
-// HistoryData manages history records for a specific DAG, providing methods to create,
+// Repository manages history records for a specific DAG, providing methods to create,
 // read, update, and manage history files. It supports parallel processing for improved
 // performance with large datasets.
-type HistoryData struct {
+type Repository struct {
 	parentDir  string                                // Base directory for all history data
 	baseDir    string                                // Directory specific to this DAG
 	dagName    string                                // Original DAG name/path
@@ -56,15 +56,15 @@ type HistoryData struct {
 	cache      *filecache.Cache[*persistence.Status] // Optional cache for read operations
 }
 
-// NewHistoryData creates a new HistoryData instance for the specified DAG.
+// NewRepository creates a new HistoryData instance for the specified DAG.
 // It normalizes the DAG name and sets up the appropriate directory structure.
-func NewHistoryData(ctx context.Context, parentDir, dagName string, cache *filecache.Cache[*persistence.Status]) *HistoryData {
+func NewRepository(ctx context.Context, parentDir, dagName string, cache *filecache.Cache[*persistence.Status]) *Repository {
 	if dagName == "" {
 		logger.Error(ctx, "dagName is empty")
 	}
 
 	key := normalizeKey(dagName)
-	return &HistoryData{
+	return &Repository{
 		parentDir:  parentDir,
 		dagName:    dagName,
 		baseDir:    getDirectory(parentDir, dagName, key),
@@ -76,18 +76,18 @@ func NewHistoryData(ctx context.Context, parentDir, dagName string, cache *filec
 
 // NewRecord creates a new history record for the specified timestamp and request ID.
 // The record is not opened or written to until explicitly requested.
-func (hd *HistoryData) NewRecord(ctx context.Context, timestamp time.Time, requestID string) persistence.Record {
+func (r *Repository) NewRecord(ctx context.Context, timestamp time.Time, requestID string) persistence.Record {
 	if requestID == "" {
 		logger.Error(ctx, "requestID is empty")
 	}
 
-	filePath := hd.generateFilePath(ctx, newUTC(timestamp), requestID)
-	return NewRecord(filePath, hd.cache)
+	filePath := r.generateFilePath(ctx, newUTC(timestamp), requestID)
+	return NewRecord(filePath, r.cache)
 }
 
 // Update updates the status for a specific request ID.
 // It handles the entire lifecycle of opening, writing, and closing the history record.
-func (hd *HistoryData) Update(ctx context.Context, requestID string, status persistence.Status) error {
+func (r *Repository) Update(ctx context.Context, requestID string, status persistence.Status) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -101,7 +101,7 @@ func (hd *HistoryData) Update(ctx context.Context, requestID string, status pers
 	}
 
 	// Find the history record
-	historyRecord, err := hd.FindByRequestID(ctx, requestID)
+	historyRecord, err := r.FindByRequestID(ctx, requestID)
 	if err != nil {
 		return fmt.Errorf("failed to find history record: %w", err)
 	}
@@ -127,7 +127,7 @@ func (hd *HistoryData) Update(ctx context.Context, requestID string, status pers
 
 // Rename renames all history records from the current DAG name to a new path.
 // It creates the new directory structure and moves all matching files.
-func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
+func (r *Repository) Rename(ctx context.Context, newPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -136,42 +136,42 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 		// Continue with operation
 	}
 
-	if !filepath.IsAbs(hd.dagName) || !filepath.IsAbs(newPath) {
-		return fmt.Errorf("%w: %s -> %s", ErrInvalidPath, hd.dagName, newPath)
+	if !filepath.IsAbs(r.dagName) || !filepath.IsAbs(newPath) {
+		return fmt.Errorf("%w: %s -> %s", ErrInvalidPath, r.dagName, newPath)
 	}
 
 	// Get the old directory
-	oldDir := hd.baseDir
-	if !hd.exists(oldDir) {
+	oldDir := r.baseDir
+	if !r.exists(oldDir) {
 		logger.Debugf(ctx, "Old directory %s does not exist, nothing to rename", oldDir)
 		return nil
 	}
 
 	// Create the new directory if it doesn't exist
 	newKey := normalizeKey(newPath)
-	newBaseDir := getDirectory(hd.parentDir, newPath, newKey)
-	if !hd.exists(newBaseDir) {
+	newBaseDir := getDirectory(r.parentDir, newPath, newKey)
+	if !r.exists(newBaseDir) {
 		if err := os.MkdirAll(newBaseDir, 0755); err != nil {
 			return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, newBaseDir, err)
 		}
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(hd.globPattern())
+	matches, err := filepath.Glob(r.globPattern())
 	if err != nil {
 		return fmt.Errorf("failed to glob pattern: %w", err)
 	}
 
 	if len(matches) == 0 {
-		logger.Debugf(ctx, "No files to rename for key %s", hd.dagName)
+		logger.Debugf(ctx, "No files to rename for key %s", r.dagName)
 		return nil
 	}
 
 	// Process files in parallel
-	errs := hd.processFilesParallel(ctx, matches, func(filePath string) error {
+	errs := r.processFilesParallel(ctx, matches, func(filePath string) error {
 		// Replace the old prefix with the new prefix
 		base := filepath.Base(filePath)
-		newName := strings.Replace(base, hd.key, newKey, 1)
+		newName := strings.Replace(base, r.key, newKey, 1)
 		newFilePath := filepath.Join(newBaseDir, newName)
 
 		// Rename the file
@@ -197,16 +197,16 @@ func (hd *HistoryData) Rename(ctx context.Context, newPath string) error {
 	}
 
 	// Update the instance properties
-	hd.baseDir = newBaseDir
-	hd.dagName = newPath
-	hd.key = newKey
+	r.baseDir = newBaseDir
+	r.dagName = newPath
+	r.key = newKey
 
 	return nil
 }
 
 // Recent returns the most recent history records up to itemLimit.
 // Records are sorted by timestamp with the most recent first.
-func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.Record {
+func (r *Repository) Recent(ctx context.Context, itemLimit int) []persistence.Record {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -222,7 +222,7 @@ func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.
 	}
 
 	// Get the latest matches
-	files := hd.getLatestMatches(ctx, hd.globPattern(), itemLimit)
+	files := r.getLatestMatches(ctx, r.globPattern(), itemLimit)
 	if len(files) == 0 {
 		return nil
 	}
@@ -230,7 +230,7 @@ func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.
 	// Create history records
 	records := make([]persistence.Record, 0, len(files))
 	for _, file := range files {
-		records = append(records, NewRecord(file, hd.cache))
+		records = append(records, NewRecord(file, r.cache))
 	}
 
 	return records
@@ -238,7 +238,7 @@ func (hd *HistoryData) Recent(ctx context.Context, itemLimit int) []persistence.
 
 // LatestToday returns the most recent history record for today.
 // If no records exist for today, it returns an error.
-func (hd *HistoryData) LatestToday(ctx context.Context) (persistence.Record, error) {
+func (r *Repository) LatestToday(ctx context.Context) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -251,17 +251,17 @@ func (hd *HistoryData) LatestToday(ctx context.Context) (persistence.Record, err
 	startOfDayInUTC := newUTC(startOfDay)
 
 	// Get the latest file for today
-	file, err := hd.latest(startOfDayInUTC)
+	file, err := r.latest(startOfDayInUTC)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewRecord(file, hd.cache), nil
+	return NewRecord(file, r.cache), nil
 }
 
 // Latest returns the most recent history record regardless of date.
 // If no records exist, it returns an error.
-func (hd *HistoryData) Latest(ctx context.Context) (persistence.Record, error) {
+func (r *Repository) Latest(ctx context.Context) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -271,17 +271,17 @@ func (hd *HistoryData) Latest(ctx context.Context) (persistence.Record, error) {
 	}
 
 	// Get the latest file
-	file, err := hd.latest(timeInUTC{})
+	file, err := r.latest(timeInUTC{})
 	if err != nil {
 		return nil, err
 	}
 
-	return NewRecord(file, hd.cache), nil
+	return NewRecord(file, r.cache), nil
 }
 
 // FindByRequestID finds a history record by request ID.
 // It returns the most recent record if multiple matches exist.
-func (hd *HistoryData) FindByRequestID(ctx context.Context, requestID string) (persistence.Record, error) {
+func (r *Repository) FindByRequestID(ctx context.Context, requestID string) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -295,7 +295,7 @@ func (hd *HistoryData) FindByRequestID(ctx context.Context, requestID string) (p
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(hd.globPattern())
+	matches, err := filepath.Glob(r.globPattern())
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -308,12 +308,12 @@ func (hd *HistoryData) FindByRequestID(ctx context.Context, requestID string) (p
 	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
 
 	// Return the most recent file
-	return NewRecord(matches[0], hd.cache), nil
+	return NewRecord(matches[0], r.cache), nil
 }
 
 // RemoveOld removes history records older than retentionDays.
 // It uses parallel processing for improved performance with large datasets.
-func (hd *HistoryData) RemoveOld(ctx context.Context, retentionDays int) error {
+func (r *Repository) RemoveOld(ctx context.Context, retentionDays int) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -328,7 +328,7 @@ func (hd *HistoryData) RemoveOld(ctx context.Context, retentionDays int) error {
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(hd.globPattern())
+	matches, err := filepath.Glob(r.globPattern())
 	if err != nil {
 		return fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -341,7 +341,7 @@ func (hd *HistoryData) RemoveOld(ctx context.Context, retentionDays int) error {
 	oldDate := time.Now().AddDate(0, 0, -retentionDays)
 
 	// Process files in parallel
-	errs := hd.processFilesParallel(ctx, matches, func(filePath string) error {
+	errs := r.processFilesParallel(ctx, matches, func(filePath string) error {
 		// Check if the file is older than the cutoff date
 		info, err := os.Stat(filePath)
 		if err != nil {
@@ -368,10 +368,10 @@ func (hd *HistoryData) RemoveOld(ctx context.Context, retentionDays int) error {
 
 // processFilesParallel processes files in parallel using a worker pool.
 // It returns a slice of errors encountered during processing.
-func (hd *HistoryData) processFilesParallel(ctx context.Context, files []string, processor func(string) error) []error {
+func (r *Repository) processFilesParallel(ctx context.Context, files []string, processor func(string) error) []error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(files))
-	semaphore := make(chan struct{}, hd.maxWorkers)
+	semaphore := make(chan struct{}, r.maxWorkers)
 
 	for _, file := range files {
 		// Check for context cancellation
@@ -410,15 +410,15 @@ func (hd *HistoryData) processFilesParallel(ctx context.Context, files []string,
 
 // latest returns the path to the latest history record file.
 // If cutoff is not zero, it only returns files newer than the cutoff time.
-func (hd *HistoryData) latest(cutoff timeInUTC) (string, error) {
-	pattern := path.Join(hd.baseDir, hd.key+"*"+extDat)
+func (r *Repository) latest(cutoff timeInUTC) (string, error) {
+	pattern := path.Join(r.baseDir, r.key+"*"+extDat)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
 		return "", persistence.ErrNoStatusData
 	}
 
-	ret := filterLatest(matches, 1, hd.maxWorkers)
+	ret := filterLatest(matches, 1, r.maxWorkers)
 	if len(ret) == 0 {
 		return "", persistence.ErrNoStatusData
 	}
@@ -439,7 +439,7 @@ func (hd *HistoryData) latest(cutoff timeInUTC) (string, error) {
 }
 
 // getLatestMatches returns the latest matches for the specified pattern, up to itemLimit.
-func (hd *HistoryData) getLatestMatches(ctx context.Context, pattern string, itemLimit int) []string {
+func (r *Repository) getLatestMatches(ctx context.Context, pattern string, itemLimit int) []string {
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to find matches for pattern %s: %v", pattern, err)
@@ -451,16 +451,16 @@ func (hd *HistoryData) getLatestMatches(ctx context.Context, pattern string, ite
 		return nil
 	}
 
-	return filterLatest(matches, itemLimit, hd.maxWorkers)
+	return filterLatest(matches, itemLimit, r.maxWorkers)
 }
 
 // globPattern returns the glob pattern for finding history files for this DAG.
-func (hd *HistoryData) globPattern() string {
-	return path.Join(hd.baseDir, hd.key+"*"+extDat)
+func (r *Repository) globPattern() string {
+	return path.Join(r.baseDir, r.key+"*"+extDat)
 }
 
 // generateFilePath generates a file path for a history record.
-func (hd *HistoryData) generateFilePath(ctx context.Context, timestamp timeInUTC, reqID string) string {
+func (r *Repository) generateFilePath(ctx context.Context, timestamp timeInUTC, reqID string) string {
 	if reqID == "" {
 		logger.Error(ctx, "requestID is empty")
 	}
@@ -468,11 +468,11 @@ func (hd *HistoryData) generateFilePath(ctx context.Context, timestamp timeInUTC
 	ts := timestamp.Format(dateTimeFormatUTC)
 	reqID = stringutil.TruncString(reqID, requestIDLenSafe)
 
-	return path.Join(hd.baseDir, fmt.Sprintf("%s.%s.%s%s", hd.key, ts, reqID, extDat))
+	return path.Join(r.baseDir, fmt.Sprintf("%s.%s.%s%s", r.key, ts, reqID, extDat))
 }
 
 // exists returns true if the specified file path exists.
-func (hd *HistoryData) exists(filePath string) bool {
+func (hd *Repository) exists(filePath string) bool {
 	_, err := os.Stat(filePath)
 	return !os.IsNotExist(err)
 }

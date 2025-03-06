@@ -64,8 +64,8 @@ func New(baseDir string, opts ...Option) *JsonDB {
 }
 
 // Data returns a new HistoryData instance for the specified key.
-func (db *JsonDB) Data(ctx context.Context, dagName string) *HistoryData {
-	return NewHistoryData(ctx, db.baseDir, dagName, db.cache)
+func (db *JsonDB) Data(ctx context.Context, dagName string) *Repository {
+	return NewRepository(ctx, db.baseDir, dagName, db.cache)
 }
 
 // Update updates the status for a specific request ID.
