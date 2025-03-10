@@ -584,8 +584,8 @@ handlerOn:
   failure:
     command: |
       curl -X POST -H 'Content-type: application/json' \
-      --data '{"text":"DAG Failed ($DAG_NAME")}' \
-      ${SLACK_WEBHOOK_URL}
+      --data '{ "text": "DAG Failure ('${DAG_NAME}')" }' \
+      ${SLACK_WEBHOOK_URL} 
 
 steps:
   - name: critical process
