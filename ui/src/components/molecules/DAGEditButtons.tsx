@@ -34,7 +34,7 @@ function DAGEditButtons({ name }: Props) {
             }),
           });
           if (resp.ok) {
-            window.location.href = `/dags/${val}`;
+            window.location.href = `${getConfig().basePath}/dags/${val}`;
           } else {
             const e = await resp.text();
             alert(e);
@@ -56,7 +56,7 @@ function DAGEditButtons({ name }: Props) {
             },
           });
           if (resp.ok) {
-            window.location.href = '/dags/';
+            window.location.href = `${getConfig().basePath}/dags/`;
           } else {
             const e = await resp.text();
             alert(e);
