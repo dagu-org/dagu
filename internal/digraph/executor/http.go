@@ -33,7 +33,7 @@ type httpConfig struct {
 	Body    string            `json:"body"`
 	Silent  bool              `json:"silent"`
 	Debug   bool              `json:"debug"`
-	Json    bool              `json:"json"`
+	JSON    bool              `json:"json"`
 }
 
 type httpJSONResult struct {
@@ -180,7 +180,7 @@ func (e *http) Run(_ context.Context) error {
 
 	resCode := rsp.StatusCode()
 
-	if e.cfg.Json {
+	if e.cfg.JSON {
 		if err = e.writeJSONResult(rsp); err != nil {
 			return err
 		}
