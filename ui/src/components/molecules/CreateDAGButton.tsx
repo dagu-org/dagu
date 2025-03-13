@@ -39,7 +39,10 @@ function CreateDAGButton() {
           }
         );
         if (resp.ok) {
-          window.location.href = `/dags/${name.replace(/.yaml$/, '')}/spec`;
+          window.location.href = `${getConfig().basePath}/dags/${name.replace(
+            /.yaml$/,
+            ''
+          )}/spec`;
         } else {
           const e = await resp.text();
           alert(e);
