@@ -11,15 +11,15 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
-type StorageAddress struct {
+type Address struct {
 	dagNameOrPath string
 	prefix        string
 	path          string
 }
 
-func NewStorageAddress(baseDir string, dagNameOrPath string) StorageAddress {
+func NewAddress(baseDir string, dagNameOrPath string) Address {
 	ext := filepath.Ext(dagNameOrPath)
-	addr := StorageAddress{dagNameOrPath: dagNameOrPath}
+	addr := Address{dagNameOrPath: dagNameOrPath}
 
 	switch {
 	case ext == "":
@@ -49,24 +49,24 @@ func NewStorageAddress(baseDir string, dagNameOrPath string) StorageAddress {
 	return addr
 }
 
-func (a StorageAddress) Exists() bool {
+func (a Address) Exists() bool {
 	_, err := os.Stat(a.path)
 	return !os.IsNotExist(err)
 }
 
-func (a StorageAddress) Create() error {
+func (a Address) Create() error {
 	if err := os.MkdirAll(a.path, 0755); err != nil {
 		return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, a.path, err)
 	}
 	return nil
 }
 
-func (a StorageAddress) IsEmpty() bool {
+func (a Address) IsEmpty() bool {
 	files, _ := os.ReadDir(a.path)
 	return len(files) == 0
 }
 
-func (a StorageAddress) Remove() error {
+func (a Address) Remove() error {
 	if err := os.RemoveAll(a.path); err != nil {
 		return fmt.Errorf("%w: %s : %s", ErrRemoveDirectory, a.path, err)
 	}

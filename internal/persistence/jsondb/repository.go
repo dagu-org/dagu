@@ -48,7 +48,7 @@ const (
 // performance with large datasets.
 type Repository struct {
 	parentDir  string // Base directory for all history data
-	addr       StorageAddress
+	addr       Address
 	maxWorkers int                                   // Maximum number of parallel workers
 	cache      *filecache.Cache[*persistence.Status] // Optional cache for read operations
 }
@@ -60,7 +60,7 @@ func NewRepository(ctx context.Context, parentDir, dagName string, cache *fileca
 		logger.Error(ctx, "dagName is empty")
 	}
 
-	key := NewStorageAddress(parentDir, dagName)
+	key := NewAddress(parentDir, dagName)
 	return &Repository{
 		parentDir:  parentDir,
 		addr:       key,
@@ -137,7 +137,7 @@ func (r *Repository) Rename(ctx context.Context, newNameOrPath string) error {
 	}
 
 	// Create the new directory if it doesn't exist
-	newAddr := NewStorageAddress(r.parentDir, newNameOrPath)
+	newAddr := NewAddress(r.parentDir, newNameOrPath)
 	if !newAddr.Exists() {
 		if err := newAddr.Create(); err != nil {
 			return err
