@@ -1,4 +1,4 @@
-package jsondb
+package storage
 
 import (
 	"crypto/md5" // nolint: gosec

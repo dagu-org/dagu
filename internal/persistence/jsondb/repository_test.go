@@ -3,12 +3,12 @@ package jsondb
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,14 +190,14 @@ func TestHistoryData_Remove(t *testing.T) {
 
 	t.Run("RemoveAllFiles", func(t *testing.T) {
 		dag := th.DAG("test_remove_all")
-		data := th.DB.Repository(th.Context, dag.Location)
+		repo := th.DB.Repository(th.Context, dag.Location)
 
 		// Create multiple status files
 		for i := 0; i < 3; i++ {
 			requestID := fmt.Sprintf("request-id-%d", i)
 			now := time.Now().Add(time.Duration(-i) * time.Hour)
 
-			record := data.NewRecord(th.Context, now, requestID)
+			record := repo.NewRecord(th.Context, now, requestID)
 
 			err := record.Open(th.Context)
 			require.NoError(t, err)
@@ -214,18 +214,16 @@ func TestHistoryData_Remove(t *testing.T) {
 		}
 
 		// Verify files exist
-		matches, err := filepath.Glob(data.globPattern())
-		require.NoError(t, err)
-		assert.Len(t, matches, 3)
+		records := repo.Recent(th.Context, 5)
+		assert.Len(t, records, 3)
 
 		// Remove all files
-		err = th.DB.RemoveAll(th.Context, dag.Location)
+		err := th.DB.RemoveAll(th.Context, dag.Location)
 		require.NoError(t, err)
 
 		// Verify all files are removed
-		matches, err = filepath.Glob(data.globPattern())
-		require.NoError(t, err)
-		assert.Empty(t, matches)
+		records = repo.Recent(th.Context, 5)
+		assert.Empty(t, records)
 	})
 
 	t.Run("RemoveAllNonExistent", func(t *testing.T) {
@@ -236,13 +234,13 @@ func TestHistoryData_Remove(t *testing.T) {
 
 	t.Run("RemoveOld", func(t *testing.T) {
 		dag := th.DAG("test_remove_old")
-		data := th.DB.Repository(th.Context, dag.Name)
+		repo := th.DB.Repository(th.Context, dag.Name)
 
 		// Create status file
 		requestID := "request-id-old"
 		oldTime := time.Now().AddDate(0, 0, -10)
 
-		record := data.NewRecord(th.Context, oldTime, requestID)
+		record := repo.NewRecord(th.Context, oldTime, requestID)
 		err := record.Open(th.Context)
 		require.NoError(t, err)
 
@@ -255,18 +253,19 @@ func TestHistoryData_Remove(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the file path and update its modification time
-		filePath := data.generateFilePath(th.Context, newUTC(oldTime), requestID)
+		st := storage.New()
+		filePath := st.GenerateFilePath(th.Context, repo.addr, storage.NewUTC(oldTime), requestID)
 
 		oldDate := time.Now().AddDate(0, 0, -10)
 		err = os.Chtimes(filePath, oldDate, oldDate)
 		require.NoError(t, err)
 
 		// Remove files older than 5 days
-		err = data.RemoveOld(th.Context, 5)
+		err = repo.RemoveOld(th.Context, 5)
 		require.NoError(t, err)
 
 		// Verify old file is removed
-		_, err = data.FindByRequestID(th.Context, requestID)
+		_, err = repo.FindByRequestID(th.Context, requestID)
 		assert.Error(t, err)
 	})
 }

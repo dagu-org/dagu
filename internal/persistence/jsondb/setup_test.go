@@ -10,6 +10,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/persistence"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,8 +55,9 @@ type dagTestHelper struct {
 func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Time) writerTestHelper {
 	t.Helper()
 
-	data := d.th.DB.Repository(d.th.Context, d.DAG.Location)
-	filePath := data.generateFilePath(d.th.Context, newUTC(startedAt), requestID)
+	addr := storage.NewAddress(d.th.tmpDir, d.DAG.Name)
+	st := storage.New()
+	filePath := st.GenerateFilePath(d.th.Context, addr, storage.NewUTC(startedAt), requestID)
 	writer := NewWriter(filePath)
 	require.NoError(t, writer.Open())
 

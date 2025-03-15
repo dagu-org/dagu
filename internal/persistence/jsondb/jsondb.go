@@ -7,6 +7,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 )
 
 var _ persistence.HistoryStore = (*JSONDB)(nil)
@@ -17,6 +18,7 @@ type JSONDB struct {
 	latestStatusToday bool                                  // Whether to only return today's status
 	cache             *filecache.Cache[*persistence.Status] // Optional cache for read operations
 	maxWorkers        int                                   // Maximum number of parallel workers
+	storage           storage.Storage                       // Storage interface for managing history records
 }
 
 // Option defines functional options for configuring JSONDB.
@@ -60,12 +62,13 @@ func New(baseDir string, opts ...Option) *JSONDB {
 		latestStatusToday: options.LatestStatusToday,
 		cache:             options.FileCache,
 		maxWorkers:        options.MaxWorkers,
+		storage:           storage.New(),
 	}
 }
 
 // Repository returns a new HistoryData instance for the specified key.
 func (db *JSONDB) Repository(ctx context.Context, dagName string) *Repository {
-	return NewRepository(ctx, db.baseDir, dagName, db.cache)
+	return NewRepository(ctx, db.storage, db.baseDir, dagName, db.cache)
 }
 
 // Update updates the status for a specific request ID.

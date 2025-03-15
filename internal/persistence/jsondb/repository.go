@@ -5,42 +5,21 @@ import (
 	"context" // nolint: gosec
 	"errors"
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
-	"regexp"
 	"runtime"
-	"sort"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
+	// "github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 )
 
 // Error definitions for common issues
 var (
-	ErrRequestIDNotFound  = errors.New("request ID not found")
-	ErrCreateNewDirectory = errors.New("failed to create new directory")
-	ErrRemoveDirectory    = errors.New("failed to remove directory")
-	ErrMoveDirectory      = errors.New("failed to move directory")
-	ErrInvalidPath        = errors.New("invalid path")
-	ErrRequestIDEmpty     = errors.New("requestID is empty")
-
-	// rTimestamp is a regular expression to match the timestamp in the file name.
-	rTimestamp = regexp.MustCompile(`2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}|2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}Z`)
-)
-
-// Constants for file naming and formatting
-const (
-	requestIDLenSafe  = 8
-	extDat            = ".dat"
-	dateTimeFormatUTC = "20060102.15:04:05.000Z"
-	dateTimeFormat    = "20060102.15:04:05.000"
-	dateFormat        = "20060102"
+	ErrRequestIDNotFound = errors.New("request ID not found")
+	ErrInvalidPath       = errors.New("invalid path")
+	ErrRequestIDEmpty    = errors.New("requestID is empty")
 )
 
 // Repository manages history records for a specific DAG, providing methods to create,
@@ -48,24 +27,26 @@ const (
 // performance with large datasets.
 type Repository struct {
 	parentDir  string // Base directory for all history data
-	addr       Address
+	addr       storage.Address
 	maxWorkers int                                   // Maximum number of parallel workers
 	cache      *filecache.Cache[*persistence.Status] // Optional cache for read operations
+	storage    storage.Storage
 }
 
 // NewRepository creates a new HistoryData instance for the specified DAG.
 // It normalizes the DAG name and sets up the appropriate directory structure.
-func NewRepository(ctx context.Context, parentDir, dagName string, cache *filecache.Cache[*persistence.Status]) *Repository {
+func NewRepository(ctx context.Context, s storage.Storage, parentDir, dagName string, cache *filecache.Cache[*persistence.Status]) *Repository {
 	if dagName == "" {
 		logger.Error(ctx, "dagName is empty")
 	}
 
-	key := NewAddress(parentDir, dagName)
+	key := storage.NewAddress(parentDir, dagName)
 	return &Repository{
 		parentDir:  parentDir,
 		addr:       key,
 		cache:      cache,
 		maxWorkers: runtime.NumCPU(),
+		storage:    s,
 	}
 }
 
@@ -76,7 +57,7 @@ func (r *Repository) NewRecord(ctx context.Context, timestamp time.Time, request
 		logger.Error(ctx, "requestID is empty")
 	}
 
-	filePath := r.generateFilePath(ctx, newUTC(timestamp), requestID)
+	filePath := r.storage.GenerateFilePath(ctx, r.addr, storage.NewUTC(timestamp), requestID)
 	return NewRecord(filePath, r.cache)
 }
 
@@ -131,61 +112,12 @@ func (r *Repository) Rename(ctx context.Context, newNameOrPath string) error {
 		// Continue with operation
 	}
 
-	// Get the old directory
-	if !r.addr.Exists() {
-		return nil
-	}
-
-	// Create the new directory if it doesn't exist
-	newAddr := NewAddress(r.parentDir, newNameOrPath)
-	if !newAddr.Exists() {
-		if err := newAddr.Create(); err != nil {
-			return err
-		}
-	}
-
-	// Find matching files
-	matches, err := filepath.Glob(r.globPattern())
-	if err != nil {
-		return fmt.Errorf("failed to glob pattern: %w", err)
-	}
-
-	if len(matches) == 0 {
-		logger.Debugf(ctx, "No files to rename for %q", r.globPattern())
-		return nil
-	}
-
-	// Process files in parallel
-	errs := r.processFilesParallel(ctx, matches, func(filePath string) error {
-		// Replace the old prefix with the new prefix
-		base := filepath.Base(filePath)
-		newName := strings.Replace(base, r.addr.prefix, newAddr.prefix, 1)
-		newFilePath := filepath.Join(newAddr.path, newName)
-
-		// Rename the file
-		if err := os.Rename(filePath, newFilePath); err != nil {
-			logger.Errorf(ctx, "Failed to rename %s to %s: %v", filePath, newFilePath, err)
-			return fmt.Errorf("failed to rename %s to %s: %w", filePath, newFilePath, err)
-		}
-
-		logger.Debugf(ctx, "Renamed %s to %s", filePath, newFilePath)
-		return nil
-	})
-
-	// Try to remove the old directory if it's empty
-	if r.addr.IsEmpty() {
-		if err := r.addr.Remove(); err != nil {
-			logger.Warn(ctx, "Failed to remove old directory", "err", err)
-		}
-	}
-
-	// Return combined errors if any
-	if len(errs) > 0 {
-		return errors.Join(errs...)
+	newAddr := storage.NewAddress(r.parentDir, newNameOrPath)
+	if err := r.storage.Rename(ctx, r.addr, newAddr); err != nil {
+		return fmt.Errorf("failed to rename: %w", err)
 	}
 
 	r.addr = newAddr
-
 	return nil
 }
 
@@ -207,7 +139,7 @@ func (r *Repository) Recent(ctx context.Context, itemLimit int) []persistence.Re
 	}
 
 	// Get the latest matches
-	files := r.getLatestMatches(ctx, r.globPattern(), itemLimit)
+	files := r.storage.Latest(ctx, r.addr, itemLimit)
 	if len(files) == 0 {
 		return nil
 	}
@@ -233,10 +165,10 @@ func (r *Repository) LatestToday(ctx context.Context) (persistence.Record, error
 	}
 
 	startOfDay := time.Now().Truncate(24 * time.Hour)
-	startOfDayInUTC := newUTC(startOfDay)
+	startOfDayInUTC := storage.NewUTC(startOfDay)
 
 	// Get the latest file for today
-	file, err := r.latest(startOfDayInUTC)
+	file, err := r.storage.LatestAfter(ctx, r.addr, startOfDayInUTC)
 	if err != nil {
 		return nil, err
 	}
@@ -256,12 +188,11 @@ func (r *Repository) Latest(ctx context.Context) (persistence.Record, error) {
 	}
 
 	// Get the latest file
-	file, err := r.latest(timeInUTC{})
-	if err != nil {
-		return nil, err
+	files := r.storage.Latest(ctx, r.addr, 1)
+	if len(files) == 0 {
+		return nil, persistence.ErrNoStatusData
 	}
-
-	return NewRecord(file, r.cache), nil
+	return NewRecord(files[0], r.cache), nil
 }
 
 // FindByRequestID finds a history record by request ID.
@@ -280,20 +211,13 @@ func (r *Repository) FindByRequestID(ctx context.Context, requestID string) (per
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(r.globPattern())
+	file, err := r.storage.FindByRequestID(ctx, r.addr, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob pattern: %w", err)
 	}
 
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("%w: %s", persistence.ErrRequestIDNotFound, requestID)
-	}
-
-	// Sort matches by timestamp (most recent first)
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-
 	// Return the most recent file
-	return NewRecord(matches[0], r.cache), nil
+	return NewRecord(file, r.cache), nil
 }
 
 // RemoveOld removes history records older than retentionDays.
@@ -312,243 +236,5 @@ func (r *Repository) RemoveOld(ctx context.Context, retentionDays int) error {
 		return nil
 	}
 
-	// Find matching files
-	matches, err := filepath.Glob(r.globPattern())
-	if err != nil {
-		return fmt.Errorf("failed to glob pattern: %w", err)
-	}
-
-	if len(matches) == 0 {
-		return nil
-	}
-
-	// Calculate the cutoff date
-	oldDate := time.Now().AddDate(0, 0, -retentionDays)
-
-	// Process files in parallel
-	errs := r.processFilesParallel(ctx, matches, func(filePath string) error {
-		// Check if the file is older than the cutoff date
-		info, err := os.Stat(filePath)
-		if err != nil {
-			logger.Debugf(ctx, "Failed to stat file %s: %v", filePath, err)
-			return nil // Skip files we can't stat
-		}
-
-		if info.ModTime().Before(oldDate) {
-			if err := os.Remove(filePath); err != nil {
-				return fmt.Errorf("failed to remove file %s: %w", filePath, err)
-			}
-			logger.Debugf(ctx, "Removed old file %s", filePath)
-		}
-		return nil
-	})
-
-	// Return combined errors if any
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-
-	return nil
-}
-
-// processFilesParallel processes files in parallel using a worker pool.
-// It returns a slice of errors encountered during processing.
-func (r *Repository) processFilesParallel(ctx context.Context, files []string, processor func(string) error) []error {
-	var wg sync.WaitGroup
-	errChan := make(chan error, len(files))
-	semaphore := make(chan struct{}, r.maxWorkers)
-
-	for _, file := range files {
-		// Check for context cancellation
-		select {
-		case <-ctx.Done():
-			return []error{fmt.Errorf("operation canceled: %w", ctx.Err())}
-		default:
-			// Continue processing
-		}
-
-		wg.Add(1)
-		semaphore <- struct{}{}
-
-		go func(filePath string) {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-
-			if err := processor(filePath); err != nil {
-				errChan <- err
-			}
-		}(file)
-	}
-
-	// Wait for all workers to finish
-	wg.Wait()
-	close(errChan)
-
-	// Collect errors
-	var errs []error
-	for err := range errChan {
-		errs = append(errs, err)
-	}
-
-	return errs
-}
-
-// latest returns the path to the latest history record file.
-// If cutoff is not zero, it only returns files newer than the cutoff time.
-func (r *Repository) latest(cutoff timeInUTC) (string, error) {
-	pattern := path.Join(r.addr.path, r.addr.prefix+"*"+extDat)
-
-	matches, err := filepath.Glob(pattern)
-	if err != nil || len(matches) == 0 {
-		return "", persistence.ErrNoStatusData
-	}
-
-	ret := filterLatest(matches, 1, r.maxWorkers)
-	if len(ret) == 0 {
-		return "", persistence.ErrNoStatusData
-	}
-
-	if cutoff.IsZero() {
-		return ret[0], nil
-	}
-
-	timestamp, err := parseFileTimestamp(ret[0])
-	if err != nil {
-		return "", fmt.Errorf("failed to parse timestamp: %w", err)
-	}
-	if timestamp.Before(cutoff.Time) {
-		return "", persistence.ErrNoStatusData
-	}
-
-	return ret[0], nil
-}
-
-// getLatestMatches returns the latest matches for the specified pattern, up to itemLimit.
-func (r *Repository) getLatestMatches(ctx context.Context, pattern string, itemLimit int) []string {
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		logger.Errorf(ctx, "Failed to find matches for pattern %s: %v", pattern, err)
-		return nil
-	}
-
-	if len(matches) == 0 {
-		logger.Debugf(ctx, "No matches found for pattern %s", pattern)
-		return nil
-	}
-
-	return filterLatest(matches, itemLimit, r.maxWorkers)
-}
-
-// globPattern returns the glob pattern for finding history files for this DAG.
-func (r *Repository) globPattern() string {
-	return path.Join(r.addr.path, r.addr.prefix+"*"+extDat)
-}
-
-// generateFilePath generates a file path for a history record.
-func (r *Repository) generateFilePath(ctx context.Context, timestamp timeInUTC, reqID string) string {
-	if reqID == "" {
-		logger.Error(ctx, "requestID is empty")
-	}
-
-	ts := timestamp.Format(dateTimeFormatUTC)
-	reqID = stringutil.TruncString(reqID, requestIDLenSafe)
-
-	return path.Join(r.addr.path, fmt.Sprintf("%s.%s.%s%s", r.addr.prefix, ts, reqID, extDat))
-}
-
-// filterLatest returns the most recent files up to itemLimit
-// Uses parallel processing for large file sets to improve performance
-func filterLatest(files []string, itemLimit int, maxWorkers int) []string {
-	if len(files) == 0 {
-		return nil
-	}
-
-	if maxWorkers <= 0 {
-		maxWorkers = runtime.NumCPU()
-	}
-
-	// Pre-compute timestamps to avoid repeated regex operations
-	type fileWithTime struct {
-		path string
-		time time.Time
-		err  error
-	}
-
-	filesWithTime := make([]fileWithTime, len(files))
-
-	// Process files in parallel with worker pool
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, maxWorkers)
-
-	for i, file := range files {
-		wg.Add(1)
-		semaphore <- struct{}{}
-
-		go func(idx int, filePath string) {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-
-			t, err := parseFileTimestamp(filePath)
-			filesWithTime[idx] = fileWithTime{filePath, t, err}
-		}(i, file)
-	}
-
-	wg.Wait()
-
-	// Sort by timestamp (most recent first)
-	sort.Slice(filesWithTime, func(i, j int) bool {
-		// Files with errors go to the end
-		if filesWithTime[i].err != nil {
-			return false
-		}
-		if filesWithTime[j].err != nil {
-			return true
-		}
-		return filesWithTime[i].time.After(filesWithTime[j].time)
-	})
-
-	// Extract just the paths, limiting to requested count
-	// Pre-allocate with exact capacity for efficiency
-	limit := min(len(filesWithTime), itemLimit)
-	result := make([]string, 0, limit)
-
-	for i := 0; i < limit; i++ {
-		if filesWithTime[i].err == nil {
-			result = append(result, filesWithTime[i].path)
-		}
-	}
-
-	return result
-}
-
-// parseFileTimestamp extracts and parses the timestamp from a file name.
-func parseFileTimestamp(file string) (time.Time, error) {
-	timestampString := rTimestamp.FindString(file)
-	if timestampString == "" {
-		return time.Time{}, fmt.Errorf("no timestamp found in file name: %s", file)
-	}
-
-	if !strings.Contains(timestampString, "Z") {
-		// For backward compatibility
-		t, err := time.Parse(dateTimeFormat, timestampString)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("failed to parse timestamp %s: %w", timestampString, err)
-		}
-		return t, nil
-	}
-
-	// UTC
-	t, err := time.Parse(dateTimeFormatUTC, timestampString)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse UTC timestamp %s: %w", timestampString, err)
-	}
-	return t, nil
-}
-
-// timeInUTC is a wrapper for time.Time that ensures the time is in UTC.
-type timeInUTC struct{ time.Time }
-
-// newUTC creates a new timeInUTC from a time.Time.
-func newUTC(t time.Time) timeInUTC {
-	return timeInUTC{t.UTC()}
+	return r.storage.RemoveOld(ctx, r.addr, retentionDays)
 }
