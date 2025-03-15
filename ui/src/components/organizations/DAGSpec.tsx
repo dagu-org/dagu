@@ -87,7 +87,24 @@ function DAGSpec({ data }: Props) {
             <Box sx={{ mt: 3 }}>
               <Box sx={{ mt: 2 }}>
                 <SubTitle>Steps</SubTitle>
-                <DAGStepTable steps={data.DAG.DAG.Steps}></DAGStepTable>
+                {data.DAG.Error ? (
+                  <BorderedBox
+                    sx={{
+                      mt: 2,
+                      px: 2,
+                      py: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      backgroundColor: 'error.light',
+                      color: 'error.contrastText',
+                    }}
+                  >
+                    {data.DAG.Error}
+                  </BorderedBox>
+                ) : null}
+                {data.DAG.DAG.Steps ? (
+                  <DAGStepTable steps={data.DAG.DAG.Steps}></DAGStepTable>
+                ) : null}
               </Box>
             </Box>
             {handlers?.length ? (

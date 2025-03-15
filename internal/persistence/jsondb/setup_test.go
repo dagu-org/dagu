@@ -9,7 +9,7 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,11 +54,10 @@ type dagTestHelper struct {
 func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Time) writerTestHelper {
 	t.Helper()
 
-	filePath, err := d.th.DB.generateFilePath(d.DAG.Location, newUTC(startedAt), requestID)
-	require.NoError(t, err)
-
-	writer := newWriter(filePath)
-	require.NoError(t, writer.open())
+	data := d.th.DB.Repository(d.th.Context, d.DAG.Location)
+	filePath := data.generateFilePath(d.th.Context, newUTC(startedAt), requestID)
+	writer := NewWriter(filePath)
+	require.NoError(t, writer.Open())
 
 	t.Cleanup(func() {
 		require.NoError(t, writer.close())
@@ -73,7 +72,7 @@ func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Tim
 	}
 }
 
-func (w writerTestHelper) Write(t *testing.T, status model.Status) {
+func (w writerTestHelper) Write(t *testing.T, status persistence.Status) {
 	t.Helper()
 
 	err := w.Writer.write(status)
@@ -102,6 +101,6 @@ type writerTestHelper struct {
 
 	RequestID string
 	FilePath  string
-	Writer    *writer
+	Writer    *Writer
 	Closed    bool
 }

@@ -1,0 +1,263 @@
+# Dagu Coding and Contribution Guidelines
+
+This document establishes comprehensive guidelines for developing high-quality code for the Dagu project. These standards ensure all contributions are well-structured, maintainable, and thoroughly tested.
+
+## Project Overview
+
+Dagu is a compact, portable workflow engine implemented in Go. It provides a declarative model for orchestrating command execution across diverse environments, including shell scripts, Python commands, containerized operations, or remote commands.
+
+### Key Attributes
+- **Small Footprint**: Single binary with minimal resource requirements
+- **Language Agnostic**: Execute any command across various programming languages
+- **Local-First Architecture**: Run offline or in air-gapped environments
+- **Declarative Configuration**: Simple YAML-based workflow definitions
+- **Simple Setup**: Quick installation without complex infrastructure
+
+### Core Responsibilities
+- Parsing and validating DAG configurations
+- Scheduling and executing workflows
+- Managing persistence (state, caching, logging)
+- Exposing APIs for both CLI and Web UI
+- Orchestrating interactions between subsystems (logging, mailer, client communication)
+
+## Project Structure
+
+```
+.
+├── cmd/                          # Application entry point and command initialization
+├── config/                       # General configuration files and settings (e.g., SSL, environment)
+├── docs/                         # Project documentation including guides, API references, and manuals
+├── examples/                     # Sample YAML configurations and workflow examples
+├── internal/                     # Core backend (Go) code organized by functionality
+│   ├── agent/                    # Implements workflow agent logic and task lifecycle management
+│   ├── build/                    # Build utilities and versioning information
+│   ├── client/                   # API clients for communicating with external services
+│   ├── cmd/                      # Backend CLI command implementations (start, stop, etc.)
+│   ├── cmdutil/                  # Helper functions and utilities for command processing
+│   ├── config/                   # Advanced configuration parsing, resolution, and validation
+│   ├── digraph/                  # Core workflow logic including dependency graphs and scheduling
+│   ├── fileutil/                 # Utilities for file handling and filesystem operations
+│   ├── frontend/                 # Backend support for REST APIs and web UI integrations
+│   ├── integration/              # Integration tests and orchestration of multiple components
+│   ├── logger/                   # Logging framework and context-aware logging utilities
+│   ├── mailer/                   # Email notification functionality and SMTP configuration
+│   ├── persistence/              # Persistence layer for caching, state, and data storage
+│   ├── scheduler/                # Task scheduling, job management, and execution control
+│   ├── sock/                     # Socket-based communication for inter-process interactions
+│   ├── stringutil/               # Utility functions for string manipulation
+│   └── test/                     # Shared testing utilities and helper functions
+├── schemas/                      # JSON schema definitions for configuration and DAG validation
+├── scripts/                      # Deployment, setup, and maintenance utility scripts
+└── ui/                           # Frontend web UI source code and related configuration files
+```
+
+## Code Quality Standards
+
+### General Guidelines
+
+1. **Simplicity Over Complexity**: Prefer simple, direct solutions over clever, complex ones
+2. **Modularity**: Design components with clear boundaries and responsibilities
+3. **Documentation**: Every function, method, and type must have appropriate documentation
+4. **Error Handling**: Implement comprehensive error handling with meaningful error messages
+5. **Security First**: Write secure code with proper error handling and vulnerability mitigation
+
+### Go-Specific Guidelines
+
+1. **Follow Go Best Practices**:
+   - Adhere to the [Effective Go](https://go.dev/doc/effective_go) guidelines
+   - Pass [gofmt](https://pkg.go.dev/cmd/gofmt) and [golint](https://github.com/golang/lint) checks
+   - Code must pass [Go Report Card](https://goreportcard.com/) with A+ rating
+
+2. **Code Structure**:
+   - Use meaningful package names
+   - Keep packages focused on a single responsibility
+   - Maintain a clear hierarchy of dependencies
+   - Write small, reusable, and well-defined functions
+
+3. **Naming Conventions**:
+   - Use descriptive names for variables, functions, and types
+   - Follow Go's camelCase for unexported and PascalCase for exported identifiers
+   - Use consistent naming patterns throughout the codebase
+
+4. **Error Handling**:
+   - Check and handle all errors appropriately
+   - Avoid using `_` to ignore errors unless absolutely justified
+   - Return meaningful error messages that aid in debugging
+
+5. **Logging**:
+   - Use the provided logger package consistently
+   - Include context in log messages
+   - Apply appropriate log levels (debug, info, warn, error)
+
+### UI Development Guidelines (JavaScript/TypeScript)
+
+1. **Modern Practices**:
+   - Use functional components and hooks for React code
+   - Apply TypeScript for type safety
+   - Follow ESLint and Prettier configurations
+
+2. **Component Structure**:
+   - Create reusable, single-responsibility components
+   - Implement proper prop validation
+   - Keep component state minimal and well-managed
+
+## Testing Requirements
+
+### 100% Test Coverage Mandate
+
+All code contributions **must** achieve 100% test coverage. This is non-negotiable for ensuring the reliability of Dagu as critical infrastructure.
+
+### Testing Guidelines
+
+1. **Unit Tests**:
+   - Every function must have comprehensive unit tests
+   - Test both success and failure paths
+   - Test edge cases and boundary conditions
+   - Mock external dependencies appropriately
+   - Use table-driven tests where applicable
+
+2. **Integration Tests**:
+   - Test interactions between components
+   - Verify proper API contracts are maintained
+   - Test configuration parsing and validation
+   - Validate end-to-end behavior of workflows
+
+3. **End-to-End Tests**:
+   - Test complete workflows from definition to execution
+   - Verify UI interactions work as expected
+   - Test scheduler functionality
+
+4. **Performance Tests**:
+   - Include benchmarks for performance-critical code
+   - Test resource usage under load
+   - Verify scalability with large workflows
+
+5. **Test Naming and Organization**:
+   - Use descriptive test names that indicate what's being tested
+   - Organize tests in a structure mirroring the code
+   - Group related tests using Go's subtests
+   - Place tests in `*_test.go` files adjacent to the code being tested
+
+6. **Coverage Monitoring**:
+   - Run code coverage tools regularly
+   - Integrate results with CI pipelines
+   - Enforce coverage thresholds in automated builds
+
+## Tools and Dependencies
+
+- **Go Modules:** For dependency management
+- **Cobra:** For CLI command structure
+- **Golangci-lint:** To enforce code quality
+- **Go Test:** For running tests
+- **Codecov:** For tracking and reporting test coverage
+
+## Contribution Process
+
+### Before You Start
+
+1. **Understand the Architecture**:
+   - Review existing code and documentation
+   - Understand the component you're modifying or extending
+
+2. **Create an Issue**:
+   - Discuss significant changes in an issue before coding
+   - Get alignment on approach and design
+
+### Development Workflow
+
+1. **Fork and Branch**:
+   - Fork the repository and create a feature branch
+   - Use descriptive branch names: `feature/your-feature` or `fix/issue-number`
+
+2. **Commit Guidelines**:
+   - Write clear, descriptive commit messages (preferably following Conventional Commits)
+   - Reference issue numbers in commits
+   - Keep commits focused and atomic
+
+3. **Pre-Submission Checklist**:
+   - Run all tests locally: `make test`
+   - Ensure 100% test coverage: `make coverage`
+   - Run linters: `make lint`
+   - Format code: `make fmt`
+   - Verify the build works: `make build`
+
+### Pull Request Process
+
+1. **PR Description**:
+   - Provide a clear description of changes
+   - Reference related issues
+   - Include screenshots for UI changes
+   - Document any new dependencies
+
+2. **Code Review**:
+   - Address all review comments
+   - Be open to suggestions and improvements
+   - Respond to reviewers in a timely manner
+
+3. **Continuous Integration**:
+   - All CI checks must pass before merge
+   - Coverage must remain at 100%
+   - No regressions in existing functionality
+
+## Documentation Standards
+
+1. **Code Documentation**:
+   - All exported functions, types, and constants must have godoc comments
+   - Include examples for non-obvious usage
+   - Document function parameters and return values
+   - Use inline comments to explain complex logic
+
+2. **User Documentation**:
+   - Update relevant user documentation for feature changes
+   - Add examples for new functionality
+   - Ensure documentation is clear and accessible
+
+3. **Architecture Documentation**:
+   - Update design docs for architectural changes
+   - Document decision rationales
+
+## Development Environment Setup
+
+1. **Prerequisites**:
+   - Go 1.23 or later
+   - Node.js (Latest LTS or Current)
+   - Yarn
+
+2. **Setup Commands**:
+   ```sh
+   # Clone the repository
+   git clone https://github.com/dagu-org/dagu.git
+   cd dagu
+   
+   # Build the UI
+   cd ui
+   yarn
+   cd ..
+   make build-ui
+   
+   # Build the binary
+   make build-bin
+   
+   # Run tests
+   make test
+   
+   # Check coverage
+   make coverage
+   ```
+
+## Review Criteria
+
+Pull requests will be evaluated based on:
+
+1. **Functionality**: Does it work as expected?
+2. **Test Coverage**: Is there 100% test coverage?
+3. **Code Quality**: Is the code clean, readable, and maintainable?
+4. **Performance**: Are there any performance regressions?
+5. **Documentation**: Is the documentation complete and clear?
+
+## Community Standards
+
+1. **Be Respectful**: Treat all contributors with respect and courtesy
+2. **Be Constructive**: Provide constructive feedback in reviews
+3. **Be Collaborative**: Work together to solve problems
+4. **Be Inclusive**: Welcome contributors of all backgrounds and experience levels

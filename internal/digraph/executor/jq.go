@@ -28,7 +28,6 @@ type jqConfig struct {
 }
 
 func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
-	stepContext := digraph.GetStepContext(ctx)
 	var jqCfg jqConfig
 	if step.ExecutorConfig.Config != nil {
 		if err := decodeJqConfig(
@@ -37,7 +36,7 @@ func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
 			return nil, err
 		}
 	}
-	script, err := stepContext.EvalString(step.Script)
+	script, err := digraph.EvalString(ctx, step.Script)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate jq input: %w", err)
 	}
