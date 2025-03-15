@@ -54,7 +54,7 @@ type dagTestHelper struct {
 func (d dagTestHelper) Writer(t *testing.T, requestID string, startedAt time.Time) writerTestHelper {
 	t.Helper()
 
-	data := d.th.DB.Data(d.th.Context, d.DAG.Location)
+	data := d.th.DB.Repository(d.th.Context, d.DAG.Location)
 	filePath := data.generateFilePath(d.th.Context, newUTC(startedAt), requestID)
 	writer := NewWriter(filePath)
 	require.NoError(t, writer.Open())

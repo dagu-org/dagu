@@ -63,38 +63,38 @@ func New(baseDir string, opts ...Option) *JSONDB {
 	}
 }
 
-// Data returns a new HistoryData instance for the specified key.
-func (db *JSONDB) Data(ctx context.Context, dagName string) *Repository {
+// Repository returns a new HistoryData instance for the specified key.
+func (db *JSONDB) Repository(ctx context.Context, dagName string) *Repository {
 	return NewRepository(ctx, db.baseDir, dagName, db.cache)
 }
 
 // Update updates the status for a specific request ID.
 // It handles the entire lifecycle of opening, writing, and closing the history record.
 func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status persistence.Status) error {
-	return db.Data(ctx, dagName).Update(ctx, requestID, status)
+	return db.Repository(ctx, dagName).Update(ctx, requestID, status)
 }
 
 // NewRecord creates a new history record for the specified key, timestamp, and request ID.
 func (db *JSONDB) NewRecord(ctx context.Context, dagName string, timestamp time.Time, requestID string) persistence.Record {
-	return db.Data(ctx, dagName).NewRecord(ctx, timestamp, requestID)
+	return db.Repository(ctx, dagName).NewRecord(ctx, timestamp, requestID)
 }
 
 // ReadRecent returns the most recent history records for the specified key, up to itemLimit.
 func (db *JSONDB) ReadRecent(ctx context.Context, dagName string, itemLimit int) []persistence.Record {
-	return db.Data(ctx, dagName).Recent(ctx, itemLimit)
+	return db.Repository(ctx, dagName).Recent(ctx, itemLimit)
 }
 
 // ReadToday returns the most recent history record for today.
 func (db *JSONDB) ReadToday(ctx context.Context, dagName string) (persistence.Record, error) {
 	if db.latestStatusToday {
-		return db.Data(ctx, dagName).LatestToday(ctx)
+		return db.Repository(ctx, dagName).LatestToday(ctx)
 	}
-	return db.Data(ctx, dagName).Latest(ctx)
+	return db.Repository(ctx, dagName).Latest(ctx)
 }
 
 // FindByRequestID finds a history record by request ID.
 func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID string) (persistence.Record, error) {
-	return db.Data(ctx, dagName).FindByRequestID(ctx, requestID)
+	return db.Repository(ctx, dagName).FindByRequestID(ctx, requestID)
 }
 
 // RemoveAll removes all history records for the specified key.
@@ -104,10 +104,10 @@ func (db *JSONDB) RemoveAll(ctx context.Context, dagName string) error {
 
 // RemoveOld removes history records older than retentionDays for the specified key.
 func (db *JSONDB) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
-	return db.Data(ctx, dagName).RemoveOld(ctx, retentionDays)
+	return db.Repository(ctx, dagName).RemoveOld(ctx, retentionDays)
 }
 
 // Rename renames all history records from oldKey to newKey.
 func (db *JSONDB) Rename(ctx context.Context, oldPath, newPath string) error {
-	return db.Data(ctx, oldPath).Rename(ctx, newPath)
+	return db.Repository(ctx, oldPath).Rename(ctx, newPath)
 }

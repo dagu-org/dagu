@@ -18,7 +18,7 @@ func TestHistoryData_Read(t *testing.T) {
 
 	t.Run("Recent", func(t *testing.T) {
 		dag := th.DAG("test_read_recent")
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 
 		for i := 0; i < 5; i++ {
 			requestID := fmt.Sprintf("request-id-%d", i)
@@ -50,7 +50,7 @@ func TestHistoryData_Read(t *testing.T) {
 		dag := th.DAG("test_read_today")
 		requestID := "request-id-today"
 		now := time.Now()
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 
 		record := data.NewRecord(th.Context, now, requestID)
 		err := record.Open(th.Context)
@@ -75,7 +75,7 @@ func TestHistoryData_Read(t *testing.T) {
 
 	t.Run("Latest", func(t *testing.T) {
 		dag := th.DAG("test_no_status_today")
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 
 		// Create status from yesterday
 		yesterdayTime := time.Now().AddDate(0, 0, -1)
@@ -112,7 +112,7 @@ func TestHistoryData_Read(t *testing.T) {
 
 	t.Run("NoFilesExist", func(t *testing.T) {
 		dag := th.DAG("test_no_files")
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 		statuses := data.Recent(th.Context, 5)
 		assert.Empty(t, statuses)
 
@@ -125,7 +125,7 @@ func TestHistoryData_Read(t *testing.T) {
 
 	t.Run("RequestedMoreThanExist", func(t *testing.T) {
 		dag := th.DAG("test_fewer_files")
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 
 		// Create 3 status entries
 		for i := 0; i < 3; i++ {
@@ -153,14 +153,9 @@ func TestHistoryData_Read(t *testing.T) {
 
 	t.Run("FindByRequestIDNotFound", func(t *testing.T) {
 		dag := th.DAG("test_not_found")
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 		_, err := data.FindByRequestID(th.Context, "nonexistent-id")
 		assert.ErrorIs(t, err, persistence.ErrRequestIDNotFound)
-	})
-
-	t.Run("InvalidPath", func(t *testing.T) {
-		err := th.DB.Rename(th.Context, "relative/path", "/absolute/path")
-		assert.Error(t, err)
 	})
 }
 
@@ -170,7 +165,7 @@ func TestHistoryData_Update(t *testing.T) {
 	t.Run("UpdateNonExistentStatus", func(t *testing.T) {
 		dag := th.DAG("test_update_nonexistent")
 		requestID := "request-id-nonexistent"
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusSuccess, 12345, time.Now(),
 		)
@@ -184,7 +179,7 @@ func TestHistoryData_Update(t *testing.T) {
 		status := persistence.NewStatusFactory(dag.DAG).Create(
 			requestID, scheduler.StatusSuccess, 12345, time.Now(),
 		)
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 		err := data.Update(th.Context, "", status)
 		assert.ErrorIs(t, err, ErrRequestIDEmpty)
 	})
@@ -195,7 +190,7 @@ func TestHistoryData_Remove(t *testing.T) {
 
 	t.Run("RemoveAllFiles", func(t *testing.T) {
 		dag := th.DAG("test_remove_all")
-		data := th.DB.Data(th.Context, dag.Location)
+		data := th.DB.Repository(th.Context, dag.Location)
 
 		// Create multiple status files
 		for i := 0; i < 3; i++ {
@@ -241,7 +236,7 @@ func TestHistoryData_Remove(t *testing.T) {
 
 	t.Run("RemoveOld", func(t *testing.T) {
 		dag := th.DAG("test_remove_old")
-		data := th.DB.Data(th.Context, dag.Name)
+		data := th.DB.Repository(th.Context, dag.Name)
 
 		// Create status file
 		requestID := "request-id-old"

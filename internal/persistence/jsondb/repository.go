@@ -2,9 +2,7 @@
 package jsondb
 
 import (
-	"context"
-	"crypto/md5" // nolint: gosec
-	"encoding/hex"
+	"context" // nolint: gosec
 	"errors"
 	"fmt"
 	"os"
@@ -17,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -28,6 +25,8 @@ import (
 var (
 	ErrRequestIDNotFound  = errors.New("request ID not found")
 	ErrCreateNewDirectory = errors.New("failed to create new directory")
+	ErrRemoveDirectory    = errors.New("failed to remove directory")
+	ErrMoveDirectory      = errors.New("failed to move directory")
 	ErrInvalidPath        = errors.New("invalid path")
 	ErrRequestIDEmpty     = errors.New("requestID is empty")
 
@@ -48,10 +47,8 @@ const (
 // read, update, and manage history files. It supports parallel processing for improved
 // performance with large datasets.
 type Repository struct {
-	parentDir  string                                // Base directory for all history data
-	baseDir    string                                // Directory specific to this DAG
-	dagName    string                                // Original DAG name/path
-	key        string                                // Normalized key derived from dagName
+	parentDir  string // Base directory for all history data
+	addr       StorageAddress
 	maxWorkers int                                   // Maximum number of parallel workers
 	cache      *filecache.Cache[*persistence.Status] // Optional cache for read operations
 }
@@ -63,12 +60,10 @@ func NewRepository(ctx context.Context, parentDir, dagName string, cache *fileca
 		logger.Error(ctx, "dagName is empty")
 	}
 
-	key := normalizeKey(dagName)
+	key := NewStorageAddress(parentDir, dagName)
 	return &Repository{
 		parentDir:  parentDir,
-		dagName:    dagName,
-		baseDir:    getDirectory(parentDir, dagName, key),
-		key:        key,
+		addr:       key,
 		cache:      cache,
 		maxWorkers: runtime.NumCPU(),
 	}
@@ -127,7 +122,7 @@ func (r *Repository) Update(ctx context.Context, requestID string, status persis
 
 // Rename renames all history records from the current DAG name to a new path.
 // It creates the new directory structure and moves all matching files.
-func (r *Repository) Rename(ctx context.Context, newPath string) error {
+func (r *Repository) Rename(ctx context.Context, newNameOrPath string) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -136,23 +131,16 @@ func (r *Repository) Rename(ctx context.Context, newPath string) error {
 		// Continue with operation
 	}
 
-	if !filepath.IsAbs(r.dagName) || !filepath.IsAbs(newPath) {
-		return fmt.Errorf("%w: %s -> %s", ErrInvalidPath, r.dagName, newPath)
-	}
-
 	// Get the old directory
-	oldDir := r.baseDir
-	if !r.exists(oldDir) {
-		logger.Debugf(ctx, "Old directory %s does not exist, nothing to rename", oldDir)
+	if !r.addr.Exists() {
 		return nil
 	}
 
 	// Create the new directory if it doesn't exist
-	newKey := normalizeKey(newPath)
-	newBaseDir := getDirectory(r.parentDir, newPath, newKey)
-	if !r.exists(newBaseDir) {
-		if err := os.MkdirAll(newBaseDir, 0755); err != nil {
-			return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, newBaseDir, err)
+	newAddr := NewStorageAddress(r.parentDir, newNameOrPath)
+	if !newAddr.Exists() {
+		if err := newAddr.Create(); err != nil {
+			return err
 		}
 	}
 
@@ -163,7 +151,7 @@ func (r *Repository) Rename(ctx context.Context, newPath string) error {
 	}
 
 	if len(matches) == 0 {
-		logger.Debugf(ctx, "No files to rename for key %s", r.dagName)
+		logger.Debugf(ctx, "No files to rename for %q", r.globPattern())
 		return nil
 	}
 
@@ -171,8 +159,8 @@ func (r *Repository) Rename(ctx context.Context, newPath string) error {
 	errs := r.processFilesParallel(ctx, matches, func(filePath string) error {
 		// Replace the old prefix with the new prefix
 		base := filepath.Base(filePath)
-		newName := strings.Replace(base, r.key, newKey, 1)
-		newFilePath := filepath.Join(newBaseDir, newName)
+		newName := strings.Replace(base, r.addr.prefix, newAddr.prefix, 1)
+		newFilePath := filepath.Join(newAddr.path, newName)
 
 		// Rename the file
 		if err := os.Rename(filePath, newFilePath); err != nil {
@@ -185,9 +173,9 @@ func (r *Repository) Rename(ctx context.Context, newPath string) error {
 	})
 
 	// Try to remove the old directory if it's empty
-	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
-		if err := os.Remove(oldDir); err != nil {
-			logger.Warnf(ctx, "Failed to remove empty directory %s: %v", oldDir, err)
+	if r.addr.IsEmpty() {
+		if err := r.addr.Remove(); err != nil {
+			logger.Warn(ctx, "Failed to remove old directory", "err", err)
 		}
 	}
 
@@ -196,10 +184,7 @@ func (r *Repository) Rename(ctx context.Context, newPath string) error {
 		return errors.Join(errs...)
 	}
 
-	// Update the instance properties
-	r.baseDir = newBaseDir
-	r.dagName = newPath
-	r.key = newKey
+	r.addr = newAddr
 
 	return nil
 }
@@ -411,7 +396,7 @@ func (r *Repository) processFilesParallel(ctx context.Context, files []string, p
 // latest returns the path to the latest history record file.
 // If cutoff is not zero, it only returns files newer than the cutoff time.
 func (r *Repository) latest(cutoff timeInUTC) (string, error) {
-	pattern := path.Join(r.baseDir, r.key+"*"+extDat)
+	pattern := path.Join(r.addr.path, r.addr.prefix+"*"+extDat)
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
@@ -456,7 +441,7 @@ func (r *Repository) getLatestMatches(ctx context.Context, pattern string, itemL
 
 // globPattern returns the glob pattern for finding history files for this DAG.
 func (r *Repository) globPattern() string {
-	return path.Join(r.baseDir, r.key+"*"+extDat)
+	return path.Join(r.addr.path, r.addr.prefix+"*"+extDat)
 }
 
 // generateFilePath generates a file path for a history record.
@@ -468,28 +453,7 @@ func (r *Repository) generateFilePath(ctx context.Context, timestamp timeInUTC, 
 	ts := timestamp.Format(dateTimeFormatUTC)
 	reqID = stringutil.TruncString(reqID, requestIDLenSafe)
 
-	return path.Join(r.baseDir, fmt.Sprintf("%s.%s.%s%s", r.key, ts, reqID, extDat))
-}
-
-// exists returns true if the specified file path exists.
-func (hd *Repository) exists(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return !os.IsNotExist(err)
-}
-
-// getDirectory returns the directory path for storing history files.
-// It handles cases where the original key needs to be hashed to avoid conflicts.
-func getDirectory(baseDir, originalKey, normalizedKey string) string {
-	if originalKey != normalizedKey {
-		// Add a hash postfix to the directory name to avoid conflicts.
-		// nolint: gosec
-		h := md5.New()
-		_, _ = h.Write([]byte(originalKey))
-		v := hex.EncodeToString(h.Sum(nil))
-		return filepath.Join(baseDir, fmt.Sprintf("%s-%s", normalizedKey, v))
-	}
-
-	return filepath.Join(baseDir, originalKey)
+	return path.Join(r.addr.path, fmt.Sprintf("%s.%s.%s%s", r.addr.prefix, ts, reqID, extDat))
 }
 
 // filterLatest returns the most recent files up to itemLimit
@@ -579,21 +543,6 @@ func parseFileTimestamp(file string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("failed to parse UTC timestamp %s: %w", timestampString, err)
 	}
 	return t, nil
-}
-
-// normalizeKey normalizes the key by removing the extension and directory path.
-func normalizeKey(key string) string {
-	ext := filepath.Ext(key)
-	if ext == "" {
-		// No extension
-		return filepath.Base(key)
-	}
-	if fileutil.IsYAMLFile(key) {
-		// Remove .yaml or .yml extension
-		return strings.TrimSuffix(filepath.Base(key), ext)
-	}
-	// Use the base name (if it's a path or just a name)
-	return filepath.Base(key)
 }
 
 // timeInUTC is a wrapper for time.Time that ensures the time is in UTC.
