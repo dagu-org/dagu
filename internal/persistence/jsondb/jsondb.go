@@ -127,8 +127,8 @@ func (db *JSONDB) NewRecord(ctx context.Context, dagName string, timestamp time.
 	return NewRecord(filePath, db.cache)
 }
 
-// ReadRecent returns the most recent history records for the specified key, up to itemLimit.
-func (db *JSONDB) ReadRecent(ctx context.Context, dagName string, itemLimit int) []persistence.Record {
+// Recent returns the most recent history records for the specified key, up to itemLimit.
+func (db *JSONDB) Recent(ctx context.Context, dagName string, itemLimit int) []persistence.Record {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -159,8 +159,8 @@ func (db *JSONDB) ReadRecent(ctx context.Context, dagName string, itemLimit int)
 	return records
 }
 
-// ReadToday returns the most recent history record for today.
-func (db *JSONDB) ReadToday(ctx context.Context, dagName string) (persistence.Record, error) {
+// Latest returns the most recent history record for today.
+func (db *JSONDB) Latest(ctx context.Context, dagName string) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():

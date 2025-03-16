@@ -17,8 +17,8 @@ var (
 type HistoryStore interface {
 	NewRecord(ctx context.Context, key string, timestamp time.Time, requestID string) Record
 	Update(ctx context.Context, key, requestID string, status Status) error
-	ReadRecent(ctx context.Context, key string, itemLimit int) []Record
-	ReadToday(ctx context.Context, key string) (Record, error)
+	Recent(ctx context.Context, key string, itemLimit int) []Record
+	Latest(ctx context.Context, key string) (Record, error)
 	FindByRequestID(ctx context.Context, key string, requestID string) (Record, error)
 	RemoveAll(ctx context.Context, key string) error
 	RemoveOld(ctx context.Context, key string, retentionDays int) error

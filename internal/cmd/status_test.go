@@ -25,7 +25,7 @@ func TestStatusCommand(t *testing.T) {
 		}()
 
 		require.Eventually(t, func() bool {
-			historyRecords := th.HistoryStore.ReadRecent(th.Context, dagFile.Location, 1)
+			historyRecords := th.HistoryStore.Recent(th.Context, dagFile.Location, 1)
 			if len(historyRecords) < 1 {
 				return false
 			}

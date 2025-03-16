@@ -37,7 +37,7 @@ func TestHistoryData_Read(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		statuses := th.DB.ReadRecent(th.Context, dag.Location, 3)
+		statuses := th.DB.Recent(th.Context, dag.Location, 3)
 		assert.Len(t, statuses, 3)
 
 		first, err := statuses[0].ReadStatus(th.Context)
@@ -66,7 +66,7 @@ func TestHistoryData_Read(t *testing.T) {
 		require.NoError(t, err)
 
 		th.DB.latestStatusToday = true
-		todaysRecord, err := th.DB.ReadToday(th.Context, dag.Location)
+		todaysRecord, err := th.DB.Latest(th.Context, dag.Location)
 		require.NoError(t, err)
 
 		todaysStatus, err := todaysRecord.ReadStatus(th.Context)
@@ -98,12 +98,12 @@ func TestHistoryData_Read(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to read today's status and expect an error
-		_, err = th.DB.ReadToday(th.Context, dag.Location)
+		_, err = th.DB.Latest(th.Context, dag.Location)
 		assert.ErrorIs(t, err, persistence.ErrNoStatusData)
 
 		// Read the latest status
 		th.DB.latestStatusToday = false
-		latestRecord, err := th.DB.ReadToday(th.Context, dag.Location)
+		latestRecord, err := th.DB.Latest(th.Context, dag.Location)
 		require.NoError(t, err)
 
 		// Read the status from the latest record
@@ -115,10 +115,10 @@ func TestHistoryData_Read(t *testing.T) {
 	t.Run("NoFilesExist", func(t *testing.T) {
 		th := testSetup(t)
 		dag := th.DAG("test_no_files")
-		statuses := th.DB.ReadRecent(th.Context, dag.Location, 5)
+		statuses := th.DB.Recent(th.Context, dag.Location, 5)
 		assert.Empty(t, statuses)
 
-		_, err := th.DB.ReadToday(th.Context, dag.Location)
+		_, err := th.DB.Latest(th.Context, dag.Location)
 		assert.ErrorIs(t, err, persistence.ErrNoStatusData)
 	})
 
@@ -146,7 +146,7 @@ func TestHistoryData_Read(t *testing.T) {
 		}
 
 		// Request more than exist
-		statuses := th.DB.ReadRecent(th.Context, dag.Location, 5)
+		statuses := th.DB.Recent(th.Context, dag.Location, 5)
 		assert.Len(t, statuses, 3)
 	})
 
@@ -210,7 +210,7 @@ func TestHistoryData_Remove(t *testing.T) {
 		}
 
 		// Verify files exist
-		records := th.DB.ReadRecent(th.Context, dag.Location, 5)
+		records := th.DB.Recent(th.Context, dag.Location, 5)
 		assert.Len(t, records, 3)
 
 		// Remove all files
@@ -218,7 +218,7 @@ func TestHistoryData_Remove(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify all files are removed
-		records = th.DB.ReadRecent(th.Context, dag.Location, 5)
+		records = th.DB.Recent(th.Context, dag.Location, 5)
 		assert.Empty(t, records)
 	})
 

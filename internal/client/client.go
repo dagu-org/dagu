@@ -224,7 +224,7 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persist
 
 	var latestStatus *persistence.Status
 
-	record, err := e.historyStore.ReadToday(ctx, dag.Location)
+	record, err := e.historyStore.Latest(ctx, dag.Location)
 	if err != nil {
 		goto handleError
 	}
@@ -248,7 +248,7 @@ handleError:
 }
 
 func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile {
-	records := e.historyStore.ReadRecent(ctx, dag.Location, n)
+	records := e.historyStore.Recent(ctx, dag.Location, n)
 
 	var ret []persistence.StatusFile
 	for _, record := range records {
