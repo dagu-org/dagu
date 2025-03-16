@@ -111,7 +111,7 @@ func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, _ []*persistence.Node) {
 	status := persistence.NewStatusFactory(dag).Create("request-id", scheduler.StatusError, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
