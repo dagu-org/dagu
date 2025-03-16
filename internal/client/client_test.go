@@ -243,10 +243,8 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, spec, newSpec)
 
-		status, _ := cli.GetStatus(ctx, id)
-
 		// delete
-		err = cli.DeleteDAG(ctx, id, status.DAG.Location)
+		err = cli.DeleteDAG(ctx, id)
 		require.NoError(t, err)
 	})
 	t.Run("Create", func(t *testing.T) {

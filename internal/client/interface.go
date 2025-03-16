@@ -10,8 +10,8 @@ import (
 )
 
 type Client interface {
-	CreateDAG(ctx context.Context, id string) (string, error)
-	GetDAGSpec(ctx context.Context, id string) (string, error)
+	CreateDAG(ctx context.Context, name string) (string, error)
+	GetDAGSpec(ctx context.Context, name string) (string, error)
 	Grep(ctx context.Context, pattern string) ([]*persistence.GrepResult, []string, error)
 	Rename(ctx context.Context, oldID, newID string) error
 	Stop(ctx context.Context, dag *digraph.DAG) error
@@ -24,13 +24,13 @@ type Client interface {
 	GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error)
 	GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile
 	UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error
-	UpdateDAG(ctx context.Context, id string, spec string) error
-	DeleteDAG(ctx context.Context, id, loc string) error
+	UpdateDAG(ctx context.Context, name string, spec string) error
+	DeleteDAG(ctx context.Context, name string) error
 	GetAllStatus(ctx context.Context) (statuses []DAGStatus, errs []string, err error)
 	GetAllStatusPagination(ctx context.Context, params dags.ListDAGsParams) ([]DAGStatus, *DagListPaginationSummaryResult, error)
 	GetStatus(ctx context.Context, dagLocation string) (DAGStatus, error)
-	IsSuspended(ctx context.Context, id string) bool
-	ToggleSuspend(ctx context.Context, id string, suspend bool) error
+	IsSuspended(ctx context.Context, name string) bool
+	ToggleSuspend(ctx context.Context, name string, suspend bool) error
 	GetTagList(ctx context.Context) ([]string, []string, error)
 }
 

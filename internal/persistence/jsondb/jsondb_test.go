@@ -185,49 +185,6 @@ func TestHistoryData_Update(t *testing.T) {
 func TestHistoryData_Remove(t *testing.T) {
 	th := testSetup(t)
 
-	t.Run("RemoveAllFiles", func(t *testing.T) {
-		dag := th.DAG("test_remove_all")
-
-		// Create multiple status files
-		for i := 0; i < 3; i++ {
-			requestID := fmt.Sprintf("request-id-%d", i)
-			now := time.Now().Add(time.Duration(-i) * time.Hour)
-
-			record := th.DB.NewRecord(th.Context, dag.Location, now, requestID)
-
-			err := record.Open(th.Context)
-			require.NoError(t, err)
-
-			status := persistence.NewStatusFactory(dag.DAG).Create(
-				requestID, scheduler.StatusRunning, 12345, time.Now(),
-			)
-
-			err = record.Write(th.Context, status)
-			require.NoError(t, err)
-
-			err = record.Close(th.Context)
-			require.NoError(t, err)
-		}
-
-		// Verify files exist
-		records := th.DB.Recent(th.Context, dag.Location, 5)
-		assert.Len(t, records, 3)
-
-		// Remove all files
-		err := th.DB.RemoveAll(th.Context, dag.Location)
-		require.NoError(t, err)
-
-		// Verify all files are removed
-		records = th.DB.Recent(th.Context, dag.Location, 5)
-		assert.Empty(t, records)
-	})
-
-	t.Run("RemoveAllNonExistent", func(t *testing.T) {
-		dag := th.DAG("test_remove_all_nonexistent")
-		err := th.DB.RemoveAll(th.Context, dag.Location)
-		assert.NoError(t, err)
-	})
-
 	t.Run("RemoveOld", func(t *testing.T) {
 		dag := th.DAG("test_remove_old")
 

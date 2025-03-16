@@ -342,11 +342,11 @@ func (h *DAG) createDAG(ctx context.Context, params dags.CreateDAGParams) (
 }
 
 func (h *DAG) deleteDAG(ctx context.Context, params dags.DeleteDAGParams) *codedError {
-	dagStatus, err := h.client.GetStatus(ctx, params.DagID)
+	_, err := h.client.GetStatus(ctx, params.DagID)
 	if err != nil {
 		return newNotFoundError(err)
 	}
-	if err := h.client.DeleteDAG(ctx, params.DagID, dagStatus.DAG.Location); err != nil {
+	if err := h.client.DeleteDAG(ctx, params.DagID); err != nil {
 		return newInternalError(err)
 	}
 	return nil

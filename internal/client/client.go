@@ -285,11 +285,7 @@ func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
 	return e.dagStore.UpdateSpec(ctx, id, []byte(spec))
 }
 
-func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
-	err := e.historyStore.RemoveAll(ctx, loc)
-	if err != nil {
-		return err
-	}
+func (e *client) DeleteDAG(ctx context.Context, name string) error {
 	return e.dagStore.Delete(ctx, name)
 }
 

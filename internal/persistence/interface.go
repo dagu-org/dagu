@@ -20,7 +20,6 @@ type HistoryStore interface {
 	Recent(ctx context.Context, key string, itemLimit int) []Record
 	Latest(ctx context.Context, key string) (Record, error)
 	FindByRequestID(ctx context.Context, key string, requestID string) (Record, error)
-	RemoveAll(ctx context.Context, key string) error
 	RemoveOld(ctx context.Context, key string, retentionDays int) error
 	Rename(ctx context.Context, oldKey, newKey string) error
 }
