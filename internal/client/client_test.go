@@ -175,6 +175,8 @@ func TestClient_RunDAG(t *testing.T) {
 		previousRequestID := status.RequestID
 		previousParams := status.Params
 
+		time.Sleep(1 * time.Second)
+
 		err = cli.Retry(ctx, dag.DAG, previousRequestID)
 		require.NoError(t, err)
 
