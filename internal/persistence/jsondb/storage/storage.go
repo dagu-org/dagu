@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/stringutil"
 )
 
 var maxWorkers = runtime.NumCPU()
@@ -25,13 +23,11 @@ var maxWorkers = runtime.NumCPU()
 var dataFileExtension = ".dat"
 
 // rTimestamp is a regular expression to match the timestamp in the file name.
-var rTimestamp = regexp.MustCompile(`2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}|2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}Z`)
+var rTimestamp = regexp.MustCompile(`2\d{7}_\d{6}_\d{3}Z`)
 
 // Filename formats
 const (
-	requestIDLenSafe  = 8
-	dateTimeFormatUTC = "20060102.15:04:05.000Z"
-	dateTimeFormat    = "20060102.15:04:05.000"
+	dateTimeFormatUTC = "20060102_150405_000Z"
 	dateFormat        = "20060102"
 )
 
@@ -71,7 +67,7 @@ func New() Storage {
 // FindByRequestID implements Storage.
 func (s *storage) FindByRequestID(_ context.Context, a Address, requestID string) (string, error) {
 	// Find matching files
-	matches, err := filepath.Glob(globPattern(a))
+	matches, err := filepath.Glob(a.globPattern)
 	if err != nil {
 		return "", fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -88,15 +84,12 @@ func (s *storage) FindByRequestID(_ context.Context, a Address, requestID string
 
 // GenerateFilePath implements Storage.
 func (s *storage) GenerateFilePath(_ context.Context, a Address, timestamp TimeInUTC, reqID string) string {
-	ts := timestamp.Format(dateTimeFormatUTC)
-	reqID = stringutil.TruncString(reqID, requestIDLenSafe)
-
-	return path.Join(a.path, fmt.Sprintf("%s.%s.%s%s", a.prefix, ts, reqID, dataFileExtension))
+	return a.FilePath(timestamp, reqID)
 }
 
 // Latest implements Storage.
 func (s *storage) Latest(ctx context.Context, a Address, itemLimit int) []string {
-	pattern := globPattern(a)
+	pattern := a.globPattern
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to find matches for pattern %s: %v", pattern, err)
@@ -113,9 +106,7 @@ func (s *storage) Latest(ctx context.Context, a Address, itemLimit int) []string
 
 // LatestAfter implements Storage.
 func (s *storage) LatestAfter(_ context.Context, a Address, cutoff TimeInUTC) (string, error) {
-	pattern := path.Join(a.path, a.prefix+"*"+dataFileExtension)
-
-	matches, err := filepath.Glob(pattern)
+	matches, err := filepath.Glob(a.globPattern)
 	if err != nil || len(matches) == 0 {
 		return "", persistence.ErrNoStatusData
 	}
@@ -143,7 +134,7 @@ func (s *storage) LatestAfter(_ context.Context, a Address, cutoff TimeInUTC) (s
 // RemoveOld implements Storage.
 func (s *storage) RemoveOld(ctx context.Context, a Address, retentionDays int) error {
 	// Find matching files
-	matches, err := filepath.Glob(globPattern(a))
+	matches, err := filepath.Glob(a.globPattern)
 	if err != nil {
 		return fmt.Errorf("failed to glob pattern: %w", err)
 	}
@@ -165,10 +156,11 @@ func (s *storage) RemoveOld(ctx context.Context, a Address, retentionDays int) e
 		}
 
 		if info.ModTime().Before(oldDate) {
-			if err := os.Remove(filePath); err != nil {
-				return fmt.Errorf("failed to remove file %s: %w", filePath, err)
+			dir := filepath.Dir(filePath)
+			if err := os.RemoveAll(dir); err != nil {
+				return fmt.Errorf("failed to remove directory %s: %w", dir, err)
 			}
-			logger.Debugf(ctx, "Removed old file %s", filePath)
+			logger.Debugf(ctx, "Removed old directory %s", dir)
 		}
 		return nil
 	})
@@ -196,30 +188,31 @@ func (s *storage) Rename(ctx context.Context, o Address, n Address) error {
 	}
 
 	// Find matching files
-	matches, err := filepath.Glob(globPattern(o))
+	matches, err := filepath.Glob(o.globPattern)
 	if err != nil {
 		return fmt.Errorf("failed to glob pattern: %w", err)
 	}
 
 	if len(matches) == 0 {
-		logger.Debugf(ctx, "No files to rename for %q", globPattern(o))
+		logger.Debugf(ctx, "No files to rename for %q", o.globPattern)
 		return nil
 	}
 
 	// Process files in parallel
 	errs := processFilesParallel(ctx, matches, func(filePath string) error {
 		// Replace the old prefix with the new prefix
-		base := filepath.Base(filePath)
-		newName := strings.Replace(base, o.prefix, n.prefix, 1)
-		newFilePath := filepath.Join(n.path, newName)
+		oldDir := filepath.Dir(filePath)
+		dirName := filepath.Base(oldDir)
+		newName := strings.Replace(dirName, o.prefix, n.prefix, 1)
+		newDir := filepath.Join(n.path, newName)
 
 		// Rename the file
-		if err := os.Rename(filePath, newFilePath); err != nil {
-			logger.Errorf(ctx, "Failed to rename %s to %s: %v", filePath, newFilePath, err)
-			return fmt.Errorf("failed to rename %s to %s: %w", filePath, newFilePath, err)
+		if err := os.Rename(oldDir, newDir); err != nil {
+			logger.Error(ctx, "Failed to rename directory", "err", err, "old", oldDir, "new", newDir)
+			return fmt.Errorf("failed to rename directory %s to %s: %w", oldDir, newDir, err)
 		}
 
-		logger.Debugf(ctx, "Renamed %s to %s", filePath, newFilePath)
+		logger.Debugf(ctx, "Renamed %s to %s", filePath, newDir)
 		return nil
 	})
 
@@ -236,11 +229,6 @@ func (s *storage) Rename(ctx context.Context, o Address, n Address) error {
 	}
 
 	return nil
-}
-
-// globPattern returns the glob pattern for finding history files for this DAG.
-func globPattern(a Address) string {
-	return path.Join(a.path, a.prefix+"*"+dataFileExtension)
 }
 
 // processFilesParallel processes files in parallel using a worker pool.
@@ -356,17 +344,6 @@ func parseFileTimestamp(file string) (time.Time, error) {
 	if timestampString == "" {
 		return time.Time{}, fmt.Errorf("no timestamp found in file name: %s", file)
 	}
-
-	if !strings.Contains(timestampString, "Z") {
-		// For backward compatibility
-		t, err := time.Parse(dateTimeFormat, timestampString)
-		if err != nil {
-			return time.Time{}, fmt.Errorf("failed to parse timestamp %s: %w", timestampString, err)
-		}
-		return t, nil
-	}
-
-	// UTC
 	t, err := time.Parse(dateTimeFormatUTC, timestampString)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to parse UTC timestamp %s: %w", timestampString, err)

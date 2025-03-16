@@ -1,10 +1,12 @@
 package storage
 
 import (
-	"crypto/md5" // nolint: gosec
+	// nolint: gosec
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -12,41 +14,40 @@ import (
 )
 
 type Address struct {
-	dagNameOrPath string
-	prefix        string
-	path          string
+	dagName     string
+	prefix      string
+	path        string
+	globPattern string
 }
 
-func NewAddress(baseDir string, dagNameOrPath string) Address {
-	ext := filepath.Ext(dagNameOrPath)
-	addr := Address{dagNameOrPath: dagNameOrPath}
+func NewAddress(baseDir string, dagName string) Address {
+	ext := filepath.Ext(dagName)
+	a := Address{dagName: dagName}
 
-	switch {
-	case ext == "":
-		// No extension
-		addr.prefix = filepath.Base(dagNameOrPath)
-
-	case fileutil.IsYAMLFile(dagNameOrPath):
+	base := filepath.Base(dagName)
+	if fileutil.IsYAMLFile(dagName) {
 		// Remove .yaml or .yml extension
-		addr.prefix = strings.TrimSuffix(filepath.Base(dagNameOrPath), ext)
-
-	default:
-		// Use the base name (if it's a path or just a name)
-		addr.prefix = filepath.Base(dagNameOrPath)
-		// TODO: Convert it to a safe name
+		base = strings.TrimSuffix(base, ext)
 	}
 
-	if dagNameOrPath != addr.prefix {
-		// Legacy behavior: Add a hash postfix to the directory name to avoid conflicts.
-		// nolint: gosec
-		h := md5.New()
-		_, _ = h.Write([]byte(addr.dagNameOrPath))
-		v := hex.EncodeToString(h.Sum(nil))
-		addr.path = filepath.Join(baseDir, addr.prefix+"-"+v)
+	n := fileutil.SafeName(base)
+	if n != base {
+		hash := sha256.Sum256([]byte(dagName))
+		hashLength := 8
+		n = n + "-" + hex.EncodeToString(hash[:])[0:hashLength]
 	}
 
-	addr.path = filepath.Join(baseDir, addr.prefix)
-	return addr
+	a.prefix = n
+	a.path = filepath.Join(baseDir, a.prefix)
+	a.globPattern = path.Join(a.path, a.prefix+"*", "*"+dataFileExtension)
+
+	return a
+}
+
+func (a Address) FilePath(timestamp TimeInUTC, requestID string) string {
+	ts := timestamp.Format(dateTimeFormatUTC)
+	dir := a.prefix + "_" + ts + "_" + requestID
+	return path.Join(a.path, dir, "status"+dataFileExtension)
 }
 
 func (a Address) Exists() bool {
