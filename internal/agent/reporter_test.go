@@ -16,7 +16,7 @@ import (
 
 func TestReporter(t *testing.T) {
 	for scenario, fn := range map[string]func(
-		t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*persistence.Node,
+		t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node,
 	){
 		"create error mail":   testErrorMail,
 		"no error mail":       testNoErrorMail,
@@ -62,14 +62,15 @@ func TestReporter(t *testing.T) {
 				},
 			}
 
-			rp := &reporter{sender: &mockSender{}}
+			mock := &mockSender{}
+			rp := &reporter{senderFn: mock.Send}
 
-			fn(t, rp, d, nodes)
+			fn(t, rp, mock, d, nodes)
 		})
 	}
 }
 
-func testErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*persistence.Node) {
+func testErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = false
 
@@ -78,14 +79,12 @@ func testErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*persis
 		Nodes:  nodes,
 	}, fmt.Errorf("Error"))
 
-	mock, ok := rp.sender.(*mockSender)
-	require.True(t, ok)
 	require.Contains(t, mock.subject, "Error")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
 }
 
-func testNoErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*persistence.Node) {
+func testNoErrorMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
 	dag.MailOn.Failure = false
 	dag.MailOn.Success = true
 
@@ -94,13 +93,10 @@ func testNoErrorMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*pers
 		Nodes:  nodes,
 	}, nil)
 	require.NoError(t, err)
-
-	mock, ok := rp.sender.(*mockSender)
-	require.True(t, ok)
 	require.Equal(t, 0, mock.count)
 }
 
-func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*persistence.Node) {
+func testSuccessMail(t *testing.T, rp *reporter, mock *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
 	dag.MailOn.Failure = true
 	dag.MailOn.Success = true
 
@@ -110,21 +106,19 @@ func testSuccessMail(t *testing.T, rp *reporter, dag *digraph.DAG, nodes []*pers
 	}, nil)
 	require.NoError(t, err)
 
-	mock, ok := rp.sender.(*mockSender)
-	require.True(t, ok)
 	require.Contains(t, mock.subject, "Success")
 	require.Contains(t, mock.subject, "test DAG")
 	require.Equal(t, 1, mock.count)
 }
 
-func testRenderSummary(t *testing.T, _ *reporter, dag *digraph.DAG, nodes []*persistence.Node) {
+func testRenderSummary(t *testing.T, _ *reporter, _ *mockSender, dag *digraph.DAG, nodes []*persistence.Node) {
 	status := persistence.NewStatusFactory(dag).Create("request-id", scheduler.StatusError, 0, time.Now())
 	summary := renderDAGSummary(status, errors.New("test error"))
 	require.Contains(t, summary, "test error")
 	require.Contains(t, summary, dag.Name)
 }
 
-func testRenderTable(t *testing.T, _ *reporter, _ *digraph.DAG, nodes []*persistence.Node) {
+func testRenderTable(t *testing.T, _ *reporter, _ *mockSender, _ *digraph.DAG, nodes []*persistence.Node) {
 	summary := renderStepSummary(nodes)
 	require.Contains(t, summary, nodes[0].Step.Name)
 	require.Contains(t, summary, nodes[0].Step.Args[0])

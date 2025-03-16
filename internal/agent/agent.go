@@ -309,13 +309,21 @@ func (a *Agent) setup(ctx context.Context) error {
 	defer a.lock.Unlock()
 
 	a.scheduler = a.newScheduler()
-	mailer := mailer.New(mailer.Config{
-		Host:     a.dag.SMTP.Host,
-		Port:     a.dag.SMTP.Port,
-		Username: a.dag.SMTP.Username,
-		Password: a.dag.SMTP.Password,
-	})
-	a.reporter = newReporter(mailer)
+	var senderFn SenderFn
+	if a.dag.SMTP != nil {
+		senderFn = mailer.New(mailer.Config{
+			Host:     a.dag.SMTP.Host,
+			Port:     a.dag.SMTP.Port,
+			Username: a.dag.SMTP.Username,
+			Password: a.dag.SMTP.Password,
+		}).Send
+	} else {
+		senderFn = func(ctx context.Context, _ string, _ []string, subject, _ string, _ []string) error {
+			logger.Debug(ctx, "Mail notification is disabled", "subject", subject)
+			return nil
+		}
+	}
+	a.reporter = newReporter(senderFn)
 
 	return a.setupGraph(ctx)
 }

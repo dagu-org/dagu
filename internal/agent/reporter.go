@@ -18,12 +18,15 @@ type Sender interface {
 	Send(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
 }
 
+// SenderFn is a function type for sending reports.
+type SenderFn func(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
+
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
-type reporter struct{ sender Sender }
+type reporter struct{ senderFn SenderFn }
 
-func newReporter(sender Sender) *reporter {
-	return &reporter{sender: sender}
+func newReporter(f SenderFn) *reporter {
+	return &reporter{senderFn: f}
 }
 
 // reportStep is a function that reports the status of a step.
@@ -34,13 +37,13 @@ func (r *reporter) reportStep(
 	if nodeStatus != scheduler.NodeStatusNone {
 		logger.Info(ctx, "Step execution finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == scheduler.NodeStatusError && node.NodeData().Step.MailOnError {
+	if nodeStatus == scheduler.NodeStatusError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := []string{dag.ErrorMail.To}
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
 		html := renderHTML(status.Nodes)
 		attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
-		return r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
+		return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 	}
 	return nil
 }
@@ -60,22 +63,22 @@ func (r *reporter) getSummary(_ context.Context, status persistence.Status, err 
 // send is a function that sends a report mail.
 func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status persistence.Status, err error) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if dag.MailOn != nil && dag.MailOn.Failure {
+		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := []string{dag.ErrorMail.To}
 			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
 			html := renderHTML(status.Nodes)
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
-			return r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
+			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if dag.MailOn != nil && dag.MailOn.Success {
+		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := []string{dag.InfoMail.To}
 			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, status.Status)
 			html := renderHTML(status.Nodes)
 			attachments := addAttachments(dag.InfoMail.AttachLogs, status.Nodes)
-			_ = r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
+			_ = r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	}
 	return nil
