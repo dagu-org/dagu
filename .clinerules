@@ -245,6 +245,77 @@ All code contributions **must** achieve 100% test coverage. This is non-negotiab
    make coverage
    ```
 
+## Testing Standards
+
+1. **Test Organization**: Use a single test function with logical subtests (per function, method, or other logical grouping).
+   - Example: In `internal/config/config_test.go`, all tests are organized under a single `TestConfig` function with logical groupings using `t.Run`:
+   ```go
+   func TestConfig(t *testing.T) {
+       // Loading Configuration Tests
+       t.Run("Load_Success", func(t *testing.T) {
+           // Test implementation
+       })
+       
+       t.Run("Load_FileNotFound", func(t *testing.T) {
+           // Test implementation
+       })
+       
+       // More subtests...
+   }
+   - Do not include redundant test names in subtests:
+   ```go
+   func TestConfig(t *testing.T) {
+      // Bad
+      t.Run("TestConfig_Load_Success", func(t *testing.T) {
+          // Test implementation
+      })
+      // Good
+      t.Run("Load_Success", func(t *testing.T) {
+          // Test implementation
+      })
+   } 
+   ```
+   - Use t.Parallel() in subtests that can run concurrently:
+   ```go
+   t.Run("Load_Success", func(t *testing.T) {
+       t.Parallel()
+       // Test implementation
+   })
+   ```
+   - Create test helper structs when it makes tests more readable:
+   ```go
+   // Example test helper struct
+   type TestHelper struct {
+   	tb testing.TB
+   }
+   func NewTestHelper(tb testing.TB) *TestHelper {
+   	return &TestHelper{tb: tb}
+   }
+   func (th *TestHelper) Post(t *testing.TB, url string, expectedStatus int) ResponseHelper {
+   	t.Helper()
+   	// Test implementation
+   }
+   ```
+   - Use table-driven tests for multiple test cases with similar logic
+
+2. **Logical Test Grouping**: Group related tests together with clear section comments.
+   - Example: Tests in `internal/config/config_test.go` are grouped into sections like "Loading Configuration Tests", "Environment Variable Tests", "Options Tests", etc.
+
+3. **Test Isolation**: Each test should be independent and not rely on the state from other tests.
+   - Example: Each subtest in `TestConfig` creates its own temporary directory and test files.
+
+4. **Descriptive Test Names**: Use clear, descriptive names for tests that indicate what's being tested.
+   - Example: Test names like `Load_Success`, `Load_FileNotFound`, `Config_LoadEnvs_OverrideHost` clearly indicate the functionality being tested.
+
+5. **Comprehensive Assertions**: Test both success and error cases, and validate all relevant aspects of the result.
+   - Example: Testing both valid configurations and various error conditions like missing files, invalid YAML, and validation failures.
+
+6. **Test Simplicity and Minimal Redundancy**: Keep tests simple and avoid redundant test cases. Focus on testing unique code paths rather than repeating similar tests with minor variations.
+   - Example: Use table-driven tests to handle multiple similar test cases with a single test function.
+   - Example: Test boundary conditions and representative cases rather than every possible input.
+   - Example: Split large test functions into multiple smaller, focused test functions when they become too complex.
+   - Example: Use helper functions to reduce duplication in test setup and assertions.
+
 ## Review Criteria
 
 Pull requests will be evaluated based on:
@@ -261,3 +332,4 @@ Pull requests will be evaluated based on:
 2. **Be Constructive**: Provide constructive feedback in reviews
 3. **Be Collaborative**: Work together to solve problems
 4. **Be Inclusive**: Welcome contributors of all backgrounds and experience levels
+
