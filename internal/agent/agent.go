@@ -459,12 +459,12 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 }
 
 func (a *Agent) setupHistoryRecord(ctx context.Context) persistence.Record {
-	location, retentionDays := a.dag.Location, a.dag.HistRetentionDays
-	if err := a.historyStore.RemoveOld(ctx, location, retentionDays); err != nil {
+	retentionDays := a.dag.HistRetentionDays
+	if err := a.historyStore.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)
 	}
 
-	return a.historyStore.NewRecord(ctx, location, time.Now(), a.requestID)
+	return a.historyStore.NewRecord(ctx, a.dag, time.Now(), a.requestID)
 }
 
 // setupSocketServer create socket server instance.

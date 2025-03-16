@@ -84,7 +84,7 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get metadata for %s: %w", newID, err)
 	}
-	if err := e.historyStore.Rename(ctx, oldDAG.Location, newDAG.Location); err != nil {
+	if err := e.historyStore.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
 		return fmt.Errorf("failed to rename history for %s: %w", oldID, err)
 	}
 	return nil
@@ -186,7 +186,7 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persisten
 func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
 	*persistence.Status, error,
 ) {
-	record, err := e.historyStore.FindByRequestID(ctx, dag.Location, requestID)
+	record, err := e.historyStore.FindByRequestID(ctx, dag.Name, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
@@ -224,7 +224,7 @@ func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persist
 
 	var latestStatus *persistence.Status
 
-	record, err := e.historyStore.Latest(ctx, dag.Location)
+	record, err := e.historyStore.Latest(ctx, dag.Name)
 	if err != nil {
 		goto handleError
 	}
@@ -248,7 +248,7 @@ handleError:
 }
 
 func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile {
-	records := e.historyStore.Recent(ctx, dag.Location, n)
+	records := e.historyStore.Recent(ctx, dag.Name, n)
 
 	var ret []persistence.StatusFile
 	for _, record := range records {
@@ -278,7 +278,7 @@ func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status pers
 		}
 	}
 
-	return e.historyStore.Update(ctx, dag.Location, status.RequestID, status)
+	return e.historyStore.Update(ctx, dag.Name, status.RequestID, status)
 }
 
 func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
@@ -357,11 +357,11 @@ func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) 
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
-	dag, err := e.getDAG(ctx, id)
+func (e *client) GetStatus(ctx context.Context, name string) (DAGStatus, error) {
+	dag, err := e.getDAG(ctx, name)
 	if dag == nil {
 		// TODO: fix not to use location
-		dag = &digraph.DAG{Name: id, Location: id}
+		dag = &digraph.DAG{Name: name, Location: name}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
@@ -369,12 +369,12 @@ func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
 	}
 	latestStatus, _ := e.GetLatestStatus(ctx, dag)
 	return newDAGStatus(
-		dag, latestStatus, e.IsSuspended(ctx, id), err,
+		dag, latestStatus, e.IsSuspended(ctx, name), err,
 	), err
 }
 
-func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error {
-	return e.flagStore.ToggleSuspend(id, suspend)
+func (e *client) ToggleSuspend(_ context.Context, name string, suspend bool) error {
+	return e.flagStore.ToggleSuspend(name, suspend)
 }
 
 func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {

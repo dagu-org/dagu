@@ -15,13 +15,13 @@ var (
 )
 
 type HistoryStore interface {
-	NewRecord(ctx context.Context, key string, timestamp time.Time, requestID string) Record
-	Update(ctx context.Context, key, requestID string, status Status) error
-	Recent(ctx context.Context, key string, itemLimit int) []Record
-	Latest(ctx context.Context, key string) (Record, error)
-	FindByRequestID(ctx context.Context, key string, requestID string) (Record, error)
-	RemoveOld(ctx context.Context, key string, retentionDays int) error
-	Rename(ctx context.Context, oldKey, newKey string) error
+	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, requestID string) Record
+	Update(ctx context.Context, name, requestID string, status Status) error
+	Recent(ctx context.Context, name string, itemLimit int) []Record
+	Latest(ctx context.Context, name string) (Record, error)
+	FindByRequestID(ctx context.Context, name string, requestID string) (Record, error)
+	RemoveOld(ctx context.Context, name string, retentionDays int) error
+	Rename(ctx context.Context, oldName, newName string) error
 }
 
 type Record interface {

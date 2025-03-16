@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -117,14 +118,14 @@ func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status 
 }
 
 // NewRecord creates a new history record for the specified key, timestamp, and request ID.
-func (db *JSONDB) NewRecord(ctx context.Context, dagName string, timestamp time.Time, requestID string) persistence.Record {
+func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, requestID string) persistence.Record {
 	if requestID == "" {
 		logger.Error(ctx, "requestID is empty")
 	}
 
-	addr := storage.NewAddress(db.baseDir, dagName)
+	addr := storage.NewAddress(db.baseDir, dag.Name)
 	filePath := db.storage.GenerateFilePath(ctx, addr, storage.NewUTC(timestamp), requestID)
-	return NewRecord(filePath, db.cache)
+	return NewRecord(filePath, db.cache, WithDAG(dag))
 }
 
 // Recent returns the most recent history records for the specified key, up to itemLimit.
@@ -215,11 +216,6 @@ func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID
 
 	// Return the most recent file
 	return NewRecord(file, db.cache), nil
-}
-
-// RemoveAll removes all history records for the specified key.
-func (db *JSONDB) RemoveAll(ctx context.Context, dagName string) error {
-	return db.RemoveOld(ctx, dagName, 0)
 }
 
 // RemoveOld removes history records older than retentionDays for the specified key.

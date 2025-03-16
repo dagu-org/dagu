@@ -24,7 +24,7 @@ func TestHistoryData_Read(t *testing.T) {
 			requestID := fmt.Sprintf("request-id-%d", i)
 			now := time.Now().Add(time.Duration(-i) * time.Hour)
 
-			record := th.DB.NewRecord(th.Context, dag.Location, now, requestID)
+			record := th.DB.NewRecord(th.Context, dag.DAG, now, requestID)
 			err := record.Open(th.Context)
 			require.NoError(t, err)
 
@@ -52,7 +52,7 @@ func TestHistoryData_Read(t *testing.T) {
 		requestID := "request-id-today"
 		now := time.Now()
 
-		record := th.DB.NewRecord(th.Context, dag.Location, now, requestID)
+		record := th.DB.NewRecord(th.Context, dag.DAG, now, requestID)
 		err := record.Open(th.Context)
 		require.NoError(t, err)
 
@@ -82,7 +82,7 @@ func TestHistoryData_Read(t *testing.T) {
 		yesterdayTime := time.Now().AddDate(0, 0, -1)
 		requestID := "request-id-yesterday"
 
-		record := th.DB.NewRecord(th.Context, dag.Location, yesterdayTime, requestID)
+		record := th.DB.NewRecord(th.Context, dag.DAG, yesterdayTime, requestID)
 
 		err := record.Open(th.Context)
 		require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestHistoryData_Read(t *testing.T) {
 			requestID := fmt.Sprintf("request-id-%d", i)
 			now := time.Now().Add(time.Duration(-i) * time.Hour)
 
-			record := th.DB.NewRecord(th.Context, dag.Location, now, requestID)
+			record := th.DB.NewRecord(th.Context, dag.DAG, now, requestID)
 			err := record.Open(th.Context)
 			require.NoError(t, err)
 
@@ -192,7 +192,7 @@ func TestHistoryData_Remove(t *testing.T) {
 		requestID := "request-id-old"
 		oldTime := time.Now().AddDate(0, 0, -10)
 
-		record := th.DB.NewRecord(th.Context, dag.Location, oldTime, requestID)
+		record := th.DB.NewRecord(th.Context, dag.DAG, oldTime, requestID)
 		err := record.Open(th.Context)
 		require.NoError(t, err)
 

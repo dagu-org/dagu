@@ -3,6 +3,7 @@ package jsondb
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
@@ -36,14 +38,25 @@ type Record struct {
 	mu        sync.RWMutex                          // Mutex for thread safety
 	cache     *filecache.Cache[*persistence.Status] // Optional cache for read operations
 	isClosing atomic.Bool                           // Flag to prevent writes during Close/Compact
+	dag       *digraph.DAG                          // DAG associated with the status file
+}
+
+type RecordOption func(*Record)
+
+// WithDAG sets the DAG associated with the record.
+func WithDAG(dag *digraph.DAG) RecordOption {
+	return func(r *Record) {
+		r.dag = dag
+	}
 }
 
 // NewRecord creates a new HistoryRecord for the specified file.
-func NewRecord(file string, cache *filecache.Cache[*persistence.Status]) *Record {
-	return &Record{
-		file:  file,
-		cache: cache,
+func NewRecord(file string, cache *filecache.Cache[*persistence.Status], opts ...RecordOption) *Record {
+	r := &Record{file: file, cache: cache}
+	for _, opt := range opts {
+		opt(r)
 	}
+	return r
 }
 
 // Open initializes the status file for writing. It returns an error if the file is already open.
@@ -68,6 +81,17 @@ func (r *Record) Open(ctx context.Context) error {
 	dir := filepath.Dir(r.file)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// If it's a new record, save the DAG metadata
+	if r.dag != nil {
+		dagJSON, err := json.Marshal(r.dag)
+		if err != nil {
+			return fmt.Errorf("failed to marshal DAG metadata: %w", err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "dag.json"), dagJSON, 0755); err != nil { //nolint:gosec
+			return fmt.Errorf("failed to write DAG metadata: %w", err)
+		}
 	}
 
 	logger.Infof(ctx, "Initializing status file: %s", r.file)
