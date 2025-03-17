@@ -93,6 +93,9 @@ func (c ExecContext) LoadOutputVariables(vars *SyncMap) {
 }
 
 func (c ExecContext) MailerConfig() (mailer.Config, error) {
+	if c.dag.SMTP == nil {
+		return mailer.Config{}, nil
+	}
 	return cmdutil.EvalStringFields(c.ctx, mailer.Config{
 		Host:     c.dag.SMTP.Host,
 		Port:     c.dag.SMTP.Port,
