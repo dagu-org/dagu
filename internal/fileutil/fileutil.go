@@ -131,6 +131,9 @@ func EnsureYAMLExtension(filename string) string {
 
 // ResolvePath resolves the path to an absolute path.
 func ResolvePath(path string) string {
+	if path == "" {
+		return ""
+	}
 	if strings.HasPrefix(path, "~") {
 		path = filepath.Join(MustGetUserHomeDir(), path[1:])
 	}
