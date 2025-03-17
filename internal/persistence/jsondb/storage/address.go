@@ -33,7 +33,7 @@ func NewAddress(baseDir string, dagName string) Address {
 	n := fileutil.SafeName(base)
 	if n != base {
 		hash := sha256.Sum256([]byte(dagName))
-		hashLength := 8
+		hashLength := 4 // 4 characters of the hash should be enough
 		n = n + "-" + hex.EncodeToString(hash[:])[0:hashLength]
 	}
 
