@@ -48,7 +48,7 @@ func newSubWorkflow(
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}
 
-	subDAG, err := c.GetDAGByName(config.Name)
+	subDAG, err := digraph.GetDAGByName(ctx, config.Name)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to find subworkflow %q: %w", config.Name, err,
@@ -103,8 +103,7 @@ func (e *subWorkflow) Run(ctx context.Context) error {
 	}
 
 	// get results from the subworkflow
-	c := digraph.GetExecContext(ctx)
-	result, err := c.GetResult(e.subDAG, e.requestID)
+	result, err := digraph.GetResult(ctx, e.subDAG, e.requestID)
 	if err != nil {
 		return fmt.Errorf("failed to collect result: %w", err)
 	}

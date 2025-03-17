@@ -125,20 +125,20 @@ func (s *Data) Setup(ctx context.Context, logFile string, startedAt time.Time) e
 	c := digraph.GetExecContext(ctx)
 
 	// Evaluate the stdout and stderr fields
-	stdout, err := c.EvalString(s.inner.Step.Stdout)
+	stdout, err := c.EvalString(ctx, s.inner.Step.Stdout)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stdout field: %w", err)
 	}
 	s.inner.Step.Stdout = stdout
 
-	stderr, err := c.EvalString(s.inner.Step.Stderr)
+	stderr, err := c.EvalString(ctx, s.inner.Step.Stderr)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate stderr field: %w", err)
 	}
 	s.inner.Step.Stderr = stderr
 
 	// Evaluate the dir field
-	dir, err := c.EvalString(s.inner.Step.Dir)
+	dir, err := c.EvalString(ctx, s.inner.Step.Dir)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate dir field: %w", err)
 	}

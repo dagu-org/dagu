@@ -17,13 +17,13 @@ func AllEnvs(ctx context.Context) []string {
 
 // EvalString evaluates the given string with the variables within the execution context.
 func EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
-	return GetExecContext(ctx).EvalString(s, opts...)
+	return GetExecContext(ctx).EvalString(ctx, s, opts...)
 }
 
 // EvalBool evaluates the given value with the variables within the execution context
 // and parses it as a boolean.
 func EvalBool(ctx context.Context, value any) (bool, error) {
-	return GetExecContext(ctx).EvalBool(value)
+	return GetExecContext(ctx).EvalBool(ctx, value)
 }
 
 // EvalObject recursively evaluates the string fields of the given object
@@ -44,7 +44,6 @@ func GetExecContext(ctx context.Context) ExecContext {
 	if !ok {
 		return NewExecContext(ctx, Step{})
 	}
-	contextValue.ctx = ctx
 	return contextValue
 }
 
@@ -92,11 +91,11 @@ func (c ExecContext) LoadOutputVariables(vars *SyncMap) {
 	})
 }
 
-func (c ExecContext) MailerConfig() (mailer.Config, error) {
+func (c ExecContext) MailerConfig(ctx context.Context) (mailer.Config, error) {
 	if c.dag.SMTP == nil {
 		return mailer.Config{}, nil
 	}
-	return cmdutil.EvalStringFields(c.ctx, mailer.Config{
+	return cmdutil.EvalStringFields(ctx, mailer.Config{
 		Host:     c.dag.SMTP.Host,
 		Port:     c.dag.SMTP.Port,
 		Username: c.dag.SMTP.Username,
@@ -105,19 +104,19 @@ func (c ExecContext) MailerConfig() (mailer.Config, error) {
 }
 
 // EvalString evaluates the given string with the variables within the execution context.
-func (c ExecContext) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
-	ctx := GetContext(c.ctx)
-	opts = append(opts, cmdutil.WithVariables(ctx.envs))
+func (c ExecContext) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
+	dagCtx := GetContext(ctx)
+	opts = append(opts, cmdutil.WithVariables(dagCtx.envs))
 	opts = append(opts, cmdutil.WithVariables(c.envs))
 	opts = append(opts, cmdutil.WithVariables(c.vars.Variables()))
-	return cmdutil.EvalString(c.ctx, s, opts...)
+	return cmdutil.EvalString(ctx, s, opts...)
 }
 
 // EvalBool evaluates the given value with the variables within the execution context
-func (c ExecContext) EvalBool(value any) (bool, error) {
+func (c ExecContext) EvalBool(ctx context.Context, value any) (bool, error) {
 	switch v := value.(type) {
 	case string:
-		s, err := c.EvalString(v)
+		s, err := c.EvalString(ctx, v)
 		if err != nil {
 			return false, err
 		}

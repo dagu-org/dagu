@@ -42,7 +42,7 @@ func newMail(ctx context.Context, step digraph.Step) (Executor, error) {
 	c := digraph.NewExecContext(ctx, step)
 
 	exec := &mail{cfg: &cfg}
-	mailerConfig, err := c.MailerConfig()
+	mailerConfig, err := c.MailerConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields: %w", err)
 	}

@@ -578,7 +578,7 @@ func (sc *Scheduler) runHandlerNode(ctx context.Context, graph *ExecutionGraph, 
 }
 
 func (sc *Scheduler) setup(ctx context.Context) (err error) {
-	digraph.GetContext(ctx).ApplyEnvs()
+	digraph.ApplyEnvs(ctx)
 
 	if !sc.dry {
 		if err = os.MkdirAll(sc.logDir, 0755); err != nil {
