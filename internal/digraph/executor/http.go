@@ -55,20 +55,20 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		); err != nil {
 			return nil, err
 		}
-		body, err := stepContext.EvalString(reqCfg.Body)
+		body, err := stepContext.EvalString(ctx, reqCfg.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate body: %w", err)
 		}
 		reqCfg.Body = body
 		for k, v := range reqCfg.Headers {
-			header, err := stepContext.EvalString(v)
+			header, err := stepContext.EvalString(ctx, v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to evaluate header %q: %w", k, err)
 			}
 			reqCfg.Headers[k] = header
 		}
 		for k, v := range reqCfg.Query {
-			query, err := stepContext.EvalString(v)
+			query, err := stepContext.EvalString(ctx, v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to evaluate query %q: %w", k, err)
 			}
@@ -76,12 +76,12 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		}
 	}
 
-	url, err := stepContext.EvalString(step.Args[0])
+	url, err := stepContext.EvalString(ctx, step.Args[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate url: %w", err)
 	}
 
-	method, err := stepContext.EvalString(step.Command)
+	method, err := stepContext.EvalString(ctx, step.Command)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate method: %w", err)
 	}
@@ -209,7 +209,7 @@ func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 func decodeHTTPConfigFromString(ctx context.Context, s string, cfg *httpConfig) error {
 	stepContext := digraph.GetStepContext(ctx)
 	if len(s) > 0 {
-		configString, err := stepContext.EvalString(s)
+		configString, err := stepContext.EvalString(ctx, s)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate http config: %w", err)
 		}

@@ -102,7 +102,7 @@ func (e *docker) Run(ctx context.Context) error {
 	stepContext := digraph.GetStepContext(ctx)
 	var args []string
 	for _, arg := range e.step.Args {
-		val, err := stepContext.EvalString(arg)
+		val, err := stepContext.EvalString(ctx, arg)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate arg %s: %w", arg, err)
 		}
@@ -134,7 +134,7 @@ func (e *docker) Run(ctx context.Context) error {
 
 	env := make([]string, len(containerConfig.Env))
 	for i, e := range containerConfig.Env {
-		env[i], err = stepContext.EvalString(e)
+		env[i], err = stepContext.EvalString(ctx, e)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate env %s: %w", e, err)
 		}
@@ -367,7 +367,7 @@ func newDocker(
 
 	if a, ok := execCfg.Config["autoRemove"]; ok {
 		var err error
-		autoRemove, err = stepContext.EvalBool(a)
+		autoRemove, err = stepContext.EvalBool(ctx, a)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate autoRemove value: %w", err)
 		}
@@ -376,7 +376,7 @@ func newDocker(
 	pull := true
 	if p, ok := execCfg.Config["pull"]; ok {
 		var err error
-		pull, err = stepContext.EvalBool(p)
+		pull, err = stepContext.EvalBool(ctx, p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate pull value: %w", err)
 		}
@@ -395,7 +395,7 @@ func newDocker(
 
 	// Check for existing container name first
 	if containerName, ok := execCfg.Config["containerName"].(string); ok {
-		value, err := stepContext.EvalString(containerName)
+		value, err := stepContext.EvalString(ctx, containerName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate containerName: %w", err)
 		}
@@ -405,7 +405,7 @@ func newDocker(
 
 	// Fall back to image if no container name is provided
 	if img, ok := execCfg.Config["image"].(string); ok {
-		value, err := stepContext.EvalString(img)
+		value, err := stepContext.EvalString(ctx, img)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate image: %w", err)
 		}

@@ -37,7 +37,7 @@ func newJQ(ctx context.Context, step digraph.Step) (Executor, error) {
 			return nil, err
 		}
 	}
-	script, err := stepContext.EvalString(step.Script)
+	script, err := stepContext.EvalString(ctx, step.Script)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate jq input: %w", err)
 	}
