@@ -151,22 +151,14 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr() string {
-	// Normalize the location path
-	normalizedPath := strings.ReplaceAll(d.Location, " ", "_")
-	name := strings.TrimSuffix(filepath.Base(normalizedPath), filepath.Ext(filepath.Base(normalizedPath)))
-
-	// Generate hash for uniqueness
-	hash := md5.New() // nolint // gosec
-	hash.Write([]byte(normalizedPath))
-	hashSum := hash.Sum(nil)
-
-	// Truncate name if necessary
-	if len(name) > maxSocketNameLength {
-		name = name[:maxSocketNameLength-1]
+func (d *DAG) SockAddr(requestID string) string {
+	// Get DAG name for the socket
+	name := d.Name
+	if name == "" {
+		name = defaultName(d.Location)
 	}
 
-	return filepath.Join("/tmp", fmt.Sprintf("@dagu-%s-%x.sock", name, hashSum))
+	return SockAddr(name, requestID)
 }
 
 // String implements the Stringer interface.
@@ -257,4 +249,32 @@ func (d *DAG) setupHandlers(workDir string) {
 			handler.setup(workDir)
 		}
 	}
+}
+
+// SockAddr returns the unix socket address for the DAG.
+// The address is used to communicate with the agent process.
+func SockAddr(name, requestID string) string {
+	// Create MD5 hash of the combined name and requestID and take first 8 chars
+	combined := name + requestID
+	hashLength := 8
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength]
+
+	// Calculate the total length with the full name
+	prefix := "@dagu_"
+	connector := "_"
+	suffix := ".sock"
+	totalLen := len(prefix) + len(name) + len(connector) + len(hash) + len(suffix)
+
+	// Truncate name only if the total length exceeds maxSocketNameLength (50)
+	if totalLen > maxSocketNameLength {
+		// Calculate how much to truncate
+		excessLen := totalLen - maxSocketNameLength
+		nameLen := len(name) - excessLen
+		name = name[:nameLen]
+	}
+
+	// Build the socket name
+	socketName := prefix + name + connector + hash + suffix
+
+	return filepath.Join("/tmp", socketName)
 }
