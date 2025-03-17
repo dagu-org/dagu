@@ -33,12 +33,12 @@ Server Configuration
 
 Directory Paths
 ~~~~~~~~~~~~~
-- ``DAGU_DAGS_DIR`` (``$HOME/.config/dagu/dags``): DAG definitions directory
-- ``DAGU_LOG_DIR`` (``$HOME/.local/share/dagu/logs``): Log files directory
-- ``DAGU_DATA_DIR`` (``$HOME/.local/share/dagu/history``): Application data directory
-- ``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): DAG suspend flags directory
-- ``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): Admin logs directory
-- ``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): Base configuration file path
+- ``DAGU_DAGS_DIR`` (``~/.config/dagu/dags``): DAG definitions directory
+- ``DAGU_LOG_DIR`` (``~/.local/share/dagu/logs``): Log files directory
+- ``DAGU_DATA_DIR`` (``~/.local/share/dagu/history``): Application data directory
+- ``DAGU_SUSPEND_FLAGS_DIR`` (``~/.config/dagu/suspend``): DAG suspend flags directory
+- ``DAGU_ADMIN_LOG_DIR`` (``~/.local/share/admin``): Admin logs directory
+- ``DAGU_BASE_CONFIG`` (``~/.config/dagu/base.yaml``): Base configuration file path
 - ``DAGU_WORK_DIR``: Default working directory for DAGs (default: DAG location)
 
 Authentication
@@ -54,7 +54,7 @@ UI Customization
 
 Configuration File
 ----------------
-Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. Below is a complete example with all available options:
+Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Below is a complete example with all available options:
 
 .. code-block:: yaml
 
@@ -63,32 +63,37 @@ Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. 
     port: 8080        # Web UI port
     basePath: ""      # Base path to serve the application
     tz: "Asia/Tokyo"  # Timezone (e.g., "America/New_York")
+    headless: true    # Run in headless mode
     
     # Directory Configuration
-    dagsDir: "${HOME}/.config/dagu/dags"            # DAG definitions location
+    dagsDir: "~/.config/dagu/dags"            # DAG definitions location
     workDir: "/path/to/work"                        # Default working directory
-    logDir: "${HOME}/.local/share/dagu/logs"        # Log files location
-    dataDir: "${HOME}/.local/share/dagu/history"    # Application data location
-    suspendFlagsDir: "${HOME}/.config/dagu/suspend" # DAG suspend flags location
-    adminLogsDir: "${HOME}/.local/share/admin"      # Admin logs location
+    logDir: "~/.local/share/dagu/logs"        # Log files location
+    dataDir: "~/.local/share/dagu/history"    # Application data location
+    suspendFlagsDir: "~/.config/dagu/suspend" # DAG suspend flags location
+    adminLogsDir: "~/.local/share/admin"      # Admin logs location
 
     # Common Configuration for all DAGs
-    baseConfig: "${HOME}/.config/dagu/base.yaml"  # Base DAG config
+    baseConfig: "~/.config/dagu/base.yaml"  # Base DAG config
+
+    # Latest status configuration
+    latestStatusToday: true    # Show today's latest status
     
     # UI Configuration
-    navbarColor: "#ff0000"     # Header color
-    navbarTitle: "Dagu - PROD" # Header title
-    latestStatusToday: true    # Show today's latest status
-    headless: true             # Run in headless mode
+    ui:
+      navbarColor: "#ff0000"      # Header color
+      navbarTitle: "Dagu - PROD"  # Header title
+      logEncodingCharset: "utf-8" # Log encoding charset
     
     # Authentication
-    isBasicAuth: true           # Enable basic auth
-    basicAuthUsername: "admin"  # Basic auth username
-    basicAuthPassword: "secret" # Basic auth password
-    
-    # API Authentication
-    isAuthToken: true              # Enable API token
-    authToken: "your-secret-token" # API token value
+    auth:
+      basic:
+        enabled: true              # Enable basic auth
+        username: "admin"          # Basic auth username
+        password: "secret"         # Basic auth password
+      token:
+        enabled: true              # Enable API token
+        value: "your-secret-token" # API token value
     
     # SSL Configuration
     tls:
@@ -124,26 +129,30 @@ Most commonly used configurations:
      
    host: "127.0.0.1"
    port: 8080
-   dags: "${HOME}/dags"
+   dags: "~/dags"
 
 2. Production setup:
  .. code-block:: yaml
      
-   host: "0.0.0.0"
-   port: 443
-   isBasicAuth: true
-   basicAuthUsername: "admin"
-   basicAuthPassword: "strong-password"
-   tls:
-       certFile: "/path/to/cert.pem"
-       keyFile: "/path/to/key.pem"
-   navbarColor: "#ff0000"
-   navbarTitle: "Dagu - PROD"
+    host: "0.0.0.0"
+    port: 443
+    auth:
+      basic:
+        enabled: true
+        username: "admin"
+        password: "strong-password"
+    tls:
+      certFile: "/path/to/cert.pem"
+      keyFile: "/path/to/key.pem"
+    ui:
+      navbarColor: "#ff0000"
+      navbarTitle: "Dagu - PROD"
 
 3. Development setup:
  .. code-block:: yaml
      
-   host: "127.0.0.1"
-   port: 8080
-   navbarColor: "#00ff00"
-   navbarTitle: "Dagu - DEV"
+    host: "127.0.0.1"
+    port: 8080
+    ui:
+      navbarColor: "#00ff00"
+      navbarTitle: "Dagu - DEV"
