@@ -43,14 +43,14 @@ Directory Paths
 
 Authentication
 ~~~~~~~~~~~~
-- ``DAGU_IS_BASICAUTH`` (``0``): Enable basic authentication (1=enabled)
-- ``DAGU_BASICAUTH_USERNAME`` (``""``): Basic auth username
-- ``DAGU_BASICAUTH_PASSWORD`` (``""``): Basic auth password
+- ``AUTH_BASIC_ENABLED`` (``0``): Enable basic authentication (1=enabled)
+- ``AUTH_BASIC_USERNAME`` (``""``): Basic auth username
+- ``AUTH_BASIC_PASSWORD`` (``""``): Basic auth password
 
 UI Customization
 ~~~~~~~~~~~~~~
-- ``DAGU_NAVBAR_COLOR`` (``""``): Navigation bar color (e.g., ``red`` or ``#ff0000``)
-- ``DAGU_NAVBAR_TITLE`` (``Dagu``): Navigation bar title (e.g., ``Dagu - PROD``)
+- ``DAGU_UI_NAVBAR_COLOR`` (``""``): Navigation bar color (e.g., ``red`` or ``#ff0000``)
+- ``DAGU_UI_NAVBAR_TITLE`` (``Dagu``): Navigation bar title (e.g., ``Dagu - PROD``)
 
 Configuration File
 ----------------
