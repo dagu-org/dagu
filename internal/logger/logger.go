@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -125,15 +124,8 @@ func NewLogger(opts ...Option) Logger {
 	}
 
 	if cfg.writer != nil {
-		var bufferedWriter io.Writer
-		if f, ok := cfg.writer.(*os.File); ok {
-			bufferedWriter = bufio.NewWriterSize(f, 8192)
-		} else {
-			bufferedWriter = cfg.writer
-		}
-
-		handler := newHandler(bufferedWriter, cfg.format, handlerOpts)
-		guardedHandler = newGuardedHandler(handler, bufferedWriter)
+		handler := newHandler(cfg.writer, cfg.format, handlerOpts)
+		guardedHandler = newGuardedHandler(handler, cfg.writer)
 		handlers = append(handlers, guardedHandler)
 	}
 
