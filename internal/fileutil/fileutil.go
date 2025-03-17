@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 var (
@@ -126,4 +127,15 @@ func EnsureYAMLExtension(filename string) string {
 	default:
 		return filename + yamlExtension
 	}
+}
+
+// ResolvePath resolves the path to an absolute path.
+func ResolvePath(path string) string {
+	if strings.HasPrefix(path, "~") {
+		path = filepath.Join(MustGetUserHomeDir(), path[1:])
+	}
+	// Expand environment variables
+	path = os.ExpandEnv(path)
+	path = filepath.Clean(path)
+	return path
 }

@@ -12,8 +12,8 @@ To enable API token for Dagu, follow these steps:
   
    .. code-block:: bash
   
-       export DAGU_IS_AUTHTOKEN=1
-       export DAGU_AUTHTOKEN="<arbitrary token string>"
+       export DAGU_AUTH_TOKEN_ENABLED=1
+       export DAGU_AUTH_TOKEN="<arbitrary token string>"
   
    Replace ``<arbitrary token string>`` with a random string of your choice. This string will be used as the API token for Dagu.
 
@@ -21,9 +21,10 @@ To enable API token for Dagu, follow these steps:
 
    .. code-block:: yaml
   
-       # API Token
-       isAuthToken: true
-       authToken: "<arbitrary token string>"
+        # API Token
+        auth:
+          enabled: true
+          value: "<arbitrary token string>"
 
 #. You can enable HTTPS by configuring the following environment variables:
 
@@ -40,9 +41,9 @@ To enable API token for Dagu, follow these steps:
 
    .. code-block:: bash
   
-       export DAGU_IS_BASICAUTH=1
-       export DAGU_BASICAUTH_USERNAME="<username>"
-       export DAGU_BASICAUTH_PASSWORD="<password>"
+       export AUTH_BASIC_ENABLED=1
+       export AUTH_BASIC_USERNAME="<username>"
+       export AUTH_BASIC_PASSWORD="<password>"
   
    Replace ``<username>`` and ``<password>`` with your username and password.
 
