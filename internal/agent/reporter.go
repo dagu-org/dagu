@@ -9,7 +9,7 @@ import (
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
@@ -18,35 +18,38 @@ type Sender interface {
 	Send(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
 }
 
+// SenderFn is a function type for sending reports.
+type SenderFn func(ctx context.Context, from string, to []string, subject, body string, attachments []string) error
+
 // reporter is responsible for reporting the status of the scheduler
 // to the user.
-type reporter struct{ sender Sender }
+type reporter struct{ senderFn SenderFn }
 
-func newReporter(sender Sender) *reporter {
-	return &reporter{sender: sender}
+func newReporter(f SenderFn) *reporter {
+	return &reporter{senderFn: f}
 }
 
 // reportStep is a function that reports the status of a step.
 func (r *reporter) reportStep(
-	ctx context.Context, dag *digraph.DAG, status model.Status, node *scheduler.Node,
+	ctx context.Context, dag *digraph.DAG, status persistence.Status, node *scheduler.Node,
 ) error {
 	nodeStatus := node.State().Status
 	if nodeStatus != scheduler.NodeStatusNone {
-		logger.Info(ctx, "Step execution finished", "step", node.Data().Step.Name, "status", nodeStatus)
+		logger.Info(ctx, "Step execution finished", "step", node.NodeData().Step.Name, "status", nodeStatus)
 	}
-	if nodeStatus == scheduler.NodeStatusError && node.Data().Step.MailOnError {
+	if nodeStatus == scheduler.NodeStatusError && node.NodeData().Step.MailOnError && dag.ErrorMail != nil {
 		fromAddress := dag.ErrorMail.From
 		toAddresses := []string{dag.ErrorMail.To}
 		subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
 		html := renderHTML(status.Nodes)
 		attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
-		return r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
+		return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 	}
 	return nil
 }
 
 // report is a function that reports the status of the scheduler.
-func (r *reporter) getSummary(_ context.Context, status model.Status, err error) string {
+func (r *reporter) getSummary(_ context.Context, status persistence.Status, err error) string {
 	var buf bytes.Buffer
 	_, _ = buf.Write([]byte("\n"))
 	_, _ = buf.Write([]byte("Summary ->\n"))
@@ -58,24 +61,24 @@ func (r *reporter) getSummary(_ context.Context, status model.Status, err error)
 }
 
 // send is a function that sends a report mail.
-func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status model.Status, err error) error {
+func (r *reporter) send(ctx context.Context, dag *digraph.DAG, status persistence.Status, err error) error {
 	if err != nil || status.Status == scheduler.StatusError {
-		if dag.MailOn != nil && dag.MailOn.Failure {
+		if dag.MailOn != nil && dag.MailOn.Failure && dag.ErrorMail != nil {
 			fromAddress := dag.ErrorMail.From
 			toAddresses := []string{dag.ErrorMail.To}
 			subject := fmt.Sprintf("%s %s (%s)", dag.ErrorMail.Prefix, dag.Name, status.Status)
 			html := renderHTML(status.Nodes)
 			attachments := addAttachments(dag.ErrorMail.AttachLogs, status.Nodes)
-			return r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
+			return r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	} else if status.Status == scheduler.StatusSuccess {
-		if dag.MailOn != nil && dag.MailOn.Success {
+		if dag.MailOn != nil && dag.MailOn.Success && dag.InfoMail != nil {
 			fromAddress := dag.InfoMail.From
 			toAddresses := []string{dag.InfoMail.To}
 			subject := fmt.Sprintf("%s %s (%s)", dag.InfoMail.Prefix, dag.Name, status.Status)
 			html := renderHTML(status.Nodes)
 			attachments := addAttachments(dag.InfoMail.AttachLogs, status.Nodes)
-			_ = r.sender.Send(ctx, fromAddress, toAddresses, subject, html, attachments)
+			_ = r.senderFn(ctx, fromAddress, toAddresses, subject, html, attachments)
 		}
 	}
 	return nil
@@ -91,7 +94,7 @@ var dagHeader = table.Row{
 	"Error",
 }
 
-func renderDAGSummary(status model.Status, err error) string {
+func renderDAGSummary(status persistence.Status, err error) string {
 	dataRow := table.Row{
 		status.RequestID,
 		status.Name,
@@ -122,7 +125,7 @@ var stepHeader = table.Row{
 	"Error",
 }
 
-func renderStepSummary(nodes []*model.Node) string {
+func renderStepSummary(nodes []*persistence.Node) string {
 	stepTable := table.NewWriter()
 	stepTable.AppendHeader(stepHeader)
 
@@ -147,7 +150,7 @@ func renderStepSummary(nodes []*model.Node) string {
 	return stepTable.Render()
 }
 
-func renderHTML(nodes []*model.Node) string {
+func renderHTML(nodes []*persistence.Node) string {
 	var buffer bytes.Buffer
 	addValFunc := func(val string) {
 		_, _ = buffer.WriteString(
@@ -195,7 +198,7 @@ func renderHTML(nodes []*model.Node) string {
 }
 
 func addAttachments(
-	trigger bool, nodes []*model.Node,
+	trigger bool, nodes []*persistence.Node,
 ) (attachments []string) {
 	if trigger {
 		for _, n := range nodes {

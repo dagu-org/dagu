@@ -15,25 +15,25 @@ import (
 type ExecutionGraph struct {
 	startedAt  time.Time
 	finishedAt time.Time
-	dict       map[int]*Node
+	nodeByID   map[int]*Node
 	nodes      []*Node
-	from       map[int][]int
-	to         map[int][]int
-	mu         sync.RWMutex
+	From       map[int][]int
+	To         map[int][]int
+	lock       sync.RWMutex
 }
 
 // NewExecutionGraph creates a new execution graph with the given steps.
 func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		dict:  make(map[int]*Node),
-		from:  make(map[int][]int),
-		to:    make(map[int][]int),
-		nodes: []*Node{},
+		nodeByID: make(map[int]*Node),
+		From:     make(map[int][]int),
+		To:       make(map[int][]int),
+		nodes:    []*Node{},
 	}
 	for _, step := range steps {
-		node := &Node{data: newSafeData(NodeData{Step: step})}
+		node := &Node{Data: newSafeData(NodeData{Step: step})}
 		node.Init()
-		graph.dict[node.id] = node
+		graph.nodeByID[node.id] = node
 		graph.nodes = append(graph.nodes, node)
 	}
 	if err := graph.setup(); err != nil {
@@ -46,14 +46,14 @@ func NewExecutionGraph(steps ...digraph.Step) (*ExecutionGraph, error) {
 // given nodes.
 func CreateRetryExecutionGraph(ctx context.Context, nodes ...*Node) (*ExecutionGraph, error) {
 	graph := &ExecutionGraph{
-		dict:  make(map[int]*Node),
-		from:  make(map[int][]int),
-		to:    make(map[int][]int),
-		nodes: []*Node{},
+		nodeByID: make(map[int]*Node),
+		From:     make(map[int][]int),
+		To:       make(map[int][]int),
+		nodes:    []*Node{},
 	}
 	for _, node := range nodes {
 		node.Init()
-		graph.dict[node.id] = node
+		graph.nodeByID[node.id] = node
 		graph.nodes = append(graph.nodes, node)
 	}
 	if err := graph.setup(); err != nil {
@@ -67,8 +67,8 @@ func CreateRetryExecutionGraph(ctx context.Context, nodes ...*Node) (*ExecutionG
 
 // Duration returns the duration of the execution.
 func (g *ExecutionGraph) Duration() time.Duration {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	if g.finishedAt.IsZero() {
 		return time.Since(g.startedAt)
 	}
@@ -76,27 +76,27 @@ func (g *ExecutionGraph) Duration() time.Duration {
 }
 
 func (g *ExecutionGraph) IsStarted() bool {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	return !g.startedAt.IsZero()
 }
 
 func (g *ExecutionGraph) IsFinished() bool {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	return !g.finishedAt.IsZero()
 }
 
 func (g *ExecutionGraph) StartAt() time.Time {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	return g.startedAt
 }
 
 func (g *ExecutionGraph) IsRunning() bool {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	for _, node := range g.Nodes() {
+	g.lock.RLock()
+	defer g.lock.RUnlock()
+	for _, node := range g.nodes {
 		if node.State().Status == NodeStatusRunning {
 			return true
 		}
@@ -105,56 +105,56 @@ func (g *ExecutionGraph) IsRunning() bool {
 }
 
 func (g *ExecutionGraph) FinishAt() time.Time {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+	g.lock.RLock()
+	defer g.lock.RUnlock()
 	return g.finishedAt
 }
 
 func (g *ExecutionGraph) Finish() {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	g.lock.Lock()
+	defer g.lock.Unlock()
 	g.finishedAt = time.Now()
 }
 
 func (g *ExecutionGraph) Start() {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	g.lock.Lock()
+	defer g.lock.Unlock()
 	g.startedAt = time.Now()
 }
 
-// Nodes returns the nodes of the execution graph.
-func (g *ExecutionGraph) Nodes() []*Node {
-	return g.nodes
-}
-
 func (g *ExecutionGraph) NodeData() []NodeData {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	g.lock.Lock()
+	defer g.lock.Unlock()
 
 	var ret []NodeData
 	for _, node := range g.nodes {
 		node.mu.Lock()
-		ret = append(ret, node.data.Data())
+		ret = append(ret, node.NodeData())
 		node.mu.Unlock()
 	}
 
 	return ret
 }
 
-func (g *ExecutionGraph) node(id int) *Node {
-	return g.dict[id]
+func (g *ExecutionGraph) NodeByName(name string) *Node {
+	for _, node := range g.nodes {
+		if node.Name() == name {
+			return node
+		}
+	}
+	return nil
 }
 
 func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 	dict := map[int]NodeStatus{}
 	retry := map[int]bool{}
 	for _, node := range g.nodes {
-		dict[node.id] = node.data.Status()
+		dict[node.id] = node.Status()
 		retry[node.id] = false
 	}
 	var frontier []int
 	for _, node := range g.nodes {
-		if len(node.data.Step().Depends) == 0 {
+		if len(node.Step().Depends) == 0 {
 			frontier = append(frontier, node.id)
 		}
 	}
@@ -163,11 +163,11 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
-				logger.Info(ctx, "clear node state", "step", g.dict[u].data.Name())
-				g.dict[u].data.ClearState()
+				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
+				g.nodeByID[u].ClearState()
 				retry[u] = true
 			}
-			for _, v := range g.from[u] {
+			for _, v := range g.From[u] {
 				if retry[u] {
 					retry[v] = true
 				}
@@ -181,7 +181,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 
 func (g *ExecutionGraph) setup() error {
 	for _, node := range g.nodes {
-		for _, dep := range node.data.Step().Depends {
+		for _, dep := range node.Step().Depends {
 			depStep, err := g.findStep(dep)
 			if err != nil {
 				return err
@@ -199,7 +199,7 @@ func (g *ExecutionGraph) setup() error {
 
 func (g *ExecutionGraph) hasCycle() bool {
 	var inDegrees = make(map[int]int)
-	for node, depends := range g.to {
+	for node, depends := range g.To {
 		inDegrees[node] = len(depends)
 	}
 
@@ -215,7 +215,7 @@ func (g *ExecutionGraph) hasCycle() bool {
 		var f = q[0]
 		q = q[1:]
 
-		var tos = g.from[f]
+		var tos = g.From[f]
 		for _, to := range tos {
 			inDegrees[to]--
 			if inDegrees[to] == 0 {
@@ -234,13 +234,13 @@ func (g *ExecutionGraph) hasCycle() bool {
 }
 
 func (g *ExecutionGraph) addEdge(from, to *Node) {
-	g.from[from.id] = append(g.from[from.id], to.id)
-	g.to[to.id] = append(g.to[to.id], from.id)
+	g.From[from.id] = append(g.From[from.id], to.id)
+	g.To[to.id] = append(g.To[to.id], from.id)
 }
 
 func (g *ExecutionGraph) findStep(name string) (*Node, error) {
-	for _, n := range g.dict {
-		if n.data.Name() == name {
+	for _, n := range g.nodeByID {
+		if n.Name() == name {
 			return n, nil
 		}
 	}

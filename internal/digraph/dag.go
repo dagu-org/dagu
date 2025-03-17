@@ -21,58 +21,58 @@ const (
 // DAG contains all information about a workflow.
 type DAG struct {
 	// Location is the absolute path to the DAG file.
-	Location string `json:"Location"`
+	Location string `json:"Location,omitempty"`
 	// Group is the group name of the DAG. This is optional.
-	Group string `json:"Group"`
+	Group string `json:"Group,omitempty"`
 	// Name is the name of the DAG. The default is the filename without the extension.
-	Name string `json:"Name"`
+	Name string `json:"Name,omitempty"`
 	// Dotenv is the path to the dotenv file. This is optional.
-	Dotenv []string `json:"Dotenv"`
+	Dotenv []string `json:"Dotenv,omitempty"`
 	// Tags contains the list of tags for the DAG. This is optional.
-	Tags []string `json:"Tags"`
+	Tags []string `json:"Tags,omitempty"`
 	// Description is the description of the DAG. This is optional.
-	Description string `json:"Description"`
+	Description string `json:"Description,omitempty"`
 	// Schedule configuration for starting, stopping, and restarting the DAG.
-	Schedule        []Schedule `json:"Schedule"`
-	StopSchedule    []Schedule `json:"StopSchedule"`
-	RestartSchedule []Schedule `json:"RestartSchedule"`
+	Schedule        []Schedule `json:"Schedule,omitempty"`
+	StopSchedule    []Schedule `json:"StopSchedule,omitempty"`
+	RestartSchedule []Schedule `json:"RestartSchedule,omitempty"`
 	// SkipIfSuccessful indicates whether to skip the DAG if it was successful previously.
 	// E.g., when the DAG has already been executed manually before the scheduled time.
-	SkipIfSuccessful bool `json:"SkipIfSuccessful"`
+	SkipIfSuccessful bool `json:"SkipIfSuccessful,omitempty"`
 	// Env contains a list of environment variables to be set before running the DAG.
-	Env []string `json:"Env"`
+	Env []string `json:"Env,omitempty"`
 	// LogDir is the directory where the logs are stored.
-	LogDir string `json:"LogDir"`
+	LogDir string `json:"LogDir,omitempty"`
 	// DefaultParams contains the default parameters to be passed to the DAG.
-	DefaultParams string `json:"DefaultParams"`
+	DefaultParams string `json:"DefaultParams,omitempty"`
 	// Params contains the list of parameters to be passed to the DAG.
-	Params []string `json:"Params"`
+	Params []string `json:"Params,omitempty"`
 	// Steps contains the list of steps in the DAG.
-	Steps []Step `json:"Steps"`
+	Steps []Step `json:"Steps,omitempty"`
 	// HandlerOn contains the steps to be executed on different events.
-	HandlerOn HandlerOn `json:"HandlerOn"`
+	HandlerOn HandlerOn `json:"HandlerOn,omitempty"`
 	// Preconditions contains the conditions to be met before running the DAG.
-	Preconditions []Condition `json:"Preconditions"`
+	Preconditions []Condition `json:"Preconditions,omitempty"`
 	// SMTP contains the SMTP configuration.
-	SMTP *SMTPConfig `json:"Smtp"`
+	SMTP *SMTPConfig `json:"Smtp,omitempty"`
 	// ErrorMail contains the mail configuration for errors.
-	ErrorMail *MailConfig `json:"ErrorMail"`
+	ErrorMail *MailConfig `json:"ErrorMail,omitempty"`
 	// InfoMail contains the mail configuration for informational messages.
-	InfoMail *MailConfig `json:"InfoMail"`
+	InfoMail *MailConfig `json:"InfoMail,omitempty"`
 	// MailOn contains the conditions to send mail.
-	MailOn *MailOn `json:"MailOn"`
+	MailOn *MailOn `json:"MailOn,omitempty"`
 	// Timeout specifies the maximum execution time of the DAG task.
-	Timeout time.Duration `json:"Timeout"`
+	Timeout time.Duration `json:"Timeout,omitempty"`
 	// Delay is the delay before starting the DAG.
-	Delay time.Duration `json:"Delay"`
+	Delay time.Duration `json:"Delay,omitempty"`
 	// RestartWait is the time to wait before restarting the DAG.
-	RestartWait time.Duration `json:"RestartWait"`
+	RestartWait time.Duration `json:"RestartWait,omitempty"`
 	// MaxActiveRuns specifies the maximum concurrent steps to run in an execution.
-	MaxActiveRuns int `json:"MaxActiveRuns"`
+	MaxActiveRuns int `json:"MaxActiveRuns,omitempty"`
 	// MaxCleanUpTime is the maximum time to wait for cleanup when the DAG is stopped.
-	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime"`
+	MaxCleanUpTime time.Duration `json:"MaxCleanUpTime,omitempty"`
 	// HistRetentionDays is the number of days to keep the history.
-	HistRetentionDays int `json:"HistRetentionDays"`
+	HistRetentionDays int `json:"HistRetentionDays,omitempty"`
 }
 
 // Schedule contains the cron expression and the parsed cron schedule.
@@ -85,32 +85,32 @@ type Schedule struct {
 
 // HandlerOn contains the steps to be executed on different events in the DAG.
 type HandlerOn struct {
-	Failure *Step `json:"Failure"`
-	Success *Step `json:"Success"`
-	Cancel  *Step `json:"Cancel"`
-	Exit    *Step `json:"Exit"`
+	Failure *Step `json:"Failure,omitempty"`
+	Success *Step `json:"Success,omitempty"`
+	Cancel  *Step `json:"Cancel,omitempty"`
+	Exit    *Step `json:"Exit,omitempty"`
 }
 
 // MailOn contains the conditions to send mail.
 type MailOn struct {
-	Failure bool `json:"Failure"`
-	Success bool `json:"Success"`
+	Failure bool `json:"Failure,omitempty"`
+	Success bool `json:"Success,omitempty"`
 }
 
 // SMTPConfig contains the SMTP configuration.
 type SMTPConfig struct {
-	Host     string `json:"Host"`
-	Port     string `json:"Port"`
-	Username string `json:"Username"`
-	Password string `json:"Password"`
+	Host     string `json:"Host,omitempty"`
+	Port     string `json:"Port,omitempty"`
+	Username string `json:"Username,omitempty"`
+	Password string `json:"Password,omitempty"`
 }
 
 // MailConfig contains the mail configuration.
 type MailConfig struct {
-	From       string `json:"From"`
-	To         string `json:"To"`
-	Prefix     string `json:"Prefix"`
-	AttachLogs bool   `json:"AttachLogs"`
+	From       string `json:"From,omitempty"`
+	To         string `json:"To,omitempty"`
+	Prefix     string `json:"Prefix,omitempty"`
+	AttachLogs bool   `json:"AttachLogs,omitempty"`
 }
 
 // HandlerType is the type of the handler.
@@ -188,8 +188,33 @@ func (d *DAG) String() string {
 	return sb.String()
 }
 
-// setup sets the default values for the DAG.
-func (d *DAG) setup() {
+// Validate performs basic validation of the DAG structure
+func (d *DAG) Validate() error {
+	// Ensure all referenced steps exist
+	stepMap := make(map[string]bool)
+	for _, step := range d.Steps {
+		stepMap[step.Name] = true
+	}
+
+	// Check dependencies
+	for _, step := range d.Steps {
+		for _, dep := range step.Depends {
+			if !stepMap[dep] {
+				return fmt.Errorf("step %s depends on non-existent step %s", step.Name, dep)
+			}
+		}
+	}
+
+	return nil
+}
+
+// initializeDefaults sets the default values for the DAG.
+func (d *DAG) initializeDefaults() {
+	// Set the name if not set.
+	if d.Name == "" {
+		d.Name = defaultName(d.Location)
+	}
+
 	// Set default history retention days to 30 if not specified.
 	if d.HistRetentionDays == 0 {
 		d.HistRetentionDays = defaultHistoryRetentionDays
@@ -200,7 +225,13 @@ func (d *DAG) setup() {
 		d.MaxCleanUpTime = defaultMaxCleanUpTime
 	}
 
+	// Ensure we have a valid working directory
 	workDir := filepath.Dir(d.Location)
+	if workDir == "" {
+		workDir = "."
+	}
+
+	// Setup steps and handlers with the working directory
 	d.setupSteps(workDir)
 	d.setupHandlers(workDir)
 }

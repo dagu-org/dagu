@@ -11,6 +11,7 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/dagu-org/dagu/internal/build"
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/spf13/viper"
 )
 
@@ -164,13 +165,13 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set file system paths from the definition.
 	if def.Paths != nil {
-		cfg.Paths.DAGsDir = def.Paths.DAGsDir
-		cfg.Paths.SuspendFlagsDir = def.Paths.SuspendFlagsDir
-		cfg.Paths.DataDir = def.Paths.DataDir
-		cfg.Paths.LogDir = def.Paths.LogDir
-		cfg.Paths.AdminLogsDir = def.Paths.AdminLogsDir
-		cfg.Paths.BaseConfig = def.Paths.BaseConfig
-		cfg.Paths.Executable = def.Paths.Executable
+		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.Paths.DAGsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.Paths.SuspendFlagsDir)
+		cfg.Paths.DataDir = fileutil.MustResolvePath(def.Paths.DataDir)
+		cfg.Paths.LogDir = fileutil.MustResolvePath(def.Paths.LogDir)
+		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.Paths.AdminLogsDir)
+		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.Paths.BaseConfig)
+		cfg.Paths.Executable = fileutil.MustResolvePath(def.Paths.Executable)
 	}
 
 	// Set UI configuration if provided.
@@ -216,28 +217,28 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 	// For DAGs directory, if both legacy fields are present, def.DAGsDir takes precedence.
 	if def.DAGs != "" {
-		cfg.Paths.DAGsDir = def.DAGs
+		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGs)
 	}
 	if def.DAGsDir != "" {
-		cfg.Paths.DAGsDir = def.DAGsDir
+		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGsDir)
 	}
 	if def.Executable != "" {
-		cfg.Paths.Executable = def.Executable
+		cfg.Paths.Executable = fileutil.MustResolvePath(def.Executable)
 	}
 	if def.LogDir != "" {
-		cfg.Paths.LogDir = def.LogDir
+		cfg.Paths.LogDir = fileutil.MustResolvePath(def.LogDir)
 	}
 	if def.DataDir != "" {
-		cfg.Paths.DataDir = def.DataDir
+		cfg.Paths.DataDir = fileutil.MustResolvePath(def.DataDir)
 	}
 	if def.SuspendFlagsDir != "" {
-		cfg.Paths.SuspendFlagsDir = def.SuspendFlagsDir
+		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.SuspendFlagsDir)
 	}
 	if def.AdminLogsDir != "" {
-		cfg.Paths.AdminLogsDir = def.AdminLogsDir
+		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.AdminLogsDir)
 	}
 	if def.BaseConfig != "" {
-		cfg.Paths.BaseConfig = def.BaseConfig
+		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.BaseConfig)
 	}
 	if def.LogEncodingCharset != "" {
 		cfg.UI.LogEncodingCharset = def.LogEncodingCharset
@@ -292,17 +293,20 @@ func (l *ConfigLoader) getXDGConfig(homeDir string) XDGConfig {
 
 // configureViper sets up viper's configuration file location, type, and environment variable handling.
 func (l *ConfigLoader) configureViper(resolver PathResolver) {
+	l.setupViperConfigPath(resolver.ConfigDir)
+	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
+}
+
+func (l *ConfigLoader) setupViperConfigPath(configDir string) {
 	if l.configFile == "" {
-		viper.AddConfigPath(resolver.ConfigDir)
+		viper.AddConfigPath(configDir)
 		viper.SetConfigName("config")
 	} else {
 		viper.SetConfigFile(l.configFile)
 	}
 	viper.SetConfigType("yaml")
-	// Use the application slug as prefix and replace hyphens with underscores.
-	viper.SetEnvPrefix(strings.ToUpper(build.Slug))
-	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-	viper.AutomaticEnv()
 }
 
 // setDefaultValues establishes the default configuration values for various keys.

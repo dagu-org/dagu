@@ -33,7 +33,7 @@ type httpConfig struct {
 	Body    string            `json:"body"`
 	Silent  bool              `json:"silent"`
 	Debug   bool              `json:"debug"`
-	Json    bool              `json:"json"`
+	JSON    bool              `json:"json"`
 }
 
 type httpJSONResult struct {
@@ -43,7 +43,6 @@ type httpJSONResult struct {
 }
 
 func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
-	stepContext := digraph.GetStepContext(ctx)
 	var reqCfg httpConfig
 	if len(step.Script) > 0 {
 		if err := decodeHTTPConfigFromString(ctx, step.Script, &reqCfg); err != nil {
@@ -55,20 +54,20 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		); err != nil {
 			return nil, err
 		}
-		body, err := stepContext.EvalString(reqCfg.Body)
+		body, err := digraph.EvalString(ctx, reqCfg.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to evaluate body: %w", err)
 		}
 		reqCfg.Body = body
 		for k, v := range reqCfg.Headers {
-			header, err := stepContext.EvalString(v)
+			header, err := digraph.EvalString(ctx, v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to evaluate header %q: %w", k, err)
 			}
 			reqCfg.Headers[k] = header
 		}
 		for k, v := range reqCfg.Query {
-			query, err := stepContext.EvalString(v)
+			query, err := digraph.EvalString(ctx, v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to evaluate query %q: %w", k, err)
 			}
@@ -76,12 +75,12 @@ func newHTTP(ctx context.Context, step digraph.Step) (Executor, error) {
 		}
 	}
 
-	url, err := stepContext.EvalString(step.Args[0])
+	url, err := digraph.EvalString(ctx, step.Args[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate url: %w", err)
 	}
 
-	method, err := stepContext.EvalString(step.Command)
+	method, err := digraph.EvalString(ctx, step.Command)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate method: %w", err)
 	}
@@ -181,7 +180,7 @@ func (e *http) Run(_ context.Context) error {
 
 	resCode := rsp.StatusCode()
 
-	if e.cfg.Json {
+	if e.cfg.JSON {
 		if err = e.writeJSONResult(rsp); err != nil {
 			return err
 		}
@@ -206,14 +205,13 @@ func decodeHTTPConfig(dat map[string]any, cfg *httpConfig) error {
 	return md.Decode(dat)
 }
 
-func decodeHTTPConfigFromString(ctx context.Context, s string, cfg *httpConfig) error {
-	stepContext := digraph.GetStepContext(ctx)
-	if len(s) > 0 {
-		configString, err := stepContext.EvalString(s)
+func decodeHTTPConfigFromString(ctx context.Context, source string, target *httpConfig) error {
+	if len(source) > 0 {
+		s, err := digraph.EvalString(ctx, source)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate http config: %w", err)
 		}
-		if err := json.Unmarshal([]byte(configString), &cfg); err != nil {
+		if err := json.Unmarshal([]byte(s), &target); err != nil {
 			return err
 		}
 	}

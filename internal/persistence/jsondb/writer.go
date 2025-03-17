@@ -1,113 +1,200 @@
+// Package jsondb provides a JSON-based database implementation for storing DAG execution history.
 package jsondb
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/dagu-org/dagu/internal/fileutil"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/logger"
+	"github.com/dagu-org/dagu/internal/persistence"
 )
 
+// WriterState represents the current state of a writer
+type WriterState int
+
+const (
+	WriterStateClosed WriterState = iota
+	WriterStateOpen
+)
+
+// Error definitions
 var (
 	ErrWriterClosed  = errors.New("writer is closed")
 	ErrWriterNotOpen = errors.New("writer is not open")
 )
 
-// writer manages writing status to a local file.
-type writer struct {
-	target string
-	writer *bufio.Writer
-	file   *os.File
-	mu     sync.Mutex
-	closed bool
+// Writer manages writing status to a local file.
+// It provides thread-safe operations and ensures data durability.
+type Writer struct {
+	target     string        // Path to the target file
+	state      WriterState   // Current state of the writer
+	writer     *bufio.Writer // Buffered writer for performance
+	file       *os.File      // Underlying file handle
+	mu         sync.Mutex    // Mutex for thread safety
+	bufferSize int           // Size of the write buffer
 }
 
-func newWriter(target string) *writer {
-	return &writer{target: target}
+// WriterOption defines functional options for configuring a Writer.
+type WriterOption func(*Writer)
+
+// NewWriter creates a new Writer instance for the specified target file path.
+func NewWriter(target string, opts ...WriterOption) *Writer {
+	w := &Writer{
+		target:     target,
+		state:      WriterStateClosed,
+		bufferSize: 4096, // Default buffer size
+	}
+
+	for _, opt := range opts {
+		opt(w)
+	}
+
+	return w
 }
 
-// open opens the writer.
-func (w *writer) open() error {
+// Open prepares the writer for writing by creating necessary directories
+// and opening the target file.
+func (w *Writer) Open() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed {
-		return ErrWriterClosed
+	if w.state == WriterStateOpen {
+		return nil // Already open, no need to reopen
 	}
 
-	if err := os.MkdirAll(filepath.Dir(w.target), 0755); err != nil {
-		return err
+	// Create directories if needed
+	dir := filepath.Dir(w.target)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
+	// Open or create file
 	file, err := fileutil.OpenOrCreateFile(w.target)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file %s: %w", w.target, err)
 	}
 
 	w.file = file
-	w.writer = bufio.NewWriter(file)
+	w.writer = bufio.NewWriterSize(file, w.bufferSize)
+	w.state = WriterStateOpen
 	return nil
 }
 
-// write appends the status to the local file.
-func (w *writer) write(st model.Status) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	if w.closed {
-		return ErrWriterClosed
-	}
-
-	if w.writer == nil {
-		return ErrWriterNotOpen
-	}
-
-	jsonb, err := json.Marshal(st)
-	if err != nil {
+// Write serializes the status to JSON and appends it to the file.
+// It automatically flushes data to ensure durability.
+func (w *Writer) Write(ctx context.Context, st persistence.Status) error {
+	// Add context info to logs if write fails
+	if err := w.write(st); err != nil {
+		logger.Errorf(ctx, "Failed to write status: %v", err)
 		return err
 	}
 
-	if _, err := w.writer.Write(jsonb); err != nil {
-		return err
-	}
-
-	if err := w.writer.WriteByte('\n'); err != nil {
-		return err
-	}
-
-	return w.writer.Flush()
+	return nil
 }
 
-// close closes the writer.
-func (w *writer) close() error {
+func (w *Writer) write(st persistence.Status) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed {
-		return nil
-	}
-
 	var err error
+
+	if w.state != WriterStateOpen {
+		err = ErrWriterNotOpen
+		return err
+	}
+
+	// Marshal status to JSON
+	jsonBytes, jsonErr := json.Marshal(st)
+	if jsonErr != nil {
+		err = fmt.Errorf("failed to marshal status: %w", jsonErr)
+		return err
+	}
+
+	// Write JSON line
+	if _, writeErr := w.writer.Write(jsonBytes); writeErr != nil {
+		err = fmt.Errorf("failed to write JSON: %w", writeErr)
+		return err
+	}
+
+	// Add newline
+	if nlErr := w.writer.WriteByte('\n'); nlErr != nil {
+		err = fmt.Errorf("failed to write newline: %w", nlErr)
+		return err
+	}
+
+	// Flush to ensure data is written to the underlying file
+	if flushErr := w.writer.Flush(); flushErr != nil {
+		err = fmt.Errorf("failed to flush data: %w", flushErr)
+		return err
+	}
+
+	return nil
+}
+
+// Close flushes any buffered data and closes the underlying file.
+// It's safe to call close multiple times.
+func (w *Writer) Close(ctx context.Context) error {
+	// Add context info to logs if close fails
+	if err := w.close(); err != nil {
+		logger.Errorf(ctx, "Failed to close writer: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// close flushes any buffered data and closes the underlying file.
+func (w *Writer) close() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.state == WriterStateClosed {
+		return nil // Already closed
+	}
+
+	var errs []error
+
+	// Flush any buffered data
 	if w.writer != nil {
-		err = w.writer.Flush()
+		if err := w.writer.Flush(); err != nil {
+			errs = append(errs, fmt.Errorf("flush error: %w", err))
+		}
 	}
 
+	// Ensure data is synced to disk
 	if w.file != nil {
-		if syncErr := w.file.Sync(); syncErr != nil && err == nil {
-			err = syncErr
+		if err := w.file.Sync(); err != nil {
+			errs = append(errs, fmt.Errorf("sync error: %w", err))
 		}
-		if closeErr := w.file.Close(); closeErr != nil && err == nil {
-			err = closeErr
+
+		if err := w.file.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close error: %w", err))
 		}
 	}
 
-	w.closed = true
+	// Reset writer state
 	w.writer = nil
 	w.file = nil
+	w.state = WriterStateClosed
 
-	return err
+	// Return combined errors if any
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
+}
+
+// IsOpen returns true if the writer is currently open.
+func (w *Writer) IsOpen() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.state == WriterStateOpen
 }

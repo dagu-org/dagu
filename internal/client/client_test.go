@@ -13,7 +13,7 @@ import (
 	"github.com/dagu-org/dagu/internal/client"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/digraph/scheduler"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/sock"
 	"github.com/dagu-org/dagu/internal/test"
 )
@@ -31,7 +31,7 @@ func TestClient_GetStatus(t *testing.T) {
 		socketServer, _ := sock.NewServer(
 			dag.SockAddr(),
 			func(w http.ResponseWriter, _ *http.Request) {
-				status := model.NewStatusFactory(dag.DAG).Create(
+				status := persistence.NewStatusFactory(dag.DAG).Create(
 					requestID, scheduler.StatusRunning, 0, time.Now(),
 				)
 				w.WriteHeader(http.StatusOK)
@@ -75,14 +75,16 @@ func TestClient_GetStatus(t *testing.T) {
 		cli := th.Client
 
 		// Open the history store and write a status before updating it.
-		err := th.HistoryStore.Open(ctx, dag.Location, now, requestID)
+		record := th.HistoryStore.NewRecord(ctx, dag.DAG, now, requestID)
+
+		err := record.Open(ctx)
 		require.NoError(t, err)
 
 		status := testNewStatus(dag.DAG, requestID, scheduler.StatusSuccess, scheduler.NodeStatusSuccess)
 
-		err = th.HistoryStore.Write(ctx, status)
+		err = record.Write(ctx, status)
 		require.NoError(t, err)
-		_ = th.HistoryStore.Close(ctx)
+		_ = record.Close(ctx)
 
 		// Get the status and check if it is the same as the one we wrote.
 		statusToCheck, err := cli.GetStatusByRequestID(ctx, dag.DAG, requestID)
@@ -173,6 +175,8 @@ func TestClient_RunDAG(t *testing.T) {
 		previousRequestID := status.RequestID
 		previousParams := status.Params
 
+		time.Sleep(1 * time.Second)
+
 		err = cli.Retry(ctx, dag.DAG, previousRequestID)
 		require.NoError(t, err)
 
@@ -239,10 +243,8 @@ steps:
 		require.NoError(t, err)
 		require.Equal(t, spec, newSpec)
 
-		status, _ := cli.GetStatus(ctx, id)
-
 		// delete
-		err = cli.DeleteDAG(ctx, id, status.DAG.Location)
+		err = cli.DeleteDAG(ctx, id)
 		require.NoError(t, err)
 	})
 	t.Run("Create", func(t *testing.T) {
@@ -308,11 +310,11 @@ func TestClient_ReadHistory(t *testing.T) {
 	})
 }
 
-func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) model.Status {
+func testNewStatus(dag *digraph.DAG, requestID string, status scheduler.Status, nodeStatus scheduler.NodeStatus) persistence.Status {
 	nodes := []scheduler.NodeData{{State: scheduler.NodeState{Status: nodeStatus}}}
-	startedAt := model.Time(time.Now())
-	return model.NewStatusFactory(dag).Create(
-		requestID, status, 0, *startedAt, model.WithNodes(nodes),
+	startedAt := persistence.Time(time.Now())
+	return persistence.NewStatusFactory(dag).Create(
+		requestID, status, 0, *startedAt, persistence.WithNodes(nodes),
 	)
 }
 

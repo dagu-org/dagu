@@ -88,7 +88,7 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "Json",
+			name: "JSON",
 			dag:  "json.yaml",
 			expectedOutputs: map[string]any{
 				"OUT1": "Starting server at localhost:8080",
@@ -137,7 +137,7 @@ func TestDAGExecution(t *testing.T) {
 			},
 		},
 		{
-			name: "JsonVar",
+			name: "JSONVar",
 			dag:  "json_var.yaml",
 			expectedOutputs: map[string]any{
 				"OUT1": "Starting server at localhost:8080",

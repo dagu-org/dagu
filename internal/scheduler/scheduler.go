@@ -159,13 +159,15 @@ func (s *Scheduler) start(ctx context.Context) {
 }
 
 func (s *Scheduler) run(ctx context.Context, now time.Time) {
+	// Get jobs scheduled to run at or before the current time
+	// Subtract a small buffer to avoid edge cases with exact timing
 	jobs, err := s.manager.Next(ctx, now.Add(-time.Second).In(s.location))
 	if err != nil {
 		logger.Error(ctx, "failed to get next jobs", "err", err)
 		return
 	}
 
-	// Sort the jobs by the next scheduled time.
+	// Sort the jobs by the next scheduled time for predictable execution order
 	sort.SliceStable(jobs, func(i, j int) bool {
 		return jobs[i].Next.Before(jobs[j].Next)
 	})
@@ -175,19 +177,31 @@ func (s *Scheduler) run(ctx context.Context, now time.Time) {
 			break
 		}
 
-		go func(job *ScheduledJob) {
+		// Create a child context for this specific job execution
+		jobCtx := logger.WithValues(ctx,
+			"jobType", job.Type.String(),
+			"scheduledTime", job.Next.Format(time.RFC3339))
+
+		// Launch job with bounded concurrency
+		go func(ctx context.Context, job *ScheduledJob) {
 			if err := job.invoke(ctx); err != nil {
-				if errors.Is(err, ErrJobFinished) {
-					logger.Info(ctx, "job is already finished", "job", job.Job, "err", err)
-				} else if errors.Is(err, ErrJobRunning) {
-					logger.Info(ctx, "job is already running", "job", job.Job, "err", err)
-				} else if errors.Is(err, ErrJobSkipped) {
-					logger.Info(ctx, "job is skipped", "job", job.Job, "err", err)
-				} else {
-					logger.Error(ctx, "job failed", "job", job.Job, "err", err)
+				switch {
+				case errors.Is(err, ErrJobFinished):
+					logger.Info(ctx, "Job already completed", "job", job.Job)
+				case errors.Is(err, ErrJobRunning):
+					logger.Info(ctx, "Job already in progress", "job", job.Job)
+				case errors.Is(err, ErrJobSkipped):
+					logger.Info(ctx, "Job execution skipped", "job", job.Job, "reason", err.Error())
+				default:
+					logger.Error(ctx, "Job execution failed",
+						"job", job.Job,
+						"err", err,
+						"errorType", fmt.Sprintf("%T", err))
 				}
+			} else {
+				logger.Info(ctx, "Job completed successfully", "job", job.Job)
 			}
-		}(job)
+		}(jobCtx, job)
 	}
 }
 

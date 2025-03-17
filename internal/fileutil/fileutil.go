@@ -2,9 +2,12 @@ package fileutil
 
 import (
 	"errors"
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 var (
@@ -126,4 +129,48 @@ func EnsureYAMLExtension(filename string) string {
 	default:
 		return filename + yamlExtension
 	}
+}
+
+// ResolvePath resolves a path to an absolute path.
+// It handles empty paths, tilde expansion, environment variables,
+// and converts to an absolute path.
+func ResolvePath(path string) (string, error) {
+	// Handle empty path case
+	if path == "" {
+		return "", nil
+	}
+
+	// Expand tilde to user's home directory
+	if strings.HasPrefix(path, "~") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		path = filepath.Join(homeDir, path[1:])
+	}
+
+	// Expand environment variables
+	path = os.ExpandEnv(path)
+
+	// Convert to absolute path
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Clean the path
+	cleanPath := filepath.Clean(absPath)
+
+	return cleanPath, nil
+}
+
+// MustResolvePath works like ResolvePath but panics on error.
+// Useful when you're confident the path resolution will succeed.
+func MustResolvePath(path string) string {
+	resolvedPath, err := ResolvePath(path)
+	if err != nil {
+		log.Println("Failed to resolve path:", err)
+		return path
+	}
+	return resolvedPath
 }

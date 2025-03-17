@@ -292,7 +292,7 @@ func TestLoadLegacyFields_AllSet(t *testing.T) {
 		IsAuthToken:           true,
 		AuthToken:             "legacyToken",
 		DAGs:                  "legacyDags",
-		DAGsDir:               "newDags", // should override def.DAGs if both are set
+		DAGsDir:               "/usr/user/dags", // should override def.DAGs if both are set
 		Executable:            "/usr/bin/legacy",
 		LogDir:                "/var/log/legacy",
 		DataDir:               "/var/data/legacy",
@@ -325,7 +325,7 @@ func TestLoadLegacyFields_AllSet(t *testing.T) {
 	assert.True(t, cfg.Server.Auth.Token.Enabled, "Auth token should be enabled when IsAuthToken is true")
 	assert.Equal(t, "legacyToken", cfg.Server.Auth.Token.Value, "Auth token value should be set")
 	// When both DAGs and DAGsDir are provided, DAGsDir takes precedence.
-	assert.Equal(t, "newDags", cfg.Paths.DAGsDir, "DAGsDir should be set from def.DAGsDir")
+	assert.Equal(t, "/usr/user/dags", cfg.Paths.DAGsDir, "DAGsDir should be set from def.DAGsDir")
 	assert.Equal(t, "/usr/bin/legacy", cfg.Paths.Executable, "Executable should be set")
 	assert.Equal(t, "/var/log/legacy", cfg.Paths.LogDir, "LogDir should be set")
 	assert.Equal(t, "/var/data/legacy", cfg.Paths.DataDir, "DataDir should be set")

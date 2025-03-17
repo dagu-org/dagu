@@ -8,7 +8,7 @@ import (
 	"github.com/dagu-org/dagu/internal/agent"
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
-	"github.com/dagu-org/dagu/internal/persistence/model"
+	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +45,7 @@ func runRetry(ctx *Context, args []string) error {
 		return fmt.Errorf("failed to resolve absolute path for %s: %w", specFilePath, err)
 	}
 
-	status, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
+	historyRecord, err := ctx.historyStore().FindByRequestID(ctx, absolutePath, requestID)
 	if err != nil {
 		logger.Error(ctx, "Failed to retrieve historical execution", "requestID", requestID, "err", err)
 		return fmt.Errorf("failed to retrieve historical execution for request ID %s: %w", requestID, err)
@@ -53,6 +53,12 @@ func runRetry(ctx *Context, args []string) error {
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
+	}
+
+	status, err := historyRecord.Read(ctx)
+	if err != nil {
+		logger.Error(ctx, "Failed to read status", "err", err)
+		return fmt.Errorf("failed to read status: %w", err)
 	}
 
 	if status.Status.Params != "" {
@@ -79,7 +85,7 @@ func runRetry(ctx *Context, args []string) error {
 	return nil
 }
 
-func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *model.StatusFile) error {
+func executeRetry(ctx *Context, dag *digraph.DAG, originalStatus *persistence.StatusFile) error {
 	newRequestID, err := generateRequestID()
 	if err != nil {
 		return fmt.Errorf("failed to generate new request ID: %w", err)

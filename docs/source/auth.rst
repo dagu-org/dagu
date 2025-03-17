@@ -12,9 +12,9 @@ To enable basic authentication for Dagu, follow these steps:
   
    .. code-block:: bash
   
-       export DAGU_IS_BASICAUTH=1
-       export DAGU_BASICAUTH_USERNAME="<your-username>"
-       export DAGU_BASICAUTH_PASSWORD="<your-password>"
+       export DAGU_AUTH_BASIC_ENABLED=1
+       export DAGU_AUTH_BASIC_USERNAME="<your-username>"
+       export DAGU_AUTH_BASIC_PASSWORD="<your-password>"
   
    Replace ``<your-username>`` and ``<your-password>`` with your desired username and password.
 
@@ -22,10 +22,11 @@ To enable basic authentication for Dagu, follow these steps:
 
    .. code-block:: yaml
   
-       # Basic Auth
-       isBasicAuth: true
-       basicAuthUsername: "<your-username>"
-       basicAuthPassword: "<your-password>"
+        # Basic Auth
+        auth:
+          enabled: true
+          username: "<your-username>"
+          password: "<your-password>"
 
 #. You can enable HTTPS by configuring the following environment variables:
 
