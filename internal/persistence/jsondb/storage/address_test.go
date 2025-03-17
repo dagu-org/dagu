@@ -24,7 +24,7 @@ func TestAddress(t *testing.T) {
 			assert.Equal(t, dagName, addr.dagName, "dagName should be set correctly")
 			assert.Equal(t, "test-dag", addr.prefix, "prefix should be set correctly")
 			assert.Equal(t, filepath.Join(baseDir, "test-dag"), addr.path, "path should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "test-dag*", "*"+dataFileExtension), addr.globPattern, "globPattern should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "20*", "*"+dataFileExtension), addr.globPattern, "globPattern should be set correctly")
 		})
 
 		t.Run("WithYAMLExtension", func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestAddress(t *testing.T) {
 
 		path := addr.FilePath(timestamp, reqID)
 
-		expected := filepath.Join(baseDir, "test-dag", "test-dag_20230415_123045_000Z_req123", "status.dat")
+		expected := filepath.Join(baseDir, "test-dag", "20230415_123045_000Z_req123", "status.dat")
 		assert.Equal(t, expected, path, "FilePath should generate the correct path")
 	})
 

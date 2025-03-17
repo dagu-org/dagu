@@ -60,7 +60,7 @@ func TestStorage(t *testing.T) {
 		path := s.GenerateFilePath(ctx, a, timestamp, reqID)
 
 		// Verify the path format
-		expected := filepath.Join(tmpDir, "test-dag", "test-dag_20230415_123045_000Z_req123", "status.dat")
+		expected := filepath.Join(tmpDir, "test-dag", "20230415_123045_000Z_req123", "status.dat")
 		assert.Equal(t, expected, path, "GenerateFilePath should generate the correct path")
 	})
 
@@ -86,7 +86,7 @@ func TestStorage(t *testing.T) {
 
 		t.Run("WithLimit", func(t *testing.T) {
 			files := s.Latest(ctx, a, 2)
-			assert.Len(t, files, 2, "Latest should return at most itemLimit files")
+			require.Len(t, files, 2, "Latest should return at most itemLimit files")
 
 			// Verify files are sorted by timestamp (most recent first)
 			assert.Contains(t, files[0], "20230415_123045")
@@ -257,7 +257,7 @@ func TestStorage(t *testing.T) {
 			manyFilesAddr := NewAddress(manyFilesDir, "many-files-dag")
 
 			err := s.RemoveOld(ctx, manyFilesAddr, 7)
-			assert.Error(t, err, "RemoveOld should handle context cancellation")
+			require.Error(t, err, "RemoveOld should handle context cancellation")
 			assert.Contains(t, err.Error(), "operation canceled", "Error should indicate operation was canceled")
 		})
 	})
@@ -386,7 +386,7 @@ func TestStorage(t *testing.T) {
 			setupTestFiles(t, tmpDir)
 
 			// Get the actual files
-			pattern := filepath.Join(tmpDir, "test-dag", "test-dag*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -401,7 +401,7 @@ func TestStorage(t *testing.T) {
 			setupTestFiles(t, tmpDir)
 
 			// Get the actual files
-			pattern := filepath.Join(tmpDir, "test-dag", "test-dag*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -429,7 +429,7 @@ func TestStorage(t *testing.T) {
 			require.NoError(t, err)
 
 			// Get all files including the invalid one
-			pattern := filepath.Join(tmpDir, "test-dag", "test-dag*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -449,7 +449,7 @@ func TestStorage(t *testing.T) {
 			setupTestFiles(t, tmpDir)
 
 			// Get the actual files
-			pattern := filepath.Join(tmpDir, "test-dag", "test-dag*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -532,7 +532,7 @@ func setupTestFiles(t *testing.T, dir string) {
 	}
 
 	for _, ts := range timestamps {
-		fileDir := filepath.Join(dagDir, fmt.Sprintf("test-dag_%s_%s", ts.time, ts.reqID))
+		fileDir := filepath.Join(dagDir, fmt.Sprintf("%s_%s", ts.time, ts.reqID))
 		err := os.MkdirAll(fileDir, 0755)
 		require.NoError(t, err)
 
@@ -557,7 +557,7 @@ func setupManyTestFiles(t *testing.T, dir string, count int) {
 		tsStr := ts.Format(dateTimeFormatUTC)
 		reqID := fmt.Sprintf("req%d", i)
 
-		fileDir := filepath.Join(dagDir, fmt.Sprintf("many-files-dag_%s_%s", tsStr, reqID))
+		fileDir := filepath.Join(dagDir, fmt.Sprintf("%s_%s", tsStr, reqID))
 		err := os.MkdirAll(fileDir, 0755)
 		require.NoError(t, err)
 
@@ -572,7 +572,7 @@ func setOldFileModTime(t *testing.T, dir string) {
 	t.Helper()
 
 	// Find all status.dat files
-	pattern := filepath.Join(dir, "test-dag", "test-dag*", "status.dat")
+	pattern := filepath.Join(dir, "test-dag", "20*", "status.dat")
 	files, err := filepath.Glob(pattern)
 	require.NoError(t, err)
 
