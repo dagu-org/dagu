@@ -163,7 +163,7 @@ func (g *ExecutionGraph) setupRetry(ctx context.Context) error {
 		for _, u := range frontier {
 			if retry[u] || dict[u] == NodeStatusError ||
 				dict[u] == NodeStatusCancel {
-				logger.Info(ctx, "clear node state", "step", g.nodeByID[u].Name())
+				logger.Debug(ctx, "Clearing node state", "step", g.nodeByID[u].Name())
 				g.nodeByID[u].ClearState()
 				retry[u] = true
 			}

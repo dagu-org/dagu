@@ -606,7 +606,7 @@ func (sc *Scheduler) setup(ctx context.Context) (err error) {
 	sc.metrics.startTime = time.Now()
 
 	// Log scheduler setup
-	logger.Info(ctx, "Scheduler setup complete",
+	logger.Debug(ctx, "Scheduler setup complete",
 		"requestID", sc.requestID,
 		"maxActiveRuns", sc.maxActiveRuns,
 		"timeout", sc.timeout,

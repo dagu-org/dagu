@@ -94,7 +94,7 @@ func (r *Record) Open(ctx context.Context) error {
 		}
 	}
 
-	logger.Infof(ctx, "Initializing status file: %s", r.file)
+	logger.Debugf(ctx, "Initializing status file: %s", r.file)
 
 	writer := NewWriter(r.file)
 

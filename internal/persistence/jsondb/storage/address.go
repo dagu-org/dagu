@@ -44,6 +44,10 @@ func NewAddress(baseDir string, dagName string) Address {
 	return a
 }
 
+func (a Address) GlobPatternWithRequestID(requestID string) string {
+	return path.Join(a.path, "*"+requestID+"*", "status"+dataFileExtension)
+}
+
 func (a Address) FilePath(timestamp TimeInUTC, requestID string) string {
 	ts := timestamp.Format(dateTimeFormatUTC)
 	dir := a.prefix + "_" + ts + "_" + requestID

@@ -197,7 +197,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	})
 
 	// Start the DAG execution.
-	logger.Info(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
+	logger.Debug(ctx, "DAG execution started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 	lastErr := a.scheduler.Schedule(ctx, a.graph, done)
 
 	// Update the finished status to the history database.

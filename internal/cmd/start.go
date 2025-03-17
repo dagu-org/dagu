@@ -85,7 +85,7 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 
 	ctx.LogToFile(logFile)
 
-	logger.Info(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
+	logger.Debug(ctx, "DAG execution initiated", "DAG", dag.Name, "requestID", requestID, "logFile", logFile.Name())
 
 	dagStore, err := ctx.dagStore()
 	if err != nil {

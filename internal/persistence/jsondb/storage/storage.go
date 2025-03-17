@@ -67,7 +67,7 @@ func New() Storage {
 // FindByRequestID implements Storage.
 func (s *storage) FindByRequestID(_ context.Context, a Address, requestID string) (string, error) {
 	// Find matching files
-	matches, err := filepath.Glob(a.globPattern)
+	matches, err := filepath.Glob(a.GlobPatternWithRequestID(requestID))
 	if err != nil {
 		return "", fmt.Errorf("failed to glob pattern: %w", err)
 	}
