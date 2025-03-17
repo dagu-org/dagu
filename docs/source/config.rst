@@ -33,12 +33,12 @@ Server Configuration
 
 Directory Paths
 ~~~~~~~~~~~~~
-- ``DAGU_DAGS_DIR`` (``$HOME/.config/dagu/dags``): DAG definitions directory
-- ``DAGU_LOG_DIR`` (``$HOME/.local/share/dagu/logs``): Log files directory
-- ``DAGU_DATA_DIR`` (``$HOME/.local/share/dagu/history``): Application data directory
-- ``DAGU_SUSPEND_FLAGS_DIR`` (``$HOME/.config/dagu/suspend``): DAG suspend flags directory
-- ``DAGU_ADMIN_LOG_DIR`` (``$HOME/.local/share/admin``): Admin logs directory
-- ``DAGU_BASE_CONFIG`` (``$HOME/.config/dagu/base.yaml``): Base configuration file path
+- ``DAGU_DAGS_DIR`` (``~/.config/dagu/dags``): DAG definitions directory
+- ``DAGU_LOG_DIR`` (``~/.local/share/dagu/logs``): Log files directory
+- ``DAGU_DATA_DIR`` (``~/.local/share/dagu/history``): Application data directory
+- ``DAGU_SUSPEND_FLAGS_DIR`` (``~/.config/dagu/suspend``): DAG suspend flags directory
+- ``DAGU_ADMIN_LOG_DIR`` (``~/.local/share/admin``): Admin logs directory
+- ``DAGU_BASE_CONFIG`` (``~/.config/dagu/base.yaml``): Base configuration file path
 - ``DAGU_WORK_DIR``: Default working directory for DAGs (default: DAG location)
 
 Authentication
@@ -54,7 +54,7 @@ UI Customization
 
 Configuration File
 ----------------
-Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. Below is a complete example with all available options:
+Create ``config.yaml`` in ``~/.config/dagu/`` to override default settings. Below is a complete example with all available options:
 
 .. code-block:: yaml
 
@@ -68,13 +68,13 @@ Create ``config.yaml`` in ``$HOME/.config/dagu/`` to override default settings. 
     # Directory Configuration
     dagsDir: "~/.config/dagu/dags"            # DAG definitions location
     workDir: "/path/to/work"                        # Default working directory
-    logDir: "/user/dagu/.local/share/dagu/logs"        # Log files location
-    dataDir: "/user/dagu/.local/share/dagu/history"    # Application data location
-    suspendFlagsDir: "/user/dagu/.config/dagu/suspend" # DAG suspend flags location
-    adminLogsDir: "/user/dagu/.local/share/admin"      # Admin logs location
+    logDir: "~/.local/share/dagu/logs"        # Log files location
+    dataDir: "~/.local/share/dagu/history"    # Application data location
+    suspendFlagsDir: "~/.config/dagu/suspend" # DAG suspend flags location
+    adminLogsDir: "~/.local/share/admin"      # Admin logs location
 
     # Common Configuration for all DAGs
-    baseConfig: "/user/dagu/.config/dagu/base.yaml"  # Base DAG config
+    baseConfig: "~/.config/dagu/base.yaml"  # Base DAG config
 
     # Latest status configuration
     latestStatusToday: true    # Show today's latest status
@@ -129,7 +129,7 @@ Most commonly used configurations:
      
    host: "127.0.0.1"
    port: 8080
-   dags: "${HOME}/dags"
+   dags: "~/dags"
 
 2. Production setup:
  .. code-block:: yaml
