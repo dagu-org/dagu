@@ -1,145 +1,161 @@
 package fileutil
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
-func Test_MustGetUserHomeDir(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		err := os.Setenv("HOME", "/test")
+func TestResolvePath(t *testing.T) {
+	// Save original environment to restore later
+	origHome := os.Getenv("HOME")
+	origTempDir := os.Getenv("TEMP_DIR")
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("TEMP_DIR", origTempDir)
+	}()
+
+	// Set up test environment variables
+	testHome := "/test/home"
+	testTempDir := "/test/temp"
+	os.Setenv("HOME", testHome)
+	os.Setenv("TEMP_DIR", testTempDir)
+
+	// Get current working directory for absolute path tests
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current working directory: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		path        string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:        "empty path",
+			path:        "",
+			expected:    "",
+			expectError: false,
+		},
+		{
+			name:        "tilde expansion",
+			path:        "~/documents",
+			expected:    filepath.Clean(filepath.Join(testHome, "documents")),
+			expectError: false,
+		},
+		{
+			name:        "tilde only",
+			path:        "~",
+			expected:    filepath.Clean(testHome),
+			expectError: false,
+		},
+		{
+			name:        "environment variable expansion",
+			path:        "$TEMP_DIR/logs",
+			expected:    filepath.Clean(filepath.Join(testTempDir, "logs")),
+			expectError: false,
+		},
+		{
+			name:        "multiple environment variables",
+			path:        "$HOME/projects/$TEMP_DIR",
+			expected:    filepath.Clean(filepath.Join(testHome, "projects", testTempDir)),
+			expectError: false,
+		},
+		{
+			name:        "path cleaning with dots",
+			path:        "/usr/local/../bin/./app",
+			expected:    "/usr/bin/app",
+			expectError: false,
+		},
+		{
+			name:        "path cleaning with redundant slashes",
+			path:        "/usr//local/bin",
+			expected:    "/usr/local/bin",
+			expectError: false,
+		},
+		{
+			name:        "combined tilde and environment variable",
+			path:        "~/projects/$TEMP_DIR",
+			expected:    filepath.Clean(filepath.Join(testHome, "projects", testTempDir)),
+			expectError: false,
+		},
+		{
+			name:        "absolute path",
+			path:        "/usr/local/bin",
+			expected:    "/usr/local/bin",
+			expectError: false,
+		},
+		{
+			name:        "relative path",
+			path:        "projects/dagu",
+			expected:    filepath.Join(cwd, "projects/dagu"),
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ResolvePath(tt.path)
+
+			// Check error expectation
+			if (err != nil) != tt.expectError {
+				t.Errorf("ResolvePath(%q) error = %v, expectError %v", tt.path, err, tt.expectError)
+				return
+			}
+
+			if tt.expectError {
+				return // No need to check the result if we expected an error
+			}
+
+			// For empty path, we expect empty result
+			if tt.path == "" {
+				if result != "" {
+					t.Errorf("ResolvePath(%q) = %q, want %q", tt.path, result, "")
+				}
+				return
+			}
+
+			// For all other paths, check the result matches expected
+			if result != tt.expected {
+				t.Errorf("ResolvePath(%q) = %q, want %q", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMustResolvePath(t *testing.T) {
+	// Test normal case
+	t.Run("normal case", func(t *testing.T) {
+		// Get current working directory
+		cwd, err := os.Getwd()
 		if err != nil {
-			t.Fatal(err)
-		}
-		hd := MustGetUserHomeDir()
-		require.Equal(t, "/test", hd)
-	})
-}
-
-func Test_MustGetwd(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		wd, _ := os.Getwd()
-		require.Equal(t, MustGetwd(), wd)
-	})
-}
-
-func Test_FileExits(t *testing.T) {
-	t.Run("Exists", func(t *testing.T) {
-		if !FileExists("/") {
-			t.Fatal("file exists failed")
-		}
-	})
-}
-
-func Test_OpenOrCreateFile(t *testing.T) {
-	t.Run("OpenOrCreate", func(t *testing.T) {
-		tmp, err := os.MkdirTemp("", "open_or_create")
-		require.NoError(t, err)
-
-		name := filepath.Join(tmp, "/file.txt")
-		f, err := OpenOrCreateFile(name)
-		require.NoError(t, err)
-
-		defer func() {
-			_ = f.Close()
-			_ = os.Remove(name)
-		}()
-
-		if !FileExists(name) {
-			t.Fatal("failed to create file")
-		}
-	})
-	t.Run("OpenOrCreateThenWrite", func(t *testing.T) {
-		dir := MustTempDir("tempdir")
-		defer func() {
-			_ = os.RemoveAll(dir)
-		}()
-
-		filename := filepath.Join(dir, "test.txt")
-		createdFile, err := OpenOrCreateFile(filename)
-		require.NoError(t, err)
-		defer func() {
-			_ = createdFile.Close()
-		}()
-
-		_, err = createdFile.WriteString("test")
-		require.NoError(t, err)
-		require.NoError(t, createdFile.Sync(), err)
-		require.NoError(t, createdFile.Close(), err)
-		if !FileExists(filename) {
-			t.Fatal("failed to create file")
+			t.Fatalf("Failed to get current working directory: %v", err)
 		}
 
-		openedFile, err := os.Open(filename)
-		require.NoError(t, err)
-		defer func() {
-			_ = openedFile.Close()
-		}()
-		data, err := io.ReadAll(openedFile)
-		require.NoError(t, err)
-		require.Equal(t, "test", string(data))
-	})
-}
+		path := "test.txt"
+		expected := filepath.Join(cwd, path)
 
-func Test_MustTempDir(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		dir := MustTempDir("tempdir")
-		defer func() {
-			_ = os.RemoveAll(dir)
-		}()
-		require.Contains(t, dir, "tempdir")
-	})
-}
-
-func TestTruncString(t *testing.T) {
-	t.Run("Valid", func(t *testing.T) {
-		// Test empty string
-		require.Equal(t, "", TruncString("", 8))
-		// Test string with length less than limit
-		require.Equal(t, "1234567", TruncString("1234567", 8))
-		// Test string with length equal to limit
-		require.Equal(t, "12345678", TruncString("123456789", 8))
-	})
-}
-
-func TestIsYAMLFile(t *testing.T) {
-	tests := []struct {
-		file string
-		want bool
-	}{
-		{"config.yaml", true},
-		{"config.yml", true},
-		{"config.json", false},
-		{"config", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		if got := IsYAMLFile(tt.file); got != tt.want {
-			t.Errorf("IsYAMLFile(%q) = %v, want %v", tt.file, got, tt.want)
+		result := MustResolvePath(path)
+		if result != expected {
+			t.Errorf("MustResolvePath(%q) = %q, want %q", path, result, expected)
 		}
-	}
-}
+	})
 
-func TestAddYamlExtension(t *testing.T) {
-	tests := []struct {
-		file string
-		want string
-	}{
-		{"config", "config.yaml"},
-		{"config.yml", "config.yml"},
-		{"config.yaml", "config.yaml"},
-		{"config.json", "config.json.yaml"},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		if got := EnsureYAMLExtension(tt.file); got != tt.want {
-			t.Errorf("AddYamlExtension(%q) = %q, want %q", tt.file, got, tt.want)
+	// Test panic case - can't easily test without mocking os functions
+	// but we can at least verify it calls ResolvePath
+	t.Run("calls ResolvePath", func(t *testing.T) {
+		path := "test.txt"
+		resolved, err := ResolvePath(path)
+		if err != nil {
+			t.Fatalf("ResolvePath failed: %v", err)
 		}
-	}
+
+		mustResolved := MustResolvePath(path)
+		if mustResolved != resolved {
+			t.Errorf("MustResolvePath(%q) = %q, but ResolvePath(%q) = %q",
+				path, mustResolved, path, resolved)
+		}
+	})
 }

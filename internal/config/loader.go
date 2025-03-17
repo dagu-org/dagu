@@ -165,13 +165,13 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Set file system paths from the definition.
 	if def.Paths != nil {
-		cfg.Paths.DAGsDir = fileutil.ResolvePath(def.Paths.DAGsDir)
-		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePath(def.Paths.SuspendFlagsDir)
-		cfg.Paths.DataDir = fileutil.ResolvePath(def.Paths.DataDir)
-		cfg.Paths.LogDir = fileutil.ResolvePath(def.Paths.LogDir)
-		cfg.Paths.AdminLogsDir = fileutil.ResolvePath(def.Paths.AdminLogsDir)
-		cfg.Paths.BaseConfig = fileutil.ResolvePath(def.Paths.BaseConfig)
-		cfg.Paths.Executable = fileutil.ResolvePath(def.Paths.Executable)
+		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.Paths.DAGsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.Paths.SuspendFlagsDir)
+		cfg.Paths.DataDir = fileutil.MustResolvePath(def.Paths.DataDir)
+		cfg.Paths.LogDir = fileutil.MustResolvePath(def.Paths.LogDir)
+		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.Paths.AdminLogsDir)
+		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.Paths.BaseConfig)
+		cfg.Paths.Executable = fileutil.MustResolvePath(def.Paths.Executable)
 	}
 
 	// Set UI configuration if provided.
@@ -217,28 +217,28 @@ func (l *ConfigLoader) LoadLegacyFields(cfg *Config, def Definition) {
 	}
 	// For DAGs directory, if both legacy fields are present, def.DAGsDir takes precedence.
 	if def.DAGs != "" {
-		cfg.Paths.DAGsDir = fileutil.ResolvePath(def.DAGs)
+		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGs)
 	}
 	if def.DAGsDir != "" {
-		cfg.Paths.DAGsDir = fileutil.ResolvePath(def.DAGsDir)
+		cfg.Paths.DAGsDir = fileutil.MustResolvePath(def.DAGsDir)
 	}
 	if def.Executable != "" {
-		cfg.Paths.Executable = fileutil.ResolvePath(def.Executable)
+		cfg.Paths.Executable = fileutil.MustResolvePath(def.Executable)
 	}
 	if def.LogDir != "" {
-		cfg.Paths.LogDir = fileutil.ResolvePath(def.LogDir)
+		cfg.Paths.LogDir = fileutil.MustResolvePath(def.LogDir)
 	}
 	if def.DataDir != "" {
-		cfg.Paths.DataDir = fileutil.ResolvePath(def.DataDir)
+		cfg.Paths.DataDir = fileutil.MustResolvePath(def.DataDir)
 	}
 	if def.SuspendFlagsDir != "" {
-		cfg.Paths.SuspendFlagsDir = fileutil.ResolvePath(def.SuspendFlagsDir)
+		cfg.Paths.SuspendFlagsDir = fileutil.MustResolvePath(def.SuspendFlagsDir)
 	}
 	if def.AdminLogsDir != "" {
-		cfg.Paths.AdminLogsDir = fileutil.ResolvePath(def.AdminLogsDir)
+		cfg.Paths.AdminLogsDir = fileutil.MustResolvePath(def.AdminLogsDir)
 	}
 	if def.BaseConfig != "" {
-		cfg.Paths.BaseConfig = fileutil.ResolvePath(def.BaseConfig)
+		cfg.Paths.BaseConfig = fileutil.MustResolvePath(def.BaseConfig)
 	}
 	if def.LogEncodingCharset != "" {
 		cfg.UI.LogEncodingCharset = def.LogEncodingCharset
