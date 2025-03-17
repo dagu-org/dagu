@@ -226,7 +226,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// CmdArgsSys is a string with the command and args separated by special markers.
 		cmd, args := cmdutil.SplitCommandArgs(step.CmdArgsSys)
 		for i, arg := range args {
-			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			value, err := stepContext.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command with args: %w", err)
 			}
@@ -242,7 +242,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 	case step.CmdWithArgs != "":
 		// In case of the command and args are defined as a string.
 		stepContext := digraph.GetStepContext(ctx)
-		cmdWithArgs, err := stepContext.EvalString(step.CmdWithArgs, cmdutil.WithoutExpandEnv())
+		cmdWithArgs, err := stepContext.EvalString(ctx, step.CmdWithArgs, cmdutil.WithoutExpandEnv())
 		if err != nil {
 			return err
 		}
@@ -274,7 +274,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 			return fmt.Errorf("failed to split command: %w", err)
 		}
 		for i, arg := range args {
-			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			value, err := stepContext.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}
@@ -289,7 +289,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		// Shouldn't reach here except for testing.
 
 		if step.Command != "" {
-			value, err := stepContext.EvalString(step.Command, cmdutil.WithoutExpandEnv())
+			value, err := stepContext.EvalString(ctx, step.Command, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command: %w", err)
 			}
@@ -297,7 +297,7 @@ func (n *Node) evaluateCommandArgs(ctx context.Context) error {
 		}
 
 		for i, arg := range step.Args {
-			value, err := stepContext.EvalString(arg, cmdutil.WithoutExpandEnv())
+			value, err := stepContext.EvalString(ctx, arg, cmdutil.WithoutExpandEnv())
 			if err != nil {
 				return fmt.Errorf("failed to eval command args: %w", err)
 			}

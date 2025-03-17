@@ -56,7 +56,7 @@ func (c Condition) eval(ctx context.Context) (bool, error) {
 func (c Condition) evalCommand(ctx context.Context) (bool, error) {
 	var commandToRun string
 	if IsStepContext(ctx) {
-		command, err := GetStepContext(ctx).EvalString(c.Command, cmdutil.OnlyReplaceVars())
+		command, err := GetStepContext(ctx).EvalString(ctx, c.Command, cmdutil.OnlyReplaceVars())
 		if err != nil {
 			return false, err
 		}
@@ -102,7 +102,7 @@ func (c Condition) evalCondition(ctx context.Context) (bool, error) {
 	)
 
 	if IsStepContext(ctx) {
-		evaluatedVal, err = GetStepContext(ctx).EvalString(c.Condition)
+		evaluatedVal, err = GetStepContext(ctx).EvalString(ctx, c.Condition)
 	} else {
 		evaluatedVal, err = GetContext(ctx).EvalString(c.Condition)
 	}

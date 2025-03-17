@@ -60,18 +60,18 @@ func (c StepContext) MailerConfig() (mailer.Config, error) {
 	})
 }
 
-func (c StepContext) EvalString(s string, opts ...cmdutil.EvalOption) (string, error) {
-	dagContext := GetContext(c.ctx)
-	opts = append(opts, cmdutil.WithVariables(dagContext.envs))
+func (c StepContext) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalOption) (string, error) {
+	dagCtx := GetContext(ctx)
+	opts = append(opts, cmdutil.WithVariables(dagCtx.envs))
 	opts = append(opts, cmdutil.WithVariables(c.envs))
 	opts = append(opts, cmdutil.WithVariables(c.outputVariables.Variables()))
 	return cmdutil.EvalString(c.ctx, s, opts...)
 }
 
-func (c StepContext) EvalBool(value any) (bool, error) {
+func (c StepContext) EvalBool(ctx context.Context, value any) (bool, error) {
 	switch v := value.(type) {
 	case string:
-		s, err := c.EvalString(v)
+		s, err := c.EvalString(ctx, v)
 		if err != nil {
 			return false, err
 		}

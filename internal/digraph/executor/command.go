@@ -200,7 +200,7 @@ func setupScript(ctx context.Context, step digraph.Step) (string, error) {
 	}()
 
 	stepContext := digraph.GetStepContext(ctx)
-	script, err := stepContext.EvalString(step.Script, cmdutil.OnlyReplaceVars())
+	script, err := stepContext.EvalString(ctx, step.Script, cmdutil.OnlyReplaceVars())
 	if err != nil {
 		return "", fmt.Errorf("failed to evaluate script: %w", err)
 	}
