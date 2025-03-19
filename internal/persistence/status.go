@@ -21,7 +21,7 @@ func NewStatusFactory(dag *digraph.DAG) *StatusFactory {
 
 func (f *StatusFactory) CreateDefault() Status {
 	return Status{
-		Name:       f.dag.Name,
+		Name:       f.dag.GetName(),
 		Status:     scheduler.StatusNone,
 		StatusText: scheduler.StatusNone.String(),
 		PID:        PID(0),
@@ -38,6 +38,12 @@ func (f *StatusFactory) CreateDefault() Status {
 }
 
 type StatusOption func(*Status)
+
+func WithRootRequestID(rootRequestID string) StatusOption {
+	return func(s *Status) {
+		s.RootRequestID = rootRequestID
+	}
+}
 
 func WithNodes(nodes []scheduler.NodeData) StatusOption {
 	return func(s *Status) {
@@ -136,21 +142,22 @@ type StatusResponse struct {
 }
 
 type Status struct {
-	RequestID  string           `json:"RequestId"`
-	Name       string           `json:"Name"`
-	Status     scheduler.Status `json:"Status"`
-	StatusText string           `json:"StatusText"`
-	PID        PID              `json:"Pid"`
-	Nodes      []*Node          `json:"Nodes"`
-	OnExit     *Node            `json:"OnExit"`
-	OnSuccess  *Node            `json:"OnSuccess"`
-	OnFailure  *Node            `json:"OnFailure"`
-	OnCancel   *Node            `json:"OnCancel"`
-	StartedAt  string           `json:"StartedAt"`
-	FinishedAt string           `json:"FinishedAt"`
-	Log        string           `json:"Log"`
-	Params     string           `json:"Params,omitempty"`
-	ParamsList []string         `json:"ParamsList,omitempty"`
+	RootRequestID string           `json:"RootRequestId,omitempty"`
+	RequestID     string           `json:"RequestId,omitempty"`
+	Name          string           `json:"Name,omitempty"`
+	Status        scheduler.Status `json:"Status"`
+	StatusText    string           `json:"StatusText"`
+	PID           PID              `json:"Pid,omitempty"`
+	Nodes         []*Node          `json:"Nodes,omitempty"`
+	OnExit        *Node            `json:"OnExit,omitempty"`
+	OnSuccess     *Node            `json:"OnSuccess,omitempty"`
+	OnFailure     *Node            `json:"OnFailure,omitempty"`
+	OnCancel      *Node            `json:"OnCancel,omitempty"`
+	StartedAt     string           `json:"StartedAt,omitempty"`
+	FinishedAt    string           `json:"FinishedAt,omitempty"`
+	Log           string           `json:"Log,omitempty"`
+	Params        string           `json:"Params,omitempty"`
+	ParamsList    []string         `json:"ParamsList,omitempty"`
 }
 
 func (st *Status) SetStatusToErrorIfRunning() {

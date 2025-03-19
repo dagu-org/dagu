@@ -44,6 +44,9 @@ type Agent struct {
 	logDir       string
 	logFile      string
 
+	// rootRequestID is the request ID of the root DAG that triggers the DAG execution.
+	rootRequestID string
+
 	// requestID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
 	requestID string
@@ -51,6 +54,9 @@ type Agent struct {
 
 	lock    sync.RWMutex
 	lastErr error
+
+	// subExecution is true if the agent is running as a sub-DAG.
+	subExecution atomic.Bool
 }
 
 // Options is the configuration for the Agent.
@@ -62,6 +68,8 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *persistence.Status
+	// RootRequestID for the workflow execution. It's required for sub-DAGs.
+	RootRequestID string
 }
 
 // New creates a new Agent.
@@ -76,15 +84,16 @@ func New(
 	opts Options,
 ) *Agent {
 	return &Agent{
-		requestID:    requestID,
-		dag:          dag,
-		dry:          opts.Dry,
-		retryTarget:  opts.RetryTarget,
-		logDir:       logDir,
-		logFile:      logFile,
-		client:       cli,
-		dagStore:     dagStore,
-		historyStore: historyStore,
+		rootRequestID: opts.RootRequestID,
+		requestID:     requestID,
+		dag:           dag,
+		dry:           opts.Dry,
+		retryTarget:   opts.RetryTarget,
+		logDir:        logDir,
+		logFile:       logFile,
+		client:        cli,
+		dagStore:      dagStore,
+		historyStore:  historyStore,
 	}
 }
 
@@ -105,6 +114,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx = logger.WithValues(ctx,
 		"dag", a.dag.Name,
 		"requestID", a.requestID,
+		"rootRequestID", a.rootRequestID,
 	)
 
 	// It should not run the DAG if the condition is unmet.
@@ -238,6 +248,20 @@ func (a *Agent) Status() persistence.Status {
 		schedulerStatus = scheduler.StatusRunning
 	}
 
+	opts := []persistence.StatusOption{
+		persistence.WithFinishedAt(a.graph.FinishAt()),
+		persistence.WithNodes(a.graph.NodeData()),
+		persistence.WithLogFilePath(a.logFile),
+		persistence.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
+		persistence.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
+		persistence.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
+		persistence.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+	}
+
+	if a.subExecution.Load() {
+		opts = append(opts, persistence.WithRootRequestID(a.rootRequestID))
+	}
+
 	// Create the status object to record the current status.
 	return persistence.NewStatusFactory(a.dag).
 		Create(
@@ -245,13 +269,7 @@ func (a *Agent) Status() persistence.Status {
 			schedulerStatus,
 			os.Getpid(),
 			a.graph.StartAt(),
-			persistence.WithFinishedAt(a.graph.FinishAt()),
-			persistence.WithNodes(a.graph.NodeData()),
-			persistence.WithLogFilePath(a.logFile),
-			persistence.WithOnExitNode(a.scheduler.HandlerNode(digraph.HandlerOnExit)),
-			persistence.WithOnSuccessNode(a.scheduler.HandlerNode(digraph.HandlerOnSuccess)),
-			persistence.WithOnFailureNode(a.scheduler.HandlerNode(digraph.HandlerOnFailure)),
-			persistence.WithOnCancelNode(a.scheduler.HandlerNode(digraph.HandlerOnCancel)),
+			opts...,
 		)
 }
 
@@ -307,6 +325,11 @@ func (a *Agent) setup(ctx context.Context) error {
 	// Lock to prevent race condition.
 	a.lock.Lock()
 	defer a.lock.Unlock()
+
+	if a.rootRequestID != "" {
+		logger.Debug(ctx, "Initiating sub-DAG execution", "rootRequestId", a.rootRequestID)
+		a.subExecution.Store(true)
+	}
 
 	a.scheduler = a.newScheduler()
 	var senderFn SenderFn
@@ -502,6 +525,9 @@ func (a *Agent) checkPreconditions(ctx context.Context) error {
 
 // checkIsAlreadyRunning returns error if the DAG is already running.
 func (a *Agent) checkIsAlreadyRunning(ctx context.Context) error {
+	if a.subExecution.Load() {
+		return nil // Skip the check for sub-DAGs
+	}
 	status, err := a.client.GetCurrentStatus(ctx, a.dag)
 	if err != nil {
 		return err
