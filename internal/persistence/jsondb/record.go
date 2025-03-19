@@ -89,7 +89,8 @@ func (r *Record) Open(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal DAG metadata: %w", err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "dag.json"), dagJSON, 0755); err != nil { //nolint:gosec
+		// TODO: use 0600 // nolint: gosec
+		if err := os.WriteFile(filepath.Join(dir, "dag.json"), dagJSON, 0744); err != nil { //nolint:gosec
 			return fmt.Errorf("failed to write DAG metadata: %w", err)
 		}
 	}
