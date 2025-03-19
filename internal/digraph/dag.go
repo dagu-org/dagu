@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/robfig/cron/v3"
 )
 
@@ -151,7 +152,7 @@ func (d *DAG) HasTag(tag string) bool {
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
 func (d *DAG) SockAddr() string {
-	return SockAddr(d.GetName(), "")
+	return SockAddr(d.Location, "")
 }
 
 // SockAddrSub returns the unix socket address for a specific request ID.
@@ -264,6 +265,8 @@ func (d *DAG) setupHandlers(workDir string) {
 // The address is used to communicate with the agent process.
 func SockAddr(name, key string) string {
 	maxSocketNameLength := 50 // Maximum length for socket name
+	name = fileutil.SafeName(name)
+	key = fileutil.SafeName(key)
 
 	// Create MD5 hash of the combined name and requestID and take first 8 chars
 	combined := name + key
