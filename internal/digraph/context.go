@@ -10,9 +10,11 @@ import (
 )
 
 type Context struct {
-	dag    *DAG
-	client DBClient
-	envs   map[string]string
+	rootRequestID string
+	requestID     string
+	dag           *DAG
+	client        DBClient
+	envs          map[string]string
 }
 
 func GetDAGByName(ctx context.Context, name string) (*DAG, error) {
@@ -53,7 +55,14 @@ func (c Context) EvalString(ctx context.Context, s string, opts ...cmdutil.EvalO
 	return cmdutil.EvalString(ctx, s, opts...)
 }
 
-func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFile string, params []string) context.Context {
+func (c Context) RootRequestID() string {
+	if c.rootRequestID != "" {
+		return c.rootRequestID
+	}
+	return c.requestID
+}
+
+func NewContext(ctx context.Context, dag *DAG, client DBClient, rootRequestID, requestID, logFile string, params []string) context.Context {
 	var envs = map[string]string{
 		EnvKeySchedulerLogPath: logFile,
 		EnvKeyRequestID:        requestID,
@@ -69,9 +78,11 @@ func NewContext(ctx context.Context, dag *DAG, client DBClient, requestID, logFi
 	}
 
 	return context.WithValue(ctx, ctxKey{}, Context{
-		dag:    dag,
-		client: client,
-		envs:   envs,
+		rootRequestID: rootRequestID,
+		requestID:     requestID,
+		dag:           dag,
+		client:        client,
+		envs:          envs,
 	})
 }
 
