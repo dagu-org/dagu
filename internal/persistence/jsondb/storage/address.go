@@ -10,22 +10,23 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/fileutil"
 )
 
 type Address struct {
-	dagName       string
-	prefix        string
-	path          string
-	globPattern   string
-	rootRequestID string
+	dagName     string
+	prefix      string
+	path        string
+	globPattern string
+	rootDAG     *digraph.RootDAG
 }
 
 type AddressOption func(*Address)
 
-func WithRootRequestID(rootRequestID string) AddressOption {
+func WithRootDAG(rootDAG *digraph.RootDAG) AddressOption {
 	return func(a *Address) {
-		a.rootRequestID = rootRequestID
+		a.rootDAG = rootDAG
 	}
 }
 
