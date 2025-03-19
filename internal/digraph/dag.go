@@ -15,7 +15,6 @@ import (
 const (
 	defaultHistoryRetentionDays = 30
 	defaultMaxCleanUpTime       = 60 * time.Second
-	maxSocketNameLength         = 50 // Maximum length for socket name (108 - 16 - 34 - 8 = 50)
 )
 
 // DAG contains all information about a workflow.
@@ -151,14 +150,24 @@ func (d *DAG) HasTag(tag string) bool {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func (d *DAG) SockAddr(requestID string) string {
-	// Get DAG name for the socket
-	name := d.Name
-	if name == "" {
-		name = defaultName(d.Location)
-	}
+func (d *DAG) SockAddr() string {
+	return SockAddr(d.GetName(), "")
+}
 
-	return SockAddr(name, requestID)
+// SockAddrSub returns the unix socket address for a specific request ID.
+// This is used to control sub DAG executions.
+func (d *DAG) SockAddrSub(requestID string) string {
+	return SockAddr(d.GetName(), requestID)
+}
+
+// GetName returns the name of the DAG.
+// If the name is not set, it returns the default name (filename without extension).
+func (d *DAG) GetName() string {
+	name := d.Name
+	if name != "" {
+		return name
+	}
+	return defaultName(d.Location)
 }
 
 // String implements the Stringer interface.
@@ -253,11 +262,13 @@ func (d *DAG) setupHandlers(workDir string) {
 
 // SockAddr returns the unix socket address for the DAG.
 // The address is used to communicate with the agent process.
-func SockAddr(name, requestID string) string {
+func SockAddr(name, key string) string {
+	maxSocketNameLength := 50 // Maximum length for socket name
+
 	// Create MD5 hash of the combined name and requestID and take first 8 chars
-	combined := name + requestID
-	hashLength := 8
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength]
+	combined := name + key
+	hashLength := 6
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(combined)))[:hashLength] // nolint:gosec
 
 	// Calculate the total length with the full name
 	prefix := "@dagu_"
