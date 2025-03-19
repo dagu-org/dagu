@@ -31,7 +31,7 @@ This command parses the DAG specification, resolves parameters, and initiates th
 	)
 }
 
-var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, rootRequestIDFlag}
+var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, rootDAGNameFlag, rootRequestIDFlag}
 
 func runStart(ctx *Context, args []string) error {
 	requestID, err := ctx.Flags().GetString("request-id")
@@ -40,6 +40,12 @@ func runStart(ctx *Context, args []string) error {
 	}
 
 	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
+	rootDAGName, _ := ctx.Flags().GetString("root-dag-name")
+
+	// Validate consistency between rootRequestID and rootDAGName
+	if (rootRequestID == "" && rootDAGName != "") || (rootRequestID != "" && rootDAGName == "") {
+		return fmt.Errorf("both root-request-id and root-dag-name must be provided together or neither should be provided")
+	}
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
@@ -58,10 +64,10 @@ func runStart(ctx *Context, args []string) error {
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(ctx, args[0], loadOpts, requestID, rootRequestID)
+	return executeDag(ctx, args[0], loadOpts, requestID, rootDAGName, rootRequestID)
 }
 
-func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, requestID, rootRequestID string) error {
+func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, requestID, rootDAGName, rootRequestID string) error {
 	dag, err := digraph.Load(ctx, specPath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
@@ -101,6 +107,14 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		return fmt.Errorf("failed to initialize client: %w", err)
 	}
 
+	var opts agent.Options
+	if rootDAGName != "" && rootRequestID != "" {
+		opts.RootDAG = &digraph.RootDAG{
+			Name:      rootDAGName,
+			RequestID: rootRequestID,
+		}
+	}
+
 	agentInstance := agent.New(
 		requestID,
 		dag,
@@ -109,7 +123,7 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		cli,
 		dagStore,
 		ctx.historyStore(),
-		agent.Options{RootRequestID: rootRequestID},
+		opts,
 	)
 
 	listenSignals(ctx, agentInstance)

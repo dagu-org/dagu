@@ -39,9 +39,10 @@ func (f *StatusFactory) CreateDefault() Status {
 
 type StatusOption func(*Status)
 
-func WithRootRequestID(rootRequestID string) StatusOption {
+func WithRootDAG(rootDAG *digraph.RootDAG) StatusOption {
 	return func(s *Status) {
-		s.RootRequestID = rootRequestID
+		s.RootRequestID = rootDAG.RequestID
+		s.RootDAGName = rootDAG.Name
 	}
 }
 
@@ -142,6 +143,7 @@ type StatusResponse struct {
 }
 
 type Status struct {
+	RootDAGName   string           `json:"RootDAGName,omitempty"`
 	RootRequestID string           `json:"RootRequestId,omitempty"`
 	RequestID     string           `json:"RequestId,omitempty"`
 	Name          string           `json:"Name,omitempty"`

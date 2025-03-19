@@ -63,7 +63,8 @@ func newSubWorkflow(
 	args := []string{
 		"start",
 		fmt.Sprintf("--request-id=%s", requestID),
-		fmt.Sprintf("--root-request-id=%s", c.RootRequestID()),
+		fmt.Sprintf("--root-dag-name=%s", c.RootRequestID()),
+		fmt.Sprintf("--root-request-id=%s", c.RootDAGName()),
 		"--quiet",
 		subDAG.Location,
 	}

@@ -69,11 +69,16 @@ var (
 		usage:     "Unique request ID for a DAG execution",
 	}
 
-	// Root request ID used for starting a new DAG execution.
-	// This is required when starting a sub-DAG execution.
+	// rootRequestIDFlag reads the root request ID for starting a sub-DAG execution
 	rootRequestIDFlag = commandLineFlag{
 		name:  "root-request-id",
 		usage: "Root request ID for a DAG execution",
+	}
+
+	// rootDAGNameFlag reads the root DAG name for starting a sub-DAG execution.
+	rootDAGNameFlag = commandLineFlag{
+		name:  "root-dag-name",
+		usage: "Root DAG name for a DAG execution",
 	}
 
 	// Suppresses output during DAG execution (e.g., logs, status updates).

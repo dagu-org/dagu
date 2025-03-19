@@ -158,7 +158,7 @@ func TestClient_RunDAG(t *testing.T) {
 		dag.AssertLatestStatus(t, scheduler.StatusSuccess)
 	})
 	t.Run("Retry", func(t *testing.T) {
-		dag := th.DAG(t, filepath.Join("client", "client_retry.yaml"))
+		dag := th.DAG(t, filepath.Join("client", "retry.yaml"))
 		ctx := th.Context
 		cli := th.Client
 
