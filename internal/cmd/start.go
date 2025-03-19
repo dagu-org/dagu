@@ -31,13 +31,15 @@ This command parses the DAG specification, resolves parameters, and initiates th
 	)
 }
 
-var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart}
+var startFlags = []commandLineFlag{paramsFlag, requestIDFlagStart, rootRequestIDFlag}
 
 func runStart(ctx *Context, args []string) error {
 	requestID, err := ctx.Flags().GetString("request-id")
 	if err != nil {
 		return fmt.Errorf("failed to get request ID: %w", err)
 	}
+
+	rootRequestID, _ := ctx.Flags().GetString("root-request-id")
 
 	loadOpts := []digraph.LoadOption{
 		digraph.WithBaseConfig(ctx.cfg.Paths.BaseConfig),
@@ -56,10 +58,10 @@ func runStart(ctx *Context, args []string) error {
 		loadOpts = append(loadOpts, digraph.WithParams(removeQuotes(params)))
 	}
 
-	return executeDag(ctx, args[0], loadOpts, requestID)
+	return executeDag(ctx, args[0], loadOpts, requestID, rootRequestID)
 }
 
-func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, requestID string) error {
+func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, requestID, rootRequestID string) error {
 	dag, err := digraph.Load(ctx, specPath, loadOpts...)
 	if err != nil {
 		logger.Error(ctx, "Failed to load DAG", "path", specPath, "err", err)
@@ -107,7 +109,7 @@ func executeDag(ctx *Context, specPath string, loadOpts []digraph.LoadOption, re
 		cli,
 		dagStore,
 		ctx.historyStore(),
-		agent.Options{},
+		agent.Options{RootRequestID: rootRequestID},
 	)
 
 	listenSignals(ctx, agentInstance)

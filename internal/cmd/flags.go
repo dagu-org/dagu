@@ -69,6 +69,13 @@ var (
 		usage:     "Unique request ID for a DAG execution",
 	}
 
+	// Root request ID used for starting a new DAG execution.
+	// This is required when starting a sub-DAG execution.
+	rootRequestIDFlag = commandLineFlag{
+		name:  "root-request-id",
+		usage: "Root request ID for a DAG execution",
+	}
+
 	// Suppresses output during DAG execution (e.g., logs, status updates).
 	quietFlag = commandLineFlag{
 		name:      "quiet",
