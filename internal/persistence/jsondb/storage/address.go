@@ -14,15 +14,28 @@ import (
 )
 
 type Address struct {
-	dagName     string
-	prefix      string
-	path        string
-	globPattern string
+	dagName       string
+	prefix        string
+	path          string
+	globPattern   string
+	rootRequestID string
 }
 
-func NewAddress(baseDir string, dagName string) Address {
+type AddressOption func(*Address)
+
+func WithRootRequestID(rootRequestID string) AddressOption {
+	return func(a *Address) {
+		a.rootRequestID = rootRequestID
+	}
+}
+
+func NewAddress(baseDir, dagName string, opts ...AddressOption) Address {
 	ext := filepath.Ext(dagName)
 	a := Address{dagName: dagName}
+
+	for _, opt := range opts {
+		opt(&a)
+	}
 
 	base := filepath.Base(dagName)
 	if fileutil.IsYAMLFile(dagName) {
