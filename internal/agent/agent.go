@@ -43,9 +43,7 @@ type Agent struct {
 	socketServer *sock.Server
 	logDir       string
 	logFile      string
-
-	// rootRequestID is the request ID of the root DAG that triggers the DAG execution.
-	rootRequestID string
+	rootDAG      *digraph.RootDAG
 
 	// requestID is request ID to identify DAG execution uniquely.
 	// The request ID can be used for history lookup, retry, etc.
@@ -68,8 +66,8 @@ type Options struct {
 	// If it's specified the agent will execute the DAG with the same
 	// configuration as the specified history.
 	RetryTarget *persistence.Status
-	// RootRequestID for the workflow execution. It's required for sub-DAGs.
-	RootRequestID string
+	// RootDAG is the root DAG name for the sub-DAG execution.
+	RootDAG *digraph.RootDAG
 }
 
 // New creates a new Agent.
@@ -84,16 +82,16 @@ func New(
 	opts Options,
 ) *Agent {
 	return &Agent{
-		rootRequestID: opts.RootRequestID,
-		requestID:     requestID,
-		dag:           dag,
-		dry:           opts.Dry,
-		retryTarget:   opts.RetryTarget,
-		logDir:        logDir,
-		logFile:       logFile,
-		client:        cli,
-		dagStore:      dagStore,
-		historyStore:  historyStore,
+		rootDAG:      opts.RootDAG,
+		requestID:    requestID,
+		dag:          dag,
+		dry:          opts.Dry,
+		retryTarget:  opts.RetryTarget,
+		logDir:       logDir,
+		logFile:      logFile,
+		client:       cli,
+		dagStore:     dagStore,
+		historyStore: historyStore,
 	}
 }
 
@@ -108,14 +106,14 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG execution with all necessary information
 	dbClient := newDBClient(a.historyStore, a.dagStore)
-	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootRequestID, a.requestID, a.logFile, a.dag.Params)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootDAG, a.requestID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
-	ctx = logger.WithValues(ctx,
-		"dag", a.dag.Name,
-		"requestID", a.requestID,
-		"rootRequestID", a.rootRequestID,
-	)
+	logFields := []any{"dag", a.dag.Name, "requestID", a.requestID}
+	if a.rootDAG != nil {
+		logFields = append(logFields, "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
+	}
+	ctx = logger.WithValues(ctx, logFields...)
 
 	// It should not run the DAG if the condition is unmet.
 	if err := a.checkPreconditions(ctx); err != nil {
@@ -259,7 +257,7 @@ func (a *Agent) Status() persistence.Status {
 	}
 
 	if a.subExecution.Load() {
-		opts = append(opts, persistence.WithRootRequestID(a.rootRequestID))
+		opts = append(opts, persistence.WithRootDAG(a.rootDAG))
 	}
 
 	// Create the status object to record the current status.
@@ -326,8 +324,8 @@ func (a *Agent) setup(ctx context.Context) error {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	if a.rootRequestID != "" {
-		logger.Debug(ctx, "Initiating sub-DAG execution", "rootRequestId", a.rootRequestID)
+	if a.rootDAG != nil {
+		logger.Debug(ctx, "Initiating sub-DAG execution", "rootDAG", a.rootDAG.Name, "rootRequestID", a.rootDAG.RequestID)
 		a.subExecution.Store(true)
 	}
 
@@ -400,7 +398,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.rootRequestID, a.requestID, a.logFile, a.dag.Params)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.rootDAG, a.requestID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
