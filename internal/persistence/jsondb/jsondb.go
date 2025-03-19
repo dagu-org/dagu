@@ -79,7 +79,7 @@ func New(baseDir string, opts ...Option) *JSONDB {
 
 // Update updates the status for a specific request ID.
 // It handles the entire lifecycle of opening, writing, and closing the history record.
-func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status persistence.Status) error {
+func (db *JSONDB) Update(ctx context.Context, dagName, reqID string, status persistence.Status) error {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -88,12 +88,12 @@ func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status 
 		// Continue with operation
 	}
 
-	if requestID == "" {
+	if reqID == "" {
 		return ErrRequestIDEmpty
 	}
 
 	// Find the history record
-	historyRecord, err := db.FindByRequestID(ctx, dagName, requestID)
+	historyRecord, err := db.FindByRequestID(ctx, dagName, reqID)
 	if err != nil {
 		return fmt.Errorf("failed to find history record: %w", err)
 	}
@@ -117,14 +117,28 @@ func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status 
 	return nil
 }
 
-// NewRecord creates a new history record for the specified key, timestamp, and request ID.
-func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, requestID string) persistence.Record {
-	if requestID == "" {
-		logger.Error(ctx, "requestID is empty")
+// NewRecord creates a new history record for the specified DAG execution.
+func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) persistence.Record {
+	if reqID == "" {
+		logger.Error(ctx, "RequestID is empty")
 	}
 
 	addr := storage.NewAddress(db.baseDir, dag.Name)
-	filePath := db.storage.GenerateFilePath(ctx, addr, storage.NewUTC(timestamp), requestID)
+	filePath := db.storage.GenerateFilePath(ctx, addr, storage.NewUTC(timestamp), reqID)
+	return NewRecord(filePath, db.cache, WithDAG(dag))
+}
+
+// NewSubRecord creates a new history record for the specified sub-DAG execution.
+func (db *JSONDB) NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, rootReqID, reqID string) persistence.Record {
+	if reqID == "" {
+		logger.Error(ctx, "RequestID is empty")
+	}
+	if rootReqID == "" {
+		logger.Error(ctx, "RootRequestID is empty")
+	}
+
+	addr := storage.NewAddress(db.baseDir, dag.Name)
+	filePath := db.storage.GenerateFilePath(ctx, addr, storage.NewUTC(timestamp), reqID)
 	return NewRecord(filePath, db.cache, WithDAG(dag))
 }
 
@@ -194,7 +208,7 @@ func (db *JSONDB) Latest(ctx context.Context, dagName string) (persistence.Recor
 }
 
 // FindByRequestID finds a history record by request ID.
-func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID string) (persistence.Record, error) {
+func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, reqID string) (persistence.Record, error) {
 	// Check for context cancellation
 	select {
 	case <-ctx.Done():
@@ -203,13 +217,13 @@ func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID
 		// Continue with operation
 	}
 
-	if requestID == "" {
+	if reqID == "" {
 		return nil, ErrRequestIDEmpty
 	}
 
 	// Find matching files
 	addr := storage.NewAddress(db.baseDir, dagName)
-	file, err := db.storage.FindByRequestID(ctx, addr, requestID)
+	file, err := db.storage.FindByRequestID(ctx, addr, reqID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob pattern: %w", err)
 	}
