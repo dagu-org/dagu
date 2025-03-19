@@ -22,7 +22,7 @@ func TestDAG(t *testing.T) {
 func TestUnixSocket(t *testing.T) {
 	t.Run("Location", func(t *testing.T) {
 		dag := &digraph.DAG{Location: "testdata/testDag.yml"}
-		require.Regexp(t, `^/tmp/@dagu_testDag_[0-9a-f]+\.sock$`, dag.SockAddr())
+		require.Regexp(t, `^/tmp/@dagu_testdata_testDag_yml_[0-9a-f]+\.sock$`, dag.SockAddr())
 	})
 	t.Run("MaxUnixSocketLength", func(t *testing.T) {
 		dag := &digraph.DAG{
@@ -32,7 +32,7 @@ func TestUnixSocket(t *testing.T) {
 		require.LessOrEqual(t, 50, len(dag.SockAddr()))
 		require.Equal(
 			t,
-			"/tmp/@dagu_testDagVeryLongNameThatExceedsUn_e959f2.sock",
+			"/tmp/@dagu_testdata_testDagVeryLongNameThat_21bace.sock",
 			dag.SockAddr(),
 		)
 	})
