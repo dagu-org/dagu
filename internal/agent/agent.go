@@ -108,7 +108,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	// Create a new context for the DAG execution with all necessary information
 	dbClient := newDBClient(a.historyStore, a.dagStore)
-	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.requestID, a.logFile, a.dag.Params)
+	ctx = digraph.NewContext(ctx, a.dag, dbClient, a.rootRequestID, a.requestID, a.logFile, a.dag.Params)
 
 	// Add structured logging context
 	ctx = logger.WithValues(ctx,
@@ -400,7 +400,7 @@ func (a *Agent) dryRun(ctx context.Context) error {
 
 	logger.Info(ctx, "Dry-run started", "reqId", a.requestID, "name", a.dag.Name, "params", a.dag.Params)
 
-	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.requestID, a.logFile, a.dag.Params)
+	dagCtx := digraph.NewContext(context.Background(), a.dag, newDBClient(a.historyStore, a.dagStore), a.rootRequestID, a.requestID, a.logFile, a.dag.Params)
 	lastErr := a.scheduler.Schedule(dagCtx, a.graph, done)
 	a.lastErr = lastErr
 
@@ -500,7 +500,14 @@ func (a *Agent) setupHistoryRecord(ctx context.Context) persistence.Record {
 
 // setupSocketServer create socket server instance.
 func (a *Agent) setupSocketServer(ctx context.Context) error {
-	socketServer, err := sock.NewServer(a.dag.SockAddr(), a.HandleHTTP(ctx))
+	var socketAddr string
+	if a.subExecution.Load() {
+		// Use separate socket address for sub-DAGs to allow them run concurrently.
+		socketAddr = a.dag.SockAddrSub(a.requestID)
+	} else {
+		socketAddr = a.dag.SockAddr()
+	}
+	socketServer, err := sock.NewServer(socketAddr, a.HandleHTTP(ctx))
 	if err != nil {
 		return err
 	}
