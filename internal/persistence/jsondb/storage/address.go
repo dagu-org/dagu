@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -53,19 +52,22 @@ func NewAddress(baseDir, dagName string, opts ...AddressOption) Address {
 
 	a.prefix = n
 	a.path = filepath.Join(baseDir, a.prefix)
-	a.globPattern = path.Join(a.path, "20*", "*"+dataFileExtension)
+	a.globPattern = filepath.Join(a.path, "2*", "*", "*", "*", "*"+dataFileExtension)
 
 	return a
 }
 
 func (a Address) GlobPatternWithRequestID(requestID string) string {
-	return path.Join(a.path, "20*"+requestID+"*", "status"+dataFileExtension)
+	return filepath.Join(a.path, "2*", "*", "*", "2*"+requestID+"*", "status"+dataFileExtension)
 }
 
 func (a Address) FilePath(timestamp TimeInUTC, requestID string) string {
+	year := timestamp.Format("2006")
+	month := timestamp.Format("01")
+	date := timestamp.Format("02")
 	ts := timestamp.Format(dateTimeFormatUTC)
-	dir := ts + "_" + requestID
-	return path.Join(a.path, dir, "status"+dataFileExtension)
+	dirName := ts + "_" + requestID
+	return filepath.Join(a.path, year, month, date, dirName, "status"+dataFileExtension)
 }
 
 func (a Address) Exists() bool {
