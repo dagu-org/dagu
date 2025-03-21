@@ -14,11 +14,11 @@ import (
 )
 
 type Address struct {
-	dagName     string
-	prefix      string
-	path        string
-	globPattern string
-	rootDAG     *digraph.RootDAG
+	dagName       string
+	prefix        string
+	executionsDir string
+	globPattern   string
+	rootDAG       *digraph.RootDAG
 }
 
 type AddressOption func(*Address)
@@ -51,14 +51,14 @@ func NewAddress(baseDir, dagName string, opts ...AddressOption) Address {
 	}
 
 	a.prefix = n
-	a.path = filepath.Join(baseDir, a.prefix)
-	a.globPattern = filepath.Join(a.path, "2*", "*", "*", "*", "*"+dataFileExtension)
+	a.executionsDir = filepath.Join(baseDir, a.prefix, "executions")
+	a.globPattern = filepath.Join(a.executionsDir, "2*", "*", "*", "exec_*", "status"+dataFileExtension)
 
 	return a
 }
 
 func (a Address) GlobPatternWithRequestID(requestID string) string {
-	return filepath.Join(a.path, "2*", "*", "*", "2*"+requestID+"*", "status"+dataFileExtension)
+	return filepath.Join(a.executionsDir, "2*", "*", "*", "exec_*"+requestID+"*", "status"+dataFileExtension)
 }
 
 func (a Address) FilePath(timestamp TimeInUTC, requestID string) string {
@@ -66,30 +66,30 @@ func (a Address) FilePath(timestamp TimeInUTC, requestID string) string {
 	month := timestamp.Format("01")
 	date := timestamp.Format("02")
 	ts := timestamp.Format(dateTimeFormatUTC)
-	dirName := ts + "_" + requestID
-	return filepath.Join(a.path, year, month, date, dirName, "status"+dataFileExtension)
+	dirName := "exec_" + ts + "_" + requestID
+	return filepath.Join(a.executionsDir, year, month, date, dirName, "status"+dataFileExtension)
 }
 
 func (a Address) Exists() bool {
-	_, err := os.Stat(a.path)
+	_, err := os.Stat(a.executionsDir)
 	return !os.IsNotExist(err)
 }
 
 func (a Address) Create() error {
-	if err := os.MkdirAll(a.path, 0755); err != nil {
-		return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, a.path, err)
+	if err := os.MkdirAll(a.executionsDir, 0755); err != nil {
+		return fmt.Errorf("%w: %s : %s", ErrCreateNewDirectory, a.executionsDir, err)
 	}
 	return nil
 }
 
 func (a Address) IsEmpty() bool {
-	files, _ := os.ReadDir(a.path)
+	files, _ := os.ReadDir(a.executionsDir)
 	return len(files) == 0
 }
 
 func (a Address) Remove() error {
-	if err := os.RemoveAll(a.path); err != nil {
-		return fmt.Errorf("%w: %s : %s", ErrRemoveDirectory, a.path, err)
+	if err := os.RemoveAll(a.executionsDir); err != nil {
+		return fmt.Errorf("%w: %s : %s", ErrRemoveDirectory, a.executionsDir, err)
 	}
 	return nil
 }

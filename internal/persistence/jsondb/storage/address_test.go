@@ -23,8 +23,8 @@ func TestAddress(t *testing.T) {
 
 			assert.Equal(t, dagName, addr.dagName, "dagName should be set correctly")
 			assert.Equal(t, "test-dag", addr.prefix, "prefix should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag"), addr.path, "path should be set correctly")
-			assert.Equal(t, filepath.Join(baseDir, "test-dag", "2*", "*", "*", "*", "*"+dataFileExtension), addr.globPattern, "globPattern should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions"), addr.executionsDir, "path should be set correctly")
+			assert.Equal(t, filepath.Join(baseDir, "test-dag", "executions", "2*", "*", "*", "exec_*", "status"+dataFileExtension), addr.globPattern, "globPattern should be set correctly")
 		})
 
 		t.Run("WithYAMLExtension", func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestAddress(t *testing.T) {
 
 		path := addr.FilePath(timestamp, reqID)
 
-		expected := filepath.Join(baseDir, "test-dag", "2023", "04", "15", "20230415_123045_000Z_req123", "status.dat")
+		expected := filepath.Join(baseDir, "test-dag", "executions", "2023", "04", "15", "exec_20230415_123045_000Z_req123", "status.dat")
 		assert.Equal(t, expected, path, "FilePath should generate the correct path")
 	})
 
@@ -93,7 +93,7 @@ func TestAddress(t *testing.T) {
 			addr := NewAddress(tmpDir, "test-dag")
 
 			// Create the directory
-			err := os.MkdirAll(addr.path, 0755)
+			err := os.MkdirAll(addr.executionsDir, 0755)
 			require.NoError(t, err)
 
 			assert.True(t, addr.Exists(), "Exists should return true when directory exists")
@@ -124,7 +124,7 @@ func TestAddress(t *testing.T) {
 			addr := NewAddress(tmpDir, "test-dag")
 
 			// Create the directory first
-			err := os.MkdirAll(addr.path, 0755)
+			err := os.MkdirAll(addr.executionsDir, 0755)
 			require.NoError(t, err)
 
 			// Try to create again
@@ -142,7 +142,7 @@ func TestAddress(t *testing.T) {
 			addr := NewAddress(tmpDir, "test-dag")
 
 			// Create the directory
-			err := os.MkdirAll(addr.path, 0755)
+			err := os.MkdirAll(addr.executionsDir, 0755)
 			require.NoError(t, err)
 
 			assert.True(t, addr.IsEmpty(), "IsEmpty should return true for empty directory")
@@ -153,11 +153,11 @@ func TestAddress(t *testing.T) {
 			addr := NewAddress(tmpDir, "test-dag")
 
 			// Create the directory
-			err := os.MkdirAll(addr.path, 0755)
+			err := os.MkdirAll(addr.executionsDir, 0755)
 			require.NoError(t, err)
 
 			// Create a file in the directory
-			err = os.WriteFile(filepath.Join(addr.path, "test.txt"), []byte("test"), 0644)
+			err = os.WriteFile(filepath.Join(addr.executionsDir, "test.txt"), []byte("test"), 0644)
 			require.NoError(t, err)
 
 			assert.False(t, addr.IsEmpty(), "IsEmpty should return false for non-empty directory")
@@ -179,7 +179,7 @@ func TestAddress(t *testing.T) {
 			addr := NewAddress(tmpDir, "test-dag")
 
 			// Create the directory
-			err := os.MkdirAll(addr.path, 0755)
+			err := os.MkdirAll(addr.executionsDir, 0755)
 			require.NoError(t, err)
 
 			err = addr.Remove()

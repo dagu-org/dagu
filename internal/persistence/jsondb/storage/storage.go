@@ -131,14 +131,14 @@ var (
 
 func (s *storage) listRecent(_ context.Context, a Address, n int) ([]string, error) {
 	var result []string
-	years, err := listDirsSorted(a.path, true, reYear)
+	years, err := listDirsSorted(a.executionsDir, true, reYear)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list years: %w", err)
 	}
 
 OUT:
 	for _, year := range years {
-		yearPath := filepath.Join(a.path, year)
+		yearPath := filepath.Join(a.executionsDir, year)
 		months, err := listDirsSorted(yearPath, true, reMonth)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list months: %w", err)
@@ -153,7 +153,7 @@ OUT:
 
 			for _, day := range days {
 				dayPath := filepath.Join(monthPath, day)
-				files, err := filepath.Glob(filepath.Join(dayPath, "2*", "status.dat"))
+				files, err := filepath.Glob(filepath.Join(dayPath, "exec_*", "status.dat"))
 				if err != nil {
 					return nil, fmt.Errorf("failed to find matches for pattern %s: %w", dayPath, err)
 				}
@@ -203,7 +203,7 @@ func (s *storage) listInRange(ctx context.Context, a Address, start, end TimeInU
 	}
 
 	// Get all years in the range
-	years, err := listDirsSorted(a.path, true, reYear)
+	years, err := listDirsSorted(a.executionsDir, true, reYear)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to list years: %v", err)
 		return nil
@@ -211,7 +211,7 @@ func (s *storage) listInRange(ctx context.Context, a Address, start, end TimeInU
 
 	for _, year := range years {
 		yearInt, _ := strconv.Atoi(year)
-		yearPath := filepath.Join(a.path, year)
+		yearPath := filepath.Join(a.executionsDir, year)
 
 		// Skip years outside the range
 		if yearInt < startDate.Year() || yearInt > endDate.Year() {
@@ -246,7 +246,7 @@ func (s *storage) listInRange(ctx context.Context, a Address, start, end TimeInU
 				dayPath := filepath.Join(monthPath, day)
 
 				// Find all status files for this day
-				files, err := filepath.Glob(filepath.Join(dayPath, "2*", "status"+dataFileExtension))
+				files, err := filepath.Glob(filepath.Join(dayPath, "exec_*", "status"+dataFileExtension))
 				if err != nil {
 					logger.Errorf(ctx, "Failed to glob pattern in %s/%s/%s: %v", year, month, day, err)
 					continue
@@ -352,7 +352,7 @@ func (s *storage) Rename(ctx context.Context, o Address, n Address) error {
 		day := filepath.Base(filepath.Dir(oldDir))
 		month := filepath.Base(filepath.Dir(filepath.Dir(oldDir)))
 		year := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(oldDir))))
-		newDir := filepath.Join(n.path, year, month, day, newName)
+		newDir := filepath.Join(n.executionsDir, year, month, day, newName)
 
 		// Make sure the new directory exists
 		if err := os.MkdirAll(filepath.Dir(newDir), 0755); err != nil {
