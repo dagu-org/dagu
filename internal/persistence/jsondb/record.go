@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -57,6 +58,20 @@ func NewRecord(file string, cache *filecache.Cache[*persistence.Status], opts ..
 		opt(r)
 	}
 	return r
+}
+
+// Exists returns true if the status file exists.
+func (r *Record) Exists() bool {
+	_, err := os.Stat(r.file)
+	return err == nil
+}
+
+func (r *Record) ModTime() (time.Time, error) {
+	info, err := os.Stat(r.file)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
 }
 
 // Open initializes the status file for writing. It returns an error if the file is already open.
