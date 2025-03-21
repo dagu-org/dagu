@@ -60,7 +60,7 @@ func TestStorage(t *testing.T) {
 		path := s.GenerateFilePath(ctx, a, timestamp, reqID)
 
 		// Verify the path format
-		expected := filepath.Join(tmpDir, "test-dag", "20230415_123045_000Z_req123", "status.dat")
+		expected := filepath.Join(tmpDir, "test-dag", "2023", "04", "15", "20230415_123045_000Z_req123", "status.dat")
 		assert.Equal(t, expected, path, "GenerateFilePath should generate the correct path")
 	})
 
@@ -386,7 +386,7 @@ func TestStorage(t *testing.T) {
 			setupTestFiles(t, tmpDir)
 
 			// Get the actual files
-			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "2*", "*", "*", "*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -401,7 +401,7 @@ func TestStorage(t *testing.T) {
 			setupTestFiles(t, tmpDir)
 
 			// Get the actual files
-			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "*", "*", "*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -429,7 +429,7 @@ func TestStorage(t *testing.T) {
 			require.NoError(t, err)
 
 			// Get all files including the invalid one
-			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "*", "*", "*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -449,7 +449,7 @@ func TestStorage(t *testing.T) {
 			setupTestFiles(t, tmpDir)
 
 			// Get the actual files
-			pattern := filepath.Join(tmpDir, "test-dag", "20*", "status.dat")
+			pattern := filepath.Join(tmpDir, "test-dag", "20*", "*", "*", "*", "status.dat")
 			files, err := filepath.Glob(pattern)
 			require.NoError(t, err)
 			require.NotEmpty(t, files)
@@ -532,8 +532,14 @@ func setupTestFiles(t *testing.T, dir string) {
 	}
 
 	for _, ts := range timestamps {
-		fileDir := filepath.Join(dagDir, fmt.Sprintf("%s_%s", ts.time, ts.reqID))
-		err := os.MkdirAll(fileDir, 0755)
+		timestamp, err := time.Parse(dateTimeFormatUTC, ts.time)
+		require.NoError(t, err)
+		fileDir := filepath.Join(dagDir,
+			timestamp.Format("2006"),
+			timestamp.Format("01"),
+			timestamp.Format("02"),
+			fmt.Sprintf("%s_%s", ts.time, ts.reqID))
+		err = os.MkdirAll(fileDir, 0755)
 		require.NoError(t, err)
 
 		filePath := filepath.Join(fileDir, "status.dat")
@@ -557,7 +563,11 @@ func setupManyTestFiles(t *testing.T, dir string, count int) {
 		tsStr := ts.Format(dateTimeFormatUTC)
 		reqID := fmt.Sprintf("req%d", i)
 
-		fileDir := filepath.Join(dagDir, fmt.Sprintf("%s_%s", tsStr, reqID))
+		fileDir := filepath.Join(dagDir,
+			ts.Format("2006"),
+			ts.Format("01"),
+			ts.Format("02"),
+			fmt.Sprintf("%s_%s", tsStr, reqID))
 		err := os.MkdirAll(fileDir, 0755)
 		require.NoError(t, err)
 
@@ -572,7 +582,7 @@ func setOldFileModTime(t *testing.T, dir string) {
 	t.Helper()
 
 	// Find all status.dat files
-	pattern := filepath.Join(dir, "test-dag", "20*", "status.dat")
+	pattern := filepath.Join(dir, "test-dag", "2*", "*", "*", "*", "status.dat")
 	files, err := filepath.Glob(pattern)
 	require.NoError(t, err)
 

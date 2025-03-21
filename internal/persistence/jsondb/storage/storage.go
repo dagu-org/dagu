@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -89,29 +91,19 @@ func (s *storage) GenerateFilePath(_ context.Context, a Address, timestamp TimeI
 
 // Latest implements Storage.
 func (s *storage) Latest(ctx context.Context, a Address, itemLimit int) []string {
-	pattern := a.globPattern
-	matches, err := filepath.Glob(pattern)
+	recents, err := s.listRecent(ctx, a, itemLimit)
 	if err != nil {
-		logger.Errorf(ctx, "Failed to find matches for pattern %s: %v", pattern, err)
+		logger.Errorf(ctx, "Failed to list recent files: %v", err)
 		return nil
 	}
 
-	if len(matches) == 0 {
-		logger.Debugf(ctx, "No matches found for pattern %s", pattern)
-		return nil
-	}
-
-	return filterLatest(matches, itemLimit, maxWorkers)
+	return recents
 }
 
 // LatestAfter implements Storage.
-func (s *storage) LatestAfter(_ context.Context, a Address, cutoff TimeInUTC) (string, error) {
-	matches, err := filepath.Glob(a.globPattern)
-	if err != nil || len(matches) == 0 {
-		return "", persistence.ErrNoStatusData
-	}
-
-	ret := filterLatest(matches, 1, maxWorkers)
+func (s *storage) LatestAfter(ctx context.Context, a Address, cutoff TimeInUTC) (string, error) {
+	files := s.listInRange(ctx, a, cutoff, TimeInUTC{time.Now().UTC()})
+	ret := filterLatest(files, 1, maxWorkers)
 	if len(ret) == 0 {
 		return "", persistence.ErrNoStatusData
 	}
@@ -129,6 +121,157 @@ func (s *storage) LatestAfter(_ context.Context, a Address, cutoff TimeInUTC) (s
 	}
 
 	return ret[0], nil
+}
+
+var (
+	reYear  = regexp.MustCompile(`^\d{4}$`)
+	reMonth = regexp.MustCompile(`^\d{2}$`)
+	reDay   = regexp.MustCompile(`^\d{2}$`)
+)
+
+func (s *storage) listRecent(_ context.Context, a Address, n int) ([]string, error) {
+	var result []string
+	years, err := listDirsSorted(a.path, true, reYear)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list years: %w", err)
+	}
+
+OUT:
+	for _, year := range years {
+		yearPath := filepath.Join(a.path, year)
+		months, err := listDirsSorted(yearPath, true, reMonth)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list months: %w", err)
+		}
+
+		for _, month := range months {
+			monthPath := filepath.Join(yearPath, month)
+			days, err := listDirsSorted(monthPath, true, reDay)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list days: %w", err)
+			}
+
+			for _, day := range days {
+				dayPath := filepath.Join(monthPath, day)
+				files, err := filepath.Glob(filepath.Join(dayPath, "2*", "status.dat"))
+				if err != nil {
+					return nil, fmt.Errorf("failed to find matches for pattern %s: %w", dayPath, err)
+				}
+
+				result = append(result, files...)
+				if len(result) >= n {
+					break OUT
+				}
+			}
+		}
+	}
+
+	sort.Strings(result)
+	slices.Reverse(result)
+	if len(result) > n {
+		return result[:n], nil
+	}
+
+	return result, nil
+}
+
+// listStatusInRange retrieves all status files for a specific date range.
+// The range is inclusive of the start time and exclusive of the end time.
+func (s *storage) listInRange(ctx context.Context, a Address, start, end TimeInUTC) []string {
+	var result []string
+	var lock sync.Mutex
+
+	// If start time is after end time, return empty result
+	if !start.IsZero() && !end.IsZero() && start.After(end.Time) {
+		return result
+	}
+
+	// Calculate the date range to search
+	var startDate, endDate time.Time
+	if start.IsZero() {
+		// If start is zero, use a very old date to include all files
+		startDate = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	} else {
+		startDate = start.Time
+	}
+
+	if end.IsZero() {
+		// If end is zero, use current time
+		endDate = time.Now().UTC()
+	} else {
+		endDate = end.Time
+	}
+
+	// Get all years in the range
+	years, err := listDirsSorted(a.path, true, reYear)
+	if err != nil {
+		logger.Errorf(ctx, "Failed to list years: %v", err)
+		return nil
+	}
+
+	for _, year := range years {
+		yearInt, _ := strconv.Atoi(year)
+		yearPath := filepath.Join(a.path, year)
+
+		// Skip years outside the range
+		if yearInt < startDate.Year() || yearInt > endDate.Year() {
+			continue
+		}
+
+		// Get all months in the year
+		months, err := listDirsSorted(yearPath, true, reMonth)
+		if err != nil {
+			logger.Errorf(ctx, "Failed to list months in %s: %v", year, err)
+			continue
+		}
+
+		for _, month := range months {
+			monthInt, _ := strconv.Atoi(month)
+			monthPath := filepath.Join(yearPath, month)
+
+			// Skip months outside the range
+			if (yearInt == startDate.Year() && monthInt < int(startDate.Month())) ||
+				(yearInt == endDate.Year() && monthInt > int(endDate.Month())) {
+				continue
+			}
+
+			// Get all days in the month
+			days, err := listDirsSorted(monthPath, true, reDay)
+			if err != nil {
+				logger.Errorf(ctx, "Failed to list days in %s/%s: %v", year, month, err)
+				continue
+			}
+
+			for _, day := range days {
+				dayPath := filepath.Join(monthPath, day)
+
+				// Find all status files for this day
+				files, err := filepath.Glob(filepath.Join(dayPath, "2*", "status"+dataFileExtension))
+				if err != nil {
+					logger.Errorf(ctx, "Failed to glob pattern in %s/%s/%s: %v", year, month, day, err)
+					continue
+				}
+
+				_ = processFilesParallel(ctx, files, func(filePath string) error {
+					timestamp, err := parseFileTimestamp(filePath)
+					if err != nil {
+						logger.Debugf(ctx, "Failed to parse timestamp from file %s: %v", filePath, err)
+						return err
+					}
+					// Check if the timestamp is within the range
+					if (start.IsZero() || !timestamp.Before(startDate)) &&
+						(end.IsZero() || timestamp.Before(endDate)) {
+						lock.Lock()
+						result = append(result, filePath)
+						lock.Unlock()
+					}
+					return nil
+				})
+			}
+		}
+	}
+
+	return result
 }
 
 // RemoveOld implements Storage.
@@ -204,7 +347,18 @@ func (s *storage) Rename(ctx context.Context, o Address, n Address) error {
 		oldDir := filepath.Dir(filePath)
 		dirName := filepath.Base(oldDir)
 		newName := strings.Replace(dirName, o.prefix, n.prefix, 1)
-		newDir := filepath.Join(n.path, newName)
+
+		// Construct the new directory path
+		day := filepath.Base(filepath.Dir(oldDir))
+		month := filepath.Base(filepath.Dir(filepath.Dir(oldDir)))
+		year := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(oldDir))))
+		newDir := filepath.Join(n.path, year, month, day, newName)
+
+		// Make sure the new directory exists
+		if err := os.MkdirAll(filepath.Dir(newDir), 0755); err != nil {
+			logger.Error(ctx, "Failed to create new directory", "err", err, "new", newDir)
+			return fmt.Errorf("failed to create directory %s: %w", newDir, err)
+		}
 
 		// Rename the file
 		if err := os.Rename(oldDir, newDir); err != nil {
@@ -349,4 +503,38 @@ func parseFileTimestamp(file string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("failed to parse UTC timestamp %s: %w", timestampString, err)
 	}
 	return t, nil
+}
+
+// listDirsSorted lists directories in the given path, optionally in reverse order.
+func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	// If the directory does not exist, return nil
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var dirs []string
+	if pattern != nil {
+		for _, entry := range entries {
+			if entry.IsDir() && pattern.MatchString(entry.Name()) {
+				dirs = append(dirs, entry.Name())
+			}
+		}
+	} else {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				dirs = append(dirs, entry.Name())
+			}
+		}
+	}
+
+	if reverse {
+		sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
+	} else {
+		sort.Strings(dirs)
+	}
+
+	return dirs, nil
 }
