@@ -157,7 +157,7 @@ func joinBytes(s ...[]byte) []byte {
 
 func newlineToBrTag(body string) string {
 	return strings.NewReplacer(
-		`\r\n`, "<br />", `\r`, "<br />", `\n`, "<br />",
+		`\r\n`, "<br />", `\r`, "<br />", `\n`, "<br />", "\r\n", "<br />", "\r", "<br />", "\n", "<br />",
 	).Replace(body)
 }
 
