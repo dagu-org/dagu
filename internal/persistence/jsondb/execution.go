@@ -1,3 +1,4 @@
+// Package jsondb provides a JSON-based persistence implementation for DAG execution history.
 package jsondb
 
 import (
@@ -12,12 +13,16 @@ import (
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
 )
 
+// Execution represents a single execution of a DAG with its associated timestamp and request ID.
+// It manages the directory structure for storing execution data.
 type Execution struct {
-	baseDir   string
-	timestamp time.Time
-	requestID string
+	baseDir   string    // Base directory path for this execution
+	timestamp time.Time // Timestamp when the execution was created
+	requestID string    // Unique request ID for this execution
 }
 
+// NewExecution creates a new Execution instance from a directory path.
+// It parses the directory name to extract the timestamp and request ID.
 func NewExecution(dir string) (*Execution, error) {
 	exec := &Execution{baseDir: dir}
 	matches := reExecution.FindStringSubmatch(filepath.Base(dir))
@@ -33,15 +38,19 @@ func NewExecution(dir string) (*Execution, error) {
 	return exec, nil
 }
 
-func (e Execution) CreateRecord(_ context.Context, timestamp TimeInUTC, cache *filecache.Cache[*persistence.Status]) (*Record, error) {
+// CreateRecord creates a new record for this execution with the given timestamp.
+// It creates a new attempt directory and initializes a record within it.
+func (e Execution) CreateRecord(_ context.Context, timestamp TimeInUTC, cache *filecache.Cache[*persistence.Status], opts ...RecordOption) (*Record, error) {
 	dirName := "attempt_" + timestamp.Format(dateTimeFormatUTC)
 	dir := filepath.Join(e.baseDir, dirName)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create attempt directory: %w", err)
 	}
-	return NewRecord(filepath.Join(dir, "status.json"), cache), nil
+	return NewRecord(filepath.Join(dir, "status.json"), cache, opts...), nil
 }
 
+// LatestRecord returns the most recent record for this execution.
+// It searches through all attempt directories and returns the first valid record found.
 func (e Execution) LatestRecord(_ context.Context, cache *filecache.Cache[*persistence.Status]) (*Record, error) {
 	attempts, err := listDirsSorted(e.baseDir, true, reAttempt)
 	if err != nil {
@@ -57,6 +66,8 @@ func (e Execution) LatestRecord(_ context.Context, cache *filecache.Cache[*persi
 	return nil, persistence.ErrNoStatusData
 }
 
+// LastUpdated returns the last modification time of the latest record.
+// This is used to determine when the execution was last updated.
 func (e Execution) LastUpdated(ctx context.Context) (time.Time, error) {
 	latestRecord, err := e.LatestRecord(ctx, nil)
 	if err != nil {
@@ -65,13 +76,17 @@ func (e Execution) LastUpdated(ctx context.Context) (time.Time, error) {
 	return latestRecord.ModTime()
 }
 
+// Remove deletes the entire execution directory and all its contents.
 func (e Execution) Remove() error {
 	return os.RemoveAll(e.baseDir)
 }
 
-var reExecution = regexp.MustCompile(`^exec_(\d{8}_\d{6}_\d{3}Z)_(.*)$`)
-var reAttempt = regexp.MustCompile(`^attempt_(\d{8}_\d{6}_\d{3}Z)$`)
+// Regular expressions for parsing directory names
+var reExecution = regexp.MustCompile(`^exec_(\d{8}_\d{6}_\d{3}Z)_(.*)$`) // Matches execution directory names
+var reAttempt = regexp.MustCompile(`^attempt_(\d{8}_\d{6}_\d{3}Z)$`)     // Matches attempt directory names
 
+// parseFileTimestamp converts a timestamp string from a filename into a time.Time.
+// The timestamp format is expected to match dateTimeFormatUTC.
 func parseFileTimestamp(s string) (time.Time, error) {
 	t, err := time.Parse(dateTimeFormatUTC, s)
 	if err != nil {

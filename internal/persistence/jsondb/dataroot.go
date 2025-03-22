@@ -22,26 +22,41 @@ import (
 	"github.com/dagu-org/dagu/internal/fileutil"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 )
 
+// DataRoot manages the directory structure for a DAG's execution history.
+// It handles the organization of execution data in a hierarchical structure
+// based on year, month, and day.
 type DataRoot struct {
-	baseDir       string
-	dagName       string
-	prefix        string
-	executionsDir string
-	globPattern   string
-	rootDAG       *digraph.RootDAG
+	baseDir       string           // Base directory for all DAGs
+	dagName       string           // Name of the DAG
+	prefix        string           // Sanitized prefix for directory names
+	executionsDir string           // Path to the executions directory
+	globPattern   string           // Pattern for finding execution directories
+	rootDAG       *digraph.RootDAG // Optional reference to the root DAG
 }
 
+// RootOption defines a functional option for configuring DataRoot.
 type RootOption func(*DataRoot)
 
+// WithRootDAG sets the root DAG for the DataRoot.
+// This is used when the DataRoot needs access to the DAG definition.
 func WithRootDAG(rootDAG *digraph.RootDAG) RootOption {
 	return func(dr *DataRoot) {
 		dr.rootDAG = rootDAG
 	}
 }
 
+// NewDataRoot creates a new DataRoot instance for managing a DAG's execution history.
+// It sanitizes the DAG name to create a safe directory structure and applies any provided options.
+//
+// Parameters:
+//   - baseDir: The base directory where all DAG data is stored
+//   - dagName: The name of the DAG (can be a path to a YAML file)
+//   - opts: Optional functional options for configuring the DataRoot
+//
+// Returns:
+//   - A configured DataRoot instance
 func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
 	ext := filepath.Ext(dagName)
 	root := DataRoot{baseDir: baseDir, dagName: dagName}
@@ -56,8 +71,10 @@ func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
 		base = strings.TrimSuffix(base, ext)
 	}
 
+	// Create a safe directory name from the DAG name
 	prefix := fileutil.SafeName(base)
 	if prefix != base {
+		// If the name was modified for safety, append a hash to ensure uniqueness
 		hash := sha256.Sum256([]byte(dagName))
 		hashLength := 4 // 4 characters of the hash should be enough
 		prefix = prefix + "-" + hex.EncodeToString(hash[:])[0:hashLength]
@@ -70,6 +87,16 @@ func NewDataRoot(baseDir, dagName string, opts ...RootOption) DataRoot {
 	return root
 }
 
+// FindByRequestID locates an execution by its request ID.
+// It searches through all execution directories to find a match,
+// and returns the most recent one if multiple matches are found.
+//
+// Parameters:
+//   - ctx: Context for the operation (unused but kept for interface consistency)
+//   - requestID: The unique request ID to search for
+//
+// Returns:
+//   - The matching Execution instance, or an error if not found
 func (dr *DataRoot) FindByRequestID(_ context.Context, requestID string) (*Execution, error) {
 	// Find matching files
 	matches, err := filepath.Glob(dr.GlobPatternWithRequestID(requestID))
@@ -119,7 +146,7 @@ func (dr *DataRoot) CreateExecution(timestamp TimeInUTC, reqID string) (*Executi
 	dir := filepath.Join(dr.executionsDir, timestamp.Format("2006"), timestamp.Format("01"), timestamp.Format("02"), dirName)
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("%w: %s : %s", storage.ErrCreateNewDirectory, dir, err)
+		return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	return NewExecution(dir)
@@ -129,7 +156,7 @@ func (dr DataRoot) GlobPatternWithRequestID(requestID string) string {
 	return filepath.Join(dr.executionsDir, "2*", "*", "*", "exec_*"+requestID+"*")
 }
 
-func (dr DataRoot) FilePath(timestamp storage.TimeInUTC, requestID string) string {
+func (dr DataRoot) FilePath(timestamp TimeInUTC, requestID string) string {
 	year := timestamp.Format("2006")
 	month := timestamp.Format("01")
 	date := timestamp.Format("02")
@@ -148,7 +175,7 @@ func (dr DataRoot) Create() error {
 		return nil
 	}
 	if err := os.MkdirAll(dr.executionsDir, 0755); err != nil {
-		return fmt.Errorf("%w: %s : %s", storage.ErrCreateNewDirectory, dr.executionsDir, err)
+		return fmt.Errorf("failed to create directory %s: %w", dr.executionsDir, err)
 	}
 	return nil
 }
@@ -170,7 +197,7 @@ func (dr DataRoot) IsEmpty() bool {
 
 func (dr DataRoot) Remove() error {
 	if err := os.RemoveAll(dr.executionsDir); err != nil {
-		return fmt.Errorf("%w: %s : %s", storage.ErrRemoveDirectory, dr.executionsDir, err)
+		return fmt.Errorf("failed to remove directory %s: %w", dr.executionsDir, err)
 	}
 	return nil
 }
@@ -213,6 +240,8 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 			return fmt.Errorf("failed to rename %s to %s: %w", targetDir, newDir, err)
 		}
 
+		dr.removeEmptyDir(ctx, filepath.Dir(targetDir))
+
 		return nil
 	})
 
@@ -231,6 +260,7 @@ func (dr DataRoot) Rename(ctx context.Context, newRoot DataRoot) error {
 func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 	keepTime := NewUTC(time.Now().AddDate(0, 0, -retentionDays))
 	executions := dr.listInRange(ctx, TimeInUTC{}, keepTime)
+
 	for _, exec := range executions {
 		lastUpdate, err := exec.LastUpdated(ctx)
 		if err != nil {
@@ -243,8 +273,32 @@ func (dr DataRoot) RemoveOld(ctx context.Context, retentionDays int) error {
 		if err := exec.Remove(); err != nil {
 			logger.Errorf(ctx, "failed to remove execution %s: %v", exec.baseDir, err)
 		}
+		dr.removeEmptyDir(ctx, filepath.Dir(exec.baseDir))
 	}
 	return nil
+}
+
+func (dr DataRoot) removeEmptyDir(ctx context.Context, dayDir string) {
+	monthDir := filepath.Dir(dayDir)
+	yearDir := filepath.Dir(monthDir)
+
+	if isDirEmpty(dayDir) {
+		if err := os.Remove(dayDir); err != nil {
+			logger.Errorf(ctx, "failed to remove day directory %s: %v", dayDir, err)
+		}
+	}
+
+	if isDirEmpty(monthDir) {
+		if err := os.Remove(monthDir); err != nil {
+			logger.Errorf(ctx, "failed to remove month directory %s: %v", monthDir, err)
+		}
+	}
+
+	if isDirEmpty(yearDir) {
+		if err := os.Remove(yearDir); err != nil {
+			logger.Errorf(ctx, "failed to remove year directory %s: %v", yearDir, err)
+		}
+	}
 }
 
 func (dr DataRoot) listInRange(ctx context.Context, start, end TimeInUTC) []*Execution {
@@ -403,6 +457,17 @@ YEAR_LOOP:
 }
 
 // listDirsSorted lists directories in the given path, optionally in reverse order.
+// It can filter directories based on a regular expression pattern and sort them
+// either in ascending or descending order.
+//
+// Parameters:
+//   - path: Directory path to list
+//   - reverse: If true, sort in descending order; if false, sort in ascending order
+//   - pattern: Optional regex pattern to filter directory names (nil means no filtering)
+//
+// Returns:
+//   - A sorted slice of directory names, or nil if the directory doesn't exist
+//   - An error if the directory couldn't be read
 func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string, error) {
 	entries, err := os.ReadDir(path)
 	// If the directory does not exist, return nil
@@ -437,7 +502,16 @@ func listDirsSorted(path string, reverse bool, pattern *regexp.Regexp) ([]string
 }
 
 // processFilesParallel processes files in parallel using a worker pool.
-// It returns a slice of errors encountered during processing.
+// It limits concurrency to the number of available CPU cores and handles
+// context cancellation gracefully.
+//
+// Parameters:
+//   - ctx: Context for the operation, which can be used to cancel processing
+//   - files: Slice of file paths to process
+//   - processor: Function to apply to each file path
+//
+// Returns:
+//   - A slice of errors encountered during processing
 func processFilesParallel(ctx context.Context, files []string, processor func(string) error) []error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(files))
@@ -478,10 +552,22 @@ func processFilesParallel(ctx context.Context, files []string, processor func(st
 	return errs
 }
 
+// isDirEmpty checks if a directory is empty.
+// It returns true if the directory exists and contains no entries,
+// and false if the directory doesn't exist or contains entries.
+func isDirEmpty(path string) bool {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false
+	}
+	return len(entries) == 0
+}
+
+// Regular expressions for directory structure validation
 var (
-	reYear  = regexp.MustCompile(`^\d{4}$`)
-	reMonth = regexp.MustCompile(`^\d{2}$`)
-	reDay   = regexp.MustCompile(`^\d{2}$`)
+	reYear  = regexp.MustCompile(`^\d{4}$`) // Matches 4-digit year directories (e.g., "2023")
+	reMonth = regexp.MustCompile(`^\d{2}$`) // Matches 2-digit month directories (e.g., "01" for January)
+	reDay   = regexp.MustCompile(`^\d{2}$`) // Matches 2-digit day directories (e.g., "15" for the 15th day)
 )
 
 // dateTimeFormatUTC is the format for execution timestamps.

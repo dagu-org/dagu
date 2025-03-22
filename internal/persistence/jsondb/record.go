@@ -42,9 +42,11 @@ type Record struct {
 	dag       *digraph.DAG                          // DAG associated with the status file
 }
 
+// RecordOption defines a functional option for configuring a Record.
 type RecordOption func(*Record)
 
 // WithDAG sets the DAG associated with the record.
+// This allows the record to store DAG metadata alongside the execution data.
 func WithDAG(dag *digraph.DAG) RecordOption {
 	return func(r *Record) {
 		r.dag = dag
@@ -66,6 +68,8 @@ func (r *Record) Exists() bool {
 	return err == nil
 }
 
+// ModTime returns the last modification time of the status file.
+// This is used to determine when the record was last updated.
 func (r *Record) ModTime() (time.Time, error) {
 	info, err := os.Stat(r.file)
 	if err != nil {

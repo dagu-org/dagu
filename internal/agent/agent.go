@@ -135,7 +135,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	// Make a connection to the database.
 	// It should close the connection to the history database when the DAG
 	// execution is finished.
-	historyRecord := a.setupHistoryRecord(ctx)
+	historyRecord, err := a.setupHistoryRecord(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to setup history record: %w", err)
+	}
 	if err := historyRecord.Open(ctx); err != nil {
 		return fmt.Errorf("failed to open history record: %w", err)
 	}
@@ -487,7 +490,7 @@ func (a *Agent) setupGraphForRetry(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) setupHistoryRecord(ctx context.Context) persistence.Record {
+func (a *Agent) setupHistoryRecord(ctx context.Context) (persistence.Record, error) {
 	retentionDays := a.dag.HistRetentionDays
 	if err := a.historyStore.RemoveOld(ctx, a.dag.Name, retentionDays); err != nil {
 		logger.Error(ctx, "History data cleanup failed", "err", err)

@@ -24,10 +24,10 @@ func TestExecution(t *testing.T) {
 		_ = exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
 		_ = exec.WriteStatus(t, ts3, scheduler.StatusError)
 
-		record, err := exec.LatestRecord(exec.Ctx, nil)
+		record, err := exec.LatestRecord(exec.Context, nil)
 		require.NoError(t, err)
 
-		status, err := record.ReadStatus(exec.Ctx)
+		status, err := record.ReadStatus(exec.Context)
 		require.NoError(t, err)
 
 		require.Equal(t, scheduler.StatusError.String(), status.Status.String())
@@ -44,7 +44,7 @@ func TestExecution(t *testing.T) {
 		_ = exec.WriteStatus(t, ts2, scheduler.StatusSuccess)
 		record := exec.WriteStatus(t, ts3, scheduler.StatusError)
 
-		lastUpdate, err := exec.LastUpdated(exec.Ctx)
+		lastUpdate, err := exec.LastUpdated(exec.Context)
 		require.NoError(t, err)
 
 		info, err := os.Stat(record.file)
@@ -68,14 +68,14 @@ func (et ExecutionTest) WriteStatus(t *testing.T, ts TimeInUTC, s scheduler.Stat
 	status.RequestID = "test-id-1"
 	status.Status = s
 
-	record, err := et.CreateRecord(et.Ctx, ts, nil)
+	record, err := et.CreateRecord(et.Context, ts, nil)
 	require.NoError(t, err)
-	err = record.Open(et.Ctx)
+	err = record.Open(et.Context)
 	require.NoError(t, err)
 
-	defer record.Close(et.Ctx)
+	defer record.Close(et.Context)
 
-	err = record.Write(et.Ctx, status)
+	err = record.Write(et.Context, status)
 	require.NoError(t, err)
 
 	return record
