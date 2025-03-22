@@ -249,7 +249,7 @@ gen-swagger:
 changelog:
 	@echo "${COLOR_GREEN}Running changelog...${COLOR_RESET}"
 	@GOBIN=${LOCAL_BIN_DIR} go install $(PKG_changelog-from-release)
-	@${LOCAL_BIN_DIR}/changelog-from-release > CHANGELOG.md
+	@${LOCAL_BIN_DIR}/changelog-from-release -c > CHANGELOG.md
 
 ##############################################################################
 # Certificates
