@@ -1,3 +1,34 @@
+<a id="v1.16.5"></a>
+# [v1.16.5](https://github.com/dagu-org/dagu/releases/tag/v1.16.5) - 2025-03-22
+
+## Changelog
+* [`f057884935`](https://github.com/dagu-org/dagu/commit/f0578849351b808eb353d2d7c8f58e1eb8148366) executor/mail: fix: line breaks in email body are not properly converted to `<br />` ([#888](https://github.com/dagu-org/dagu/issues/888))
+
+## What's Changed
+* docs: bump python version for docs to 3.11.9 by [@Lewiscowles1986](https://github.com/Lewiscowles1986) in [#865](https://github.com/dagu-org/dagu/pull/865)
+* chore: add CHANGELOG.md by [@yottahmd](https://github.com/yottahmd) in [#866](https://github.com/dagu-org/dagu/pull/866)
+* fix: snapshot deprecated warning (Fixes [#869](https://github.com/dagu-org/dagu/issues/869)) by [@arky](https://github.com/arky) in [#870](https://github.com/dagu-org/dagu/pull/870)
+* docs: fixed incorrect command syntax in slack notification example by [@david-waterworth](https://github.com/david-waterworth) in [#874](https://github.com/dagu-org/dagu/pull/874)
+* [[#877](https://github.com/dagu-org/dagu/issues/877)] ui: fix: base path is not working on web by [@yottahmd](https://github.com/yottahmd) in [#878](https://github.com/dagu-org/dagu/pull/878)
+* [[#882](https://github.com/dagu-org/dagu/issues/882)] Fix context handling issue by [@yottahmd](https://github.com/yottahmd) in [#883](https://github.com/dagu-org/dagu/pull/883)
+* [[#880](https://github.com/dagu-org/dagu/issues/880)] config: fix: auth token issue by [@yottahmd](https://github.com/yottahmd) in [#884](https://github.com/dagu-org/dagu/pull/884)
+* executor/mail: fix: line breaks in email body are not properly converted to `<br />` by [@yottahmd](https://github.com/yottahmd) in [#888](https://github.com/dagu-org/dagu/pull/888)
+
+## New Contributors
+* [@david-waterworth](https://github.com/david-waterworth) made their first contribution in [#874](https://github.com/dagu-org/dagu/pull/874)
+
+**Full Changelog**: https://github.com/dagu-org/dagu/compare/v1.16.4...v1.16.5
+
+## Contributors
+
+<a href="https://github.com/Lewiscowles1986"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FLewiscowles1986.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Lewiscowles1986"></a>
+<a href="https://github.com/arky"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Farky.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@arky"></a>
+<a href="https://github.com/david-waterworth"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdavid-waterworth.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@david-waterworth"></a>
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
+
+[Changes][v1.16.5]
+
+
 <a id="v1.16.4"></a>
 # [v1.16.4](https://github.com/dagu-org/dagu/releases/tag/v1.16.4) - 2025-02-25
 
@@ -17,8 +48,8 @@
 
 ## Contributors
 
-<a href="https://github.com/Lewiscowles1986"><img src="https://wsrv.nl/?url=https://github.com/Lewiscowles1986.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Lewiscowles1986"></a> <a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https://github.com/yottahmd.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a> 
-
+<a href="https://github.com/Lewiscowles1986"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FLewiscowles1986.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Lewiscowles1986"></a>
+<a href="https://github.com/yottahmd"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyottahmd.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yottahmd"></a>
 
 [Changes][v1.16.4]
 
@@ -45,8 +76,8 @@
 
 ## Contributors
 
-<a href="https://github.com/arky"><img src="https://wsrv.nl/?url=https://github.com/arky.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@arky"></a> <a href="https://github.com/vnghia"><img src="https://wsrv.nl/?url=https://github.com/vnghia.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@vnghia"></a> 
-
+<a href="https://github.com/arky"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Farky.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@arky"></a>
+<a href="https://github.com/vnghia"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fvnghia.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@vnghia"></a>
 
 [Changes][v1.16.3]
 
@@ -71,8 +102,8 @@
 
 ## Contributors
 
-<a href="https://github.com/dayne"><img src="https://wsrv.nl/?url=https://github.com/dayne.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@dayne"></a> <a href="https://github.com/dependabot"><img src="https://wsrv.nl/?url=https://github.com/dependabot.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@dependabot"></a> 
-
+<a href="https://github.com/dayne"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdayne.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@dayne"></a>
+<a href="https://github.com/dependabot"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdependabot.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@dependabot"></a>
 
 [Changes][v1.16.2]
 
@@ -106,8 +137,11 @@
 
 ## Contributors
 
-<a href="https://github.com/arky"><img src="https://wsrv.nl/?url=https://github.com/arky.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@arky"></a> <a href="https://github.com/eltociear"><img src="https://wsrv.nl/?url=https://github.com/eltociear.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@eltociear"></a> <a href="https://github.com/kennethpjdyer"><img src="https://wsrv.nl/?url=https://github.com/kennethpjdyer.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@kennethpjdyer"></a> <a href="https://github.com/kriyanshii"><img src="https://wsrv.nl/?url=https://github.com/kriyanshii.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@kriyanshii"></a> <a href="https://github.com/vhespanha"><img src="https://wsrv.nl/?url=https://github.com/vhespanha.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@vhespanha"></a> 
-
+<a href="https://github.com/arky"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Farky.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@arky"></a>
+<a href="https://github.com/eltociear"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Feltociear.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@eltociear"></a>
+<a href="https://github.com/kennethpjdyer"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fkennethpjdyer.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@kennethpjdyer"></a>
+<a href="https://github.com/kriyanshii"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fkriyanshii.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@kriyanshii"></a>
+<a href="https://github.com/vhespanha"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fvhespanha.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@vhespanha"></a>
 
 [Changes][v1.16.1]
 
@@ -201,8 +235,8 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/chrishoage"><img src="https://wsrv.nl/?url=https://github.com/chrishoage.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@chrishoage"></a> <a href="https://github.com/jonnochoo"><img src="https://wsrv.nl/?url=https://github.com/jonnochoo.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@jonnochoo"></a> 
-
+<a href="https://github.com/chrishoage"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fchrishoage.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@chrishoage"></a>
+<a href="https://github.com/jonnochoo"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjonnochoo.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jonnochoo"></a>
 
 [Changes][v1.15.0]
 
@@ -218,8 +252,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/jonnochoo"><img src="https://wsrv.nl/?url=https://github.com/jonnochoo.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@jonnochoo"></a> 
-
+<a href="https://github.com/jonnochoo"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjonnochoo.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jonnochoo"></a>
 
 [Changes][v1.14.8]
 
@@ -255,8 +288,8 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/KMe72"><img src="https://wsrv.nl/?url=https://github.com/KMe72.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@KMe72"></a> <a href="https://github.com/jonnochoo"><img src="https://wsrv.nl/?url=https://github.com/jonnochoo.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@jonnochoo"></a> 
-
+<a href="https://github.com/KMe72"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FKMe72.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@KMe72"></a>
+<a href="https://github.com/jonnochoo"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fjonnochoo.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@jonnochoo"></a>
 
 [Changes][v1.14.6]
 
@@ -291,8 +324,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/halalala222"><img src="https://wsrv.nl/?url=https://github.com/halalala222.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@halalala222"></a> 
-
+<a href="https://github.com/halalala222"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fhalalala222.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@halalala222"></a>
 
 [Changes][v1.14.4]
 
@@ -326,8 +358,9 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/Kiyo510"><img src="https://wsrv.nl/?url=https://github.com/Kiyo510.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Kiyo510"></a> <a href="https://github.com/Lucaslah"><img src="https://wsrv.nl/?url=https://github.com/Lucaslah.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Lucaslah"></a> <a href="https://github.com/halalala222"><img src="https://wsrv.nl/?url=https://github.com/halalala222.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@halalala222"></a> 
-
+<a href="https://github.com/Kiyo510"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FKiyo510.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Kiyo510"></a>
+<a href="https://github.com/Lucaslah"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FLucaslah.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Lucaslah"></a>
+<a href="https://github.com/halalala222"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fhalalala222.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@halalala222"></a>
 
 [Changes][v1.14.3]
 
@@ -349,8 +382,11 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/Kiyo510"><img src="https://wsrv.nl/?url=https://github.com/Kiyo510.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Kiyo510"></a> <a href="https://github.com/bbqi"><img src="https://wsrv.nl/?url=https://github.com/bbqi.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@bbqi"></a> <a href="https://github.com/rocwang"><img src="https://wsrv.nl/?url=https://github.com/rocwang.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@rocwang"></a> <a href="https://github.com/x4204"><img src="https://wsrv.nl/?url=https://github.com/x4204.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@x4204"></a> <a href="https://github.com/zph"><img src="https://wsrv.nl/?url=https://github.com/zph.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@zph"></a> 
-
+<a href="https://github.com/Kiyo510"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FKiyo510.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Kiyo510"></a>
+<a href="https://github.com/bbqi"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fbbqi.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@bbqi"></a>
+<a href="https://github.com/rocwang"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Frocwang.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@rocwang"></a>
+<a href="https://github.com/x4204"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fx4204.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@x4204"></a>
+<a href="https://github.com/zph"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fzph.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@zph"></a>
 
 [Changes][v1.14.2]
 
@@ -373,8 +409,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/rocwang"><img src="https://wsrv.nl/?url=https://github.com/rocwang.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@rocwang"></a> 
-
+<a href="https://github.com/rocwang"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Frocwang.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@rocwang"></a>
 
 [Changes][v1.14.1]
 
@@ -422,8 +457,9 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/x2ocoder"><img src="https://wsrv.nl/?url=https://github.com/x2ocoder.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@x2ocoder"></a> <a href="https://github.com/x4204"><img src="https://wsrv.nl/?url=https://github.com/x4204.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@x4204"></a> <a href="https://github.com/zph"><img src="https://wsrv.nl/?url=https://github.com/zph.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@zph"></a> 
-
+<a href="https://github.com/x2ocoder"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fx2ocoder.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@x2ocoder"></a>
+<a href="https://github.com/x4204"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fx4204.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@x4204"></a>
+<a href="https://github.com/zph"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fzph.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@zph"></a>
 
 [Changes][v1.13.1]
 
@@ -474,8 +510,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/Kiyo510"><img src="https://wsrv.nl/?url=https://github.com/Kiyo510.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Kiyo510"></a> 
-
+<a href="https://github.com/Kiyo510"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FKiyo510.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Kiyo510"></a>
 
 [Changes][v1.13.0]
 
@@ -515,8 +550,10 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/HtcOrange"><img src="https://wsrv.nl/?url=https://github.com/HtcOrange.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@HtcOrange"></a> <a href="https://github.com/JadRho"><img src="https://wsrv.nl/?url=https://github.com/JadRho.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@JadRho"></a> <a href="https://github.com/fruworg"><img src="https://wsrv.nl/?url=https://github.com/fruworg.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@fruworg"></a> <a href="https://github.com/yarikoptic"><img src="https://wsrv.nl/?url=https://github.com/yarikoptic.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@yarikoptic"></a> 
-
+<a href="https://github.com/HtcOrange"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FHtcOrange.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@HtcOrange"></a>
+<a href="https://github.com/JadRho"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FJadRho.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@JadRho"></a>
+<a href="https://github.com/fruworg"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Ffruworg.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@fruworg"></a>
+<a href="https://github.com/yarikoptic"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fyarikoptic.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@yarikoptic"></a>
 
 [Changes][v1.12.10]
 
@@ -537,8 +574,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/rafiramadhana"><img src="https://wsrv.nl/?url=https://github.com/rafiramadhana.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@rafiramadhana"></a> 
-
+<a href="https://github.com/rafiramadhana"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Frafiramadhana.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@rafiramadhana"></a>
 
 [Changes][v1.12.9]
 
@@ -565,8 +601,9 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/ArseniySavin"><img src="https://wsrv.nl/?url=https://github.com/ArseniySavin.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@ArseniySavin"></a> <a href="https://github.com/rafiramadhana"><img src="https://wsrv.nl/?url=https://github.com/rafiramadhana.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@rafiramadhana"></a> <a href="https://github.com/smekuria1"><img src="https://wsrv.nl/?url=https://github.com/smekuria1.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@smekuria1"></a> 
-
+<a href="https://github.com/ArseniySavin"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArseniySavin.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@ArseniySavin"></a>
+<a href="https://github.com/rafiramadhana"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Frafiramadhana.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@rafiramadhana"></a>
+<a href="https://github.com/smekuria1"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fsmekuria1.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@smekuria1"></a>
 
 [Changes][v1.12.8]
 
@@ -599,8 +636,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/triole"><img src="https://wsrv.nl/?url=https://github.com/triole.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@triole"></a> 
-
+<a href="https://github.com/triole"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Ftriole.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@triole"></a>
 
 [Changes][v1.12.6]
 
@@ -689,8 +725,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/dat-adi"><img src="https://wsrv.nl/?url=https://github.com/dat-adi.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@dat-adi"></a> 
-
+<a href="https://github.com/dat-adi"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fdat-adi.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@dat-adi"></a>
 
 [Changes][v1.12.0]
 
@@ -725,8 +760,8 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/fljdin"><img src="https://wsrv.nl/?url=https://github.com/fljdin.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@fljdin"></a> <a href="https://github.com/garunitule"><img src="https://wsrv.nl/?url=https://github.com/garunitule.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@garunitule"></a> 
-
+<a href="https://github.com/fljdin"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Ffljdin.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@fljdin"></a>
+<a href="https://github.com/garunitule"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fgarunitule.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@garunitule"></a>
 
 [Changes][v1.10.6]
 
@@ -750,8 +785,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/garunitule"><img src="https://wsrv.nl/?url=https://github.com/garunitule.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@garunitule"></a> 
-
+<a href="https://github.com/garunitule"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fgarunitule.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@garunitule"></a>
 
 [Changes][v1.10.5]
 
@@ -773,8 +807,8 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/1005281342"><img src="https://wsrv.nl/?url=https://github.com/1005281342.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@1005281342"></a> <a href="https://github.com/stefaan1o"><img src="https://wsrv.nl/?url=https://github.com/stefaan1o.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@stefaan1o"></a> 
-
+<a href="https://github.com/1005281342"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2F1005281342.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@1005281342"></a>
+<a href="https://github.com/stefaan1o"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fstefaan1o.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@stefaan1o"></a>
 
 [Changes][v1.10.4]
 
@@ -805,8 +839,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/stefaan1o"><img src="https://wsrv.nl/?url=https://github.com/stefaan1o.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@stefaan1o"></a> 
-
+<a href="https://github.com/stefaan1o"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fstefaan1o.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@stefaan1o"></a>
 
 [Changes][v1.10.2]
 
@@ -843,8 +876,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/vkill"><img src="https://wsrv.nl/?url=https://github.com/vkill.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@vkill"></a> 
-
+<a href="https://github.com/vkill"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Fvkill.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@vkill"></a>
 
 [Changes][v1.9.4]
 
@@ -871,8 +903,9 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/TahirAIi"><img src="https://wsrv.nl/?url=https://github.com/TahirAIi.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@TahirAIi"></a> <a href="https://github.com/emcassi"><img src="https://wsrv.nl/?url=https://github.com/emcassi.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@emcassi"></a> <a href="https://github.com/zwZjut"><img src="https://wsrv.nl/?url=https://github.com/zwZjut.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@zwZjut"></a> 
-
+<a href="https://github.com/TahirAIi"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FTahirAIi.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@TahirAIi"></a>
+<a href="https://github.com/emcassi"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Femcassi.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@emcassi"></a>
+<a href="https://github.com/zwZjut"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FzwZjut.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@zwZjut"></a>
 
 [Changes][v1.9.3]
 
@@ -926,8 +959,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/SimonWaldherr"><img src="https://wsrv.nl/?url=https://github.com/SimonWaldherr.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@SimonWaldherr"></a> 
-
+<a href="https://github.com/SimonWaldherr"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FSimonWaldherr.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@SimonWaldherr"></a>
 
 [Changes][v1.9.0]
 
@@ -966,8 +998,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/RamonEspinosa"><img src="https://wsrv.nl/?url=https://github.com/RamonEspinosa.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@RamonEspinosa"></a> 
-
+<a href="https://github.com/RamonEspinosa"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FRamonEspinosa.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@RamonEspinosa"></a>
 
 [Changes][v1.8.7]
 
@@ -1014,8 +1045,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https://github.com/Arvintian.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a> 
-
+<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 
 [Changes][v1.8.4]
 
@@ -1153,8 +1183,7 @@ steps:
 
 ## Contributors
 
-<a href="https://github.com/fishnux"><img src="https://wsrv.nl/?url=https://github.com/fishnux.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@fishnux"></a> 
-
+<a href="https://github.com/fishnux"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2Ffishnux.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@fishnux"></a>
 
 [Changes][v1.7.7]
 
@@ -1181,8 +1210,7 @@ Update: `${DAG_HOME}/logs/dags/${name}`
 
 ## Contributors
 
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https://github.com/Arvintian.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a> 
-
+<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 
 [Changes][v1.7.6]
 
@@ -1319,8 +1347,7 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 
 ## Contributors
 
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https://github.com/Arvintian.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a> 
-
+<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 
 [Changes][v1.6.6]
 
@@ -1357,8 +1384,7 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 
 ## Contributors
 
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https://github.com/Arvintian.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a> 
-
+<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 
 [Changes][v1.6.4]
 
@@ -1417,8 +1443,7 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 
 ## Contributors
 
-<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https://github.com/Arvintian.png&w=64&h=64&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a> 
-
+<a href="https://github.com/Arvintian"><img src="https://wsrv.nl/?url=https%3A%2F%2Fgithub.com%2FArvintian.png&w=128&h=128&fit=cover&mask=circle" width="64" height="64" alt="@Arvintian"></a>
 
 [Changes][v1.6.0]
 
@@ -2175,6 +2200,7 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 [Changes][v1.0.0]
 
 
+[v1.16.5]: https://github.com/dagu-org/dagu/compare/v1.16.4...v1.16.5
 [v1.16.4]: https://github.com/dagu-org/dagu/compare/v1.16.3...v1.16.4
 [v1.16.3]: https://github.com/dagu-org/dagu/compare/v1.16.2...v1.16.3
 [v1.16.2]: https://github.com/dagu-org/dagu/compare/v1.16.1...v1.16.2
@@ -2311,4 +2337,4 @@ For the internal-use directory path you can set the environment variable `DAGU_H
 [v1.0.1]: https://github.com/dagu-org/dagu/compare/v1.0.0...v1.0.1
 [v1.0.0]: https://github.com/dagu-org/dagu/tree/v1.0.0
 
-<!-- Generated by https://github.com/rhysd/changelog-from-release v3.8.1 -->
+<!-- Generated by https://github.com/rhysd/changelog-from-release v3.9.0 -->

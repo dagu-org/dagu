@@ -34,7 +34,6 @@
     },
     "schedule": {
       "type": "string",
-      "pattern": "(\\*|[0-5]?[0-9]|\\*/[0-9]+)\\s+(\\*|1?[0-9]|2[0-3]|\\*/[0-9]+)\\s+(\\*|[1-2]?[0-9]|3[0-1]|\\*/[0-9]+)\\s+(\\*|[0-9]|1[0-2]|\\*/[0-9]+|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\\s+(\\*/[0-9]+|\\*|[0-7]|sun|mon|tue|wed|thu|fri|sat)\\s*(\\*/[0-9]+|\\*|[0-9]+)?",
       "description": "Cron expression that determines how often the DAG runs (e.g., '5 4 * * *' runs daily at 04:05). If omitted, the DAG will only run manually."
     },
     "skipIfSuccessful": {

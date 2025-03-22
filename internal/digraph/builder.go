@@ -85,6 +85,7 @@ var stepBuilderRegistry = []stepBuilderEntry{
 	{name: "repeatPolicy", fn: buildRepeatPolicy},
 	{name: "signalOnStop", fn: buildSignalOnStop},
 	{name: "precondition", fn: buildStepPrecondition},
+	{name: "output", fn: buildOutput},
 }
 
 type stepBuilderEntry struct {
@@ -558,7 +559,6 @@ func buildStep(ctx BuildContext, def stepDef, fns []*funcDef) (*Step, error) {
 		Script:         def.Script,
 		Stdout:         def.Stdout,
 		Stderr:         def.Stderr,
-		Output:         def.Output,
 		Dir:            def.Dir,
 		MailOnError:    def.MailOnError,
 		ExecutorConfig: ExecutorConfig{Config: make(map[string]any)},
@@ -630,6 +630,20 @@ func buildRepeatPolicy(_ BuildContext, def stepDef, step *Step) error {
 		step.RepeatPolicy.Repeat = def.RepeatPolicy.Repeat
 		step.RepeatPolicy.Interval = time.Second * time.Duration(def.RepeatPolicy.IntervalSec)
 	}
+	return nil
+}
+
+func buildOutput(_ BuildContext, def stepDef, step *Step) error {
+	if def.Output == "" {
+		return nil
+	}
+
+	if strings.HasPrefix(def.Output, "$") {
+		step.Output = strings.TrimPrefix(def.Output, "$")
+		return nil
+	}
+
+	step.Output = def.Output
 	return nil
 }
 
