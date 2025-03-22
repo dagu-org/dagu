@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
@@ -41,9 +42,11 @@ type Record struct {
 	dag       *digraph.DAG                          // DAG associated with the status file
 }
 
+// RecordOption defines a functional option for configuring a Record.
 type RecordOption func(*Record)
 
 // WithDAG sets the DAG associated with the record.
+// This allows the record to store DAG metadata alongside the execution data.
 func WithDAG(dag *digraph.DAG) RecordOption {
 	return func(r *Record) {
 		r.dag = dag
@@ -57,6 +60,22 @@ func NewRecord(file string, cache *filecache.Cache[*persistence.Status], opts ..
 		opt(r)
 	}
 	return r
+}
+
+// Exists returns true if the status file exists.
+func (r *Record) Exists() bool {
+	_, err := os.Stat(r.file)
+	return err == nil
+}
+
+// ModTime returns the last modification time of the status file.
+// This is used to determine when the record was last updated.
+func (r *Record) ModTime() (time.Time, error) {
+	info, err := os.Stat(r.file)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return info.ModTime(), nil
 }
 
 // Open initializes the status file for writing. It returns an error if the file is already open.
@@ -89,7 +108,8 @@ func (r *Record) Open(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal DAG metadata: %w", err)
 		}
-		if err := os.WriteFile(filepath.Join(dir, "dag.json"), dagJSON, 0755); err != nil { //nolint:gosec
+		// TODO: use 0600 // nolint: gosec
+		if err := os.WriteFile(filepath.Join(dir, "dag.json"), dagJSON, 0744); err != nil { //nolint:gosec
 			return fmt.Errorf("failed to write DAG metadata: %w", err)
 		}
 	}
