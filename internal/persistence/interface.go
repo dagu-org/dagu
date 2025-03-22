@@ -15,8 +15,8 @@ var (
 )
 
 type HistoryStore interface {
-	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) Record
-	NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, rootReqID, reqID string) Record
+	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, reqID string) (Record, error)
+	NewSubRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, rootReqID, reqID string) (Record, error)
 	Update(ctx context.Context, name, reqID string, status Status) error
 	Recent(ctx context.Context, name string, itemLimit int) []Record
 	Latest(ctx context.Context, name string) (Record, error)

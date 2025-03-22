@@ -156,7 +156,7 @@ func TestDataRootRename(t *testing.T) {
 	}
 
 	newRoot := NewDataRoot(root.baseDir, "new-dag")
-	err := root.Rename(root.Ctx, newRoot)
+	err := root.Rename(root.Context, newRoot)
 	require.NoError(t, err)
 
 	// Check that the old directory is removed
@@ -210,13 +210,13 @@ func setupTestDataRoot(t *testing.T) *DataRootTest {
 
 	tmpDir := t.TempDir()
 	root := NewDataRoot(tmpDir, "test-dag")
-	return &DataRootTest{DataRoot: root, TB: t, Ctx: context.Background()}
+	return &DataRootTest{DataRoot: root, TB: t, Context: context.Background()}
 }
 
 type DataRootTest struct {
 	DataRoot
-	TB  testing.TB
-	Ctx context.Context
+	TB      testing.TB
+	Context context.Context
 }
 
 func (drt *DataRootTest) CreateTestExecution(t *testing.T, reqID string, ts TimeInUTC) ExecutionTest {
