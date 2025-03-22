@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -700,5 +699,5 @@ func (oc *OutputCoordinator) capturedOutput(ctx context.Context) (string, error)
 	if _, err := io.Copy(&buf, oc.outputReader); err != nil {
 		return "", fmt.Errorf("io: failed to read output: %w", err)
 	}
-	return strings.TrimSpace(buf.String()), nil
+	return buf.String(), nil
 }
