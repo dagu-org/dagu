@@ -504,6 +504,10 @@ func buildSteps(ctx BuildContext, spec *definition, dag *DAG) error {
 
 // buildSMTPConfig builds the SMTP configuration for the DAG.
 func buildSMTPConfig(_ BuildContext, spec *definition, dag *DAG) (err error) {
+	if spec.SMTP.Host == "" && spec.SMTP.Port == "" {
+		return nil
+	}
+
 	dag.SMTP = &SMTPConfig{
 		Host:     spec.SMTP.Host,
 		Port:     spec.SMTP.Port,
@@ -530,6 +534,10 @@ func buildInfoMailConfig(_ BuildContext, spec *definition, dag *DAG) (err error)
 
 // buildMailConfig builds a MailConfig from the definition.
 func buildMailConfig(def mailConfigDef) (*MailConfig, error) {
+	if def.From == "" && def.To == "" {
+		return nil, nil
+	}
+
 	return &MailConfig{
 		From:       def.From,
 		To:         def.To,

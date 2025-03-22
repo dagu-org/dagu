@@ -60,7 +60,7 @@ export type DAG = {
   Env: string[];
   LogDir: string;
   HandlerOn: HandlerOn;
-  Steps: Step[];
+  Steps?: Step[];
   HistRetentionDays: number;
   Preconditions: Condition[] | null;
   MaxActiveRuns: number;

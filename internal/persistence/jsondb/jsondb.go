@@ -1,510 +1,256 @@
 package jsondb
 
 import (
-	"bufio"
 	"context"
-
-	// nolint: gosec
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
+	"runtime"
 	"time"
 
-	"github.com/dagu-org/dagu/internal/fileutil"
+	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
 	"github.com/dagu-org/dagu/internal/persistence/filecache"
-	"github.com/dagu-org/dagu/internal/persistence/model"
-	"github.com/dagu-org/dagu/internal/stringutil"
+	"github.com/dagu-org/dagu/internal/persistence/jsondb/storage"
 )
 
+// Error definitions for common issues
 var (
-	errRequestIDNotFound  = errors.New("request ID not found")
-	errCreateNewDirectory = errors.New("failed to create new directory")
-	errKeyEmpty           = errors.New("dagFile is empty")
-
-	// rTimestamp is a regular expression to match the timestamp in the file name.
-	rTimestamp = regexp.MustCompile(`2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}|2\d{7}\.\d{2}:\d{2}:\d{2}\.\d{3}Z`)
-)
-
-type Config struct {
-	Location          string
-	LatestStatusToday bool
-	FileCache         *filecache.Cache[*model.Status]
-}
-
-const (
-	requestIDLenSafe  = 8
-	extDat            = ".dat"
-	dateTimeFormatUTC = "20060102.15:04:05.000Z"
-	dateTimeFormat    = "20060102.15:04:05.000"
-	dateFormat        = "20060102"
+	ErrRequestIDNotFound = errors.New("request ID not found")
+	ErrInvalidPath       = errors.New("invalid path")
+	ErrRequestIDEmpty    = errors.New("requestID is empty")
 )
 
 var _ persistence.HistoryStore = (*JSONDB)(nil)
 
-// JSONDB manages DAGs status files in local storage.
+// JSONDB manages DAGs status files in local storage with high performance and reliability.
 type JSONDB struct {
-	baseDir           string
-	latestStatusToday bool
-	fileCache         *filecache.Cache[*model.Status]
-	writer            *writer
+	baseDir           string                                // Base directory for all status files
+	latestStatusToday bool                                  // Whether to only return today's status
+	cache             *filecache.Cache[*persistence.Status] // Optional cache for read operations
+	maxWorkers        int                                   // Maximum number of parallel workers
+	storage           storage.Storage                       // Storage interface for managing history records
 }
 
+// Option defines functional options for configuring JSONDB.
 type Option func(*Options)
 
+// Options holds configuration options for JSONDB.
 type Options struct {
-	FileCache         *filecache.Cache[*model.Status]
+	FileCache         *filecache.Cache[*persistence.Status]
 	LatestStatusToday bool
+	MaxWorkers        int
+	OperationTimeout  time.Duration
 }
 
-func WithFileCache(cache *filecache.Cache[*model.Status]) Option {
+// WithFileCache sets the file cache for JSONDB.
+func WithFileCache(cache *filecache.Cache[*persistence.Status]) Option {
 	return func(o *Options) {
 		o.FileCache = cache
 	}
 }
 
+// WithLatestStatusToday sets whether to only return today's status.
 func WithLatestStatusToday(latestStatusToday bool) Option {
 	return func(o *Options) {
 		o.LatestStatusToday = latestStatusToday
 	}
 }
 
-// New creates a new JSONDB instance.
+// New creates a new JSONDB instance with the specified options.
 func New(baseDir string, opts ...Option) *JSONDB {
 	options := &Options{
 		LatestStatusToday: true,
+		MaxWorkers:        runtime.NumCPU(),
 	}
+
 	for _, opt := range opts {
 		opt(options)
 	}
+
 	return &JSONDB{
 		baseDir:           baseDir,
 		latestStatusToday: options.LatestStatusToday,
-		fileCache:         options.FileCache,
+		cache:             options.FileCache,
+		maxWorkers:        options.MaxWorkers,
+		storage:           storage.New(),
 	}
 }
 
-func (db *JSONDB) Update(ctx context.Context, key, requestID string, status model.Status) error {
-	statusFile, err := db.FindByRequestID(ctx, key, requestID)
-	if err != nil {
-		return err
+// Update updates the status for a specific request ID.
+// It handles the entire lifecycle of opening, writing, and closing the history record.
+func (db *JSONDB) Update(ctx context.Context, dagName, requestID string, status persistence.Status) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("update canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
 	}
 
-	writer := newWriter(statusFile.File)
-	if err := writer.open(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = writer.close()
-	}()
-
-	if db.fileCache != nil {
-		defer func() {
-			db.fileCache.Invalidate(statusFile.File)
-		}()
-	}
-
-	return writer.write(status)
-}
-
-func (db *JSONDB) Open(ctx context.Context, key string, timestamp time.Time, requestID string) error {
-	filePath, err := db.generateFilePath(key, newUTC(timestamp), requestID)
-	if err != nil {
-		return err
-	}
-
-	logger.Infof(ctx, "Initializing status file: %s", filePath)
-
-	writer := newWriter(filePath)
-	if err := writer.open(); err != nil {
-		return err
-	}
-
-	db.writer = writer
-	return nil
-}
-
-func (db *JSONDB) Write(_ context.Context, status model.Status) error {
-	return db.writer.write(status)
-}
-
-func (db *JSONDB) Close(ctx context.Context) error {
-	if db.writer == nil {
-		return nil
-	}
-
-	defer func() {
-		_ = db.writer.close()
-		db.writer = nil
-	}()
-
-	if err := db.Compact(ctx, db.writer.target); err != nil {
-		return err
-	}
-
-	if db.fileCache != nil {
-		db.fileCache.Invalidate(db.writer.target)
-	}
-	return db.writer.close()
-}
-
-func (db *JSONDB) ReadStatusRecent(_ context.Context, key string, itemLimit int) []model.StatusFile {
-	var ret []model.StatusFile
-
-	files := db.getLatestMatches(db.globPattern(key), itemLimit)
-	for _, file := range files {
-		status, err := db.parseStatusFile(file)
-		if err != nil {
-			continue
-		}
-		ret = append(ret, model.StatusFile{
-			File:   file,
-			Status: *status,
-		})
-	}
-
-	return ret
-}
-
-func (db *JSONDB) ReadStatusToday(_ context.Context, key string) (*model.Status, error) {
-	file, err := db.latestToday(key, time.Now(), db.latestStatusToday)
-	if err != nil {
-		return nil, err
-	}
-	return db.parseStatusFile(file)
-}
-
-func (db *JSONDB) FindByRequestID(_ context.Context, key string, requestID string) (*model.StatusFile, error) {
 	if requestID == "" {
-		return nil, errRequestIDNotFound
+		return ErrRequestIDEmpty
 	}
 
-	matches, err := filepath.Glob(db.globPattern(key))
+	// Find the history record
+	historyRecord, err := db.FindByRequestID(ctx, dagName, requestID)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to find history record: %w", err)
 	}
 
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-	for _, match := range matches {
-		status, err := ParseStatusFile(match)
-		if err != nil {
-			log.Printf("parsing failed %s : %s", match, err)
-			continue
+	// Open, write, and close the history record
+	if err := historyRecord.Open(ctx); err != nil {
+		return fmt.Errorf("failed to open history record: %w", err)
+	}
+
+	// Ensure the record is closed even if write fails
+	defer func() {
+		if closeErr := historyRecord.Close(ctx); closeErr != nil {
+			logger.Errorf(ctx, "Failed to close history record: %v", closeErr)
 		}
-		if status != nil && status.RequestID == requestID {
-			return &model.StatusFile{
-				File:   match,
-				Status: *status,
-			}, nil
-		}
-	}
+	}()
 
-	return nil, fmt.Errorf("%w : %s", persistence.ErrRequestIDNotFound, requestID)
-}
-
-func (db *JSONDB) RemoveAll(ctx context.Context, key string) error {
-	return db.RemoveOld(ctx, key, 0)
-}
-
-func (db *JSONDB) RemoveOld(_ context.Context, key string, retentionDays int) error {
-	if retentionDays < 0 {
-		return nil
-	}
-
-	matches, err := filepath.Glob(db.globPattern(key))
-	if err != nil {
-		return err
-	}
-
-	oldDate := time.Now().AddDate(0, 0, -retentionDays)
-	var lastErr error
-	for _, m := range matches {
-		info, err := os.Stat(m)
-		if err != nil {
-			continue
-		}
-		if info.ModTime().Before(oldDate) {
-			if err := os.Remove(m); err != nil {
-				lastErr = err
-			}
-		}
-	}
-
-	return lastErr
-}
-
-func (db *JSONDB) Compact(_ context.Context, targetFilePath string) error {
-	status, err := ParseStatusFile(targetFilePath)
-	if err == io.EOF {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %s", err, targetFilePath)
-	}
-
-	newFile := fmt.Sprintf("%s_c.dat", strings.TrimSuffix(filepath.Base(targetFilePath), filepath.Ext(targetFilePath)))
-	tempFilePath := filepath.Join(filepath.Dir(targetFilePath), newFile)
-	writer := newWriter(tempFilePath)
-	if err := writer.open(); err != nil {
-		return err
-	}
-	defer writer.close()
-
-	if err := writer.write(*status); err != nil {
-		if removeErr := os.Remove(tempFilePath); removeErr != nil {
-			return fmt.Errorf("%w: %s", err, removeErr)
-		}
-		return fmt.Errorf("%w: %s", err, tempFilePath)
-	}
-
-	// remove the original file
-	if err := os.Remove(targetFilePath); err != nil {
-		return fmt.Errorf("%w: %s", err, targetFilePath)
-	}
-
-	// rename the file to the original
-	if err := os.Rename(tempFilePath, targetFilePath); err != nil {
-		return fmt.Errorf("%w: %s", err, targetFilePath)
+	if err := historyRecord.Write(ctx, status); err != nil {
+		return fmt.Errorf("failed to write status: %w", err)
 	}
 
 	return nil
 }
 
-func (db *JSONDB) Rename(_ context.Context, oldKey, newKey string) error {
-	if !filepath.IsAbs(oldKey) || !filepath.IsAbs(newKey) {
-		return fmt.Errorf("invalid path: %s -> %s", oldKey, newKey)
+// NewRecord creates a new history record for the specified key, timestamp, and request ID.
+func (db *JSONDB) NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, requestID string) persistence.Record {
+	if requestID == "" {
+		logger.Error(ctx, "requestID is empty")
 	}
 
-	oldDir := db.getDirectory(oldKey, getPrefix(oldKey))
-	if !db.exists(oldDir) {
+	addr := storage.NewAddress(db.baseDir, dag.Name)
+	filePath := db.storage.GenerateFilePath(ctx, addr, storage.NewUTC(timestamp), requestID)
+	return NewRecord(filePath, db.cache, WithDAG(dag))
+}
+
+// Recent returns the most recent history records for the specified key, up to itemLimit.
+func (db *JSONDB) Recent(ctx context.Context, dagName string, itemLimit int) []persistence.Record {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		logger.Errorf(ctx, "Recent canceled: %v", ctx.Err())
 		return nil
+	default:
+		// Continue with operation
 	}
 
-	newDir := db.getDirectory(newKey, getPrefix(newKey))
-	if !db.exists(newDir) {
-		if err := os.MkdirAll(newDir, 0755); err != nil {
-			return fmt.Errorf("%w: %s : %s", errCreateNewDirectory, newDir, err)
-		}
+	if itemLimit <= 0 {
+		logger.Warnf(ctx, "Invalid itemLimit %d, using default of 10", itemLimit)
+		itemLimit = 10
 	}
 
-	matches, err := filepath.Glob(db.globPattern(oldKey))
-	if err != nil {
-		return err
-	}
-
-	oldPrefix := filepath.Base(db.createPrefix(oldKey))
-	newPrefix := filepath.Base(db.createPrefix(newKey))
-	for _, m := range matches {
-		base := filepath.Base(m)
-		f := strings.Replace(base, oldPrefix, newPrefix, 1)
-		if err := os.Rename(m, filepath.Join(newDir, f)); err != nil {
-			log.Printf("failed to rename %s to %s: %s", m, f, err)
-		}
-	}
-	if files, _ := os.ReadDir(oldDir); len(files) == 0 {
-		_ = os.Remove(oldDir)
-	}
-	return nil
-}
-
-func (db *JSONDB) parseStatusFile(file string) (*model.Status, error) {
-	if db.fileCache != nil {
-		return db.fileCache.LoadLatest(file, func() (*model.Status, error) {
-			return ParseStatusFile(file)
-		})
-	}
-	return ParseStatusFile(file)
-}
-
-func (db *JSONDB) getDirectory(key string, prefix string) string {
-	if key != prefix {
-		// Add a hash postfix to the directory name to avoid conflicts.
-		// nolint: gosec
-		h := md5.New()
-		_, _ = h.Write([]byte(key))
-		v := hex.EncodeToString(h.Sum(nil))
-		return filepath.Join(db.baseDir, fmt.Sprintf("%s-%s", prefix, v))
-	}
-
-	return filepath.Join(db.baseDir, key)
-}
-
-func (db *JSONDB) generateFilePath(key string, timestamp timeInUTC, requestID string) (string, error) {
-	if key == "" {
-		return "", errKeyEmpty
-	}
-	prefix := db.createPrefix(key)
-	timestampString := timestamp.Format(dateTimeFormatUTC)
-	requestID = stringutil.TruncString(requestID, requestIDLenSafe)
-	return fmt.Sprintf("%s.%s.%s.dat", prefix, timestampString, requestID), nil
-}
-
-func (db *JSONDB) latestToday(key string, day time.Time, latestStatusToday bool) (string, error) {
-	prefix := db.createPrefix(key)
-	pattern := fmt.Sprintf("%s.*.*.dat", prefix)
-
-	matches, err := filepath.Glob(pattern)
-	if err != nil || len(matches) == 0 {
-		return "", persistence.ErrNoStatusDataToday
-	}
-
-	ret := filterLatest(matches, 1)
-	if len(ret) == 0 {
-		return "", persistence.ErrNoStatusData
-	}
-
-	startOfDay := day.Truncate(24 * time.Hour)
-	startOfDayInUTC := newUTC(startOfDay)
-	if latestStatusToday {
-		timestamp, err := findTimestamp(ret[0])
-		if err != nil {
-			return "", err
-		}
-		if timestamp.Before(startOfDayInUTC.Time) {
-			return "", persistence.ErrNoStatusDataToday
-		}
-	}
-
-	return ret[0], nil
-}
-
-func (s *JSONDB) getLatestMatches(pattern string, itemLimit int) []string {
-	matches, err := filepath.Glob(pattern)
-	if err != nil || len(matches) == 0 {
-		return nil
-	}
-
-	return filterLatest(matches, itemLimit)
-}
-
-func (s *JSONDB) globPattern(key string) string {
-	return s.createPrefix(key) + "*" + extDat
-}
-
-func (s *JSONDB) createPrefix(key string) string {
-	prefix := getPrefix(key)
-	return filepath.Join(s.getDirectory(key, prefix), prefix)
-}
-
-func (s *JSONDB) exists(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return !os.IsNotExist(err)
-}
-
-func ParseStatusFile(filePath string) (*model.Status, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		log.Printf("failed to open file. err: %v", err)
-		return nil, err
-	}
-	defer f.Close()
-
-	var (
-		offset int64
-		result *model.Status
-	)
-	for {
-		line, err := readLineFrom(f, offset)
-		if err == io.EOF {
-			if result == nil {
-				return nil, err
-			}
-			return result, nil
-		} else if err != nil {
-			return nil, err
-		}
-		offset += int64(len(line)) + 1 // +1 for newline
-		if len(line) > 0 {
-			status, err := model.StatusFromJSON(string(line))
-			if err == nil {
-				result = status
-			}
-		}
-	}
-}
-
-func filterLatest(files []string, itemLimit int) []string {
+	// Get the latest matches
+	addr := storage.NewAddress(db.baseDir, dagName)
+	files := db.storage.Latest(ctx, addr, itemLimit)
 	if len(files) == 0 {
 		return nil
 	}
-	sort.Slice(files, func(i, j int) bool {
-		a, err := findTimestamp(files[i])
-		if err != nil {
-			return false
-		}
-		b, err := findTimestamp(files[j])
-		if err != nil {
-			return true
-		}
-		return a.After(b)
-	})
-	return files[:min(len(files), itemLimit)]
-}
 
-func findTimestamp(file string) (time.Time, error) {
-	timestampString := rTimestamp.FindString(file)
-	if !strings.Contains(timestampString, "Z") {
-		// For backward compatibility
-		t, err := time.Parse(dateTimeFormat, timestampString)
-		if err != nil {
-			return time.Time{}, nil
-		}
-		return t, nil
+	// Create history records
+	records := make([]persistence.Record, 0, len(files))
+	for _, file := range files {
+		records = append(records, NewRecord(file, db.cache))
 	}
 
-	// UTC
-	t, err := time.Parse(dateTimeFormatUTC, timestampString)
+	return records
+}
+
+// Latest returns the most recent history record for today.
+func (db *JSONDB) Latest(ctx context.Context, dagName string) (persistence.Record, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("LatestToday canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	addr := storage.NewAddress(db.baseDir, dagName)
+
+	if db.latestStatusToday {
+		startOfDay := time.Now().Truncate(24 * time.Hour)
+		startOfDayInUTC := storage.NewUTC(startOfDay)
+
+		// Get the latest file for today
+		file, err := db.storage.LatestAfter(ctx, addr, startOfDayInUTC)
+		if err != nil {
+			return nil, err
+		}
+
+		return NewRecord(file, db.cache), nil
+	}
+
+	// Get the latest file
+	files := db.storage.Latest(ctx, addr, 1)
+	if len(files) == 0 {
+		return nil, persistence.ErrNoStatusData
+	}
+	return NewRecord(files[0], db.cache), nil
+}
+
+// FindByRequestID finds a history record by request ID.
+func (db *JSONDB) FindByRequestID(ctx context.Context, dagName string, requestID string) (persistence.Record, error) {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("FindByRequestID canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
+	}
+
+	if requestID == "" {
+		return nil, ErrRequestIDEmpty
+	}
+
+	// Find matching files
+	addr := storage.NewAddress(db.baseDir, dagName)
+	file, err := db.storage.FindByRequestID(ctx, addr, requestID)
 	if err != nil {
-		return time.Time{}, nil
+		return nil, fmt.Errorf("failed to glob pattern: %w", err)
 	}
-	return t, nil
+
+	// Return the most recent file
+	return NewRecord(file, db.cache), nil
 }
 
-func readLineFrom(f *os.File, offset int64) ([]byte, error) {
-	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		return nil, err
+// RemoveOld removes history records older than retentionDays for the specified key.
+func (db *JSONDB) RemoveOld(ctx context.Context, dagName string, retentionDays int) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("RemoveOld canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
 	}
-	reader := bufio.NewReader(f)
-	var ret []byte
-	for {
-		line, isPrefix, err := reader.ReadLine()
-		if err != nil {
-			return ret, err
-		}
-		ret = append(ret, line...)
-		if !isPrefix {
-			break
-		}
+
+	if retentionDays < 0 {
+		logger.Warnf(ctx, "Negative retentionDays %d, no files will be removed", retentionDays)
+		return nil
 	}
-	return ret, nil
+
+	addr := storage.NewAddress(db.baseDir, dagName)
+	return db.storage.RemoveOld(ctx, addr, retentionDays)
 }
 
-func getPrefix(key string) string {
-	ext := filepath.Ext(key)
-	if ext == "" {
-		// No extension
-		return filepath.Base(key)
+// Rename renames all history records from oldKey to newKey.
+func (db *JSONDB) Rename(ctx context.Context, oldPath, newNameOrPath string) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("rename canceled: %w", ctx.Err())
+	default:
+		// Continue with operation
 	}
-	if fileutil.IsYAMLFile(key) {
-		// Remove .yaml or .yml extension
-		return strings.TrimSuffix(filepath.Base(key), ext)
+
+	oldAddr := storage.NewAddress(db.baseDir, oldPath)
+	newAddr := storage.NewAddress(db.baseDir, newNameOrPath)
+	if err := db.storage.Rename(ctx, oldAddr, newAddr); err != nil {
+		return fmt.Errorf("failed to rename: %w", err)
 	}
-	// Use the base name (if it's a path or just a name)
-	return filepath.Base(key)
-}
-
-// timeInUTC is a wrapper for time.Time that ensures the time is in UTC.
-type timeInUTC struct{ time.Time }
-
-func newUTC(t time.Time) timeInUTC {
-	return timeInUTC{t.UTC()}
+	return nil
 }

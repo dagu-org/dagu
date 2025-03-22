@@ -16,7 +16,6 @@ import (
 	"github.com/dagu-org/dagu/internal/frontend/gen/restapi/operations/dags"
 	"github.com/dagu-org/dagu/internal/logger"
 	"github.com/dagu-org/dagu/internal/persistence"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 	"github.com/dagu-org/dagu/internal/sock"
 )
 
@@ -85,7 +84,7 @@ func (e *client) Rename(ctx context.Context, oldID, newID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get metadata for %s: %w", newID, err)
 	}
-	if err := e.historyStore.Rename(ctx, oldDAG.Location, newDAG.Location); err != nil {
+	if err := e.historyStore.Rename(ctx, oldDAG.Name, newDAG.Name); err != nil {
 		return fmt.Errorf("failed to rename history for %s: %w", oldID, err)
 	}
 	return nil
@@ -170,7 +169,7 @@ func (e *client) Retry(_ context.Context, dag *digraph.DAG, requestID string) er
 	return cmd.Wait()
 }
 
-func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
+func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
 	client := sock.NewClient(dag.SockAddr())
 	ret, err := client.Request("GET", "/status")
 	if err != nil {
@@ -178,87 +177,115 @@ func (*client) GetCurrentStatus(_ context.Context, dag *digraph.DAG) (*model.Sta
 			return nil, err
 		}
 		// The DAG is not running so return the default status
-		status := model.NewStatusFactory(dag).CreateDefault()
+		status := persistence.NewStatusFactory(dag).CreateDefault()
 		return &status, nil
 	}
-	return model.StatusFromJSON(ret)
+	return persistence.StatusFromJSON(ret)
 }
 
 func (e *client) GetStatusByRequestID(ctx context.Context, dag *digraph.DAG, requestID string) (
-	*model.Status, error,
+	*persistence.Status, error,
 ) {
-	ret, err := e.historyStore.FindByRequestID(ctx, dag.Location, requestID)
+	record, err := e.historyStore.FindByRequestID(ctx, dag.Name, requestID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find status by request id: %w", err)
 	}
+	historyStatus, err := record.ReadStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read status: %w", err)
+	}
+
+	// If the DAG is running, set the status to error if the request ID does not match
+	// Because the DAG execution must be stopped
+	// TODO: Handle different request IDs for the same DAG
 	status, _ := e.GetCurrentStatus(ctx, dag)
 	if status != nil && status.RequestID != requestID {
-		// if the request id is not matched then correct the status
-		ret.Status.CorrectRunningStatus()
+		historyStatus.SetStatusToErrorIfRunning()
 	}
-	return &ret.Status, err
+
+	return historyStatus, err
 }
 
-func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*model.Status, error) {
+func (*client) currentStatus(_ context.Context, dag *digraph.DAG) (*persistence.Status, error) {
 	client := sock.NewClient(dag.SockAddr())
-	ret, err := client.Request("GET", "/status")
+	statusJSON, err := client.Request("GET", "/status")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
-	return model.StatusFromJSON(ret)
+
+	return persistence.StatusFromJSON(statusJSON)
 }
 
-func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (model.Status, error) {
+func (e *client) GetLatestStatus(ctx context.Context, dag *digraph.DAG) (persistence.Status, error) {
 	currStatus, _ := e.currentStatus(ctx, dag)
 	if currStatus != nil {
 		return *currStatus, nil
 	}
-	status, err := e.historyStore.ReadStatusToday(ctx, dag.Location)
+
+	var latestStatus *persistence.Status
+
+	record, err := e.historyStore.Latest(ctx, dag.Name)
 	if err != nil {
-		status := model.NewStatusFactory(dag).CreateDefault()
-		if errors.Is(err, persistence.ErrNoStatusDataToday) ||
-			errors.Is(err, persistence.ErrNoStatusData) {
-			// No status for today
-			return status, nil
-		}
-		return status, err
+		goto handleError
 	}
-	status.CorrectRunningStatus()
-	return *status, nil
+
+	latestStatus, err = record.ReadStatus(ctx)
+	if err != nil {
+		goto handleError
+	}
+
+	latestStatus.SetStatusToErrorIfRunning()
+	return *latestStatus, nil
+
+handleError:
+
+	if errors.Is(err, persistence.ErrNoStatusData) {
+		// No status for today
+		return persistence.NewStatusFactory(dag).CreateDefault(), nil
+	}
+
+	return persistence.NewStatusFactory(dag).CreateDefault(), err
 }
 
-func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []model.StatusFile {
-	return e.historyStore.ReadStatusRecent(ctx, dag.Location, n)
+func (e *client) GetRecentHistory(ctx context.Context, dag *digraph.DAG, n int) []persistence.StatusFile {
+	records := e.historyStore.Recent(ctx, dag.Name, n)
+
+	var ret []persistence.StatusFile
+	for _, record := range records {
+		if statusFile, err := record.Read(ctx); err == nil {
+			ret = append(ret, *statusFile)
+		}
+	}
+
+	return ret
 }
 
 var errDAGIsRunning = errors.New("the DAG is running")
 
-func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status model.Status) error {
+func (e *client) UpdateStatus(ctx context.Context, dag *digraph.DAG, status persistence.Status) error {
 	client := sock.NewClient(dag.SockAddr())
+
 	res, err := client.Request("GET", "/status")
 	if err != nil {
 		if errors.Is(err, sock.ErrTimeout) {
 			return err
 		}
 	} else {
-		unmarshalled, _ := model.StatusFromJSON(res)
+		unmarshalled, _ := persistence.StatusFromJSON(res)
 		if unmarshalled != nil && unmarshalled.RequestID == status.RequestID &&
 			unmarshalled.Status == scheduler.StatusRunning {
 			return errDAGIsRunning
 		}
 	}
-	return e.historyStore.Update(ctx, dag.Location, status.RequestID, status)
+
+	return e.historyStore.Update(ctx, dag.Name, status.RequestID, status)
 }
 
 func (e *client) UpdateDAG(ctx context.Context, id string, spec string) error {
 	return e.dagStore.UpdateSpec(ctx, id, []byte(spec))
 }
 
-func (e *client) DeleteDAG(ctx context.Context, name, loc string) error {
-	err := e.historyStore.RemoveAll(ctx, loc)
-	if err != nil {
-		return err
-	}
+func (e *client) DeleteDAG(ctx context.Context, name string) error {
 	return e.dagStore.Delete(ctx, name)
 }
 
@@ -330,11 +357,11 @@ func (e *client) getDAG(ctx context.Context, name string) (*digraph.DAG, error) 
 	return e.emptyDAGIfNil(dagDetail, name), err
 }
 
-func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
-	dag, err := e.getDAG(ctx, id)
+func (e *client) GetStatus(ctx context.Context, name string) (DAGStatus, error) {
+	dag, err := e.getDAG(ctx, name)
 	if dag == nil {
 		// TODO: fix not to use location
-		dag = &digraph.DAG{Name: id, Location: id}
+		dag = &digraph.DAG{Name: name, Location: name}
 	}
 	if err == nil {
 		// check the dag is correct in terms of graph
@@ -342,12 +369,12 @@ func (e *client) GetStatus(ctx context.Context, id string) (DAGStatus, error) {
 	}
 	latestStatus, _ := e.GetLatestStatus(ctx, dag)
 	return newDAGStatus(
-		dag, latestStatus, e.IsSuspended(ctx, id), err,
+		dag, latestStatus, e.IsSuspended(ctx, name), err,
 	), err
 }
 
-func (e *client) ToggleSuspend(_ context.Context, id string, suspend bool) error {
-	return e.flagStore.ToggleSuspend(id, suspend)
+func (e *client) ToggleSuspend(_ context.Context, name string, suspend bool) error {
+	return e.flagStore.ToggleSuspend(name, suspend)
 }
 
 func (e *client) readStatus(ctx context.Context, dag *digraph.DAG) (DAGStatus, error) {

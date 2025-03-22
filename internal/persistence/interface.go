@@ -7,26 +7,29 @@ import (
 
 	"github.com/dagu-org/dagu/internal/digraph"
 	"github.com/dagu-org/dagu/internal/persistence/grep"
-	"github.com/dagu-org/dagu/internal/persistence/model"
 )
 
 var (
 	ErrRequestIDNotFound = fmt.Errorf("request id not found")
-	ErrNoStatusDataToday = fmt.Errorf("no status data today")
 	ErrNoStatusData      = fmt.Errorf("no status data")
 )
 
 type HistoryStore interface {
-	Open(ctx context.Context, key string, timestamp time.Time, requestID string) error
-	Write(ctx context.Context, status model.Status) error
+	NewRecord(ctx context.Context, dag *digraph.DAG, timestamp time.Time, requestID string) Record
+	Update(ctx context.Context, name, requestID string, status Status) error
+	Recent(ctx context.Context, name string, itemLimit int) []Record
+	Latest(ctx context.Context, name string) (Record, error)
+	FindByRequestID(ctx context.Context, name string, requestID string) (Record, error)
+	RemoveOld(ctx context.Context, name string, retentionDays int) error
+	Rename(ctx context.Context, oldName, newName string) error
+}
+
+type Record interface {
+	Open(ctx context.Context) error
+	Write(ctx context.Context, status Status) error
 	Close(ctx context.Context) error
-	Update(ctx context.Context, key, requestID string, status model.Status) error
-	ReadStatusRecent(ctx context.Context, key string, itemLimit int) []model.StatusFile
-	ReadStatusToday(ctx context.Context, key string) (*model.Status, error)
-	FindByRequestID(ctx context.Context, key string, requestID string) (*model.StatusFile, error)
-	RemoveAll(ctx context.Context, key string) error
-	RemoveOld(ctx context.Context, key string, retentionDays int) error
-	Rename(ctx context.Context, oldKey, newKey string) error
+	Read(ctx context.Context) (*StatusFile, error)
+	ReadStatus(ctx context.Context) (*Status, error)
 }
 
 type DAGStore interface {

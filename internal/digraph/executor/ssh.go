@@ -81,8 +81,7 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		def.Port = "22"
 	}
 
-	stepContext := digraph.GetStepContext(ctx)
-	cfg, err := digraph.EvalStringFields(stepContext, sshExecConfig{
+	cfg, err := digraph.EvalObject(ctx, sshExecConfig{
 		User:     def.User,
 		IP:       def.IP,
 		Key:      def.Key,
@@ -98,7 +97,7 @@ func newSSHExec(ctx context.Context, step digraph.Step) (Executor, error) {
 		return nil, errStrictHostKey
 	}
 
-	cfg, err = digraph.EvalStringFields(stepContext, cfg)
+	cfg, err = digraph.EvalObject(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to substitute string fields for ssh config: %w", err)
 	}

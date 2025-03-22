@@ -1,6 +1,7 @@
 package digraph_test
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -34,5 +35,15 @@ func TestUnixSocket(t *testing.T) {
 			"/tmp/@dagu-testDagVeryLongNameThatExceedsUnixSocketLengthMax-b92b711162d6012f025a76d0cf0b40c2.sock",
 			dag.SockAddr(),
 		)
+	})
+}
+
+func TestMashalJSON(t *testing.T) {
+	th := test.Setup(t)
+	t.Run("MarshalJSON", func(t *testing.T) {
+		dag := th.DAG(t, filepath.Join("digraph", "default.yaml"))
+		dat, err := json.Marshal(dag.DAG)
+		require.NoError(t, err)
+		println(string(dat))
 	})
 }
