@@ -125,10 +125,7 @@ func (l *ConfigLoader) buildConfig(def Definition) (*Config, error) {
 
 	// Process remote node definitions.
 	for _, node := range def.RemoteNodes {
-		cfg.Server.RemoteNodes = append(cfg.Server.RemoteNodes, RemoteNode{
-			Name:       node.Name,
-			APIBaseURL: node.APIBaseURL,
-		})
+		cfg.Server.RemoteNodes = append(cfg.Server.RemoteNodes, RemoteNode(node))
 	}
 
 	// Dereference pointer fields if they are provided.
